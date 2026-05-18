@@ -12,10 +12,21 @@ import { deleteObject, getDownloadURL, ref, uploadBytes } from "firebase/storage
 
 import { getAppSettings } from "@/lib/app-settings";
 import {
+  IMAGE_BACKUP_SIZE_EXCEEDED_MESSAGE,
+  IMAGE_OPTIMIZATION_FAILED_MESSAGE,
+  MAX_TOTAL_IMAGE_BACKUP_SIZE_BYTES
+} from "@/constants/image";
+import {
   CLOUD_BACKUP_VIDEO_LIMIT,
   canBackupMoreVideos
 } from "@/lib/cloud-backup-limits";
 import { firestore, firebaseStorage } from "@/lib/firebase";
+import {
+  calculateCombinedImageBackupSize,
+  isImageBackupSizeExceeded,
+  optimizeImageForBackup,
+  type OptimizedBackupImage
+} from "@/lib/image-backup-utils";
 import { getPhotos } from "@/lib/photo-library";
 import { isCreatorSubscriptionActive, type UserSubscription } from "@/lib/subscription";
 import { getMadeVideos } from "@/lib/video-library";
@@ -27,6 +38,7 @@ export type BackupSummary = {
   photoCount: number;
   imageBundleCount: number;
   videoCount: number;
+  imageBackupBytes: number;
   deleteAfter: string | null;
 };
 
@@ -83,6 +95,7 @@ const emptyBackupOverview: CloudBackupOverview = {
   photoCount: 0,
   imageBundleCount: 0,
   videoCount: 0,
+  imageBackupBytes: 0,
   deleteAfter: null,
   status: "none",
   backedUpAt: null,
@@ -98,15 +111,102 @@ const getCollectionSize = async (userId: string, collectionName: string) => {
   return snapshot.size;
 };
 
+const getDocImageBackupSize = (data: Record<string, unknown>) => {
+  const directSize = data.imageBackupSize ?? data.optimizedSize ?? data.size;
+  if (typeof directSize === "number") {
+    return directSize;
+  }
+
+  if (Array.isArray(data.optimizedImages)) {
+    return data.optimizedImages.reduce((sum, image) => {
+      if (image && typeof image === "object" && "size" in image) {
+        const size = (image as { size?: unknown }).size;
+        return sum + (typeof size === "number" ? size : 0);
+      }
+
+      return sum;
+    }, 0);
+  }
+
+  return 0;
+};
+
+const getCurrentImageBackupSize = async ({
+  userId,
+  excludePhotoIds = [],
+  excludeImageWorkIds = []
+}: {
+  userId: string;
+  excludePhotoIds?: string[];
+  excludeImageWorkIds?: string[];
+}) => {
+  if (!firestore) {
+    return 0;
+  }
+
+  const excludePhotoSet = new Set(excludePhotoIds);
+  const excludeImageWorkSet = new Set(excludeImageWorkIds);
+  const [photoSnapshot, imageWorkSnapshot] = await Promise.all([
+    getDocs(collection(firestore, "users", userId, "photoBackups")),
+    getDocs(collection(firestore, "users", userId, "imageWorks"))
+  ]);
+
+  const photoBytes = photoSnapshot.docs.reduce((sum, item) => {
+    if (excludePhotoSet.has(item.id)) {
+      return sum;
+    }
+
+    return sum + getDocImageBackupSize(item.data());
+  }, 0);
+  const imageWorkBytes = imageWorkSnapshot.docs.reduce((sum, item) => {
+    if (excludeImageWorkSet.has(item.id)) {
+      return sum;
+    }
+
+    return sum + getDocImageBackupSize(item.data());
+  }, 0);
+
+  return photoBytes + imageWorkBytes;
+};
+
+const assertImageBackupCapacity = async ({
+  userId,
+  newImages,
+  excludePhotoIds,
+  excludeImageWorkIds
+}: {
+  userId: string;
+  newImages: OptimizedBackupImage[];
+  excludePhotoIds?: string[];
+  excludeImageWorkIds?: string[];
+}) => {
+  const currentSize = await getCurrentImageBackupSize({
+    userId,
+    excludePhotoIds,
+    excludeImageWorkIds
+  });
+  const totalSize = calculateCombinedImageBackupSize(
+    currentSize,
+    newImages.map((image) => image.size)
+  );
+
+  if (isImageBackupSizeExceeded(totalSize, MAX_TOTAL_IMAGE_BACKUP_SIZE_BYTES)) {
+    throw new Error(IMAGE_BACKUP_SIZE_EXCEEDED_MESSAGE);
+  }
+
+  return totalSize;
+};
+
 const refreshBackupOverview = async (userId: string) => {
   if (!firestore) {
     return emptyBackupOverview;
   }
 
-  const [photoCount, imageBundleCount, videoCount] = await Promise.all([
+  const [photoCount, imageBundleCount, videoCount, imageBackupBytes] = await Promise.all([
     getCollectionSize(userId, "photoBackups"),
     getCollectionSize(userId, "imageWorks"),
-    getCollectionSize(userId, "videos")
+    getCollectionSize(userId, "videos"),
+    getCurrentImageBackupSize({ userId })
   ]);
 
   const overview: CloudBackupOverview = {
@@ -114,6 +214,7 @@ const refreshBackupOverview = async (userId: string) => {
     photoCount,
     imageBundleCount,
     videoCount,
+    imageBackupBytes,
     status: photoCount + imageBundleCount + videoCount > 0 ? "active" : "none"
   };
 
@@ -123,6 +224,7 @@ const refreshBackupOverview = async (userId: string) => {
       photoCount,
       imageBundleCount,
       videoCount,
+      imageBackupBytes,
       status: overview.status,
       updatedAt: serverTimestamp()
     },
@@ -153,6 +255,7 @@ export const subscribeCloudBackupOverview = ({
       photoCount: data?.photoCount ?? 0,
       imageBundleCount: data?.imageBundleCount ?? 0,
       videoCount: data?.videoCount ?? 0,
+      imageBackupBytes: data?.imageBackupBytes ?? 0,
       deleteAfter: data?.deleteAfter ?? null,
       backedUpAt: data?.backedUpAt ?? null,
       deletedAt: data?.deletedAt ?? null
@@ -194,37 +297,104 @@ export const backupCurrentWorkspace = async ({
     getMadeVideos()
   ]);
   const backedUpAt = new Date().toISOString();
+  const optimizedPhotos = await Promise.all(
+    photos.map(async (photo) => ({
+      photo,
+      optimized: await optimizeImageForBackup({
+        uri: photo.uri,
+        width: photo.width,
+        height: photo.height,
+        imageQuality: settings.imageBackupQuality
+      })
+    }))
+  ).catch(() => {
+    throw new Error(IMAGE_OPTIMIZATION_FAILED_MESSAGE);
+  });
+  const optimizedImageBundles = await Promise.all(
+    imageBundles.map(async (work) => ({
+      work,
+      images: await Promise.all(
+        work.imageUris.map((imageUri) =>
+          optimizeImageForBackup({
+            uri: imageUri,
+            imageQuality: settings.imageBackupQuality
+          })
+        )
+      )
+    }))
+  ).catch(() => {
+    throw new Error(IMAGE_OPTIMIZATION_FAILED_MESSAGE);
+  });
+  const allOptimizedImages = [
+    ...optimizedPhotos.map((item) => item.optimized),
+    ...optimizedImageBundles.flatMap((item) => item.images)
+  ];
+  const imageBackupBytes = await assertImageBackupCapacity({
+    userId: user.uid,
+    newImages: allOptimizedImages,
+    excludePhotoIds: photos.map((photo) => photo.id),
+    excludeImageWorkIds: imageBundles.map((work) => work.id)
+  });
 
-  for (const photo of photos) {
+  for (const { photo, optimized } of optimizedPhotos) {
     const photoFileName = fileNameFromUri(photo.uri, `${photo.id}.jpg`);
-    const photoPath = `users/${user.uid}/backups/photos/${photo.id}-${photoFileName}`;
+    const photoPath = `users/${user.uid}/backups/photos/${photo.id}-${photoFileName}.jpg`;
     const photoDownloadUrl = await uploadLocalFile({
-      uri: photo.uri,
+      uri: optimized.uri,
       storagePath: photoPath
     });
-    let previewDownloadUrl: string | null = null;
-    let previewPath: string | null = null;
-
-    if (photo.previewUri) {
-      const previewFileName = fileNameFromUri(photo.previewUri, `${photo.id}-preview.jpg`);
-      previewPath = `users/${user.uid}/backups/photo-previews/${photo.id}-${previewFileName}`;
-      previewDownloadUrl = await uploadLocalFile({
-        uri: photo.previewUri,
-        storagePath: previewPath
-      });
-    }
 
     await setDoc(doc(firestore, "users", user.uid, "photoBackups", photo.id), {
       ...photo,
       uri: photoDownloadUrl,
       localUri: photo.uri,
       storagePath: photoPath,
-      previewUri: previewDownloadUrl,
+      downloadURL: photoDownloadUrl,
+      previewUri: photoDownloadUrl,
       localPreviewUri: photo.previewUri ?? null,
-      previewStoragePath: previewPath,
+      previewStoragePath: null,
+      optimizedWidth: optimized.width,
+      optimizedHeight: optimized.height,
+      optimizedSize: optimized.size,
+      imageBackupSize: optimized.size,
+      optimizedQuality: optimized.quality,
+      imageQuality: optimized.imageQuality,
+      originalSize: optimized.originalSize,
       backedUpAt,
       updatedAt: serverTimestamp()
     });
+  }
+
+  for (const { work, images } of optimizedImageBundles) {
+    const backedUpImageUris: string[] = [];
+    const storagePaths: string[] = [];
+    for (const [index, optimized] of images.entries()) {
+      const fileName = fileNameFromUri(work.imageUris[index], `${work.id}-${index}.jpg`);
+      const storagePath = `users/${user.uid}/backups/image-works/${work.id}/${index}-${fileName}.jpg`;
+      const downloadUrl = await uploadLocalFile({
+        uri: optimized.uri,
+        storagePath
+      });
+      storagePaths.push(storagePath);
+      backedUpImageUris.push(downloadUrl);
+    }
+
+    await setDoc(
+      doc(firestore, "users", user.uid, "imageWorks", work.id),
+      {
+        ...work,
+        localImageUris: work.imageUris,
+        imageUris: backedUpImageUris,
+        storagePaths,
+        optimizedImages: images,
+        imageBackupSize: images.reduce((sum, image) => sum + image.size, 0),
+        originalBackupSize: images.reduce((sum, image) => sum + image.originalSize, 0),
+        imageQuality: settings.imageBackupQuality,
+        backedUpAt,
+        updatedAt: serverTimestamp()
+      },
+      { merge: true }
+    );
   }
 
   await setDoc(
@@ -237,6 +407,7 @@ export const backupCurrentWorkspace = async ({
       photoCount: photos.length,
       imageBundleCount: imageBundles.length,
       videoCount: videos.length,
+      imageBackupBytes,
       status: "active",
       backedUpAt,
       deleteAfter: null,
@@ -249,6 +420,7 @@ export const backupCurrentWorkspace = async ({
     photoCount: photos.length,
     imageBundleCount: imageBundles.length,
     videoCount: videos.length,
+    imageBackupBytes,
     deleteAfter: null
   };
 };
@@ -270,11 +442,33 @@ export const backupImageBundleWork = async ({
     throw new Error("Firebase 연결 정보가 아직 설정되지 않았습니다.");
   }
 
+  const settings = await getAppSettings();
+  const optimizedImages = await Promise.all(
+    work.imageUris.map((imageUri) =>
+      optimizeImageForBackup({
+        uri: imageUri,
+        imageQuality: settings.imageBackupQuality
+      })
+    )
+  ).catch(() => {
+    throw new Error(IMAGE_OPTIMIZATION_FAILED_MESSAGE);
+  });
+  await assertImageBackupCapacity({
+    userId: user.uid,
+    newImages: optimizedImages,
+    excludeImageWorkIds: [work.id]
+  });
+
   const backedUpImageUris: string[] = [];
+  const storagePaths: string[] = [];
   for (const [index, imageUri] of work.imageUris.entries()) {
     const fileName = fileNameFromUri(imageUri, `${work.id}-${index}.jpg`);
-    const storagePath = `users/${user.uid}/backups/image-works/${work.id}/${index}-${fileName}`;
-    const downloadUrl = await uploadLocalFile({ uri: imageUri, storagePath });
+    const storagePath = `users/${user.uid}/backups/image-works/${work.id}/${index}-${fileName}.jpg`;
+    const downloadUrl = await uploadLocalFile({
+      uri: optimizedImages[index].uri,
+      storagePath
+    });
+    storagePaths.push(storagePath);
     backedUpImageUris.push(downloadUrl);
   }
 
@@ -284,10 +478,14 @@ export const backupImageBundleWork = async ({
       ...work,
       localImageUris: work.imageUris,
       imageUris: backedUpImageUris,
-      storagePaths: work.imageUris.map((_, index) => {
-        const fileName = fileNameFromUri(work.imageUris[index], `${work.id}-${index}.jpg`);
-        return `users/${user.uid}/backups/image-works/${work.id}/${index}-${fileName}`;
-      }),
+      storagePaths,
+      optimizedImages,
+      imageBackupSize: optimizedImages.reduce((sum, image) => sum + image.size, 0),
+      originalBackupSize: optimizedImages.reduce(
+        (sum, image) => sum + image.originalSize,
+        0
+      ),
+      imageQuality: settings.imageBackupQuality,
       backedUpAt: new Date().toISOString(),
       updatedAt: serverTimestamp()
     },
@@ -436,6 +634,7 @@ export const deleteCloudBackupData = async ({ user }: { user: User | null }) => 
       photoCount: 0,
       imageBundleCount: 0,
       videoCount: 0,
+      imageBackupBytes: 0,
       deletedAt: new Date().toISOString(),
       updatedAt: serverTimestamp()
     },
@@ -446,6 +645,7 @@ export const deleteCloudBackupData = async ({ user }: { user: User | null }) => 
     photoCount: photoSnapshot.size,
     imageBundleCount: imageWorkSnapshot.size,
     videoCount: videoSnapshot.size,
+    imageBackupBytes: 0,
     deleteAfter: null
   };
 };

@@ -1,4 +1,9 @@
 import type { GuideType } from "@/constants/camera-guides";
+import {
+  DEFAULT_IMAGE_QUALITY,
+  IMAGE_QUALITY_OPTIONS,
+  type ImageQuality
+} from "@/constants/image";
 import type { TripClipRatio } from "@/constants/trip-clip";
 import { localStorageAdapter } from "@/lib/local-storage";
 
@@ -31,6 +36,7 @@ export type AppSettings = {
   fontSize: FontSize;
   screenLayout: ScreenLayout;
   cloudBackupEnabled: boolean;
+  imageBackupQuality: ImageQuality;
 };
 
 export const defaultAppSettings: AppSettings = {
@@ -46,7 +52,8 @@ export const defaultAppSettings: AppSettings = {
   fontStyle: "compact",
   fontSize: "medium",
   screenLayout: "compact",
-  cloudBackupEnabled: false
+  cloudBackupEnabled: false,
+  imageBackupQuality: DEFAULT_IMAGE_QUALITY
 };
 
 const themeModes: ThemeMode[] = ["light", "dark", "system"];
@@ -54,6 +61,7 @@ const fontStyles: FontStyle[] = ["standard", "compact", "bold"];
 const fontSizes: FontSize[] = ["small", "medium", "large"];
 const screenLayouts: ScreenLayout[] = ["compact", "balanced", "comfortable"];
 const exportQualities: ExportQuality[] = ["standard", "high", "max"];
+const imageBackupQualities = IMAGE_QUALITY_OPTIONS.map((option) => option.value);
 const tripClipRatios: TripClipRatio[] = ["9:16", "4:5", "1:1", "16:9", "3:4"];
 
 const clampGuideSize = (value: unknown) => {
@@ -115,7 +123,10 @@ const normalizeSettings = (value: Partial<AppSettings> | null): AppSettings => {
     cloudBackupEnabled:
       typeof nextSettings.cloudBackupEnabled === "boolean"
         ? nextSettings.cloudBackupEnabled
-        : defaultAppSettings.cloudBackupEnabled
+        : defaultAppSettings.cloudBackupEnabled,
+    imageBackupQuality: imageBackupQualities.includes(nextSettings.imageBackupQuality)
+      ? nextSettings.imageBackupQuality
+      : defaultAppSettings.imageBackupQuality
   };
 };
 

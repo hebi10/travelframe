@@ -20,6 +20,11 @@ import { SectionBlock } from "@/components/section-block";
 import { colors, controls, spacing, typography } from "@/constants/app-theme";
 import { GUIDE_LABELS, GUIDE_TYPES } from "@/constants/camera-guides";
 import {
+  IMAGE_BACKUP_OPTIMIZATION_MESSAGE,
+  IMAGE_QUALITY_DESCRIPTION,
+  IMAGE_QUALITY_OPTIONS
+} from "@/constants/image";
+import {
   DELETE_ACCOUNT_REQUEST_URL,
   PRIVACY_POLICY_URL
 } from "@/constants/legal-links";
@@ -49,6 +54,7 @@ import {
   subscribeCloudBackupOverview,
   type CloudBackupOverview
 } from "@/lib/cloud-backup";
+import { formatImageBackupUsage } from "@/lib/image-backup-utils";
 import { isCreatorSubscriptionActive } from "@/lib/subscription";
 
 type SettingKey =
@@ -64,7 +70,8 @@ type SettingKey =
   | "fontStyle"
   | "fontSize"
   | "screenLayout"
-  | "cloudBackupEnabled";
+  | "cloudBackupEnabled"
+  | "imageBackupQuality";
 
 const opacityOptions = [0.2, 0.3, 0.4, 0.5, 0.6, 0.7];
 
@@ -72,6 +79,7 @@ const emptyBackupOverview: CloudBackupOverview = {
   photoCount: 0,
   imageBundleCount: 0,
   videoCount: 0,
+  imageBackupBytes: 0,
   deleteAfter: null,
   status: "none",
   backedUpAt: null,
@@ -110,6 +118,14 @@ const qualityLabel: Record<ExportQuality, string> = {
   high: "높음",
   max: "최대"
 };
+
+const imageQualityLabel = IMAGE_QUALITY_OPTIONS.reduce(
+  (labels, option) => ({
+    ...labels,
+    [option.value]: option.label
+  }),
+  {} as Record<(typeof IMAGE_QUALITY_OPTIONS)[number]["value"], string>
+);
 
 const themeOptions: {
   value: ThemeMode;
@@ -278,6 +294,10 @@ export default function SettingsScreen() {
 
     if (activeSetting === "cloudBackupEnabled") {
       return "클라우드 백업";
+    }
+
+    if (activeSetting === "imageBackupQuality") {
+      return "이미지 백업 화질";
     }
 
     return "";
@@ -537,6 +557,9 @@ export default function SettingsScreen() {
                   <Text selectable style={[styles.backupStatusDetail, themed.mutedText]}>
                     사진 {backupOverview.photoCount}장 / 여러 사진 작업{" "}
                     {backupOverview.imageBundleCount}개 / 영상 {backupOverview.videoCount}개
+                  </Text>
+                  <Text selectable style={[styles.backupStatusDetail, themed.mutedText]}>
+                    {formatImageBackupUsage(backupOverview.imageBackupBytes)}
                   </Text>
                   <Pressable
                     disabled={isBackupSubmitting}
@@ -882,6 +905,12 @@ export default function SettingsScreen() {
             mark={qualityLabel[settings.exportQuality]}
             onPress={() => setActiveSetting("exportQuality")}
           />
+          <ActionRow
+            label="이미지 백업 화질"
+            detail={IMAGE_BACKUP_OPTIMIZATION_MESSAGE}
+            mark={imageQualityLabel[settings.imageBackupQuality]}
+            onPress={() => setActiveSetting("imageBackupQuality")}
+          />
         </SectionBlock>
       </ScreenShell>
 
@@ -1018,6 +1047,26 @@ export default function SettingsScreen() {
                   ))
                 : null}
 
+              {activeSetting === "imageBackupQuality" ? (
+                <>
+                  <Text selectable style={[styles.optionDetail, themed.mutedText]}>
+                    {IMAGE_BACKUP_OPTIMIZATION_MESSAGE}
+                  </Text>
+                  <Text selectable style={[styles.optionDetail, themed.mutedText]}>
+                    {IMAGE_QUALITY_DESCRIPTION}
+                  </Text>
+                  {IMAGE_QUALITY_OPTIONS.map((quality) => (
+                    <OptionButton
+                      key={quality.value}
+                      label={quality.label}
+                      detail={quality.detail}
+                      active={settings.imageBackupQuality === quality.value}
+                      onPress={() => updateSetting({ imageBackupQuality: quality.value })}
+                    />
+                  ))}
+                </>
+              ) : null}
+
               {activeSetting === "themeMode"
                 ? themeOptions.map((theme) => (
                     <OptionButton
@@ -1075,6 +1124,12 @@ export default function SettingsScreen() {
                     <Text selectable style={[styles.backupStatusDetail, themed.mutedText]}>
                       사진 {backupOverview.photoCount}장 / 여러 사진 작업{" "}
                       {backupOverview.imageBundleCount}개 / 영상 {backupOverview.videoCount}개
+                    </Text>
+                    <Text selectable style={[styles.backupStatusDetail, themed.mutedText]}>
+                      {formatImageBackupUsage(backupOverview.imageBackupBytes)}
+                    </Text>
+                    <Text selectable style={[styles.backupStatusDetail, themed.mutedText]}>
+                      {IMAGE_BACKUP_OPTIMIZATION_MESSAGE}
                     </Text>
                   </View>
                   <OptionButton
@@ -1137,6 +1192,9 @@ export default function SettingsScreen() {
             >
               <Text selectable style={[styles.optionDetail, themed.mutedText]}>
                 현재 기기에 저장된 사진, 편집 결과, 영상 만들기 작업, 만든 영상 기록과 앱 설정을 계정 백업으로 저장합니다.
+              </Text>
+              <Text selectable style={[styles.optionDetail, themed.mutedText]}>
+                {IMAGE_BACKUP_OPTIMIZATION_MESSAGE} {IMAGE_QUALITY_DESCRIPTION}
               </Text>
               <Text selectable style={[styles.optionDetail, themed.mutedText]}>
                 구독 기간이 끝나면 새 백업은 중단됩니다. 기존 백업 데이터 삭제는 이 화면에서 직접 요청할 수 있습니다.

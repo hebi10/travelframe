@@ -40,6 +40,7 @@ import {
   subscribeCloudBackupOverview,
   type CloudBackupOverview
 } from "@/lib/cloud-backup";
+import { formatImageBackupUsage } from "@/lib/image-backup-utils";
 
 type AuthMode = "signIn" | "signUp" | "recover";
 type PaymentPlanId = "adRemove" | "creator";
@@ -71,6 +72,7 @@ const initialBackupOverview: CloudBackupOverview = {
   photoCount: 0,
   imageBundleCount: 0,
   videoCount: 0,
+  imageBackupBytes: 0,
   deleteAfter: null,
   status: "none",
   backedUpAt: null,
@@ -782,6 +784,10 @@ export default function AccountScreen() {
                 <InfoRow
                   label="백업 데이터"
                   value={`사진 ${backupOverview.photoCount}장 / 여러 사진 작업 ${backupOverview.imageBundleCount}개 / 영상 ${backupOverview.videoCount}개`}
+                />
+                <InfoRow
+                  label="이미지 용량"
+                  value={formatImageBackupUsage(backupOverview.imageBackupBytes)}
                 />
                 <InfoRow
                   label="마지막 백업"

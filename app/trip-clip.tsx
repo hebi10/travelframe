@@ -142,6 +142,7 @@ const initialBackupOverview: CloudBackupOverview = {
   photoCount: 0,
   imageBundleCount: 0,
   videoCount: 0,
+  imageBackupBytes: 0,
   deleteAfter: null,
   status: "none",
   backedUpAt: null,
