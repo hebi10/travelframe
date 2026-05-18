@@ -92,7 +92,7 @@ export const reserveWeeklyVideoExport = async (user: User) => {
 
     if (currentCount >= FREE_WEEKLY_VIDEO_EXPORT_LIMIT) {
       throw new Error(
-        `무료 사용자는 이번 주에 MP4 영상을 ${FREE_WEEKLY_VIDEO_EXPORT_LIMIT}개까지 만들 수 있습니다. 다음 주에 다시 만들거나 영상 내보내기 플랜을 이용해 주세요.`
+        `무료 사용자는 이번 주에 MP4 영상을 ${FREE_WEEKLY_VIDEO_EXPORT_LIMIT}개까지 만들 수 있습니다. 다음 주에 다시 만들거나 구독을 이용해 주세요.`
       );
     }
 

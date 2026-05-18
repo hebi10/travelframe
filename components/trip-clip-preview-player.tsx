@@ -15,6 +15,11 @@ import { CameraGuideOverlay } from "@/components/camera-guide-overlay";
 import { colors } from "@/constants/app-theme";
 import type { GuideType } from "@/constants/camera-guides";
 import type { TripClipTemplate, TripClipTransition } from "@/constants/trip-clip";
+import {
+  getTripClipPhotoAdjustment,
+  type TripClipPhotoAdjustment,
+  type TripClipPhotoAdjustmentMap
+} from "@/lib/trip-clip-photo-adjustment";
 import type { PhotoItem } from "@/types/photo";
 
 type LayerKey = "a" | "b";
@@ -30,6 +35,11 @@ type TripClipPreviewPlayerProps = {
   guideSize: number;
   guideStrokeWidth: number;
   guideColor: string;
+  photoAdjustments: TripClipPhotoAdjustmentMap;
+  onPhotoAdjustmentChange: (
+    photoId: string,
+    adjustment: TripClipPhotoAdjustment
+  ) => void;
 };
 
 const getPreviewUri = (photo: PhotoItem) => photo.previewUri ?? photo.uri;
@@ -39,6 +49,14 @@ const formatDate = (value: string) =>
     month: "short",
     day: "numeric"
   }).format(new Date(value));
+
+const getAdjustmentStyle = (adjustment: TripClipPhotoAdjustment) => ({
+  transform: [
+    { translateX: adjustment.translateX },
+    { translateY: adjustment.translateY },
+    { scale: adjustment.scale }
+  ]
+});
 
 export function TripClipPreviewPlayer({
   photo,
@@ -50,7 +68,9 @@ export function TripClipPreviewPlayer({
   guide,
   guideSize,
   guideStrokeWidth,
-  guideColor
+  guideColor,
+  photoAdjustments,
+  onPhotoAdjustmentChange
 }: TripClipPreviewPlayerProps) {
   const isFilm = template === "film-log";
   const isCenter = template === "center-cut";
@@ -70,6 +90,7 @@ export function TripClipPreviewPlayer({
   const startX = useSharedValue(0);
   const startY = useSharedValue(0);
   const startScale = useSharedValue(1);
+  const currentAdjustment = getTripClipPhotoAdjustment(photoAdjustments, photo.id);
 
   const contentFit = isCenter || isFilm ? "contain" : "cover";
 
@@ -153,10 +174,34 @@ export function TripClipPreviewPlayer({
   }, [finishTransition, photo, transition, transitionDuration, transitionProgress]);
 
   useEffect(() => {
-    translateX.value = 0;
-    translateY.value = 0;
-    scale.value = 1;
-  }, [photo.id, scale, translateX, translateY]);
+    translateX.value = currentAdjustment.translateX;
+    translateY.value = currentAdjustment.translateY;
+    scale.value = currentAdjustment.scale;
+  }, [
+    currentAdjustment.scale,
+    currentAdjustment.translateX,
+    currentAdjustment.translateY,
+    photo.id,
+    scale,
+    translateX,
+    translateY
+  ]);
+
+  const commitAdjustment = useCallback(
+    (adjustment: TripClipPhotoAdjustment) => {
+      onPhotoAdjustmentChange(photo.id, adjustment);
+    },
+    [onPhotoAdjustmentChange, photo.id]
+  );
+
+  const commitCurrentAdjustment = () => {
+    "worklet";
+    runOnJS(commitAdjustment)({
+      translateX: Number(translateX.value.toFixed(2)),
+      translateY: Number(translateY.value.toFixed(2)),
+      scale: Number(scale.value.toFixed(3))
+    });
+  };
 
   const pan = Gesture.Pan()
     .enabled(adjustEnabled)
@@ -167,7 +212,8 @@ export function TripClipPreviewPlayer({
     .onUpdate((event) => {
       translateX.value = startX.value + event.translationX;
       translateY.value = startY.value + event.translationY;
-    });
+    })
+    .onEnd(commitCurrentAdjustment);
 
   const pinch = Gesture.Pinch()
     .enabled(adjustEnabled)
@@ -176,7 +222,8 @@ export function TripClipPreviewPlayer({
     })
     .onUpdate((event) => {
       scale.value = Math.max(0.6, Math.min(4, startScale.value * event.scale));
-    });
+    })
+    .onEnd(commitCurrentAdjustment);
 
   const gesture = Gesture.Simultaneous(pan, pinch);
   const adjustStyle = useAnimatedStyle(() => ({
@@ -234,12 +281,22 @@ export function TripClipPreviewPlayer({
           <PreviewLayer
             photo={layers.a}
             animatedStyle={layerAStyle}
+            adjustmentStyle={
+              layers.a?.id === photo.id
+                ? adjustStyle
+                : getAdjustmentStyle(getTripClipPhotoAdjustment(photoAdjustments, layers.a?.id))
+            }
             contentFit={contentFit}
             isFilm={isFilm}
           />
           <PreviewLayer
             photo={layers.b}
             animatedStyle={layerBStyle}
+            adjustmentStyle={
+              layers.b?.id === photo.id
+                ? adjustStyle
+                : getAdjustmentStyle(getTripClipPhotoAdjustment(photoAdjustments, layers.b?.id))
+            }
             contentFit={contentFit}
             isFilm={isFilm}
           />
@@ -270,24 +327,28 @@ export function TripClipPreviewPlayer({
 function PreviewLayer({
   photo,
   animatedStyle,
+  adjustmentStyle,
   contentFit,
   isFilm
 }: {
   photo: PhotoItem | null;
   animatedStyle: object;
+  adjustmentStyle: object;
   contentFit: "contain" | "cover";
   isFilm: boolean;
 }) {
   return (
     <Reanimated.View style={[styles.previewLayer, animatedStyle]}>
-      {photo ? (
-        <Image
-          source={{ uri: getPreviewUri(photo) }}
-          style={[styles.previewImage, isFilm && styles.previewImageFilm]}
-          contentFit={contentFit}
-          cachePolicy="memory-disk"
-        />
-      ) : null}
+      <Reanimated.View style={[styles.previewImageMotionLayer, adjustmentStyle]}>
+        {photo ? (
+          <Image
+            source={{ uri: getPreviewUri(photo) }}
+            style={[styles.previewImage, isFilm && styles.previewImageFilm]}
+            contentFit={contentFit}
+            cachePolicy="memory-disk"
+          />
+        ) : null}
+      </Reanimated.View>
     </Reanimated.View>
   );
 }
@@ -306,6 +367,9 @@ const styles = StyleSheet.create({
   },
   previewLayer: {
     ...StyleSheet.absoluteFillObject
+  },
+  previewImageMotionLayer: {
+    flex: 1
   },
   previewImage: {
     width: "100%",

@@ -16,7 +16,7 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "test": "node tests/no-legacy-renderer.test.mjs && node tests/media-library-availability.test.mjs",
+    "test": "node tests/no-legacy-renderer.test.mjs && node tests/media-library-availability.test.mjs && node tests/trip-clip-selection.test.mjs && node tests/trip-clip-photo-adjustment.test.mjs && node tests/home-slide-layout.test.mjs && node tests/subscription-copy.test.mjs && node tests/subscription-products.test.mjs && node tests/account-backup-summary.test.mjs && node tests/bottom-tab-spacing.test.mjs && node tests/export-modal-copy.test.mjs && node tests/trip-clip-export-default.test.mjs && node tests/account-management-section-removed.test.mjs && node tests/cloud-backup-manual-delete-policy.test.mjs && node tests/cloud-backup-limits.test.mjs && node tests/trip-clip-video-backup-option.test.mjs && node tests/studio-backup-usage.test.mjs && node tests/video-utils.test.mjs && node tests/trip-clip-duration-quality.test.mjs",
     "typecheck": "tsc --noEmit",
     "firebase:deploy-rules": "firebase deploy --only firestore:rules,storage --project travelframe-4e1fb",
     "firebase:deploy-functions": "firebase deploy --only functions --project travelframe-4e1fb",

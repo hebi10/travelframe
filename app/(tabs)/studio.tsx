@@ -8,7 +8,19 @@ import { ScreenShell } from "@/components/screen-shell";
 import { SectionBlock } from "@/components/section-block";
 import { colors, controls, typography } from "@/constants/app-theme";
 import { useAppAppearance } from "@/lib/app-appearance";
+import { getAppSettings } from "@/lib/app-settings";
+import { useAuth } from "@/lib/auth-context";
+import {
+  subscribeCloudBackupOverview,
+  type CloudBackupOverview
+} from "@/lib/cloud-backup";
+import {
+  CLOUD_BACKUP_IMAGE_WORK_LIMIT,
+  CLOUD_BACKUP_PHOTO_LIMIT,
+  CLOUD_BACKUP_VIDEO_LIMIT
+} from "@/lib/cloud-backup-limits";
 import { deletePhoto, getPhotos, saveCapturedPhoto } from "@/lib/photo-library";
+import { isCreatorSubscriptionActive } from "@/lib/subscription";
 import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 import { deleteMadeVideo, getMadeVideos } from "@/lib/video-library";
 import { deleteImageBundleWork, getImageBundleWorks } from "@/lib/work-library";
@@ -30,6 +42,15 @@ const tabs: { label: string; value: StudioTab }[] = [
 ];
 
 const PAGE_SIZE_OPTIONS: PageSize[] = [6, 10, 20];
+const initialBackupOverview: CloudBackupOverview = {
+  photoCount: 0,
+  imageBundleCount: 0,
+  videoCount: 0,
+  deleteAfter: null,
+  status: "none",
+  backedUpAt: null,
+  deletedAt: null
+};
 
 const formatDate = (value: string) =>
   new Intl.DateTimeFormat("ko-KR", {
@@ -49,6 +70,7 @@ const formatDuration = (seconds: number) => {
 export default function StudioScreen() {
   const router = useRouter();
   const { palette } = useAppAppearance();
+  const { user, subscription } = useAuth();
   const { tab } = useLocalSearchParams<{ tab?: string }>();
   const [activeTab, setActiveTab] = useState<StudioTab>("photos");
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
@@ -58,17 +80,22 @@ export default function StudioScreen() {
   const [isImportingImage, setIsImportingImage] = useState(false);
   const [pageSize, setPageSize] = useState<PageSize>(6);
   const [pages, setPages] = useState<Record<string, number>>({});
+  const [cloudBackupEnabled, setCloudBackupEnabled] = useState(false);
+  const [backupOverview, setBackupOverview] =
+    useState<CloudBackupOverview>(initialBackupOverview);
 
   const loadStudio = useCallback(async () => {
     setIsLoading(true);
-    const [storedPhotos, storedVideos, storedImageBundles] = await Promise.all([
+    const [storedPhotos, storedVideos, storedImageBundles, settings] = await Promise.all([
       getPhotos(),
       getMadeVideos(),
-      getImageBundleWorks()
+      getImageBundleWorks(),
+      getAppSettings()
     ]);
     setPhotos(storedPhotos);
     setVideos(storedVideos);
     setImageBundles(storedImageBundles);
+    setCloudBackupEnabled(settings.cloudBackupEnabled);
     setIsLoading(false);
   }, []);
 
@@ -76,6 +103,15 @@ export default function StudioScreen() {
     useCallback(() => {
       loadStudio();
     }, [loadStudio])
+  );
+
+  useEffect(
+    () =>
+      subscribeCloudBackupOverview({
+        user,
+        onChange: setBackupOverview
+      }),
+    [user]
   );
 
   useEffect(() => {
@@ -197,6 +233,8 @@ export default function StudioScreen() {
   const workCount =
     singleImageWorks.length + imageBundleWorks.length + videoWorks.length;
   const videoWorkCount = imageBundleWorks.length + videoWorks.length;
+  const shouldShowBackupUsage =
+    Boolean(user) && cloudBackupEnabled && isCreatorSubscriptionActive(subscription);
   const isDark = palette.background !== colors.background;
   const filledButtonStyle = {
     borderColor: palette.text,
@@ -280,6 +318,12 @@ export default function StudioScreen() {
           </SectionBlock>
 
           <SectionBlock title="사진">
+          {shouldShowBackupUsage ? (
+            <BackupUsageBadge
+              count={backupOverview.photoCount}
+              limit={CLOUD_BACKUP_PHOTO_LIMIT}
+            />
+          ) : null}
           {isLoading ? (
             <LoadingState />
           ) : capturedPhotos.length > 0 ? (
@@ -339,6 +383,14 @@ export default function StudioScreen() {
                 router={router}
                 onDeleteWork={confirmDeleteWork}
                 onPageChange={(page) => setSectionPage("videoImageBundles", page)}
+                backupUsage={
+                  shouldShowBackupUsage
+                    ? {
+                        count: backupOverview.imageBundleCount,
+                        limit: CLOUD_BACKUP_IMAGE_WORK_LIMIT
+                      }
+                    : null
+                }
               />
               <WorkSection
                 title="저장한 영상"
@@ -349,6 +401,14 @@ export default function StudioScreen() {
                 router={router}
                 onDeleteWork={confirmDeleteWork}
                 onPageChange={(page) => setSectionPage("videoWorks", page)}
+                backupUsage={
+                  shouldShowBackupUsage
+                    ? {
+                        count: backupOverview.videoCount,
+                        limit: CLOUD_BACKUP_VIDEO_LIMIT
+                      }
+                    : null
+                }
               />
             </>
           ) : (
@@ -379,6 +439,14 @@ export default function StudioScreen() {
                 router={router}
                 onDeleteWork={confirmDeleteWork}
                 onPageChange={(page) => setSectionPage("singleImages", page)}
+                backupUsage={
+                  shouldShowBackupUsage
+                    ? {
+                        count: backupOverview.photoCount,
+                        limit: CLOUD_BACKUP_PHOTO_LIMIT
+                      }
+                    : null
+                }
               />
               <WorkSection
                 title="영상 만들기 작업"
@@ -389,6 +457,14 @@ export default function StudioScreen() {
                 router={router}
                 onDeleteWork={confirmDeleteWork}
                 onPageChange={(page) => setSectionPage("imageBundles", page)}
+                backupUsage={
+                  shouldShowBackupUsage
+                    ? {
+                        count: backupOverview.imageBundleCount,
+                        limit: CLOUD_BACKUP_IMAGE_WORK_LIMIT
+                      }
+                    : null
+                }
               />
               <WorkSection
                 title="영상"
@@ -399,6 +475,14 @@ export default function StudioScreen() {
                 router={router}
                 onDeleteWork={confirmDeleteWork}
                 onPageChange={(page) => setSectionPage("videos", page)}
+                backupUsage={
+                  shouldShowBackupUsage
+                    ? {
+                        count: backupOverview.videoCount,
+                        limit: CLOUD_BACKUP_VIDEO_LIMIT
+                      }
+                    : null
+                }
               />
             </>
           ) : (
@@ -584,6 +668,16 @@ function PaginatedPhotoGrid({
   );
 }
 
+function BackupUsageBadge({ count, limit }: { count: number; limit: number }) {
+  return (
+    <View style={styles.backupUsageBadge}>
+      <Text selectable style={styles.backupUsageText}>
+        클라우드 백업 {count}/{limit}
+      </Text>
+    </View>
+  );
+}
+
 function WorkSection({
   title,
   emptyDetail,
@@ -592,7 +686,8 @@ function WorkSection({
   pageSize,
   router,
   onDeleteWork,
-  onPageChange
+  onPageChange,
+  backupUsage
 }: {
   title: string;
   emptyDetail: string;
@@ -602,11 +697,15 @@ function WorkSection({
   router: ReturnType<typeof useRouter>;
   onDeleteWork: (work: StudioWorkItem) => void;
   onPageChange: (page: number) => void;
+  backupUsage?: { count: number; limit: number } | null;
 }) {
   const result = getPaginatedItems(items, page, pageSize);
 
   return (
     <SectionBlock title={title}>
+      {backupUsage ? (
+        <BackupUsageBadge count={backupUsage.count} limit={backupUsage.limit} />
+      ) : null}
       {items.length > 0 ? (
         <View style={styles.paginatedList}>
           <View style={styles.videoList}>
@@ -979,6 +1078,20 @@ const styles = StyleSheet.create({
   },
   paginatedList: {
     gap: 12
+  },
+  backupUsageBadge: {
+    alignSelf: "flex-start",
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.surface
+  },
+  backupUsageText: {
+    color: colors.muted,
+    fontSize: typography.small,
+    fontWeight: "800",
+    letterSpacing: 0
   },
   photoGrid: {
     flexDirection: "row",

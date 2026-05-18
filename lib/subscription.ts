@@ -10,6 +10,10 @@ import {
 } from "firebase/firestore";
 
 import { firestore } from "@/lib/firebase";
+import {
+  emptySubscriptionProducts,
+  getSubscriptionProductsFromSubscription
+} from "@/lib/subscription-products";
 
 export type SubscriptionPlan = "free" | "premium";
 export type SubscriptionStatus = "inactive" | "active" | "expired";
@@ -83,12 +87,6 @@ export const isSubscriptionProductActive = (
   productId: Exclude<SubscriptionProductId, "free">
 ) => isPremiumSubscription(subscription) && subscription?.productId === productId;
 
-export const getBackupDeleteAfter = (expiresAt?: string | null) => {
-  const baseDate = expiresAt ? new Date(expiresAt) : new Date();
-  baseDate.setMonth(baseDate.getMonth() + 3);
-  return baseDate.toISOString();
-};
-
 const parseSubscription = (value: string | null): UserSubscription => {
   if (!value) {
     return freeSubscription;
@@ -158,11 +156,12 @@ export const getUserSubscription = async (user: User | null) => {
 export const getUserSubscriptionProducts = async (
   user: User | null
 ): Promise<UserSubscriptionProducts> => {
-  if (!user || !firestore) {
-    return {
-      adRemove: null,
-      creatorMonthly: null
-    };
+  if (!user) {
+    return emptySubscriptionProducts;
+  }
+
+  if (!firestore) {
+    return getSubscriptionProductsFromSubscription(await getLocalSubscription(user.uid));
   }
 
   try {
@@ -184,10 +183,7 @@ export const getUserSubscriptionProducts = async (
         : null
     };
   } catch {
-    return {
-      adRemove: null,
-      creatorMonthly: null
-    };
+    return getSubscriptionProductsFromSubscription(await getLocalSubscription(user.uid));
   }
 };
 
@@ -224,7 +220,7 @@ export const activateMockSubscription = async (
     expiresAt,
     lastPaymentAt: now.toISOString(),
     priceLabel: isCreator ? "월 3,900원" : "3,900원",
-    productName: isCreator ? "영상 내보내기" : "광고 제거"
+    productName: isCreator ? "구독" : "광고 제거"
   };
 
   const currentRef = doc(firestore, "users", user.uid, "subscriptions", "current");

@@ -11,9 +11,13 @@ import {
 import { deleteObject, getDownloadURL, ref, uploadBytes } from "firebase/storage";
 
 import { getAppSettings } from "@/lib/app-settings";
+import {
+  CLOUD_BACKUP_VIDEO_LIMIT,
+  canBackupMoreVideos
+} from "@/lib/cloud-backup-limits";
 import { firestore, firebaseStorage } from "@/lib/firebase";
 import { getPhotos } from "@/lib/photo-library";
-import { isCreatorSubscriptionActive, getBackupDeleteAfter, type UserSubscription } from "@/lib/subscription";
+import { isCreatorSubscriptionActive, type UserSubscription } from "@/lib/subscription";
 import { getMadeVideos } from "@/lib/video-library";
 import { getImageBundleWorks } from "@/lib/work-library";
 import type { MadeVideoItem } from "@/types/video";
@@ -161,16 +165,8 @@ export const ensureBackupAvailable = (subscription: UserSubscription) => {
     return;
   }
 
-  const deleteAfter = getBackupDeleteAfter(subscription.expiresAt);
   throw new Error(
-    `영상 내보내기 월결제 기간이 만료되어 백업을 사용할 수 없습니다. 기존 백업은 ${new Intl.DateTimeFormat(
-      "ko-KR",
-      {
-        year: "numeric",
-        month: "long",
-        day: "numeric"
-      }
-    ).format(new Date(deleteAfter))} 이후 제거될 수 있습니다.`
+    "구독 기간이 만료되어 백업을 사용할 수 없습니다. 기존 백업 데이터 삭제는 설정에서 직접 요청할 수 있습니다."
   );
 };
 
@@ -197,9 +193,6 @@ export const backupCurrentWorkspace = async ({
     getImageBundleWorks(),
     getMadeVideos()
   ]);
-  const deleteAfter = subscription.expiresAt
-    ? getBackupDeleteAfter(subscription.expiresAt)
-    : null;
   const backedUpAt = new Date().toISOString();
 
   for (const photo of photos) {
@@ -230,7 +223,6 @@ export const backupCurrentWorkspace = async ({
       localPreviewUri: photo.previewUri ?? null,
       previewStoragePath: previewPath,
       backedUpAt,
-      deleteAfter,
       updatedAt: serverTimestamp()
     });
   }
@@ -247,7 +239,7 @@ export const backupCurrentWorkspace = async ({
       videoCount: videos.length,
       status: "active",
       backedUpAt,
-      deleteAfter,
+      deleteAfter: null,
       updatedAt: serverTimestamp()
     },
     { merge: true }
@@ -257,7 +249,7 @@ export const backupCurrentWorkspace = async ({
     photoCount: photos.length,
     imageBundleCount: imageBundles.length,
     videoCount: videos.length,
-    deleteAfter
+    deleteAfter: null
   };
 };
 
@@ -327,6 +319,13 @@ export const backupMadeVideo = async ({
     throw new Error("Firebase 연결 정보가 아직 설정되지 않았습니다.");
   }
 
+  const currentVideoCount = await getCollectionSize(user.uid, "videos");
+  if (!canBackupMoreVideos(currentVideoCount)) {
+    throw new Error(
+      `영상 백업 한도 ${CLOUD_BACKUP_VIDEO_LIMIT}개를 모두 사용했습니다. 설정에서 기존 영상 백업을 정리한 뒤 다시 시도해 주세요.`
+    );
+  }
+
   const fileName = fileNameFromUri(video.uri, `${video.id}.mp4`);
   const storagePath = `users/${user.uid}/backups/videos/${video.id}-${fileName}`;
   const downloadUrl = await uploadLocalFile({
@@ -366,37 +365,15 @@ export const markBackupExpired = async ({
     return;
   }
 
-  const deleteAfter = getBackupDeleteAfter(subscription.expiresAt);
   await setDoc(
     doc(firestore, "users", user.uid, "backups", "current"),
     {
       status: "expired",
-      deleteAfter,
+      deleteAfter: null,
       updatedAt: serverTimestamp()
     },
     { merge: true }
   );
-};
-
-export const cleanupExpiredBackup = async ({
-  user,
-  subscription
-}: {
-  user: User | null;
-  subscription: UserSubscription;
-}) => {
-  if (!user || !firestore || !firebaseStorage || isCreatorSubscriptionActive(subscription)) {
-    return false;
-  }
-
-  const deleteAfter = getBackupDeleteAfter(subscription.expiresAt);
-  if (new Date(deleteAfter).getTime() > Date.now()) {
-    await markBackupExpired({ user, subscription });
-    return false;
-  }
-
-  await deleteCloudBackupData({ user });
-  return true;
 };
 
 export const deleteCloudBackupData = async ({ user }: { user: User | null }) => {

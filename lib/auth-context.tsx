@@ -7,8 +7,6 @@ import {
   signInWithEmailAndPassword,
   signInWithCredential,
   signOut,
-  updatePassword,
-  updateProfile,
   type User
 } from "firebase/auth";
 import { doc, serverTimestamp, setDoc } from "firebase/firestore";
@@ -45,8 +43,6 @@ type AuthContextValue = {
   logOut: () => Promise<void>;
   sendVerificationEmail: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
-  changePassword: (password: string) => Promise<void>;
-  updateName: (displayName: string) => Promise<void>;
   refreshUser: () => Promise<void>;
   startMockSubscription: (
     productId?: Exclude<SubscriptionProductId, "free">
@@ -166,21 +162,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await sendPasswordResetEmail(auth, email.trim());
   }, []);
 
-  const changePassword = useCallback(async (password: string) => {
-    const currentUser = ensureCurrentUser();
-    await updatePassword(currentUser, password);
-  }, []);
-
-  const updateName = useCallback(async (displayName: string) => {
-    const currentUser = ensureCurrentUser();
-    await updateProfile(currentUser, {
-      displayName: displayName.trim() || null
-    });
-    await currentUser.reload();
-    await ensureUserDocument(currentUser);
-    setUser(ensureFirebaseAuth().currentUser);
-  }, []);
-
   const refreshUser = useCallback(async () => {
     const currentUser = ensureCurrentUser();
     await currentUser.reload();
@@ -215,13 +196,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       logOut,
       sendVerificationEmail,
       resetPassword,
-      changePassword,
-      updateName,
       refreshUser,
       startMockSubscription
     }),
     [
-      changePassword,
       isAuthLoading,
       logOut,
       refreshUser,
@@ -232,7 +210,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signUp,
       startMockSubscription,
       subscription,
-      updateName,
       user
     ]
   );

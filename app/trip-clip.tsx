@@ -12,7 +12,6 @@ import {
 } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Modal,
   Platform,
   Pressable,
@@ -50,6 +49,15 @@ import {
   type TripClipTransition
 } from "@/constants/trip-clip";
 import {
+  DEFAULT_VIDEO_QUALITY,
+  MAX_VIDEO_DURATION_SECONDS,
+  VIDEO_DURATION_LIMIT_MESSAGE,
+  VIDEO_EXPORT_BLOCKED_MESSAGE,
+  VIDEO_QUALITY_DESCRIPTION,
+  VIDEO_QUALITY_OPTIONS,
+  type VideoQualityId
+} from "@/constants/video";
+import {
   type ImageSaveFormat,
   saveImageToLibrary,
   saveVideoToLibrary,
@@ -66,13 +74,26 @@ import {
   updateAppSettings
 } from "@/lib/app-settings";
 import {
-  deletePhoto,
   ensurePhotoPreviews,
   getPhotos,
   saveCapturedPhoto
 } from "@/lib/photo-library";
+import { deselectTripClipPhoto } from "@/lib/trip-clip-selection";
 import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 import { getMadeVideoById, saveMadeVideo } from "@/lib/video-library";
+import {
+  calculateVideoDuration,
+  formatVideoDuration,
+  getVideoQualityOption,
+  getVideoQualityOutputSize,
+  isVideoDurationTooLong
+} from "@/lib/video-utils";
+import {
+  getTripClipPhotoAdjustment,
+  setTripClipPhotoAdjustment,
+  type TripClipPhotoAdjustment,
+  type TripClipPhotoAdjustmentMap
+} from "@/lib/trip-clip-photo-adjustment";
 import {
   getImageBundleWorkById,
   saveImageBundleWork,
@@ -84,7 +105,17 @@ import {
   OptionalRecordingView,
   useOptionalViewRecorder
 } from "@/lib/view-recorder";
-import { backupImageBundleWork, backupMadeVideo } from "@/lib/cloud-backup";
+import {
+  backupImageBundleWork,
+  backupMadeVideo,
+  subscribeCloudBackupOverview,
+  type CloudBackupOverview
+} from "@/lib/cloud-backup";
+import {
+  CLOUD_BACKUP_VIDEO_LIMIT,
+  canBackupMoreVideos,
+  getRemainingBackupSlots
+} from "@/lib/cloud-backup-limits";
 import { shouldShowAds } from "@/lib/ad-entitlement";
 import { isCreatorSubscriptionActive } from "@/lib/subscription";
 import {
@@ -106,6 +137,15 @@ const initialExportProgress = {
   percent: 0,
   title: "",
   detail: ""
+};
+const initialBackupOverview: CloudBackupOverview = {
+  photoCount: 0,
+  imageBundleCount: 0,
+  videoCount: 0,
+  deleteAfter: null,
+  status: "none",
+  backedUpAt: null,
+  deletedAt: null
 };
 const FADE_OPTIONS = [
   { label: "짧게", value: 0.25 },
@@ -141,14 +181,14 @@ const EXPORT_FORMAT_OPTIONS: {
   detail: string;
 }[] = [
   {
-    label: "이미지 저장",
-    value: "images",
-    detail: "선택한 사진을 각각 개별 이미지로 저장합니다."
-  },
-  {
     label: "MP4 영상",
     value: "mp4",
     detail: "사진, 전환 효과, 음악을 영상으로 저장합니다."
+  },
+  {
+    label: "이미지 저장",
+    value: "images",
+    detail: "선택한 사진을 각각 개별 이미지로 저장합니다."
   }
 ];
 
@@ -207,14 +247,6 @@ const ratioAspect: Record<TripClipRatio, number> = {
   "1:1": 1,
   "16:9": 16 / 9,
   "3:4": 3 / 4
-};
-
-const recordingOutputSize: Record<TripClipRatio, { width: number; height: number }> = {
-  "9:16": { width: 720, height: 1280 },
-  "4:5": { width: 864, height: 1080 },
-  "1:1": { width: 1080, height: 1080 },
-  "16:9": { width: 1280, height: 720 },
-  "3:4": { width: 810, height: 1080 }
 };
 
 type RecordingFrame = {
@@ -319,13 +351,6 @@ const getRecordingFrame = ({
   };
 };
 
-const formatClipTime = (seconds: number) => {
-  const safeSeconds = Math.max(0, Math.floor(seconds));
-  const minutes = Math.floor(safeSeconds / 60);
-  const restSeconds = safeSeconds % 60;
-  return `${String(minutes).padStart(2, "0")}:${String(restSeconds).padStart(2, "0")}`;
-};
-
 export default function TripClipScreen() {
   const { bundleId, videoId } = useLocalSearchParams<{
     bundleId?: string;
@@ -338,7 +363,11 @@ export default function TripClipScreen() {
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [durations, setDurations] = useState<Record<string, number>>({});
+  const [photoAdjustments, setPhotoAdjustments] =
+    useState<TripClipPhotoAdjustmentMap>({});
   const [ratio, setRatio] = useState<TripClipRatio>("9:16");
+  const [videoQuality, setVideoQuality] =
+    useState<VideoQualityId>(DEFAULT_VIDEO_QUALITY);
   const [template, setTemplate] = useState<TripClipTemplate>("minimal");
   const [transition, setTransition] = useState<TripClipTransition>("fade");
   const [transitionDuration, setTransitionDuration] = useState(0.45);
@@ -360,10 +389,13 @@ export default function TripClipScreen() {
   const [isImportingPhotos, setIsImportingPhotos] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [, setIsMusicPreviewing] = useState(false);
-  const [exportFormat, setExportFormat] = useState<ExportFormat>("images");
+  const [exportFormat, setExportFormat] = useState<ExportFormat>("mp4");
   const [imageSaveFormat, setImageSaveFormat] =
     useState<ImageSaveFormat>("original");
   const [cloudBackupEnabled, setCloudBackupEnabled] = useState(false);
+  const [backupOverview, setBackupOverview] =
+    useState<CloudBackupOverview>(initialBackupOverview);
+  const [shouldBackupVideoExport, setShouldBackupVideoExport] = useState(true);
   const [workTitle, setWorkTitle] = useState("");
   const [isExporting, setIsExporting] = useState(false);
   const [renderedVideoUri, setRenderedVideoUri] = useState<string | null>(null);
@@ -410,6 +442,15 @@ export default function TripClipScreen() {
       ? customMusic?.name ?? "내 음악 선택"
       : "무음";
   const creatorExportActive = isCreatorSubscriptionActive(subscription);
+  const videoBackupRemaining = getRemainingBackupSlots(
+    backupOverview.videoCount,
+    CLOUD_BACKUP_VIDEO_LIMIT
+  );
+  const canBackupVideoExport =
+    cloudBackupEnabled &&
+    Boolean(user) &&
+    creatorExportActive &&
+    canBackupMoreVideos(backupOverview.videoCount);
   const player = useAudioPlayer(activeMusicSource);
 
   const selectedPhotos = useMemo(
@@ -425,9 +466,16 @@ export default function TripClipScreen() {
     (id: string, index: number) => durations[id] ?? getDefaultFrameDuration(index),
     [durations]
   );
-  const totalDuration = selectedIds.reduce(
-    (sum, id, index) => sum + getFrameDuration(id, index),
-    0
+  const totalDuration = calculateVideoDuration(selectedIds, getFrameDuration);
+  const videoDurationTooLong = isVideoDurationTooLong(totalDuration);
+  const selectedVideoQuality = getVideoQualityOption(videoQuality);
+  const updatePhotoAdjustment = useCallback(
+    (photoId: string, adjustment: TripClipPhotoAdjustment) => {
+      setPhotoAdjustments((current) =>
+        setTripClipPhotoAdjustment(current, photoId, adjustment)
+      );
+    },
+    []
   );
   const recordingFrame = useMemo(
     () =>
@@ -623,6 +671,15 @@ export default function TripClipScreen() {
     }, [loadPhotos])
   );
 
+  useEffect(
+    () =>
+      subscribeCloudBackupOverview({
+        user,
+        onChange: setBackupOverview
+      }),
+    [user]
+  );
+
   useEffect(() => {
     if (selectedIds.length === 0) {
       autoDurationIdsRef.current.clear();
@@ -684,7 +741,7 @@ export default function TripClipScreen() {
 
   useEffect(() => {
     setRenderedVideoUri(null);
-  }, [customMusic?.uri, musicMode, selectedUserMusicId]);
+  }, [customMusic?.uri, musicMode, ratio, selectedUserMusicId, videoQuality]);
 
   useEffect(() => {
     if (activeIndex >= selectedPhotos.length) {
@@ -771,32 +828,18 @@ export default function TripClipScreen() {
     });
   };
 
-  const deletePickerPhoto = (photo: PhotoItem) => {
-    Alert.alert("사진을 삭제할까요?", "앱에 저장된 사진 목록에서 삭제됩니다.", [
-      { text: "취소", style: "cancel" },
-      {
-        text: "삭제",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await deletePhoto(photo.id);
-            setPhotos((current) => current.filter((item) => item.id !== photo.id));
-            setSelectedIds((current) => current.filter((id) => id !== photo.id));
-            setDurations((current) => {
-              const next = { ...current };
-              delete next[photo.id];
-              return next;
-            });
-            setActiveIndex((current) =>
-              Math.max(0, Math.min(current, selectedIds.length - 2))
-            );
-            setExportMessage("사진을 삭제했습니다.");
-          } catch (error) {
-            setExportMessage(getUserFacingErrorMessage(error, "사진을 삭제하지 못했습니다."));
-          }
-        }
-      }
-    ]);
+  const deselectPickerPhoto = (photo: PhotoItem) => {
+    const nextSelection = deselectTripClipPhoto({
+      photoId: photo.id,
+      selectedIds,
+      durations,
+      activeIndex
+    });
+
+    setSelectedIds(nextSelection.selectedIds);
+    setDurations(nextSelection.durations);
+    setActiveIndex(nextSelection.activeIndex);
+    setExportMessage("사진 선택을 해제했습니다.");
   };
 
   const pickPhotosFromPreview = async () => {
@@ -997,7 +1040,7 @@ export default function TripClipScreen() {
     }
 
     const totalFrames = Math.max(1, Math.ceil(totalDuration * VIEW_RECORDER_FPS));
-    const outputSize = recordingOutputSize[ratio];
+    const outputSize = getVideoQualityOutputSize(videoQuality, ratioAspect[ratio]);
     const outputUri = `${FileSystem.cacheDirectory}trip-clip-${Date.now()}.mp4`;
     const output = toNativeFilePath(outputUri);
     const audioFilePath =
@@ -1008,7 +1051,7 @@ export default function TripClipScreen() {
     await preloadSelectedPreviewImages();
     setRecordingFrameIndex(0);
     await waitForPaint();
-    onProgress?.(12, "기기 안에서 영상 저장을 준비하고 있습니다.");
+    onProgress?.(12, "영상 제작을 준비하고 있습니다.");
 
     const recordedPath = await recorder.record({
       output,
@@ -1018,6 +1061,7 @@ export default function TripClipScreen() {
       height: outputSize.height,
       codec: "h264",
       quality: 0.92,
+      bitrate: selectedVideoQuality.bitrate,
       keyFrameInterval: 1,
       ...(audioFilePath ? { audioFile: { path: audioFilePath, startTime: 0 } } : {}),
       onFrame: async ({ frameIndex }) => {
@@ -1028,7 +1072,7 @@ export default function TripClipScreen() {
         const percent = 12 + Math.round((framesEncoded / totalFrames) * 70);
         onProgress?.(
           Math.min(82, percent),
-          `기기 안에서 MP4 영상을 만들고 있습니다. ${framesEncoded}/${totalFrames}`
+          `영상을 제작중입니다. ${framesEncoded}/${totalFrames}`
         );
       }
     });
@@ -1080,9 +1124,25 @@ export default function TripClipScreen() {
     }
   };
 
+  const showVideoDurationBlocked = () => {
+    setExportMessage(VIDEO_EXPORT_BLOCKED_MESSAGE);
+    setExportProgress({
+      visible: true,
+      percent: 100,
+      title: "내보내기 불가",
+      detail: `현재 예상 길이는 ${formatVideoDuration(totalDuration)}입니다. 최대 길이는 ${formatVideoDuration(MAX_VIDEO_DURATION_SECONDS)}입니다.`,
+      error: VIDEO_EXPORT_BLOCKED_MESSAGE
+    });
+  };
+
   const saveSelectedExport = async () => {
     if (exportFormat !== "mp4") {
       await executeSelectedExport();
+      return;
+    }
+
+    if (videoDurationTooLong) {
+      showVideoDurationBlocked();
       return;
     }
 
@@ -1114,7 +1174,7 @@ export default function TripClipScreen() {
           percent: 100,
           title: "무료 저장 한도 초과",
           detail: "무료 로그인 사용자는 MP4 영상을 주 1개까지 만들 수 있습니다.",
-          error: `이번 주(${usage.weekLabel}) 무료 저장 1회를 이미 사용했습니다. 영상 내보내기 플랜을 이용하면 제한 없이 만들 수 있습니다.`
+          error: `이번 주(${usage.weekLabel}) 무료 저장 1회를 이미 사용했습니다. 구독하면 제한 없이 만들 수 있고 광고도 제거됩니다.`
         });
         return;
       }
@@ -1148,6 +1208,11 @@ export default function TripClipScreen() {
 
     if (selectedPhotos.length === 0 || isExporting) {
       setExportMessage("저장하기 전에 사진을 선택해 주세요.");
+      return;
+    }
+
+    if (exportFormat === "mp4" && videoDurationTooLong) {
+      showVideoDurationBlocked();
       return;
     }
 
@@ -1299,8 +1364,12 @@ export default function TripClipScreen() {
         musicLabel: activeMusicLabel
       });
       let backupWarning: string | null = null;
+      const wantsVideoBackup =
+        shouldBackupVideoExport && cloudBackupEnabled && user && creatorExportActive;
 
-      if (cloudBackupEnabled && user && isCreatorSubscriptionActive(subscription)) {
+      if (wantsVideoBackup && !canBackupMoreVideos(backupOverview.videoCount)) {
+        backupWarning = `영상 백업 한도 ${CLOUD_BACKUP_VIDEO_LIMIT}개를 모두 사용해 클라우드 백업은 건너뛰었습니다.`;
+      } else if (wantsVideoBackup) {
         try {
           setExportProgress({
             visible: true,
@@ -1330,8 +1399,8 @@ export default function TripClipScreen() {
         percent: 100,
         title: "저장 완료",
         detail: backupWarning
-          ? "저장한 영상은 작업물 목록에서 확인할 수 있고, 클라우드 백업은 나중에 다시 시도할 수 있습니다."
-          : "저장한 영상을 작업물 목록에서 확인할 수 있습니다.",
+          ? "저장한 영상은 핸드폰 갤러리에 저장됐습니다. 클라우드 백업은 나중에 다시 시도할 수 있습니다."
+          : "저장한 영상은 핸드폰 갤러리에 저장됐습니다.",
         completedVideoId: savedVideo.id
       });
       if (reservedWeeklyExport && user) {
@@ -1360,6 +1429,11 @@ export default function TripClipScreen() {
   };
 
   const shareSelectedExport = async () => {
+    if (exportFormat === "mp4" && videoDurationTooLong) {
+      showVideoDurationBlocked();
+      return;
+    }
+
     if (selectedPhotos.length === 0 || isExporting) {
       setExportMessage("공유하기 전에 사진을 선택해 주세요.");
       return;
@@ -1432,7 +1506,7 @@ export default function TripClipScreen() {
       >
       <View style={styles.header}>
         <Text selectable style={styles.eyebrow}>
-          여행 클립
+          여행클립 만들기
         </Text>
         <Text selectable style={styles.title}>
           다중 편집
@@ -1469,6 +1543,8 @@ export default function TripClipScreen() {
                 guideSize={previewGuideSize}
                 guideStrokeWidth={previewGuideStrokeWidth}
                 guideColor={previewGuideColor}
+                photoAdjustments={photoAdjustments}
+                onPhotoAdjustmentChange={updatePhotoAdjustment}
               />
               <Pressable
                 style={[
@@ -1512,6 +1588,11 @@ export default function TripClipScreen() {
           <Text selectable style={styles.previewDetail}>
             {ratio} / {transitionLabel(transition)} / {activeMusicLabel}
           </Text>
+          {videoDurationTooLong ? (
+            <Text selectable style={styles.durationWarningText}>
+              {VIDEO_DURATION_LIMIT_MESSAGE}
+            </Text>
+          ) : null}
         </View>
 
         <View style={styles.playbackPanel}>
@@ -1536,7 +1617,7 @@ export default function TripClipScreen() {
               </Pressable>
             </View>
             <Text selectable style={styles.timeText}>
-              {formatClipTime(progressSeconds)} / {formatClipTime(totalDuration)}
+              {formatVideoDuration(progressSeconds)} / {formatVideoDuration(totalDuration)}
             </Text>
             <View style={[styles.playbackSide, styles.playbackSideRight]}>
               <Pressable style={styles.restartButton} onPress={() => jumpPhoto(1)}>
@@ -1603,7 +1684,7 @@ export default function TripClipScreen() {
                         hitSlop={8}
                         onPress={(event) => {
                           event.stopPropagation();
-                          deletePickerPhoto(photo);
+                          deselectPickerPhoto(photo);
                         }}
                       >
                         <Text selectable={false} style={styles.removePhotoButtonText}>
@@ -1698,6 +1779,25 @@ export default function TripClipScreen() {
             />
           ))}
         </OptionRow>
+        <Text selectable style={styles.settingLabel}>
+          영상 화질
+        </Text>
+        <OptionRow>
+          {VIDEO_QUALITY_OPTIONS.map((option) => (
+            <Chip
+              key={option.id}
+              label={option.label}
+              active={videoQuality === option.id}
+              onPress={() => {
+                setVideoQuality(option.id);
+                setRenderedVideoUri(null);
+              }}
+            />
+          ))}
+        </OptionRow>
+        <Text selectable style={styles.settingDetail}>
+          {VIDEO_QUALITY_DESCRIPTION}
+        </Text>
         {transition === "fade" ? (
           <>
             <Text selectable style={styles.settingDetail}>
@@ -1966,7 +2066,7 @@ export default function TripClipScreen() {
             </Text>
           ) : exportFormat === "mp4" && creatorExportActive ? (
             <Text selectable style={styles.exportNotice}>
-              영상 내보내기 플랜 이용 중입니다. MP4 영상을 제한 없이 저장할 수 있습니다.
+              구독 이용 중입니다. MP4 영상을 제한 없이 저장하고 광고 없이 사용할 수 있습니다.
             </Text>
           ) : exportFormat === "mp4" ? (
             <Text selectable style={styles.exportNotice}>
@@ -2022,6 +2122,44 @@ export default function TripClipScreen() {
               );
             })}
           </View>
+          {exportFormat === "mp4" ? (
+            <Pressable
+              disabled={!canBackupVideoExport}
+              style={[
+                styles.videoBackupOption,
+                !canBackupVideoExport && styles.videoBackupOptionDisabled
+              ]}
+              onPress={() => {
+                setShouldBackupVideoExport((current) => !current);
+                setExportMessage(null);
+              }}
+            >
+              <View
+                style={[
+                  styles.videoBackupCheckbox,
+                  shouldBackupVideoExport &&
+                    canBackupVideoExport &&
+                    styles.videoBackupCheckboxActive
+                ]}
+              >
+                {shouldBackupVideoExport && canBackupVideoExport ? (
+                  <Text selectable={false} style={styles.videoBackupCheckboxText}>
+                    ✓
+                  </Text>
+                ) : null}
+              </View>
+              <View style={styles.videoBackupCopy}>
+                <Text selectable style={styles.videoBackupTitle}>
+                  클라우드 백업
+                </Text>
+                <Text selectable style={styles.videoBackupDetail}>
+                  {cloudBackupEnabled && creatorExportActive
+                    ? `체크한 영상만 백업합니다. 남은 영상 백업 ${videoBackupRemaining}개 / ${CLOUD_BACKUP_VIDEO_LIMIT}개`
+                    : "구독과 클라우드 백업 설정이 켜져 있을 때 사용할 수 있습니다."}
+                </Text>
+              </View>
+            </Pressable>
+          ) : null}
           {exportFormat === "images" ? (
             <View style={styles.imageFormatPanel}>
               <Text selectable style={styles.settingLabel}>
@@ -2064,10 +2202,11 @@ export default function TripClipScreen() {
           ) : null}
           <View style={styles.previewActions}>
             <Pressable
-              disabled={isExporting}
+              disabled={isExporting || selectedPhotos.length === 0 || videoDurationTooLong}
               style={[
                 styles.primaryButton,
-                isExporting && styles.disabledButton
+                (isExporting || selectedPhotos.length === 0 || videoDurationTooLong) &&
+                  styles.disabledButton
               ]}
               onPress={saveSelectedExport}
             >
@@ -2082,10 +2221,17 @@ export default function TripClipScreen() {
               </Text>
             </Pressable>
             <Pressable
-              disabled={isExporting || selectedPhotos.length === 0}
+              disabled={
+                isExporting ||
+                selectedPhotos.length === 0 ||
+                (exportFormat === "mp4" && videoDurationTooLong)
+              }
               style={[
                 styles.secondaryButton,
-                (isExporting || selectedPhotos.length === 0) && styles.disabledButton
+                (isExporting ||
+                  selectedPhotos.length === 0 ||
+                  (exportFormat === "mp4" && videoDurationTooLong)) &&
+                  styles.disabledButton
               ]}
               onPress={shareSelectedExport}
             >
@@ -2121,6 +2267,7 @@ export default function TripClipScreen() {
               template={template}
               transition={transition}
               showWatermark={!creatorExportActive}
+              photoAdjustments={photoAdjustments}
             />
           </OptionalRecordingView>
         </View>
@@ -2172,20 +2319,19 @@ export default function TripClipScreen() {
         }}
       >
         <View style={styles.exportModalBackdrop}>
-          <ScrollView
+          <View
             style={[
               styles.exportModalPanel,
               exportProgress.error && styles.exportModalPanelError
             ]}
-            contentContainerStyle={styles.exportModalContent}
-            showsVerticalScrollIndicator={false}
           >
-            <Text style={styles.exportModalTitle}>
-              {exportProgress.title}
-            </Text>
-            <Text style={styles.exportModalDetail}>
-              {exportProgress.detail}
-            </Text>
+            <View style={styles.exportModalContent}>
+              <Text style={styles.exportModalTitle}>
+                {exportProgress.title}
+              </Text>
+              <Text style={styles.exportModalDetail}>
+                {exportProgress.detail}
+              </Text>
             {exportProgress.error ? (
               <View style={styles.exportErrorBox}>
                 <Text style={styles.exportErrorLabel}>
@@ -2252,7 +2398,8 @@ export default function TripClipScreen() {
                 </Pressable>
               </View>
             ) : null}
-          </ScrollView>
+            </View>
+          </View>
         </View>
       </Modal>
       <Modal
@@ -2291,21 +2438,37 @@ export default function TripClipScreen() {
   );
 }
 
+const getRecordingPhotoAdjustmentStyle = (adjustment: TripClipPhotoAdjustment) => ({
+  transform: [
+    { translateX: adjustment.translateX },
+    { translateY: adjustment.translateY },
+    { scale: adjustment.scale }
+  ]
+});
+
 function TripClipRecordingCanvas({
   frame,
   template,
   transition,
-  showWatermark
+  showWatermark,
+  photoAdjustments
 }: {
   frame: RecordingFrame;
   template: TripClipTemplate;
   transition: TripClipTransition;
   showWatermark: boolean;
+  photoAdjustments: TripClipPhotoAdjustmentMap;
 }) {
   const isFilm = template === "film-log";
   const isCenter = template === "center-cut";
   const contentFit = isFilm || isCenter ? "contain" : "cover";
   const progress = frame.transitionProgress;
+  const currentAdjustmentStyle = getRecordingPhotoAdjustmentStyle(
+    getTripClipPhotoAdjustment(photoAdjustments, frame.currentPhoto?.id)
+  );
+  const nextAdjustmentStyle = getRecordingPhotoAdjustmentStyle(
+    getTripClipPhotoAdjustment(photoAdjustments, frame.nextPhoto?.id)
+  );
   const nextLayerStyle =
     transition === "slide"
       ? { opacity: progress > 0 ? 1 : 0, transform: [{ translateX: (1 - progress) * 44 }] }
@@ -2317,22 +2480,26 @@ function TripClipRecordingCanvas({
     <View style={[styles.recordingCanvasInner, isFilm && styles.recordingCanvasFilm]}>
       {frame.currentPhoto ? (
         <View style={styles.recordingLayer}>
-          <Image
-            source={{ uri: getPreviewUri(frame.currentPhoto) }}
-            style={[styles.recordingImage, isFilm && styles.recordingImageFilm]}
-            contentFit={contentFit}
-            cachePolicy="memory-disk"
-          />
+          <View style={[styles.recordingImageMotionLayer, currentAdjustmentStyle]}>
+            <Image
+              source={{ uri: getPreviewUri(frame.currentPhoto) }}
+              style={[styles.recordingImage, isFilm && styles.recordingImageFilm]}
+              contentFit={contentFit}
+              cachePolicy="memory-disk"
+            />
+          </View>
         </View>
       ) : null}
       {frame.nextPhoto ? (
         <View style={[styles.recordingLayer, styles.recordingNextLayer, nextLayerStyle]}>
-          <Image
-            source={{ uri: getPreviewUri(frame.nextPhoto) }}
-            style={[styles.recordingImage, isFilm && styles.recordingImageFilm]}
-            contentFit={contentFit}
-            cachePolicy="memory-disk"
-          />
+          <View style={[styles.recordingImageMotionLayer, nextAdjustmentStyle]}>
+            <Image
+              source={{ uri: getPreviewUri(frame.nextPhoto) }}
+              style={[styles.recordingImage, isFilm && styles.recordingImageFilm]}
+              contentFit={contentFit}
+              cachePolicy="memory-disk"
+            />
+          </View>
         </View>
       ) : null}
       {isFilm ? (
@@ -2518,6 +2685,9 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%"
   },
+  recordingImageMotionLayer: {
+    flex: 1
+  },
   recordingImageFilm: {
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.22)"
@@ -2695,6 +2865,13 @@ const styles = StyleSheet.create({
   previewDetail: {
     color: colors.muted,
     fontSize: typography.small,
+    lineHeight: 18,
+    letterSpacing: 0
+  },
+  durationWarningText: {
+    color: colors.text,
+    fontSize: typography.small,
+    fontWeight: "800",
     lineHeight: 18,
     letterSpacing: 0
   },
@@ -3327,6 +3504,55 @@ const styles = StyleSheet.create({
     borderColor: colors.inverse,
     backgroundColor: colors.inverse
   },
+  videoBackupOption: {
+    minHeight: 72,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.surface
+  },
+  videoBackupOptionDisabled: {
+    opacity: 0.58
+  },
+  videoBackupCheckbox: {
+    width: 22,
+    height: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: colors.text,
+    backgroundColor: colors.background
+  },
+  videoBackupCheckboxActive: {
+    backgroundColor: colors.text
+  },
+  videoBackupCheckboxText: {
+    color: colors.inverse,
+    fontSize: 14,
+    fontWeight: "900",
+    lineHeight: 16,
+    letterSpacing: 0
+  },
+  videoBackupCopy: {
+    flex: 1,
+    gap: 4
+  },
+  videoBackupTitle: {
+    color: colors.text,
+    fontSize: typography.button,
+    fontWeight: "800",
+    letterSpacing: 0
+  },
+  videoBackupDetail: {
+    color: colors.muted,
+    fontSize: typography.small,
+    lineHeight: 17,
+    letterSpacing: 0
+  },
   imageFormatPanel: {
     gap: 8,
     paddingVertical: 4
@@ -3430,7 +3656,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.text,
     backgroundColor: colors.background,
-    overflow: "visible"
+    overflow: "hidden"
   },
   exportModalContent: {
     gap: 12,

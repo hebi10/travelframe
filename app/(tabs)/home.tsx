@@ -16,6 +16,8 @@ import { ScreenShell } from "@/components/screen-shell";
 import { colors, typography } from "@/constants/app-theme";
 import { useAppAppearance } from "@/lib/app-appearance";
 
+const HOME_SLIDE_IMAGE_ASPECT_RATIO = 2 / 3;
+
 const homeSlides: {
   image: number;
   href: Href;
@@ -111,7 +113,7 @@ export default function HomeScreen() {
               <Image
                 source={slide.image}
                 style={[styles.heroImage, { backgroundColor: palette.surface }]}
-                contentFit="cover"
+                contentFit="contain"
               />
               <View style={[styles.heroCopy, { borderTopColor: palette.line }]}>
                 <View style={styles.heroCopyHeader}>
@@ -208,7 +210,7 @@ const styles = StyleSheet.create({
   },
   heroImage: {
     width: "100%",
-    aspectRatio: 1,
+    aspectRatio: HOME_SLIDE_IMAGE_ASPECT_RATIO,
     backgroundColor: "#F5F5F2"
   },
   heroCopy: {

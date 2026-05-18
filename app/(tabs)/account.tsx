@@ -35,6 +35,11 @@ import {
   type UserMusicTrack
 } from "@/lib/user-music";
 import { type AppPalette, useAppAppearance } from "@/lib/app-appearance";
+import { getAppSettings } from "@/lib/app-settings";
+import {
+  subscribeCloudBackupOverview,
+  type CloudBackupOverview
+} from "@/lib/cloud-backup";
 
 type AuthMode = "signIn" | "signUp" | "recover";
 type PaymentPlanId = "adRemove" | "creator";
@@ -60,6 +65,16 @@ const initialStats: UsageStats = {
   editedPhotos: 0,
   imageBundles: 0,
   videos: 0
+};
+
+const initialBackupOverview: CloudBackupOverview = {
+  photoCount: 0,
+  imageBundleCount: 0,
+  videoCount: 0,
+  deleteAfter: null,
+  status: "none",
+  backedUpAt: null,
+  deletedAt: null
 };
 
 const initialSubscriptionProducts: UserSubscriptionProducts = {
@@ -88,12 +103,13 @@ const paymentPlans: PaymentPlan[] = [
   },
   {
     id: "creator",
-    title: "영상 내보내기",
+    title: "구독",
     price: "월 3,900원",
     billing: "월결제",
-    summary: "월 결제로 영상 내보내기와 백업 기능을 사용합니다.",
+    summary: "구독하면 영상 저장, 클라우드 백업, 광고 제거를 함께 사용할 수 있습니다.",
     benefits: [
       "편집 화면에서 영상으로 내보내기 가능",
+      "구독 기간 동안 앱 전반의 광고 제거",
       "저장 한도를 200장까지 확장",
       "여러 사진 작업과 영상 작업 백업 가능",
       "빠른 영상 저장 지원",
@@ -174,22 +190,23 @@ export default function AccountScreen() {
     logOut,
     sendVerificationEmail,
     resetPassword,
-    changePassword,
-    updateName,
     refreshUser,
     startMockSubscription
   } = useAuth();
   const [mode, setMode] = useState<AuthMode>("signIn");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [displayName, setDisplayName] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false);
   const [isMusicSubmitting, setIsMusicSubmitting] = useState(false);
   const [selectedPaymentPlan, setSelectedPaymentPlan] = useState<PaymentPlan | null>(null);
   const [stats, setStats] = useState<UsageStats>(initialStats);
+  const [cloudBackupEnabled, setCloudBackupEnabled] = useState(false);
+  const [backupOverview, setBackupOverview] =
+    useState<CloudBackupOverview>(initialBackupOverview);
+  const [isSubscriptionProductsLoading, setIsSubscriptionProductsLoading] =
+    useState(true);
   const [subscriptionProducts, setSubscriptionProducts] = useState<UserSubscriptionProducts>(
     initialSubscriptionProducts
   );
@@ -201,6 +218,7 @@ export default function AccountScreen() {
   useFocusEffect(
     useCallback(() => {
       let isActive = true;
+      setIsSubscriptionProductsLoading(true);
 
       const loadStats = async () => {
         const [
@@ -208,12 +226,14 @@ export default function AccountScreen() {
           videos,
           imageBundles,
           userMusicTracks,
+          appSettings,
           nextSubscriptionProducts
         ] = await Promise.all([
           getPhotos(),
           getMadeVideos(),
           getImageBundleWorks(),
           user ? syncUserMusicTracks(user) : Promise.resolve([]),
+          getAppSettings(),
           getUserSubscriptionProducts(user)
         ]);
 
@@ -227,16 +247,31 @@ export default function AccountScreen() {
           imageBundles: imageBundles.length,
           videos: videos.length
         });
+        setCloudBackupEnabled(appSettings.cloudBackupEnabled);
         setMusicTracks(userMusicTracks);
         setSubscriptionProducts(nextSubscriptionProducts);
+        setIsSubscriptionProductsLoading(false);
       };
 
-      loadStats();
+      loadStats().catch(() => {
+        if (isActive) {
+          setIsSubscriptionProductsLoading(false);
+        }
+      });
 
       return () => {
         isActive = false;
       };
     }, [user])
+  );
+
+  useEffect(
+    () =>
+      subscribeCloudBackupOverview({
+        user,
+        onChange: setBackupOverview
+      }),
+    [user]
   );
 
   const providerText = useMemo(() => {
@@ -251,10 +286,6 @@ export default function AccountScreen() {
 
     return "이메일";
   }, [user]);
-
-  useEffect(() => {
-    setDisplayName(user?.displayName ?? "");
-  }, [user?.displayName]);
 
   const accountEmail = user?.email ?? email;
 
@@ -398,22 +429,6 @@ export default function AccountScreen() {
     });
   };
 
-  const handleChangePassword = () => {
-    if (newPassword.length < 6) {
-      setMessage("새 비밀번호는 6자리 이상으로 입력해 주세요.");
-      return;
-    }
-
-    runAuthAction(async () => {
-      await changePassword(newPassword);
-      setNewPassword("");
-    }, "비밀번호를 변경했습니다.");
-  };
-
-  const handleUpdateName = () => {
-    runAuthAction(() => updateName(displayName), "이름을 저장했습니다.");
-  };
-
   const handleMockPayment = (plan: PaymentPlan) => {
     if (!user) {
       setSelectedPaymentPlan(null);
@@ -429,10 +444,21 @@ export default function AccountScreen() {
   };
 
   const getPaymentPlanStatus = (plan: PaymentPlan) => {
+    if (isSubscriptionProductsLoading) {
+      return {
+        active: false,
+        label: "확인 중..."
+      };
+    }
+
     if (plan.id === "adRemove") {
       return {
-        active: Boolean(subscriptionProducts.adRemove),
-        label: subscriptionProducts.adRemove ? "구매 완료" : plan.billing
+        active: Boolean(subscriptionProducts.adRemove || subscriptionProducts.creatorMonthly),
+        label: subscriptionProducts.adRemove
+          ? "구매 완료"
+          : subscriptionProducts.creatorMonthly
+            ? "구독 포함"
+            : plan.billing
       };
     }
 
@@ -660,6 +686,33 @@ export default function AccountScreen() {
                   </View>
                 </View>
               ) : null}
+              <View style={styles.form}>
+                <Pressable
+                  disabled={isSubmitting}
+                  style={[styles.primaryButton, themed.activeFill, isSubmitting && styles.disabledButton]}
+                  onPress={() => runAuthAction(logOut, "로그아웃했습니다.")}
+                >
+                  <Text selectable={false} style={[styles.primaryButtonText, themed.inverseText]}>
+                    로그아웃
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.secondaryButton, themed.secondaryButton]}
+                  onPress={() => Linking.openURL(PRIVACY_POLICY_URL)}
+                >
+                  <Text selectable={false} style={[styles.secondaryButtonText, themed.text]}>
+                    개인정보처리방침
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.secondaryButton, themed.secondaryButton]}
+                  onPress={() => Linking.openURL(DELETE_ACCOUNT_REQUEST_URL)}
+                >
+                  <Text selectable={false} style={[styles.secondaryButtonText, themed.text]}>
+                    계정 및 데이터 삭제 요청
+                  </Text>
+                </Pressable>
+              </View>
             </View>
           </SectionBlock>
 
@@ -677,11 +730,25 @@ export default function AccountScreen() {
               />
               <InfoRow
                 label="광고 제거"
-                value={subscriptionProducts.adRemove ? "구매 완료" : "미구매"}
+                value={
+                  isSubscriptionProductsLoading
+                    ? "확인 중..."
+                    : subscriptionProducts.adRemove
+                    ? "구매 완료"
+                    : subscriptionProducts.creatorMonthly
+                      ? "구독 포함"
+                      : "미구매"
+                }
               />
               <InfoRow
-                label="영상 내보내기"
-                value={subscriptionProducts.creatorMonthly ? "구독 중" : "미구독"}
+                label="구독"
+                value={
+                  isSubscriptionProductsLoading
+                    ? "확인 중..."
+                    : subscriptionProducts.creatorMonthly
+                      ? "구독 중"
+                      : "미구독"
+                }
               />
               <InfoRow
                 label="구독 시작일"
@@ -692,6 +759,42 @@ export default function AccountScreen() {
                 value={subscription.expiresAt ? formatDateTime(subscription.expiresAt) : "없음"}
               />
               <InfoRow label="클라우드 백업" value={hasFullAccess ? "사용 가능" : "프리미엄 활성 후 사용 권장"} />
+            </View>
+          </SectionBlock>
+
+          <SectionBlock title="클라우드 백업">
+            <View style={[styles.backupSummaryPanel, themed.panel]}>
+              <View style={styles.infoList}>
+                <InfoRow
+                  label="백업 설정"
+                  value={cloudBackupEnabled ? "켜짐" : "꺼짐"}
+                />
+                <InfoRow
+                  label="백업 권한"
+                  value={
+                    subscriptionProducts.creatorMonthly
+                      ? "사용 가능"
+                      : isLoggedIn
+                        ? "구독 후 사용 가능"
+                        : "로그인 필요"
+                  }
+                />
+                <InfoRow
+                  label="백업 데이터"
+                  value={`사진 ${backupOverview.photoCount}장 / 여러 사진 작업 ${backupOverview.imageBundleCount}개 / 영상 ${backupOverview.videoCount}개`}
+                />
+                <InfoRow
+                  label="마지막 백업"
+                  value={backupOverview.backedUpAt ? formatDateTime(backupOverview.backedUpAt) : "기록 없음"}
+                />
+                <InfoRow
+                  label="삭제 방식"
+                  value="설정에서 직접 요청"
+                />
+              </View>
+              <Text selectable style={[styles.helpText, themed.mutedText]}>
+                설정의 클라우드 백업에서 켜거나 끌 수 있습니다. 구독 기간이 끝나면 새 백업은 중단됩니다. 기존 백업 데이터 삭제는 설정에서 직접 요청할 수 있습니다.
+              </Text>
             </View>
           </SectionBlock>
 
@@ -821,76 +924,6 @@ export default function AccountScreen() {
             </View>
           </SectionBlock>
 
-          <SectionBlock title="계정 관리">
-            <View style={styles.form}>
-              <TextInput
-                value={displayName}
-                placeholder="표시 이름"
-                placeholderTextColor={palette.faint}
-                style={[styles.input, themed.input]}
-                onChangeText={setDisplayName}
-              />
-              <Pressable
-                disabled={isSubmitting}
-                style={[
-                  styles.secondaryButton,
-                  themed.secondaryButton,
-                  isSubmitting && styles.disabledButton
-                ]}
-                onPress={handleUpdateName}
-              >
-                <Text selectable={false} style={[styles.secondaryButtonText, themed.text]}>
-                  이름 저장
-                </Text>
-              </Pressable>
-              <TextInput
-                value={newPassword}
-                secureTextEntry
-                placeholder="새 비밀번호 6자리 이상"
-                placeholderTextColor={palette.faint}
-                style={[styles.input, themed.input]}
-                onChangeText={setNewPassword}
-              />
-              <Pressable
-                disabled={isSubmitting}
-                style={[
-                  styles.secondaryButton,
-                  themed.secondaryButton,
-                  isSubmitting && styles.disabledButton
-                ]}
-                onPress={handleChangePassword}
-              >
-                <Text selectable={false} style={[styles.secondaryButtonText, themed.text]}>
-                  비밀번호 변경
-                </Text>
-              </Pressable>
-              <Pressable
-                disabled={isSubmitting}
-                style={[styles.primaryButton, themed.activeFill, isSubmitting && styles.disabledButton]}
-                onPress={() => runAuthAction(logOut, "로그아웃했습니다.")}
-              >
-                <Text selectable={false} style={[styles.primaryButtonText, themed.inverseText]}>
-                  로그아웃
-                </Text>
-              </Pressable>
-              <Pressable
-                style={[styles.secondaryButton, themed.secondaryButton]}
-                onPress={() => Linking.openURL(PRIVACY_POLICY_URL)}
-              >
-                <Text selectable={false} style={[styles.secondaryButtonText, themed.text]}>
-                  개인정보처리방침
-                </Text>
-              </Pressable>
-              <Pressable
-                style={[styles.secondaryButton, themed.secondaryButton]}
-                onPress={() => Linking.openURL(DELETE_ACCOUNT_REQUEST_URL)}
-              >
-                <Text selectable={false} style={[styles.secondaryButtonText, themed.text]}>
-                  계정 및 데이터 삭제 요청
-                </Text>
-              </Pressable>
-            </View>
-          </SectionBlock>
         </>
       ) : null}
 
@@ -1257,6 +1290,13 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     textAlign: "right",
     letterSpacing: 0
+  },
+  backupSummaryPanel: {
+    padding: spacing.row,
+    borderWidth: 1,
+    borderColor: colors.line,
+    gap: 12,
+    backgroundColor: colors.background
   },
   planCard: {
     padding: spacing.row,

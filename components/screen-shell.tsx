@@ -8,7 +8,7 @@ import {
 } from "@/lib/app-settings";
 import { useAppAppearance } from "@/lib/app-appearance";
 
-const TAB_BAR_RESERVED_HEIGHT = 104;
+const TAB_BAR_RESERVED_HEIGHT = 52;
 const MAX_CONTENT_WIDTH = 750;
 
 type ScreenShellProps = {

@@ -44,7 +44,6 @@ import { type AppPalette, useAppAppearance } from "@/lib/app-appearance";
 import { useAuth } from "@/lib/auth-context";
 import {
   backupCurrentWorkspace,
-  cleanupExpiredBackup,
   deleteCloudBackupData,
   markBackupExpired,
   subscribeCloudBackupOverview,
@@ -214,7 +213,6 @@ export default function SettingsScreen() {
 
       const loadSettings = async () => {
         const storedSettings = await getAppSettings();
-        await cleanupExpiredBackup({ user, subscription });
         await markBackupExpired({ user, subscription });
         if (isActive) {
           setSettings(storedSettings);
@@ -305,7 +303,7 @@ export default function SettingsScreen() {
     if (!isCreatorSubscriptionActive(subscription)) {
       await markBackupExpired({ user, subscription });
       setAuthMessage(
-        "영상 내보내기 월결제 기간이 만료되었거나 활성화되지 않았습니다. 백업은 사용할 수 없고 기존 백업은 만료 후 3개월 뒤 제거됩니다."
+        "구독 기간이 만료되었거나 활성화되지 않았습니다. 백업은 사용할 수 없고 기존 백업 데이터 삭제는 설정에서 직접 요청할 수 있습니다."
       );
       setActiveSetting(null);
       return;
@@ -1141,7 +1139,7 @@ export default function SettingsScreen() {
                 현재 기기에 저장된 사진, 편집 결과, 영상 만들기 작업, 만든 영상 기록과 앱 설정을 계정 백업으로 저장합니다.
               </Text>
               <Text selectable style={[styles.optionDetail, themed.mutedText]}>
-                영상 내보내기 월결제 기간이 끝나면 새 백업은 중단되고, 기존 백업은 만료일 기준 3개월 뒤 제거될 수 있습니다.
+                구독 기간이 끝나면 새 백업은 중단됩니다. 기존 백업 데이터 삭제는 이 화면에서 직접 요청할 수 있습니다.
               </Text>
               <Pressable
                 disabled={isBackupSubmitting}
