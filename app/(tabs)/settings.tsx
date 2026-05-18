@@ -12,6 +12,7 @@ import {
   TextInput,
   View
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ActionRow } from "@/components/action-row";
 import { CameraGuideOverlay } from "@/components/camera-guide-overlay";
@@ -48,14 +49,31 @@ import {
 import { type AppPalette, useAppAppearance } from "@/lib/app-appearance";
 import { useAuth } from "@/lib/auth-context";
 import {
+  clearBackupFailure,
+  getBackupFailures,
+  recordBackupFailure,
+  type BackupFailureRecord
+} from "@/lib/backup-failure-queue";
+import {
+  backupImageBundleWork,
+  backupMadeVideo,
+  backupPhotoIfEnabled,
   backupCurrentWorkspace,
   deleteCloudBackupData,
+  getCloudBackupOverview,
+  getLocalWorkspaceSummary,
   markBackupExpired,
+  restoreCloudBackupToLocal,
   subscribeCloudBackupOverview,
-  type CloudBackupOverview
+  type CloudBackupOverview,
+  type LocalWorkspaceSummary
 } from "@/lib/cloud-backup";
 import { formatImageBackupUsage } from "@/lib/image-backup-utils";
+import { getPhotos } from "@/lib/photo-library";
 import { isCreatorSubscriptionActive } from "@/lib/subscription";
+import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
+import { getMadeVideos } from "@/lib/video-library";
+import { getImageBundleWorks } from "@/lib/work-library";
 
 type SettingKey =
   | "defaultGuide"
@@ -84,6 +102,20 @@ const emptyBackupOverview: CloudBackupOverview = {
   status: "none",
   backedUpAt: null,
   deletedAt: null
+};
+
+const formatBackupDateTime = (value?: string | null) => {
+  if (!value) {
+    return "기록 없음";
+  }
+
+  return new Intl.DateTimeFormat("ko-KR", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(new Date(value));
 };
 
 const guideSizeOptions = [
@@ -192,8 +224,16 @@ const screenLayoutLabel: Record<ScreenLayout, string> = {
 };
 
 export default function SettingsScreen() {
+  const insets = useSafeAreaInsets();
   const { palette } = useAppAppearance();
   const themed = useMemo(() => createThemedStyles(palette), [palette]);
+  const modalSafeStyle = useMemo(
+    () => ({
+      paddingTop: Math.max(insets.top + 14, 24),
+      paddingBottom: Math.max(insets.bottom + 14, 24)
+    }),
+    [insets.bottom, insets.top]
+  );
   const {
     user,
     subscription,
@@ -213,8 +253,13 @@ export default function SettingsScreen() {
   const [showBackupConfirm, setShowBackupConfirm] = useState(false);
   const [guideExpanded, setGuideExpanded] = useState(false);
   const [isBackupSubmitting, setIsBackupSubmitting] = useState(false);
+  const [backupFailures, setBackupFailures] = useState<BackupFailureRecord[]>([]);
   const [backupOverview, setBackupOverview] =
     useState<CloudBackupOverview>(emptyBackupOverview);
+
+  const refreshBackupFailures = useCallback(async () => {
+    setBackupFailures(await getBackupFailures());
+  }, []);
 
   useEffect(() => {
     return subscribeCloudBackupOverview({
@@ -228,10 +273,14 @@ export default function SettingsScreen() {
       let isActive = true;
 
       const loadSettings = async () => {
-        const storedSettings = await getAppSettings();
+        const [storedSettings, storedBackupFailures] = await Promise.all([
+          getAppSettings(),
+          getBackupFailures()
+        ]);
         await markBackupExpired({ user, subscription });
         if (isActive) {
           setSettings(storedSettings);
+          setBackupFailures(storedBackupFailures);
         }
       };
 
@@ -314,6 +363,10 @@ export default function SettingsScreen() {
   };
 
   const handleEnableBackup = async () => {
+    if (isBackupSubmitting) {
+      return;
+    }
+
     if (!isLoggedIn || !user) {
       setAuthMessage("로그인 후 백업을 사용할 수 있습니다.");
       setActiveSetting(null);
@@ -329,8 +382,47 @@ export default function SettingsScreen() {
       return;
     }
 
-    setActiveSetting(null);
-    setShowBackupConfirm(true);
+    try {
+      setIsBackupSubmitting(true);
+      setAuthMessage(null);
+      const [localSummary, cloudOverview] = await Promise.all([
+        getLocalWorkspaceSummary(),
+        getCloudBackupOverview({ user })
+      ]);
+      const hasCloudBackup =
+        cloudOverview.photoCount + cloudOverview.imageBundleCount + cloudOverview.videoCount > 0;
+
+      setActiveSetting(null);
+
+      if (!hasCloudBackup) {
+        setShowBackupConfirm(true);
+        return;
+      }
+
+      Alert.alert(
+        "기존 백업 데이터",
+        `이 계정에 기존 백업 데이터가 있습니다. 현재 기기의 데이터를 백업하거나 기존 백업 데이터를 불러올 수 있습니다.\n\n기존 백업: 사진 ${cloudOverview.photoCount}장 / 여러 사진 작업 ${cloudOverview.imageBundleCount}개 / 영상 ${cloudOverview.videoCount}개\n이미지 백업 용량: ${formatImageBackupUsage(cloudOverview.imageBackupBytes)}\n마지막 백업: ${formatBackupDateTime(cloudOverview.backedUpAt)}`,
+        [
+          {
+            text: "현재 기기 데이터 백업",
+            onPress: () => confirmCurrentDeviceBackup()
+          },
+          {
+            text: "클라우드 데이터 불러오기",
+            onPress: () => confirmCloudRestore(localSummary)
+          },
+          {
+            text: "나중에 선택",
+            style: "cancel",
+            onPress: () => setAuthMessage("백업 선택을 나중에 다시 진행할 수 있습니다.")
+          }
+        ]
+      );
+    } catch (error) {
+      setAuthMessage(error instanceof Error ? error.message : "백업 상태를 확인하지 못했습니다.");
+    } finally {
+      setIsBackupSubmitting(false);
+    }
   };
 
   const confirmBackup = async () => {
@@ -349,6 +441,162 @@ export default function SettingsScreen() {
       );
     } catch (error) {
       setAuthMessage(error instanceof Error ? error.message : "백업 중 문제가 발생했습니다.");
+    } finally {
+      setIsBackupSubmitting(false);
+    }
+  };
+
+  const confirmCurrentDeviceBackup = () => {
+    Alert.alert(
+      "현재 기기 데이터 백업",
+      "현재 기기의 데이터로 백업을 시작합니다. 기존 클라우드 백업과 중복될 수 있습니다. 계속하시겠습니까?",
+      [
+        { text: "취소", style: "cancel" },
+        {
+          text: "계속",
+          onPress: () => {
+            void confirmBackup();
+          }
+        }
+      ]
+    );
+  };
+
+  const restoreBackupData = async () => {
+    if (isBackupSubmitting) {
+      return;
+    }
+
+    try {
+      setIsBackupSubmitting(true);
+      setAuthMessage(null);
+      const summary = await restoreCloudBackupToLocal({ user });
+      await updateSetting({ cloudBackupEnabled: true });
+      setAuthMessage(
+        `클라우드 백업을 불러왔습니다. 사진 ${summary.photoCount}장, 여러 사진 작업 ${summary.imageBundleCount}개, 영상 ${summary.videoCount}개를 현재 기기 목록에 반영했습니다.`
+      );
+    } catch (error) {
+      setAuthMessage(error instanceof Error ? error.message : "클라우드 백업을 불러오지 못했습니다.");
+    } finally {
+      setIsBackupSubmitting(false);
+    }
+  };
+
+  const confirmCloudRestore = (localSummary: LocalWorkspaceSummary) => {
+    const showWarning = () =>
+      Alert.alert(
+        "클라우드 데이터 불러오기",
+        "클라우드 백업 데이터를 불러오면 현재 기기의 사진, 작업물, 영상 목록이 클라우드 백업 기준으로 변경됩니다. 자동 병합하지 않습니다. 계속하시겠습니까?",
+        [
+          { text: "취소", style: "cancel" },
+          {
+            text: "불러오기",
+            onPress: () => {
+              void restoreBackupData();
+            }
+          }
+        ]
+      );
+
+    if (localSummary.totalCount > 0) {
+      showWarning();
+      return;
+    }
+
+    void restoreBackupData();
+  };
+
+  const retryBackupFailures = async () => {
+    if (isBackupSubmitting) {
+      return;
+    }
+
+    if (!isLoggedIn || !user) {
+      setAuthMessage("로그인 후 실패한 백업을 다시 시도할 수 있습니다.");
+      return;
+    }
+
+    if (!settings.cloudBackupEnabled || !isCreatorSubscriptionActive(subscription)) {
+      setAuthMessage("구독과 클라우드 백업 설정이 켜져 있을 때 다시 시도할 수 있습니다.");
+      return;
+    }
+
+    try {
+      setIsBackupSubmitting(true);
+      setAuthMessage(null);
+      const [failures, photos, imageBundles, videos] = await Promise.all([
+        getBackupFailures(),
+        getPhotos(),
+        getImageBundleWorks(),
+        getMadeVideos()
+      ]);
+      let successCount = 0;
+      let failedCount = 0;
+
+      for (const failure of failures) {
+        try {
+          if (failure.kind === "photo") {
+            const photo = photos.find((item) => item.id === failure.id);
+            if (!photo) {
+              await clearBackupFailure(failure.id);
+              continue;
+            }
+
+            await backupPhotoIfEnabled({ user, subscription, photo });
+          }
+
+          if (failure.kind === "image-bundle") {
+            const work = imageBundles.find((item) => item.id === failure.id);
+            if (!work) {
+              await clearBackupFailure(failure.id);
+              continue;
+            }
+
+            await backupImageBundleWork({
+              user,
+              work,
+              enabled: settings.cloudBackupEnabled
+            });
+          }
+
+          if (failure.kind === "video") {
+            const video = videos.find((item) => item.id === failure.id);
+            if (!video) {
+              await clearBackupFailure(failure.id);
+              continue;
+            }
+
+            await backupMadeVideo({
+              user,
+              video,
+              enabled: settings.cloudBackupEnabled
+            });
+          }
+
+          await clearBackupFailure(failure.id);
+          successCount += 1;
+        } catch (retryError) {
+          failedCount += 1;
+          await recordBackupFailure({
+            id: failure.id,
+            kind: failure.kind,
+            label: failure.label,
+            message: getUserFacingErrorMessage(
+              retryError,
+              "클라우드 백업은 완료하지 못했습니다."
+            )
+          });
+        }
+      }
+
+      await refreshBackupFailures();
+      setAuthMessage(
+        failedCount > 0
+          ? `백업 재시도 ${successCount}개를 완료했고 ${failedCount}개는 다시 실패했습니다.`
+          : `실패한 백업 ${successCount}개를 다시 완료했습니다.`
+      );
+    } catch (error) {
+      setAuthMessage(error instanceof Error ? error.message : "백업을 다시 시도하지 못했습니다.");
     } finally {
       setIsBackupSubmitting(false);
     }
@@ -561,6 +809,21 @@ export default function SettingsScreen() {
                   <Text selectable style={[styles.backupStatusDetail, themed.mutedText]}>
                     {formatImageBackupUsage(backupOverview.imageBackupBytes)}
                   </Text>
+                  {backupFailures.length > 0 ? (
+                    <Pressable
+                      disabled={isBackupSubmitting}
+                      style={[
+                        styles.authSecondaryButton,
+                        themed.secondaryButton,
+                        isBackupSubmitting && styles.disabledButton
+                      ]}
+                      onPress={retryBackupFailures}
+                    >
+                      <Text selectable={false} style={[styles.authSecondaryButtonText, themed.text]}>
+                        실패한 백업 다시 시도 ({backupFailures.length})
+                      </Text>
+                    </Pressable>
+                  ) : null}
                   <Pressable
                     disabled={isBackupSubmitting}
                     style={[
@@ -920,7 +1183,7 @@ export default function SettingsScreen() {
         visible={Boolean(activeSetting)}
         onRequestClose={() => setActiveSetting(null)}
       >
-        <View style={styles.modalBackdrop}>
+        <View style={[styles.modalBackdrop, modalSafeStyle]}>
           <View style={[styles.modalPanel, themed.modalPanel]}>
             <View style={styles.modalHeader}>
               <Text selectable style={[styles.modalTitle, themed.text]}>
@@ -1131,6 +1394,21 @@ export default function SettingsScreen() {
                     <Text selectable style={[styles.backupStatusDetail, themed.mutedText]}>
                       {IMAGE_BACKUP_OPTIMIZATION_MESSAGE}
                     </Text>
+                    {backupFailures.length > 0 ? (
+                      <Pressable
+                        disabled={isBackupSubmitting}
+                        style={[
+                          styles.authSecondaryButton,
+                          themed.secondaryButton,
+                          isBackupSubmitting && styles.disabledButton
+                        ]}
+                        onPress={retryBackupFailures}
+                      >
+                        <Text selectable={false} style={[styles.authSecondaryButtonText, themed.text]}>
+                          실패한 백업 다시 시도 ({backupFailures.length})
+                        </Text>
+                      </Pressable>
+                    ) : null}
                   </View>
                   <OptionButton
                     label="켜짐"
@@ -1170,7 +1448,7 @@ export default function SettingsScreen() {
         visible={showBackupConfirm}
         onRequestClose={() => setShowBackupConfirm(false)}
       >
-        <View style={styles.modalBackdrop}>
+        <View style={[styles.modalBackdrop, modalSafeStyle]}>
           <View style={[styles.modalPanel, themed.modalPanel]}>
             <View style={styles.modalHeader}>
               <Text selectable style={[styles.modalTitle, themed.text]}>

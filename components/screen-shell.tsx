@@ -8,7 +8,8 @@ import {
 } from "@/lib/app-settings";
 import { useAppAppearance } from "@/lib/app-appearance";
 
-const TAB_BAR_RESERVED_HEIGHT = 52;
+const TAB_BAR_BASE_HEIGHT = 58;
+const TAB_BAR_MIN_BOTTOM_PADDING = 16;
 const MAX_CONTENT_WIDTH = 750;
 
 type ScreenShellProps = {
@@ -41,7 +42,7 @@ export function ScreenShell({
           padding: screenPadding,
           gap: sectionGap,
           paddingTop: safeTop ? insets.top + screenPadding : screenPadding,
-          paddingBottom: insets.bottom + TAB_BAR_RESERVED_HEIGHT
+          paddingBottom: TAB_BAR_BASE_HEIGHT + Math.max(insets.bottom + 8, TAB_BAR_MIN_BOTTOM_PADDING)
         }
       ]}
     >

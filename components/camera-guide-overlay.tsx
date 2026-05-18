@@ -9,6 +9,8 @@ type CameraGuideOverlayProps = {
   size?: number;
   strokeWidth?: number;
   aspectRatio?: number;
+  offsetX?: number;
+  offsetY?: number;
 };
 
 export function CameraGuideOverlay({
@@ -17,7 +19,9 @@ export function CameraGuideOverlay({
   color = "rgba(255, 255, 255, 0.72)",
   size = 44,
   strokeWidth = 1,
-  aspectRatio = 1
+  aspectRatio = 1,
+  offsetX = 0,
+  offsetY = 0
 }: CameraGuideOverlayProps) {
   if (!visible) {
     return null;
@@ -66,9 +70,15 @@ export function CameraGuideOverlay({
           height: guideHeight,
           aspectRatio: safeAspectRatio
         };
+  const offsetStyle = {
+    transform: [
+      { translateX: Number.isFinite(offsetX) ? offsetX : 0 },
+      { translateY: Number.isFinite(offsetY) ? offsetY : 0 }
+    ]
+  };
 
   return (
-    <View style={styles.overlay}>
+    <View style={[styles.overlay, offsetStyle]}>
       {guide === "dot" ? (
         <View
           style={[

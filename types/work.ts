@@ -1,6 +1,7 @@
 import type { TripClipRatio } from "@/constants/trip-clip";
+import type { BackupMetadata } from "@/types/photo";
 
-export type ImageBundleWorkItem = {
+export type ImageBundleWorkItem = BackupMetadata & {
   id: string;
   kind: "image-bundle";
   title: string;

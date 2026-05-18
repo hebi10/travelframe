@@ -264,6 +264,11 @@ export const getRecentPhoto = async () => {
   return photos[0] ?? null;
 };
 
+export const replacePhotosFromBackup = async (photos: PhotoItem[]) => {
+  await writePhotos(photos);
+  return getPhotos();
+};
+
 export const createCaptureDraft = async (sourceUri: string) => {
   const id = createPhotoId();
   const extension = getFileExtension(sourceUri);

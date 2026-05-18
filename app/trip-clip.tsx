@@ -100,6 +100,7 @@ import {
   updateImageBundleWork
 } from "@/lib/work-library";
 import { useAuth } from "@/lib/auth-context";
+import { recordBackupFailure } from "@/lib/backup-failure-queue";
 import {
   isRecordingViewAvailable,
   OptionalRecordingView,
@@ -361,6 +362,13 @@ export default function TripClipScreen() {
   const { user, isLoggedIn, subscription } = useAuth();
   const insets = useSafeAreaInsets();
   const bottomSafePadding = Math.max(insets.bottom + 12, 28);
+  const modalSafeStyle = useMemo(
+    () => ({
+      paddingTop: Math.max(insets.top + 18, 24),
+      paddingBottom: Math.max(insets.bottom + 18, 24)
+    }),
+    [insets.bottom, insets.top]
+  );
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [durations, setDurations] = useState<Record<string, number>>({});
@@ -1293,6 +1301,15 @@ export default function TripClipScreen() {
               enabled: cloudBackupEnabled
             });
           } catch (backupError) {
+            await recordBackupFailure({
+              id: savedBundle.id,
+              kind: "image-bundle",
+              label: savedBundle.title,
+              message: getUserFacingErrorMessage(
+                backupError,
+                "클라우드 백업은 완료하지 못했습니다."
+              )
+            });
             backupWarning = getUserFacingErrorMessage(
               backupError,
               "클라우드 백업은 완료하지 못했습니다."
@@ -1384,6 +1401,15 @@ export default function TripClipScreen() {
             enabled: cloudBackupEnabled
           });
         } catch (backupError) {
+          await recordBackupFailure({
+            id: savedVideo.id,
+            kind: "video",
+            label: savedVideo.title,
+            message: getUserFacingErrorMessage(
+              backupError,
+              "클라우드 백업은 완료하지 못했습니다."
+            )
+          });
           backupWarning = getUserFacingErrorMessage(
             backupError,
             "클라우드 백업은 완료하지 못했습니다."
@@ -2319,7 +2345,7 @@ export default function TripClipScreen() {
           }
         }}
       >
-        <View style={styles.exportModalBackdrop}>
+        <View style={[styles.exportModalBackdrop, modalSafeStyle]}>
           <View
             style={[
               styles.exportModalPanel,
@@ -2409,7 +2435,7 @@ export default function TripClipScreen() {
         animationType="fade"
         onRequestClose={() => setIsExportComingSoonVisible(false)}
       >
-        <View style={styles.exportModalBackdrop}>
+        <View style={[styles.exportModalBackdrop, modalSafeStyle]}>
           <View style={[styles.exportModalPanel, styles.comingSoonPanel]}>
             <Text style={styles.exportModalTitle}>
               준비중입니다

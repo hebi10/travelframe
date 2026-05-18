@@ -1,14 +1,18 @@
 import { Image } from "expo-image";
 import { router, type Href, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { colors, controls, typography } from "@/constants/app-theme";
+import { useAuth } from "@/lib/auth-context";
+import { recordBackupFailure } from "@/lib/backup-failure-queue";
+import { backupPhotoIfEnabled } from "@/lib/cloud-backup";
 import { deleteLocalFile, getPhotoById, saveCapturedPhoto } from "@/lib/photo-library";
 import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 import type { PhotoItem } from "@/types/photo";
 
 export default function CapturePreviewScreen() {
+  const { user, subscription } = useAuth();
   const { id, uri, width, height } = useLocalSearchParams<{
     id?: string;
     uri?: string;
@@ -70,6 +74,28 @@ export default function CapturePreviewScreen() {
         width: Number.isFinite(parsedWidth) ? parsedWidth : undefined,
         height: Number.isFinite(parsedHeight) ? parsedHeight : undefined
       });
+      try {
+        await backupPhotoIfEnabled({
+          user,
+          subscription,
+          photo: savedPhoto
+        });
+      } catch (backupError) {
+        console.error("사진 자동 백업에 실패했습니다.", backupError);
+        await recordBackupFailure({
+          id: savedPhoto.id,
+          kind: "photo",
+          label: "촬영 사진",
+          message: getUserFacingErrorMessage(
+            backupError,
+            "클라우드 백업은 완료하지 못했습니다."
+          )
+        });
+        Alert.alert(
+          "백업 실패",
+          "사진은 현재 기기에 저장되었습니다. 클라우드 백업은 설정에서 다시 시도할 수 있습니다."
+        );
+      }
       try {
         await deleteLocalFile(uri);
       } catch (cleanupError) {

@@ -12,7 +12,21 @@ export type PhotoEditTransform = {
   frameHeight?: number;
 };
 
-export type PhotoItem = {
+export type BackupMetadata = {
+  userId?: string;
+  localId?: string;
+  updatedAt?: string;
+  backupEnabledAt?: string;
+  lastBackedUpAt?: string;
+  sourceDeviceId?: string;
+  fileSize?: number;
+  fileType?: string;
+  storagePath?: string;
+  downloadURL?: string;
+  backupStatus?: "pending" | "backed_up" | "failed" | "restored";
+};
+
+export type PhotoItem = BackupMetadata & {
   id: string;
   uri: string;
   previewUri?: string;

@@ -130,6 +130,10 @@ export default function CameraScreen() {
   const [guideSizeInput, setGuideSizeInput] = useState("44");
   const [guideStrokeWidth, setGuideStrokeWidth] = useState(1);
   const [guideColor, setGuideColor] = useState<string>(GUIDE_COLOR_OPTIONS[0].value);
+  const [guideOffsetX, setGuideOffsetX] = useState(0);
+  const [guideOffsetY, setGuideOffsetY] = useState(0);
+  const [isGuidePositionAdjusting, setIsGuidePositionAdjusting] = useState(false);
+  const [guideChoiceOpen, setGuideChoiceOpen] = useState(false);
   const [guideSettingsOpen, setGuideSettingsOpen] = useState(false);
   const [cameraSettingsOpen, setCameraSettingsOpen] = useState(false);
   const [cameraMenuOpen, setCameraMenuOpen] = useState(false);
@@ -153,10 +157,22 @@ export default function CameraScreen() {
   const [overlayLocked, setOverlayLocked] = useState(false);
   const [overlayResetKey, setOverlayResetKey] = useState(0);
   const [recentPhoto, setRecentPhoto] = useState<PhotoItem | null>(null);
+  const [cameraFrame, setCameraFrame] = useState({ width: 0, height: 0 });
+  const guideOffsetXValue = useSharedValue(0);
+  const guideOffsetYValue = useSharedValue(0);
+  const guideDragStartX = useSharedValue(0);
+  const guideDragStartY = useSharedValue(0);
   const insets = useSafeAreaInsets();
   const bottomSafePadding = Math.max(insets.bottom + 10, 24);
   const bottomModalPadding = Math.max(insets.bottom + 18, 28);
-  const isCameraModalOpen = guideSettingsOpen || cameraSettingsOpen || navigationOpen;
+  const modalSafeStyle = useMemo(
+    () => ({
+      paddingTop: Math.max(insets.top + 14, 14),
+      paddingBottom: Math.max(insets.bottom + 14, 14)
+    }),
+    [insets.bottom, insets.top]
+  );
+  const isCameraModalOpen = guideChoiceOpen || guideSettingsOpen || cameraSettingsOpen || navigationOpen;
 
   const returnFromPermissionScreen = useCallback(() => {
     if (router.canGoBack()) {
@@ -289,6 +305,10 @@ export default function CameraScreen() {
         setGuideSizeInput(String(settings.guideSize));
         setGuideStrokeWidth(settings.guideStrokeWidth);
         setGuideColor(settings.guideColor);
+        setGuideOffsetX(settings.guideOffsetX);
+        setGuideOffsetY(settings.guideOffsetY);
+        guideOffsetXValue.value = settings.guideOffsetX;
+        guideOffsetYValue.value = settings.guideOffsetY;
         setOverlayOpacity(settings.overlayOpacity);
         setRecentPhoto(latestPhoto);
       };
@@ -298,7 +318,7 @@ export default function CameraScreen() {
       return () => {
         isActive = false;
       };
-    }, [])
+    }, [guideOffsetXValue, guideOffsetYValue])
   );
 
   const triggerFeedback = useCallback(async () => {
@@ -470,9 +490,75 @@ export default function CameraScreen() {
     setCameraSettingsOpen(true);
   };
 
-  const openReferenceOverlayMenu = () => {
+  const openGuideChoiceMenu = () => {
     setCameraMenuOpen(false);
+    setGuideChoiceOpen(true);
+  };
+
+  const openLineGuideSettings = () => {
+    setGuideChoiceOpen(false);
+    setGuideSettingsOpen(true);
+  };
+
+  const openPhotoGuideSettings = () => {
+    setGuideChoiceOpen(false);
     reopenOverlaySetup();
+  };
+
+  const getClampedGuideOffset = useCallback(
+    (nextX: number, nextY: number) => {
+      const maxX = Math.max(0, cameraFrame.width * 0.42);
+      const maxY = Math.max(0, cameraFrame.height * 0.42);
+
+      return {
+        x: Math.round(Math.max(-maxX, Math.min(maxX, nextX))),
+        y: Math.round(Math.max(-maxY, Math.min(maxY, nextY)))
+      };
+    },
+    [cameraFrame.height, cameraFrame.width]
+  );
+
+  const syncGuideOffsetFromGesture = useCallback(
+    (nextX: number, nextY: number) => {
+      const clampedOffset = getClampedGuideOffset(nextX, nextY);
+      setGuideOffsetX(clampedOffset.x);
+      setGuideOffsetY(clampedOffset.y);
+    },
+    [getClampedGuideOffset]
+  );
+
+  const startGuidePositionAdjustment = () => {
+    setGuideSettingsOpen(false);
+    setCameraMenuOpen(false);
+    setGuideVisible(true);
+    guideOffsetXValue.value = guideOffsetX;
+    guideOffsetYValue.value = guideOffsetY;
+    setIsGuidePositionAdjusting(true);
+  };
+
+  const finishGuidePositionAdjustment = () => {
+    const clampedOffset = getClampedGuideOffset(
+      guideOffsetXValue.value,
+      guideOffsetYValue.value
+    );
+    guideOffsetXValue.value = clampedOffset.x;
+    guideOffsetYValue.value = clampedOffset.y;
+    setGuideOffsetX(clampedOffset.x);
+    setGuideOffsetY(clampedOffset.y);
+    setIsGuidePositionAdjusting(false);
+    setGuideSettingsOpen(true);
+    void updateAppSettings({
+      guideOffsetX: clampedOffset.x,
+      guideOffsetY: clampedOffset.y,
+      guideVisible: true
+    });
+  };
+
+  const resetGuidePositionToCenter = () => {
+    guideOffsetXValue.value = 0;
+    guideOffsetYValue.value = 0;
+    setGuideOffsetX(0);
+    setGuideOffsetY(0);
   };
 
   const navigateFromCamera = (href: (typeof CAMERA_NAV_ITEMS)[number]["href"]) => {
@@ -491,6 +577,7 @@ export default function CameraScreen() {
           !isCameraModalOpen &&
             !cameraMenuOpen &&
             !overlaySetupActive &&
+            !isGuidePositionAdjusting &&
             !isCapturing
         )
         .activeOffsetY([-CAMERA_FLIP_SWIPE_THRESHOLD, CAMERA_FLIP_SWIPE_THRESHOLD])
@@ -509,11 +596,55 @@ export default function CameraScreen() {
     [
       cameraMenuOpen,
       isCameraModalOpen,
+      isGuidePositionAdjusting,
       isCapturing,
       overlaySetupActive,
       toggleCameraFacingBySwipe
     ]
   );
+
+  const guidePositionGesture = useMemo(
+    () =>
+      Gesture.Pan()
+        .enabled(isGuidePositionAdjusting)
+        .onBegin(() => {
+          guideDragStartX.value = guideOffsetXValue.value;
+          guideDragStartY.value = guideOffsetYValue.value;
+        })
+        .onUpdate((event) => {
+          const maxX = Math.max(0, cameraFrame.width * 0.42);
+          const maxY = Math.max(0, cameraFrame.height * 0.42);
+          guideOffsetXValue.value = Math.max(
+            -maxX,
+            Math.min(maxX, guideDragStartX.value + event.translationX)
+          );
+          guideOffsetYValue.value = Math.max(
+            -maxY,
+            Math.min(maxY, guideDragStartY.value + event.translationY)
+          );
+          runOnJS(syncGuideOffsetFromGesture)(
+            guideOffsetXValue.value,
+            guideOffsetYValue.value
+          );
+        }),
+    [
+      cameraFrame.height,
+      cameraFrame.width,
+      guideDragStartX,
+      guideDragStartY,
+      guideOffsetXValue,
+      guideOffsetYValue,
+      isGuidePositionAdjusting,
+      syncGuideOffsetFromGesture
+    ]
+  );
+
+  const guidePositionAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: guideOffsetXValue.value },
+      { translateY: guideOffsetYValue.value }
+    ]
+  }));
 
   if (!permission) {
     return (
@@ -559,7 +690,13 @@ export default function CameraScreen() {
   }
 
   return (
-    <View style={styles.screen}>
+    <View
+      style={styles.screen}
+      onLayout={(event) => {
+        const { width, height } = event.nativeEvent.layout;
+        setCameraFrame({ width, height });
+      }}
+    >
       <CameraView
         ref={cameraRef}
         style={styles.camera}
@@ -576,13 +713,18 @@ export default function CameraScreen() {
         }
       />
 
-      <CameraGuideOverlay
-        guide={guide}
-        visible={guideVisible}
-        size={guideSize}
-        strokeWidth={guideStrokeWidth}
-        color={guideColor}
-      />
+      <Animated.View
+        pointerEvents="none"
+        style={[styles.guidePositionLayer, guidePositionAnimatedStyle]}
+      >
+        <CameraGuideOverlay
+          guide={guide}
+          visible={guideVisible}
+          size={guideSize}
+          strokeWidth={guideStrokeWidth}
+          color={guideColor}
+        />
+      </Animated.View>
       <PhotoReferenceOverlay
         ref={referenceOverlayRef}
         uri={referenceUri}
@@ -591,13 +733,23 @@ export default function CameraScreen() {
         resetKey={overlayResetKey}
       />
 
-      <GestureDetector gesture={cameraSwipeGesture}>
-        <View
-          collapsable={false}
-          pointerEvents={isCameraModalOpen || overlaySetupActive ? "none" : "box-only"}
-          style={styles.cameraSwipeLayer}
-        />
-      </GestureDetector>
+      {isGuidePositionAdjusting ? (
+        <GestureDetector gesture={guidePositionGesture}>
+          <View
+            collapsable={false}
+            pointerEvents="box-only"
+            style={styles.guidePositionDragLayer}
+          />
+        </GestureDetector>
+      ) : (
+        <GestureDetector gesture={cameraSwipeGesture}>
+          <View
+            collapsable={false}
+            pointerEvents={isCameraModalOpen || overlaySetupActive ? "none" : "box-only"}
+            style={styles.cameraSwipeLayer}
+          />
+        </GestureDetector>
+      )}
 
       {countdown ? (
         <View style={styles.countdownOverlay}>
@@ -607,6 +759,7 @@ export default function CameraScreen() {
         </View>
       ) : null}
 
+      {!isGuidePositionAdjusting ? (
       <View style={[styles.topBar, { paddingTop: insets.top + 12 }]}>
         <Text selectable={false} style={styles.brand}>
           트래블프레임
@@ -630,14 +783,6 @@ export default function CameraScreen() {
                   카메라 설정
                 </Text>
               </Pressable>
-              <Pressable
-                style={styles.cameraDropdownItem}
-                onPress={openReferenceOverlayMenu}
-              >
-                <Text selectable={false} style={styles.cameraDropdownText}>
-                  사진 가이드 띄우기
-                </Text>
-              </Pressable>
               <Pressable style={styles.cameraDropdownItem} onPress={openNavigationMenu}>
                 <Text selectable={false} style={styles.cameraDropdownText}>
                   페이지 이동
@@ -647,6 +792,65 @@ export default function CameraScreen() {
           ) : null}
         </View>
       </View>
+      ) : null}
+
+      <Modal
+        visible={guideChoiceOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setGuideChoiceOpen(false)}
+      >
+        <View style={[styles.navModalBackdrop, modalSafeStyle]}>
+          <View style={[styles.navModal, { paddingBottom: bottomModalPadding }]}>
+            <View style={styles.modalHeader}>
+              <View style={styles.modalTitleGroup}>
+                <Text selectable={false} style={styles.modalEyebrow}>
+                  GUIDE
+                </Text>
+                <Text selectable={false} style={styles.modalTitle}>
+                  가이드 띄우기
+                </Text>
+              </View>
+              <Pressable
+                style={styles.modalCloseButton}
+                onPress={() => setGuideChoiceOpen(false)}
+              >
+                <Text selectable={false} style={styles.modalCloseText}>
+                  닫기
+                </Text>
+              </Pressable>
+            </View>
+            <View style={styles.navList}>
+              <Pressable style={styles.navItem} onPress={openLineGuideSettings}>
+                <View style={styles.navItemCopy}>
+                  <Text selectable={false} style={styles.navItemTitle}>
+                    라인 가이드
+                  </Text>
+                  <Text selectable={false} style={styles.navItemDetail}>
+                    중앙점, 원, 십자선, 격자, 수평선 가이드를 설정합니다.
+                  </Text>
+                </View>
+                <View style={styles.navItemArrow}>
+                  <ChevronIcon color={colors.text} size={10} />
+                </View>
+              </Pressable>
+              <Pressable style={styles.navItem} onPress={openPhotoGuideSettings}>
+                <View style={styles.navItemCopy}>
+                  <Text selectable={false} style={styles.navItemTitle}>
+                    사진 가이드
+                  </Text>
+                  <Text selectable={false} style={styles.navItemDetail}>
+                    이전 사진을 카메라 위에 띄워 같은 구도로 맞춥니다.
+                  </Text>
+                </View>
+                <View style={styles.navItemArrow}>
+                  <ChevronIcon color={colors.text} size={10} />
+                </View>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <Modal
         visible={cameraSettingsOpen}
@@ -654,7 +858,7 @@ export default function CameraScreen() {
         animationType="fade"
         onRequestClose={() => setCameraSettingsOpen(false)}
       >
-        <View style={styles.navModalBackdrop}>
+        <View style={[styles.navModalBackdrop, modalSafeStyle]}>
           <View style={[styles.navModal, { paddingBottom: bottomModalPadding }]}>
             <View style={styles.modalHeader}>
               <View style={styles.modalTitleGroup}>
@@ -876,7 +1080,7 @@ export default function CameraScreen() {
         animationType="fade"
         onRequestClose={() => setNavigationOpen(false)}
       >
-        <View style={styles.navModalBackdrop}>
+        <View style={[styles.navModalBackdrop, modalSafeStyle]}>
           <View style={[styles.navModal, { paddingBottom: bottomModalPadding }]}>
             <View style={styles.modalHeader}>
               <View style={styles.modalTitleGroup}>
@@ -929,7 +1133,7 @@ export default function CameraScreen() {
         onRequestClose={() => setGuideSettingsOpen(false)}
       >
         <GestureHandlerRootView style={styles.modalGestureRoot}>
-          <View style={styles.modalBackdrop}>
+          <View style={[styles.modalBackdrop, modalSafeStyle]}>
             <View
               style={[
                 styles.guideModal,
@@ -1093,6 +1297,15 @@ export default function CameraScreen() {
               </View>
 
               <Pressable
+                style={styles.guidePositionButton}
+                onPress={startGuidePositionAdjustment}
+              >
+                <Text selectable={false} style={styles.guidePositionButtonText}>
+                  드래그 이동하기
+                </Text>
+              </Pressable>
+
+              <Pressable
                 style={[styles.visibilityButton, guideVisible && styles.visibilityButtonActive]}
                 onPress={() => updateGuideVisibility(!guideVisible)}
               >
@@ -1111,7 +1324,7 @@ export default function CameraScreen() {
         </GestureHandlerRootView>
       </Modal>
 
-      {!isCameraModalOpen ? (
+      {!isCameraModalOpen && !isGuidePositionAdjusting ? (
       <View style={[styles.controls, { paddingBottom: bottomSafePadding }]}>
         {errorMessage ? (
           <Text selectable style={styles.errorText}>
@@ -1218,7 +1431,7 @@ export default function CameraScreen() {
             <View style={styles.captureRow}>
               <Pressable
                 style={styles.guideSettingsButton}
-                onPress={() => setGuideSettingsOpen(true)}
+                onPress={openGuideChoiceMenu}
               >
                 <View style={styles.guideSettingsIcon}>
                   <View
@@ -1229,11 +1442,8 @@ export default function CameraScreen() {
                   />
                 </View>
                 <View style={styles.guideSettingsCopy}>
-                  <Text selectable={false} style={styles.guideSettingsLabel}>
+                  <Text selectable={false} style={styles.guideOnlyLabel}>
                     가이드
-                  </Text>
-                  <Text selectable={false} style={styles.guideSettingsValue}>
-                    {GUIDE_LABELS[guide]} / {guideSize} / {guideStrokeWidth}px
                   </Text>
                 </View>
               </Pressable>
@@ -1285,6 +1495,31 @@ export default function CameraScreen() {
           </>
         )}
       </View>
+      ) : null}
+      {isGuidePositionAdjusting ? (
+        <View
+          style={[
+            styles.guidePositionActionGroup,
+            { right: 16, bottom: bottomSafePadding }
+          ]}
+        >
+          <Pressable
+            style={styles.guidePositionSecondaryButton}
+            onPress={resetGuidePositionToCenter}
+          >
+            <Text selectable={false} style={styles.guidePositionSecondaryText}>
+              중앙
+            </Text>
+          </Pressable>
+          <Pressable
+            style={styles.guidePositionDoneButton}
+            onPress={finishGuidePositionAdjustment}
+          >
+            <Text selectable={false} style={styles.guidePositionDoneText}>
+              완료
+            </Text>
+          </Pressable>
+        </View>
       ) : null}
     </View>
   );
@@ -1446,6 +1681,15 @@ const styles = StyleSheet.create({
   },
   camera: {
     ...StyleSheet.absoluteFillObject
+  },
+  guidePositionLayer: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 3
+  },
+  guidePositionDragLayer: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 16,
+    backgroundColor: "transparent"
   },
   cameraSwipeLayer: {
     position: "absolute",
@@ -1979,6 +2223,58 @@ const styles = StyleSheet.create({
   visibilityButtonTextActive: {
     color: colors.inverse
   },
+  guidePositionButton: {
+    minHeight: controls.height,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: colors.text,
+    backgroundColor: colors.background
+  },
+  guidePositionButtonText: {
+    color: colors.text,
+    fontSize: typography.button,
+    fontWeight: "800",
+    letterSpacing: 0
+  },
+  guidePositionActionGroup: {
+    position: "absolute",
+    zIndex: 30,
+    flexDirection: "row",
+    gap: 8
+  },
+  guidePositionSecondaryButton: {
+    minWidth: 76,
+    minHeight: controls.height,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.72)",
+    backgroundColor: "rgba(0, 0, 0, 0.42)"
+  },
+  guidePositionSecondaryText: {
+    color: colors.inverse,
+    fontSize: typography.button,
+    fontWeight: "800",
+    letterSpacing: 0
+  },
+  guidePositionDoneButton: {
+    minWidth: 88,
+    minHeight: controls.height,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 18,
+    borderWidth: 1,
+    borderColor: colors.inverse,
+    backgroundColor: "rgba(0, 0, 0, 0.58)"
+  },
+  guidePositionDoneText: {
+    color: colors.inverse,
+    fontSize: typography.button,
+    fontWeight: "900",
+    letterSpacing: 0
+  },
   navList: {
     gap: 8
   },
@@ -2070,9 +2366,9 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     letterSpacing: 0
   },
-  guideSettingsValue: {
-    color: colors.inverse,
-    fontSize: typography.button,
+  guideOnlyLabel: {
+    color: "rgba(255, 255, 255, 0.86)",
+    fontSize: 11,
     fontWeight: "800",
     letterSpacing: 0
   },

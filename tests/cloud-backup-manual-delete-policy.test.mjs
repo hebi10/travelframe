@@ -43,4 +43,18 @@ assert.equal(
   "Firebase functions should not schedule automatic backup deletion"
 );
 
+for (const snippet of [
+  "deleteField",
+  "settings: deleteField()",
+  "imageBundles: deleteField()",
+  "videos: deleteField()",
+  "backedUpAt: null",
+  "deleteAfter: null"
+]) {
+  assert.ok(
+    backupSource.includes(snippet),
+    `cloud backup deletion should clear stale overview data: ${snippet}`
+  );
+}
+
 console.log("ok - cloud backup deletion is described and implemented as manual");

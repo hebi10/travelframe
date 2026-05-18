@@ -2,7 +2,9 @@ import { type User } from "firebase/auth";
 import {
   collection,
   deleteDoc,
+  deleteField,
   doc,
+  getDoc,
   getDocs,
   onSnapshot,
   serverTimestamp,
@@ -27,10 +29,12 @@ import {
   optimizeImageForBackup,
   type OptimizedBackupImage
 } from "@/lib/image-backup-utils";
-import { getPhotos } from "@/lib/photo-library";
+import { localStorageAdapter } from "@/lib/local-storage";
+import { getPhotos, replacePhotosFromBackup } from "@/lib/photo-library";
 import { isCreatorSubscriptionActive, type UserSubscription } from "@/lib/subscription";
-import { getMadeVideos } from "@/lib/video-library";
-import { getImageBundleWorks } from "@/lib/work-library";
+import { getMadeVideos, replaceMadeVideosFromBackup } from "@/lib/video-library";
+import { getImageBundleWorks, replaceImageBundleWorksFromBackup } from "@/lib/work-library";
+import type { PhotoItem } from "@/types/photo";
 import type { MadeVideoItem } from "@/types/video";
 import type { ImageBundleWorkItem } from "@/types/work";
 
@@ -47,6 +51,15 @@ export type CloudBackupOverview = BackupSummary & {
   backedUpAt: string | null;
   deletedAt: string | null;
 };
+
+export type LocalWorkspaceSummary = {
+  photoCount: number;
+  imageBundleCount: number;
+  videoCount: number;
+  totalCount: number;
+};
+
+const DEVICE_ID_STORAGE_KEY = "travel-frame.backup-device-id.v1";
 
 const fileNameFromUri = (uri: string, fallback: string) => {
   const cleanUri = uri.split("?")[0] ?? uri;
@@ -69,6 +82,37 @@ const getContentType = (uri: string) => {
   }
 
   return "image/jpeg";
+};
+
+const normalizeDateValue = (value: unknown) => {
+  if (!value) {
+    return null;
+  }
+
+  if (typeof value === "string") {
+    return value;
+  }
+
+  if (
+    typeof value === "object" &&
+    "toDate" in value &&
+    typeof (value as { toDate?: unknown }).toDate === "function"
+  ) {
+    return (value as { toDate: () => Date }).toDate().toISOString();
+  }
+
+  return null;
+};
+
+const getSourceDeviceId = async () => {
+  const storedDeviceId = await localStorageAdapter.getItem(DEVICE_ID_STORAGE_KEY);
+  if (storedDeviceId) {
+    return storedDeviceId;
+  }
+
+  const nextDeviceId = `device-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  await localStorageAdapter.setItem(DEVICE_ID_STORAGE_KEY, nextDeviceId);
+  return nextDeviceId;
 };
 
 const uploadLocalFile = async ({
@@ -109,6 +153,21 @@ const getCollectionSize = async (userId: string, collectionName: string) => {
 
   const snapshot = await getDocs(collection(firestore, "users", userId, collectionName));
   return snapshot.size;
+};
+
+export const getLocalWorkspaceSummary = async (): Promise<LocalWorkspaceSummary> => {
+  const [photos, imageBundles, videos] = await Promise.all([
+    getPhotos(),
+    getImageBundleWorks(),
+    getMadeVideos()
+  ]);
+
+  return {
+    photoCount: photos.length,
+    imageBundleCount: imageBundles.length,
+    videoCount: videos.length,
+    totalCount: photos.length + imageBundles.length + videos.length
+  };
 };
 
 const getDocImageBackupSize = (data: Record<string, unknown>) => {
@@ -263,6 +322,40 @@ export const subscribeCloudBackupOverview = ({
   });
 };
 
+export const getCloudBackupOverview = async ({
+  user
+}: {
+  user: User | null;
+}): Promise<CloudBackupOverview> => {
+  if (!user || !firestore) {
+    return emptyBackupOverview;
+  }
+
+  const [overviewSnapshot, photoCount, imageBundleCount, videoCount, imageBackupBytes] =
+    await Promise.all([
+      getDoc(doc(firestore, "users", user.uid, "backups", "current")),
+      getCollectionSize(user.uid, "photoBackups"),
+      getCollectionSize(user.uid, "imageWorks"),
+      getCollectionSize(user.uid, "videos"),
+      getCurrentImageBackupSize({ userId: user.uid })
+    ]);
+  const data = overviewSnapshot.data() as Partial<CloudBackupOverview> | undefined;
+  const hasBackupData = photoCount + imageBundleCount + videoCount > 0;
+
+  return {
+    ...emptyBackupOverview,
+    ...data,
+    status: data?.status ?? (hasBackupData ? "active" : "none"),
+    photoCount,
+    imageBundleCount,
+    videoCount,
+    imageBackupBytes,
+    deleteAfter: data?.deleteAfter ?? null,
+    backedUpAt: normalizeDateValue(data?.backedUpAt),
+    deletedAt: normalizeDateValue(data?.deletedAt)
+  };
+};
+
 export const ensureBackupAvailable = (subscription: UserSubscription) => {
   if (isCreatorSubscriptionActive(subscription)) {
     return;
@@ -297,6 +390,7 @@ export const backupCurrentWorkspace = async ({
     getMadeVideos()
   ]);
   const backedUpAt = new Date().toISOString();
+  const sourceDeviceId = await getSourceDeviceId();
   const optimizedPhotos = await Promise.all(
     photos.map(async (photo) => ({
       photo,
@@ -346,6 +440,8 @@ export const backupCurrentWorkspace = async ({
 
     await setDoc(doc(firestore, "users", user.uid, "photoBackups", photo.id), {
       ...photo,
+      userId: user.uid,
+      localId: photo.id,
       uri: photoDownloadUrl,
       localUri: photo.uri,
       storagePath: photoPath,
@@ -360,6 +456,12 @@ export const backupCurrentWorkspace = async ({
       optimizedQuality: optimized.quality,
       imageQuality: optimized.imageQuality,
       originalSize: optimized.originalSize,
+      fileSize: optimized.size,
+      fileType: "image/jpeg",
+      backupStatus: "backed_up",
+      backupEnabledAt: backedUpAt,
+      lastBackedUpAt: backedUpAt,
+      sourceDeviceId,
       backedUpAt,
       updatedAt: serverTimestamp()
     });
@@ -390,6 +492,12 @@ export const backupCurrentWorkspace = async ({
         imageBackupSize: images.reduce((sum, image) => sum + image.size, 0),
         originalBackupSize: images.reduce((sum, image) => sum + image.originalSize, 0),
         imageQuality: settings.imageBackupQuality,
+        userId: user.uid,
+        localId: work.id,
+        backupStatus: "backed_up",
+        backupEnabledAt: backedUpAt,
+        lastBackedUpAt: backedUpAt,
+        sourceDeviceId,
         backedUpAt,
         updatedAt: serverTimestamp()
       },
@@ -425,6 +533,132 @@ export const backupCurrentWorkspace = async ({
   };
 };
 
+export const backupPhoto = async ({
+  user,
+  photo,
+  enabled,
+  backupEnabledAt
+}: {
+  user: User | null;
+  photo: PhotoItem;
+  enabled: boolean;
+  backupEnabledAt?: string | null;
+}) => {
+  if (!enabled || !user) {
+    return null;
+  }
+
+  if (!firestore || !firebaseStorage) {
+    throw new Error("Firebase 연결 정보가 아직 설정되지 않았습니다.");
+  }
+
+  const existingSnapshot = await getDoc(
+    doc(firestore, "users", user.uid, "photoBackups", photo.id)
+  );
+  const existingData = existingSnapshot.data() as
+    | { localId?: string; storagePath?: string; backupStatus?: string }
+    | undefined;
+
+  if (
+    existingSnapshot.exists() &&
+    existingData?.localId === photo.id &&
+    existingData.storagePath &&
+    existingData.backupStatus === "backed_up"
+  ) {
+    return existingData;
+  }
+
+  const [settings, sourceDeviceId] = await Promise.all([
+    getAppSettings(),
+    getSourceDeviceId()
+  ]);
+  const backedUpAt = new Date().toISOString();
+  const optimized = await optimizeImageForBackup({
+    uri: photo.uri,
+    width: photo.width,
+    height: photo.height,
+    imageQuality: settings.imageBackupQuality
+  }).catch(() => {
+    throw new Error(IMAGE_OPTIMIZATION_FAILED_MESSAGE);
+  });
+
+  await assertImageBackupCapacity({
+    userId: user.uid,
+    newImages: [optimized],
+    excludePhotoIds: [photo.id]
+  });
+
+  const photoFileName = fileNameFromUri(photo.uri, `${photo.id}.jpg`);
+  const storagePath = `users/${user.uid}/backups/photos/${photo.id}-${photoFileName}.jpg`;
+  const downloadURL = await uploadLocalFile({
+    uri: optimized.uri,
+    storagePath
+  });
+
+  await setDoc(
+    doc(firestore, "users", user.uid, "photoBackups", photo.id),
+    {
+      ...photo,
+      userId: user.uid,
+      localId: photo.id,
+      uri: downloadURL,
+      localUri: photo.uri,
+      storagePath,
+      downloadURL,
+      previewUri: downloadURL,
+      localPreviewUri: photo.previewUri ?? null,
+      optimizedWidth: optimized.width,
+      optimizedHeight: optimized.height,
+      optimizedSize: optimized.size,
+      imageBackupSize: optimized.size,
+      optimizedQuality: optimized.quality,
+      imageQuality: optimized.imageQuality,
+      originalSize: optimized.originalSize,
+      fileSize: optimized.size,
+      fileType: "image/jpeg",
+      backupStatus: "backed_up",
+      backupEnabledAt: backupEnabledAt ?? backedUpAt,
+      lastBackedUpAt: backedUpAt,
+      sourceDeviceId,
+      backedUpAt,
+      updatedAt: serverTimestamp()
+    },
+    { merge: true }
+  );
+
+  await refreshBackupOverview(user.uid);
+
+  return {
+    ...photo,
+    uri: downloadURL,
+    previewUri: downloadURL,
+    storagePath,
+    downloadURL,
+    backupStatus: "backed_up" as const
+  };
+};
+
+export const backupPhotoIfEnabled = async ({
+  user,
+  subscription,
+  photo
+}: {
+  user: User | null;
+  subscription: UserSubscription;
+  photo: PhotoItem;
+}) => {
+  const settings = await getAppSettings();
+  if (!settings.cloudBackupEnabled || !isCreatorSubscriptionActive(subscription)) {
+    return null;
+  }
+
+  return backupPhoto({
+    user,
+    photo,
+    enabled: settings.cloudBackupEnabled
+  });
+};
+
 export const backupImageBundleWork = async ({
   user,
   work,
@@ -443,6 +677,8 @@ export const backupImageBundleWork = async ({
   }
 
   const settings = await getAppSettings();
+  const sourceDeviceId = await getSourceDeviceId();
+  const backedUpAt = new Date().toISOString();
   const optimizedImages = await Promise.all(
     work.imageUris.map((imageUri) =>
       optimizeImageForBackup({
@@ -486,7 +722,13 @@ export const backupImageBundleWork = async ({
         0
       ),
       imageQuality: settings.imageBackupQuality,
-      backedUpAt: new Date().toISOString(),
+      userId: user.uid,
+      localId: work.id,
+      backupStatus: "backed_up",
+      backupEnabledAt: backedUpAt,
+      lastBackedUpAt: backedUpAt,
+      sourceDeviceId,
+      backedUpAt,
       updatedAt: serverTimestamp()
     },
     { merge: true }
@@ -517,6 +759,11 @@ export const backupMadeVideo = async ({
     throw new Error("Firebase 연결 정보가 아직 설정되지 않았습니다.");
   }
 
+  const [sourceDeviceId, settings] = await Promise.all([
+    getSourceDeviceId(),
+    getAppSettings()
+  ]);
+  const backedUpAt = new Date().toISOString();
   const currentVideoCount = await getCollectionSize(user.uid, "videos");
   if (!canBackupMoreVideos(currentVideoCount)) {
     throw new Error(
@@ -535,10 +782,17 @@ export const backupMadeVideo = async ({
     doc(firestore, "users", user.uid, "videos", video.id),
     {
       ...video,
+      userId: user.uid,
+      localId: video.id,
       localUri: video.uri,
       uri: downloadUrl,
       storagePath,
-      backedUpAt: new Date().toISOString(),
+      backupStatus: "backed_up",
+      backupEnabledAt: settings.cloudBackupEnabled ? backedUpAt : null,
+      lastBackedUpAt: backedUpAt,
+      sourceDeviceId,
+      fileType: "video/mp4",
+      backedUpAt,
       updatedAt: serverTimestamp()
     },
     { merge: true }
@@ -549,6 +803,115 @@ export const backupMadeVideo = async ({
   return {
     ...video,
     uri: downloadUrl
+  };
+};
+
+const normalizePhotoBackup = (data: Record<string, unknown>, id: string): PhotoItem => ({
+  ...(data as PhotoItem),
+  id,
+  uri:
+    (typeof data.downloadURL === "string" && data.downloadURL) ||
+    (typeof data.uri === "string" && data.uri) ||
+    "",
+  previewUri:
+    (typeof data.previewUri === "string" && data.previewUri) ||
+    (typeof data.downloadURL === "string" && data.downloadURL) ||
+    undefined,
+  createdAt: normalizeDateValue(data.createdAt) ?? new Date().toISOString(),
+  width: typeof data.width === "number" ? data.width : 0,
+  height: typeof data.height === "number" ? data.height : 0,
+  ratioLabel: typeof data.ratioLabel === "string" ? data.ratioLabel : "Original",
+  kind: data.kind === "edited" ? "edited" : "original",
+  edited: Boolean(data.edited),
+  addedToVideo: Boolean(data.addedToVideo),
+  backupStatus: "restored"
+});
+
+const normalizeImageWorkBackup = (
+  data: Record<string, unknown>,
+  id: string
+): ImageBundleWorkItem => ({
+  ...(data as ImageBundleWorkItem),
+  id,
+  kind: "image-bundle",
+  title: typeof data.title === "string" ? data.title : "클라우드 백업 작업",
+  createdAt: normalizeDateValue(data.createdAt) ?? new Date().toISOString(),
+  ratio:
+    data.ratio === "4:5" || data.ratio === "1:1" || data.ratio === "16:9" || data.ratio === "3:4"
+      ? data.ratio
+      : "9:16",
+  photoIds: Array.isArray(data.photoIds) ? (data.photoIds as string[]) : [],
+  imageUris: Array.isArray(data.imageUris) ? (data.imageUris as string[]) : [],
+  backupStatus: "restored"
+});
+
+const normalizeVideoBackup = (
+  data: Record<string, unknown>,
+  id: string
+): MadeVideoItem => ({
+  ...(data as MadeVideoItem),
+  id,
+  uri: typeof data.uri === "string" ? data.uri : "",
+  coverUri: typeof data.coverUri === "string" ? data.coverUri : undefined,
+  createdAt: normalizeDateValue(data.createdAt) ?? new Date().toISOString(),
+  title: typeof data.title === "string" ? data.title : "클라우드 백업 영상",
+  ratio:
+    data.ratio === "4:5" || data.ratio === "1:1" || data.ratio === "16:9" || data.ratio === "3:4"
+      ? data.ratio
+      : "9:16",
+  template:
+    data.template === "film-log" || data.template === "center-cut" || data.template === "reel-basic"
+      ? data.template
+      : "minimal",
+  transition: data.transition === "slide" || data.transition === "zoom" ? data.transition : "fade",
+  transitionDuration: typeof data.transitionDuration === "number" ? data.transitionDuration : 0.45,
+  duration: typeof data.duration === "number" ? data.duration : 0,
+  photoIds: Array.isArray(data.photoIds) ? (data.photoIds as string[]) : [],
+  durations:
+    data.durations && typeof data.durations === "object"
+      ? (data.durations as Record<string, number>)
+      : {},
+  musicId: data.musicId === "custom" || typeof data.musicId === "string" ? (data.musicId as MadeVideoItem["musicId"]) : "none",
+  musicLabel: typeof data.musicLabel === "string" ? data.musicLabel : "무음",
+  backupStatus: "restored"
+});
+
+export const restoreCloudBackupToLocal = async ({ user }: { user: User | null }) => {
+  if (!user) {
+    throw new Error("로그인이 필요합니다.");
+  }
+
+  if (!firestore) {
+    throw new Error("Firebase 연결 정보가 아직 설정되지 않았습니다.");
+  }
+
+  const [photoSnapshot, imageWorkSnapshot, videoSnapshot] = await Promise.all([
+    getDocs(collection(firestore, "users", user.uid, "photoBackups")),
+    getDocs(collection(firestore, "users", user.uid, "imageWorks")),
+    getDocs(collection(firestore, "users", user.uid, "videos"))
+  ]);
+  const photos = photoSnapshot.docs.map((item) =>
+    normalizePhotoBackup(item.data(), item.id)
+  );
+  const imageWorks = imageWorkSnapshot.docs.map((item) =>
+    normalizeImageWorkBackup(item.data(), item.id)
+  );
+  const videos = videoSnapshot.docs.map((item) =>
+    normalizeVideoBackup(item.data(), item.id)
+  );
+
+  await Promise.all([
+    replacePhotosFromBackup(photos),
+    replaceImageBundleWorksFromBackup(imageWorks),
+    replaceMadeVideosFromBackup(videos)
+  ]);
+
+  return {
+    photoCount: photos.length,
+    imageBundleCount: imageWorks.length,
+    videoCount: videos.length,
+    imageBackupBytes: await getCurrentImageBackupSize({ userId: user.uid }),
+    deleteAfter: null
   };
 };
 
@@ -635,6 +998,11 @@ export const deleteCloudBackupData = async ({ user }: { user: User | null }) => 
       imageBundleCount: 0,
       videoCount: 0,
       imageBackupBytes: 0,
+      settings: deleteField(),
+      imageBundles: deleteField(),
+      videos: deleteField(),
+      backedUpAt: null,
+      deleteAfter: null,
       deletedAt: new Date().toISOString(),
       updatedAt: serverTimestamp()
     },

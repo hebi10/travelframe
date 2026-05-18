@@ -11,6 +11,7 @@ import {
   TextInput,
   View
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ScreenShell } from "@/components/screen-shell";
 import { SectionBlock } from "@/components/section-block";
@@ -177,8 +178,16 @@ const getAuthErrorMessage = (error: unknown) => {
 };
 
 export default function AccountScreen() {
+  const insets = useSafeAreaInsets();
   const { palette } = useAppAppearance();
   const themed = useMemo(() => createAccountThemedStyles(palette), [palette]);
+  const modalSafeStyle = useMemo(
+    () => ({
+      paddingTop: Math.max(insets.top + 14, 24),
+      paddingBottom: Math.max(insets.bottom + 14, 24)
+    }),
+    [insets.bottom, insets.top]
+  );
   const {
     user,
     subscription,
@@ -949,7 +958,7 @@ export default function AccountScreen() {
         visible={Boolean(selectedPaymentPlan)}
         onRequestClose={() => setSelectedPaymentPlan(null)}
       >
-        <View style={styles.paymentModalBackdrop}>
+        <View style={[styles.paymentModalBackdrop, modalSafeStyle]}>
           <View style={[styles.paymentModalPanel, themed.panelStrong]}>
             <View style={styles.modalHeader}>
               <View style={styles.planCopy}>

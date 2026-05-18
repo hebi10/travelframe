@@ -39,6 +39,11 @@ export const getMadeVideoById = async (id: string) => {
   return videos.find((video) => video.id === id) ?? null;
 };
 
+export const replaceMadeVideosFromBackup = async (videos: MadeVideoItem[]) => {
+  await writeVideos(videos);
+  return getMadeVideos();
+};
+
 export const saveMadeVideo = async (
   video: Omit<MadeVideoItem, "id" | "createdAt" | "title"> & {
     title?: string;

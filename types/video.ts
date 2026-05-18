@@ -1,6 +1,7 @@
 import type { MusicTrack, TripClipRatio, TripClipTemplate, TripClipTransition } from "@/constants/trip-clip";
+import type { BackupMetadata } from "@/types/photo";
 
-export type MadeVideoItem = {
+export type MadeVideoItem = BackupMetadata & {
   id: string;
   uri: string;
   coverUri?: string;

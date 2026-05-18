@@ -11,7 +11,7 @@ export default function TabsLayout() {
   const insets = useSafeAreaInsets();
   const { palette } = useAppAppearance();
   const { isLoggedIn } = useAuth();
-  const tabBarBottomPadding = Math.max(Math.round(insets.bottom * 0.5) + 4, 10);
+  const tabBarBottomPadding = Math.max(insets.bottom + 8, 16);
   const tabBarHeight = 58 + tabBarBottomPadding;
 
   return (

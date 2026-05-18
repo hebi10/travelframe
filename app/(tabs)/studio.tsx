@@ -10,7 +10,9 @@ import { colors, controls, typography } from "@/constants/app-theme";
 import { useAppAppearance } from "@/lib/app-appearance";
 import { getAppSettings } from "@/lib/app-settings";
 import { useAuth } from "@/lib/auth-context";
+import { recordBackupFailure } from "@/lib/backup-failure-queue";
 import {
+  backupPhotoIfEnabled,
   subscribeCloudBackupOverview,
   type CloudBackupOverview
 } from "@/lib/cloud-backup";
@@ -196,13 +198,39 @@ export default function StudioScreen() {
       }
 
       const asset = result.assets[0];
-      await saveCapturedPhoto({
+      const savedPhoto = await saveCapturedPhoto({
         uri: asset.uri,
         width: asset.width,
         height: asset.height
       });
+      let backupWarning = "";
+      try {
+        await backupPhotoIfEnabled({
+          user,
+          subscription,
+          photo: savedPhoto
+        });
+      } catch (backupError) {
+        console.error("가져온 사진 자동 백업에 실패했습니다.", backupError);
+        await recordBackupFailure({
+          id: savedPhoto.id,
+          kind: "photo",
+          label: "가져온 사진",
+          message: getUserFacingErrorMessage(
+            backupError,
+            "클라우드 백업은 완료하지 못했습니다."
+          )
+        });
+        backupWarning = " 클라우드 백업은 설정에서 다시 시도할 수 있습니다.";
+      }
       await loadStudio();
       setActiveTab("photos");
+      if (backupWarning) {
+        Alert.alert(
+          "백업 실패",
+          "사진은 현재 기기에 저장되었습니다. 클라우드 백업은 설정에서 다시 시도할 수 있습니다."
+        );
+      }
       Alert.alert("저장 완료", "선택한 이미지를 앱 사진 목록에 저장했습니다.");
     } catch (error) {
       Alert.alert(

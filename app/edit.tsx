@@ -3,6 +3,7 @@ import { router, type Href, useFocusEffect, useLocalSearchParams } from "expo-ro
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   StyleSheet,
   Text,
@@ -33,6 +34,9 @@ import {
   getAppSettings,
   updateAppSettings
 } from "@/lib/app-settings";
+import { useAuth } from "@/lib/auth-context";
+import { recordBackupFailure } from "@/lib/backup-failure-queue";
+import { backupPhotoIfEnabled } from "@/lib/cloud-backup";
 import { getPhotoById, saveEditedPhoto } from "@/lib/photo-library";
 import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 import type { PhotoEditTransform, PhotoItem, PhotoRatioLabel } from "@/types/photo";
@@ -83,6 +87,7 @@ const getDraftSourceKey = (draft: Pick<PhotoEditDraft, "sourceUri" | "sourcePhot
   draft.sourcePhotoId ?? draft.sourceUri;
 
 export default function EditScreen() {
+  const { user, subscription } = useAuth();
   const { photoId } = useLocalSearchParams<{ photoId?: string }>();
   const canvasRef = useRef<EditablePhotoCanvasHandle>(null);
   const insets = useSafeAreaInsets();
@@ -369,13 +374,35 @@ export default function EditScreen() {
       const transform =
         canvasRef.current?.getTransform() ?? getFallbackTransform(ratio);
 
-      await saveEditedPhoto({
+      const savedPhoto = await saveEditedPhoto({
         sourceUri: source.uri,
         sourcePhotoId: source.sourcePhotoId,
         width: source.width,
         height: source.height,
         transform
       });
+      try {
+        await backupPhotoIfEnabled({
+          user,
+          subscription,
+          photo: savedPhoto
+        });
+      } catch (backupError) {
+        console.error("편집 사진 자동 백업에 실패했습니다.", backupError);
+        await recordBackupFailure({
+          id: savedPhoto.id,
+          kind: "photo",
+          label: "편집 사진",
+          message: getUserFacingErrorMessage(
+            backupError,
+            "클라우드 백업은 완료하지 못했습니다."
+          )
+        });
+        Alert.alert(
+          "백업 실패",
+          "편집 결과는 현재 기기에 저장되었습니다. 클라우드 백업은 설정에서 다시 시도할 수 있습니다."
+        );
+      }
 
       await clearEditDraft();
       router.replace("/studio?tab=works" as Href);

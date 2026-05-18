@@ -11,7 +11,7 @@ const screenShellSource = fs.readFileSync(
 );
 
 for (const snippet of [
-  "const tabBarBottomPadding = Math.max(Math.round(insets.bottom * 0.5) + 4, 10);",
+  "const tabBarBottomPadding = Math.max(insets.bottom + 8, 16);",
   "const tabBarHeight = 58 + tabBarBottomPadding;",
   "paddingTop: 6",
   "minHeight: 46"
@@ -20,8 +20,20 @@ for (const snippet of [
 }
 
 assert.ok(
-  screenShellSource.includes("const TAB_BAR_RESERVED_HEIGHT = 52;"),
-  "screen shell should reserve about half the previous bottom space"
+  screenShellSource.includes("const TAB_BAR_BASE_HEIGHT = 58;"),
+  "screen shell should reserve the tab bar base height"
 );
 
-console.log("ok - bottom tab spacing is compact");
+assert.ok(
+  screenShellSource.includes("const TAB_BAR_MIN_BOTTOM_PADDING = 16;"),
+  "screen shell should include minimum safe bottom padding"
+);
+
+assert.ok(
+  screenShellSource.includes(
+    "paddingBottom: TAB_BAR_BASE_HEIGHT + Math.max(insets.bottom + 8, TAB_BAR_MIN_BOTTOM_PADDING)"
+  ),
+  "screen shell should reserve the tab bar plus full bottom safe area"
+);
+
+console.log("ok - bottom tab spacing respects the full bottom safe area");

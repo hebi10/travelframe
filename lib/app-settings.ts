@@ -28,6 +28,8 @@ export type AppSettings = {
   guideSize: number;
   guideStrokeWidth: number;
   guideColor: string;
+  guideOffsetX: number;
+  guideOffsetY: number;
   overlayOpacity: number;
   defaultRatio: TripClipRatio;
   exportQuality: ExportQuality;
@@ -45,6 +47,8 @@ export const defaultAppSettings: AppSettings = {
   guideSize: 44,
   guideStrokeWidth: 1,
   guideColor: DEFAULT_GUIDE_COLOR,
+  guideOffsetX: 0,
+  guideOffsetY: 0,
   overlayOpacity: 0.4,
   defaultRatio: "9:16",
   exportQuality: "high",
@@ -84,6 +88,11 @@ const clampGuideStrokeWidth = (value: unknown) => {
   );
 };
 
+const normalizeGuideOffset = (value: unknown) => {
+  const parsedValue = Number(value);
+  return Number.isFinite(parsedValue) ? Math.round(parsedValue) : 0;
+};
+
 const normalizeSettings = (value: Partial<AppSettings> | null): AppSettings => {
   const nextSettings = {
     ...defaultAppSettings,
@@ -102,6 +111,8 @@ const normalizeSettings = (value: Partial<AppSettings> | null): AppSettings => {
       typeof nextSettings.guideColor === "string" && nextSettings.guideColor.trim()
         ? nextSettings.guideColor
         : defaultAppSettings.guideColor,
+    guideOffsetX: normalizeGuideOffset(nextSettings.guideOffsetX),
+    guideOffsetY: normalizeGuideOffset(nextSettings.guideOffsetY),
     defaultRatio: tripClipRatios.includes(nextSettings.defaultRatio)
       ? nextSettings.defaultRatio
       : defaultAppSettings.defaultRatio,

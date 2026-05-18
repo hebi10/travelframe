@@ -44,6 +44,11 @@ export const getImageBundleWorkById = async (id: string) => {
   return items.find((item) => item.id === id) ?? null;
 };
 
+export const replaceImageBundleWorksFromBackup = async (items: ImageBundleWorkItem[]) => {
+  await writeImageBundles(items);
+  return getImageBundleWorks();
+};
+
 export const saveImageBundleWork = async (
   item: Omit<ImageBundleWorkItem, "id" | "createdAt" | "title" | "kind"> & {
     title?: string;
