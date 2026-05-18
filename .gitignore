@@ -9,6 +9,7 @@ web-build/
 .env
 .env.*
 !.env.example
+*.jks
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
