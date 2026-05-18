@@ -96,6 +96,11 @@ $buildGradle = Get-Content -LiteralPath $buildGradlePath -Raw
 
 if ($buildGradle -notmatch "TRAVELFRAME_UPLOAD_STORE_FILE") {
   $releaseSigning = @"
+def requestedTasksForSigning = gradle.startParameter.taskNames.collect { it.toLowerCase() }
+def requiresReleaseSigning = requestedTasksForSigning.any {
+        it.contains("release") || it.contains("bundle")
+    }
+
 signingConfigs {
         release {
             // TRAVELFRAME_UPLOAD_STORE_FILE
@@ -103,13 +108,20 @@ signingConfigs {
             def uploadStorePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
             def uploadKeyAlias = System.getenv("ANDROID_KEY_ALIAS")
             def uploadKeyPassword = System.getenv("ANDROID_KEY_PASSWORD")
-            if (uploadStoreFile == null || uploadStorePassword == null || uploadKeyAlias == null || uploadKeyPassword == null) {
+            if (requiresReleaseSigning && (uploadStoreFile == null || uploadStorePassword == null || uploadKeyAlias == null || uploadKeyPassword == null)) {
                 throw new GradleException("Android release signing environment variables are missing.")
             }
-            storeFile file(uploadStoreFile)
-            storePassword uploadStorePassword
-            keyAlias uploadKeyAlias
-            keyPassword uploadKeyPassword
+            if (uploadStoreFile != null && uploadStorePassword != null && uploadKeyAlias != null && uploadKeyPassword != null) {
+                storeFile file(uploadStoreFile)
+                storePassword uploadStorePassword
+                keyAlias uploadKeyAlias
+                keyPassword uploadKeyPassword
+            } else {
+                storeFile file('debug.keystore')
+                storePassword 'android'
+                keyAlias 'androiddebugkey'
+                keyPassword 'android'
+            }
         }
 "@
   $buildGradle = $buildGradle -replace "signingConfigs\s*\{", $releaseSigning
@@ -118,7 +130,7 @@ signingConfigs {
 $buildGradle = [regex]::Replace($buildGradle, "versionCode\s+\d+", "versionCode $VersionCode", 1)
 $buildGradle = [regex]::Replace(
   $buildGradle,
-  "(release\s*\{[\s\S]*?signingConfig\s+)signingConfigs\.debug",
+  "(buildTypes\s*\{[\s\S]*?release\s*\{[\s\S]*?signingConfig\s+)signingConfigs\.debug",
   '${1}signingConfigs.release',
   1
 )
