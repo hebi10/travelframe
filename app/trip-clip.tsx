@@ -34,6 +34,7 @@ import Reanimated, {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { InterstitialAdModal } from "@/components/interstitial-ad-modal";
+import { CameraGuideOverlay } from "@/components/camera-guide-overlay";
 import { TripClipPreviewPlayer } from "@/components/trip-clip-preview-player";
 import { colors, controls, spacing, typography } from "@/constants/app-theme";
 import {
@@ -401,6 +402,10 @@ export default function TripClipScreen() {
   const [previewGuideColor, setPreviewGuideColor] = useState<string>(
     GUIDE_COLOR_OPTIONS[0].value
   );
+  const [previewGuideOffsetX, setPreviewGuideOffsetX] = useState(0);
+  const [previewGuideOffsetY, setPreviewGuideOffsetY] = useState(0);
+  const [isPreviewGuideMoving, setIsPreviewGuideMoving] = useState(false);
+  const [previewFrameSize, setPreviewFrameSize] = useState({ width: 0, height: 0 });
   const [activeEditorTab, setActiveEditorTab] = useState<EditorTab>("photos");
   const [isLoading, setIsLoading] = useState(true);
   const [isImportingPhotos, setIsImportingPhotos] = useState(false);
@@ -432,6 +437,10 @@ export default function TripClipScreen() {
   const autoDurationIdsRef = useRef<Set<string>>(new Set());
   const playbackOffsetRef = useRef(0);
   const playbackProgress = useSharedValue(0);
+  const previewGuideOffsetXValue = useSharedValue(0);
+  const previewGuideOffsetYValue = useSharedValue(0);
+  const previewGuideDragStartX = useSharedValue(0);
+  const previewGuideDragStartY = useSharedValue(0);
 
   const selectedUserMusic =
     userMusicTracks.find((track) => track.id === selectedUserMusicId) ??
@@ -572,6 +581,10 @@ export default function TripClipScreen() {
     setPreviewGuideSizeInput(String(settings.guideSize));
     setPreviewGuideStrokeWidth(settings.guideStrokeWidth);
     setPreviewGuideColor(settings.guideColor);
+    setPreviewGuideOffsetX(settings.guideOffsetX);
+    setPreviewGuideOffsetY(settings.guideOffsetY);
+    previewGuideOffsetXValue.value = settings.guideOffsetX;
+    previewGuideOffsetYValue.value = settings.guideOffsetY;
     setCloudBackupEnabled(settings.cloudBackupEnabled);
     setImageQuality(settings.imageBackupQuality);
 
@@ -620,7 +633,7 @@ export default function TripClipScreen() {
         .map((photo) => photo.id);
     });
     setIsLoading(false);
-  }, [bundleId, user, videoId]);
+  }, [bundleId, previewGuideOffsetXValue, previewGuideOffsetYValue, user, videoId]);
 
   const applyPreviewGuideSize = useCallback((value: number) => {
     const nextSize = Math.round(
@@ -672,6 +685,116 @@ export default function TripClipScreen() {
       guideVisible: true
     });
   };
+
+  const getClampedPreviewGuideOffset = useCallback(
+    (nextX: number, nextY: number) => {
+      const maxX = Math.max(0, previewFrameSize.width * 0.42);
+      const maxY = Math.max(0, previewFrameSize.height * 0.42);
+
+      return {
+        x: Math.round(Math.max(-maxX, Math.min(maxX, nextX))),
+        y: Math.round(Math.max(-maxY, Math.min(maxY, nextY)))
+      };
+    },
+    [previewFrameSize.height, previewFrameSize.width]
+  );
+
+  const syncPreviewGuideOffsetFromGesture = useCallback(
+    (nextX: number, nextY: number) => {
+      const clampedOffset = getClampedPreviewGuideOffset(nextX, nextY);
+      setPreviewGuideOffsetX(clampedOffset.x);
+      setPreviewGuideOffsetY(clampedOffset.y);
+    },
+    [getClampedPreviewGuideOffset]
+  );
+
+  const finishPreviewGuideMove = useCallback(
+    (nextX: number, nextY: number) => {
+      const clampedOffset = getClampedPreviewGuideOffset(nextX, nextY);
+      previewGuideOffsetXValue.value = clampedOffset.x;
+      previewGuideOffsetYValue.value = clampedOffset.y;
+      setPreviewGuideOffsetX(clampedOffset.x);
+      setPreviewGuideOffsetY(clampedOffset.y);
+      void updateAppSettings({
+        guideOffsetX: clampedOffset.x,
+        guideOffsetY: clampedOffset.y,
+        guideVisible: true
+      });
+    },
+    [getClampedPreviewGuideOffset, previewGuideOffsetXValue, previewGuideOffsetYValue]
+  );
+
+  const startPreviewGuideMove = () => {
+    setPreviewGuideVisible(true);
+    setPreviewAdjustEnabled(false);
+    previewGuideOffsetXValue.value = previewGuideOffsetX;
+    previewGuideOffsetYValue.value = previewGuideOffsetY;
+    setIsPreviewGuideMoving(true);
+    void updateAppSettings({ guideVisible: true });
+  };
+
+  const stopPreviewGuideMove = () => {
+    finishPreviewGuideMove(
+      previewGuideOffsetXValue.value,
+      previewGuideOffsetYValue.value
+    );
+    setIsPreviewGuideMoving(false);
+  };
+
+  const resetPreviewGuidePositionToCenter = () => {
+    previewGuideOffsetXValue.value = 0;
+    previewGuideOffsetYValue.value = 0;
+    setPreviewGuideOffsetX(0);
+    setPreviewGuideOffsetY(0);
+    setPreviewGuideVisible(true);
+    void updateAppSettings({
+      guideOffsetX: 0,
+      guideOffsetY: 0,
+      guideVisible: true
+    });
+  };
+
+  const previewGuideMoveGesture = useMemo(
+    () =>
+      Gesture.Pan()
+        .enabled(isPreviewGuideMoving)
+        .onStart(() => {
+          previewGuideDragStartX.value = previewGuideOffsetXValue.value;
+          previewGuideDragStartY.value = previewGuideOffsetYValue.value;
+        })
+        .onUpdate((event) => {
+          const maxX = Math.max(0, previewFrameSize.width * 0.42);
+          const maxY = Math.max(0, previewFrameSize.height * 0.42);
+          const nextX = Math.max(
+            -maxX,
+            Math.min(maxX, previewGuideDragStartX.value + event.translationX)
+          );
+          const nextY = Math.max(
+            -maxY,
+            Math.min(maxY, previewGuideDragStartY.value + event.translationY)
+          );
+          previewGuideOffsetXValue.value = nextX;
+          previewGuideOffsetYValue.value = nextY;
+          runOnJS(syncPreviewGuideOffsetFromGesture)(nextX, nextY);
+        })
+        .onEnd(() => {
+          runOnJS(finishPreviewGuideMove)(
+            previewGuideOffsetXValue.value,
+            previewGuideOffsetYValue.value
+          );
+        }),
+    [
+      finishPreviewGuideMove,
+      isPreviewGuideMoving,
+      previewFrameSize.height,
+      previewFrameSize.width,
+      previewGuideDragStartX,
+      previewGuideDragStartY,
+      previewGuideOffsetXValue,
+      previewGuideOffsetYValue,
+      syncPreviewGuideOffsetFromGesture
+    ]
+  );
 
   const updateImageQuality = (nextQuality: ImageQuality) => {
     setImageQuality(nextQuality);
@@ -1578,7 +1701,13 @@ export default function TripClipScreen() {
       </View>
 
       <View style={styles.previewSection}>
-        <View style={[styles.previewFrame, { aspectRatio: ratioAspect[ratio] }]}>
+        <View
+          style={[styles.previewFrame, { aspectRatio: ratioAspect[ratio] }]}
+          onLayout={(event) => {
+            const { width, height } = event.nativeEvent.layout;
+            setPreviewFrameSize({ width, height });
+          }}
+        >
           {activePhoto ? (
             <>
               <TripClipPreviewPlayer
@@ -1593,6 +1722,8 @@ export default function TripClipScreen() {
                 guideSize={previewGuideSize}
                 guideStrokeWidth={previewGuideStrokeWidth}
                 guideColor={previewGuideColor}
+                guideOffsetX={previewGuideOffsetX}
+                guideOffsetY={previewGuideOffsetY}
                 photoAdjustments={photoAdjustments}
                 onPhotoAdjustmentChange={updatePhotoAdjustment}
               />
@@ -1613,6 +1744,19 @@ export default function TripClipScreen() {
                   드래그 조절 {previewAdjustEnabled ? "ON" : "OFF"}
                 </Text>
               </Pressable>
+              {isPreviewGuideMoving ? (
+                <GestureDetector gesture={previewGuideMoveGesture}>
+                  <View
+                    collapsable={false}
+                    pointerEvents="box-only"
+                    style={styles.previewGuideMoveLayer}
+                  >
+                    <Text selectable={false} style={styles.previewGuideMoveText}>
+                      가이드를 손가락으로 드래그하세요
+                    </Text>
+                  </View>
+                </GestureDetector>
+              ) : null}
             </>
           ) : (
             <Pressable
@@ -1876,6 +2020,35 @@ export default function TripClipScreen() {
               ]}
             >
               가이드 {previewGuideVisible ? "끄기" : "켜기"}
+            </Text>
+          </Pressable>
+        </View>
+        <View style={styles.guideMoveActions}>
+          <Pressable
+            disabled={!activePhoto}
+            style={[
+              styles.guideMoveButton,
+              isPreviewGuideMoving && styles.guideMoveButtonActive,
+              !activePhoto && styles.disabledButton
+            ]}
+            onPress={isPreviewGuideMoving ? stopPreviewGuideMove : startPreviewGuideMove}
+          >
+            <Text
+              selectable={false}
+              style={[
+                styles.guideMoveButtonText,
+                isPreviewGuideMoving && styles.guideMoveButtonTextActive
+              ]}
+            >
+              {isPreviewGuideMoving ? "이동 완료" : "드래그 이동하기"}
+            </Text>
+          </Pressable>
+          <Pressable
+            style={styles.guideMoveButton}
+            onPress={resetPreviewGuidePositionToCenter}
+          >
+            <Text selectable={false} style={styles.guideMoveButtonText}>
+              중앙 이동
             </Text>
           </Pressable>
         </View>
@@ -2338,6 +2511,13 @@ export default function TripClipScreen() {
               transition={transition}
               showWatermark={!creatorExportActive}
               frameAspectRatio={ratioAspect[ratio]}
+              guideVisible={previewGuideVisible}
+              guide={previewGuide}
+              guideSize={previewGuideSize}
+              guideStrokeWidth={previewGuideStrokeWidth}
+              guideColor={previewGuideColor}
+              guideOffsetX={previewGuideOffsetX}
+              guideOffsetY={previewGuideOffsetY}
               photoAdjustments={photoAdjustments}
             />
           </OptionalRecordingView>
@@ -2554,6 +2734,13 @@ function TripClipRecordingCanvas({
   transition,
   showWatermark,
   frameAspectRatio,
+  guideVisible,
+  guide,
+  guideSize,
+  guideStrokeWidth,
+  guideColor,
+  guideOffsetX,
+  guideOffsetY,
   photoAdjustments
 }: {
   frame: RecordingFrame;
@@ -2561,6 +2748,13 @@ function TripClipRecordingCanvas({
   transition: TripClipTransition;
   showWatermark: boolean;
   frameAspectRatio: number;
+  guideVisible: boolean;
+  guide: GuideType;
+  guideSize: number;
+  guideStrokeWidth: number;
+  guideColor: string;
+  guideOffsetX: number;
+  guideOffsetY: number;
   photoAdjustments: TripClipPhotoAdjustmentMap;
 }) {
   const isFilm = template === "film-log";
@@ -2625,6 +2819,15 @@ function TripClipRecordingCanvas({
         </View>
       ) : null}
       {isCenter ? <View style={styles.recordingCenterGuide} /> : null}
+      <CameraGuideOverlay
+        guide={guide}
+        visible={guideVisible}
+        size={guideSize}
+        strokeWidth={guideStrokeWidth}
+        color={guideColor}
+        offsetX={guideOffsetX}
+        offsetY={guideOffsetY}
+      />
       {showWatermark ? (
         <View style={styles.recordingWatermark}>
           <Text selectable={false} style={styles.recordingWatermarkText}>
@@ -2898,6 +3101,24 @@ const styles = StyleSheet.create({
     borderColor: colors.text,
     backgroundColor: colors.ink,
     position: "relative"
+  },
+  previewGuideMoveLayer: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 11,
+    alignItems: "center",
+    justifyContent: "flex-end",
+    padding: 10,
+    backgroundColor: "rgba(17, 17, 17, 0.08)"
+  },
+  previewGuideMoveText: {
+    color: colors.inverse,
+    fontSize: typography.small,
+    fontWeight: "800",
+    lineHeight: 17,
+    letterSpacing: 0,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: "rgba(17, 17, 17, 0.74)"
   },
   previewAdjustButton: {
     position: "absolute",
@@ -3344,6 +3565,32 @@ const styles = StyleSheet.create({
     letterSpacing: 0
   },
   guideToggleButtonTextActive: {
+    color: colors.inverse
+  },
+  guideMoveActions: {
+    flexDirection: "row",
+    gap: 8
+  },
+  guideMoveButton: {
+    flex: 1,
+    minHeight: controls.height,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: colors.text,
+    backgroundColor: colors.background
+  },
+  guideMoveButtonActive: {
+    backgroundColor: colors.text
+  },
+  guideMoveButtonText: {
+    color: colors.text,
+    fontSize: typography.button,
+    fontWeight: "800",
+    letterSpacing: 0
+  },
+  guideMoveButtonTextActive: {
     color: colors.inverse
   },
   guideSizeInputRow: {

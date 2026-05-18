@@ -110,6 +110,8 @@ export default function EditScreen() {
     defaultAppSettings.guideStrokeWidth
   );
   const [guideColor, setGuideColor] = useState(defaultAppSettings.guideColor);
+  const [guideOffsetX, setGuideOffsetX] = useState(defaultAppSettings.guideOffsetX);
+  const [guideOffsetY, setGuideOffsetY] = useState(defaultAppSettings.guideOffsetY);
   const [guidePanelOpen, setGuidePanelOpen] = useState(false);
   const [isCanvasExpanded, setIsCanvasExpanded] = useState(false);
   const originalAspectRatio =
@@ -162,6 +164,8 @@ export default function EditScreen() {
         setGuideSize(settings.guideSize);
         setGuideStrokeWidth(settings.guideStrokeWidth);
         setGuideColor(settings.guideColor);
+        setGuideOffsetX(settings.guideOffsetX);
+        setGuideOffsetY(settings.guideOffsetY);
       };
 
       loadGuideSettings();
@@ -453,6 +457,8 @@ export default function EditScreen() {
             guideSize={guideSize}
             guideStrokeWidth={guideStrokeWidth}
             guideColor={guideColor}
+            guideOffsetX={guideOffsetX}
+            guideOffsetY={guideOffsetY}
           />
         )}
         <Pressable

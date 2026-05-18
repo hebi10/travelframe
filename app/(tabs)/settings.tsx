@@ -978,6 +978,8 @@ export default function SettingsScreen() {
                   color={settings.guideColor}
                   size={settings.guideSize}
                   strokeWidth={settings.guideStrokeWidth}
+                  offsetX={settings.guideOffsetX}
+                  offsetY={settings.guideOffsetY}
                 />
                 {!settings.guideVisible ? (
                   <View style={styles.guidePreviewDisabled}>

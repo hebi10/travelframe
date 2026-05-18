@@ -294,23 +294,43 @@ export const deleteLocalFile = async (uri?: string | null) => {
 export const saveCapturedPhoto = async ({
   uri,
   width,
-  height
+  height,
+  ratioLabel = "Original"
 }: SaveCapturedPhotoInput) => {
   const id = createPhotoId();
-  const extension = getFileExtension(uri);
+  const shouldApplyRatio = ratioLabel !== "Original";
+  const extension = shouldApplyRatio ? "jpg" : getFileExtension(uri);
   const directory = await ensurePhotoDirectory();
   const destinationUri = `${directory}${id}.${extension}`;
+  const rendered = shouldApplyRatio
+    ? await renderEditedPhotoFromTransform({
+        sourceUri: uri,
+        width,
+        height,
+        transform: {
+          ratioLabel,
+          translateX: 0,
+          translateY: 0,
+          scale: 1,
+          rotation: 0
+        }
+      })
+    : {
+        uri,
+        width: width ?? 0,
+        height: height ?? 0
+      };
 
   await FileSystem.copyAsync({
-    from: uri,
+    from: rendered.uri,
     to: destinationUri
   });
 
   const previewUri = await createPhotoPreview({
     sourceUri: destinationUri,
     id,
-    width,
-    height
+    width: rendered.width,
+    height: rendered.height
   });
 
   const photo: PhotoItem = {
@@ -318,9 +338,9 @@ export const saveCapturedPhoto = async ({
     uri: destinationUri,
     previewUri,
     createdAt: new Date().toISOString(),
-    width: width ?? 0,
-    height: height ?? 0,
-    ratioLabel: getRatioLabel(width, height),
+    width: rendered.width ?? 0,
+    height: rendered.height ?? 0,
+    ratioLabel: shouldApplyRatio ? ratioLabel : getRatioLabel(width, height),
     kind: "original",
     edited: false,
     addedToVideo: false

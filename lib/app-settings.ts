@@ -5,6 +5,7 @@ import {
   type ImageQuality
 } from "@/constants/image";
 import type { TripClipRatio } from "@/constants/trip-clip";
+import type { PhotoRatioLabel } from "@/types/photo";
 import { localStorageAdapter } from "@/lib/local-storage";
 
 const APP_SETTINGS_KEY = "travel-frame.settings.v1";
@@ -31,6 +32,7 @@ export type AppSettings = {
   guideOffsetX: number;
   guideOffsetY: number;
   overlayOpacity: number;
+  cameraRatio: PhotoRatioLabel;
   defaultRatio: TripClipRatio;
   exportQuality: ExportQuality;
   themeMode: ThemeMode;
@@ -50,6 +52,7 @@ export const defaultAppSettings: AppSettings = {
   guideOffsetX: 0,
   guideOffsetY: 0,
   overlayOpacity: 0.4,
+  cameraRatio: "Original",
   defaultRatio: "9:16",
   exportQuality: "high",
   themeMode: "light",
@@ -66,6 +69,7 @@ const fontSizes: FontSize[] = ["small", "medium", "large"];
 const screenLayouts: ScreenLayout[] = ["compact", "balanced", "comfortable"];
 const exportQualities: ExportQuality[] = ["standard", "high", "max"];
 const imageBackupQualities = IMAGE_QUALITY_OPTIONS.map((option) => option.value);
+const cameraRatios: PhotoRatioLabel[] = ["Original", "1:1", "3:4", "4:5", "9:16", "16:9"];
 const tripClipRatios: TripClipRatio[] = ["9:16", "4:5", "1:1", "16:9", "3:4"];
 
 const clampGuideSize = (value: unknown) => {
@@ -113,6 +117,9 @@ const normalizeSettings = (value: Partial<AppSettings> | null): AppSettings => {
         : defaultAppSettings.guideColor,
     guideOffsetX: normalizeGuideOffset(nextSettings.guideOffsetX),
     guideOffsetY: normalizeGuideOffset(nextSettings.guideOffsetY),
+    cameraRatio: cameraRatios.includes(nextSettings.cameraRatio)
+      ? nextSettings.cameraRatio
+      : defaultAppSettings.cameraRatio,
     defaultRatio: tripClipRatios.includes(nextSettings.defaultRatio)
       ? nextSettings.defaultRatio
       : defaultAppSettings.defaultRatio,

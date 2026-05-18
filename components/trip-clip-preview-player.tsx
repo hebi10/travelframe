@@ -36,6 +36,8 @@ type TripClipPreviewPlayerProps = {
   guideSize: number;
   guideStrokeWidth: number;
   guideColor: string;
+  guideOffsetX?: number;
+  guideOffsetY?: number;
   photoAdjustments: TripClipPhotoAdjustmentMap;
   onPhotoAdjustmentChange: (
     photoId: string,
@@ -102,6 +104,8 @@ export function TripClipPreviewPlayer({
   guideSize,
   guideStrokeWidth,
   guideColor,
+  guideOffsetX = 0,
+  guideOffsetY = 0,
   photoAdjustments,
   onPhotoAdjustmentChange
 }: TripClipPreviewPlayerProps) {
@@ -354,6 +358,8 @@ export function TripClipPreviewPlayer({
         size={guideSize}
         strokeWidth={guideStrokeWidth}
         color={guideColor}
+        offsetX={guideOffsetX}
+        offsetY={guideOffsetY}
       />
     </View>
   );

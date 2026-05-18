@@ -29,6 +29,8 @@ type EditablePhotoCanvasProps = {
   guideSize: number;
   guideStrokeWidth: number;
   guideColor: string;
+  guideOffsetX?: number;
+  guideOffsetY?: number;
 };
 
 export type EditablePhotoCanvasHandle = {
@@ -195,7 +197,9 @@ export const EditablePhotoCanvas = forwardRef<
   guideVisible,
   guideSize,
   guideStrokeWidth,
-  guideColor
+  guideColor,
+  guideOffsetX = 0,
+  guideOffsetY = 0
 }, ref) {
   const recorder = useOptionalViewRecorder();
   const [frameSize, setFrameSize] = useState({ width: 0, height: 0 });
@@ -469,6 +473,8 @@ export const EditablePhotoCanvas = forwardRef<
                 strokeWidth={guideStrokeWidth}
                 color={guideColor}
                 aspectRatio={frameAspectRatio}
+                offsetX={guideOffsetX}
+                offsetY={guideOffsetY}
               />
             </View>
 

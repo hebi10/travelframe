@@ -56,7 +56,7 @@ import {
 } from "@/lib/app-settings";
 import { createCaptureDraft, getRecentPhoto } from "@/lib/photo-library";
 import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
-import type { PhotoItem } from "@/types/photo";
+import type { PhotoItem, PhotoRatioLabel } from "@/types/photo";
 
 const GUIDE_SIZE_OPTIONS = [
   { label: "작게", value: 34 },
@@ -94,6 +94,24 @@ const CAMERA_QUALITY_OPTIONS = [
   { label: "높음", value: "high", quality: 0.92 },
   { label: "최대", value: "max", quality: 1 }
 ] as const;
+
+const CAMERA_RATIO_OPTIONS: { label: string; value: PhotoRatioLabel }[] = [
+  { label: "원본", value: "Original" },
+  { label: "1:1", value: "1:1" },
+  { label: "3:4", value: "3:4" },
+  { label: "4:5", value: "4:5" },
+  { label: "9:16", value: "9:16" },
+  { label: "16:9", value: "16:9" }
+];
+
+const cameraRatioAspect: Record<PhotoRatioLabel, number | null> = {
+  Original: null,
+  "1:1": 1,
+  "3:4": 3 / 4,
+  "4:5": 4 / 5,
+  "9:16": 9 / 16,
+  "16:9": 16 / 9
+};
 
 const CAMERA_FACING_OPTIONS: { label: string; value: CameraType }[] = [
   { label: "후면", value: "back" },
@@ -142,6 +160,7 @@ export default function CameraScreen() {
   const [countdown, setCountdown] = useState<number | null>(null);
   const [hapticEnabled, setHapticEnabled] = useState(true);
   const [photoQuality, setPhotoQuality] = useState<CameraQualityValue>("high");
+  const [cameraRatio, setCameraRatio] = useState<PhotoRatioLabel>("Original");
   const [cameraFacing, setCameraFacing] = useState<CameraType>("back");
   const [flashMode, setFlashMode] = useState<FlashMode>("off");
   const [torchEnabled, setTorchEnabled] = useState(false);
@@ -318,6 +337,7 @@ export default function CameraScreen() {
         guideOffsetXValue.value = settings.guideOffsetX;
         guideOffsetYValue.value = settings.guideOffsetY;
         setOverlayOpacity(settings.overlayOpacity);
+        setCameraRatio(settings.cameraRatio);
         setRecentPhoto(latestPhoto);
       };
 
@@ -365,7 +385,8 @@ export default function CameraScreen() {
         params: {
           uri: draftUri,
           width: String(photo.width ?? 0),
-          height: String(photo.height ?? 0)
+          height: String(photo.height ?? 0),
+          ratio: cameraRatio
         }
       });
     } catch (error) {
@@ -451,6 +472,12 @@ export default function CameraScreen() {
       setTorchEnabled(false);
     }
   }, []);
+
+  const updateCameraRatio = (nextRatio: PhotoRatioLabel) => {
+    setCameraRatio(nextRatio);
+    void updateAppSettings({ cameraRatio: nextRatio });
+    void triggerFeedback();
+  };
 
   const toggleCameraFacingBySwipe = useCallback(() => {
     changeCameraFacing(cameraFacing === "back" ? "front" : "back");
@@ -731,6 +758,7 @@ export default function CameraScreen() {
           size={guideSize}
           strokeWidth={guideStrokeWidth}
           color={guideColor}
+          aspectRatio={cameraRatioAspect[cameraRatio] ?? 1}
         />
       </Animated.View>
       <PhotoReferenceOverlay
@@ -1022,6 +1050,37 @@ export default function CameraScreen() {
                     </Pressable>
                   ))}
                 </View>
+              </View>
+
+              <View style={styles.cameraSettingBlock}>
+                <Text selectable={false} style={styles.modalSectionTitle}>
+                  카메라 비율
+                </Text>
+                <View style={styles.optionRow}>
+                  {CAMERA_RATIO_OPTIONS.map((option) => (
+                    <Pressable
+                      key={option.value}
+                      style={[
+                        styles.optionButton,
+                        cameraRatio === option.value && styles.optionButtonActive
+                      ]}
+                      onPress={() => updateCameraRatio(option.value)}
+                    >
+                      <Text
+                        selectable={false}
+                        style={[
+                          styles.optionButtonText,
+                          cameraRatio === option.value && styles.optionButtonTextActive
+                        ]}
+                      >
+                        {option.label}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+                <Text selectable={false} style={styles.modalSectionDetail}>
+                  촬영 원본은 유지하고, 사진 사용 시 선택한 비율로 저장합니다.
+                </Text>
               </View>
 
               <View style={styles.cameraSettingBlock}>
@@ -2077,6 +2136,12 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: typography.body,
     fontWeight: "800",
+    letterSpacing: 0
+  },
+  modalSectionDetail: {
+    color: colors.muted,
+    fontSize: typography.small,
+    lineHeight: 18,
     letterSpacing: 0
   },
   optionGrid: {

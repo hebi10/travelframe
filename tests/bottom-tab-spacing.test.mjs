@@ -25,15 +25,20 @@ assert.ok(
 );
 
 assert.ok(
+  screenShellSource.includes("const TAB_BAR_CONTENT_RESERVE_HEIGHT = TAB_BAR_BASE_HEIGHT / 2;"),
+  "screen shell should reserve a reduced content gap above the tab bar"
+);
+
+assert.ok(
   screenShellSource.includes("const TAB_BAR_MIN_BOTTOM_PADDING = 16;"),
   "screen shell should include minimum safe bottom padding"
 );
 
 assert.ok(
   screenShellSource.includes(
-    "paddingBottom: TAB_BAR_BASE_HEIGHT + Math.max(insets.bottom + 8, TAB_BAR_MIN_BOTTOM_PADDING)"
+    "TAB_BAR_CONTENT_RESERVE_HEIGHT +"
   ),
-  "screen shell should reserve the tab bar plus full bottom safe area"
+  "screen shell should reserve a reduced tab gap plus the bottom safe area"
 );
 
 console.log("ok - bottom tab spacing respects the full bottom safe area");

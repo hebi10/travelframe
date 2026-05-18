@@ -191,7 +191,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     alignSelf: "center",
     paddingTop: 4,
-    paddingBottom: 18
+    paddingBottom: 8
   },
   heroScroller: {
     width: "100%",

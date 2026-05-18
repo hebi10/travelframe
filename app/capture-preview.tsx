@@ -9,15 +9,33 @@ import { recordBackupFailure } from "@/lib/backup-failure-queue";
 import { backupPhotoIfEnabled } from "@/lib/cloud-backup";
 import { deleteLocalFile, getPhotoById, saveCapturedPhoto } from "@/lib/photo-library";
 import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
-import type { PhotoItem } from "@/types/photo";
+import type { PhotoItem, PhotoRatioLabel } from "@/types/photo";
+
+const previewRatioAspect: Record<PhotoRatioLabel, number | null> = {
+  Original: null,
+  "1:1": 1,
+  "3:4": 3 / 4,
+  "4:5": 4 / 5,
+  "9:16": 9 / 16,
+  "16:9": 16 / 9
+};
+
+const isPhotoRatioLabel = (value: unknown): value is PhotoRatioLabel =>
+  value === "Original" ||
+  value === "1:1" ||
+  value === "3:4" ||
+  value === "4:5" ||
+  value === "9:16" ||
+  value === "16:9";
 
 export default function CapturePreviewScreen() {
   const { user, subscription } = useAuth();
-  const { id, uri, width, height } = useLocalSearchParams<{
+  const { id, uri, width, height, ratio } = useLocalSearchParams<{
     id?: string;
     uri?: string;
     width?: string;
     height?: string;
+    ratio?: string;
   }>();
   const [photo, setPhoto] = useState<PhotoItem | null>(null);
   const [isLoading, setIsLoading] = useState(Boolean(id));
@@ -50,6 +68,8 @@ export default function CapturePreviewScreen() {
   const previewUri = photo?.uri ?? uri;
   const parsedWidth = width ? Number(width) : undefined;
   const parsedHeight = height ? Number(height) : undefined;
+  const selectedRatio: PhotoRatioLabel = isPhotoRatioLabel(ratio) ? ratio : "Original";
+  const selectedRatioAspect = previewRatioAspect[selectedRatio];
 
   const usePhoto = async () => {
     if (isSaving) {
@@ -72,7 +92,8 @@ export default function CapturePreviewScreen() {
       const savedPhoto = await saveCapturedPhoto({
         uri,
         width: Number.isFinite(parsedWidth) ? parsedWidth : undefined,
-        height: Number.isFinite(parsedHeight) ? parsedHeight : undefined
+        height: Number.isFinite(parsedHeight) ? parsedHeight : undefined,
+        ratioLabel: selectedRatio
       });
       try {
         await backupPhotoIfEnabled({
@@ -128,7 +149,22 @@ export default function CapturePreviewScreen() {
           <ActivityIndicator color={colors.inverse} />
         </View>
       ) : previewUri ? (
-        <Image source={{ uri: previewUri }} style={styles.image} contentFit="contain" />
+        <View style={styles.previewArea}>
+          <View
+            style={[
+              styles.previewFrame,
+              selectedRatioAspect
+                ? { aspectRatio: selectedRatioAspect }
+                : styles.previewFrameOriginal
+            ]}
+          >
+            <Image
+              source={{ uri: previewUri }}
+              style={styles.image}
+              contentFit={selectedRatioAspect ? "cover" : "contain"}
+            />
+          </View>
+        </View>
       ) : (
         <View style={styles.emptyState}>
           <Text selectable style={styles.emptyTitle}>
@@ -177,6 +213,21 @@ const styles = StyleSheet.create({
     backgroundColor: colors.ink
   },
   image: {
+    width: "100%",
+    height: "100%"
+  },
+  previewArea: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 18
+  },
+  previewFrame: {
+    width: "100%",
+    maxHeight: "100%",
+    overflow: "hidden"
+  },
+  previewFrameOriginal: {
     flex: 1
   },
   emptyState: {

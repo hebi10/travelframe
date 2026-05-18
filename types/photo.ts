@@ -45,6 +45,7 @@ export type SaveCapturedPhotoInput = {
   uri: string;
   width?: number;
   height?: number;
+  ratioLabel?: PhotoRatioLabel;
 };
 
 export type SaveEditedPhotoInput = {
