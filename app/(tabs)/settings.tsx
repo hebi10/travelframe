@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { AppGuideOverlay } from "@/components/app-guide-overlay";
 import { ActionRow } from "@/components/action-row";
 import { CameraGuideOverlay } from "@/components/camera-guide-overlay";
 import { ScreenShell } from "@/components/screen-shell";
@@ -70,6 +71,7 @@ import {
   type LocalWorkspaceSummary
 } from "@/lib/cloud-backup";
 import { formatImageBackupUsage } from "@/lib/image-backup-utils";
+import { resetAppGuideProgress } from "@/lib/guide-progress";
 import { getPhotos } from "@/lib/photo-library";
 import { isCreatorSubscriptionActive } from "@/lib/subscription";
 import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
@@ -369,6 +371,11 @@ export default function SettingsScreen() {
   const openDeleteRequestPage = () => {
     setShowDeleteRequestInfo(false);
     void Linking.openURL(DELETE_ACCOUNT_REQUEST_URL);
+  };
+
+  const handleResetGuideProgress = async () => {
+    await resetAppGuideProgress();
+    setAuthMessage("사용 가이드를 다시 볼 수 있도록 초기화했습니다. 각 탭에 들어가면 안내가 다시 표시됩니다.");
   };
 
   const handleEnableBackup = async () => {
@@ -904,6 +911,12 @@ export default function SettingsScreen() {
             detail="선, 여백, 타이포 중심의 정돈된 스타일"
             mark={screenLayoutLabel[settings.screenLayout]}
             onPress={() => setActiveSetting("screenLayout")}
+          />
+          <ActionRow
+            label="사용 가이드 다시 보기"
+            detail="처음 사용하는 사람을 위한 화면별 안내를 다시 표시합니다."
+            mark="초기화"
+            onPress={handleResetGuideProgress}
           />
           <ActionRow
             label="개인정보처리방침"
@@ -1599,6 +1612,7 @@ export default function SettingsScreen() {
           </View>
         </View>
       </Modal>
+      <AppGuideOverlay tabKey="settings" />
     </>
   );
 }

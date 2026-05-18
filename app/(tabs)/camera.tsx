@@ -33,6 +33,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { AppGuideOverlay } from "@/components/app-guide-overlay";
 import { CameraGuideOverlay } from "@/components/camera-guide-overlay";
 import { ChevronIcon } from "@/components/chevron-icon";
 import {
@@ -1594,6 +1595,7 @@ export default function CameraScreen() {
           </Pressable>
         </View>
       ) : null}
+      <AppGuideOverlay tabKey="camera" transparentBackdrop />
     </View>
   );
 }

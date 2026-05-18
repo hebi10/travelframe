@@ -12,6 +12,7 @@ import {
   View
 } from "react-native";
 
+import { AppGuideOverlay } from "@/components/app-guide-overlay";
 import { ScreenShell } from "@/components/screen-shell";
 import { colors, typography } from "@/constants/app-theme";
 import { useAppAppearance } from "@/lib/app-appearance";
@@ -76,6 +77,7 @@ export default function HomeScreen() {
   };
 
   return (
+    <>
     <ScreenShell
       eyebrow="트래블프레임"
       title="여행 사진을 깔끔하게."
@@ -183,6 +185,8 @@ export default function HomeScreen() {
         </View>
       </View>
     </ScreenShell>
+    <AppGuideOverlay tabKey="home" />
+    </>
   );
 }
 

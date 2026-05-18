@@ -162,6 +162,11 @@ export const getAppSettings = async () => {
   }
 };
 
+export const hasStoredAppSettings = async () => {
+  const value = await localStorageAdapter.getItem(APP_SETTINGS_KEY);
+  return Boolean(value);
+};
+
 export const saveAppSettings = async (settings: AppSettings) => {
   const normalizedSettings = normalizeSettings(settings);
   await localStorageAdapter.setItem(

@@ -4,6 +4,7 @@ import { type Href, useFocusEffect, useLocalSearchParams, useRouter } from "expo
 import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Alert, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 
+import { AppGuideOverlay } from "@/components/app-guide-overlay";
 import { ScreenShell } from "@/components/screen-shell";
 import { SectionBlock } from "@/components/section-block";
 import { colors, controls, typography } from "@/constants/app-theme";
@@ -313,6 +314,7 @@ export default function StudioScreen() {
   };
 
   return (
+    <>
     <ScreenShell
       eyebrow="편집"
       title="사진과 영상을 관리하세요."
@@ -600,6 +602,8 @@ export default function StudioScreen() {
         </View>
       </Modal>
     </ScreenShell>
+    <AppGuideOverlay tabKey="studio" />
+    </>
   );
 }
 

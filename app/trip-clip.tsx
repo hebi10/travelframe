@@ -33,6 +33,7 @@ import Reanimated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { AppGuideOverlay } from "@/components/app-guide-overlay";
 import { InterstitialAdModal } from "@/components/interstitial-ad-modal";
 import { CameraGuideOverlay } from "@/components/camera-guide-overlay";
 import { TripClipPreviewPlayer } from "@/components/trip-clip-preview-player";
@@ -2685,6 +2686,7 @@ export default function TripClipScreen() {
         placement="post_video_save"
         onClose={() => setIsPostSaveAdVisible(false)}
       />
+      <AppGuideOverlay tabKey="tripClip" />
     </View>
   );
 }

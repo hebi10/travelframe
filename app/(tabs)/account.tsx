@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { AppGuideOverlay } from "@/components/app-guide-overlay";
 import { ScreenShell } from "@/components/screen-shell";
 import { SectionBlock } from "@/components/section-block";
 import { colors, controls, spacing, typography } from "@/constants/app-theme";
@@ -1048,6 +1049,7 @@ export default function AccountScreen() {
           </View>
         </View>
       </Modal>
+      <AppGuideOverlay tabKey="account" />
     </>
   );
 }
