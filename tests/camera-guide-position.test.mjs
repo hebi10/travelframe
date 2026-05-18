@@ -17,7 +17,9 @@ for (const snippet of [
   "드래그 이동하기",
   "중앙",
   "완료",
-  "setGuideSettingsOpen(true)"
+  "setGuideSettingsOpen(true)",
+  "guideSettingsScroll",
+  "guideSettingsContent"
 ]) {
   assert.ok(cameraSource.includes(snippet), `camera guide position UI missing: ${snippet}`);
 }
@@ -25,6 +27,13 @@ for (const snippet of [
 assert.ok(
   cameraSource.includes("GestureDetector gesture={guidePositionGesture}"),
   "guide position adjustment should use a drag gesture detector"
+);
+
+assert.ok(
+  cameraSource.includes("<ScrollView") &&
+    cameraSource.includes("style={styles.guideSettingsScroll}") &&
+    cameraSource.includes("contentContainerStyle={styles.guideSettingsContent}"),
+  "guide settings modal should scroll so bottom actions remain visible"
 );
 
 assert.ok(

@@ -189,20 +189,28 @@ export default function CameraScreen() {
 
   useFocusEffect(
     useCallback(() => {
-    if (
-      permission &&
-      !permission.granted &&
-      permission.canAskAgain &&
-      !hasRequestedPermissionOnFocus.current
-    ) {
-      hasRequestedPermissionOnFocus.current = true;
-      void requestPermission();
-    }
+      const requestCameraPermissionOnFocus = async () => {
+        if (hasRequestedPermissionOnFocus.current) {
+          return;
+        }
 
-    return () => {
-      hasRequestedPermissionOnFocus.current = false;
-    };
-    }, [permission, requestPermission])
+        const nextPermission = permission ?? (await getPermission());
+        if (
+          nextPermission &&
+          !nextPermission.granted &&
+          nextPermission.canAskAgain
+        ) {
+          hasRequestedPermissionOnFocus.current = true;
+          await requestPermission();
+        }
+      };
+
+      void requestCameraPermissionOnFocus();
+
+      return () => {
+        hasRequestedPermissionOnFocus.current = false;
+      };
+    }, [getPermission, permission, requestPermission])
   );
 
   useEffect(() => {
@@ -1159,166 +1167,172 @@ export default function CameraScreen() {
                 </Pressable>
               </View>
 
-              <View style={styles.modalSection}>
-                <Text selectable={false} style={styles.modalSectionTitle}>
-                  가이드라인
-                </Text>
-                <View style={styles.optionGrid}>
-                  {GUIDE_TYPES.map((type) => (
-                    <Pressable
-                      key={type}
-                      style={[
-                        styles.optionButton,
-                        guide === type && styles.optionButtonActive
-                      ]}
-                      onPress={() => {
-                        updateGuideType(type);
-                      }}
-                    >
-                      <Text
-                        selectable={false}
-                        style={[
-                          styles.optionButtonText,
-                          guide === type && styles.optionButtonTextActive
-                        ]}
-                      >
-                        {GUIDE_LABELS[type]}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
-              </View>
-
-              <View style={styles.modalSection}>
-                <Text selectable={false} style={styles.modalSectionTitle}>
-                  크기
-                </Text>
-                <View style={styles.optionRow}>
-                  {GUIDE_SIZE_OPTIONS.map((option) => (
-                    <Pressable
-                      key={option.value}
-                      style={[
-                        styles.optionButton,
-                        guideSize === option.value && styles.optionButtonActive
-                      ]}
-                      onPress={() => applyGuideSize(option.value)}
-                    >
-                      <Text
-                        selectable={false}
-                        style={[
-                          styles.optionButtonText,
-                          guideSize === option.value && styles.optionButtonTextActive
-                        ]}
-                      >
-                        {option.label}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
-                <View style={styles.sizeFineControl}>
-                  <GuideSizeSlider
-                    value={guideSize}
-                    onChange={previewGuideSize}
-                    onCommit={applyGuideSize}
-                  />
-                  <TextInput
-                    value={guideSizeInput}
-                    keyboardType="number-pad"
-                    maxLength={2}
-                    selectTextOnFocus
-                    style={styles.sizeInput}
-                    onChangeText={(value) =>
-                      setGuideSizeInput(value.replace(/[^0-9]/g, ""))
-                    }
-                    onBlur={commitGuideSizeInput}
-                    onSubmitEditing={commitGuideSizeInput}
-                  />
-                </View>
-              </View>
-
-              <View style={[styles.modalSection, styles.modalSectionSpaced]}>
-                <Text selectable={false} style={styles.modalSectionTitle}>
-                  선 두께
-                </Text>
-                <View style={styles.optionRow}>
-                  {GUIDE_STROKE_WIDTH_OPTIONS.map((strokeWidth) => {
-                    const isActive = guideStrokeWidth === strokeWidth;
-
-                    return (
+              <ScrollView
+                style={styles.guideSettingsScroll}
+                contentContainerStyle={styles.guideSettingsContent}
+                showsVerticalScrollIndicator={false}
+              >
+                <View style={styles.modalSection}>
+                  <Text selectable={false} style={styles.modalSectionTitle}>
+                    가이드라인
+                  </Text>
+                  <View style={styles.optionGrid}>
+                    {GUIDE_TYPES.map((type) => (
                       <Pressable
-                        key={strokeWidth}
+                        key={type}
                         style={[
                           styles.optionButton,
-                          isActive && styles.optionButtonActive
+                          guide === type && styles.optionButtonActive
                         ]}
-                        onPress={() => updateGuideStrokeWidth(strokeWidth)}
+                        onPress={() => {
+                          updateGuideType(type);
+                        }}
                       >
                         <Text
                           selectable={false}
                           style={[
                             styles.optionButtonText,
-                            isActive && styles.optionButtonTextActive
+                            guide === type && styles.optionButtonTextActive
                           ]}
                         >
-                          {strokeWidth}px
+                          {GUIDE_LABELS[type]}
                         </Text>
                       </Pressable>
-                    );
-                  })}
+                    ))}
+                  </View>
                 </View>
-              </View>
 
-              <View style={[styles.modalSection, styles.modalSectionSpaced]}>
-                <Text selectable={false} style={styles.modalSectionTitle}>
-                  색상
-                </Text>
-                <View style={styles.colorRow}>
-                  {GUIDE_COLOR_OPTIONS.map((option) => (
-                    <Pressable
-                      key={option.label}
-                      style={[
-                        styles.colorOption,
-                        guideColor === option.value && styles.colorOptionActive
-                      ]}
-                      onPress={() => updateGuideColor(option.value)}
-                    >
-                      <View
+                <View style={styles.modalSection}>
+                  <Text selectable={false} style={styles.modalSectionTitle}>
+                    크기
+                  </Text>
+                  <View style={styles.optionRow}>
+                    {GUIDE_SIZE_OPTIONS.map((option) => (
+                      <Pressable
+                        key={option.value}
                         style={[
-                          styles.colorSwatch,
-                          { backgroundColor: option.value }
+                          styles.optionButton,
+                          guideSize === option.value && styles.optionButtonActive
                         ]}
-                      />
-                      <Text selectable={false} style={styles.colorLabel}>
-                        {option.label}
-                      </Text>
-                    </Pressable>
-                  ))}
+                        onPress={() => applyGuideSize(option.value)}
+                      >
+                        <Text
+                          selectable={false}
+                          style={[
+                            styles.optionButtonText,
+                            guideSize === option.value && styles.optionButtonTextActive
+                          ]}
+                        >
+                          {option.label}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                  <View style={styles.sizeFineControl}>
+                    <GuideSizeSlider
+                      value={guideSize}
+                      onChange={previewGuideSize}
+                      onCommit={applyGuideSize}
+                    />
+                    <TextInput
+                      value={guideSizeInput}
+                      keyboardType="number-pad"
+                      maxLength={2}
+                      selectTextOnFocus
+                      style={styles.sizeInput}
+                      onChangeText={(value) =>
+                        setGuideSizeInput(value.replace(/[^0-9]/g, ""))
+                      }
+                      onBlur={commitGuideSizeInput}
+                      onSubmitEditing={commitGuideSizeInput}
+                    />
+                  </View>
                 </View>
-              </View>
 
-              <Pressable
-                style={styles.guidePositionButton}
-                onPress={startGuidePositionAdjustment}
-              >
-                <Text selectable={false} style={styles.guidePositionButtonText}>
-                  드래그 이동하기
-                </Text>
-              </Pressable>
+                <View style={[styles.modalSection, styles.modalSectionSpaced]}>
+                  <Text selectable={false} style={styles.modalSectionTitle}>
+                    선 두께
+                  </Text>
+                  <View style={styles.optionRow}>
+                    {GUIDE_STROKE_WIDTH_OPTIONS.map((strokeWidth) => {
+                      const isActive = guideStrokeWidth === strokeWidth;
 
-              <Pressable
-                style={[styles.visibilityButton, guideVisible && styles.visibilityButtonActive]}
-                onPress={() => updateGuideVisibility(!guideVisible)}
-              >
-                <Text
-                  selectable={false}
-                  style={[
-                    styles.visibilityButtonText,
-                    guideVisible && styles.visibilityButtonTextActive
-                  ]}
+                      return (
+                        <Pressable
+                          key={strokeWidth}
+                          style={[
+                            styles.optionButton,
+                            isActive && styles.optionButtonActive
+                          ]}
+                          onPress={() => updateGuideStrokeWidth(strokeWidth)}
+                        >
+                          <Text
+                            selectable={false}
+                            style={[
+                              styles.optionButtonText,
+                              isActive && styles.optionButtonTextActive
+                            ]}
+                          >
+                            {strokeWidth}px
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </View>
+
+                <View style={[styles.modalSection, styles.modalSectionSpaced]}>
+                  <Text selectable={false} style={styles.modalSectionTitle}>
+                    색상
+                  </Text>
+                  <View style={styles.colorRow}>
+                    {GUIDE_COLOR_OPTIONS.map((option) => (
+                      <Pressable
+                        key={option.label}
+                        style={[
+                          styles.colorOption,
+                          guideColor === option.value && styles.colorOptionActive
+                        ]}
+                        onPress={() => updateGuideColor(option.value)}
+                      >
+                        <View
+                          style={[
+                            styles.colorSwatch,
+                            { backgroundColor: option.value }
+                          ]}
+                        />
+                        <Text selectable={false} style={styles.colorLabel}>
+                          {option.label}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                </View>
+
+                <Pressable
+                  style={styles.guidePositionButton}
+                  onPress={startGuidePositionAdjustment}
                 >
-                  가이드 {guideVisible ? "숨기기" : "보이기"}
-                </Text>
-              </Pressable>
+                  <Text selectable={false} style={styles.guidePositionButtonText}>
+                    드래그 이동하기
+                  </Text>
+                </Pressable>
+
+                <Pressable
+                  style={[styles.visibilityButton, guideVisible && styles.visibilityButtonActive]}
+                  onPress={() => updateGuideVisibility(!guideVisible)}
+                >
+                  <Text
+                    selectable={false}
+                    style={[
+                      styles.visibilityButtonText,
+                      guideVisible && styles.visibilityButtonTextActive
+                    ]}
+                  >
+                    가이드 {guideVisible ? "숨기기" : "보이기"}
+                  </Text>
+                </Pressable>
+              </ScrollView>
             </View>
           </View>
         </GestureHandlerRootView>
@@ -1943,7 +1957,7 @@ const styles = StyleSheet.create({
     backgroundColor: "transparent"
   },
   guideModal: {
-    gap: 22,
+    gap: 16,
     flexGrow: 0,
     maxHeight: "88%",
     padding: 18,
@@ -1968,6 +1982,13 @@ const styles = StyleSheet.create({
   },
   cameraSettingsContent: {
     gap: 18,
+    paddingBottom: 2
+  },
+  guideSettingsScroll: {
+    flexGrow: 0
+  },
+  guideSettingsContent: {
+    gap: 22,
     paddingBottom: 2
   },
   cameraSettingBlock: {

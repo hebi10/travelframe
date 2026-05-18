@@ -65,6 +65,7 @@ import {
   markBackupExpired,
   restoreCloudBackupToLocal,
   subscribeCloudBackupOverview,
+  type BackupProgressUpdate,
   type CloudBackupOverview,
   type LocalWorkspaceSummary
 } from "@/lib/cloud-backup";
@@ -253,6 +254,8 @@ export default function SettingsScreen() {
   const [showBackupConfirm, setShowBackupConfirm] = useState(false);
   const [guideExpanded, setGuideExpanded] = useState(false);
   const [isBackupSubmitting, setIsBackupSubmitting] = useState(false);
+  const [backupProgress, setBackupProgress] =
+    useState<BackupProgressUpdate | null>(null);
   const [backupFailures, setBackupFailures] = useState<BackupFailureRecord[]>([]);
   const [backupOverview, setBackupOverview] =
     useState<CloudBackupOverview>(emptyBackupOverview);
@@ -432,8 +435,16 @@ export default function SettingsScreen() {
 
     try {
       setIsBackupSubmitting(true);
+      setBackupProgress({
+        percent: 0,
+        detail: "백업할 데이터를 준비하고 있습니다."
+      });
       setAuthMessage(null);
-      const summary = await backupCurrentWorkspace({ user, subscription });
+      const summary = await backupCurrentWorkspace({
+        user,
+        subscription,
+        onProgress: setBackupProgress
+      });
       await updateSetting({ cloudBackupEnabled: true });
       setShowBackupConfirm(false);
       setAuthMessage(
@@ -443,6 +454,7 @@ export default function SettingsScreen() {
       setAuthMessage(error instanceof Error ? error.message : "백업 중 문제가 발생했습니다.");
     } finally {
       setIsBackupSubmitting(false);
+      setBackupProgress(null);
     }
   };
 
@@ -1498,6 +1510,46 @@ export default function SettingsScreen() {
           </View>
         </View>
       </Modal>
+      <Modal
+        animationType="fade"
+        transparent
+        visible={isBackupSubmitting && Boolean(backupProgress)}
+        onRequestClose={() => undefined}
+      >
+        <View style={[styles.modalBackdrop, modalSafeStyle]}>
+          <View style={[styles.modalPanel, styles.backupProgressPanel, themed.modalPanel]}>
+            {backupProgress ? (
+              <>
+                <View style={styles.backupProgressHeader}>
+                  <ActivityIndicator color={palette.text} />
+                  <View style={styles.backupProgressCopy}>
+                    <Text selectable style={[styles.modalTitle, themed.text]}>
+                      백업 중
+                    </Text>
+                    <Text selectable style={[styles.optionDetail, themed.mutedText]}>
+                      백업 중입니다. 앱을 닫지 말고 잠시만 기다려 주세요.
+                    </Text>
+                  </View>
+                </View>
+                <Text selectable style={[styles.optionDetail, themed.mutedText]}>
+                  {backupProgress.detail}
+                </Text>
+                <View style={styles.backupProgressTrack}>
+                  <View
+                    style={[
+                      styles.backupProgressFill,
+                      { width: `${Math.max(0, Math.min(100, backupProgress.percent))}%` }
+                    ]}
+                  />
+                </View>
+                <Text selectable style={[styles.backupProgressText, themed.text]}>
+                  {Math.round(backupProgress.percent)}%
+                </Text>
+              </>
+            ) : null}
+          </View>
+        </View>
+      </Modal>
     </>
   );
 }
@@ -2005,6 +2057,36 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontSize: typography.small,
     lineHeight: 18,
+    letterSpacing: 0
+  },
+  backupProgressPanel: {
+    gap: 14
+  },
+  backupProgressHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12
+  },
+  backupProgressCopy: {
+    flex: 1,
+    gap: 6
+  },
+  backupProgressTrack: {
+    height: 8,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: "rgba(0, 0, 0, 0.08)"
+  },
+  backupProgressFill: {
+    height: "100%",
+    backgroundColor: colors.text
+  },
+  backupProgressText: {
+    color: colors.text,
+    fontSize: typography.button,
+    fontWeight: "900",
+    textAlign: "right",
     letterSpacing: 0
   },
   deleteBackupButton: {

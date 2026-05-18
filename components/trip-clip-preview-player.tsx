@@ -29,6 +29,7 @@ type TripClipPreviewPlayerProps = {
   template: TripClipTemplate;
   transition: TripClipTransition;
   transitionDuration: number;
+  frameAspectRatio: number;
   adjustEnabled: boolean;
   guideVisible: boolean;
   guide: GuideType;
@@ -58,11 +59,43 @@ const getAdjustmentStyle = (adjustment: TripClipPhotoAdjustment) => ({
   ]
 });
 
+const getOriginalImageFrameStyle = (
+  photo: PhotoItem | null,
+  frameAspectRatio: number,
+  contentFit: "contain" | "cover"
+) => {
+  const imageAspectRatio =
+    photo?.width && photo?.height ? photo.width / photo.height : frameAspectRatio;
+
+  if (!Number.isFinite(imageAspectRatio) || imageAspectRatio <= 0) {
+    return {
+      width: "100%" as const,
+      height: "100%" as const
+    };
+  }
+
+  const shouldFitByWidth =
+    contentFit === "contain"
+      ? imageAspectRatio >= frameAspectRatio
+      : imageAspectRatio <= frameAspectRatio;
+
+  return shouldFitByWidth
+    ? {
+        width: "100%" as const,
+        aspectRatio: imageAspectRatio
+      }
+    : {
+        height: "100%" as const,
+        aspectRatio: imageAspectRatio
+      };
+};
+
 export function TripClipPreviewPlayer({
   photo,
   template,
   transition,
   transitionDuration,
+  frameAspectRatio,
   adjustEnabled,
   guideVisible,
   guide,
@@ -277,7 +310,7 @@ export function TripClipPreviewPlayer({
   return (
     <View style={[styles.previewInner, isFilm && styles.previewInnerFilm]}>
       <GestureDetector gesture={gesture}>
-        <Reanimated.View style={[styles.previewGestureLayer, adjustStyle]}>
+        <Reanimated.View style={styles.previewGestureLayer}>
           <PreviewLayer
             photo={layers.a}
             animatedStyle={layerAStyle}
@@ -287,6 +320,7 @@ export function TripClipPreviewPlayer({
                 : getAdjustmentStyle(getTripClipPhotoAdjustment(photoAdjustments, layers.a?.id))
             }
             contentFit={contentFit}
+            frameAspectRatio={frameAspectRatio}
             isFilm={isFilm}
           />
           <PreviewLayer
@@ -298,6 +332,7 @@ export function TripClipPreviewPlayer({
                 : getAdjustmentStyle(getTripClipPhotoAdjustment(photoAdjustments, layers.b?.id))
             }
             contentFit={contentFit}
+            frameAspectRatio={frameAspectRatio}
             isFilm={isFilm}
           />
         </Reanimated.View>
@@ -329,22 +364,26 @@ function PreviewLayer({
   animatedStyle,
   adjustmentStyle,
   contentFit,
+  frameAspectRatio,
   isFilm
 }: {
   photo: PhotoItem | null;
   animatedStyle: object;
   adjustmentStyle: object;
   contentFit: "contain" | "cover";
+  frameAspectRatio: number;
   isFilm: boolean;
 }) {
+  const imageFrameStyle = getOriginalImageFrameStyle(photo, frameAspectRatio, contentFit);
+
   return (
     <Reanimated.View style={[styles.previewLayer, animatedStyle]}>
       <Reanimated.View style={[styles.previewImageMotionLayer, adjustmentStyle]}>
         {photo ? (
           <Image
             source={{ uri: getPreviewUri(photo) }}
-            style={[styles.previewImage, isFilm && styles.previewImageFilm]}
-            contentFit={contentFit}
+            style={[styles.previewImage, imageFrameStyle, isFilm && styles.previewImageFilm]}
+            contentFit="fill"
             cachePolicy="memory-disk"
           />
         ) : null}
@@ -369,12 +408,11 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject
   },
   previewImageMotionLayer: {
-    flex: 1
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center"
   },
-  previewImage: {
-    width: "100%",
-    height: "100%"
-  },
+  previewImage: {},
   previewImageFilm: {
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.22)"

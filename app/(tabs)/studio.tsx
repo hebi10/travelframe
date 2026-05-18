@@ -2,7 +2,7 @@ import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { type Href, useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { ScreenShell } from "@/components/screen-shell";
 import { SectionBlock } from "@/components/section-block";
@@ -36,6 +36,11 @@ type StudioWorkItem =
   | { kind: "single-image"; item: PhotoItem; createdAt: string }
   | { kind: "image-bundle"; item: ImageBundleWorkItem; createdAt: string }
   | { kind: "video"; item: MadeVideoItem; createdAt: string };
+
+type ImportProgress = {
+  percent: number;
+  detail: string;
+};
 
 const tabs: { label: string; value: StudioTab }[] = [
   { label: "사진", value: "photos" },
@@ -81,6 +86,7 @@ export default function StudioScreen() {
   const [imageBundles, setImageBundles] = useState<ImageBundleWorkItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isImportingImage, setIsImportingImage] = useState(false);
+  const [importProgress, setImportProgress] = useState<ImportProgress | null>(null);
   const [pageSize, setPageSize] = useState<PageSize>(6);
   const [pages, setPages] = useState<Record<string, number>>({});
   const [cloudBackupEnabled, setCloudBackupEnabled] = useState(false);
@@ -189,49 +195,77 @@ export default function StudioScreen() {
 
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ["images"],
+        allowsMultipleSelection: true,
+        selectionLimit: 20,
         allowsEditing: false,
         quality: 1
       });
 
-      if (result.canceled || !result.assets[0]?.uri) {
+      if (result.canceled) {
         return;
       }
 
-      const asset = result.assets[0];
-      const savedPhoto = await saveCapturedPhoto({
-        uri: asset.uri,
-        width: asset.width,
-        height: asset.height
-      });
-      let backupWarning = "";
-      try {
-        await backupPhotoIfEnabled({
-          user,
-          subscription,
-          photo: savedPhoto
-        });
-      } catch (backupError) {
-        console.error("가져온 사진 자동 백업에 실패했습니다.", backupError);
-        await recordBackupFailure({
-          id: savedPhoto.id,
-          kind: "photo",
-          label: "가져온 사진",
-          message: getUserFacingErrorMessage(
-            backupError,
-            "클라우드 백업은 완료하지 못했습니다."
-          )
-        });
-        backupWarning = " 클라우드 백업은 설정에서 다시 시도할 수 있습니다.";
+      const importAssets = result.assets.filter((asset) => Boolean(asset.uri));
+      if (importAssets.length === 0) {
+        return;
       }
+
+      let backupFailureCount = 0;
+      setImportProgress({
+        percent: 0,
+        detail: `선택한 이미지 ${importAssets.length}장을 저장할 준비를 하고 있습니다.`
+      });
+
+      for (const [index, asset] of importAssets.entries()) {
+        const savedPhoto = await saveCapturedPhoto({
+          uri: asset.uri,
+          width: asset.width,
+          height: asset.height
+        });
+
+        setImportProgress({
+          percent: ((index + 0.5) / importAssets.length) * 100,
+          detail: `이미지를 앱에 저장하는 중입니다. ${index + 1}/${importAssets.length}`
+        });
+
+        try {
+          await backupPhotoIfEnabled({
+            user,
+            subscription,
+            photo: savedPhoto
+          });
+        } catch (backupError) {
+          backupFailureCount += 1;
+          console.error("가져온 사진 자동 백업에 실패했습니다.", backupError);
+          await recordBackupFailure({
+            id: savedPhoto.id,
+            kind: "photo",
+            label: "가져온 사진",
+            message: getUserFacingErrorMessage(
+              backupError,
+              "클라우드 백업은 완료하지 못했습니다."
+            )
+          });
+        }
+
+        setImportProgress({
+          percent: ((index + 1) / importAssets.length) * 100,
+          detail: `이미지를 앱에 저장하는 중입니다. ${index + 1}/${importAssets.length}`
+        });
+      }
+
       await loadStudio();
       setActiveTab("photos");
-      if (backupWarning) {
+      if (backupFailureCount > 0) {
         Alert.alert(
           "백업 실패",
-          "사진은 현재 기기에 저장되었습니다. 클라우드 백업은 설정에서 다시 시도할 수 있습니다."
+          `선택한 이미지는 현재 기기에 저장되었습니다. ${backupFailureCount}장은 클라우드 백업을 설정에서 다시 시도할 수 있습니다.`
         );
       }
-      Alert.alert("저장 완료", "선택한 이미지를 앱 사진 목록에 저장했습니다.");
+      Alert.alert(
+        "저장 완료",
+        `선택한 이미지 ${importAssets.length}장을 앱 사진 목록에 저장했습니다.`
+      );
     } catch (error) {
       Alert.alert(
         "저장 실패",
@@ -239,6 +273,7 @@ export default function StudioScreen() {
       );
     } finally {
       setIsImportingImage(false);
+      setImportProgress(null);
     }
   };
 
@@ -335,7 +370,7 @@ export default function StudioScreen() {
                   앱에 이미지 저장
                 </Text>
                 <Text selectable style={styles.clipDetail}>
-                  핸드폰 앨범에서 이미지를 골라 앱 사진 목록에 보관합니다.
+                  핸드폰 앨범에서 이미지를 여러 장 골라 앱 사진 목록에 보관합니다.
                 </Text>
               </View>
               <View style={[styles.clipAction, filledButtonStyle]}>
@@ -391,7 +426,7 @@ export default function StudioScreen() {
               </View>
               <View style={[styles.clipAction, filledButtonStyle]}>
                 <Text selectable={false} style={[styles.clipActionText, filledButtonTextStyle]}>
-                  사진 선택
+                  생성 시작
                 </Text>
               </View>
             </Pressable>
@@ -524,6 +559,46 @@ export default function StudioScreen() {
           )}
         </>
       ) : null}
+      <Modal
+        animationType="fade"
+        transparent
+        visible={isImportingImage && Boolean(importProgress)}
+        onRequestClose={() => undefined}
+      >
+        <View style={styles.importProgressBackdrop}>
+          <View style={[styles.importProgressPanel, panelStyle]}>
+            {importProgress ? (
+              <>
+                <View style={styles.importProgressHeader}>
+                  <ActivityIndicator color={palette.text} />
+                  <View style={styles.importProgressCopy}>
+                    <Text selectable style={styles.importProgressTitle}>
+                      이미지 저장 중
+                    </Text>
+                    <Text selectable style={styles.importProgressDetail}>
+                      이미지를 앱에 저장하는 중입니다.
+                    </Text>
+                  </View>
+                </View>
+                <Text selectable style={styles.importProgressDetail}>
+                  {importProgress.detail}
+                </Text>
+                <View style={styles.importProgressTrack}>
+                  <View
+                    style={[
+                      styles.importProgressFill,
+                      { width: `${Math.max(0, Math.min(100, importProgress.percent))}%` }
+                    ]}
+                  />
+                </View>
+                <Text selectable style={styles.importProgressText}>
+                  {Math.round(importProgress.percent)}%
+                </Text>
+              </>
+            ) : null}
+          </View>
+        </View>
+      </Modal>
     </ScreenShell>
   );
 }
@@ -1091,13 +1166,68 @@ const styles = StyleSheet.create({
     alignSelf: "stretch",
     alignItems: "center",
     justifyContent: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 12,
     backgroundColor: colors.text
   },
   clipActionText: {
     color: colors.inverse,
     fontSize: typography.button,
     fontWeight: "800",
-    lineHeight: 16,
+    lineHeight: 19,
+    textAlign: "center",
+    letterSpacing: 0
+  },
+  importProgressBackdrop: {
+    flex: 1,
+    justifyContent: "center",
+    paddingHorizontal: 18,
+    backgroundColor: "rgba(0, 0, 0, 0.38)"
+  },
+  importProgressPanel: {
+    gap: 14,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: colors.text,
+    backgroundColor: colors.background
+  },
+  importProgressHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12
+  },
+  importProgressCopy: {
+    flex: 1,
+    gap: 6
+  },
+  importProgressTitle: {
+    color: colors.text,
+    fontSize: typography.body,
+    fontWeight: "900",
+    letterSpacing: 0
+  },
+  importProgressDetail: {
+    color: colors.muted,
+    fontSize: typography.small,
+    lineHeight: 18,
+    letterSpacing: 0
+  },
+  importProgressTrack: {
+    height: 8,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: "rgba(0, 0, 0, 0.08)"
+  },
+  importProgressFill: {
+    height: "100%",
+    backgroundColor: colors.text
+  },
+  importProgressText: {
+    color: colors.text,
+    fontSize: typography.button,
+    fontWeight: "900",
+    textAlign: "right",
     letterSpacing: 0
   },
   loading: {

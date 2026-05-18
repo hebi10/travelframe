@@ -456,7 +456,7 @@ export default function EditScreen() {
           />
         )}
         <Pressable
-          style={styles.expandCanvasButton}
+          style={[styles.expandCanvasButton, { bottom: bottomSafePadding }]}
           onPress={() => setIsCanvasExpanded((value) => !value)}
         >
           <Text selectable={false} style={styles.expandCanvasButtonText}>
@@ -662,9 +662,12 @@ export default function EditScreen() {
         </View>
 
         <View style={styles.toolRow}>
-          <Pressable style={[styles.toolButton, styles.toolButtonActive]}>
+          <Pressable
+            style={styles.toolButton}
+            onPress={() => canvasRef.current?.straighten()}
+          >
             <Text selectable={false} style={styles.toolButtonText}>
-              이동
+              수평 맞추기
             </Text>
           </Pressable>
           <Pressable

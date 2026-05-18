@@ -46,6 +46,11 @@ export type BackupSummary = {
   deleteAfter: string | null;
 };
 
+export type BackupProgressUpdate = {
+  percent: number;
+  detail: string;
+};
+
 export type CloudBackupOverview = BackupSummary & {
   status: string;
   backedUpAt: string | null;
@@ -60,6 +65,17 @@ export type LocalWorkspaceSummary = {
 };
 
 const DEVICE_ID_STORAGE_KEY = "travel-frame.backup-device-id.v1";
+
+const emitBackupProgress = (
+  onProgress: ((progress: BackupProgressUpdate) => void) | undefined,
+  percent: number,
+  detail: string
+) => {
+  onProgress?.({
+    percent: Math.max(0, Math.min(100, Math.round(percent))),
+    detail
+  });
+};
 
 const fileNameFromUri = (uri: string, fallback: string) => {
   const cleanUri = uri.split("?")[0] ?? uri;
@@ -368,10 +384,12 @@ export const ensureBackupAvailable = (subscription: UserSubscription) => {
 
 export const backupCurrentWorkspace = async ({
   user,
-  subscription
+  subscription,
+  onProgress
 }: {
   user: User | null;
   subscription: UserSubscription;
+  onProgress?: (progress: BackupProgressUpdate) => void;
 }): Promise<BackupSummary> => {
   if (!user) {
     throw new Error("로그인 후 백업할 수 있습니다.");
@@ -382,6 +400,7 @@ export const backupCurrentWorkspace = async ({
   }
 
   ensureBackupAvailable(subscription);
+  emitBackupProgress(onProgress, 3, "백업할 데이터를 준비하고 있습니다.");
 
   const [settings, photos, imageBundles, videos] = await Promise.all([
     getAppSettings(),
@@ -389,18 +408,32 @@ export const backupCurrentWorkspace = async ({
     getImageBundleWorks(),
     getMadeVideos()
   ]);
+  emitBackupProgress(onProgress, 8, "백업할 데이터를 확인하고 있습니다.");
   const backedUpAt = new Date().toISOString();
   const sourceDeviceId = await getSourceDeviceId();
+  const totalOptimizeItems =
+    photos.length +
+    imageBundles.reduce((sum, work) => sum + work.imageUris.length, 0);
+  let optimizedItemCount = 0;
+  const updateOptimizationProgress = () => {
+    optimizedItemCount += 1;
+    emitBackupProgress(
+      onProgress,
+      10 + (optimizedItemCount / Math.max(1, totalOptimizeItems)) * 35,
+      "이미지를 최적화하고 있습니다."
+    );
+  };
   const optimizedPhotos = await Promise.all(
-    photos.map(async (photo) => ({
-      photo,
-      optimized: await optimizeImageForBackup({
+    photos.map(async (photo) => {
+      const optimized = await optimizeImageForBackup({
         uri: photo.uri,
         width: photo.width,
         height: photo.height,
         imageQuality: settings.imageBackupQuality
-      })
-    }))
+      });
+      updateOptimizationProgress();
+      return { photo, optimized };
+    })
   ).catch(() => {
     throw new Error(IMAGE_OPTIMIZATION_FAILED_MESSAGE);
   });
@@ -408,17 +441,22 @@ export const backupCurrentWorkspace = async ({
     imageBundles.map(async (work) => ({
       work,
       images: await Promise.all(
-        work.imageUris.map((imageUri) =>
-          optimizeImageForBackup({
+        work.imageUris.map(async (imageUri) => {
+          const optimized = await optimizeImageForBackup({
             uri: imageUri,
             imageQuality: settings.imageBackupQuality
-          })
-        )
+          });
+          updateOptimizationProgress();
+          return optimized;
+        })
       )
     }))
   ).catch(() => {
     throw new Error(IMAGE_OPTIMIZATION_FAILED_MESSAGE);
   });
+  if (totalOptimizeItems === 0) {
+    emitBackupProgress(onProgress, 45, "백업할 이미지가 있는지 확인하고 있습니다.");
+  }
   const allOptimizedImages = [
     ...optimizedPhotos.map((item) => item.optimized),
     ...optimizedImageBundles.flatMap((item) => item.images)
@@ -429,6 +467,20 @@ export const backupCurrentWorkspace = async ({
     excludePhotoIds: photos.map((photo) => photo.id),
     excludeImageWorkIds: imageBundles.map((work) => work.id)
   });
+  emitBackupProgress(onProgress, 50, "백업 용량을 확인했습니다.");
+
+  const totalUploadItems =
+    photos.length +
+    optimizedImageBundles.reduce((sum, item) => sum + item.images.length, 0);
+  let uploadedItemCount = 0;
+  const updateUploadProgress = () => {
+    uploadedItemCount += 1;
+    emitBackupProgress(
+      onProgress,
+      52 + (uploadedItemCount / Math.max(1, totalUploadItems)) * 40,
+      "Firebase에 백업하고 있습니다."
+    );
+  };
 
   for (const { photo, optimized } of optimizedPhotos) {
     const photoFileName = fileNameFromUri(photo.uri, `${photo.id}.jpg`);
@@ -465,6 +517,7 @@ export const backupCurrentWorkspace = async ({
       backedUpAt,
       updatedAt: serverTimestamp()
     });
+    updateUploadProgress();
   }
 
   for (const { work, images } of optimizedImageBundles) {
@@ -479,6 +532,7 @@ export const backupCurrentWorkspace = async ({
       });
       storagePaths.push(storagePath);
       backedUpImageUris.push(downloadUrl);
+      updateUploadProgress();
     }
 
     await setDoc(
@@ -504,7 +558,11 @@ export const backupCurrentWorkspace = async ({
       { merge: true }
     );
   }
+  if (totalUploadItems === 0) {
+    emitBackupProgress(onProgress, 92, "Firebase에 백업할 파일을 확인했습니다.");
+  }
 
+  emitBackupProgress(onProgress, 96, "백업을 마무리하고 있습니다.");
   await setDoc(
     doc(firestore, "users", user.uid, "backups", "current"),
     {
@@ -523,6 +581,7 @@ export const backupCurrentWorkspace = async ({
     },
     { merge: true }
   );
+  emitBackupProgress(onProgress, 100, "백업을 완료했습니다.");
 
   return {
     photoCount: photos.length,

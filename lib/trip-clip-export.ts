@@ -2,6 +2,11 @@ import * as FileSystem from "expo-file-system/legacy";
 import { manipulateAsync, SaveFormat } from "expo-image-manipulator";
 import * as Sharing from "expo-sharing";
 import { Platform } from "react-native";
+import { type ImageQuality } from "@/constants/image";
+import {
+  getImageQualityOption,
+  getImageResizeAction
+} from "@/lib/image-backup-utils";
 import {
   assertCanSaveToMediaLibrary,
   MEDIA_LIBRARY_SAVE_UNAVAILABLE_MESSAGE
@@ -10,6 +15,11 @@ import {
 type MediaLibraryModule = typeof import("expo-media-library");
 type MediaPermissionKind = "photo" | "video";
 export type ImageSaveFormat = "original" | "png" | "jpeg";
+type ImageExportOptions = {
+  imageQuality?: ImageQuality;
+  width?: number | null;
+  height?: number | null;
+};
 let androidDownloadDirectoryUri: string | null = null;
 
 const getMediaLibrary = async (): Promise<MediaLibraryModule> =>
@@ -74,9 +84,10 @@ const getImageSaveExtension = (mimeType: string) => {
 
 const saveImageToAndroidDownload = async (
   uri: string,
-  format: ImageSaveFormat
+  format: ImageSaveFormat,
+  options: ImageExportOptions = {}
 ) => {
-  const saveUri = await prepareImageForLibrarySave(uri, format);
+  const saveUri = await prepareImageForLibrarySave(uri, format, options);
   const mimeType = getImageSaveMimeType(saveUri, format);
   const extension = getImageSaveExtension(mimeType);
   const directoryUri = await getAndroidDownloadDirectoryUri();
@@ -101,18 +112,33 @@ const saveImageToAndroidDownload = async (
 
 export const prepareImageForLibrarySave = async (
   uri: string,
-  format: ImageSaveFormat
+  format: ImageSaveFormat,
+  options: ImageExportOptions = {}
 ) => {
   if (format === "original") {
     return uri;
   }
 
+  const qualityOption = options.imageQuality
+    ? getImageQualityOption(options.imageQuality)
+    : null;
+  const resizeAction = qualityOption
+    ? getImageResizeAction({
+        width: options.width,
+        height: options.height,
+        maxLongSide: qualityOption.maxLongSide
+      })
+    : undefined;
+
   const rendered = await manipulateAsync(
     uri,
-    [],
+    resizeAction ? [resizeAction] : [],
     format === "png"
       ? { format: SaveFormat.PNG }
-      : { compress: 1, format: SaveFormat.JPEG }
+      : {
+          compress: qualityOption?.quality ?? 1,
+          format: SaveFormat.JPEG
+        }
   );
 
   return rendered.uri;
@@ -130,16 +156,17 @@ export const saveVideoToLibrary = async (uri: string) => {
 
 export const saveImageToLibrary = async (
   uri: string,
-  format: ImageSaveFormat = "original"
+  format: ImageSaveFormat = "original",
+  options: ImageExportOptions = {}
 ) => {
   try {
     if (Platform.OS === "android") {
-      await saveImageToAndroidDownload(uri, format);
+      await saveImageToAndroidDownload(uri, format, options);
       return;
     }
 
     const MediaLibrary = await requestSavePermission("photo");
-    const saveUri = await prepareImageForLibrarySave(uri, format);
+    const saveUri = await prepareImageForLibrarySave(uri, format, options);
     assertCanSaveToMediaLibrary(MediaLibrary);
     await MediaLibrary.saveToLibraryAsync(saveUri);
   } catch (error) {
@@ -186,15 +213,21 @@ export const shareVideo = async (uri: string) => {
   });
 };
 
-export const shareImage = async (uri: string) => {
+export const shareImage = async (
+  uri: string,
+  format: ImageSaveFormat = "original",
+  options: ImageExportOptions = {}
+) => {
   const available = await Sharing.isAvailableAsync();
 
   if (!available) {
     throw new Error("이 기기에서는 공유 기능을 사용할 수 없습니다.");
   }
 
-  await Sharing.shareAsync(uri, {
-    mimeType: "image/jpeg",
+  const shareUri = await prepareImageForLibrarySave(uri, format, options);
+
+  await Sharing.shareAsync(shareUri, {
+    mimeType: getImageSaveMimeType(shareUri, format),
     dialogTitle: "대표 이미지 공유"
   });
 };

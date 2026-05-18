@@ -34,6 +34,7 @@ type EditablePhotoCanvasProps = {
 export type EditablePhotoCanvasHandle = {
   reset: () => void;
   rotateRight: () => void;
+  straighten: () => void;
   fillFrame: () => void;
   captureEditedImage: () => Promise<{ uri: string; width: number; height: number }>;
   getTransform: () => PhotoEditTransform;
@@ -247,6 +248,9 @@ export const EditablePhotoCanvas = forwardRef<
     reset,
     rotateRight: () => {
       rotation.value += Math.PI / 2;
+    },
+    straighten: () => {
+      rotation.value = 0;
     },
     fillFrame,
     captureEditedImage: async () => {

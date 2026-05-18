@@ -58,6 +58,12 @@ import {
   type VideoQualityId
 } from "@/constants/video";
 import {
+  DEFAULT_IMAGE_QUALITY,
+  IMAGE_QUALITY_DESCRIPTION,
+  IMAGE_QUALITY_OPTIONS,
+  type ImageQuality
+} from "@/constants/image";
+import {
   type ImageSaveFormat,
   saveImageToLibrary,
   saveVideoToLibrary,
@@ -377,6 +383,8 @@ export default function TripClipScreen() {
   const [ratio, setRatio] = useState<TripClipRatio>("9:16");
   const [videoQuality, setVideoQuality] =
     useState<VideoQualityId>(DEFAULT_VIDEO_QUALITY);
+  const [imageQuality, setImageQuality] =
+    useState<ImageQuality>(DEFAULT_IMAGE_QUALITY);
   const [template, setTemplate] = useState<TripClipTemplate>("minimal");
   const [transition, setTransition] = useState<TripClipTransition>("fade");
   const [transitionDuration, setTransitionDuration] = useState(0.45);
@@ -565,6 +573,7 @@ export default function TripClipScreen() {
     setPreviewGuideStrokeWidth(settings.guideStrokeWidth);
     setPreviewGuideColor(settings.guideColor);
     setCloudBackupEnabled(settings.cloudBackupEnabled);
+    setImageQuality(settings.imageBackupQuality);
 
     if (videoId && restoredVideoIdRef.current !== videoId) {
       const storedVideo = await getMadeVideoById(videoId);
@@ -662,6 +671,11 @@ export default function TripClipScreen() {
       guideColor: nextColor,
       guideVisible: true
     });
+  };
+
+  const updateImageQuality = (nextQuality: ImageQuality) => {
+    setImageQuality(nextQuality);
+    void updateAppSettings({ imageBackupQuality: nextQuality });
   };
 
   const commitPreviewGuideSizeInput = () => {
@@ -1260,7 +1274,11 @@ export default function TripClipScreen() {
             title: "이미지 저장 중",
             detail: `선택한 사진 ${selectedPhotos.length}장 중 ${index + 1}장을 저장하고 있습니다.`
           });
-          await saveImageToLibrary(photo.uri, imageSaveFormat);
+          await saveImageToLibrary(photo.uri, imageSaveFormat, {
+            imageQuality,
+            width: photo.width,
+            height: photo.height
+          });
           savedImageUris.push(photo.uri);
         }
 
@@ -1475,7 +1493,11 @@ export default function TripClipScreen() {
           return;
         }
 
-        await shareImage(activePhoto.uri);
+        await shareImage(activePhoto.uri, imageSaveFormat, {
+          imageQuality,
+          width: activePhoto.width,
+          height: activePhoto.height
+        });
         return;
       }
 
@@ -1564,6 +1586,7 @@ export default function TripClipScreen() {
                 template={template}
                 transition={transition}
                 transitionDuration={transitionDuration}
+                frameAspectRatio={ratioAspect[ratio]}
                 adjustEnabled={previewAdjustEnabled}
                 guideVisible={previewGuideVisible}
                 guide={previewGuide}
@@ -1806,25 +1829,6 @@ export default function TripClipScreen() {
             />
           ))}
         </OptionRow>
-        <Text selectable style={styles.settingLabel}>
-          영상 화질
-        </Text>
-        <OptionRow>
-          {VIDEO_QUALITY_OPTIONS.map((option) => (
-            <Chip
-              key={option.id}
-              label={option.label}
-              active={videoQuality === option.id}
-              onPress={() => {
-                setVideoQuality(option.id);
-                setRenderedVideoUri(null);
-              }}
-            />
-          ))}
-        </OptionRow>
-        <Text selectable style={styles.settingDetail}>
-          {VIDEO_QUALITY_DESCRIPTION}
-        </Text>
         {transition === "fade" ? (
           <>
             <Text selectable style={styles.settingDetail}>
@@ -2150,45 +2154,84 @@ export default function TripClipScreen() {
             })}
           </View>
           {exportFormat === "mp4" ? (
-            <Pressable
-              disabled={!canBackupVideoExport}
-              style={[
-                styles.videoBackupOption,
-                !canBackupVideoExport && styles.videoBackupOptionDisabled
-              ]}
-              onPress={() => {
-                setShouldBackupVideoExport((current) => !current);
-                setExportMessage(null);
-              }}
-            >
-              <View
+            <>
+              <View style={styles.imageFormatPanel}>
+                <Text selectable style={styles.settingLabel}>
+                  영상 화질
+                </Text>
+                <OptionRow>
+                  {VIDEO_QUALITY_OPTIONS.map((option) => (
+                    <Chip
+                      key={option.id}
+                      label={option.label}
+                      active={videoQuality === option.id}
+                      onPress={() => {
+                        setVideoQuality(option.id);
+                        setRenderedVideoUri(null);
+                      }}
+                    />
+                  ))}
+                </OptionRow>
+                <Text selectable style={styles.settingDetail}>
+                  {VIDEO_QUALITY_DESCRIPTION}
+                </Text>
+              </View>
+              <Pressable
+                disabled={!canBackupVideoExport}
                 style={[
-                  styles.videoBackupCheckbox,
-                  shouldBackupVideoExport &&
-                    canBackupVideoExport &&
-                    styles.videoBackupCheckboxActive
+                  styles.videoBackupOption,
+                  !canBackupVideoExport && styles.videoBackupOptionDisabled
                 ]}
+                onPress={() => {
+                  setShouldBackupVideoExport((current) => !current);
+                  setExportMessage(null);
+                }}
               >
-                {shouldBackupVideoExport && canBackupVideoExport ? (
-                  <Text selectable={false} style={styles.videoBackupCheckboxText}>
-                    ✓
+                <View
+                  style={[
+                    styles.videoBackupCheckbox,
+                    shouldBackupVideoExport &&
+                      canBackupVideoExport &&
+                      styles.videoBackupCheckboxActive
+                  ]}
+                >
+                  {shouldBackupVideoExport && canBackupVideoExport ? (
+                    <Text selectable={false} style={styles.videoBackupCheckboxText}>
+                      ✓
+                    </Text>
+                  ) : null}
+                </View>
+                <View style={styles.videoBackupCopy}>
+                  <Text selectable style={styles.videoBackupTitle}>
+                    클라우드 백업
                   </Text>
-                ) : null}
-              </View>
-              <View style={styles.videoBackupCopy}>
-                <Text selectable style={styles.videoBackupTitle}>
-                  클라우드 백업
-                </Text>
-                <Text selectable style={styles.videoBackupDetail}>
-                  {cloudBackupEnabled && creatorExportActive
-                    ? `체크한 영상만 백업합니다. 남은 영상 백업 ${videoBackupRemaining}개 / ${CLOUD_BACKUP_VIDEO_LIMIT}개`
-                    : "구독과 클라우드 백업 설정이 켜져 있을 때 사용할 수 있습니다."}
-                </Text>
-              </View>
-            </Pressable>
+                  <Text selectable style={styles.videoBackupDetail}>
+                    {cloudBackupEnabled && creatorExportActive
+                      ? `체크한 영상만 백업합니다. 남은 영상 백업 ${videoBackupRemaining}개 / ${CLOUD_BACKUP_VIDEO_LIMIT}개`
+                      : "구독과 클라우드 백업 설정이 켜져 있을 때 사용할 수 있습니다."}
+                  </Text>
+                </View>
+              </Pressable>
+            </>
           ) : null}
           {exportFormat === "images" ? (
             <View style={styles.imageFormatPanel}>
+              <Text selectable style={styles.settingLabel}>
+                이미지 화질
+              </Text>
+              <OptionRow>
+                {IMAGE_QUALITY_OPTIONS.map((option) => (
+                  <Chip
+                    key={option.value}
+                    label={option.label}
+                    active={imageQuality === option.value}
+                    onPress={() => updateImageQuality(option.value)}
+                  />
+                ))}
+              </OptionRow>
+              <Text selectable style={styles.settingDetail}>
+                {IMAGE_QUALITY_DESCRIPTION}
+              </Text>
               <Text selectable style={styles.settingLabel}>
                 이미지 형식
               </Text>
@@ -2294,6 +2337,7 @@ export default function TripClipScreen() {
               template={template}
               transition={transition}
               showWatermark={!creatorExportActive}
+              frameAspectRatio={ratioAspect[ratio]}
               photoAdjustments={photoAdjustments}
             />
           </OptionalRecordingView>
@@ -2473,17 +2517,50 @@ const getRecordingPhotoAdjustmentStyle = (adjustment: TripClipPhotoAdjustment) =
   ]
 });
 
+const getOriginalImageFrameStyle = (
+  photo: PhotoItem | null,
+  frameAspectRatio: number,
+  contentFit: "contain" | "cover"
+) => {
+  const imageAspectRatio =
+    photo?.width && photo?.height ? photo.width / photo.height : frameAspectRatio;
+
+  if (!Number.isFinite(imageAspectRatio) || imageAspectRatio <= 0) {
+    return {
+      width: "100%" as const,
+      height: "100%" as const
+    };
+  }
+
+  const shouldFitByWidth =
+    contentFit === "contain"
+      ? imageAspectRatio >= frameAspectRatio
+      : imageAspectRatio <= frameAspectRatio;
+
+  return shouldFitByWidth
+    ? {
+        width: "100%" as const,
+        aspectRatio: imageAspectRatio
+      }
+    : {
+        height: "100%" as const,
+        aspectRatio: imageAspectRatio
+      };
+};
+
 function TripClipRecordingCanvas({
   frame,
   template,
   transition,
   showWatermark,
+  frameAspectRatio,
   photoAdjustments
 }: {
   frame: RecordingFrame;
   template: TripClipTemplate;
   transition: TripClipTransition;
   showWatermark: boolean;
+  frameAspectRatio: number;
   photoAdjustments: TripClipPhotoAdjustmentMap;
 }) {
   const isFilm = template === "film-log";
@@ -2510,8 +2587,12 @@ function TripClipRecordingCanvas({
           <View style={[styles.recordingImageMotionLayer, currentAdjustmentStyle]}>
             <Image
               source={{ uri: getPreviewUri(frame.currentPhoto) }}
-              style={[styles.recordingImage, isFilm && styles.recordingImageFilm]}
-              contentFit={contentFit}
+              style={[
+                styles.recordingImage,
+                getOriginalImageFrameStyle(frame.currentPhoto, frameAspectRatio, contentFit),
+                isFilm && styles.recordingImageFilm
+              ]}
+              contentFit="fill"
               cachePolicy="memory-disk"
             />
           </View>
@@ -2522,8 +2603,12 @@ function TripClipRecordingCanvas({
           <View style={[styles.recordingImageMotionLayer, nextAdjustmentStyle]}>
             <Image
               source={{ uri: getPreviewUri(frame.nextPhoto) }}
-              style={[styles.recordingImage, isFilm && styles.recordingImageFilm]}
-              contentFit={contentFit}
+              style={[
+                styles.recordingImage,
+                getOriginalImageFrameStyle(frame.nextPhoto, frameAspectRatio, contentFit),
+                isFilm && styles.recordingImageFilm
+              ]}
+              contentFit="fill"
               cachePolicy="memory-disk"
             />
           </View>
@@ -2708,12 +2793,11 @@ const styles = StyleSheet.create({
   recordingNextLayer: {
     zIndex: 2
   },
-  recordingImage: {
-    width: "100%",
-    height: "100%"
-  },
+  recordingImage: {},
   recordingImageMotionLayer: {
-    flex: 1
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center"
   },
   recordingImageFilm: {
     borderWidth: 1,
@@ -3354,8 +3438,6 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderWidth: 1,
     borderColor: colors.line,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.line,
     backgroundColor: colors.background
   },
   musicRowActive: {
