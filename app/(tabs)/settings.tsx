@@ -6,6 +6,7 @@ import {
   Linking,
   Modal,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -13,6 +14,7 @@ import {
 } from "react-native";
 
 import { ActionRow } from "@/components/action-row";
+import { CameraGuideOverlay } from "@/components/camera-guide-overlay";
 import { ScreenShell } from "@/components/screen-shell";
 import { SectionBlock } from "@/components/section-block";
 import { colors, controls, spacing, typography } from "@/constants/app-theme";
@@ -657,6 +659,30 @@ export default function SettingsScreen() {
 
             {guideExpanded ? (
               <>
+            <View style={styles.guidePreviewBlock}>
+              <Text selectable style={[styles.compactGroupTitle, themed.text]}>
+                예시 미리보기
+              </Text>
+              <View style={styles.guidePreviewFrame}>
+                <View style={styles.guidePreviewSky} />
+                <View style={styles.guidePreviewGround} />
+                <View style={styles.guidePreviewSubject} />
+                <CameraGuideOverlay
+                  guide={settings.defaultGuide}
+                  visible={settings.guideVisible}
+                  color={settings.guideColor}
+                  size={settings.guideSize}
+                />
+                {!settings.guideVisible ? (
+                  <View style={styles.guidePreviewDisabled}>
+                    <Text selectable={false} style={styles.guidePreviewDisabledText}>
+                      가이드 꺼짐
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+            </View>
+
             <View style={styles.compactGroup}>
               <Text selectable style={[styles.compactGroupTitle, themed.text]}>
                 가이드라인
@@ -832,7 +858,11 @@ export default function SettingsScreen() {
               </Pressable>
             </View>
 
-            <View style={styles.optionList}>
+            <ScrollView
+              style={styles.modalScroll}
+              contentContainerStyle={styles.optionList}
+              showsVerticalScrollIndicator={false}
+            >
               {activeSetting === "defaultGuide"
                 ? GUIDE_TYPES.map((guide) => (
                     <OptionButton
@@ -1008,7 +1038,7 @@ export default function SettingsScreen() {
                   </Pressable>
                 </>
               ) : null}
-            </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -1034,7 +1064,11 @@ export default function SettingsScreen() {
                 </Text>
               </Pressable>
             </View>
-            <View style={styles.optionList}>
+            <ScrollView
+              style={styles.modalScroll}
+              contentContainerStyle={styles.optionList}
+              showsVerticalScrollIndicator={false}
+            >
               <Text selectable style={[styles.optionDetail, themed.mutedText]}>
                 현재 기기에 저장된 사진, 편집 결과, 영상 만들기 작업, 만든 영상 기록과 앱 설정을 계정 백업으로 저장합니다.
               </Text>
@@ -1058,7 +1092,7 @@ export default function SettingsScreen() {
                   </Text>
                 )}
               </Pressable>
-            </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -1119,8 +1153,10 @@ function OptionButton({
   );
 }
 
-const createThemedStyles = (palette: AppPalette) =>
-  StyleSheet.create({
+const createThemedStyles = (palette: AppPalette) => {
+  const isDark = palette.background !== colors.background;
+
+  return StyleSheet.create({
     panel: {
       borderColor: palette.line,
       backgroundColor: palette.surface
@@ -1141,7 +1177,7 @@ const createThemedStyles = (palette: AppPalette) =>
     },
     activeFill: {
       borderColor: palette.text,
-      backgroundColor: palette.text
+      backgroundColor: isDark ? "transparent" : palette.text
     },
     secondaryButton: {
       borderColor: palette.line,
@@ -1163,20 +1199,21 @@ const createThemedStyles = (palette: AppPalette) =>
       color: palette.muted
     },
     inverseText: {
-      color: palette.inverse
+      color: isDark ? palette.text : palette.inverse
     },
     inverseMutedText: {
-      color: palette.inverse
+      color: isDark ? palette.text : palette.inverse
     },
     optionMark: {
       borderColor: palette.faint,
       backgroundColor: "transparent"
     },
     optionMarkActive: {
-      borderColor: palette.inverse,
-      backgroundColor: palette.inverse
+      borderColor: isDark ? palette.text : palette.inverse,
+      backgroundColor: isDark ? "transparent" : palette.inverse
     }
   });
+};
 
 const styles = StyleSheet.create({
   modalBackdrop: {
@@ -1186,11 +1223,16 @@ const styles = StyleSheet.create({
   },
   modalPanel: {
     gap: 18,
+    flexGrow: 0,
+    maxHeight: "86%",
     padding: spacing.screen,
     paddingBottom: spacing.section,
     borderTopWidth: 1,
     borderTopColor: colors.text,
     backgroundColor: colors.background
+  },
+  modalScroll: {
+    flexGrow: 0
   },
   modalHeader: {
     flexDirection: "row",
@@ -1352,6 +1394,55 @@ const styles = StyleSheet.create({
   },
   compactGroup: {
     gap: 9
+  },
+  guidePreviewBlock: {
+    gap: 9
+  },
+  guidePreviewFrame: {
+    height: 172,
+    overflow: "hidden",
+    position: "relative",
+    borderWidth: 1,
+    borderColor: colors.darkLine,
+    backgroundColor: colors.ink
+  },
+  guidePreviewSky: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: "58%",
+    backgroundColor: "#26343A"
+  },
+  guidePreviewGround: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: "48%",
+    backgroundColor: "#161817"
+  },
+  guidePreviewSubject: {
+    position: "absolute",
+    left: "38%",
+    bottom: 30,
+    width: "24%",
+    height: "42%",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.38)",
+    backgroundColor: "rgba(255, 255, 255, 0.12)"
+  },
+  guidePreviewDisabled: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.38)"
+  },
+  guidePreviewDisabledText: {
+    color: colors.inverse,
+    fontSize: typography.button,
+    fontWeight: "900",
+    letterSpacing: 0
   },
   compactGroupTitle: {
     color: colors.text,

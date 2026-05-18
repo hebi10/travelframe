@@ -116,7 +116,12 @@ signingConfigs {
 }
 
 $buildGradle = [regex]::Replace($buildGradle, "versionCode\s+\d+", "versionCode $VersionCode", 1)
-$buildGradle = $buildGradle -replace "signingConfig\s+signingConfigs\.debug", "signingConfig signingConfigs.release"
+$buildGradle = [regex]::Replace(
+  $buildGradle,
+  "(release\s*\{[\s\S]*?signingConfig\s+)signingConfigs\.debug",
+  '${1}signingConfigs.release',
+  1
+)
 
 Write-Utf8NoBom -Path $buildGradlePath -Value $buildGradle
 

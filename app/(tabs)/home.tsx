@@ -12,9 +12,9 @@ import {
   View
 } from "react-native";
 
-import { AdBanner } from "@/components/ad-banner";
 import { ScreenShell } from "@/components/screen-shell";
 import { colors, typography } from "@/constants/app-theme";
+import { useAppAppearance } from "@/lib/app-appearance";
 
 const homeSlides: {
   image: number;
@@ -44,10 +44,19 @@ const homeSlides: {
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { palette } = useAppAppearance();
   const { width } = useWindowDimensions();
   const scrollerRef = useRef<ScrollView>(null);
   const [activeSlide, setActiveSlide] = useState(0);
   const slideWidth = Math.min(width - 44, 360);
+  const isDark = palette.background !== colors.background;
+  const filledButtonStyle = {
+    borderColor: palette.text,
+    backgroundColor: isDark ? "transparent" : palette.text
+  };
+  const filledButtonTextStyle = {
+    color: isDark ? palette.text : palette.inverse
+  };
 
   const handleSlideScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const nextIndex = Math.round(event.nativeEvent.contentOffset.x / slideWidth);
@@ -80,7 +89,10 @@ export default function HomeScreen() {
           snapToInterval={slideWidth}
           decelerationRate="fast"
           onMomentumScrollEnd={handleSlideScroll}
-          style={styles.heroScroller}
+          style={[
+            styles.heroScroller,
+            { borderColor: palette.text, backgroundColor: palette.background }
+          ]}
           contentContainerStyle={styles.heroTrack}
         >
           {homeSlides.map((slide) => (
@@ -91,21 +103,33 @@ export default function HomeScreen() {
               style={({ pressed }) => [
                 styles.heroSlide,
                 { width: slideWidth },
+                { backgroundColor: palette.background },
                 pressed && styles.heroPressed
               ]}
               onPress={() => router.push(slide.href)}
             >
-              <Image source={slide.image} style={styles.heroImage} contentFit="cover" />
-              <View style={styles.heroCopy}>
+              <Image
+                source={slide.image}
+                style={[styles.heroImage, { backgroundColor: palette.surface }]}
+                contentFit="cover"
+              />
+              <View style={[styles.heroCopy, { borderTopColor: palette.line }]}>
                 <View style={styles.heroCopyHeader}>
-                  <Text selectable style={styles.heroLabel}>
+                  <Text selectable style={[styles.heroLabel, { color: palette.text }]}>
                     {slide.label}
                   </Text>
-                  <Text selectable={false} style={styles.heroArrow}>
+                  <Text
+                    selectable={false}
+                    style={[
+                      styles.heroArrow,
+                      filledButtonStyle,
+                      filledButtonTextStyle
+                    ]}
+                  >
                     이동
                   </Text>
                 </View>
-                <Text selectable style={styles.heroDetail}>
+                <Text selectable style={[styles.heroDetail, { color: palette.muted }]}>
                   {slide.detail}
                 </Text>
               </View>
@@ -117,10 +141,13 @@ export default function HomeScreen() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="이전 슬라이드"
-            style={styles.sliderButton}
+            style={[
+              styles.sliderButton,
+              { borderColor: palette.text, backgroundColor: palette.background }
+            ]}
             onPress={() => moveSlide(-1)}
           >
-            <Text selectable={false} style={styles.sliderButtonText}>
+            <Text selectable={false} style={[styles.sliderButtonText, { color: palette.text }]}>
               ‹
             </Text>
           </Pressable>
@@ -128,23 +155,31 @@ export default function HomeScreen() {
             {homeSlides.map((slide, index) => (
               <View
                 key={slide.label}
-                style={[styles.heroDot, activeSlide === index && styles.heroDotActive]}
+                style={[
+                  styles.heroDot,
+                  { borderColor: palette.text },
+                  activeSlide === index && {
+                    backgroundColor: isDark ? "transparent" : palette.text
+                  }
+                ]}
               />
             ))}
           </View>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="다음 슬라이드"
-            style={styles.sliderButton}
+            style={[
+              styles.sliderButton,
+              { borderColor: palette.text, backgroundColor: palette.background }
+            ]}
             onPress={() => moveSlide(1)}
           >
-            <Text selectable={false} style={styles.sliderButtonText}>
+            <Text selectable={false} style={[styles.sliderButtonText, { color: palette.text }]}>
               ›
             </Text>
           </Pressable>
         </View>
       </View>
-      <AdBanner placement="home" />
     </ScreenShell>
   );
 }
@@ -208,6 +243,8 @@ const styles = StyleSheet.create({
     lineHeight: 14,
     textAlign: "center",
     letterSpacing: 0,
+    borderWidth: 1,
+    borderColor: colors.text,
     backgroundColor: colors.text
   },
   heroDetail: {

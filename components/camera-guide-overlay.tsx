@@ -7,21 +7,26 @@ type CameraGuideOverlayProps = {
   visible: boolean;
   color?: string;
   size?: number;
+  aspectRatio?: number;
 };
 
 export function CameraGuideOverlay({
   guide,
   visible,
   color = "rgba(255, 255, 255, 0.72)",
-  size = 44
+  size = 44,
+  aspectRatio = 1
 }: CameraGuideOverlayProps) {
   if (!visible) {
     return null;
   }
 
   const safeSize = Math.max(24, Math.min(86, size));
+  const safeAspectRatio =
+    Number.isFinite(aspectRatio) && aspectRatio > 0 ? aspectRatio : 1;
   const inset = `${(100 - safeSize) / 2}%` as DimensionValue;
   const guideWidth = `${safeSize}%` as DimensionValue;
+  const guideHeight = `${safeSize}%` as DimensionValue;
   const lineLengthStyle = {
     left: inset,
     right: inset
@@ -37,6 +42,16 @@ export function CameraGuideOverlay({
     backgroundColor: color,
     opacity: 0.45
   };
+  const gridFrameStyle =
+    safeAspectRatio >= 1
+      ? {
+          width: guideWidth,
+          aspectRatio: safeAspectRatio
+        }
+      : {
+          height: guideHeight,
+          aspectRatio: safeAspectRatio
+        };
 
   return (
     <View style={styles.overlay}>
@@ -67,7 +82,7 @@ export function CameraGuideOverlay({
         </>
       ) : null}
       {guide === "grid" ? (
-        <View style={[styles.gridFrame, { width: guideWidth }]}>
+        <View style={[styles.gridFrame, gridFrameStyle]}>
           <View style={[styles.gridVertical, styles.gridVerticalOne, secondaryGuideLineStyle]} />
           <View style={[styles.gridVertical, styles.gridVerticalTwo, secondaryGuideLineStyle]} />
           <View

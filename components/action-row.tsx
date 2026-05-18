@@ -2,7 +2,7 @@ import { Link, type Href } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { ChevronIcon } from "@/components/chevron-icon";
-import { controls, typography } from "@/constants/app-theme";
+import { colors, controls, typography } from "@/constants/app-theme";
 import { useAppAppearance } from "@/lib/app-appearance";
 
 type ActionRowProps = {
@@ -15,6 +15,7 @@ type ActionRowProps = {
 
 export function ActionRow({ href, label, detail, mark = ">", onPress }: ActionRowProps) {
   const { palette, fontSizeScale, layoutScale } = useAppAppearance();
+  const isDark = palette.background !== colors.background;
   const content = (
     <Pressable
       style={({ pressed }) => [
@@ -60,11 +61,25 @@ export function ActionRow({ href, label, detail, mark = ">", onPress }: ActionRo
           </Text>
         ) : null}
       </View>
-      <View style={[styles.markBox, { backgroundColor: palette.text }]}>
+      <View
+        style={[
+          styles.markBox,
+          {
+            borderColor: palette.text,
+            backgroundColor: isDark ? "transparent" : palette.text
+          }
+        ]}
+      >
         {mark === ">" ? (
-          <ChevronIcon color={palette.inverse} size={10} />
+          <ChevronIcon color={isDark ? palette.text : palette.inverse} size={10} />
         ) : (
-          <Text selectable={false} style={[styles.markText, { color: palette.inverse }]}>
+          <Text
+            selectable={false}
+            style={[
+              styles.markText,
+              { color: isDark ? palette.text : palette.inverse }
+            ]}
+          >
             {mark}
           </Text>
         )}
@@ -108,7 +123,8 @@ const styles = StyleSheet.create({
   markBox: {
     minHeight: controls.compactHeight,
     alignItems: "center",
-    justifyContent: "center"
+    justifyContent: "center",
+    borderWidth: 1
   },
   markText: {
     fontSize: typography.button,

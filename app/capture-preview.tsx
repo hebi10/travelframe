@@ -198,10 +198,12 @@ const styles = StyleSheet.create({
     minHeight: controls.height,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.inverse
+    borderWidth: 1,
+    borderColor: colors.inverse,
+    backgroundColor: "transparent"
   },
   primaryButtonText: {
-    color: colors.text,
+    color: colors.inverse,
     fontSize: typography.button,
     fontWeight: "800",
     letterSpacing: 0

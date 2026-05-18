@@ -310,6 +310,7 @@ export const EditablePhotoCanvas = forwardRef<
     ]
   }));
 
+  const frameAspectRatio = getRatioAspect(ratio, originalAspectRatio);
   const frameContent = (
     <>
         {uri ? (
@@ -330,11 +331,11 @@ export const EditablePhotoCanvas = forwardRef<
             visible={guideVisible}
             size={guideSize}
             color={guideColor}
+            aspectRatio={frameAspectRatio}
           />
         ) : null}
     </>
   );
-  const frameAspectRatio = getRatioAspect(ratio, originalAspectRatio);
   const containedFrameSize =
     stageSize.width && stageSize.height
       ? getContainedFrameSize({

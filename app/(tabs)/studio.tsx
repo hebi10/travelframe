@@ -4,10 +4,10 @@ import { type Href, useFocusEffect, useLocalSearchParams, useRouter } from "expo
 import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from "react-native";
 
-import { AdBanner } from "@/components/ad-banner";
 import { ScreenShell } from "@/components/screen-shell";
 import { SectionBlock } from "@/components/section-block";
 import { colors, controls, typography } from "@/constants/app-theme";
+import { useAppAppearance } from "@/lib/app-appearance";
 import { deletePhoto, getPhotos, saveCapturedPhoto } from "@/lib/photo-library";
 import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 import { deleteMadeVideo, getMadeVideos } from "@/lib/video-library";
@@ -48,6 +48,7 @@ const formatDuration = (seconds: number) => {
 
 export default function StudioScreen() {
   const router = useRouter();
+  const { palette } = useAppAppearance();
   const { tab } = useLocalSearchParams<{ tab?: string }>();
   const [activeTab, setActiveTab] = useState<StudioTab>("photos");
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
@@ -195,6 +196,18 @@ export default function StudioScreen() {
   }));
   const workCount =
     singleImageWorks.length + imageBundleWorks.length + videoWorks.length;
+  const isDark = palette.background !== colors.background;
+  const filledButtonStyle = {
+    borderColor: palette.text,
+    backgroundColor: isDark ? "transparent" : palette.text
+  };
+  const filledButtonTextStyle = {
+    color: isDark ? palette.text : palette.inverse
+  };
+  const panelStyle = {
+    borderColor: palette.text,
+    backgroundColor: palette.background
+  };
 
   return (
     <ScreenShell
@@ -210,12 +223,22 @@ export default function StudioScreen() {
           return (
             <Pressable
               key={tab.value}
-              style={[styles.tab, isActive && styles.tabActive]}
+              style={[
+                styles.tab,
+                { borderColor: palette.line, backgroundColor: palette.background },
+                isActive && styles.tabActive,
+                isActive && filledButtonStyle
+              ]}
               onPress={() => setActiveTab(tab.value)}
             >
               <Text
                 selectable={false}
-                style={[styles.tabText, isActive && styles.tabTextActive]}
+                style={[
+                  styles.tabText,
+                  { color: palette.text },
+                  isActive && styles.tabTextActive,
+                  isActive && filledButtonTextStyle
+                ]}
               >
                 {tab.label}
               </Text>
@@ -233,6 +256,7 @@ export default function StudioScreen() {
               disabled={isImportingImage}
               style={({ pressed }) => [
                 styles.importImageCta,
+                panelStyle,
                 pressed && styles.pressed,
                 isImportingImage && styles.disabledAction
               ]}
@@ -246,8 +270,8 @@ export default function StudioScreen() {
                   핸드폰 앨범에서 이미지를 골라 앱 사진 목록에 보관합니다.
                 </Text>
               </View>
-              <View style={styles.clipAction}>
-                <Text selectable={false} style={styles.clipActionText}>
+              <View style={[styles.clipAction, filledButtonStyle]}>
+                <Text selectable={false} style={[styles.clipActionText, filledButtonTextStyle]}>
                   {isImportingImage ? "저장 중" : "이미지 선택"}
                 </Text>
               </View>
@@ -280,7 +304,7 @@ export default function StudioScreen() {
         <>
           <SectionBlock title="영상 만들기">
             <Pressable
-              style={({ pressed }) => [styles.clipCta, pressed && styles.pressed]}
+              style={({ pressed }) => [styles.clipCta, panelStyle, pressed && styles.pressed]}
               onPress={() => router.push("/trip-clip")}
             >
               <View style={styles.clipCopy}>
@@ -291,8 +315,8 @@ export default function StudioScreen() {
                   여러 사진을 선택해 순서, 비율, 음악을 정하고 영상으로 저장합니다.
                 </Text>
               </View>
-              <View style={styles.clipAction}>
-                <Text selectable={false} style={styles.clipActionText}>
+              <View style={[styles.clipAction, filledButtonStyle]}>
+                <Text selectable={false} style={[styles.clipActionText, filledButtonTextStyle]}>
                   사진 선택
                 </Text>
               </View>
@@ -370,7 +394,6 @@ export default function StudioScreen() {
           )}
         </>
       ) : null}
-      <AdBanner placement="studio" />
     </ScreenShell>
   );
 }
@@ -384,6 +407,16 @@ function PhotoCard({
   router: ReturnType<typeof useRouter>;
   onDelete: (photo: PhotoItem) => void;
 }) {
+  const { palette } = useAppAppearance();
+  const isDark = palette.background !== colors.background;
+  const filledButtonStyle = {
+    borderColor: palette.text,
+    backgroundColor: isDark ? "transparent" : palette.text
+  };
+  const filledButtonTextStyle = {
+    color: isDark ? palette.text : palette.inverse
+  };
+
   return (
     <View style={styles.photoCard}>
       <Pressable onPress={() => router.push(`/photo/${photo.id}` as Href)}>
@@ -399,10 +432,10 @@ function PhotoCard({
       </View>
       <View style={styles.cardActions}>
         <Pressable
-          style={styles.cardButton}
+          style={[styles.cardButton, filledButtonStyle]}
           onPress={() => router.push(`/edit?photoId=${photo.id}` as Href)}
         >
-          <Text selectable={false} style={styles.cardButtonText}>
+          <Text selectable={false} style={[styles.cardButtonText, filledButtonTextStyle]}>
             편집
           </Text>
         </Pressable>
@@ -434,6 +467,16 @@ function PageSizeSelector({
   value: PageSize;
   onChange: (value: PageSize) => void;
 }) {
+  const { palette } = useAppAppearance();
+  const isDark = palette.background !== colors.background;
+  const filledButtonStyle = {
+    borderColor: palette.text,
+    backgroundColor: isDark ? "transparent" : palette.text
+  };
+  const filledButtonTextStyle = {
+    color: isDark ? palette.text : palette.inverse
+  };
+
   return (
     <View style={styles.pageSizeBar}>
       <Text selectable={false} style={styles.pageSizeLabel}>
@@ -446,14 +489,21 @@ function PageSizeSelector({
           return (
             <Pressable
               key={option}
-              style={[styles.pageSizeButton, isActive && styles.pageSizeButtonActive]}
+              style={[
+                styles.pageSizeButton,
+                { borderColor: palette.line, backgroundColor: palette.background },
+                isActive && styles.pageSizeButtonActive,
+                isActive && filledButtonStyle
+              ]}
               onPress={() => onChange(option)}
             >
               <Text
                 selectable={false}
                 style={[
                   styles.pageSizeButtonText,
-                  isActive && styles.pageSizeButtonTextActive
+                  { color: palette.text },
+                  isActive && styles.pageSizeButtonTextActive,
+                  isActive && filledButtonTextStyle
                 ]}
               >
                 {option}개

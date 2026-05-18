@@ -9,7 +9,11 @@ import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import {
+  Gesture,
+  GestureDetector,
+  GestureHandlerRootView
+} from "react-native-gesture-handler";
 import {
   ActivityIndicator,
   Modal,
@@ -18,7 +22,9 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  View
+  View,
+  Linking,
+  AppState
 } from "react-native";
 import Animated, {
   runOnJS,
@@ -113,8 +119,8 @@ const sleep = (milliseconds: number) =>
 export default function CameraScreen() {
   const cameraRef = useRef<CameraView>(null);
   const referenceOverlayRef = useRef<PhotoReferenceOverlayHandle>(null);
-  const [permission, requestPermission] = useCameraPermissions();
-  const hasRequestedPermission = useRef(false);
+  const [permission, requestPermission, getPermission] = useCameraPermissions();
+  const hasRequestedPermissionOnFocus = useRef(false);
   const [guideVisible, setGuideVisible] = useState(true);
   const [guide, setGuide] = useState<GuideType>("circle");
   const [guideSize, setGuideSize] = useState(44);
@@ -145,19 +151,49 @@ export default function CameraScreen() {
   const [recentPhoto, setRecentPhoto] = useState<PhotoItem | null>(null);
   const insets = useSafeAreaInsets();
   const bottomSafePadding = Math.max(insets.bottom + 10, 24);
+  const bottomModalPadding = Math.max(insets.bottom + 18, 28);
   const isCameraModalOpen = guideSettingsOpen || cameraSettingsOpen || navigationOpen;
 
-  useEffect(() => {
+  const returnFromPermissionScreen = useCallback(() => {
+    if (router.canGoBack()) {
+      router.back();
+      return;
+    }
+
+    router.replace("/home");
+  }, []);
+
+  const openPermissionSettings = useCallback(() => {
+    void Linking.openSettings();
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
     if (
       permission &&
       !permission.granted &&
       permission.canAskAgain &&
-      !hasRequestedPermission.current
+      !hasRequestedPermissionOnFocus.current
     ) {
-      hasRequestedPermission.current = true;
-      requestPermission();
+      hasRequestedPermissionOnFocus.current = true;
+      void requestPermission();
     }
-  }, [permission, requestPermission]);
+
+    return () => {
+      hasRequestedPermissionOnFocus.current = false;
+    };
+    }, [permission, requestPermission])
+  );
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (nextState) => {
+      if (nextState === "active") {
+        void getPermission();
+      }
+    });
+
+    return () => subscription.remove();
+  }, [getPermission]);
 
   const applyGuideSize = useCallback((value: number) => {
     const nextSize = Math.round(
@@ -170,6 +206,15 @@ export default function CameraScreen() {
       guideSize: nextSize,
       guideVisible: true
     });
+  }, []);
+
+  const previewGuideSize = useCallback((value: number) => {
+    const nextSize = Math.round(
+      Math.max(GUIDE_SIZE_MIN, Math.min(GUIDE_SIZE_MAX, value))
+    );
+    setGuideSize(nextSize);
+    setGuideSizeInput(String(nextSize));
+    setGuideVisible(true);
   }, []);
 
   const updateGuideType = (nextGuide: GuideType) => {
@@ -377,6 +422,14 @@ export default function CameraScreen() {
     setOverlaySetupActive(false);
   };
 
+  const removeReferenceOverlay = () => {
+    setReferenceUri(null);
+    setOverlayLocked(false);
+    setOverlaySetupActive(false);
+    setOverlayOpacity(defaultOverlayOpacity.current);
+    setOverlayResetKey((value) => value + 1);
+  };
+
   const reopenOverlaySetup = () => {
     if (!referenceUri) {
       pickReferencePhoto();
@@ -463,9 +516,22 @@ export default function CameraScreen() {
           실시간 카메라 화면을 보여주고 구도 가이드 촬영을 하려면
           카메라 권한이 필요합니다.
         </Text>
-        <Pressable style={styles.permissionButton} onPress={requestPermission}>
+        <Pressable
+          style={styles.permissionButton}
+          onPress={
+            permission.canAskAgain ? requestPermission : openPermissionSettings
+          }
+        >
           <Text selectable={false} style={styles.permissionButtonText}>
-            카메라 권한 허용
+            {permission.canAskAgain ? "카메라 권한 허용" : "앱 설정에서 권한 허용"}
+          </Text>
+        </Pressable>
+        <Pressable
+          style={[styles.permissionButton, styles.permissionSecondaryButton]}
+          onPress={returnFromPermissionScreen}
+        >
+          <Text selectable={false} style={styles.permissionSecondaryButtonText}>
+            뒤로가기
           </Text>
         </Pressable>
       </View>
@@ -568,7 +634,7 @@ export default function CameraScreen() {
         onRequestClose={() => setCameraSettingsOpen(false)}
       >
         <View style={styles.navModalBackdrop}>
-          <View style={styles.navModal}>
+          <View style={[styles.navModal, { paddingBottom: bottomModalPadding }]}>
             <View style={styles.modalHeader}>
               <View style={styles.modalTitleGroup}>
                 <Text selectable={false} style={styles.modalEyebrow}>
@@ -790,7 +856,7 @@ export default function CameraScreen() {
         onRequestClose={() => setNavigationOpen(false)}
       >
         <View style={styles.navModalBackdrop}>
-          <View style={styles.navModal}>
+          <View style={[styles.navModal, { paddingBottom: bottomModalPadding }]}>
             <View style={styles.modalHeader}>
               <View style={styles.modalTitleGroup}>
                 <Text selectable={false} style={styles.modalEyebrow}>
@@ -841,144 +907,155 @@ export default function CameraScreen() {
         animationType="fade"
         onRequestClose={() => setGuideSettingsOpen(false)}
       >
-        <View style={styles.modalBackdrop}>
-          <View style={styles.guideModal}>
-            <View style={styles.modalHeader}>
-              <View style={styles.modalTitleGroup}>
-                <Text selectable={false} style={styles.modalEyebrow}>
-                  GUIDE
-                </Text>
-                <Text selectable={false} style={styles.modalTitle}>
-                  가이드 설정
-                </Text>
+        <GestureHandlerRootView style={styles.modalGestureRoot}>
+          <View style={styles.modalBackdrop}>
+            <View
+              style={[
+                styles.guideModal,
+                { paddingBottom: bottomModalPadding }
+              ]}
+            >
+              <View style={styles.modalHeader}>
+                <View style={styles.modalTitleGroup}>
+                  <Text selectable={false} style={styles.modalEyebrow}>
+                    GUIDE
+                  </Text>
+                  <Text selectable={false} style={styles.modalTitle}>
+                    가이드 설정
+                  </Text>
+                </View>
+                <Pressable
+                  style={styles.modalCloseButton}
+                  onPress={() => setGuideSettingsOpen(false)}
+                >
+                  <Text selectable={false} style={styles.modalCloseText}>
+                    닫기
+                  </Text>
+                </Pressable>
               </View>
+
+              <View style={styles.modalSection}>
+                <Text selectable={false} style={styles.modalSectionTitle}>
+                  가이드라인
+                </Text>
+                <View style={styles.optionGrid}>
+                  {GUIDE_TYPES.map((type) => (
+                    <Pressable
+                      key={type}
+                      style={[
+                        styles.optionButton,
+                        guide === type && styles.optionButtonActive
+                      ]}
+                      onPress={() => {
+                        updateGuideType(type);
+                      }}
+                    >
+                      <Text
+                        selectable={false}
+                        style={[
+                          styles.optionButtonText,
+                          guide === type && styles.optionButtonTextActive
+                        ]}
+                      >
+                        {GUIDE_LABELS[type]}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+
+              <View style={styles.modalSection}>
+                <Text selectable={false} style={styles.modalSectionTitle}>
+                  크기
+                </Text>
+                <View style={styles.optionRow}>
+                  {GUIDE_SIZE_OPTIONS.map((option) => (
+                    <Pressable
+                      key={option.value}
+                      style={[
+                        styles.optionButton,
+                        guideSize === option.value && styles.optionButtonActive
+                      ]}
+                      onPress={() => applyGuideSize(option.value)}
+                    >
+                      <Text
+                        selectable={false}
+                        style={[
+                          styles.optionButtonText,
+                          guideSize === option.value && styles.optionButtonTextActive
+                        ]}
+                      >
+                        {option.label}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+                <View style={styles.sizeFineControl}>
+                  <GuideSizeSlider
+                    value={guideSize}
+                    onChange={previewGuideSize}
+                    onCommit={applyGuideSize}
+                  />
+                  <TextInput
+                    value={guideSizeInput}
+                    keyboardType="number-pad"
+                    maxLength={2}
+                    selectTextOnFocus
+                    style={styles.sizeInput}
+                    onChangeText={(value) =>
+                      setGuideSizeInput(value.replace(/[^0-9]/g, ""))
+                    }
+                    onBlur={commitGuideSizeInput}
+                    onSubmitEditing={commitGuideSizeInput}
+                  />
+                </View>
+              </View>
+
+              <View style={[styles.modalSection, styles.modalSectionSpaced]}>
+                <Text selectable={false} style={styles.modalSectionTitle}>
+                  색상
+                </Text>
+                <View style={styles.colorRow}>
+                  {GUIDE_COLOR_OPTIONS.map((option) => (
+                    <Pressable
+                      key={option.label}
+                      style={[
+                        styles.colorOption,
+                        guideColor === option.value && styles.colorOptionActive
+                      ]}
+                      onPress={() => updateGuideColor(option.value)}
+                    >
+                      <View
+                        style={[
+                          styles.colorSwatch,
+                          { backgroundColor: option.value }
+                        ]}
+                      />
+                      <Text selectable={false} style={styles.colorLabel}>
+                        {option.label}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+
               <Pressable
-                style={styles.modalCloseButton}
-                onPress={() => setGuideSettingsOpen(false)}
+                style={[styles.visibilityButton, guideVisible && styles.visibilityButtonActive]}
+                onPress={() => updateGuideVisibility(!guideVisible)}
               >
-                <Text selectable={false} style={styles.modalCloseText}>
-                  닫기
+                <Text
+                  selectable={false}
+                  style={[
+                    styles.visibilityButtonText,
+                    guideVisible && styles.visibilityButtonTextActive
+                  ]}
+                >
+                  가이드 {guideVisible ? "숨기기" : "보이기"}
                 </Text>
               </Pressable>
             </View>
-
-            <View style={styles.modalSection}>
-              <Text selectable={false} style={styles.modalSectionTitle}>
-                가이드라인
-              </Text>
-              <View style={styles.optionGrid}>
-                {GUIDE_TYPES.map((type) => (
-                  <Pressable
-                    key={type}
-                    style={[
-                      styles.optionButton,
-                      guide === type && styles.optionButtonActive
-                    ]}
-                    onPress={() => {
-                      updateGuideType(type);
-                    }}
-                  >
-                    <Text
-                      selectable={false}
-                      style={[
-                        styles.optionButtonText,
-                        guide === type && styles.optionButtonTextActive
-                      ]}
-                    >
-                      {GUIDE_LABELS[type]}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-            </View>
-
-            <View style={styles.modalSection}>
-              <Text selectable={false} style={styles.modalSectionTitle}>
-                크기
-              </Text>
-              <View style={styles.optionRow}>
-                {GUIDE_SIZE_OPTIONS.map((option) => (
-                  <Pressable
-                    key={option.value}
-                    style={[
-                      styles.optionButton,
-                      guideSize === option.value && styles.optionButtonActive
-                    ]}
-                    onPress={() => applyGuideSize(option.value)}
-                  >
-                    <Text
-                      selectable={false}
-                      style={[
-                        styles.optionButtonText,
-                        guideSize === option.value && styles.optionButtonTextActive
-                      ]}
-                    >
-                      {option.label}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-              <View style={styles.sizeFineControl}>
-                <GuideSizeSlider value={guideSize} onCommit={applyGuideSize} />
-                <TextInput
-                  value={guideSizeInput}
-                  keyboardType="number-pad"
-                  maxLength={2}
-                  selectTextOnFocus
-                  style={styles.sizeInput}
-                  onChangeText={(value) =>
-                    setGuideSizeInput(value.replace(/[^0-9]/g, ""))
-                  }
-                  onBlur={commitGuideSizeInput}
-                  onSubmitEditing={commitGuideSizeInput}
-                />
-              </View>
-            </View>
-
-            <View style={[styles.modalSection, styles.modalSectionSpaced]}>
-              <Text selectable={false} style={styles.modalSectionTitle}>
-                색상
-              </Text>
-              <View style={styles.colorRow}>
-                {GUIDE_COLOR_OPTIONS.map((option) => (
-                  <Pressable
-                    key={option.label}
-                    style={[
-                      styles.colorOption,
-                      guideColor === option.value && styles.colorOptionActive
-                    ]}
-                    onPress={() => updateGuideColor(option.value)}
-                  >
-                    <View
-                      style={[
-                        styles.colorSwatch,
-                        { backgroundColor: option.value }
-                      ]}
-                    />
-                    <Text selectable={false} style={styles.colorLabel}>
-                      {option.label}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-            </View>
-
-            <Pressable
-              style={[styles.visibilityButton, guideVisible && styles.visibilityButtonActive]}
-              onPress={() => updateGuideVisibility(!guideVisible)}
-            >
-              <Text
-                selectable={false}
-                style={[
-                  styles.visibilityButtonText,
-                  guideVisible && styles.visibilityButtonTextActive
-                ]}
-              >
-                가이드 {guideVisible ? "숨기기" : "보이기"}
-              </Text>
-            </Pressable>
           </View>
-        </View>
+        </GestureHandlerRootView>
       </Modal>
 
       {!isCameraModalOpen ? (
@@ -1011,6 +1088,7 @@ export default function CameraScreen() {
                   min={OVERLAY_OPACITY_MIN}
                   max={OVERLAY_OPACITY_MAX}
                   label="투명도"
+                  onChange={applyOverlayOpacityPercent}
                   onCommit={applyOverlayOpacityPercent}
                 />
               </View>
@@ -1037,6 +1115,17 @@ export default function CameraScreen() {
                   </Text>
                 </Pressable>
                 <Pressable
+                  style={[styles.overlayCompactButton, styles.overlayRemoveButton]}
+                  onPress={removeReferenceOverlay}
+                >
+                  <Text
+                    selectable={false}
+                    style={[styles.overlayCompactText, styles.overlayRemoveText]}
+                  >
+                    제거
+                  </Text>
+                </Pressable>
+                <Pressable
                   style={styles.overlayConfirmButton}
                   onPress={confirmOverlaySetup}
                 >
@@ -1057,6 +1146,7 @@ export default function CameraScreen() {
                   max={OVERLAY_OPACITY_MAX}
                   label="투명도"
                   compact
+                  onChange={applyOverlayOpacityPercent}
                   onCommit={applyOverlayOpacityPercent}
                 />
               </View>
@@ -1068,6 +1158,7 @@ export default function CameraScreen() {
                 max={CAMERA_ZOOM_MAX}
                 label="줌"
                 compact
+                onChange={applyZoomPercent}
                 onCommit={applyZoomPercent}
               />
             </View>
@@ -1111,6 +1202,7 @@ export default function CameraScreen() {
                     max={OVERLAY_OPACITY_MAX}
                     label="투명도"
                     compact
+                    onChange={applyOverlayOpacityPercent}
                     onCommit={applyOverlayOpacityPercent}
                   />
                 </View>
@@ -1147,16 +1239,18 @@ export default function CameraScreen() {
 
 type GuideSizeSliderProps = {
   value: number;
+  onChange: (value: number) => void;
   onCommit: (value: number) => void;
 };
 
-function GuideSizeSlider({ value, onCommit }: GuideSizeSliderProps) {
+function GuideSizeSlider({ value, onChange, onCommit }: GuideSizeSliderProps) {
   return (
     <SmoothValueSlider
       value={value}
       min={GUIDE_SIZE_MIN}
       max={GUIDE_SIZE_MAX}
       label="미세 조정"
+      onChange={onChange}
       onCommit={onCommit}
     />
   );
@@ -1168,6 +1262,7 @@ type SmoothValueSliderProps = {
   max: number;
   label: string;
   compact?: boolean;
+  onChange?: (value: number) => void;
   onCommit: (value: number) => void;
 };
 
@@ -1177,12 +1272,14 @@ function SmoothValueSlider({
   max,
   label,
   compact = false,
+  onChange,
   onCommit
 }: SmoothValueSliderProps) {
   const [trackWidth, setTrackWidth] = useState(0);
   const thumbX = useSharedValue(0);
   const dragStartThumbX = useSharedValue(0);
   const isDragging = useSharedValue(false);
+  const previewValue = onChange ?? onCommit;
 
   useEffect(() => {
     if (trackWidth <= 0) {
@@ -1205,6 +1302,11 @@ function SmoothValueSlider({
           isDragging.value = true;
           dragStartThumbX.value = Math.max(0, Math.min(trackWidth, event.x));
           thumbX.value = dragStartThumbX.value;
+          const nextRatio =
+            trackWidth > 0
+              ? Math.max(0, Math.min(1, dragStartThumbX.value / trackWidth))
+              : 0;
+          runOnJS(previewValue)(min + nextRatio * (max - min));
         })
         .onUpdate((event) => {
           const nextX = Math.max(
@@ -1212,6 +1314,9 @@ function SmoothValueSlider({
             Math.min(trackWidth, dragStartThumbX.value + event.translationX)
           );
           thumbX.value = nextX;
+          const nextRatio =
+            trackWidth > 0 ? Math.max(0, Math.min(1, nextX / trackWidth)) : 0;
+          runOnJS(previewValue)(min + nextRatio * (max - min));
         })
         .onFinalize(() => {
           const nextRatio =
@@ -1219,7 +1324,7 @@ function SmoothValueSlider({
           isDragging.value = false;
           runOnJS(onCommit)(min + nextRatio * (max - min));
         }),
-    [dragStartThumbX, isDragging, max, min, onCommit, thumbX, trackWidth]
+    [dragStartThumbX, isDragging, max, min, onCommit, previewValue, thumbX, trackWidth]
   );
 
   const fillStyle = useAnimatedStyle(() => ({
@@ -1387,6 +1492,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
+    zIndex: 12,
     alignItems: "center",
     gap: 18,
     paddingHorizontal: 16,
@@ -1436,7 +1542,7 @@ const styles = StyleSheet.create({
   },
   overlayButtonActive: {
     borderColor: colors.inverse,
-    backgroundColor: colors.inverse
+    backgroundColor: "transparent"
   },
   overlayButtonText: {
     color: colors.inverse,
@@ -1445,7 +1551,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0
   },
   overlayButtonTextActive: {
-    color: colors.text
+    color: colors.inverse
   },
   overlaySetupPanel: {
     width: "100%",
@@ -1495,21 +1601,29 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.42)"
   },
+  overlayRemoveButton: {
+    borderColor: "rgba(255, 90, 95, 0.8)"
+  },
   overlayCompactText: {
     color: colors.inverse,
     fontSize: typography.button,
     fontWeight: "800",
     letterSpacing: 0
   },
+  overlayRemoveText: {
+    color: "#FFB3B6"
+  },
   overlayConfirmButton: {
     minHeight: controls.compactHeight,
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.inverse
+    borderWidth: 1,
+    borderColor: colors.inverse,
+    backgroundColor: "transparent"
   },
   overlayConfirmText: {
-    color: colors.text,
+    color: colors.inverse,
     fontSize: typography.button,
     fontWeight: "800",
     letterSpacing: 0
@@ -1521,6 +1635,9 @@ const styles = StyleSheet.create({
     paddingTop: 14,
     backgroundColor: "transparent"
   },
+  modalGestureRoot: {
+    flex: 1
+  },
   navModalBackdrop: {
     flex: 1,
     justifyContent: "flex-end",
@@ -1530,6 +1647,8 @@ const styles = StyleSheet.create({
   },
   guideModal: {
     gap: 22,
+    flexGrow: 0,
+    maxHeight: "88%",
     padding: 18,
     paddingBottom: 22,
     borderWidth: 1,
@@ -1538,6 +1657,8 @@ const styles = StyleSheet.create({
   },
   navModal: {
     gap: 18,
+    flexGrow: 0,
+    maxHeight: "88%",
     padding: 18,
     paddingBottom: 22,
     borderWidth: 1,
@@ -1545,6 +1666,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background
   },
   cameraSettingsScroll: {
+    flexGrow: 0,
     maxHeight: 560
   },
   cameraSettingsContent: {
@@ -2026,8 +2148,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     backgroundColor: colors.text
   },
+  permissionSecondaryButton: {
+    backgroundColor: colors.background,
+    borderWidth: controls.borderWidth,
+    borderColor: colors.line
+  },
   permissionButtonText: {
     color: colors.inverse,
+    fontSize: typography.button,
+    fontWeight: "800",
+    letterSpacing: 0
+  },
+  permissionSecondaryButtonText: {
+    color: colors.text,
     fontSize: typography.button,
     fontWeight: "800",
     letterSpacing: 0

@@ -1026,8 +1026,10 @@ function StatCard({ label, value }: { label: string; value: number }) {
   );
 }
 
-const createAccountThemedStyles = (palette: AppPalette) =>
-  StyleSheet.create({
+const createAccountThemedStyles = (palette: AppPalette) => {
+  const isDark = palette.background !== colors.background;
+
+  return StyleSheet.create({
     panel: {
       borderColor: palette.line,
       backgroundColor: palette.surface
@@ -1047,7 +1049,7 @@ const createAccountThemedStyles = (palette: AppPalette) =>
     },
     activeFill: {
       borderColor: palette.text,
-      backgroundColor: palette.text
+      backgroundColor: isDark ? "transparent" : palette.text
     },
     text: {
       color: palette.text
@@ -1056,12 +1058,13 @@ const createAccountThemedStyles = (palette: AppPalette) =>
       color: palette.muted
     },
     inverseText: {
-      color: palette.inverse
+      color: isDark ? palette.text : palette.inverse
     },
     bottomBorder: {
       borderBottomColor: palette.line
     }
   });
+};
 
 const styles = StyleSheet.create({
   noticePanel: {
@@ -1318,6 +1321,8 @@ const styles = StyleSheet.create({
   },
   paymentModalPanel: {
     gap: 16,
+    flexGrow: 0,
+    maxHeight: "86%",
     padding: spacing.screen,
     borderWidth: 1,
     borderColor: colors.text,

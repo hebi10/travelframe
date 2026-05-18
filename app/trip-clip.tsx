@@ -3434,6 +3434,7 @@ const styles = StyleSheet.create({
   exportModalPanel: {
     width: "92%",
     maxWidth: 360,
+    flexGrow: 0,
     maxHeight: "78%",
     borderWidth: 1,
     borderColor: colors.text,
