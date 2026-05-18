@@ -1,12 +1,8 @@
 import { localStorageAdapter } from "@/lib/local-storage";
 import { type User } from "firebase/auth";
 import {
-  addDoc,
-  collection,
   doc,
-  getDoc,
-  serverTimestamp,
-  setDoc
+  getDoc
 } from "firebase/firestore";
 
 import { firestore } from "@/lib/firebase";
@@ -22,7 +18,7 @@ export type SubscriptionProductId = "free" | "ad_remove" | "creator_monthly";
 export type UserSubscription = {
   plan: SubscriptionPlan;
   status: SubscriptionStatus;
-  provider: "none" | "mock";
+  provider: "none" | "admin" | "google_play";
   productId: SubscriptionProductId;
   startedAt: string | null;
   expiresAt: string | null;
@@ -192,81 +188,4 @@ const saveLocalSubscription = async (uid: string, subscription: UserSubscription
     createSubscriptionStorageKey(uid),
     JSON.stringify(subscription)
   );
-};
-
-const addMonths = (date: Date, months: number) => {
-  const nextDate = new Date(date);
-  nextDate.setMonth(nextDate.getMonth() + months);
-  return nextDate;
-};
-
-export const activateMockSubscription = async (
-  user: User,
-  productId: Exclude<SubscriptionProductId, "free"> = "creator_monthly"
-) => {
-  if (!firestore) {
-    throw new Error("Firestore가 설정되지 않았습니다.");
-  }
-
-  const now = new Date();
-  const isCreator = productId === "creator_monthly";
-  const expiresAt = isCreator ? addMonths(now, 1).toISOString() : null;
-  const subscription: UserSubscription = {
-    plan: "premium",
-    status: "active",
-    provider: "mock",
-    productId,
-    startedAt: now.toISOString(),
-    expiresAt,
-    lastPaymentAt: now.toISOString(),
-    priceLabel: isCreator ? "월 3,900원" : "3,900원",
-    productName: isCreator ? "구독" : "광고 제거"
-  };
-
-  const currentRef = doc(firestore, "users", user.uid, "subscriptions", "current");
-  const currentSnapshot = await getDoc(currentRef);
-  const currentSubscription = currentSnapshot.exists()
-    ? parseSubscription(JSON.stringify(currentSnapshot.data()))
-    : freeSubscription;
-  const shouldReplaceCurrent =
-    productId === "creator_monthly" || !isCreatorSubscriptionActive(currentSubscription);
-
-  await setDoc(
-    doc(firestore, "users", user.uid, "subscriptions", productId),
-    {
-      ...subscription,
-      updatedAt: serverTimestamp()
-    },
-    { merge: true }
-  );
-
-  if (shouldReplaceCurrent) {
-    await setDoc(
-      currentRef,
-      {
-        ...subscription,
-        updatedAt: serverTimestamp()
-      },
-      { merge: true }
-    );
-  }
-
-  await addDoc(collection(firestore, "users", user.uid, "paymentEvents"), {
-    type: "mock_payment_completed",
-    plan: subscription.plan,
-    productId: subscription.productId,
-    provider: subscription.provider,
-    productName: subscription.productName,
-    priceLabel: subscription.priceLabel,
-    amount: 3900,
-    currency: "KRW",
-    billingType: isCreator ? "monthly" : "one_time",
-    startedAt: subscription.startedAt,
-    expiresAt: subscription.expiresAt,
-    createdAt: serverTimestamp()
-  });
-
-  const activeSubscription = shouldReplaceCurrent ? subscription : currentSubscription;
-  await saveLocalSubscription(user.uid, activeSubscription);
-  return activeSubscription;
 };

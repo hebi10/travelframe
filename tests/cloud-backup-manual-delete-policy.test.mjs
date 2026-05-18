@@ -44,17 +44,22 @@ assert.equal(
 );
 
 for (const snippet of [
-  "deleteField",
-  "settings: deleteField()",
-  "imageBundles: deleteField()",
-  "videos: deleteField()",
+  "FieldValue.delete",
+  "settings: FieldValue.delete()",
+  "imageBundles: FieldValue.delete()",
+  "videos: FieldValue.delete()",
   "backedUpAt: null",
   "deleteAfter: null"
 ]) {
   assert.ok(
-    backupSource.includes(snippet),
+    functionsSource.includes(snippet),
     `cloud backup deletion should clear stale overview data: ${snippet}`
   );
 }
+
+assert.ok(
+  backupSource.includes("deleteCloudBackupDataCallable"),
+  "client deletion should route through the server callable"
+);
 
 console.log("ok - cloud backup deletion is described and implemented as manual");

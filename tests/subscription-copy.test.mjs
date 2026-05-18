@@ -15,12 +15,10 @@ const requiredCopy = [
       "구독하면 영상 저장, 클라우드 백업, 광고 제거를 함께 사용할 수 있습니다.",
       "구독 기간 동안 앱 전반의 광고 제거",
       '"구독 포함"',
-      '"확인 중..."'
+      '"확인 중..."',
+      '"준비 중"',
+      "유료 기능은 Google Play 결제 검증 연동 후 사용할 수 있습니다."
     ]
-  },
-  {
-    file: "lib/subscription.ts",
-    snippets: ['productName: isCreator ? "구독" : "광고 제거"']
   },
   {
     file: "components/ad-banner.tsx",

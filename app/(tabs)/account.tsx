@@ -201,8 +201,7 @@ export default function AccountScreen() {
     logOut,
     sendVerificationEmail,
     resetPassword,
-    refreshUser,
-    startMockSubscription
+    refreshUser
   } = useAuth();
   const [mode, setMode] = useState<AuthMode>("signIn");
   const [email, setEmail] = useState("");
@@ -212,6 +211,7 @@ export default function AccountScreen() {
   const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false);
   const [isMusicSubmitting, setIsMusicSubmitting] = useState(false);
   const [selectedPaymentPlan, setSelectedPaymentPlan] = useState<PaymentPlan | null>(null);
+  const [showDeleteRequestInfo, setShowDeleteRequestInfo] = useState(false);
   const [stats, setStats] = useState<UsageStats>(initialStats);
   const [cloudBackupEnabled, setCloudBackupEnabled] = useState(false);
   const [backupOverview, setBackupOverview] =
@@ -299,6 +299,11 @@ export default function AccountScreen() {
   }, [user]);
 
   const accountEmail = user?.email ?? email;
+
+  const openDeleteRequestPage = () => {
+    setShowDeleteRequestInfo(false);
+    void Linking.openURL(DELETE_ACCOUNT_REQUEST_URL);
+  };
 
   const runAuthAction = async (action: () => Promise<void>, successMessage: string) => {
     if (isSubmitting) {
@@ -440,18 +445,9 @@ export default function AccountScreen() {
     });
   };
 
-  const handleMockPayment = (plan: PaymentPlan) => {
-    if (!user) {
-      setSelectedPaymentPlan(null);
-      setMessage("로그인 후 결제를 진행해 주세요.");
-      return;
-    }
-
-    runAuthAction(async () => {
-      await startMockSubscription(plan.id === "creator" ? "creator_monthly" : "ad_remove");
-      setSubscriptionProducts(await getUserSubscriptionProducts(user));
-    }, `${plan.title} 결제가 완료되었습니다. 결제 기록을 저장했습니다.`);
+  const handlePaymentUnavailable = () => {
     setSelectedPaymentPlan(null);
+    setMessage("유료 기능은 Google Play 결제 검증 연동 후 사용할 수 있습니다.");
   };
 
   const getPaymentPlanStatus = (plan: PaymentPlan) => {
@@ -469,13 +465,13 @@ export default function AccountScreen() {
           ? "구매 완료"
           : subscriptionProducts.creatorMonthly
             ? "구독 포함"
-            : plan.billing
+            : "준비 중"
       };
     }
 
     return {
       active: Boolean(subscriptionProducts.creatorMonthly),
-      label: subscriptionProducts.creatorMonthly ? "구독 중" : plan.billing
+      label: subscriptionProducts.creatorMonthly ? "구독 중" : "준비 중"
     };
   };
 
@@ -717,7 +713,7 @@ export default function AccountScreen() {
                 </Pressable>
                 <Pressable
                   style={[styles.secondaryButton, themed.secondaryButton]}
-                  onPress={() => Linking.openURL(DELETE_ACCOUNT_REQUEST_URL)}
+                  onPress={() => setShowDeleteRequestInfo(true)}
                 >
                   <Text selectable={false} style={[styles.secondaryButtonText, themed.text]}>
                     계정 및 데이터 삭제 요청
@@ -861,7 +857,7 @@ export default function AccountScreen() {
                   </Text>
                   <View style={[styles.paymentOpenButton, themed.activeFill]}>
                     <Text selectable={false} style={[styles.primaryButtonText, themed.inverseText]}>
-                      자세히 보기
+                      안내 보기
                     </Text>
                   </View>
                 </Pressable>
@@ -955,6 +951,52 @@ export default function AccountScreen() {
       <Modal
         animationType="fade"
         transparent
+        visible={showDeleteRequestInfo}
+        onRequestClose={() => setShowDeleteRequestInfo(false)}
+      >
+        <View style={[styles.paymentModalBackdrop, modalSafeStyle]}>
+          <View style={[styles.paymentModalPanel, themed.panelStrong]}>
+            <View style={styles.modalHeader}>
+              <View style={styles.planCopy}>
+                <Text selectable style={[styles.planTitle, themed.text]}>
+                  계정 및 데이터 삭제 요청
+                </Text>
+                <Text selectable style={[styles.benefitText, themed.mutedText]}>
+                  관련 안내 페이지로 이동하시겠습니까?
+                </Text>
+              </View>
+              <Pressable
+                style={[styles.modalCloseButton, themed.secondaryButton]}
+                onPress={() => setShowDeleteRequestInfo(false)}
+              >
+                <Text selectable={false} style={[styles.secondaryButtonText, themed.text]}>
+                  닫기
+                </Text>
+              </Pressable>
+            </View>
+
+            <Text selectable style={[styles.helpText, themed.mutedText]}>
+              백업 데이터는 설정 화면의 클라우드 백업에서 백업 데이터 삭제를 누르면 계정에서 제거됩니다.
+            </Text>
+            <Text selectable style={[styles.helpText, themed.mutedText]}>
+              계정 삭제 요청과 추가 데이터 삭제 안내는 별도 안내 페이지에서 확인하실 수 있습니다.
+            </Text>
+
+            <Pressable
+              style={[styles.primaryButton, themed.activeFill]}
+              onPress={openDeleteRequestPage}
+            >
+              <Text selectable={false} style={[styles.primaryButtonText, themed.inverseText]}>
+                안내 페이지로 이동
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        animationType="fade"
+        transparent
         visible={Boolean(selectedPaymentPlan)}
         onRequestClose={() => setSelectedPaymentPlan(null)}
       >
@@ -997,14 +1039,10 @@ export default function AccountScreen() {
             <Pressable
               disabled={isSubmitting || !selectedPaymentPlan}
               style={[styles.primaryButton, themed.activeFill, isSubmitting && styles.disabledButton]}
-              onPress={() => {
-                if (selectedPaymentPlan) {
-                  handleMockPayment(selectedPaymentPlan);
-                }
-              }}
+              onPress={handlePaymentUnavailable}
             >
               <Text selectable={false} style={[styles.primaryButtonText, themed.inverseText]}>
-                결제하기
+                준비 중
               </Text>
             </Pressable>
           </View>

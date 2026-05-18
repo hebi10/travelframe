@@ -1,0 +1,22 @@
+title = "travel-frame secret scanning"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "android-keystore"
+description = "Android keystore and certificate files must not be committed"
+path = '''(?i)(^|[/\\])[^/\\]+\.(jks|keystore|p12|pfx)$'''
+tags = ["android", "certificate", "keystore"]
+
+[[rules]]
+id = "env-file"
+description = "Environment files must not be committed"
+path = '''(?i)(^|[/\\])\.env(\.(local|development|production|staging|test))?$'''
+tags = ["env", "secrets"]
+
+[[rules]]
+id = "credentials-directory"
+description = "Credential artifacts must not be committed"
+path = '''(?i)(^|[/\\])credentials[/\\].+'''
+tags = ["credentials", "secrets"]

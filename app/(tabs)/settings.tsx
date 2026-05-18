@@ -252,6 +252,7 @@ export default function SettingsScreen() {
   const [authMessage, setAuthMessage] = useState<string | null>(null);
   const [isAuthSubmitting, setIsAuthSubmitting] = useState(false);
   const [showBackupConfirm, setShowBackupConfirm] = useState(false);
+  const [showDeleteRequestInfo, setShowDeleteRequestInfo] = useState(false);
   const [guideExpanded, setGuideExpanded] = useState(false);
   const [isBackupSubmitting, setIsBackupSubmitting] = useState(false);
   const [backupProgress, setBackupProgress] =
@@ -363,6 +364,11 @@ export default function SettingsScreen() {
     setSettings(nextSettings);
     await saveAppSettings(nextSettings);
     setActiveSetting(null);
+  };
+
+  const openDeleteRequestPage = () => {
+    setShowDeleteRequestInfo(false);
+    void Linking.openURL(DELETE_ACCOUNT_REQUEST_URL);
   };
 
   const handleEnableBackup = async () => {
@@ -909,7 +915,7 @@ export default function SettingsScreen() {
             label="계정 및 데이터 삭제 요청"
             detail="계정 삭제와 저장 데이터 삭제 요청 안내"
             mark="열기"
-            onPress={() => Linking.openURL(DELETE_ACCOUNT_REQUEST_URL)}
+            onPress={() => setShowDeleteRequestInfo(true)}
           />
         </SectionBlock>
 
@@ -1190,6 +1196,47 @@ export default function SettingsScreen() {
           />
         </SectionBlock>
       </ScreenShell>
+
+      <Modal
+        animationType="fade"
+        transparent
+        visible={showDeleteRequestInfo}
+        onRequestClose={() => setShowDeleteRequestInfo(false)}
+      >
+        <View style={[styles.modalBackdrop, modalSafeStyle]}>
+          <View style={[styles.modalPanel, themed.modalPanel]}>
+            <View style={styles.modalHeader}>
+              <Text selectable style={[styles.modalTitle, themed.text]}>
+                계정 및 데이터 삭제 요청
+              </Text>
+              <Pressable
+                style={[styles.closeButton, themed.secondaryButton]}
+                onPress={() => setShowDeleteRequestInfo(false)}
+              >
+                <Text selectable={false} style={[styles.closeButtonText, themed.text]}>
+                  닫기
+                </Text>
+              </Pressable>
+            </View>
+
+            <Text selectable style={[styles.optionDetail, themed.mutedText]}>
+              백업 데이터는 설정 화면의 클라우드 백업에서 백업 데이터 삭제를 누르면 계정에서 제거됩니다.
+            </Text>
+            <Text selectable style={[styles.optionDetail, themed.mutedText]}>
+              계정 삭제 요청과 추가 데이터 삭제 안내는 별도 안내 페이지에서 확인하실 수 있습니다. 관련 안내 페이지로 이동하시겠습니까?
+            </Text>
+
+            <Pressable
+              style={[styles.deleteRequestPrimaryButton, themed.activeFill]}
+              onPress={openDeleteRequestPage}
+            >
+              <Text selectable={false} style={[styles.authPrimaryButtonText, themed.inverseText]}>
+                안내 페이지로 이동
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
 
       <Modal
         animationType="fade"
@@ -2104,6 +2151,12 @@ const styles = StyleSheet.create({
     fontSize: typography.button,
     fontWeight: "900",
     letterSpacing: 0
+  },
+  deleteRequestPrimaryButton: {
+    minHeight: controls.height,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.text
   },
   authPrimaryButton: {
     flex: 1,

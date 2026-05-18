@@ -1,6 +1,7 @@
 import { Platform } from "react-native";
 import { getApp, getApps, initializeApp, type FirebaseApp } from "firebase/app";
 import { getAuth, initializeAuth, type Auth, type Persistence } from "firebase/auth";
+import { getFunctions, type Functions } from "firebase/functions";
 import { getFirestore, type Firestore } from "firebase/firestore";
 import { getStorage, type FirebaseStorage } from "firebase/storage";
 
@@ -100,3 +101,4 @@ export const firestore: Firestore | null = firebaseApp ? getFirestore(firebaseAp
 export const firebaseStorage: FirebaseStorage | null = firebaseApp
   ? getStorage(firebaseApp)
   : null;
+export const firebaseFunctions: Functions | null = firebaseApp ? getFunctions(firebaseApp) : null;

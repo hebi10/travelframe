@@ -1,8 +1,6 @@
 import { type User } from "firebase/auth";
 import {
   collection,
-  deleteDoc,
-  deleteField,
   doc,
   getDoc,
   getDocs,
@@ -10,7 +8,8 @@ import {
   serverTimestamp,
   setDoc
 } from "firebase/firestore";
-import { deleteObject, getDownloadURL, ref, uploadBytes } from "firebase/storage";
+import { httpsCallable } from "firebase/functions";
+import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 
 import { getAppSettings } from "@/lib/app-settings";
 import {
@@ -22,7 +21,7 @@ import {
   CLOUD_BACKUP_VIDEO_LIMIT,
   canBackupMoreVideos
 } from "@/lib/cloud-backup-limits";
-import { firestore, firebaseStorage } from "@/lib/firebase";
+import { firebaseFunctions, firestore, firebaseStorage } from "@/lib/firebase";
 import {
   calculateCombinedImageBackupSize,
   isImageBackupSizeExceeded,
@@ -100,6 +99,67 @@ const getContentType = (uri: string) => {
   return "image/jpeg";
 };
 
+type BackupMediaKind = "image" | "video" | "audio";
+
+type ReserveBackupUploadResponse = {
+  backupSessionId: string;
+  storagePath: string;
+  expiresInSeconds: number;
+};
+
+type CompleteBackupUploadResponse = {
+  usage: {
+    imageTotalBytes: number;
+    videoCount: number;
+    audioTotalBytes: number;
+  };
+};
+
+type UploadedBackupFile = {
+  downloadURL: string;
+  fileSize: number;
+  backupSessionId: string;
+};
+
+const callBackupFunction = async <Request, Response>(
+  name: string,
+  data: Request
+): Promise<Response> => {
+  if (!firebaseFunctions) {
+    throw new Error("Firebase Functions가 설정되지 않았습니다.");
+  }
+
+  const callable = httpsCallable<Request, Response>(firebaseFunctions, name);
+  const result = await callable(data);
+  return result.data;
+};
+
+const reserveBackupUpload = (data: {
+  mediaKind: BackupMediaKind;
+  fileSize: number;
+  contentType: string;
+  storagePath: string;
+}) =>
+  callBackupFunction<typeof data, ReserveBackupUploadResponse>(
+    "reserveBackupUpload",
+    data
+  );
+
+const completeBackupUpload = (data: { backupSessionId: string }) =>
+  callBackupFunction<typeof data, CompleteBackupUploadResponse>(
+    "completeBackupUpload",
+    data
+  );
+
+const releaseBackupUpload = (data: { backupSessionId: string }) =>
+  callBackupFunction<typeof data, { released: boolean }>("releaseBackupUpload", data);
+
+const deleteCloudBackupDataCallable = () =>
+  callBackupFunction<Record<string, never>, BackupSummary>(
+    "deleteCloudBackupData",
+    {}
+  );
+
 const normalizeDateValue = (value: unknown) => {
   if (!value) {
     return null;
@@ -133,22 +193,50 @@ const getSourceDeviceId = async () => {
 
 const uploadLocalFile = async ({
   uri,
-  storagePath
+  storagePath,
+  mediaKind
 }: {
   uri: string;
   storagePath: string;
-}) => {
+  mediaKind: BackupMediaKind;
+}): Promise<UploadedBackupFile> => {
   if (!firebaseStorage) {
     throw new Error("Firebase Storage가 설정되지 않았습니다.");
   }
 
   const response = await fetch(uri);
   const blob = await response.blob();
-  const fileRef = ref(firebaseStorage, storagePath);
-  await uploadBytes(fileRef, blob, {
-    contentType: getContentType(uri)
+  const contentType = getContentType(uri);
+  const reservation = await reserveBackupUpload({
+    mediaKind,
+    fileSize: blob.size,
+    contentType,
+    storagePath
   });
-  return getDownloadURL(fileRef);
+  const fileRef = ref(firebaseStorage, storagePath);
+
+  try {
+    await uploadBytes(fileRef, blob, {
+      contentType,
+      customMetadata: {
+        backupSessionId: reservation.backupSessionId
+      }
+    });
+    await completeBackupUpload({
+      backupSessionId: reservation.backupSessionId
+    });
+
+    return {
+      downloadURL: await getDownloadURL(fileRef),
+      fileSize: blob.size,
+      backupSessionId: reservation.backupSessionId
+    };
+  } catch (error) {
+    await releaseBackupUpload({
+      backupSessionId: reservation.backupSessionId
+    }).catch(() => undefined);
+    throw error;
+  }
 };
 
 const emptyBackupOverview: CloudBackupOverview = {
@@ -296,6 +384,7 @@ const refreshBackupOverview = async (userId: string) => {
   await setDoc(
     doc(firestore, "users", userId, "backups", "current"),
     {
+      userId,
       photoCount,
       imageBundleCount,
       videoCount,
@@ -485,10 +574,12 @@ export const backupCurrentWorkspace = async ({
   for (const { photo, optimized } of optimizedPhotos) {
     const photoFileName = fileNameFromUri(photo.uri, `${photo.id}.jpg`);
     const photoPath = `users/${user.uid}/backups/photos/${photo.id}-${photoFileName}.jpg`;
-    const photoDownloadUrl = await uploadLocalFile({
+    const photoUpload = await uploadLocalFile({
       uri: optimized.uri,
-      storagePath: photoPath
+      storagePath: photoPath,
+      mediaKind: "image"
     });
+    const photoDownloadUrl = photoUpload.downloadURL;
 
     await setDoc(doc(firestore, "users", user.uid, "photoBackups", photo.id), {
       ...photo,
@@ -508,8 +599,9 @@ export const backupCurrentWorkspace = async ({
       optimizedQuality: optimized.quality,
       imageQuality: optimized.imageQuality,
       originalSize: optimized.originalSize,
-      fileSize: optimized.size,
+      fileSize: photoUpload.fileSize,
       fileType: "image/jpeg",
+      backupSessionId: photoUpload.backupSessionId,
       backupStatus: "backed_up",
       backupEnabledAt: backedUpAt,
       lastBackedUpAt: backedUpAt,
@@ -523,15 +615,20 @@ export const backupCurrentWorkspace = async ({
   for (const { work, images } of optimizedImageBundles) {
     const backedUpImageUris: string[] = [];
     const storagePaths: string[] = [];
+    const backupSessionIds: string[] = [];
+    let uploadedFileSize = 0;
     for (const [index, optimized] of images.entries()) {
       const fileName = fileNameFromUri(work.imageUris[index], `${work.id}-${index}.jpg`);
       const storagePath = `users/${user.uid}/backups/image-works/${work.id}/${index}-${fileName}.jpg`;
-      const downloadUrl = await uploadLocalFile({
+      const upload = await uploadLocalFile({
         uri: optimized.uri,
-        storagePath
+        storagePath,
+        mediaKind: "image"
       });
       storagePaths.push(storagePath);
-      backedUpImageUris.push(downloadUrl);
+      backupSessionIds.push(upload.backupSessionId);
+      uploadedFileSize += upload.fileSize;
+      backedUpImageUris.push(upload.downloadURL);
       updateUploadProgress();
     }
 
@@ -542,8 +639,10 @@ export const backupCurrentWorkspace = async ({
         localImageUris: work.imageUris,
         imageUris: backedUpImageUris,
         storagePaths,
+        backupSessionIds,
         optimizedImages: images,
         imageBackupSize: images.reduce((sum, image) => sum + image.size, 0),
+        fileSize: uploadedFileSize,
         originalBackupSize: images.reduce((sum, image) => sum + image.originalSize, 0),
         imageQuality: settings.imageBackupQuality,
         userId: user.uid,
@@ -649,10 +748,12 @@ export const backupPhoto = async ({
 
   const photoFileName = fileNameFromUri(photo.uri, `${photo.id}.jpg`);
   const storagePath = `users/${user.uid}/backups/photos/${photo.id}-${photoFileName}.jpg`;
-  const downloadURL = await uploadLocalFile({
+  const upload = await uploadLocalFile({
     uri: optimized.uri,
-    storagePath
+    storagePath,
+    mediaKind: "image"
   });
+  const downloadURL = upload.downloadURL;
 
   await setDoc(
     doc(firestore, "users", user.uid, "photoBackups", photo.id),
@@ -673,8 +774,9 @@ export const backupPhoto = async ({
       optimizedQuality: optimized.quality,
       imageQuality: optimized.imageQuality,
       originalSize: optimized.originalSize,
-      fileSize: optimized.size,
+      fileSize: upload.fileSize,
       fileType: "image/jpeg",
+      backupSessionId: upload.backupSessionId,
       backupStatus: "backed_up",
       backupEnabledAt: backupEnabledAt ?? backedUpAt,
       lastBackedUpAt: backedUpAt,
@@ -756,15 +858,20 @@ export const backupImageBundleWork = async ({
 
   const backedUpImageUris: string[] = [];
   const storagePaths: string[] = [];
+  const backupSessionIds: string[] = [];
+  let uploadedFileSize = 0;
   for (const [index, imageUri] of work.imageUris.entries()) {
     const fileName = fileNameFromUri(imageUri, `${work.id}-${index}.jpg`);
     const storagePath = `users/${user.uid}/backups/image-works/${work.id}/${index}-${fileName}.jpg`;
-    const downloadUrl = await uploadLocalFile({
+    const upload = await uploadLocalFile({
       uri: optimizedImages[index].uri,
-      storagePath
+      storagePath,
+      mediaKind: "image"
     });
     storagePaths.push(storagePath);
-    backedUpImageUris.push(downloadUrl);
+    backupSessionIds.push(upload.backupSessionId);
+    uploadedFileSize += upload.fileSize;
+    backedUpImageUris.push(upload.downloadURL);
   }
 
   await setDoc(
@@ -774,8 +881,10 @@ export const backupImageBundleWork = async ({
       localImageUris: work.imageUris,
       imageUris: backedUpImageUris,
       storagePaths,
+      backupSessionIds,
       optimizedImages,
       imageBackupSize: optimizedImages.reduce((sum, image) => sum + image.size, 0),
+      fileSize: uploadedFileSize,
       originalBackupSize: optimizedImages.reduce(
         (sum, image) => sum + image.originalSize,
         0
@@ -832,10 +941,12 @@ export const backupMadeVideo = async ({
 
   const fileName = fileNameFromUri(video.uri, `${video.id}.mp4`);
   const storagePath = `users/${user.uid}/backups/videos/${video.id}-${fileName}`;
-  const downloadUrl = await uploadLocalFile({
+  const upload = await uploadLocalFile({
     uri: video.uri,
-    storagePath
+    storagePath,
+    mediaKind: "video"
   });
+  const downloadUrl = upload.downloadURL;
 
   await setDoc(
     doc(firestore, "users", user.uid, "videos", video.id),
@@ -846,6 +957,8 @@ export const backupMadeVideo = async ({
       localUri: video.uri,
       uri: downloadUrl,
       storagePath,
+      fileSize: upload.fileSize,
+      backupSessionId: upload.backupSessionId,
       backupStatus: "backed_up",
       backupEnabledAt: settings.cloudBackupEnabled ? backedUpAt : null,
       lastBackedUpAt: backedUpAt,
@@ -985,9 +1098,21 @@ export const markBackupExpired = async ({
     return;
   }
 
+  const [photoCount, imageBundleCount, videoCount, imageBackupBytes] = await Promise.all([
+    getCollectionSize(user.uid, "photoBackups"),
+    getCollectionSize(user.uid, "imageWorks"),
+    getCollectionSize(user.uid, "videos"),
+    getCurrentImageBackupSize({ userId: user.uid })
+  ]);
+
   await setDoc(
     doc(firestore, "users", user.uid, "backups", "current"),
     {
+      userId: user.uid,
+      photoCount,
+      imageBundleCount,
+      videoCount,
+      imageBackupBytes,
       status: "expired",
       deleteAfter: null,
       updatedAt: serverTimestamp()
@@ -1001,78 +1126,5 @@ export const deleteCloudBackupData = async ({ user }: { user: User | null }) => 
     throw new Error("로그인 후 백업 데이터를 삭제할 수 있습니다.");
   }
 
-  if (!firestore || !firebaseStorage) {
-    throw new Error("Firebase 연결 정보가 아직 설정되지 않았습니다.");
-  }
-
-  const photoSnapshot = await getDocs(collection(firestore, "users", user.uid, "photoBackups"));
-  for (const item of photoSnapshot.docs) {
-    const data = item.data() as {
-      storagePath?: string | null;
-      previewStoragePath?: string | null;
-    };
-
-    if (data.storagePath) {
-      await deleteObject(ref(firebaseStorage, data.storagePath)).catch(() => undefined);
-    }
-
-    if (data.previewStoragePath) {
-      await deleteObject(ref(firebaseStorage, data.previewStoragePath)).catch(() => undefined);
-    }
-
-    await deleteDoc(item.ref);
-  }
-
-  const imageWorkSnapshot = await getDocs(collection(firestore, "users", user.uid, "imageWorks"));
-  for (const item of imageWorkSnapshot.docs) {
-    const data = item.data() as {
-      storagePaths?: string[] | null;
-    };
-
-    for (const storagePath of data.storagePaths ?? []) {
-      await deleteObject(ref(firebaseStorage, storagePath)).catch(() => undefined);
-    }
-
-    await deleteDoc(item.ref);
-  }
-
-  const videoSnapshot = await getDocs(collection(firestore, "users", user.uid, "videos"));
-  for (const item of videoSnapshot.docs) {
-    const data = item.data() as {
-      storagePath?: string | null;
-    };
-
-    if (data.storagePath) {
-      await deleteObject(ref(firebaseStorage, data.storagePath)).catch(() => undefined);
-    }
-
-    await deleteDoc(item.ref);
-  }
-
-  await setDoc(
-    doc(firestore, "users", user.uid, "backups", "current"),
-    {
-      status: "deleted",
-      photoCount: 0,
-      imageBundleCount: 0,
-      videoCount: 0,
-      imageBackupBytes: 0,
-      settings: deleteField(),
-      imageBundles: deleteField(),
-      videos: deleteField(),
-      backedUpAt: null,
-      deleteAfter: null,
-      deletedAt: new Date().toISOString(),
-      updatedAt: serverTimestamp()
-    },
-    { merge: true }
-  );
-
-  return {
-    photoCount: photoSnapshot.size,
-    imageBundleCount: imageWorkSnapshot.size,
-    videoCount: videoSnapshot.size,
-    imageBackupBytes: 0,
-    deleteAfter: null
-  };
+  return deleteCloudBackupDataCallable();
 };

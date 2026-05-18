@@ -18,7 +18,7 @@ const { getSubscriptionProductsFromSubscription } = await import(
 const baseSubscription = {
   plan: "premium",
   status: "active",
-  provider: "mock",
+  provider: "google_play",
   startedAt: "2026-05-18T00:00:00.000Z",
   expiresAt: null,
   lastPaymentAt: "2026-05-18T00:00:00.000Z",

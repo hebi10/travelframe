@@ -25,10 +25,55 @@ service firebase.storage {
         && request.resource.contentType.matches('audio/.*');
     }
 
-    match /users/{userId}/{allPaths=**} {
+    function hasBackupSession() {
+      return request.resource.metadata.backupSessionId is string
+        && request.resource.metadata.backupSessionId.size() > 0;
+    }
+
+    function backupSession(userId) {
+      return firestore.get(/databases/(default)/documents/users/$(userId)/backupUploadSessions/$(request.resource.metadata.backupSessionId));
+    }
+
+    function isReservedBackupUpload(userId, mediaKind) {
+      return isOwner(userId)
+        && hasBackupSession()
+        && backupSession(userId).data.userId == userId
+        && backupSession(userId).data.status == "reserved"
+        && backupSession(userId).data.mediaKind == mediaKind
+        && backupSession(userId).data.storagePath == request.resource.name
+        && backupSession(userId).data.fileSize == request.resource.size
+        && backupSession(userId).data.contentType == request.resource.contentType
+        && backupSession(userId).data.expiresAt > request.time;
+    }
+
+    match /users/{userId}/backups/photos/{fileName} {
+      allow read: if isOwner(userId);
+      allow create, update: if isReservedBackupUpload(userId, "image") && isImageUpload();
+      allow delete: if false;
+    }
+
+    match /users/{userId}/backups/image-works/{workId}/{fileName} {
+      allow read: if isOwner(userId);
+      allow create, update: if isReservedBackupUpload(userId, "image") && isImageUpload();
+      allow delete: if false;
+    }
+
+    match /users/{userId}/backups/videos/{fileName} {
+      allow read: if isOwner(userId);
+      allow create, update: if isReservedBackupUpload(userId, "video") && isVideoUpload();
+      allow delete: if false;
+    }
+
+    match /users/{userId}/backups/audio/{fileName} {
+      allow read: if isOwner(userId);
+      allow create, update: if isReservedBackupUpload(userId, "audio") && isAudioUpload();
+      allow delete: if false;
+    }
+
+    match /users/{userId}/music/{allPaths=**} {
       allow read: if isOwner(userId);
       allow create, update: if isOwner(userId)
-        && (isImageUpload() || isVideoUpload() || isAudioUpload());
+        && isAudioUpload();
       allow delete: if isOwner(userId);
     }
 

@@ -19,61 +19,94 @@ service cloud.firestore {
       return request.resource.data.uid == userId;
     }
 
-    function isMockProductId() {
-      return request.resource.data.productId == "ad_remove"
-        || request.resource.data.productId == "creator_monthly";
+    function isNonNegativeCount(value) {
+      return value is int && value >= 0;
     }
 
-    function isValidMockSubscriptionDocument(subscriptionId) {
-      return subscriptionId == "current"
-        || subscriptionId == request.resource.data.productId;
+    function isValidBackupStoragePath(userId, storagePath) {
+      return storagePath is string
+        && storagePath.matches('users/' + userId + '/backups/.*');
     }
 
-    function isMockSubscription(subscriptionId) {
-      return request.resource.data.plan == "premium"
-        && request.resource.data.status == "active"
-        && request.resource.data.provider == "mock"
-        && isMockProductId()
-        && isValidMockSubscriptionDocument(subscriptionId)
-        && (
-          (
-            request.resource.data.productId == "ad_remove"
-            && request.resource.data.expiresAt == null
-            && request.resource.data.priceLabel == "3,900원"
-            && request.resource.data.productName == "광고 제거"
-          )
-          || (
-            request.resource.data.productId == "creator_monthly"
-            && request.resource.data.expiresAt is string
-            && request.resource.data.priceLabel == "월 3,900원"
-            && request.resource.data.productName == "영상 내보내기"
-          )
-        );
+    function isValidBackupFileSize(fileSize) {
+      return fileSize is int
+        && fileSize > 0
+        && fileSize <= 250 * 1024 * 1024;
     }
 
-    function isMockPaymentEvent() {
-      return request.resource.data.type == "mock_payment_completed"
-        && request.resource.data.provider == "mock"
-        && request.resource.data.plan == "premium"
-        && isMockProductId()
-        && (
-          (
-            request.resource.data.productId == "ad_remove"
-            && request.resource.data.productName == "광고 제거"
-            && request.resource.data.priceLabel == "3,900원"
-          )
-          || (
-            request.resource.data.productId == "creator_monthly"
-            && request.resource.data.productName == "영상 내보내기"
-            && request.resource.data.priceLabel == "월 3,900원"
-          )
-        );
+    function hasValidBackupSessionId() {
+      return request.resource.data.backupSessionId is string
+        && request.resource.data.backupSessionId.size() > 0;
     }
 
-    function isAdminSubscriptionDocument(subscriptionId) {
-      return subscriptionId == "current"
-        || subscriptionId == "ad_remove"
-        || subscriptionId == "creator_monthly";
+    function isValidBackupFileType(fileType) {
+      return fileType in ["image/jpeg", "image/png", "image/webp", "video/mp4"];
+    }
+
+    function isValidBackupStatus(status) {
+      return status in ["none", "active", "expired", "deleted", "backed_up", "failed", "restored"];
+    }
+
+    function hasValidBackupOwner(userId) {
+      return request.resource.data.userId == userId;
+    }
+
+    function isValidBackupOverview(userId, backupId) {
+      return backupId == "current"
+        && hasValidBackupOwner(userId)
+        && isNonNegativeCount(request.resource.data.photoCount)
+        && isNonNegativeCount(request.resource.data.imageBundleCount)
+        && isNonNegativeCount(request.resource.data.videoCount)
+        && isNonNegativeCount(request.resource.data.imageBackupBytes)
+        && isValidBackupStatus(request.resource.data.status);
+    }
+
+    function isValidPhotoBackup(userId, photoId) {
+      return hasValidBackupOwner(userId)
+        && request.resource.data.localId == photoId
+        && request.resource.data.storagePath is string
+        && request.resource.data.storagePath.matches('users/' + userId + '/backups/photos/.+')
+        && isValidBackupFileSize(request.resource.data.fileSize)
+        && isValidBackupFileType(request.resource.data.fileType)
+        && request.resource.data.fileType.matches('image/.*')
+        && hasValidBackupSessionId()
+        && isValidBackupStatus(request.resource.data.backupStatus);
+    }
+
+    function isValidImageWorkBackup(userId, workId) {
+      return hasValidBackupOwner(userId)
+        && request.resource.data.localId == workId
+        && request.resource.data.storagePaths is list
+        && request.resource.data.storagePaths.size() > 0
+        && request.resource.data.storagePaths[0] is string
+        && request.resource.data.storagePaths[0].matches('users/' + userId + '/backups/image-works/.+')
+        && request.resource.data.backupSessionIds is list
+        && request.resource.data.backupSessionIds.size() == request.resource.data.storagePaths.size()
+        && isValidBackupFileSize(request.resource.data.fileSize)
+        && isNonNegativeCount(request.resource.data.imageBackupSize)
+        && isValidBackupStatus(request.resource.data.backupStatus);
+    }
+
+    function isValidVideoBackup(userId, videoId) {
+      return hasValidBackupOwner(userId)
+        && request.resource.data.localId == videoId
+        && isValidBackupStoragePath(userId, request.resource.data.storagePath)
+        && isValidBackupFileSize(request.resource.data.fileSize)
+        && request.resource.data.fileType == "video/mp4"
+        && hasValidBackupSessionId()
+        && isValidBackupStatus(request.resource.data.backupStatus);
+    }
+
+    function isValidPhotoBackupMetadata(userId, photoId) {
+      return isValidPhotoBackup(userId, photoId);
+    }
+
+    function isValidVideoBackupMetadata(userId, videoId) {
+      return isValidVideoBackup(userId, videoId);
+    }
+
+    function isValidImageWorkBackupMetadata(userId, workId) {
+      return isValidImageWorkBackup(userId, workId);
     }
 
     match /users/{userId} {
@@ -85,11 +118,15 @@ service cloud.firestore {
       allow delete: if false;
 
       match /videos/{videoId} {
-        allow read, create, update, delete: if isOwner(userId) || isAdmin();
+        allow read: if isOwner(userId) || isAdmin();
+        allow create, update: if isOwner(userId) && isValidVideoBackupMetadata(userId, videoId);
+        allow delete: if isOwner(userId) || isAdmin();
       }
 
       match /imageWorks/{workId} {
-        allow read, create, update, delete: if isOwner(userId) || isAdmin();
+        allow read: if isOwner(userId) || isAdmin();
+        allow create, update: if isOwner(userId) && isValidImageWorkBackupMetadata(userId, workId);
+        allow delete: if isOwner(userId) || isAdmin();
       }
 
       match /musicTracks/{trackId} {
@@ -97,11 +134,25 @@ service cloud.firestore {
       }
 
       match /backups/{backupId} {
-        allow read, create, update, delete: if isOwner(userId) || isAdmin();
+        allow read: if isOwner(userId) || isAdmin();
+        allow create, update: if isOwner(userId) && isValidBackupOverview(userId, backupId);
+        allow delete: if isOwner(userId) || isAdmin();
       }
 
       match /photoBackups/{photoId} {
-        allow read, create, update, delete: if isOwner(userId) || isAdmin();
+        allow read: if isOwner(userId) || isAdmin();
+        allow create, update: if isOwner(userId) && isValidPhotoBackupMetadata(userId, photoId);
+        allow delete: if isOwner(userId) || isAdmin();
+      }
+
+      match /backupUsage/{usageId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow create, update, delete: if false;
+      }
+
+      match /backupUploadSessions/{sessionId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow create, update, delete: if false;
       }
 
       match /usage/{usageGroup}/weeks/{weekId} {
@@ -119,25 +170,12 @@ service cloud.firestore {
 
       match /subscriptions/{subscriptionId} {
         allow read: if isOwner(userId) || isAdmin();
-
-        // Temporary client-side mock payment flow.
-        // Replace create/update with trusted server-only writes when real billing is added.
-        allow create, update: if isOwner(userId)
-          && isAdminSubscriptionDocument(subscriptionId)
-          && isMockSubscription(subscriptionId);
-        allow create, update: if isAdmin() && isAdminSubscriptionDocument(subscriptionId);
-
-        allow delete: if isAdmin();
+        allow create, update, delete: if false;
       }
 
       match /paymentEvents/{eventId} {
         allow read: if isOwner(userId) || isAdmin();
-
-        // Temporary client-side mock payment flow.
-        // Real payment events should be written by Cloud Functions or a verified server.
-        allow create: if isOwner(userId) && isMockPaymentEvent();
-        allow create: if isAdmin();
-        allow update, delete: if false;
+        allow create, update, delete: if false;
       }
     }
 

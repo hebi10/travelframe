@@ -22,11 +22,9 @@ import {
 
 import { firebaseAuth, firestore, isFirebaseConfigured } from "@/lib/firebase";
 import {
-  activateMockSubscription,
   freeSubscription,
   getUserSubscription,
   isPremiumSubscription,
-  type SubscriptionProductId,
   type UserSubscription
 } from "@/lib/subscription";
 
@@ -44,9 +42,6 @@ type AuthContextValue = {
   sendVerificationEmail: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   refreshUser: () => Promise<void>;
-  startMockSubscription: (
-    productId?: Exclude<SubscriptionProductId, "free">
-  ) => Promise<UserSubscription>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -170,16 +165,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(ensureFirebaseAuth().currentUser);
   }, []);
 
-  const startMockSubscription = useCallback(async (
-    productId?: Exclude<SubscriptionProductId, "free">
-  ) => {
-    const currentUser = ensureCurrentUser();
-    const nextSubscription = await activateMockSubscription(currentUser, productId);
-    setSubscription(nextSubscription);
-    await ensureUserDocument(currentUser);
-    return nextSubscription;
-  }, []);
-
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
@@ -196,8 +181,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       logOut,
       sendVerificationEmail,
       resetPassword,
-      refreshUser,
-      startMockSubscription
+      refreshUser
     }),
     [
       isAuthLoading,
@@ -208,7 +192,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signIn,
       signInWithGoogleIdToken,
       signUp,
-      startMockSubscription,
       subscription,
       user
     ]
