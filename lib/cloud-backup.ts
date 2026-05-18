@@ -130,8 +130,37 @@ const callBackupFunction = async <Request, Response>(
   }
 
   const callable = httpsCallable<Request, Response>(firebaseFunctions, name);
-  const result = await callable(data);
-  return result.data;
+  try {
+    const result = await callable(data);
+    return result.data;
+  } catch (error) {
+    const code =
+      typeof error === "object" && error && "code" in error
+        ? String((error as { code?: unknown }).code)
+        : "";
+    const message = error instanceof Error ? error.message : String(error);
+
+    if (
+      code.includes("not-found") ||
+      message.includes("not-found") ||
+      message.includes("NOT_FOUND")
+    ) {
+      throw new Error(
+        "백업 서버 함수가 아직 배포되지 않았습니다. npm run firebase:deploy-functions 실행 후 다시 시도해 주세요."
+      );
+    }
+
+    if (
+      code.includes("permission-denied") ||
+      message.includes("Active creator subscription")
+    ) {
+      throw new Error(
+        "영상 내보내기 플랜이 활성화된 계정만 백업할 수 있습니다. 관리자 페이지에서 구독 상태를 확인해 주세요."
+      );
+    }
+
+    throw error;
+  }
 };
 
 const reserveBackupUpload = (data: {
@@ -560,7 +589,8 @@ export const backupCurrentWorkspace = async ({
 
   const totalUploadItems =
     photos.length +
-    optimizedImageBundles.reduce((sum, item) => sum + item.images.length, 0);
+    optimizedImageBundles.reduce((sum, item) => sum + item.images.length, 0) +
+    videos.length;
   let uploadedItemCount = 0;
   const updateUploadProgress = () => {
     uploadedItemCount += 1;
@@ -657,6 +687,62 @@ export const backupCurrentWorkspace = async ({
       { merge: true }
     );
   }
+
+  for (const video of videos) {
+    const videoSnapshot = await getDoc(
+      doc(firestore, "users", user.uid, "videos", video.id)
+    );
+    const existingVideo = videoSnapshot.data() as
+      | {
+          backupStatus?: string;
+          localId?: string;
+          storagePath?: string;
+        }
+      | undefined;
+
+    if (
+      videoSnapshot.exists() &&
+      existingVideo?.backupStatus === "backed_up" &&
+      existingVideo?.localId === video.id &&
+      existingVideo?.storagePath
+    ) {
+      updateUploadProgress();
+      continue;
+    }
+
+    const fileName = fileNameFromUri(video.uri, `${video.id}.mp4`);
+    const storagePath = `users/${user.uid}/backups/videos/${video.id}-${fileName}`;
+    const upload = await uploadLocalFile({
+      uri: video.uri,
+      storagePath,
+      mediaKind: "video"
+    });
+    const downloadUrl = upload.downloadURL;
+
+    await setDoc(
+      doc(firestore, "users", user.uid, "videos", video.id),
+      {
+        ...video,
+        userId: user.uid,
+        localId: video.id,
+        localUri: video.uri,
+        uri: downloadUrl,
+        storagePath,
+        fileSize: upload.fileSize,
+        backupSessionId: upload.backupSessionId,
+        backupStatus: "backed_up",
+        backupEnabledAt: backedUpAt,
+        lastBackedUpAt: backedUpAt,
+        sourceDeviceId,
+        fileType: "video/mp4",
+        backedUpAt,
+        updatedAt: serverTimestamp()
+      },
+      { merge: true }
+    );
+    updateUploadProgress();
+  }
+
   if (totalUploadItems === 0) {
     emitBackupProgress(onProgress, 92, "Firebase에 백업할 파일을 확인했습니다.");
   }

@@ -73,7 +73,7 @@ import {
 import { formatImageBackupUsage } from "@/lib/image-backup-utils";
 import { resetAppGuideProgress } from "@/lib/guide-progress";
 import { getPhotos } from "@/lib/photo-library";
-import { isCreatorSubscriptionActive } from "@/lib/subscription";
+import { getUserSubscription, isCreatorSubscriptionActive } from "@/lib/subscription";
 import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 import { getMadeVideos } from "@/lib/video-library";
 import { getImageBundleWorks } from "@/lib/work-library";
@@ -245,7 +245,8 @@ export default function SettingsScreen() {
     isFirebaseReady,
     signIn,
     signUp,
-    logOut
+    logOut,
+    refreshUser
   } = useAuth();
   const [settings, setSettings] = useState<AppSettings>(defaultAppSettings);
   const [activeSetting, setActiveSetting] = useState<SettingKey | null>(null);
@@ -389,8 +390,11 @@ export default function SettingsScreen() {
       return;
     }
 
-    if (!isCreatorSubscriptionActive(subscription)) {
-      await markBackupExpired({ user, subscription });
+    await refreshUser().catch(() => undefined);
+    const latestSubscription = await getUserSubscription(user);
+
+    if (!isCreatorSubscriptionActive(latestSubscription)) {
+      await markBackupExpired({ user, subscription: latestSubscription });
       setAuthMessage(
         "구독 기간이 만료되었거나 활성화되지 않았습니다. 백업은 사용할 수 없고 기존 백업 데이터 삭제는 설정에서 직접 요청할 수 있습니다."
       );
@@ -453,9 +457,11 @@ export default function SettingsScreen() {
         detail: "백업할 데이터를 준비하고 있습니다."
       });
       setAuthMessage(null);
+      await refreshUser().catch(() => undefined);
+      const latestSubscription = await getUserSubscription(user);
       const summary = await backupCurrentWorkspace({
         user,
-        subscription,
+        subscription: latestSubscription,
         onProgress: setBackupProgress
       });
       await updateSetting({ cloudBackupEnabled: true });
@@ -541,7 +547,10 @@ export default function SettingsScreen() {
       return;
     }
 
-    if (!settings.cloudBackupEnabled || !isCreatorSubscriptionActive(subscription)) {
+    await refreshUser().catch(() => undefined);
+    const latestSubscription = await getUserSubscription(user);
+
+    if (!settings.cloudBackupEnabled || !isCreatorSubscriptionActive(latestSubscription)) {
       setAuthMessage("구독과 클라우드 백업 설정이 켜져 있을 때 다시 시도할 수 있습니다.");
       return;
     }
@@ -567,7 +576,7 @@ export default function SettingsScreen() {
               continue;
             }
 
-            await backupPhotoIfEnabled({ user, subscription, photo });
+            await backupPhotoIfEnabled({ user, subscription: latestSubscription, photo });
           }
 
           if (failure.kind === "image-bundle") {

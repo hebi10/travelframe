@@ -2,6 +2,7 @@ node_modules/
 .expo/
 .gradle-local/
 .tmp/
+.android-version-code
 android/
 credentials/
 dist/

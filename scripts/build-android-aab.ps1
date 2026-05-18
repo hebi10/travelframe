@@ -1,6 +1,7 @@
 param(
   [int]$VersionCode = 0,
-  [string]$KeystorePath = ""
+  [string]$KeystorePath = "",
+  [string]$SigningEnvPath = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -40,8 +41,43 @@ function Write-Utf8NoBom {
   [System.IO.File]::WriteAllText($Path, $Value, $encoding)
 }
 
+function Import-SigningEnvFile {
+  param([string]$Path)
+
+  if (-not $Path -or -not (Test-Path -LiteralPath $Path)) {
+    return
+  }
+
+  foreach ($line in Get-Content -LiteralPath $Path) {
+    $trimmed = $line.Trim()
+    if (-not $trimmed -or $trimmed.StartsWith("#")) {
+      continue
+    }
+
+    $separatorIndex = $trimmed.IndexOf("=")
+    if ($separatorIndex -le 0) {
+      continue
+    }
+
+    $name = $trimmed.Substring(0, $separatorIndex).Trim()
+    $value = $trimmed.Substring($separatorIndex + 1).Trim()
+    if (($value.StartsWith('"') -and $value.EndsWith('"')) -or ($value.StartsWith("'") -and $value.EndsWith("'"))) {
+      $value = $value.Substring(1, $value.Length - 2)
+    }
+
+    if ($name -and -not [System.Environment]::GetEnvironmentVariable($name, "Process")) {
+      Set-Item -Path "Env:$name" -Value $value
+    }
+  }
+}
+
 $projectRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 Set-Location $projectRoot
+
+if (-not $SigningEnvPath) {
+  $SigningEnvPath = Join-Path $projectRoot "credentials\android\signing.env"
+}
+Import-SigningEnvFile -Path $SigningEnvPath
 
 Require-Command "node"
 Require-Command "npx"
@@ -81,8 +117,29 @@ if ($missingEnv.Count -gt 0) {
 }
 
 if ($VersionCode -le 0) {
-  $VersionCode = [int](Get-Date -Format "yyMMddHH")
+  $versionCodeStatePath = Join-Path $projectRoot ".android-version-code"
+  $baseVersionCode = [int](Get-Date -Format "yyMMddHH")
+  $lastVersionCode = 0
+
+  if (Test-Path -LiteralPath $versionCodeStatePath) {
+    $lastVersionCodeText = (Get-Content -LiteralPath $versionCodeStatePath -Raw).Trim()
+    if ($lastVersionCodeText -match "^\d+$") {
+      $lastVersionCode = [int]$lastVersionCodeText
+    }
+  }
+
+  if ($lastVersionCode -gt 0) {
+    $VersionCode = [Math]::Max($baseVersionCode, $lastVersionCode + 1)
+  } else {
+    $VersionCode = $baseVersionCode + 1
+  }
 }
+
+if ($VersionCode -gt 2100000000) {
+  Stop-WithMessage "Android versionCode must be 2100000000 or lower for Google Play."
+}
+
+Set-Content -LiteralPath (Join-Path $projectRoot ".android-version-code") -Value $VersionCode -Encoding ASCII
 
 Write-Host "Preparing Android project..." -ForegroundColor Cyan
 Invoke-External "npx" @("expo", "prebuild", "--platform", "android", "--no-install")

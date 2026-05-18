@@ -1,5 +1,5 @@
 import * as FileSystem from "expo-file-system/legacy";
-import { manipulateAsync, SaveFormat } from "expo-image-manipulator";
+import { manipulateAsync, SaveFormat, type Action } from "expo-image-manipulator";
 import * as Sharing from "expo-sharing";
 import { Platform } from "react-native";
 import { type ImageQuality } from "@/constants/image";
@@ -7,6 +7,10 @@ import {
   getImageQualityOption,
   getImageResizeAction
 } from "@/lib/image-backup-utils";
+import {
+  getTripClipImageExportActions,
+  type TripClipImageAdjustment
+} from "@/lib/trip-clip-image-export";
 import {
   assertCanSaveToMediaLibrary,
   MEDIA_LIBRARY_SAVE_UNAVAILABLE_MESSAGE
@@ -19,8 +23,13 @@ type ImageExportOptions = {
   imageQuality?: ImageQuality;
   width?: number | null;
   height?: number | null;
+  frameAspectRatio?: number | null;
+  adjustment?: TripClipImageAdjustment | null;
+  frameWidth?: number | null;
+  frameHeight?: number | null;
 };
 let androidDownloadDirectoryUri: string | null = null;
+const TRIP_CLIP_ANDROID_DOWNLOAD_FOLDER = "TravelFrame";
 
 const getMediaLibrary = async (): Promise<MediaLibraryModule> =>
   import("expo-media-library");
@@ -41,6 +50,32 @@ const getMimeType = (uri: string) => {
 
 const requestSavePermission = async (_kind: MediaPermissionKind) => getMediaLibrary();
 
+const getAndroidExportDirectoryUri = async (parentDirectoryUri: string) => {
+  try {
+    return await FileSystem.StorageAccessFramework.makeDirectoryAsync(
+      parentDirectoryUri,
+      TRIP_CLIP_ANDROID_DOWNLOAD_FOLDER
+    );
+  } catch {
+    try {
+      const children = await FileSystem.StorageAccessFramework.readDirectoryAsync(
+        parentDirectoryUri
+      );
+      const existingDirectoryUri = children.find((uri) =>
+        decodeURIComponent(uri).includes(TRIP_CLIP_ANDROID_DOWNLOAD_FOLDER)
+      );
+
+      if (existingDirectoryUri) {
+        return existingDirectoryUri;
+      }
+    } catch {
+      // Fall back to the selected directory if SAF cannot enumerate children.
+    }
+  }
+
+  return parentDirectoryUri;
+};
+
 const getAndroidDownloadDirectoryUri = async () => {
   if (androidDownloadDirectoryUri) {
     return androidDownloadDirectoryUri;
@@ -54,8 +89,9 @@ const getAndroidDownloadDirectoryUri = async () => {
     throw new Error("다운로드 폴더에 저장하려면 폴더 접근 권한이 필요합니다.");
   }
 
-  androidDownloadDirectoryUri = permission.directoryUri;
-  return permission.directoryUri;
+  const exportDirectoryUri = await getAndroidExportDirectoryUri(permission.directoryUri);
+  androidDownloadDirectoryUri = exportDirectoryUri;
+  return exportDirectoryUri;
 };
 
 const getImageSaveMimeType = (uri: string, format: ImageSaveFormat) => {
@@ -80,6 +116,20 @@ const getImageSaveExtension = (mimeType: string) => {
   }
 
   return "jpg";
+};
+
+const getImageSaveFormat = (uri: string, format: ImageSaveFormat) => {
+  const mimeType = getImageSaveMimeType(uri, format);
+
+  if (mimeType === "image/png") {
+    return SaveFormat.PNG;
+  }
+
+  if (mimeType === "image/webp") {
+    return SaveFormat.WEBP;
+  }
+
+  return SaveFormat.JPEG;
 };
 
 const saveImageToAndroidDownload = async (
@@ -107,7 +157,7 @@ const saveImageToAndroidDownload = async (
     encoding: FileSystem.EncodingType.Base64
   });
 
-  return `${fileName}.${extension}`;
+  return saveUri;
 };
 
 export const prepareImageForLibrarySave = async (
@@ -115,29 +165,41 @@ export const prepareImageForLibrarySave = async (
   format: ImageSaveFormat,
   options: ImageExportOptions = {}
 ) => {
-  if (format === "original") {
-    return uri;
-  }
-
   const qualityOption = options.imageQuality
     ? getImageQualityOption(options.imageQuality)
     : null;
+  const cropActions = getTripClipImageExportActions({
+    width: options.width,
+    height: options.height,
+    frameAspectRatio: options.frameAspectRatio,
+    adjustment: options.adjustment,
+    frameWidth: options.frameWidth,
+    frameHeight: options.frameHeight
+  }) as Action[];
+  const cropAction = cropActions.find(
+    (action): action is Extract<Action, { crop: unknown }> => "crop" in action
+  );
   const resizeAction = qualityOption
     ? getImageResizeAction({
-        width: options.width,
-        height: options.height,
+        width: cropAction?.crop.width ?? options.width,
+        height: cropAction?.crop.height ?? options.height,
         maxLongSide: qualityOption.maxLongSide
       })
     : undefined;
+  const actions = resizeAction ? [...cropActions, resizeAction] : cropActions;
+
+  if (format === "original" && actions.length === 0 && !qualityOption) {
+    return uri;
+  }
 
   const rendered = await manipulateAsync(
     uri,
-    resizeAction ? [resizeAction] : [],
-    format === "png"
+    actions,
+    getImageSaveFormat(uri, format) === SaveFormat.PNG
       ? { format: SaveFormat.PNG }
       : {
           compress: qualityOption?.quality ?? 1,
-          format: SaveFormat.JPEG
+          format: getImageSaveFormat(uri, format)
         }
   );
 
@@ -161,14 +223,14 @@ export const saveImageToLibrary = async (
 ) => {
   try {
     if (Platform.OS === "android") {
-      await saveImageToAndroidDownload(uri, format, options);
-      return;
+      return await saveImageToAndroidDownload(uri, format, options);
     }
 
     const MediaLibrary = await requestSavePermission("photo");
     const saveUri = await prepareImageForLibrarySave(uri, format, options);
     assertCanSaveToMediaLibrary(MediaLibrary);
     await MediaLibrary.saveToLibraryAsync(saveUri);
+    return saveUri;
   } catch (error) {
     throw normalizeMediaSaveError(error, "이미지를 핸드폰 앨범에 저장하지 못했습니다.");
   }

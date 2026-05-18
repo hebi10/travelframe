@@ -1398,12 +1398,16 @@ export default function TripClipScreen() {
             title: "이미지 저장 중",
             detail: `선택한 사진 ${selectedPhotos.length}장 중 ${index + 1}장을 저장하고 있습니다.`
           });
-          await saveImageToLibrary(photo.uri, imageSaveFormat, {
+          const savedImageUri = await saveImageToLibrary(photo.uri, imageSaveFormat, {
             imageQuality,
             width: photo.width,
-            height: photo.height
+            height: photo.height,
+            frameAspectRatio: ratioAspect[ratio],
+            adjustment: getTripClipPhotoAdjustment(photoAdjustments, photo.id),
+            frameWidth: previewFrameSize.width,
+            frameHeight: previewFrameSize.height
           });
-          savedImageUris.push(photo.uri);
+          savedImageUris.push(savedImageUri);
         }
 
         const normalizedWorkTitle = workTitle.trim();
@@ -1620,7 +1624,11 @@ export default function TripClipScreen() {
         await shareImage(activePhoto.uri, imageSaveFormat, {
           imageQuality,
           width: activePhoto.width,
-          height: activePhoto.height
+          height: activePhoto.height,
+          frameAspectRatio: ratioAspect[ratio],
+          adjustment: getTripClipPhotoAdjustment(photoAdjustments, activePhoto.id),
+          frameWidth: previewFrameSize.width,
+          frameHeight: previewFrameSize.height
         });
         return;
       }
