@@ -28,6 +28,8 @@ import {
   DEFAULT_GUIDE_COLOR,
   GUIDE_SIZE_MAX,
   GUIDE_SIZE_MIN,
+  GUIDE_STROKE_WIDTH_MAX,
+  GUIDE_STROKE_WIDTH_MIN,
   defaultAppSettings,
   getAppSettings,
   saveAppSettings,
@@ -54,6 +56,7 @@ type SettingKey =
   | "defaultGuide"
   | "guideVisible"
   | "guideSize"
+  | "guideStrokeWidth"
   | "guideColor"
   | "overlayOpacity"
   | "defaultRatio"
@@ -81,6 +84,8 @@ const guideSizeOptions = [
   { label: "기본", value: 44 },
   { label: "크게", value: 56 }
 ] as const;
+
+const guideStrokeWidthOptions = [1, 2, 3, 4, 5] as const;
 
 const guideColorOptions = [
   { label: "흰색", value: DEFAULT_GUIDE_COLOR },
@@ -235,6 +240,10 @@ export default function SettingsScreen() {
 
     if (activeSetting === "guideSize") {
       return "가이드 크기";
+    }
+
+    if (activeSetting === "guideStrokeWidth") {
+      return "가이드 선 두께";
     }
 
     if (activeSetting === "guideColor") {
@@ -644,7 +653,7 @@ export default function SettingsScreen() {
 
             <View style={styles.guideCollapsedRow}>
               <Text selectable style={[styles.guideSummary, themed.mutedText]}>
-                {GUIDE_LABELS[settings.defaultGuide]} / {settings.guideSize} /{" "}
+                {GUIDE_LABELS[settings.defaultGuide]} / {settings.guideSize} / {settings.guideStrokeWidth}px /{" "}
                 {Math.round(settings.overlayOpacity * 100)}%
               </Text>
               <Pressable
@@ -672,6 +681,7 @@ export default function SettingsScreen() {
                   visible={settings.guideVisible}
                   color={settings.guideColor}
                   size={settings.guideSize}
+                  strokeWidth={settings.guideStrokeWidth}
                 />
                 {!settings.guideVisible ? (
                   <View style={styles.guidePreviewDisabled}>
@@ -680,6 +690,47 @@ export default function SettingsScreen() {
                     </Text>
                   </View>
                 ) : null}
+              </View>
+            </View>
+
+            <View style={styles.compactGroup}>
+              <Text selectable style={[styles.compactGroupTitle, themed.text]}>
+                선 두께
+              </Text>
+              <View style={styles.compactOptionRow}>
+                {guideStrokeWidthOptions.map((strokeWidth) => {
+                  const isActive = settings.guideStrokeWidth === strokeWidth;
+
+                  return (
+                    <Pressable
+                      key={strokeWidth}
+                      style={[
+                        styles.compactOption,
+                        themed.secondaryButton,
+                        isActive && styles.compactOptionActive,
+                        isActive && themed.activeFill
+                      ]}
+                      onPress={() =>
+                        updateSetting({
+                          guideStrokeWidth: strokeWidth,
+                          guideVisible: true
+                        })
+                      }
+                    >
+                      <Text
+                        selectable={false}
+                        style={[
+                          styles.compactOptionText,
+                          themed.text,
+                          isActive && styles.compactOptionTextActive,
+                          isActive && themed.inverseText
+                        ]}
+                      >
+                        {strokeWidth}px
+                      </Text>
+                    </Pressable>
+                  );
+                })}
               </View>
             </View>
 
@@ -900,6 +951,23 @@ export default function SettingsScreen() {
                       detail={`${GUIDE_SIZE_MIN}-${GUIDE_SIZE_MAX} 범위의 공통 가이드 크기`}
                       active={settings.guideSize === size.value}
                       onPress={() => updateSetting({ guideSize: size.value, guideVisible: true })}
+                    />
+                  ))
+                : null}
+
+              {activeSetting === "guideStrokeWidth"
+                ? guideStrokeWidthOptions.map((strokeWidth) => (
+                    <OptionButton
+                      key={strokeWidth}
+                      label={`${strokeWidth}px`}
+                      detail={`${GUIDE_STROKE_WIDTH_MIN}-${GUIDE_STROKE_WIDTH_MAX}px 범위의 공통 가이드 선 두께`}
+                      active={settings.guideStrokeWidth === strokeWidth}
+                      onPress={() =>
+                        updateSetting({
+                          guideStrokeWidth: strokeWidth,
+                          guideVisible: true
+                        })
+                      }
                     />
                   ))
                 : null}

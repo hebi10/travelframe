@@ -27,6 +27,8 @@ import {
   DEFAULT_GUIDE_COLOR,
   GUIDE_SIZE_MAX,
   GUIDE_SIZE_MIN,
+  GUIDE_STROKE_WIDTH_MAX,
+  GUIDE_STROKE_WIDTH_MIN,
   defaultAppSettings,
   getAppSettings,
   updateAppSettings
@@ -48,6 +50,7 @@ const GUIDE_SIZE_OPTIONS = [
   { label: "기본", value: 44 },
   { label: "크게", value: 56 }
 ] as const;
+const GUIDE_STROKE_WIDTH_OPTIONS = [1, 2, 3, 4, 5] as const;
 const GUIDE_COLOR_OPTIONS = [
   { label: "흰색", value: DEFAULT_GUIDE_COLOR },
   { label: "노랑", value: "#F5D76E" },
@@ -98,8 +101,12 @@ export default function EditScreen() {
   const [guide, setGuide] = useState<GuideType>(defaultAppSettings.defaultGuide);
   const [guideVisible, setGuideVisible] = useState(defaultAppSettings.guideVisible);
   const [guideSize, setGuideSize] = useState(defaultAppSettings.guideSize);
+  const [guideStrokeWidth, setGuideStrokeWidth] = useState(
+    defaultAppSettings.guideStrokeWidth
+  );
   const [guideColor, setGuideColor] = useState(defaultAppSettings.guideColor);
   const [guidePanelOpen, setGuidePanelOpen] = useState(false);
+  const [isCanvasExpanded, setIsCanvasExpanded] = useState(false);
   const originalAspectRatio =
     source?.width && source?.height ? source.width / source.height : undefined;
 
@@ -148,6 +155,7 @@ export default function EditScreen() {
         setGuide(settings.defaultGuide);
         setGuideVisible(settings.guideVisible);
         setGuideSize(settings.guideSize);
+        setGuideStrokeWidth(settings.guideStrokeWidth);
         setGuideColor(settings.guideColor);
       };
 
@@ -325,6 +333,21 @@ export default function EditScreen() {
     });
   };
 
+  const updateGuideStrokeWidth = (nextStrokeWidth: number) => {
+    const clampedStrokeWidth = Math.round(
+      Math.max(
+        GUIDE_STROKE_WIDTH_MIN,
+        Math.min(GUIDE_STROKE_WIDTH_MAX, nextStrokeWidth)
+      )
+    );
+    setGuideStrokeWidth(clampedStrokeWidth);
+    setGuideVisible(true);
+    void updateAppSettings({
+      guideStrokeWidth: clampedStrokeWidth,
+      guideVisible: true
+    });
+  };
+
   const updateGuideColor = (nextColor: string) => {
     setGuideColor(nextColor);
     setGuideVisible(true);
@@ -345,17 +368,13 @@ export default function EditScreen() {
       setMessage(null);
       const transform =
         canvasRef.current?.getTransform() ?? getFallbackTransform(ratio);
-      const renderedImage = await canvasRef.current?.captureEditedImage();
 
       await saveEditedPhoto({
         sourceUri: source.uri,
         sourcePhotoId: source.sourcePhotoId,
         width: source.width,
         height: source.height,
-        transform,
-        renderedUri: renderedImage?.uri,
-        renderedWidth: renderedImage?.width,
-        renderedHeight: renderedImage?.height
+        transform
       });
 
       await clearEditDraft();
@@ -389,7 +408,7 @@ export default function EditScreen() {
         </Pressable>
       </View>
 
-      <View style={styles.canvasWrap}>
+      <View style={[styles.canvasWrap, isCanvasExpanded && styles.canvasWrapExpanded]}>
         {isLoading ? (
           <View style={styles.loading}>
             <ActivityIndicator color={colors.inverse} />
@@ -405,11 +424,21 @@ export default function EditScreen() {
             guide={guide}
             guideVisible={guideVisible}
             guideSize={guideSize}
+            guideStrokeWidth={guideStrokeWidth}
             guideColor={guideColor}
           />
         )}
+        <Pressable
+          style={styles.expandCanvasButton}
+          onPress={() => setIsCanvasExpanded((value) => !value)}
+        >
+          <Text selectable={false} style={styles.expandCanvasButtonText}>
+            {isCanvasExpanded ? "설정 열기" : "이미지만 보기"}
+          </Text>
+        </Pressable>
       </View>
 
+      {!isCanvasExpanded ? (
       <View style={[styles.bottomPanel, { paddingBottom: bottomSafePadding }]}>
         {availableDraft && showDraftPrompt ? (
           <View style={styles.draftPanel}>
@@ -536,6 +565,32 @@ export default function EditScreen() {
                   </Pressable>
                 ))}
               </View>
+              <View style={styles.guideOptionRow}>
+                {GUIDE_STROKE_WIDTH_OPTIONS.map((strokeWidth) => {
+                  const isActive = guideStrokeWidth === strokeWidth;
+
+                  return (
+                    <Pressable
+                      key={strokeWidth}
+                      style={[
+                        styles.guideChip,
+                        isActive && styles.guideChipActive
+                      ]}
+                      onPress={() => updateGuideStrokeWidth(strokeWidth)}
+                    >
+                      <Text
+                        selectable={false}
+                        style={[
+                          styles.guideChipText,
+                          isActive && styles.guideChipTextActive
+                        ]}
+                      >
+                        {strokeWidth}px
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
               <View style={styles.guideColorRow}>
                 {GUIDE_COLOR_OPTIONS.map((option) => (
                   <Pressable
@@ -614,6 +669,7 @@ export default function EditScreen() {
           </Text>
         ) : null}
       </View>
+      ) : null}
     </View>
   );
 }
@@ -672,7 +728,28 @@ const styles = StyleSheet.create({
   },
   canvasWrap: {
     flex: 1,
-    minHeight: 240
+    minHeight: 240,
+    position: "relative"
+  },
+  canvasWrapExpanded: {
+    flex: 1
+  },
+  expandCanvasButton: {
+    position: "absolute",
+    right: 14,
+    bottom: 14,
+    minHeight: 38,
+    justifyContent: "center",
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.78)",
+    backgroundColor: "rgba(0, 0, 0, 0.72)"
+  },
+  expandCanvasButtonText: {
+    color: colors.inverse,
+    fontSize: typography.button,
+    fontWeight: "800",
+    letterSpacing: 0
   },
   loading: {
     flex: 1,

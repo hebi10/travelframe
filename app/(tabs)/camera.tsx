@@ -49,6 +49,8 @@ import {
   DEFAULT_GUIDE_COLOR,
   GUIDE_SIZE_MAX,
   GUIDE_SIZE_MIN,
+  GUIDE_STROKE_WIDTH_MAX,
+  GUIDE_STROKE_WIDTH_MIN,
   getAppSettings,
   updateAppSettings
 } from "@/lib/app-settings";
@@ -61,6 +63,7 @@ const GUIDE_SIZE_OPTIONS = [
   { label: "기본", value: 44 },
   { label: "크게", value: 56 }
 ] as const;
+const GUIDE_STROKE_WIDTH_OPTIONS = [1, 2, 3, 4, 5] as const;
 const OVERLAY_OPACITY_MIN = 10;
 const OVERLAY_OPACITY_MAX = 85;
 
@@ -125,6 +128,7 @@ export default function CameraScreen() {
   const [guide, setGuide] = useState<GuideType>("circle");
   const [guideSize, setGuideSize] = useState(44);
   const [guideSizeInput, setGuideSizeInput] = useState("44");
+  const [guideStrokeWidth, setGuideStrokeWidth] = useState(1);
   const [guideColor, setGuideColor] = useState<string>(GUIDE_COLOR_OPTIONS[0].value);
   const [guideSettingsOpen, setGuideSettingsOpen] = useState(false);
   const [cameraSettingsOpen, setCameraSettingsOpen] = useState(false);
@@ -231,6 +235,21 @@ export default function CameraScreen() {
     void updateAppSettings({ guideVisible: nextVisible });
   };
 
+  const updateGuideStrokeWidth = (nextStrokeWidth: number) => {
+    const clampedStrokeWidth = Math.round(
+      Math.max(
+        GUIDE_STROKE_WIDTH_MIN,
+        Math.min(GUIDE_STROKE_WIDTH_MAX, nextStrokeWidth)
+      )
+    );
+    setGuideStrokeWidth(clampedStrokeWidth);
+    setGuideVisible(true);
+    void updateAppSettings({
+      guideStrokeWidth: clampedStrokeWidth,
+      guideVisible: true
+    });
+  };
+
   const updateGuideColor = (nextColor: string) => {
     setGuideColor(nextColor);
     setGuideVisible(true);
@@ -268,6 +287,7 @@ export default function CameraScreen() {
         setGuideVisible(settings.guideVisible);
         setGuideSize(settings.guideSize);
         setGuideSizeInput(String(settings.guideSize));
+        setGuideStrokeWidth(settings.guideStrokeWidth);
         setGuideColor(settings.guideColor);
         setOverlayOpacity(settings.overlayOpacity);
         setRecentPhoto(latestPhoto);
@@ -560,6 +580,7 @@ export default function CameraScreen() {
         guide={guide}
         visible={guideVisible}
         size={guideSize}
+        strokeWidth={guideStrokeWidth}
         color={guideColor}
       />
       <PhotoReferenceOverlay
@@ -1013,6 +1034,38 @@ export default function CameraScreen() {
 
               <View style={[styles.modalSection, styles.modalSectionSpaced]}>
                 <Text selectable={false} style={styles.modalSectionTitle}>
+                  선 두께
+                </Text>
+                <View style={styles.optionRow}>
+                  {GUIDE_STROKE_WIDTH_OPTIONS.map((strokeWidth) => {
+                    const isActive = guideStrokeWidth === strokeWidth;
+
+                    return (
+                      <Pressable
+                        key={strokeWidth}
+                        style={[
+                          styles.optionButton,
+                          isActive && styles.optionButtonActive
+                        ]}
+                        onPress={() => updateGuideStrokeWidth(strokeWidth)}
+                      >
+                        <Text
+                          selectable={false}
+                          style={[
+                            styles.optionButtonText,
+                            isActive && styles.optionButtonTextActive
+                          ]}
+                        >
+                          {strokeWidth}px
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+
+              <View style={[styles.modalSection, styles.modalSectionSpaced]}>
+                <Text selectable={false} style={styles.modalSectionTitle}>
                   색상
                 </Text>
                 <View style={styles.colorRow}>
@@ -1180,7 +1233,7 @@ export default function CameraScreen() {
                     가이드
                   </Text>
                   <Text selectable={false} style={styles.guideSettingsValue}>
-                    {GUIDE_LABELS[guide]} / {guideSize}
+                    {GUIDE_LABELS[guide]} / {guideSize} / {guideStrokeWidth}px
                   </Text>
                 </View>
               </Pressable>

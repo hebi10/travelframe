@@ -1,6 +1,5 @@
 import { Image } from "expo-image";
 import { useAudioPlayer, type AudioSource } from "expo-audio";
-import Constants from "expo-constants";
 import * as FileSystem from "expo-file-system/legacy";
 import * as ImagePicker from "expo-image-picker";
 import { router, type Href, useFocusEffect, useLocalSearchParams } from "expo-router";
@@ -51,9 +50,7 @@ import {
   type TripClipTransition
 } from "@/constants/trip-clip";
 import {
-  downloadRenderedVideo,
   type ImageSaveFormat,
-  requestTripClipRender,
   saveImageToLibrary,
   saveVideoToLibrary,
   shareImage,
@@ -63,6 +60,8 @@ import {
   DEFAULT_GUIDE_COLOR,
   GUIDE_SIZE_MAX,
   GUIDE_SIZE_MIN,
+  GUIDE_STROKE_WIDTH_MAX,
+  GUIDE_STROKE_WIDTH_MIN,
   getAppSettings,
   updateAppSettings
 } from "@/lib/app-settings";
@@ -102,7 +101,6 @@ import type { PhotoItem } from "@/types/photo";
 
 const DEFAULT_DURATION = 2.5;
 const FIRST_FRAME_DURATION = Math.max(0.5, DEFAULT_DURATION - 0.5);
-const DIRECT_EXPORT_ENABLED = process.env.EXPO_PUBLIC_DIRECT_EXPORT_ENABLED === "true";
 const initialExportProgress = {
   visible: false,
   percent: 0,
@@ -181,6 +179,7 @@ const GUIDE_SIZE_OPTIONS = [
   { label: "기본", value: 44 },
   { label: "크게", value: 56 }
 ] as const;
+const GUIDE_STROKE_WIDTH_OPTIONS = [1, 2, 3, 4, 5] as const;
 const GUIDE_COLOR_OPTIONS = [
   { label: "흰색", value: DEFAULT_GUIDE_COLOR },
   { label: "노랑", value: "#F5D76E" },
@@ -199,17 +198,6 @@ const EDITOR_TABS: { label: string; value: EditorTab }[] = [
   { label: "내보내기", value: "export" }
 ];
 
-const getDefaultRenderServerUrl = () => {
-  if (process.env.EXPO_PUBLIC_RENDER_SERVER_URL) {
-    return process.env.EXPO_PUBLIC_RENDER_SERVER_URL;
-  }
-
-  const hostUri = Constants.expoConfig?.hostUri;
-  const host = hostUri?.split(":")[0];
-  return host ? `http://${host}:4321` : "http://localhost:4321";
-};
-
-const defaultRenderServerUrl = getDefaultRenderServerUrl();
 const VIEW_RECORDER_FPS = 24;
 const RECORDING_VIEW_WIDTH = 360;
 
@@ -363,6 +351,7 @@ export default function TripClipScreen() {
   const [previewGuide, setPreviewGuide] = useState<GuideType>("circle");
   const [previewGuideSize, setPreviewGuideSize] = useState(44);
   const [previewGuideSizeInput, setPreviewGuideSizeInput] = useState("44");
+  const [previewGuideStrokeWidth, setPreviewGuideStrokeWidth] = useState(1);
   const [previewGuideColor, setPreviewGuideColor] = useState<string>(
     GUIDE_COLOR_OPTIONS[0].value
   );
@@ -371,7 +360,6 @@ export default function TripClipScreen() {
   const [isImportingPhotos, setIsImportingPhotos] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [, setIsMusicPreviewing] = useState(false);
-  const [renderServerUrl] = useState(defaultRenderServerUrl);
   const [exportFormat, setExportFormat] = useState<ExportFormat>("images");
   const [imageSaveFormat, setImageSaveFormat] =
     useState<ImageSaveFormat>("original");
@@ -517,6 +505,7 @@ export default function TripClipScreen() {
     setPreviewGuideVisible(settings.guideVisible);
     setPreviewGuideSize(settings.guideSize);
     setPreviewGuideSizeInput(String(settings.guideSize));
+    setPreviewGuideStrokeWidth(settings.guideStrokeWidth);
     setPreviewGuideColor(settings.guideColor);
     setCloudBackupEnabled(settings.cloudBackupEnabled);
 
@@ -592,6 +581,21 @@ export default function TripClipScreen() {
   const updatePreviewGuideVisibility = (nextVisible: boolean) => {
     setPreviewGuideVisible(nextVisible);
     void updateAppSettings({ guideVisible: nextVisible });
+  };
+
+  const updatePreviewGuideStrokeWidth = (nextStrokeWidth: number) => {
+    const clampedStrokeWidth = Math.round(
+      Math.max(
+        GUIDE_STROKE_WIDTH_MIN,
+        Math.min(GUIDE_STROKE_WIDTH_MAX, nextStrokeWidth)
+      )
+    );
+    setPreviewGuideStrokeWidth(clampedStrokeWidth);
+    setPreviewGuideVisible(true);
+    void updateAppSettings({
+      guideStrokeWidth: clampedStrokeWidth,
+      guideVisible: true
+    });
   };
 
   const updatePreviewGuideColor = (nextColor: string) => {
@@ -1050,58 +1054,30 @@ export default function TripClipScreen() {
       return null;
     }
 
-    if (Platform.OS !== "web") {
-      try {
-        const localUri = await recordTripClipVideo(onProgress);
-        setRenderedVideoUri(localUri);
-        return localUri;
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error ?? "");
-
-        if (
-          message.includes("Native module not linked") ||
-          message.includes("ViewRecorder") ||
-          message.includes("TurboModule")
-        ) {
-          throw new Error(
-            "react-native-view-recorder가 현재 앱에 연결되지 않았습니다. EAS Android 개발 빌드를 설치한 뒤 다시 실행해 주세요."
-          );
-        }
-
-        throw error;
-      }
-    }
-
-    if (!renderServerUrl.trim()) {
-      setExportMessage("영상 저장 준비가 완료되지 않았습니다.");
+    if (Platform.OS === "web") {
+      setIsExportComingSoonVisible(true);
       return null;
     }
 
-    setExportMessage("사진과 음악을 영상으로 만드는 중입니다.");
-    onProgress?.(25, "사진과 음악을 렌더 서버로 보내고 있습니다.");
-    setRenderedVideoUri(null);
+    try {
+      const localUri = await recordTripClipVideo(onProgress);
+      setRenderedVideoUri(localUri);
+      return localUri;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error ?? "");
 
-    const renderResult = await requestTripClipRender(renderServerUrl.trim(), {
-      ratio,
-      template,
-      transition,
-      transitionDuration,
-      musicId: musicMode === "device" && customMusic ? "custom" : "none",
-      customMusic: musicMode === "device" ? customMusic ?? undefined : undefined,
-      volume,
-      frames: selectedPhotos.map((photo, index) => ({
-        photo,
-        duration: getFrameDuration(photo.id, index)
-      }))
-    });
+      if (
+        message.includes("Native module not linked") ||
+        message.includes("ViewRecorder") ||
+        message.includes("TurboModule")
+      ) {
+        throw new Error(
+          "react-native-view-recorder가 현재 앱에 연결되지 않았습니다. EAS Android 개발 빌드를 설치한 뒤 다시 실행해 주세요."
+        );
+      }
 
-    onProgress?.(75, "완성된 영상을 핸드폰으로 가져오고 있습니다.");
-    const localUri = await downloadRenderedVideo(
-      renderResult.videoUrl,
-      renderResult.fileName
-    );
-    setRenderedVideoUri(localUri);
-    return localUri;
+      throw error;
+    }
   };
 
   const saveSelectedExport = async () => {
@@ -1165,7 +1141,7 @@ export default function TripClipScreen() {
   }: {
     countWeeklyMp4?: boolean;
   } = {}) => {
-    if (exportFormat === "mp4" && Platform.OS === "web" && !DIRECT_EXPORT_ENABLED) {
+    if (exportFormat === "mp4" && Platform.OS === "web") {
       setIsExportComingSoonVisible(true);
       return;
     }
@@ -1402,7 +1378,7 @@ export default function TripClipScreen() {
         return;
       }
 
-      if (Platform.OS === "web" && !DIRECT_EXPORT_ENABLED) {
+      if (Platform.OS === "web") {
         setIsExportComingSoonVisible(true);
         return;
       }
@@ -1491,6 +1467,7 @@ export default function TripClipScreen() {
                 guideVisible={previewGuideVisible}
                 guide={previewGuide}
                 guideSize={previewGuideSize}
+                guideStrokeWidth={previewGuideStrokeWidth}
                 guideColor={previewGuideColor}
               />
               <Pressable
@@ -1750,7 +1727,7 @@ export default function TripClipScreen() {
             </Text>
             <Text selectable style={styles.guideSummaryValue}>
               {previewGuideVisible ? "표시 중" : "숨김"} / {GUIDE_LABELS[previewGuide]} /{" "}
-              {previewGuideSize}
+              {previewGuideSize} / {previewGuideStrokeWidth}px
             </Text>
           </View>
           <Pressable
@@ -1816,6 +1793,20 @@ export default function TripClipScreen() {
             onSubmitEditing={commitPreviewGuideSizeInput}
           />
         </View>
+
+        <Text selectable style={styles.settingLabel}>
+          선 두께
+        </Text>
+        <OptionRow>
+          {GUIDE_STROKE_WIDTH_OPTIONS.map((strokeWidth) => (
+            <Chip
+              key={strokeWidth}
+              label={`${strokeWidth}px`}
+              active={previewGuideStrokeWidth === strokeWidth}
+              onPress={() => updatePreviewGuideStrokeWidth(strokeWidth)}
+            />
+          ))}
+        </OptionRow>
 
         <Text selectable style={styles.settingLabel}>
           색상
@@ -2081,7 +2072,7 @@ export default function TripClipScreen() {
               onPress={saveSelectedExport}
             >
               <Text selectable={false} style={styles.primaryButtonText}>
-                {exportFormat === "mp4" && Platform.OS === "web" && !DIRECT_EXPORT_ENABLED
+                {exportFormat === "mp4" && Platform.OS === "web"
                   ? "준비중"
                   : isExporting
                     ? "저장 중"

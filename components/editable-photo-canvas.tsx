@@ -27,6 +27,7 @@ type EditablePhotoCanvasProps = {
   guide: GuideType;
   guideVisible: boolean;
   guideSize: number;
+  guideStrokeWidth: number;
   guideColor: string;
 };
 
@@ -50,6 +51,7 @@ const ratioValue: Record<PhotoRatioLabel, number | null> = {
 };
 
 const SNAPSHOT_MAX_EDGE = 1800;
+const PREVIEW_FRAME_FILL_RATIO = 0.9;
 
 const waitForPaint = () =>
   new Promise<void>((resolve) => {
@@ -108,14 +110,16 @@ const getRatioAspect = (ratio: PhotoRatioLabel, originalAspectRatio?: number) =>
 const getContainedFrameSize = ({
   containerWidth,
   containerHeight,
-  aspectRatio
+  aspectRatio,
+  fillRatio = 1
 }: {
   containerWidth: number;
   containerHeight: number;
   aspectRatio: number;
+  fillRatio?: number;
 }) => {
-  const maxWidth = Math.max(1, containerWidth - 28);
-  const maxHeight = Math.max(1, containerHeight - 28);
+  const maxWidth = Math.max(1, Math.round((containerWidth - 28) * fillRatio));
+  const maxHeight = Math.max(1, Math.round((containerHeight - 28) * fillRatio));
   const containerAspectRatio = maxWidth / maxHeight;
 
   if (containerAspectRatio > aspectRatio) {
@@ -131,6 +135,52 @@ const getContainedFrameSize = ({
   };
 };
 
+const getCoverImageSize = ({
+  frameWidth,
+  frameHeight,
+  imageAspectRatio
+}: {
+  frameWidth: number;
+  frameHeight: number;
+  imageAspectRatio?: number;
+}) => {
+  if (!frameWidth || !frameHeight || !imageAspectRatio) {
+    return {
+      width: Math.max(1, frameWidth),
+      height: Math.max(1, frameHeight)
+    };
+  }
+
+  const frameAspectRatio = frameWidth / frameHeight;
+
+  if (imageAspectRatio > frameAspectRatio) {
+    return {
+      width: Math.round(frameHeight * imageAspectRatio),
+      height: frameHeight
+    };
+  }
+
+  return {
+    width: frameWidth,
+    height: Math.round(frameWidth / imageAspectRatio)
+  };
+};
+
+const getPreviewSurfaceSize = ({
+  frameWidth,
+  frameHeight,
+  imageWidth,
+  imageHeight
+}: {
+  frameWidth: number;
+  frameHeight: number;
+  imageWidth: number;
+  imageHeight: number;
+}) => ({
+  width: Math.max(frameWidth, imageWidth),
+  height: Math.max(frameHeight, imageHeight)
+});
+
 export const EditablePhotoCanvas = forwardRef<
   EditablePhotoCanvasHandle,
   EditablePhotoCanvasProps
@@ -143,6 +193,7 @@ export const EditablePhotoCanvas = forwardRef<
   guide,
   guideVisible,
   guideSize,
+  guideStrokeWidth,
   guideColor
 }, ref) {
   const recorder = useOptionalViewRecorder();
@@ -166,36 +217,17 @@ export const EditablePhotoCanvas = forwardRef<
     rotation.value = 0;
   }, [rotation, scale, translateX, translateY]);
 
-  const getCoverScale = useCallback(() => {
-    if (!frameSize.width || !frameSize.height || !originalAspectRatio) {
-      return 1;
-    }
-
-    const frameAspectRatio = frameSize.width / frameSize.height;
-    const normalizedRotation = Math.abs(rotation.value % Math.PI);
-    const isQuarterTurn = Math.abs(normalizedRotation - Math.PI / 2) < 0.01;
-    const imageAspectRatio = isQuarterTurn
-      ? 1 / originalAspectRatio
-      : originalAspectRatio;
-
-    if (imageAspectRatio > frameAspectRatio) {
-      return imageAspectRatio / frameAspectRatio;
-    }
-
-    return frameAspectRatio / imageAspectRatio;
-  }, [frameSize.height, frameSize.width, originalAspectRatio, rotation]);
-
   const fillFrame = useCallback(() => {
     translateX.value = 0;
     translateY.value = 0;
-    scale.value = Math.max(1, getCoverScale());
-  }, [getCoverScale, scale, translateX, translateY]);
+    scale.value = 1;
+  }, [scale, translateX, translateY]);
 
   const applyTransform = useCallback(
     (transform: PhotoEditTransform) => {
       translateX.value = transform.translateX;
       translateY.value = transform.translateY;
-      scale.value = transform.scale;
+      scale.value = Math.max(1, transform.scale);
       rotation.value = transform.rotation;
     },
     [rotation, scale, translateX, translateY]
@@ -288,7 +320,7 @@ export const EditablePhotoCanvas = forwardRef<
       startScale.value = scale.value;
     })
     .onUpdate((event) => {
-      scale.value = Math.max(0.35, Math.min(5, startScale.value * event.scale));
+      scale.value = Math.max(1, Math.min(5, startScale.value * event.scale));
     });
 
   const rotate = Gesture.Rotation()
@@ -311,32 +343,7 @@ export const EditablePhotoCanvas = forwardRef<
   }));
 
   const frameAspectRatio = getRatioAspect(ratio, originalAspectRatio);
-  const frameContent = (
-    <>
-        {uri ? (
-          <GestureDetector gesture={composedGesture}>
-            <AnimatedImage
-              source={{ uri }}
-              style={[styles.image, imageStyle]}
-              contentFit="contain"
-            />
-          </GestureDetector>
-        ) : (
-          <View style={styles.emptyFrame} />
-        )}
-
-        {!isCapturingSnapshot ? (
-          <CameraGuideOverlay
-            guide={guide}
-            visible={guideVisible}
-            size={guideSize}
-            color={guideColor}
-            aspectRatio={frameAspectRatio}
-          />
-        ) : null}
-    </>
-  );
-  const containedFrameSize =
+  const captureFrameSize =
     stageSize.width && stageSize.height
       ? getContainedFrameSize({
           containerWidth: stageSize.width,
@@ -344,6 +351,17 @@ export const EditablePhotoCanvas = forwardRef<
           aspectRatio: frameAspectRatio
         })
       : null;
+  const previewFrameSize =
+    stageSize.width && stageSize.height
+      ? getContainedFrameSize({
+          containerWidth: stageSize.width,
+          containerHeight: stageSize.height,
+          aspectRatio: frameAspectRatio,
+          fillRatio: PREVIEW_FRAME_FILL_RATIO
+        })
+      : null;
+  const containedFrameSize = isCapturingSnapshot ? captureFrameSize : previewFrameSize;
+  const activeFrameSize = containedFrameSize ?? frameSize;
   const frameStyle = [
     styles.frame,
     isCapturingSnapshot && styles.frameCapturing,
@@ -351,6 +369,51 @@ export const EditablePhotoCanvas = forwardRef<
       width: "100%" as const,
       aspectRatio: frameAspectRatio
     }
+  ];
+  const imageDisplaySize = getCoverImageSize({
+    frameWidth: activeFrameSize.width,
+    frameHeight: activeFrameSize.height,
+    imageAspectRatio: originalAspectRatio
+  });
+  const imageLayoutStyle =
+    activeFrameSize.width && activeFrameSize.height
+      ? {
+          width: imageDisplaySize.width,
+          height: imageDisplaySize.height,
+          left: Math.round((activeFrameSize.width - imageDisplaySize.width) / 2),
+          top: Math.round((activeFrameSize.height - imageDisplaySize.height) / 2)
+        }
+      : {
+          width: "100%" as const,
+          height: "100%" as const,
+          left: 0,
+          top: 0
+        };
+  const previewSurfaceSize =
+    containedFrameSize && activeFrameSize.width && activeFrameSize.height
+      ? getPreviewSurfaceSize({
+          frameWidth: activeFrameSize.width,
+          frameHeight: activeFrameSize.height,
+          imageWidth: imageDisplaySize.width,
+          imageHeight: imageDisplaySize.height
+        })
+      : null;
+  const frameOffset = previewSurfaceSize
+    ? {
+        left: Math.round((previewSurfaceSize.width - activeFrameSize.width) / 2),
+        top: Math.round((previewSurfaceSize.height - activeFrameSize.height) / 2)
+      }
+    : { left: 0, top: 0 };
+  const editableFrameStyle = [
+    frameStyle,
+    styles.framePreview,
+    previewSurfaceSize
+      ? {
+          position: "absolute" as const,
+          left: frameOffset.left,
+          top: frameOffset.top
+        }
+      : null
   ];
   const handleStageLayout = (event: {
     nativeEvent: { layout: { width: number; height: number } };
@@ -371,6 +434,119 @@ export const EditablePhotoCanvas = forwardRef<
     });
   };
 
+  if (!isCapturingSnapshot) {
+    return (
+      <View style={styles.stage} onLayout={handleStageLayout}>
+        <GestureDetector gesture={composedGesture}>
+          <View
+            style={[
+              styles.previewSurface,
+              previewSurfaceSize ?? containedFrameSize ?? {
+                width: "100%",
+                aspectRatio: frameAspectRatio
+              }
+            ]}
+          >
+            <View style={editableFrameStyle} onLayout={handleFrameLayout}>
+              {uri ? (
+                <AnimatedImage
+                  source={{ uri }}
+                  style={[styles.image, imageLayoutStyle, imageStyle]}
+                  contentFit="cover"
+                />
+              ) : (
+                <View style={styles.emptyFrame} />
+              )}
+
+              <CameraGuideOverlay
+                guide={guide}
+                visible={guideVisible}
+                size={guideSize}
+                strokeWidth={guideStrokeWidth}
+                color={guideColor}
+                aspectRatio={frameAspectRatio}
+              />
+            </View>
+
+            {previewSurfaceSize ? (
+              <>
+                <View
+                  pointerEvents="none"
+                  style={[
+                    styles.cropMask,
+                    {
+                      left: 0,
+                      top: 0,
+                      width: previewSurfaceSize.width,
+                      height: frameOffset.top
+                    }
+                  ]}
+                />
+                <View
+                  pointerEvents="none"
+                  style={[
+                    styles.cropMask,
+                    {
+                      left: 0,
+                      top: frameOffset.top + activeFrameSize.height,
+                      width: previewSurfaceSize.width,
+                      height: Math.max(
+                        0,
+                        previewSurfaceSize.height - frameOffset.top - activeFrameSize.height
+                      )
+                    }
+                  ]}
+                />
+                <View
+                  pointerEvents="none"
+                  style={[
+                    styles.cropMask,
+                    {
+                      left: 0,
+                      top: frameOffset.top,
+                      width: frameOffset.left,
+                      height: activeFrameSize.height
+                    }
+                  ]}
+                />
+                <View
+                  pointerEvents="none"
+                  style={[
+                    styles.cropMask,
+                    {
+                      left: frameOffset.left + activeFrameSize.width,
+                      top: frameOffset.top,
+                      width: Math.max(
+                        0,
+                        previewSurfaceSize.width - frameOffset.left - activeFrameSize.width
+                      ),
+                      height: activeFrameSize.height
+                    }
+                  ]}
+                />
+              </>
+            ) : null}
+
+            {previewSurfaceSize ? (
+              <View
+                pointerEvents="none"
+                style={[
+                  styles.cropBorder,
+                  {
+                    width: activeFrameSize.width,
+                    height: activeFrameSize.height,
+                    left: frameOffset.left,
+                    top: frameOffset.top
+                  }
+                ]}
+              />
+            ) : null}
+          </View>
+        </GestureDetector>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.stage} onLayout={handleStageLayout}>
       <OptionalRecordingView
@@ -379,7 +555,15 @@ export const EditablePhotoCanvas = forwardRef<
         style={frameStyle}
         onLayout={handleFrameLayout}
       >
-        {frameContent}
+        {uri ? (
+          <AnimatedImage
+            source={{ uri }}
+            style={[styles.image, imageLayoutStyle, imageStyle]}
+            contentFit="cover"
+          />
+        ) : (
+          <View style={styles.emptyFrame} />
+        )}
       </OptionalRecordingView>
     </View>
   );
@@ -393,18 +577,43 @@ const styles = StyleSheet.create({
     padding: 14,
     backgroundColor: colors.ink
   },
+  previewSurface: {
+    position: "relative",
+    overflow: "hidden",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#050505"
+  },
   frame: {
     overflow: "hidden",
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.32)",
     backgroundColor: colors.text
   },
+  framePreview: {
+    overflow: "visible",
+    borderWidth: 0,
+    backgroundColor: "transparent"
+  },
   frameCapturing: {
     borderWidth: 0
   },
   image: {
-    width: "100%",
-    height: "100%"
+    position: "absolute"
+  },
+  cropMask: {
+    position: "absolute",
+    backgroundColor: "rgba(0, 0, 0, 0.62)"
+  },
+  cropBorder: {
+    position: "absolute",
+    borderWidth: 2,
+    borderColor: "rgba(255, 255, 255, 0.96)",
+    shadowColor: "#000000",
+    shadowOpacity: 0.45,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 6
   },
   emptyFrame: {
     flex: 1,

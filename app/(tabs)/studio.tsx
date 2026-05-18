@@ -16,7 +16,7 @@ import type { PhotoItem } from "@/types/photo";
 import type { MadeVideoItem } from "@/types/video";
 import type { ImageBundleWorkItem } from "@/types/work";
 
-type StudioTab = "photos" | "edit" | "works";
+type StudioTab = "photos" | "videos" | "works";
 type PageSize = 6 | 10 | 20;
 type StudioWorkItem =
   | { kind: "single-image"; item: PhotoItem; createdAt: string }
@@ -25,7 +25,7 @@ type StudioWorkItem =
 
 const tabs: { label: string; value: StudioTab }[] = [
   { label: "사진", value: "photos" },
-  { label: "편집", value: "edit" },
+  { label: "동영상", value: "videos" },
   { label: "작업물", value: "works" }
 ];
 
@@ -79,12 +79,12 @@ export default function StudioScreen() {
   );
 
   useEffect(() => {
-    if (tab === "photos" || tab === "edit" || tab === "works") {
+    if (tab === "photos" || tab === "videos" || tab === "works") {
       setActiveTab(tab);
     }
 
-    if (tab === "videos") {
-      setActiveTab("works");
+    if (tab === "edit") {
+      setActiveTab("videos");
     }
   }, [tab]);
 
@@ -196,6 +196,7 @@ export default function StudioScreen() {
   }));
   const workCount =
     singleImageWorks.length + imageBundleWorks.length + videoWorks.length;
+  const videoWorkCount = imageBundleWorks.length + videoWorks.length;
   const isDark = palette.background !== colors.background;
   const filledButtonStyle = {
     borderColor: palette.text,
@@ -300,7 +301,7 @@ export default function StudioScreen() {
         </>
       ) : null}
 
-      {activeTab === "edit" ? (
+      {activeTab === "videos" ? (
         <>
           <SectionBlock title="영상 만들기">
             <Pressable
@@ -323,25 +324,41 @@ export default function StudioScreen() {
             </Pressable>
           </SectionBlock>
 
-          <SectionBlock title="편집한 사진">
-            {isLoading ? (
+          {isLoading ? (
+            <SectionBlock title="동영상 작업">
               <LoadingState />
-            ) : editedPhotos.length > 0 ? (
-              <PaginatedPhotoGrid
-                items={editedPhotos}
-                page={pages.editedPhotos ?? 0}
+            </SectionBlock>
+          ) : videoWorkCount > 0 ? (
+            <>
+              <WorkSection
+                title="영상 만들기 작업"
+                emptyDetail="영상 만들기에서 저장한 이미지 작업이 이곳에 표시됩니다."
+                items={imageBundleWorks}
+                page={pages.videoImageBundles ?? 0}
                 pageSize={pageSize}
                 router={router}
-                onDeletePhoto={confirmDeletePhoto}
-                onPageChange={(page) => setSectionPage("editedPhotos", page)}
+                onDeleteWork={confirmDeleteWork}
+                onPageChange={(page) => setSectionPage("videoImageBundles", page)}
               />
-            ) : (
+              <WorkSection
+                title="저장한 영상"
+                emptyDetail="여행 클립을 저장하면 이곳에 표시됩니다."
+                items={videoWorks}
+                page={pages.videoWorks ?? 0}
+                pageSize={pageSize}
+                router={router}
+                onDeleteWork={confirmDeleteWork}
+                onPageChange={(page) => setSectionPage("videoWorks", page)}
+              />
+            </>
+          ) : (
+            <SectionBlock title="동영상 작업">
               <EmptyState
-                title="아직 편집한 사진이 없습니다."
-                detail="촬영 사진을 선택해 구도와 비율을 먼저 정리해 주세요."
+                title="아직 동영상 작업물이 없습니다."
+                detail="영상 만들기에서 사진을 선택하고 저장하면 이곳에 표시됩니다."
               />
-            )}
-          </SectionBlock>
+            </SectionBlock>
+          )}
         </>
       ) : null}
 

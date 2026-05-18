@@ -107,6 +107,7 @@
         "react-native-google-mobile-ads",
         {
           "androidAppId": "ca-app-pub-3239289311207399~9959086380",
+          "iosAppId": "ca-app-pub-3940256099942544~1458002511",
           "optimizeInitialization": true,
           "optimizeAdLoading": true
         }
@@ -116,7 +117,8 @@
       "typedRoutes": true
     },
     "react-native-google-mobile-ads": {
-      "android_app_id": "ca-app-pub-3239289311207399~9959086380"
+      "android_app_id": "ca-app-pub-3239289311207399~9959086380",
+      "ios_app_id": "ca-app-pub-3940256099942544~1458002511"
     },
     "extra": {
       "router": {},

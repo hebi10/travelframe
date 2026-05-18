@@ -13,12 +13,15 @@ export type ScreenLayout = "compact" | "balanced" | "comfortable";
 
 export const GUIDE_SIZE_MIN = 24;
 export const GUIDE_SIZE_MAX = 86;
+export const GUIDE_STROKE_WIDTH_MIN = 1;
+export const GUIDE_STROKE_WIDTH_MAX = 5;
 export const DEFAULT_GUIDE_COLOR = "rgba(255, 255, 255, 0.78)";
 
 export type AppSettings = {
   defaultGuide: GuideType;
   guideVisible: boolean;
   guideSize: number;
+  guideStrokeWidth: number;
   guideColor: string;
   overlayOpacity: number;
   defaultRatio: TripClipRatio;
@@ -34,6 +37,7 @@ export const defaultAppSettings: AppSettings = {
   defaultGuide: "circle",
   guideVisible: true,
   guideSize: 44,
+  guideStrokeWidth: 1,
   guideColor: DEFAULT_GUIDE_COLOR,
   overlayOpacity: 0.4,
   defaultRatio: "9:16",
@@ -61,6 +65,17 @@ const clampGuideSize = (value: unknown) => {
   return Math.round(Math.max(GUIDE_SIZE_MIN, Math.min(GUIDE_SIZE_MAX, parsedValue)));
 };
 
+const clampGuideStrokeWidth = (value: unknown) => {
+  const parsedValue = Number(value);
+  if (!Number.isFinite(parsedValue)) {
+    return defaultAppSettings.guideStrokeWidth;
+  }
+
+  return Math.round(
+    Math.max(GUIDE_STROKE_WIDTH_MIN, Math.min(GUIDE_STROKE_WIDTH_MAX, parsedValue))
+  );
+};
+
 const normalizeSettings = (value: Partial<AppSettings> | null): AppSettings => {
   const nextSettings = {
     ...defaultAppSettings,
@@ -74,6 +89,7 @@ const normalizeSettings = (value: Partial<AppSettings> | null): AppSettings => {
         ? nextSettings.guideVisible
         : defaultAppSettings.guideVisible,
     guideSize: clampGuideSize(nextSettings.guideSize),
+    guideStrokeWidth: clampGuideStrokeWidth(nextSettings.guideStrokeWidth),
     guideColor:
       typeof nextSettings.guideColor === "string" && nextSettings.guideColor.trim()
         ? nextSettings.guideColor

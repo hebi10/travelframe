@@ -28,6 +28,7 @@ type TripClipPreviewPlayerProps = {
   guideVisible: boolean;
   guide: GuideType;
   guideSize: number;
+  guideStrokeWidth: number;
   guideColor: string;
 };
 
@@ -48,6 +49,7 @@ export function TripClipPreviewPlayer({
   guideVisible,
   guide,
   guideSize,
+  guideStrokeWidth,
   guideColor
 }: TripClipPreviewPlayerProps) {
   const isFilm = template === "film-log";
@@ -258,6 +260,7 @@ export function TripClipPreviewPlayer({
         guide={guide}
         visible={guideVisible}
         size={guideSize}
+        strokeWidth={guideStrokeWidth}
         color={guideColor}
       />
     </View>

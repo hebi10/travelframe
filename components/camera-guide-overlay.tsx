@@ -7,6 +7,7 @@ type CameraGuideOverlayProps = {
   visible: boolean;
   color?: string;
   size?: number;
+  strokeWidth?: number;
   aspectRatio?: number;
 };
 
@@ -15,6 +16,7 @@ export function CameraGuideOverlay({
   visible,
   color = "rgba(255, 255, 255, 0.72)",
   size = 44,
+  strokeWidth = 1,
   aspectRatio = 1
 }: CameraGuideOverlayProps) {
   if (!visible) {
@@ -22,6 +24,7 @@ export function CameraGuideOverlay({
   }
 
   const safeSize = Math.max(24, Math.min(86, size));
+  const safeStrokeWidth = Math.max(1, Math.min(5, Math.round(strokeWidth)));
   const safeAspectRatio =
     Number.isFinite(aspectRatio) && aspectRatio > 0 ? aspectRatio : 1;
   const inset = `${(100 - safeSize) / 2}%` as DimensionValue;
@@ -36,10 +39,21 @@ export function CameraGuideOverlay({
     bottom: inset
   };
   const guideLineStyle = {
-    backgroundColor: color
+    backgroundColor: color,
+    height: safeStrokeWidth
+  };
+  const verticalGuideLineStyle = {
+    backgroundColor: color,
+    width: safeStrokeWidth
   };
   const secondaryGuideLineStyle = {
     backgroundColor: color,
+    opacity: 0.45,
+    width: safeStrokeWidth
+  };
+  const secondaryHorizontalGuideLineStyle = {
+    backgroundColor: color,
+    height: safeStrokeWidth,
     opacity: 0.45
   };
   const gridFrameStyle =
@@ -56,7 +70,18 @@ export function CameraGuideOverlay({
   return (
     <View style={styles.overlay}>
       {guide === "dot" ? (
-        <View style={[styles.centerDot, { backgroundColor: color }]} />
+        <View
+          style={[
+            styles.centerDot,
+            {
+              backgroundColor: color,
+              width: (safeStrokeWidth + 3) * 2,
+              height: (safeStrokeWidth + 3) * 2,
+              marginLeft: -(safeStrokeWidth + 3),
+              marginTop: -(safeStrokeWidth + 3)
+            }
+          ]}
+        />
       ) : null}
       {guide === "circle" ? (
         <View
@@ -64,6 +89,7 @@ export function CameraGuideOverlay({
             styles.centerCircle,
             {
               width: guideWidth,
+              borderWidth: safeStrokeWidth,
               borderColor: color
             }
           ]}
@@ -76,7 +102,7 @@ export function CameraGuideOverlay({
             style={[
               styles.crossVertical,
               verticalLineLengthStyle,
-              guideLineStyle
+              verticalGuideLineStyle
             ]}
           />
         </>
@@ -89,14 +115,14 @@ export function CameraGuideOverlay({
             style={[
               styles.gridHorizontal,
               styles.gridHorizontalOne,
-              secondaryGuideLineStyle
+              secondaryHorizontalGuideLineStyle
             ]}
           />
           <View
             style={[
               styles.gridHorizontal,
               styles.gridHorizontalTwo,
-              secondaryGuideLineStyle
+              secondaryHorizontalGuideLineStyle
             ]}
           />
         </View>
