@@ -16,6 +16,7 @@ export type ThemeMode = "light" | "dark" | "system";
 export type FontStyle = "standard" | "compact" | "bold";
 export type FontSize = "small" | "medium" | "large";
 export type ScreenLayout = "compact" | "balanced" | "comfortable";
+export type CameraSaveScope = "app" | "device" | "both";
 
 export const GUIDE_SIZE_MIN = 24;
 export const GUIDE_SIZE_MAX = 86;
@@ -33,6 +34,7 @@ export type AppSettings = {
   guideOffsetY: number;
   overlayOpacity: number;
   cameraRatio: PhotoRatioLabel;
+  cameraSaveScope: CameraSaveScope;
   defaultRatio: TripClipRatio;
   exportQuality: ExportQuality;
   themeMode: ThemeMode;
@@ -53,6 +55,7 @@ export const defaultAppSettings: AppSettings = {
   guideOffsetY: 0,
   overlayOpacity: 0.4,
   cameraRatio: "Original",
+  cameraSaveScope: "app",
   defaultRatio: "9:16",
   exportQuality: "high",
   themeMode: "light",
@@ -70,6 +73,7 @@ const screenLayouts: ScreenLayout[] = ["compact", "balanced", "comfortable"];
 const exportQualities: ExportQuality[] = ["standard", "high", "max"];
 const imageBackupQualities = IMAGE_QUALITY_OPTIONS.map((option) => option.value);
 const cameraRatios: PhotoRatioLabel[] = ["Original", "1:1", "3:4", "4:5", "9:16", "16:9"];
+const cameraSaveScopes: CameraSaveScope[] = ["app", "device", "both"];
 const tripClipRatios: TripClipRatio[] = ["9:16", "4:5", "1:1", "16:9", "3:4"];
 
 const clampGuideSize = (value: unknown) => {
@@ -120,6 +124,9 @@ const normalizeSettings = (value: Partial<AppSettings> | null): AppSettings => {
     cameraRatio: cameraRatios.includes(nextSettings.cameraRatio)
       ? nextSettings.cameraRatio
       : defaultAppSettings.cameraRatio,
+    cameraSaveScope: cameraSaveScopes.includes(nextSettings.cameraSaveScope)
+      ? nextSettings.cameraSaveScope
+      : defaultAppSettings.cameraSaveScope,
     defaultRatio: tripClipRatios.includes(nextSettings.defaultRatio)
       ? nextSettings.defaultRatio
       : defaultAppSettings.defaultRatio,

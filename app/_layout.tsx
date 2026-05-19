@@ -21,7 +21,7 @@ function AppStack() {
         screenOptions={{
           headerLargeTitle: false,
           headerShadowVisible: false,
-          headerStyle: { backgroundColor: palette.background },
+          headerStyle: { backgroundColor: palette.chrome },
           headerTintColor: palette.text,
           headerTitleStyle: {
             fontSize: Math.round(14 * fontSizeScale),

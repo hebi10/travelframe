@@ -18,15 +18,16 @@ export type AppFontWeight = "700" | "800" | "900";
 
 const darkPalette: AppPalette = {
   background: "#0f0f0f",
+  chrome: "#000000",
   surface: "#171717",
-  surfaceStrong: "#222222",
-  text: "#f5f5f5",
-  muted: "#b8b8b8",
-  faint: "#777777",
-  line: "#2a2a2a",
-  darkLine: "#e5e5e5",
-  inverse: "#111111",
-  ink: "#ffffff"
+  surfaceStrong: "#202020",
+  text: "#eeeeee",
+  muted: "#d6d6d6",
+  faint: "#a8a8a8",
+  line: "#2d2d2d",
+  darkLine: "#777777",
+  inverse: "#0f0f0f",
+  ink: "#f2f2f2"
 };
 
 export const getEffectiveThemeMode = (

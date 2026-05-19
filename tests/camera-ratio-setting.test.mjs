@@ -30,6 +30,18 @@ for (const snippet of [
   assert.ok(cameraSource.includes(snippet), `camera ratio UI/wiring missing: ${snippet}`);
 }
 
+for (const snippet of [
+  "cameraSettingsScrollShell",
+  "cameraSettingsScrollHint",
+  "아래로 스크롤",
+  "showsVerticalScrollIndicator",
+  "persistentScrollbar",
+  "cameraSettingsBottomHint",
+  "cameraSettingsGrabber"
+]) {
+  assert.ok(cameraSource.includes(snippet), `camera settings scroll affordance missing: ${snippet}`);
+}
+
 for (const forbidden of [
   "cameraRatioMask",
   "selectedCameraRatioAspect",

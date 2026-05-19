@@ -5,6 +5,7 @@ import {
   Alert,
   Linking,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -245,6 +246,7 @@ export default function SettingsScreen() {
     isAuthLoading,
     isFirebaseReady,
     signIn,
+    signInWithGoogleIdToken,
     signUp,
     logOut,
     refreshUser
@@ -255,6 +257,7 @@ export default function SettingsScreen() {
   const [authPassword, setAuthPassword] = useState("");
   const [authMessage, setAuthMessage] = useState<string | null>(null);
   const [isAuthSubmitting, setIsAuthSubmitting] = useState(false);
+  const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false);
   const [showBackupConfirm, setShowBackupConfirm] = useState(false);
   const [showDeleteRequestInfo, setShowDeleteRequestInfo] = useState(false);
   const [guideExpanded, setGuideExpanded] = useState(false);
@@ -265,6 +268,9 @@ export default function SettingsScreen() {
   const [backupFailures, setBackupFailures] = useState<BackupFailureRecord[]>([]);
   const [backupOverview, setBackupOverview] =
     useState<CloudBackupOverview>(emptyBackupOverview);
+  const googleWebClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
+  const googleAndroidClientId = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;
+  const isGoogleReady = Boolean(googleWebClientId && googleAndroidClientId);
 
   const refreshBackupFailures = useCallback(async () => {
     setBackupFailures(await getBackupFailures());
@@ -734,6 +740,101 @@ export default function SettingsScreen() {
     }
   };
 
+  const handleGoogleSignIn = () => {
+    if (!isGoogleReady) {
+      setAuthMessage("Google 濡쒓렇???ㅼ젙媛믪쓣 ?뺤씤??二쇱꽭??");
+      return;
+    }
+
+    const runGoogleLogin = async () => {
+      setIsGoogleSubmitting(true);
+      setAuthMessage(null);
+
+      const AuthSession = await import("expo-auth-session");
+      const clientId = Platform.OS === "android" ? googleAndroidClientId! : googleWebClientId!;
+      const redirectUri =
+        Platform.OS === "android"
+          ? "com.haebi.photoguide:/oauthredirect"
+          : AuthSession.makeRedirectUri({
+              scheme: "photoguide",
+              path: "oauthredirect"
+            });
+      const discovery = {
+        authorizationEndpoint: "https://accounts.google.com/o/oauth2/v2/auth",
+        tokenEndpoint: "https://oauth2.googleapis.com/token"
+      };
+      console.log("[google-auth]", {
+        platform: Platform.OS,
+        clientId,
+        redirectUri
+      });
+      const request = new AuthSession.AuthRequest({
+        clientId,
+        responseType: AuthSession.ResponseType.Code,
+        redirectUri,
+        scopes: ["openid", "profile", "email"],
+        usePKCE: true,
+        extraParams: {
+          prompt: "select_account"
+        }
+      });
+      const result = await request.promptAsync(discovery);
+
+      if (result.type === "success") {
+        if (result.params.error) {
+          throw new Error(result.params.error_description ?? result.params.error);
+        }
+
+        const code = result.params.code;
+        if (!code) {
+          throw new Error("Google 濡쒓렇???뱀씤 肄붾뱶瑜?諛쏆? 紐삵뻽?듬땲??");
+        }
+
+        const token = await AuthSession.exchangeCodeAsync(
+          {
+            clientId,
+            code,
+            redirectUri,
+            scopes: ["openid", "profile", "email"],
+            extraParams: {
+              code_verifier: request.codeVerifier ?? ""
+            }
+          },
+          discovery
+        );
+        const idToken = token.idToken;
+        if (!idToken) {
+          throw new Error("Google 濡쒓렇???좏겙??諛쏆? 紐삵뻽?듬땲??");
+        }
+
+        await signInWithGoogleIdToken(idToken);
+        setAuthMessage("Google 怨꾩젙?쇰줈 濡쒓렇?명뻽?듬땲??");
+        return;
+      }
+
+      if (result.type === "cancel" || result.type === "dismiss") {
+        setAuthMessage("Google 濡쒓렇?몄쓣 痍⑥냼?덉뒿?덈떎.");
+        return;
+      }
+
+      throw new Error("Google 濡쒓렇??以?臾몄젣媛 諛쒖깮?덉뒿?덈떎.");
+    };
+
+    runGoogleLogin().catch((error) => {
+      setIsGoogleSubmitting(false);
+      const message = error instanceof Error ? error.message : String(error);
+      setAuthMessage(
+        message.includes("ExpoWebBrowser") ||
+          message.includes("native module") ||
+          message.includes("Cannot find native module")
+          ? "Google 濡쒓렇??紐⑤뱢???꾩옱 ??鍮뚮뱶???ы븿?섏? ?딆븯?듬땲?? Android 媛쒕컻 鍮뚮뱶瑜??ㅼ떆 留뚮뱺 ???쒕룄??二쇱꽭??"
+          : message
+      );
+    }).finally(() => {
+      setIsGoogleSubmitting(false);
+    });
+  };
+
   return (
     <>
       <ScreenShell
@@ -805,11 +906,11 @@ export default function SettingsScreen() {
                 />
                 <View style={styles.authActions}>
                   <Pressable
-                    disabled={isAuthLoading || isAuthSubmitting}
+                    disabled={isAuthLoading || isAuthSubmitting || isGoogleSubmitting}
                     style={[
                       styles.authPrimaryButton,
                       themed.activeFill,
-                      isAuthSubmitting && styles.disabledButton
+                      (isAuthSubmitting || isGoogleSubmitting) && styles.disabledButton
                     ]}
                     onPress={() => handleAuthAction("signIn")}
                   >
@@ -818,11 +919,11 @@ export default function SettingsScreen() {
                     </Text>
                   </Pressable>
                   <Pressable
-                    disabled={isAuthLoading || isAuthSubmitting}
+                    disabled={isAuthLoading || isAuthSubmitting || isGoogleSubmitting}
                     style={[
                       styles.authSecondaryButton,
                       themed.secondaryButton,
-                      isAuthSubmitting && styles.disabledButton
+                      (isAuthSubmitting || isGoogleSubmitting) && styles.disabledButton
                     ]}
                     onPress={() => handleAuthAction("signUp")}
                   >
@@ -831,6 +932,20 @@ export default function SettingsScreen() {
                     </Text>
                   </Pressable>
                 </View>
+                <Pressable
+                  disabled={isAuthLoading || isAuthSubmitting || isGoogleSubmitting}
+                  style={[
+                    styles.authSecondaryButton,
+                    styles.authGoogleButton,
+                    themed.secondaryButton,
+                    (isAuthSubmitting || isGoogleSubmitting) && styles.disabledButton
+                  ]}
+                  onPress={handleGoogleSignIn}
+                >
+                  <Text selectable={false} style={[styles.authSecondaryButtonText, themed.text]}>
+                    {isGoogleSubmitting ? "Google 로그인 중" : "Google로 계속하기"}
+                  </Text>
+                </Pressable>
               </View>
             ) : null}
 
@@ -1740,7 +1855,7 @@ const createThemedStyles = (palette: AppPalette) => {
     },
     activeFill: {
       borderColor: palette.text,
-      backgroundColor: isDark ? "transparent" : palette.text
+      backgroundColor: isDark ? palette.ink : palette.text
     },
     secondaryButton: {
       borderColor: palette.line,
@@ -1753,7 +1868,7 @@ const createThemedStyles = (palette: AppPalette) => {
     input: {
       borderColor: palette.line,
       color: palette.text,
-      backgroundColor: palette.background
+      backgroundColor: palette.surfaceStrong
     },
     text: {
       color: palette.text
@@ -1762,18 +1877,18 @@ const createThemedStyles = (palette: AppPalette) => {
       color: palette.muted
     },
     inverseText: {
-      color: isDark ? palette.text : palette.inverse
+      color: palette.inverse
     },
     inverseMutedText: {
-      color: isDark ? palette.text : palette.inverse
+      color: palette.inverse
     },
     optionMark: {
       borderColor: palette.faint,
       backgroundColor: "transparent"
     },
     optionMarkActive: {
-      borderColor: isDark ? palette.text : palette.inverse,
-      backgroundColor: isDark ? "transparent" : palette.inverse
+      borderColor: palette.inverse,
+      backgroundColor: palette.inverse
     }
   });
 };
@@ -2283,6 +2398,9 @@ const styles = StyleSheet.create({
     fontSize: typography.button,
     fontWeight: "900",
     letterSpacing: 0
+  },
+  authGoogleButton: {
+    flex: 0
   },
   disabledButton: {
     opacity: 0.45

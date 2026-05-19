@@ -2,9 +2,30 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const source = fs.readFileSync("app/(tabs)/camera.tsx", "utf8");
+const settingsSource = fs.readFileSync("lib/app-settings.ts", "utf8");
+const photoLibrarySource = fs.readFileSync("lib/photo-library.ts", "utf8");
+const tripClipExportSource = fs.readFileSync("lib/trip-clip-export.ts", "utf8");
 
 for (const snippet of [
-  "saveCapturedPhoto({",
+  'export type CameraSaveScope = "app" | "device" | "both"',
+  'cameraSaveScope: "app"',
+  "const cameraSaveScopes: CameraSaveScope[]",
+  "cameraSaveScopes.includes(nextSettings.cameraSaveScope)"
+]) {
+  assert.ok(settingsSource.includes(snippet), `camera save scope setting missing: ${snippet}`);
+}
+
+for (const snippet of [
+  "CAMERA_SAVE_SCOPE_OPTIONS",
+  'const [cameraSaveScope, setCameraSaveScope] = useState<CameraSaveScope>("app")',
+  "setCameraSaveScope(settings.cameraSaveScope)",
+  "const updateCameraSaveScope = (nextScope: CameraSaveScope)",
+  "void updateAppSettings({ cameraSaveScope: nextScope })",
+  "저장 범위",
+  'cameraSaveScope !== "device"',
+  'cameraSaveScope !== "app"',
+  "saveCapturedPhoto(captureInput)",
+  "saveCapturedPhotoToDevice(captureInput)",
   "ratioLabel: cameraRatio",
   "setRecentPhoto(savedPhoto)",
   "backupPhotoIfEnabled({",
@@ -12,6 +33,23 @@ for (const snippet of [
   "deleteLocalFile(photo.uri)"
 ]) {
   assert.ok(source.includes(snippet), `camera direct save flow missing: ${snippet}`);
+}
+
+for (const snippet of [
+  "saveCapturedPhotoToDevice",
+  "saveImageToLibrary(rendered.uri)",
+  "renderCapturedPhotoForSave({"
+]) {
+  assert.ok(photoLibrarySource.includes(snippet), `camera device save helper missing: ${snippet}`);
+}
+
+for (const snippet of [
+  "requestSavePermission",
+  "MediaLibrary.requestPermissionsAsync",
+  "if (!permission.granted)",
+  "핸드폰 앨범 저장 권한이 필요합니다."
+]) {
+  assert.ok(tripClipExportSource.includes(snippet), `media save permission request missing: ${snippet}`);
 }
 
 for (const forbidden of [

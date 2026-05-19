@@ -10,6 +10,7 @@ import type {
   SaveEditedPhotoInput
 } from "@/types/photo";
 import { getAppSettings, getExportQualityCompression } from "@/lib/app-settings";
+import { saveImageToLibrary } from "@/lib/trip-clip-export";
 
 const PHOTO_STORAGE_KEY = "travel-frame.photos.v1";
 const PHOTO_DIRECTORY = "photos/";
@@ -291,18 +292,14 @@ export const deleteLocalFile = async (uri?: string | null) => {
   await FileSystem.deleteAsync(uri, { idempotent: true });
 };
 
-export const saveCapturedPhoto = async ({
+const renderCapturedPhotoForSave = async ({
   uri,
   width,
   height,
   ratioLabel = "Original"
 }: SaveCapturedPhotoInput) => {
-  const id = createPhotoId();
   const shouldApplyRatio = ratioLabel !== "Original";
-  const extension = shouldApplyRatio ? "jpg" : getFileExtension(uri);
-  const directory = await ensurePhotoDirectory();
-  const destinationUri = `${directory}${id}.${extension}`;
-  const rendered = shouldApplyRatio
+  return shouldApplyRatio
     ? await renderEditedPhotoFromTransform({
         sourceUri: uri,
         width,
@@ -320,6 +317,37 @@ export const saveCapturedPhoto = async ({
         width: width ?? 0,
         height: height ?? 0
       };
+};
+
+export const saveCapturedPhotoToDevice = async (input: SaveCapturedPhotoInput) => {
+  const rendered = await renderCapturedPhotoForSave(input);
+
+  try {
+    return await saveImageToLibrary(rendered.uri);
+  } finally {
+    if (rendered.uri !== input.uri) {
+      await deleteLocalFile(rendered.uri);
+    }
+  }
+};
+
+export const saveCapturedPhoto = async ({
+  uri,
+  width,
+  height,
+  ratioLabel = "Original"
+}: SaveCapturedPhotoInput) => {
+  const id = createPhotoId();
+  const shouldApplyRatio = ratioLabel !== "Original";
+  const extension = shouldApplyRatio ? "jpg" : getFileExtension(uri);
+  const directory = await ensurePhotoDirectory();
+  const destinationUri = `${directory}${id}.${extension}`;
+  const rendered = await renderCapturedPhotoForSave({
+    uri,
+    width,
+    height,
+    ratioLabel
+  });
 
   await FileSystem.copyAsync({
     from: rendered.uri,

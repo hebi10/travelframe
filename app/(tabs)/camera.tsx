@@ -56,9 +56,15 @@ import {
   GUIDE_STROKE_WIDTH_MAX,
   GUIDE_STROKE_WIDTH_MIN,
   getAppSettings,
-  updateAppSettings
+  updateAppSettings,
+  type CameraSaveScope
 } from "@/lib/app-settings";
-import { deleteLocalFile, getRecentPhoto, saveCapturedPhoto } from "@/lib/photo-library";
+import {
+  deleteLocalFile,
+  getRecentPhoto,
+  saveCapturedPhoto,
+  saveCapturedPhotoToDevice
+} from "@/lib/photo-library";
 import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 import type { PhotoItem, PhotoRatioLabel } from "@/types/photo";
 
@@ -106,6 +112,12 @@ const CAMERA_RATIO_OPTIONS: { label: string; value: PhotoRatioLabel }[] = [
   { label: "4:5", value: "4:5" },
   { label: "9:16", value: "9:16" },
   { label: "16:9", value: "16:9" }
+];
+
+const CAMERA_SAVE_SCOPE_OPTIONS: { label: string; detail: string; value: CameraSaveScope }[] = [
+  { label: "앱", detail: "앱 사진 목록에만 저장", value: "app" },
+  { label: "핸드폰", detail: "핸드폰 앨범에만 저장", value: "device" },
+  { label: "앱, 핸드폰", detail: "앱과 앨범에 함께 저장", value: "both" }
 ];
 
 const cameraRatioAspect: Record<PhotoRatioLabel, number | null> = {
@@ -166,6 +178,7 @@ export default function CameraScreen() {
   const [hapticEnabled, setHapticEnabled] = useState(true);
   const [photoQuality, setPhotoQuality] = useState<CameraQualityValue>("high");
   const [cameraRatio, setCameraRatio] = useState<PhotoRatioLabel>("Original");
+  const [cameraSaveScope, setCameraSaveScope] = useState<CameraSaveScope>("app");
   const [cameraFacing, setCameraFacing] = useState<CameraType>("back");
   const [flashMode, setFlashMode] = useState<FlashMode>("off");
   const [torchEnabled, setTorchEnabled] = useState(false);
@@ -342,6 +355,7 @@ export default function CameraScreen() {
         guideOffsetYValue.value = settings.guideOffsetY;
         setOverlayOpacity(settings.overlayOpacity);
         setCameraRatio(settings.cameraRatio);
+        setCameraSaveScope(settings.cameraSaveScope);
         setRecentPhoto(latestPhoto);
       };
 
@@ -382,31 +396,42 @@ export default function CameraScreen() {
         exif: false,
         shutterSound: shutterSoundEnabled
       });
-      const savedPhoto = await saveCapturedPhoto({
+      const captureInput = {
         uri: photo.uri,
         width: photo.width,
         height: photo.height,
         ratioLabel: cameraRatio
-      });
+      };
+      let savedPhoto: PhotoItem | null = null;
+
+      if (cameraSaveScope !== "device") {
+        savedPhoto = await saveCapturedPhoto(captureInput);
+      }
+
+      if (cameraSaveScope !== "app") {
+        await saveCapturedPhotoToDevice(captureInput);
+      }
       if (__DEV__) {
         console.log("[camera] captured", {
           facing: cameraFacing,
+          cameraSaveScope,
           sourceUri: photo.uri,
           width: photo.width,
           height: photo.height,
-          savedUri: savedPhoto.uri,
-          previewUri: savedPhoto.previewUri
+          savedUri: savedPhoto?.uri,
+          previewUri: savedPhoto?.previewUri
         });
       }
-      setRecentPhoto(savedPhoto);
+      if (savedPhoto) {
+        setRecentPhoto(savedPhoto);
 
-      try {
+        try {
         await backupPhotoIfEnabled({
           user,
           subscription,
           photo: savedPhoto
         });
-      } catch (backupError) {
+        } catch (backupError) {
         console.error("촬영 사진 자동 백업에 실패했습니다.", backupError);
         await recordBackupFailure({
           id: savedPhoto.id,
@@ -417,6 +442,7 @@ export default function CameraScreen() {
             "클라우드 백업을 완료하지 못했습니다."
           )
         });
+        }
       }
 
       try {
@@ -511,6 +537,12 @@ export default function CameraScreen() {
   const updateCameraRatio = (nextRatio: PhotoRatioLabel) => {
     setCameraRatio(nextRatio);
     void updateAppSettings({ cameraRatio: nextRatio });
+    void triggerFeedback();
+  };
+
+  const updateCameraSaveScope = (nextScope: CameraSaveScope) => {
+    setCameraSaveScope(nextScope);
+    void updateAppSettings({ cameraSaveScope: nextScope });
     void triggerFeedback();
   };
 
@@ -950,40 +982,51 @@ export default function CameraScreen() {
               </Pressable>
             </View>
 
-            <ScrollView
-              style={styles.cameraSettingsScroll}
-              contentContainerStyle={styles.cameraSettingsContent}
-              showsVerticalScrollIndicator={false}
-            >
-              <View style={styles.cameraSettingBlock}>
-                <Text selectable={false} style={styles.modalSectionTitle}>
-                  카메라 방향
+            <View style={styles.cameraSettingsScrollShell}>
+              <View pointerEvents="none" style={styles.cameraSettingsScrollHint}>
+                <Text selectable={false} style={styles.cameraSettingsScrollHintText}>
+                  아래로 스크롤
                 </Text>
-                <View style={styles.optionRow}>
-                  {CAMERA_FACING_OPTIONS.map((option) => (
-                    <Pressable
-                      key={option.value}
-                      style={[
-                        styles.optionButton,
-                        cameraFacing === option.value && styles.optionButtonActive
-                      ]}
-                      onPress={() => changeCameraFacing(option.value)}
-                    >
-                      <Text
-                        selectable={false}
-                        style={[
-                          styles.optionButtonText,
-                          cameraFacing === option.value && styles.optionButtonTextActive
-                        ]}
-                      >
-                        {option.label}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
+                <Text selectable={false} style={styles.cameraSettingsScrollHintIcon}>
+                  ↓
+                </Text>
               </View>
 
-              <View style={styles.cameraSettingBlock}>
+              <ScrollView
+                style={styles.cameraSettingsScroll}
+                contentContainerStyle={styles.cameraSettingsContent}
+                showsVerticalScrollIndicator
+                persistentScrollbar
+              >
+                <View style={styles.cameraSettingBlock}>
+                  <Text selectable={false} style={styles.modalSectionTitle}>
+                    카메라 방향
+                  </Text>
+                  <View style={styles.optionRow}>
+                    {CAMERA_FACING_OPTIONS.map((option) => (
+                      <Pressable
+                        key={option.value}
+                        style={[
+                          styles.optionButton,
+                          cameraFacing === option.value && styles.optionButtonActive
+                        ]}
+                        onPress={() => changeCameraFacing(option.value)}
+                      >
+                        <Text
+                          selectable={false}
+                          style={[
+                            styles.optionButtonText,
+                            cameraFacing === option.value && styles.optionButtonTextActive
+                          ]}
+                        >
+                          {option.label}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                </View>
+
+                <View style={styles.cameraSettingBlock}>
                 <Text selectable={false} style={styles.modalSectionTitle}>
                   촬영 타이머
                 </Text>
@@ -1009,9 +1052,9 @@ export default function CameraScreen() {
                     </Pressable>
                   ))}
                 </View>
-              </View>
+                </View>
 
-              <View style={styles.cameraSettingBlock}>
+                <View style={styles.cameraSettingBlock}>
                 <Text selectable={false} style={styles.modalSectionTitle}>
                   조명
                 </Text>
@@ -1057,9 +1100,9 @@ export default function CameraScreen() {
                     {torchEnabled && cameraFacing === "back" ? "켜짐" : "꺼짐"}
                   </Text>
                 </Pressable>
-              </View>
+                </View>
 
-              <View style={styles.cameraSettingBlock}>
+                <View style={styles.cameraSettingBlock}>
                 <Text selectable={false} style={styles.modalSectionTitle}>
                   촬영 품질
                 </Text>
@@ -1085,9 +1128,9 @@ export default function CameraScreen() {
                     </Pressable>
                   ))}
                 </View>
-              </View>
+                </View>
 
-              <View style={styles.cameraSettingBlock}>
+                <View style={styles.cameraSettingBlock}>
                 <Text selectable={false} style={styles.modalSectionTitle}>
                   카메라 비율
                 </Text>
@@ -1116,9 +1159,40 @@ export default function CameraScreen() {
                 <Text selectable={false} style={styles.modalSectionDetail}>
                   촬영 원본은 유지하고, 사진 사용 시 선택한 비율로 저장합니다.
                 </Text>
-              </View>
+                </View>
 
-              <View style={styles.cameraSettingBlock}>
+                <View style={styles.cameraSettingBlock}>
+                  <Text selectable={false} style={styles.modalSectionTitle}>
+                    저장 범위
+                  </Text>
+                  <View style={styles.optionGrid}>
+                    {CAMERA_SAVE_SCOPE_OPTIONS.map((option) => (
+                      <Pressable
+                        key={option.value}
+                        style={[
+                          styles.optionButton,
+                          cameraSaveScope === option.value && styles.optionButtonActive
+                        ]}
+                        onPress={() => updateCameraSaveScope(option.value)}
+                      >
+                        <Text
+                          selectable={false}
+                          style={[
+                            styles.optionButtonText,
+                            cameraSaveScope === option.value && styles.optionButtonTextActive
+                          ]}
+                        >
+                          {option.label}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                  <Text selectable={false} style={styles.modalSectionDetail}>
+                    {CAMERA_SAVE_SCOPE_OPTIONS.find((option) => option.value === cameraSaveScope)?.detail}
+                  </Text>
+                </View>
+
+                <View style={styles.cameraSettingBlock}>
                 <Text selectable={false} style={styles.modalSectionTitle}>
                   촬영 보조
                 </Text>
@@ -1170,8 +1244,13 @@ export default function CameraScreen() {
                     {shutterSoundEnabled ? "켜짐" : "꺼짐"}
                   </Text>
                 </Pressable>
+                </View>
+              </ScrollView>
+
+              <View pointerEvents="none" style={styles.cameraSettingsBottomHint}>
+                <View style={styles.cameraSettingsGrabber} />
               </View>
-            </ScrollView>
+            </View>
           </View>
         </View>
       </Modal>
@@ -2071,13 +2150,57 @@ const styles = StyleSheet.create({
     borderColor: colors.darkLine,
     backgroundColor: colors.background
   },
+  cameraSettingsScrollShell: {
+    position: "relative",
+    gap: 10
+  },
+  cameraSettingsScrollHint: {
+    minHeight: 34,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.surface
+  },
+  cameraSettingsScrollHintText: {
+    color: colors.muted,
+    fontSize: typography.button,
+    fontWeight: "800",
+    letterSpacing: 0
+  },
+  cameraSettingsScrollHintIcon: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: "900",
+    lineHeight: 18,
+    letterSpacing: 0
+  },
   cameraSettingsScroll: {
     flexGrow: 0,
     maxHeight: 560
   },
   cameraSettingsContent: {
     gap: 18,
-    paddingBottom: 2
+    paddingBottom: 28
+  },
+  cameraSettingsBottomHint: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    minHeight: 24,
+    alignItems: "center",
+    justifyContent: "flex-end",
+    paddingBottom: 4,
+    backgroundColor: "rgba(255, 255, 255, 0.82)"
+  },
+  cameraSettingsGrabber: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.darkLine
   },
   guideSettingsScroll: {
     flexGrow: 0

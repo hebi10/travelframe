@@ -11,9 +11,8 @@ import {
   View
 } from "react-native";
 
-import { AdBanner } from "@/components/ad-banner";
 import { colors, controls, spacing, typography } from "@/constants/app-theme";
-import { deletePhoto, getPhotoById, togglePhotoForVideo } from "@/lib/photo-library";
+import { deletePhoto, getPhotoById } from "@/lib/photo-library";
 import { saveImageToLibrary } from "@/lib/trip-clip-export";
 import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 import type { PhotoItem } from "@/types/photo";
@@ -62,7 +61,6 @@ export default function PhotoDetailScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSavingToDevice, setIsSavingToDevice] = useState(false);
-  const [isTogglingVideo, setIsTogglingVideo] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
   const loadPhoto = useCallback(async () => {
@@ -124,25 +122,6 @@ export default function PhotoDetailScreen() {
     ]);
   };
 
-  const toggleVideoSelection = async () => {
-    if (!id || isTogglingVideo) {
-      return;
-    }
-
-    try {
-      setIsTogglingVideo(true);
-      setMessage(null);
-      const updatedPhoto = await togglePhotoForVideo(id);
-      if (updatedPhoto) {
-        setPhoto(updatedPhoto);
-      }
-    } catch (error) {
-      setMessage(getUserFacingErrorMessage(error, "여행 클립 상태를 바꾸지 못했습니다."));
-    } finally {
-      setIsTogglingVideo(false);
-    }
-  };
-
   if (isLoading) {
     return (
       <View style={styles.centerScreen}>
@@ -199,7 +178,6 @@ export default function PhotoDetailScreen() {
         <MetaRow label="비율" value={photo.ratioLabel} />
         <MetaRow label="크기" value={`${photo.width} x ${photo.height}`} />
         <MetaRow label="편집 여부" value={photo.edited ? "완료" : "원본"} />
-        <MetaRow label="여행 클립" value={photo.addedToVideo ? "추가됨" : "미추가"} />
       </View>
 
       <View style={styles.actions}>
@@ -221,23 +199,6 @@ export default function PhotoDetailScreen() {
           </Text>
         </Pressable>
         <Pressable
-          disabled={isTogglingVideo}
-          style={[styles.lightButton, isTogglingVideo && styles.disabledButton]}
-          onPress={toggleVideoSelection}
-        >
-          <Text selectable={false} style={styles.lightButtonText}>
-            {photo.addedToVideo ? "영상 만들기에서 제외" : "영상 만들기에 추가"}
-          </Text>
-        </Pressable>
-        <Pressable
-          style={styles.lightButton}
-          onPress={() => router.push("/trip-clip")}
-        >
-          <Text selectable={false} style={styles.lightButtonText}>
-            영상 만들기 열기
-          </Text>
-        </Pressable>
-        <Pressable
           disabled={isDeleting}
           style={[styles.deleteButton, isDeleting && styles.disabledButton]}
           onPress={confirmDelete}
@@ -252,7 +213,6 @@ export default function PhotoDetailScreen() {
           </Text>
         ) : null}
       </View>
-      <AdBanner placement="photo_detail" compact />
     </ScrollView>
   );
 }

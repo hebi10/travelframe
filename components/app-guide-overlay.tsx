@@ -1,5 +1,5 @@
 import { Image } from "expo-image";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import {
   type NativeScrollEvent,
   type NativeSyntheticEvent,
@@ -22,15 +22,6 @@ const guideVisualSlides = [
   require("@/assets/images/home-slide-video.png")
 ];
 
-const initialGuideVisualIndex: Record<AppGuideTabKey, number> = {
-  home: 0,
-  camera: 0,
-  studio: 1,
-  tripClip: 2,
-  account: 2,
-  settings: 1
-};
-
 type AppGuideOverlayProps = {
   tabKey: AppGuideTabKey;
   transparentBackdrop?: boolean;
@@ -45,9 +36,6 @@ export function AppGuideOverlay({
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const visualScrollerRef = useRef<ScrollView>(null);
-  const [activeVisualIndex, setActiveVisualIndex] = useState(
-    initialGuideVisualIndex[tabKey]
-  );
   const stageWidth = Math.min(width - 36, 750);
   const visualWidth = Math.max(1, stageWidth - 36);
   const {
@@ -57,20 +45,20 @@ export function AppGuideOverlay({
     totalSteps,
     canGoBack,
     goBack,
+    goToStep,
     goNext,
     skip
   } = useAppGuide(tabKey, replaySignal);
+  const activeVisualIndex = stepIndex;
 
   useEffect(() => {
-    const nextIndex = initialGuideVisualIndex[tabKey];
-    setActiveVisualIndex(nextIndex);
     requestAnimationFrame(() => {
       visualScrollerRef.current?.scrollTo({
-        x: nextIndex * visualWidth,
-        animated: false
+        x: activeVisualIndex * visualWidth,
+        animated: visible
       });
     });
-  }, [tabKey, visualWidth, visible]);
+  }, [activeVisualIndex, visualWidth, visible]);
 
   if (!step) {
     return null;
@@ -78,9 +66,7 @@ export function AppGuideOverlay({
 
   const handleVisualScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const nextIndex = Math.round(event.nativeEvent.contentOffset.x / visualWidth);
-    setActiveVisualIndex(
-      Math.max(0, Math.min(guideVisualSlides.length - 1, nextIndex))
-    );
+    goToStep(Math.max(0, Math.min(guideVisualSlides.length - 1, nextIndex)));
   };
 
   return (

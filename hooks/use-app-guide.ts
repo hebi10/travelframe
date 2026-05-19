@@ -70,6 +70,18 @@ export function useAppGuide(tabKey: AppGuideTabKey, replaySignal = 0) {
     });
   }, [finish, steps.length]);
 
+  const goToStep = useCallback(
+    (nextIndex: number) => {
+      if (steps.length <= 0) {
+        setStepIndex(0);
+        return;
+      }
+
+      setStepIndex(Math.max(0, Math.min(steps.length - 1, nextIndex)));
+    },
+    [steps.length]
+  );
+
   return {
     visible,
     step: steps[stepIndex] as AppGuideStep | undefined,
@@ -77,6 +89,7 @@ export function useAppGuide(tabKey: AppGuideTabKey, replaySignal = 0) {
     totalSteps: steps.length,
     canGoBack: stepIndex > 0,
     goBack,
+    goToStep,
     goNext,
     skip: finish
   };

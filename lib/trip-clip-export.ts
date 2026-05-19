@@ -49,7 +49,19 @@ const getMimeType = (uri: string) => {
   return "image/jpeg";
 };
 
-const requestSavePermission = async (_kind: MediaPermissionKind) => getMediaLibrary();
+const requestSavePermission = async (kind: MediaPermissionKind) => {
+  const MediaLibrary = await getMediaLibrary();
+  const permission =
+    Platform.OS === "android"
+      ? await MediaLibrary.requestPermissionsAsync(true, [kind])
+      : await MediaLibrary.requestPermissionsAsync(true);
+
+  if (!permission.granted) {
+    throw new Error("핸드폰 앨범 저장 권한이 필요합니다.");
+  }
+
+  return MediaLibrary;
+};
 
 const getAndroidExportDirectoryUri = async (parentDirectoryUri: string) => {
   try {

@@ -41,6 +41,28 @@ function Write-Utf8NoBom {
   [System.IO.File]::WriteAllText($Path, $Value, $encoding)
 }
 
+function Remove-DuplicateLauncherPngResources {
+  param([string]$ProjectRoot)
+
+  $resRoot = Join-Path $ProjectRoot "android\app\src\main\res"
+  if (-not (Test-Path -LiteralPath $resRoot)) {
+    return
+  }
+
+  $launcherPngs = Get-ChildItem -Path $resRoot -Recurse -File |
+    Where-Object {
+      $_.Name -match "^ic_launcher.*\.png$" -and
+      $_.DirectoryName -match "\\mipmap-(mdpi|hdpi|xhdpi|xxhdpi|xxxhdpi)$"
+    }
+
+  foreach ($png in $launcherPngs) {
+    $webpPath = [System.IO.Path]::ChangeExtension($png.FullName, ".webp")
+    if (Test-Path -LiteralPath $webpPath) {
+      Remove-Item -LiteralPath $png.FullName
+    }
+  }
+}
+
 function Import-SigningEnvFile {
   param([string]$Path)
 
@@ -73,6 +95,10 @@ function Import-SigningEnvFile {
 
 $projectRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 Set-Location $projectRoot
+
+$env:GRADLE_USER_HOME = Join-Path $projectRoot ".gradle-local"
+New-Item -ItemType Directory -Force -Path $env:GRADLE_USER_HOME | Out-Null
+Write-Host "Using project Gradle cache: $env:GRADLE_USER_HOME"
 
 if (-not $SigningEnvPath) {
   $SigningEnvPath = Join-Path $projectRoot "credentials\android\signing.env"
@@ -143,6 +169,7 @@ Set-Content -LiteralPath (Join-Path $projectRoot ".android-version-code") -Value
 
 Write-Host "Preparing Android project..." -ForegroundColor Cyan
 Invoke-External "npx" @("expo", "prebuild", "--platform", "android", "--no-install")
+Remove-DuplicateLauncherPngResources -ProjectRoot $projectRoot
 
 $buildGradlePath = Join-Path $projectRoot "android\app\build.gradle"
 if (-not (Test-Path $buildGradlePath)) {
@@ -197,7 +224,7 @@ Write-Utf8NoBom -Path $buildGradlePath -Value $buildGradle
 Write-Host "Building AAB with versionCode $VersionCode..." -ForegroundColor Cyan
 Push-Location (Join-Path $projectRoot "android")
 try {
-  Invoke-External ".\gradlew.bat" @("bundleRelease")
+  Invoke-External ".\gradlew.bat" @("--no-daemon", "--max-workers=2", "--console=plain", "bundleRelease")
 } finally {
   Pop-Location
 }

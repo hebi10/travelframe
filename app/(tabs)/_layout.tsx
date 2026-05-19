@@ -19,7 +19,7 @@ export default function TabsLayout() {
       screenOptions={{
         headerShown: false,
         headerShadowVisible: false,
-        headerStyle: { backgroundColor: palette.background },
+        headerStyle: { backgroundColor: palette.chrome },
         headerTintColor: palette.text,
         headerTitleStyle: {
           fontSize: 14,
@@ -34,7 +34,7 @@ export default function TabsLayout() {
           alignSelf: "center",
           paddingTop: Math.round(6 * layoutScale),
           paddingBottom: tabBarBottomPadding,
-          backgroundColor: palette.background,
+          backgroundColor: palette.chrome,
           borderTopColor: palette.line
         },
         tabBarIconStyle: {

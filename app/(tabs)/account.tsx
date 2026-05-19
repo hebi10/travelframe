@@ -1130,7 +1130,7 @@ const createAccountThemedStyles = (palette: AppPalette) => {
     input: {
       borderColor: palette.line,
       color: palette.text,
-      backgroundColor: palette.background
+      backgroundColor: palette.surfaceStrong
     },
     secondaryButton: {
       borderColor: palette.line,
@@ -1138,7 +1138,7 @@ const createAccountThemedStyles = (palette: AppPalette) => {
     },
     activeFill: {
       borderColor: palette.text,
-      backgroundColor: isDark ? "transparent" : palette.text
+      backgroundColor: isDark ? palette.ink : palette.text
     },
     text: {
       color: palette.text
@@ -1147,7 +1147,7 @@ const createAccountThemedStyles = (palette: AppPalette) => {
       color: palette.muted
     },
     inverseText: {
-      color: isDark ? palette.text : palette.inverse
+      color: palette.inverse
     },
     bottomBorder: {
       borderBottomColor: palette.line
