@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, Text, View, type TextStyle } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { spacing, typography } from "@/constants/app-theme";
@@ -131,7 +131,7 @@ const titleStyleByFont: Record<FontStyle, { fontSize: number; lineHeight: number
   }
 };
 
-const getTitleStyle = (fontStyle: FontStyle, scale: number) => {
+const getTitleStyle = (fontStyle: FontStyle, scale: number): TextStyle => {
   const style = titleStyleByFont[fontStyle];
   return {
     fontSize: Math.round(style.fontSize * scale),

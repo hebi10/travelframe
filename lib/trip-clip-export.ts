@@ -30,6 +30,7 @@ type ImageExportOptions = {
 };
 let androidDownloadDirectoryUri: string | null = null;
 const TRIP_CLIP_ANDROID_DOWNLOAD_FOLDER = "TravelFrame";
+const TRIP_CLIP_MEDIA_ALBUM = "트래블프레임";
 
 const getMediaLibrary = async (): Promise<MediaLibraryModule> =>
   import("expo-media-library");
@@ -160,6 +161,27 @@ const saveImageToAndroidDownload = async (
   return saveUri;
 };
 
+const saveImageToAndroidAlbum = async (
+  uri: string,
+  format: ImageSaveFormat,
+  options: ImageExportOptions = {}
+) => {
+  const MediaLibrary = await requestSavePermission("photo");
+  assertCanSaveToMediaLibrary(MediaLibrary);
+
+  const saveUri = await prepareImageForLibrarySave(uri, format, options);
+  const asset = await MediaLibrary.createAssetAsync(saveUri);
+  const album = await MediaLibrary.getAlbumAsync(TRIP_CLIP_MEDIA_ALBUM);
+
+  if (album) {
+    await MediaLibrary.addAssetsToAlbumAsync([asset], album, false);
+  } else {
+    await MediaLibrary.createAlbumAsync(TRIP_CLIP_MEDIA_ALBUM, asset, false);
+  }
+
+  return saveUri;
+};
+
 export const prepareImageForLibrarySave = async (
   uri: string,
   format: ImageSaveFormat,
@@ -223,7 +245,21 @@ export const saveImageToLibrary = async (
 ) => {
   try {
     if (Platform.OS === "android") {
-      return await saveImageToAndroidDownload(uri, format, options);
+      try {
+        return await saveImageToAndroidAlbum(uri, format, options);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error ?? "");
+
+        if (
+          message.includes(MEDIA_LIBRARY_SAVE_UNAVAILABLE_MESSAGE) ||
+          message.includes("Expo Go can no longer provide full access") ||
+          message.includes("requestPermissionsAsync has been rejected")
+        ) {
+          return await saveImageToAndroidDownload(uri, format, options);
+        }
+
+        throw error;
+      }
     }
 
     const MediaLibrary = await requestSavePermission("photo");

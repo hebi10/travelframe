@@ -40,6 +40,7 @@ import {
   defaultAppSettings,
   getAppSettings,
   saveAppSettings,
+  subscribeAppSettings,
   type AppSettings,
   type ExportQuality,
   type FontSize,
@@ -297,6 +298,14 @@ export default function SettingsScreen() {
         isActive = false;
       };
     }, [subscription, user])
+  );
+
+  useEffect(
+    () =>
+      subscribeAppSettings((nextSettings) => {
+        setSettings(nextSettings);
+      }),
+    []
   );
 
   const modalTitle = useMemo(() => {
@@ -1649,7 +1658,7 @@ function OptionButton({
   active: boolean;
   onPress: () => void;
 }) {
-  const { palette } = useAppAppearance();
+  const { palette, fontSizeScale, layoutScale, emphasisWeight } = useAppAppearance();
   const themed = useMemo(() => createThemedStyles(palette), [palette]);
 
   return (
@@ -1657,6 +1666,12 @@ function OptionButton({
       style={[
         styles.option,
         themed.panel,
+        {
+          minHeight: Math.round(72 * layoutScale),
+          gap: Math.round(14 * layoutScale),
+          paddingVertical: Math.round(14 * layoutScale),
+          paddingHorizontal: Math.round(14 * layoutScale)
+        },
         active && styles.optionActive,
         active && themed.activeFill
       ]}
@@ -1668,6 +1683,11 @@ function OptionButton({
           style={[
             styles.optionLabel,
             themed.text,
+            {
+              fontSize: Math.round(typography.body * fontSizeScale),
+              lineHeight: Math.round(20 * fontSizeScale),
+              fontWeight: emphasisWeight
+            },
             active && styles.optionLabelActive,
             active && themed.inverseText
           ]}
@@ -1679,6 +1699,10 @@ function OptionButton({
           style={[
             styles.optionDetail,
             themed.mutedText,
+            {
+              fontSize: Math.round(typography.small * fontSizeScale),
+              lineHeight: Math.round(17 * fontSizeScale)
+            },
             active && styles.optionDetailActive,
             active && themed.inverseMutedText
           ]}

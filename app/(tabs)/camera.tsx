@@ -193,6 +193,43 @@ export default function CameraScreen() {
     [insets.bottom, insets.top]
   );
   const isCameraModalOpen = guideChoiceOpen || guideSettingsOpen || cameraSettingsOpen || navigationOpen;
+  const selectedCameraRatioAspect = cameraRatioAspect[cameraRatio];
+  const cameraRatioMask = useMemo(() => {
+    if (!selectedCameraRatioAspect || cameraFrame.width <= 0 || cameraFrame.height <= 0) {
+      return null;
+    }
+
+    const areaTop = insets.top + 94;
+    const areaBottom = bottomSafePadding + 164;
+    const areaWidth = Math.max(0, cameraFrame.width);
+    const areaHeight = Math.max(0, cameraFrame.height - areaTop - areaBottom);
+    const frameAreaAspect = areaWidth / Math.max(areaHeight, 1);
+    const frameWidth =
+      selectedCameraRatioAspect > frameAreaAspect
+        ? areaWidth
+        : areaHeight * selectedCameraRatioAspect;
+    const frameHeight =
+      selectedCameraRatioAspect > frameAreaAspect
+        ? areaWidth / selectedCameraRatioAspect
+        : areaHeight;
+    const frameLeft = Math.round((cameraFrame.width - frameWidth) / 2);
+    const frameTop = Math.round(areaTop + (areaHeight - frameHeight) / 2);
+
+    return {
+      top: frameTop,
+      left: frameLeft,
+      width: Math.round(frameWidth),
+      height: Math.round(frameHeight),
+      right: Math.max(0, Math.round(cameraFrame.width - frameLeft - frameWidth)),
+      bottom: Math.max(0, Math.round(cameraFrame.height - frameTop - frameHeight))
+    };
+  }, [
+    bottomSafePadding,
+    cameraFrame.height,
+    cameraFrame.width,
+    insets.top,
+    selectedCameraRatioAspect
+  ]);
 
   const returnFromPermissionScreen = useCallback(() => {
     if (router.canGoBack()) {
@@ -768,6 +805,45 @@ export default function CameraScreen() {
         locked={overlayLocked}
         resetKey={overlayResetKey}
       />
+
+      {cameraRatioMask && !isCameraModalOpen ? (
+        <View pointerEvents="none" style={styles.cameraRatioMaskLayer}>
+          <View style={[styles.cameraRatioMask, { top: 0, left: 0, right: 0, height: cameraRatioMask.top }]} />
+          <View
+            style={[
+              styles.cameraRatioMask,
+              {
+                top: cameraRatioMask.top + cameraRatioMask.height,
+                left: 0,
+                right: 0,
+                bottom: 0
+              }
+            ]}
+          />
+          <View
+            style={[
+              styles.cameraRatioMask,
+              {
+                top: cameraRatioMask.top,
+                left: 0,
+                width: cameraRatioMask.left,
+                height: cameraRatioMask.height
+              }
+            ]}
+          />
+          <View
+            style={[
+              styles.cameraRatioMask,
+              {
+                top: cameraRatioMask.top,
+                right: 0,
+                width: cameraRatioMask.right,
+                height: cameraRatioMask.height
+              }
+            ]}
+          />
+        </View>
+      ) : null}
 
       {isGuidePositionAdjusting ? (
         <GestureDetector gesture={guidePositionGesture}>
@@ -1773,6 +1849,14 @@ const styles = StyleSheet.create({
     bottom: 188,
     zIndex: 4,
     backgroundColor: "transparent"
+  },
+  cameraRatioMaskLayer: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 5
+  },
+  cameraRatioMask: {
+    position: "absolute",
+    backgroundColor: colors.ink
   },
   topBar: {
     position: "absolute",

@@ -9,7 +9,7 @@ import { useAppAppearance } from "@/lib/app-appearance";
 import { initializeAdMob } from "@/lib/admob-config";
 
 function AppStack() {
-  const { palette, effectiveThemeMode } = useAppAppearance();
+  const { palette, effectiveThemeMode, fontSizeScale, emphasisWeight } = useAppAppearance();
 
   useEffect(() => {
     void initializeAdMob();
@@ -24,8 +24,8 @@ function AppStack() {
           headerStyle: { backgroundColor: palette.background },
           headerTintColor: palette.text,
           headerTitleStyle: {
-            fontSize: 14,
-            fontWeight: "800"
+            fontSize: Math.round(14 * fontSizeScale),
+            fontWeight: emphasisWeight
           },
           contentStyle: { backgroundColor: palette.background }
         }}

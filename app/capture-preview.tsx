@@ -1,7 +1,15 @@
-import { Image } from "expo-image";
+import { Image as ExpoImage } from "expo-image";
 import { router, type Href, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  Alert,
+  Image as NativeImage,
+  Pressable,
+  StyleSheet,
+  Text,
+  View
+} from "react-native";
 
 import { colors, controls, typography } from "@/constants/app-theme";
 import { useAuth } from "@/lib/auth-context";
@@ -28,6 +36,20 @@ const isPhotoRatioLabel = (value: unknown): value is PhotoRatioLabel =>
   value === "9:16" ||
   value === "16:9";
 
+const getRouteParam = (value?: string | string[]) => {
+  const firstValue = Array.isArray(value) ? value[0] : value;
+
+  if (!firstValue) {
+    return undefined;
+  }
+
+  try {
+    return decodeURIComponent(firstValue);
+  } catch {
+    return firstValue;
+  }
+};
+
 export default function CapturePreviewScreen() {
   const { user, subscription } = useAuth();
   const { id, uri, width, height, ratio } = useLocalSearchParams<{
@@ -40,6 +62,7 @@ export default function CapturePreviewScreen() {
   const [photo, setPhoto] = useState<PhotoItem | null>(null);
   const [isLoading, setIsLoading] = useState(Boolean(id));
   const [isSaving, setIsSaving] = useState(false);
+  const [imageLoadFailed, setImageLoadFailed] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -65,11 +88,16 @@ export default function CapturePreviewScreen() {
     };
   }, [id]);
 
-  const previewUri = photo?.uri ?? uri;
+  const draftUri = getRouteParam(uri);
+  const previewUri = photo?.uri ?? draftUri;
   const parsedWidth = width ? Number(width) : undefined;
   const parsedHeight = height ? Number(height) : undefined;
   const selectedRatio: PhotoRatioLabel = isPhotoRatioLabel(ratio) ? ratio : "Original";
   const selectedRatioAspect = previewRatioAspect[selectedRatio];
+
+  useEffect(() => {
+    setImageLoadFailed(false);
+  }, [previewUri]);
 
   const usePhoto = async () => {
     if (isSaving) {
@@ -81,7 +109,7 @@ export default function CapturePreviewScreen() {
       return;
     }
 
-    if (!uri) {
+    if (!draftUri) {
       router.replace("/studio");
       return;
     }
@@ -90,7 +118,7 @@ export default function CapturePreviewScreen() {
       setIsSaving(true);
       setMessage(null);
       const savedPhoto = await saveCapturedPhoto({
-        uri,
+        uri: draftUri,
         width: Number.isFinite(parsedWidth) ? parsedWidth : undefined,
         height: Number.isFinite(parsedHeight) ? parsedHeight : undefined,
         ratioLabel: selectedRatio
@@ -118,7 +146,7 @@ export default function CapturePreviewScreen() {
         );
       }
       try {
-        await deleteLocalFile(uri);
+        await deleteLocalFile(draftUri);
       } catch (cleanupError) {
         console.error("임시 촬영 파일을 정리하지 못했습니다.", cleanupError);
       }
@@ -133,7 +161,7 @@ export default function CapturePreviewScreen() {
   const retakePhoto = async () => {
     if (!id) {
       try {
-        await deleteLocalFile(uri);
+        await deleteLocalFile(draftUri);
       } catch (error) {
         console.error("임시 촬영 파일을 정리하지 못했습니다.", error);
       }
@@ -158,11 +186,21 @@ export default function CapturePreviewScreen() {
                 : styles.previewFrameOriginal
             ]}
           >
-            <Image
-              source={{ uri: previewUri }}
-              style={styles.image}
-              contentFit={selectedRatioAspect ? "cover" : "contain"}
-            />
+            {imageLoadFailed ? (
+              <NativeImage
+                source={{ uri: previewUri }}
+                style={styles.image}
+                resizeMode={selectedRatioAspect ? "cover" : "contain"}
+              />
+            ) : (
+              <ExpoImage
+                source={{ uri: previewUri }}
+                style={styles.image}
+                contentFit={selectedRatioAspect ? "cover" : "contain"}
+                cachePolicy="none"
+                onError={() => setImageLoadFailed(true)}
+              />
+            )}
           </View>
         </View>
       ) : (

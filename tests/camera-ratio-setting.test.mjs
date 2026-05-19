@@ -25,7 +25,10 @@ for (const snippet of [
   "void updateAppSettings({ cameraRatio: nextRatio })",
   "카메라 비율",
   "ratio: cameraRatio",
-  "aspectRatio={cameraRatioAspect[cameraRatio] ?? 1}"
+  "aspectRatio={cameraRatioAspect[cameraRatio] ?? 1}",
+  "const selectedCameraRatioAspect = cameraRatioAspect[cameraRatio]",
+  "cameraRatioMask",
+  "styles.cameraRatioMask"
 ]) {
   assert.ok(cameraSource.includes(snippet), `camera ratio UI/wiring missing: ${snippet}`);
 }
