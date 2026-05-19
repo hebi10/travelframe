@@ -1,4 +1,3 @@
-import { Image as ExpoImage } from "expo-image";
 import { router, type Href, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import {
@@ -62,7 +61,6 @@ export default function CapturePreviewScreen() {
   const [photo, setPhoto] = useState<PhotoItem | null>(null);
   const [isLoading, setIsLoading] = useState(Boolean(id));
   const [isSaving, setIsSaving] = useState(false);
-  const [imageLoadFailed, setImageLoadFailed] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -94,10 +92,6 @@ export default function CapturePreviewScreen() {
   const parsedHeight = height ? Number(height) : undefined;
   const selectedRatio: PhotoRatioLabel = isPhotoRatioLabel(ratio) ? ratio : "Original";
   const selectedRatioAspect = previewRatioAspect[selectedRatio];
-
-  useEffect(() => {
-    setImageLoadFailed(false);
-  }, [previewUri]);
 
   const usePhoto = async () => {
     if (isSaving) {
@@ -186,21 +180,11 @@ export default function CapturePreviewScreen() {
                 : styles.previewFrameOriginal
             ]}
           >
-            {imageLoadFailed ? (
-              <NativeImage
-                source={{ uri: previewUri }}
-                style={styles.image}
-                resizeMode={selectedRatioAspect ? "cover" : "contain"}
-              />
-            ) : (
-              <ExpoImage
-                source={{ uri: previewUri }}
-                style={styles.image}
-                contentFit={selectedRatioAspect ? "cover" : "contain"}
-                cachePolicy="none"
-                onError={() => setImageLoadFailed(true)}
-              />
-            )}
+            <NativeImage
+              source={{ uri: previewUri }}
+              style={styles.image}
+              resizeMode={selectedRatioAspect ? "cover" : "contain"}
+            />
           </View>
         </View>
       ) : (

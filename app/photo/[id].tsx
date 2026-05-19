@@ -1,9 +1,9 @@
-import { Image } from "expo-image";
 import { router, type Href, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Image as NativeImage,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -20,6 +20,7 @@ import type { PhotoItem } from "@/types/photo";
 
 const formatDate = (value: string) =>
   new Intl.DateTimeFormat("ko-KR", {
+    timeZone: "Asia/Seoul",
     year: "numeric",
     month: "short",
     day: "numeric",
@@ -171,7 +172,7 @@ export default function PhotoDetailScreen() {
       contentContainerStyle={styles.content}
       contentInsetAdjustmentBehavior="automatic"
     >
-      <Image
+      <NativeImage
         source={{ uri: photo.uri }}
         style={[
           styles.heroImage,
@@ -179,7 +180,7 @@ export default function PhotoDetailScreen() {
             aspectRatio: getPhotoAspectRatio(photo)
           }
         ]}
-        contentFit="contain"
+        resizeMode="contain"
       />
 
       <View style={styles.header}>

@@ -4,6 +4,7 @@ import fs from "node:fs";
 const authSource = fs.readFileSync("lib/auth-context.tsx", "utf8");
 const backupSource = fs.readFileSync("lib/cloud-backup.ts", "utf8");
 const settingsSource = fs.readFileSync("app/(tabs)/settings.tsx", "utf8");
+const cameraSource = fs.readFileSync("app/(tabs)/camera.tsx", "utf8");
 const capturePreviewSource = fs.readFileSync("app/capture-preview.tsx", "utf8");
 const editSource = fs.readFileSync("app/edit.tsx", "utf8");
 const studioSource = fs.readFileSync("app/(tabs)/studio.tsx", "utf8");
@@ -53,6 +54,7 @@ for (const snippet of [
 }
 
 for (const [name, source] of [
+  ["camera capture", cameraSource],
   ["capture preview", capturePreviewSource],
   ["edit", editSource],
   ["studio import", studioSource]

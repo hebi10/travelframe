@@ -19,6 +19,7 @@ import type { MadeVideoItem } from "@/types/video";
 
 const formatDate = (value: string) =>
   new Intl.DateTimeFormat("ko-KR", {
+    timeZone: "Asia/Seoul",
     year: "numeric",
     month: "short",
     day: "numeric",

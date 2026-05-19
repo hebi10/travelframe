@@ -24,13 +24,21 @@ for (const snippet of [
   "const updateCameraRatio = (nextRatio: PhotoRatioLabel)",
   "void updateAppSettings({ cameraRatio: nextRatio })",
   "카메라 비율",
-  "ratio: cameraRatio",
-  "aspectRatio={cameraRatioAspect[cameraRatio] ?? 1}",
-  "const selectedCameraRatioAspect = cameraRatioAspect[cameraRatio]",
-  "cameraRatioMask",
-  "styles.cameraRatioMask"
+  "ratioLabel: cameraRatio",
+  "aspectRatio={cameraRatioAspect[cameraRatio] ?? 1}"
 ]) {
   assert.ok(cameraSource.includes(snippet), `camera ratio UI/wiring missing: ${snippet}`);
+}
+
+for (const forbidden of [
+  "cameraRatioMask",
+  "selectedCameraRatioAspect",
+  "styles.cameraRatioMask"
+]) {
+  assert.ok(
+    !cameraSource.includes(forbidden),
+    `camera ratio should not draw capture-blocking masks: ${forbidden}`
+  );
 }
 
 for (const snippet of [
@@ -38,7 +46,7 @@ for (const snippet of [
   "const selectedRatio: PhotoRatioLabel",
   "previewRatioAspect",
   "ratioLabel: selectedRatio",
-  'contentFit={selectedRatioAspect ? "cover" : "contain"}'
+  'resizeMode={selectedRatioAspect ? "cover" : "contain"}'
 ]) {
   assert.ok(previewSource.includes(snippet), `capture preview ratio handling missing: ${snippet}`);
 }

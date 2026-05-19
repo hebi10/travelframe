@@ -5,7 +5,6 @@ import {
   useCameraPermissions
 } from "expo-camera";
 import * as Haptics from "expo-haptics";
-import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -16,6 +15,7 @@ import {
 } from "react-native-gesture-handler";
 import {
   ActivityIndicator,
+  Image as NativeImage,
   Modal,
   Pressable,
   ScrollView,
@@ -46,6 +46,9 @@ import {
   GUIDE_TYPES,
   type GuideType
 } from "@/constants/camera-guides";
+import { useAuth } from "@/lib/auth-context";
+import { recordBackupFailure } from "@/lib/backup-failure-queue";
+import { backupPhotoIfEnabled } from "@/lib/cloud-backup";
 import {
   DEFAULT_GUIDE_COLOR,
   GUIDE_SIZE_MAX,
@@ -55,7 +58,7 @@ import {
   getAppSettings,
   updateAppSettings
 } from "@/lib/app-settings";
-import { createCaptureDraft, getRecentPhoto } from "@/lib/photo-library";
+import { deleteLocalFile, getRecentPhoto, saveCapturedPhoto } from "@/lib/photo-library";
 import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 import type { PhotoItem, PhotoRatioLabel } from "@/types/photo";
 
@@ -139,6 +142,7 @@ const sleep = (milliseconds: number) =>
   });
 
 export default function CameraScreen() {
+  const { user, subscription } = useAuth();
   const cameraRef = useRef<CameraView>(null);
   const referenceOverlayRef = useRef<PhotoReferenceOverlayHandle>(null);
   const [permission, requestPermission, getPermission] = useCameraPermissions();
@@ -193,43 +197,6 @@ export default function CameraScreen() {
     [insets.bottom, insets.top]
   );
   const isCameraModalOpen = guideChoiceOpen || guideSettingsOpen || cameraSettingsOpen || navigationOpen;
-  const selectedCameraRatioAspect = cameraRatioAspect[cameraRatio];
-  const cameraRatioMask = useMemo(() => {
-    if (!selectedCameraRatioAspect || cameraFrame.width <= 0 || cameraFrame.height <= 0) {
-      return null;
-    }
-
-    const areaTop = insets.top + 94;
-    const areaBottom = bottomSafePadding + 164;
-    const areaWidth = Math.max(0, cameraFrame.width);
-    const areaHeight = Math.max(0, cameraFrame.height - areaTop - areaBottom);
-    const frameAreaAspect = areaWidth / Math.max(areaHeight, 1);
-    const frameWidth =
-      selectedCameraRatioAspect > frameAreaAspect
-        ? areaWidth
-        : areaHeight * selectedCameraRatioAspect;
-    const frameHeight =
-      selectedCameraRatioAspect > frameAreaAspect
-        ? areaWidth / selectedCameraRatioAspect
-        : areaHeight;
-    const frameLeft = Math.round((cameraFrame.width - frameWidth) / 2);
-    const frameTop = Math.round(areaTop + (areaHeight - frameHeight) / 2);
-
-    return {
-      top: frameTop,
-      left: frameLeft,
-      width: Math.round(frameWidth),
-      height: Math.round(frameHeight),
-      right: Math.max(0, Math.round(cameraFrame.width - frameLeft - frameWidth)),
-      bottom: Math.max(0, Math.round(cameraFrame.height - frameTop - frameHeight))
-    };
-  }, [
-    bottomSafePadding,
-    cameraFrame.height,
-    cameraFrame.width,
-    insets.top,
-    selectedCameraRatioAspect
-  ]);
 
   const returnFromPermissionScreen = useCallback(() => {
     if (router.canGoBack()) {
@@ -415,17 +382,48 @@ export default function CameraScreen() {
         exif: false,
         shutterSound: shutterSoundEnabled
       });
-      const draftUri = await createCaptureDraft(photo.uri);
-
-      router.push({
-        pathname: "/capture-preview",
-        params: {
-          uri: draftUri,
-          width: String(photo.width ?? 0),
-          height: String(photo.height ?? 0),
-          ratio: cameraRatio
-        }
+      const savedPhoto = await saveCapturedPhoto({
+        uri: photo.uri,
+        width: photo.width,
+        height: photo.height,
+        ratioLabel: cameraRatio
       });
+      if (__DEV__) {
+        console.log("[camera] captured", {
+          facing: cameraFacing,
+          sourceUri: photo.uri,
+          width: photo.width,
+          height: photo.height,
+          savedUri: savedPhoto.uri,
+          previewUri: savedPhoto.previewUri
+        });
+      }
+      setRecentPhoto(savedPhoto);
+
+      try {
+        await backupPhotoIfEnabled({
+          user,
+          subscription,
+          photo: savedPhoto
+        });
+      } catch (backupError) {
+        console.error("촬영 사진 자동 백업에 실패했습니다.", backupError);
+        await recordBackupFailure({
+          id: savedPhoto.id,
+          kind: "photo",
+          label: "촬영 사진",
+          message: getUserFacingErrorMessage(
+            backupError,
+            "클라우드 백업을 완료하지 못했습니다."
+          )
+        });
+      }
+
+      try {
+        await deleteLocalFile(photo.uri);
+      } catch (cleanupError) {
+        console.error("임시 촬영 파일을 정리하지 못했습니다.", cleanupError);
+      }
     } catch (error) {
       setErrorMessage(getUserFacingErrorMessage(error, "사진을 촬영하지 못했습니다."));
     } finally {
@@ -805,45 +803,6 @@ export default function CameraScreen() {
         locked={overlayLocked}
         resetKey={overlayResetKey}
       />
-
-      {cameraRatioMask && !isCameraModalOpen ? (
-        <View pointerEvents="none" style={styles.cameraRatioMaskLayer}>
-          <View style={[styles.cameraRatioMask, { top: 0, left: 0, right: 0, height: cameraRatioMask.top }]} />
-          <View
-            style={[
-              styles.cameraRatioMask,
-              {
-                top: cameraRatioMask.top + cameraRatioMask.height,
-                left: 0,
-                right: 0,
-                bottom: 0
-              }
-            ]}
-          />
-          <View
-            style={[
-              styles.cameraRatioMask,
-              {
-                top: cameraRatioMask.top,
-                left: 0,
-                width: cameraRatioMask.left,
-                height: cameraRatioMask.height
-              }
-            ]}
-          />
-          <View
-            style={[
-              styles.cameraRatioMask,
-              {
-                top: cameraRatioMask.top,
-                right: 0,
-                width: cameraRatioMask.right,
-                height: cameraRatioMask.height
-              }
-            ]}
-          />
-        </View>
-      ) : null}
 
       {isGuidePositionAdjusting ? (
         <GestureDetector gesture={guidePositionGesture}>
@@ -1628,10 +1587,10 @@ export default function CameraScreen() {
                 accessibilityLabel="개인 갤러리 열기"
               >
                 {recentPhoto ? (
-                  <Image
-                    source={{ uri: recentPhoto.previewUri ?? recentPhoto.uri }}
+                  <NativeImage
+                    source={{ uri: recentPhoto.uri }}
                     style={styles.galleryThumb}
-                    contentFit="cover"
+                    resizeMode="cover"
                   />
                 ) : (
                   <View style={styles.galleryEmptyThumb}>
@@ -1849,14 +1808,6 @@ const styles = StyleSheet.create({
     bottom: 188,
     zIndex: 4,
     backgroundColor: "transparent"
-  },
-  cameraRatioMaskLayer: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 5
-  },
-  cameraRatioMask: {
-    position: "absolute",
-    backgroundColor: colors.ink
   },
   topBar: {
     position: "absolute",

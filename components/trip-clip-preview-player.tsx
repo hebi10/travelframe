@@ -49,6 +49,7 @@ const getPreviewUri = (photo: PhotoItem) => photo.previewUri ?? photo.uri;
 
 const formatDate = (value: string) =>
   new Intl.DateTimeFormat("ko-KR", {
+    timeZone: "Asia/Seoul",
     month: "short",
     day: "numeric"
   }).format(new Date(value));

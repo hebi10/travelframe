@@ -2,7 +2,16 @@ import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { type Href, useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  Alert,
+  Image as NativeImage,
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  View
+} from "react-native";
 
 import { AppGuideOverlay } from "@/components/app-guide-overlay";
 import { ScreenShell } from "@/components/screen-shell";
@@ -63,6 +72,7 @@ const initialBackupOverview: CloudBackupOverview = {
 
 const formatDate = (value: string) =>
   new Intl.DateTimeFormat("ko-KR", {
+    timeZone: "Asia/Seoul",
     month: "short",
     day: "numeric",
     hour: "2-digit",
@@ -629,7 +639,7 @@ function PhotoCard({
   return (
     <View style={styles.photoCard}>
       <Pressable onPress={() => router.push(`/photo/${photo.id}` as Href)}>
-        <Image source={{ uri: photo.uri }} style={styles.thumbnail} contentFit="cover" />
+        <NativeImage source={{ uri: photo.uri }} style={styles.thumbnail} resizeMode="cover" />
       </Pressable>
       <View style={styles.photoMeta}>
         <Text selectable style={styles.photoDate}>
@@ -903,7 +913,7 @@ function WorkCard({
 
     return (
       <View style={styles.videoCard}>
-        <Image source={{ uri: photo.uri }} style={styles.videoThumb} contentFit="cover" />
+        <NativeImage source={{ uri: photo.uri }} style={styles.videoThumb} resizeMode="cover" />
         <Pressable
           style={({ pressed }) => [styles.videoCopy, pressed && styles.pressed]}
           onPress={() => router.push(`/photo/${photo.id}` as Href)}

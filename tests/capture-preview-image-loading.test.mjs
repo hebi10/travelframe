@@ -8,9 +8,6 @@ for (const snippet of [
   "decodeURIComponent(firstValue)",
   "const draftUri = getRouteParam(uri)",
   "const previewUri = photo?.uri ?? draftUri",
-  "const [imageLoadFailed, setImageLoadFailed] = useState(false)",
-  "cachePolicy=\"none\"",
-  "onError={() => setImageLoadFailed(true)}",
   "Image as NativeImage",
   "resizeMode={selectedRatioAspect ? \"cover\" : \"contain\"}",
   "uri: draftUri",
@@ -19,4 +16,6 @@ for (const snippet of [
   assert.ok(source.includes(snippet), `capture preview image loading guard missing: ${snippet}`);
 }
 
-console.log("ok - capture preview normalizes local file URI and falls back for image loading");
+assert.ok(!source.includes("ExpoImage"), "capture preview should not use expo-image for local camera drafts");
+
+console.log("ok - capture preview normalizes local file URI and renders local drafts with native image");
