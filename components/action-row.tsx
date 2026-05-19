@@ -14,7 +14,7 @@ type ActionRowProps = {
 };
 
 export function ActionRow({ href, label, detail, mark = ">", onPress }: ActionRowProps) {
-  const { palette, fontSizeScale, layoutScale } = useAppAppearance();
+  const { palette, fontSizeScale, layoutScale, emphasisWeight } = useAppAppearance();
   const isDark = palette.background !== colors.background;
   const content = (
     <Pressable
@@ -39,7 +39,8 @@ export function ActionRow({ href, label, detail, mark = ">", onPress }: ActionRo
             {
               color: palette.text,
               fontSize: Math.round(typography.body * fontSizeScale),
-              lineHeight: Math.round(21 * fontSizeScale)
+              lineHeight: Math.round(21 * fontSizeScale),
+              fontWeight: emphasisWeight
             }
           ]}
         >
@@ -65,6 +66,7 @@ export function ActionRow({ href, label, detail, mark = ">", onPress }: ActionRo
         style={[
           styles.markBox,
           {
+            minHeight: Math.round(controls.compactHeight * layoutScale),
             borderColor: palette.text,
             backgroundColor: isDark ? "transparent" : palette.text
           }
@@ -77,7 +79,12 @@ export function ActionRow({ href, label, detail, mark = ">", onPress }: ActionRo
             selectable={false}
             style={[
               styles.markText,
-              { color: isDark ? palette.text : palette.inverse }
+              {
+                color: isDark ? palette.text : palette.inverse,
+                fontSize: Math.round(typography.button * fontSizeScale),
+                lineHeight: Math.round(18 * fontSizeScale),
+                fontWeight: emphasisWeight
+              }
             ]}
           >
             {mark}

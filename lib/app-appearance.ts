@@ -3,6 +3,7 @@ import { useColorScheme } from "react-native";
 
 import { colors } from "@/constants/app-theme";
 import {
+  type FontStyle,
   defaultAppSettings,
   getAppSettings,
   getFontSizeScale,
@@ -13,6 +14,7 @@ import {
 
 export type AppPalette = Record<keyof typeof colors, string>;
 export type EffectiveThemeMode = "light" | "dark";
+export type AppFontWeight = "700" | "800" | "900";
 
 const darkPalette: AppPalette = {
   background: "#0f0f0f",
@@ -44,6 +46,18 @@ export const getAppPalette = (
   const effectiveMode = getEffectiveThemeMode(settings, systemScheme);
 
   return effectiveMode === "dark" ? darkPalette : colors;
+};
+
+export const getFontWeightForStyle = (fontStyle: FontStyle): AppFontWeight => {
+  if (fontStyle === "bold") {
+    return "900";
+  }
+
+  if (fontStyle === "standard") {
+    return "700";
+  }
+
+  return "800";
 };
 
 export function useAppAppearance() {
@@ -89,6 +103,7 @@ export function useAppAppearance() {
     effectiveThemeMode,
     palette,
     fontSizeScale: getFontSizeScale(settings.fontSize),
-    layoutScale: getScreenLayoutScale(settings.screenLayout)
+    layoutScale: getScreenLayoutScale(settings.screenLayout),
+    emphasisWeight: getFontWeightForStyle(settings.fontStyle)
   };
 }

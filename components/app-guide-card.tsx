@@ -29,12 +29,12 @@ export function AppGuideCard({
   return (
     <View style={[styles.card, { borderColor: palette.text, backgroundColor: palette.background }]}>
       <View style={styles.metaRow}>
-        <Text selectable={false} style={[styles.meta, { color: palette.muted }]}>
+        <Text selectable={false} style={[styles.textBase, styles.meta, { color: palette.muted }]}>
           {current} / {total}
         </Text>
         {step.targetLabel ? (
           <View style={[styles.targetPill, { borderColor: palette.line }]}>
-            <Text selectable={false} style={[styles.targetText, { color: palette.text }]}>
+            <Text selectable={false} style={[styles.textBase, styles.targetText, { color: palette.text }]}>
               {step.targetLabel}
             </Text>
           </View>
@@ -42,10 +42,10 @@ export function AppGuideCard({
       </View>
 
       <View style={styles.copy}>
-        <Text selectable style={[styles.title, { color: palette.text }]}>
+        <Text selectable={false} style={[styles.textBase, styles.title, { color: palette.text }]}>
           {step.title}
         </Text>
-        <Text selectable style={[styles.description, { color: palette.muted }]}>
+        <Text selectable={false} style={[styles.textBase, styles.description, { color: palette.muted }]}>
           {step.description}
         </Text>
       </View>
@@ -56,7 +56,7 @@ export function AppGuideCard({
           style={[styles.textButton, { borderColor: palette.line }]}
           onPress={onSkip}
         >
-          <Text selectable={false} style={[styles.textButtonLabel, { color: palette.muted }]}>
+          <Text selectable={false} style={[styles.textBase, styles.textButtonLabel, { color: palette.muted }]}>
             스킵
           </Text>
         </Pressable>
@@ -67,7 +67,7 @@ export function AppGuideCard({
               style={[styles.secondaryButton, { borderColor: palette.line }]}
               onPress={onBack}
             >
-              <Text selectable={false} style={[styles.secondaryButtonLabel, { color: palette.text }]}>
+              <Text selectable={false} style={[styles.textBase, styles.secondaryButtonLabel, { color: palette.text }]}>
                 이전
               </Text>
             </Pressable>
@@ -77,7 +77,7 @@ export function AppGuideCard({
             style={[styles.primaryButton, { borderColor: palette.text, backgroundColor: palette.text }]}
             onPress={onNext}
           >
-            <Text selectable={false} style={[styles.primaryButtonLabel, { color: palette.inverse }]}>
+            <Text selectable={false} style={[styles.textBase, styles.primaryButtonLabel, { color: palette.inverse }]}>
               {isLast ? "완료" : "다음"}
             </Text>
           </Pressable>
@@ -90,11 +90,16 @@ export function AppGuideCard({
 const styles = StyleSheet.create({
   card: {
     width: "100%",
-    maxWidth: 360,
     gap: 16,
     padding: 18,
     borderWidth: 1,
+    borderLeftWidth: 0,
+    borderRightWidth: 0,
+    borderBottomWidth: 0,
     backgroundColor: colors.background
+  },
+  textBase: {
+    backgroundColor: "transparent"
   },
   metaRow: {
     minHeight: 28,

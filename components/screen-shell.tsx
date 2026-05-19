@@ -3,9 +3,7 @@ import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { spacing, typography } from "@/constants/app-theme";
-import {
-  type FontStyle
-} from "@/lib/app-settings";
+import { type FontStyle } from "@/lib/app-settings";
 import { useAppAppearance } from "@/lib/app-appearance";
 
 const TAB_BAR_BASE_HEIGHT = 58;
@@ -137,6 +135,7 @@ const getTitleStyle = (fontStyle: FontStyle, scale: number) => {
   const style = titleStyleByFont[fontStyle];
   return {
     fontSize: Math.round(style.fontSize * scale),
-    lineHeight: Math.round(style.lineHeight * scale)
+    lineHeight: Math.round(style.lineHeight * scale),
+    fontWeight: fontStyle === "bold" ? "900" : "800"
   };
 };

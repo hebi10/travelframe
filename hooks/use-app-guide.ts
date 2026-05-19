@@ -1,5 +1,5 @@
 import { useFocusEffect } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
   APP_GUIDE_STEPS,
@@ -11,7 +11,7 @@ import {
   shouldShowGuideForTab
 } from "@/lib/guide-progress";
 
-export function useAppGuide(tabKey: AppGuideTabKey) {
+export function useAppGuide(tabKey: AppGuideTabKey, replaySignal = 0) {
   const steps = useMemo(() => APP_GUIDE_STEPS[tabKey], [tabKey]);
   const [visible, setVisible] = useState(false);
   const [stepIndex, setStepIndex] = useState(0);
@@ -21,6 +21,10 @@ export function useAppGuide(tabKey: AppGuideTabKey) {
       let isActive = true;
 
       const loadGuide = async () => {
+        if (tabKey !== "home") {
+          return;
+        }
+
         const shouldShow = await shouldShowGuideForTab(tabKey);
 
         if (isActive && shouldShow && steps.length > 0) {
@@ -36,6 +40,15 @@ export function useAppGuide(tabKey: AppGuideTabKey) {
       };
     }, [steps.length, tabKey])
   );
+
+  useEffect(() => {
+    if (replaySignal <= 0 || steps.length <= 0) {
+      return;
+    }
+
+    setStepIndex(0);
+    setVisible(true);
+  }, [replaySignal, steps.length]);
 
   const finish = useCallback(async () => {
     setVisible(false);

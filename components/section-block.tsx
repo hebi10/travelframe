@@ -10,11 +10,22 @@ type SectionBlockProps = {
 };
 
 export function SectionBlock({ title, children }: SectionBlockProps) {
-  const { palette, layoutScale } = useAppAppearance();
+  const { palette, fontSizeScale, layoutScale, emphasisWeight } = useAppAppearance();
 
   return (
     <View style={[styles.section, { gap: Math.round(14 * layoutScale) }]}>
-      <Text selectable style={[styles.title, { color: palette.text }]}>
+      <Text
+        selectable
+        style={[
+          styles.title,
+          {
+            color: palette.text,
+            fontSize: Math.round(typography.section * fontSizeScale),
+            lineHeight: Math.round(22 * fontSizeScale),
+            fontWeight: emphasisWeight
+          }
+        ]}
+      >
         {title}
       </Text>
       <View style={[styles.body, { gap: Math.round(8 * layoutScale) }]}>{children}</View>
@@ -29,6 +40,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: typography.section,
     fontWeight: "800",
+    lineHeight: 22,
     letterSpacing: 0
   },
   body: {

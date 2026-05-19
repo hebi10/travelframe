@@ -89,8 +89,10 @@ export default function HomeScreen() {
           ref={scrollerRef}
           horizontal
           pagingEnabled
+          disableIntervalMomentum
           showsHorizontalScrollIndicator={false}
           snapToInterval={slideWidth}
+          snapToAlignment="start"
           decelerationRate="fast"
           onMomentumScrollEnd={handleSlideScroll}
           style={[

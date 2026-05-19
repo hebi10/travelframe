@@ -71,7 +71,6 @@ import {
   type LocalWorkspaceSummary
 } from "@/lib/cloud-backup";
 import { formatImageBackupUsage } from "@/lib/image-backup-utils";
-import { resetAppGuideProgress } from "@/lib/guide-progress";
 import { getPhotos } from "@/lib/photo-library";
 import { getUserSubscription, isCreatorSubscriptionActive } from "@/lib/subscription";
 import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
@@ -257,6 +256,7 @@ export default function SettingsScreen() {
   const [showBackupConfirm, setShowBackupConfirm] = useState(false);
   const [showDeleteRequestInfo, setShowDeleteRequestInfo] = useState(false);
   const [guideExpanded, setGuideExpanded] = useState(false);
+  const [guideReplaySignal, setGuideReplaySignal] = useState(0);
   const [isBackupSubmitting, setIsBackupSubmitting] = useState(false);
   const [backupProgress, setBackupProgress] =
     useState<BackupProgressUpdate | null>(null);
@@ -375,8 +375,8 @@ export default function SettingsScreen() {
   };
 
   const handleResetGuideProgress = async () => {
-    await resetAppGuideProgress();
-    setAuthMessage("사용 가이드를 다시 볼 수 있도록 초기화했습니다. 각 탭에 들어가면 안내가 다시 표시됩니다.");
+    setAuthMessage(null);
+    setGuideReplaySignal((value) => value + 1);
   };
 
   const handleEnableBackup = async () => {
@@ -921,12 +921,24 @@ export default function SettingsScreen() {
             mark={screenLayoutLabel[settings.screenLayout]}
             onPress={() => setActiveSetting("screenLayout")}
           />
-          <ActionRow
-            label="사용 가이드 다시 보기"
-            detail="처음 사용하는 사람을 위한 화면별 안내를 다시 표시합니다."
-            mark="초기화"
-            onPress={handleResetGuideProgress}
-          />
+          <View style={[styles.guidePopupPanel, themed.panel]}>
+            <View style={styles.guidePopupCopy}>
+              <Text selectable style={[styles.guidePopupTitle, themed.text]}>
+                사용 가이드
+              </Text>
+              <Text selectable style={[styles.guidePopupDetail, themed.mutedText]}>
+                처음 사용하는 사람을 위한 화면별 안내 팝업을 다시 볼 수 있습니다.
+              </Text>
+            </View>
+            <Pressable
+              style={[styles.guidePopupButton, themed.activeFill]}
+              onPress={handleResetGuideProgress}
+            >
+              <Text selectable={false} style={[styles.guidePopupButtonText, themed.inverseText]}>
+                가이드 팝업 보기
+              </Text>
+            </Pressable>
+          </View>
           <ActionRow
             label="개인정보처리방침"
             detail="권한 사용과 데이터 처리 안내"
@@ -1621,7 +1633,7 @@ export default function SettingsScreen() {
           </View>
         </View>
       </Modal>
-      <AppGuideOverlay tabKey="settings" />
+      <AppGuideOverlay tabKey="settings" replaySignal={guideReplaySignal} />
     </>
   );
 }
@@ -1844,6 +1856,44 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.line,
     backgroundColor: colors.background
+  },
+  guidePopupPanel: {
+    gap: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.background
+  },
+  guidePopupCopy: {
+    gap: 5
+  },
+  guidePopupTitle: {
+    color: colors.text,
+    fontSize: typography.section,
+    fontWeight: "900",
+    lineHeight: 21,
+    letterSpacing: 0
+  },
+  guidePopupDetail: {
+    color: colors.muted,
+    fontSize: typography.small,
+    lineHeight: 18,
+    letterSpacing: 0
+  },
+  guidePopupButton: {
+    minHeight: controls.height,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: colors.text,
+    backgroundColor: colors.text
+  },
+  guidePopupButtonText: {
+    color: colors.inverse,
+    fontSize: typography.button,
+    fontWeight: "900",
+    letterSpacing: 0
   },
   guidePanelHeader: {
     flexDirection: "row",
