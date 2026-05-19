@@ -5,13 +5,12 @@ import {
   collection,
   deleteDoc,
   doc,
-  getDocs,
-  serverTimestamp,
-  setDoc
+  getDocs
 } from "firebase/firestore";
+import { httpsCallable } from "firebase/functions";
 import { deleteObject, getDownloadURL, ref, uploadBytes } from "firebase/storage";
 
-import { firestore, firebaseStorage } from "@/lib/firebase";
+import { firestore, firebaseFunctions, firebaseStorage } from "@/lib/firebase";
 import { localStorageAdapter } from "@/lib/local-storage";
 
 export type UserMusicTrack = {
@@ -81,6 +80,48 @@ const normalizeTrackName = (name?: string | null) => {
 const getContentType = (mimeType?: string | null) =>
   mimeType && mimeType.startsWith("audio/") ? mimeType : "audio/mpeg";
 
+type ReserveMusicUploadResponse = {
+  musicSessionId: string;
+  storagePath: string;
+  expiresInSeconds: number;
+};
+
+const callMusicFunction = async <Request, Response>(
+  name: string,
+  data: Request
+): Promise<Response> => {
+  if (!firebaseFunctions) {
+    throw new Error("Firebase Functions가 설정되지 않았습니다.");
+  }
+
+  const callable = httpsCallable<Request, Response>(firebaseFunctions, name);
+  const result = await callable(data);
+  return result.data;
+};
+
+const reserveMusicUpload = (data: {
+  trackId: string;
+  name: string;
+  fileSize: number;
+  contentType: string;
+  storagePath: string;
+}) =>
+  callMusicFunction<typeof data, ReserveMusicUploadResponse>(
+    "reserveMusicUpload",
+    data
+  );
+
+const completeMusicUpload = (data: {
+  musicSessionId: string;
+  trackId: string;
+  name: string;
+  downloadUrl: string;
+  createdAt: string;
+}) => callMusicFunction<typeof data, { trackId: string }>("completeMusicUpload", data);
+
+const releaseMusicUpload = (data: { musicSessionId: string }) =>
+  callMusicFunction<typeof data, { released: boolean }>("releaseMusicUpload", data);
+
 const saveTracksToCache = async (userId: string, tracks: UserMusicTrack[]) => {
   await localStorageAdapter.setItem(getMusicCacheKey(userId), JSON.stringify(tracks));
 };
@@ -105,11 +146,17 @@ export const getUserMusicTracks = async (userId?: string | null) => {
 const uploadLocalAudioFile = async ({
   uri,
   storagePath,
-  contentType
+  contentType,
+  trackId,
+  name,
+  createdAt
 }: {
   uri: string;
   storagePath: string;
   contentType: string;
+  trackId: string;
+  name: string;
+  createdAt: string;
 }) => {
   if (!firebaseStorage) {
     throw new Error("Firebase Storage가 설정되지 않았습니다.");
@@ -117,9 +164,38 @@ const uploadLocalAudioFile = async ({
 
   const response = await fetch(uri);
   const blob = await response.blob();
+  const reservation = await reserveMusicUpload({
+    trackId,
+    name,
+    fileSize: blob.size,
+    contentType,
+    storagePath
+  });
   const fileRef = ref(firebaseStorage, storagePath);
-  await uploadBytes(fileRef, blob, { contentType });
-  return getDownloadURL(fileRef);
+
+  try {
+    await uploadBytes(fileRef, blob, {
+      contentType,
+      customMetadata: {
+        musicSessionId: reservation.musicSessionId
+      }
+    });
+    const downloadUrl = await getDownloadURL(fileRef);
+    await completeMusicUpload({
+      musicSessionId: reservation.musicSessionId,
+      trackId,
+      name,
+      downloadUrl,
+      createdAt
+    });
+    return downloadUrl;
+  } catch (error) {
+    await releaseMusicUpload({
+      musicSessionId: reservation.musicSessionId
+    }).catch(() => undefined);
+    await deleteObject(fileRef).catch(() => undefined);
+    throw error;
+  }
 };
 
 export const syncUserMusicTracks = async (user: User | null) => {
@@ -213,6 +289,7 @@ export const pickAndUploadUserMusicTrack = async (user: User | null) => {
   const directory = await ensureMusicDirectory(user.uid);
   const fileName = `${id}-${sanitizeFileName(name)}.${extension}`;
   const localUri = `${directory}${fileName}`;
+  const createdAt = new Date().toISOString();
 
   await FileSystem.copyAsync({
     from: asset.uri,
@@ -223,9 +300,11 @@ export const pickAndUploadUserMusicTrack = async (user: User | null) => {
   const downloadUrl = await uploadLocalAudioFile({
     uri: localUri,
     storagePath,
-    contentType: getContentType(asset.mimeType)
+    contentType: getContentType(asset.mimeType),
+    trackId: id,
+    name,
+    createdAt
   });
-  const createdAt = new Date().toISOString();
   const track: UserMusicTrack = {
     id,
     userId: user.uid,
@@ -237,19 +316,6 @@ export const pickAndUploadUserMusicTrack = async (user: User | null) => {
     downloadUrl,
     createdAt
   };
-
-  await setDoc(doc(firestore, "users", user.uid, "musicTracks", id), {
-    id,
-    userId: user.uid,
-    name,
-    mimeType: track.mimeType,
-    size: track.size ?? null,
-    storagePath,
-    downloadUrl,
-    localUri,
-    createdAt,
-    updatedAt: serverTimestamp()
-  });
 
   const nextTracks = [track, ...currentTracks].slice(0, MAX_USER_MUSIC_TRACKS);
   await saveTracksToCache(user.uid, nextTracks);

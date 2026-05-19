@@ -635,17 +635,41 @@ function PhotoCard({
   const filledButtonTextStyle = {
     color: isDark ? palette.text : palette.inverse
   };
+  const secondaryButtonStyle = {
+    borderColor: palette.line,
+    backgroundColor: palette.background
+  };
+  const secondaryButtonTextStyle = {
+    color: palette.text
+  };
+  const secondaryDeleteButtonTextStyle = {
+    color: palette.muted
+  };
+  const thumbnailStyle = {
+    borderColor: palette.line,
+    backgroundColor: palette.surface
+  };
+  const primaryMetaTextStyle = {
+    color: palette.text
+  };
+  const secondaryMetaTextStyle = {
+    color: palette.muted
+  };
 
   return (
     <View style={styles.photoCard}>
       <Pressable onPress={() => router.push(`/photo/${photo.id}` as Href)}>
-        <NativeImage source={{ uri: photo.uri }} style={styles.thumbnail} resizeMode="cover" />
+        <NativeImage
+          source={{ uri: photo.uri }}
+          style={[styles.thumbnail, thumbnailStyle]}
+          resizeMode="cover"
+        />
       </Pressable>
       <View style={styles.photoMeta}>
-        <Text selectable style={styles.photoDate}>
+        <Text selectable style={[styles.photoDate, primaryMetaTextStyle]}>
           {formatDate(photo.createdAt)}
         </Text>
-        <Text selectable style={styles.metaText}>
+        <Text selectable style={[styles.metaText, secondaryMetaTextStyle]}>
           {photo.ratioLabel} / {photo.edited ? "편집됨" : "원본"}
         </Text>
       </View>
@@ -659,18 +683,21 @@ function PhotoCard({
           </Text>
         </Pressable>
         <Pressable
-          style={styles.cardLightButton}
+          style={[styles.cardLightButton, secondaryButtonStyle]}
           onPress={() => router.push(`/photo/${photo.id}` as Href)}
         >
-          <Text selectable={false} style={styles.cardLightButtonText}>
+          <Text selectable={false} style={[styles.cardLightButtonText, secondaryButtonTextStyle]}>
             보기
           </Text>
         </Pressable>
         <Pressable
-          style={styles.cardLightButton}
+          style={[styles.cardLightButton, secondaryButtonStyle]}
           onPress={() => onDelete(photo)}
         >
-          <Text selectable={false} style={styles.cardDeleteButtonText}>
+          <Text
+            selectable={false}
+            style={[styles.cardDeleteButtonText, secondaryDeleteButtonTextStyle]}
+          >
             삭제
           </Text>
         </Pressable>

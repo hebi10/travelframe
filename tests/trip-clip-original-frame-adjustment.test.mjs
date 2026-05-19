@@ -3,6 +3,7 @@ import fs from "node:fs";
 
 const previewSource = fs.readFileSync("components/trip-clip-preview-player.tsx", "utf8");
 const tripClipSource = fs.readFileSync("app/trip-clip.tsx", "utf8");
+const recordingSource = fs.readFileSync("components/trip-clip-recording-canvas.tsx", "utf8");
 
 for (const snippet of [
   "frameAspectRatio",
@@ -22,11 +23,16 @@ assert.ok(
 
 for (const snippet of [
   "frameAspectRatio={ratioAspect[ratio]}",
+]) {
+  assert.ok(tripClipSource.includes(snippet), `recording original-frame adjustment missing: ${snippet}`);
+}
+
+for (const snippet of [
   "frameAspectRatio: number;",
   "getOriginalImageFrameStyle",
   "contentFit=\"fill\""
 ]) {
-  assert.ok(tripClipSource.includes(snippet), `recording original-frame adjustment missing: ${snippet}`);
+  assert.ok(recordingSource.includes(snippet), `recording original-frame adjustment missing: ${snippet}`);
 }
 
 console.log("ok - trip clip adjustment moves the original image frame");

@@ -18,21 +18,16 @@ assert.match(homeSource, /const HOME_SLIDE_IMAGE_ASPECT_RATIO = 2 \/ 3;/);
 assert.match(homeSource, /aspectRatio: HOME_SLIDE_IMAGE_ASPECT_RATIO/);
 assert.match(homeSource, /contentFit="contain"/);
 assert.ok(
-  homeSource.includes("tightImage?: boolean"),
-  "home slides should allow selected images to be cropped tighter"
-);
-assert.equal(
-  homeSource.match(/tightImage: true/g)?.length,
-  2,
-  "only the second and third home slides should crop their top whitespace"
-);
-assert.ok(
   homeSource.includes("styles.heroImageFrame"),
   "home slide images should render inside a clipped frame"
 );
 assert.ok(
-  homeSource.includes("slide.tightImage && styles.heroImageTight"),
-  "tight home slides should move the image upward inside the frame"
+  homeSource.includes("style={styles.heroImage}"),
+  "home slide images should render without per-slide transform cropping"
+);
+assert.ok(
+  !homeSource.includes("heroImageTight"),
+  "home slide images should not be shifted or scaled in the frame"
 );
 
 for (const imageName of [

@@ -12,7 +12,7 @@ export default function TabsLayout() {
   const { palette, fontSizeScale, layoutScale, emphasisWeight } = useAppAppearance();
   const { isLoggedIn } = useAuth();
   const tabBarBottomPadding = Math.max(insets.bottom + 8, 16);
-  const tabBarHeight = Math.round(58 * layoutScale) + tabBarBottomPadding;
+  const tabBarHeight = 58 + tabBarBottomPadding;
 
   return (
     <Tabs
@@ -32,7 +32,7 @@ export default function TabsLayout() {
           width: "100%",
           maxWidth: MAX_APP_WIDTH,
           alignSelf: "center",
-          paddingTop: Math.round(6 * layoutScale),
+          paddingTop: 6,
           paddingBottom: tabBarBottomPadding,
           backgroundColor: palette.chrome,
           borderTopColor: palette.line
@@ -42,7 +42,7 @@ export default function TabsLayout() {
           marginBottom: 2
         },
         tabBarItemStyle: {
-          minHeight: Math.round(46 * layoutScale),
+          minHeight: 46,
           paddingVertical: Math.round(3 * layoutScale)
         },
         tabBarLabelStyle: {

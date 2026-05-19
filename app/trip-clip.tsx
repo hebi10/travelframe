@@ -35,7 +35,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppGuideOverlay } from "@/components/app-guide-overlay";
 import { InterstitialAdModal } from "@/components/interstitial-ad-modal";
-import { CameraGuideOverlay } from "@/components/camera-guide-overlay";
+import { TripClipRecordingCanvas } from "@/components/trip-clip-recording-canvas";
 import { TripClipPreviewPlayer } from "@/components/trip-clip-preview-player";
 import { colors, controls, spacing, typography } from "@/constants/app-theme";
 import {
@@ -115,6 +115,7 @@ import {
   useOptionalViewRecorder
 } from "@/lib/view-recorder";
 import {
+  backupPhotoIfEnabled,
   backupImageBundleWork,
   backupMadeVideo,
   subscribeCloudBackupOverview,
@@ -139,10 +140,13 @@ import {
   USER_MUSIC_LIMIT,
   type UserMusicTrack
 } from "@/lib/user-music";
+import {
+  DEFAULT_TRIP_CLIP_FRAME_DURATION as DEFAULT_DURATION,
+  getDefaultFrameDuration,
+  getRecordingFrame
+} from "@/lib/trip-clip-playback";
 import type { PhotoItem } from "@/types/photo";
 
-const DEFAULT_DURATION = 2.5;
-const FIRST_FRAME_DURATION = Math.max(0.5, DEFAULT_DURATION - 0.5);
 const initialExportProgress = {
   visible: false,
   percent: 0,
@@ -256,19 +260,10 @@ const ratioAspect: Record<TripClipRatio, number> = {
   "3:4": 3 / 4
 };
 
-type RecordingFrame = {
-  currentPhoto: PhotoItem | null;
-  nextPhoto: PhotoItem | null;
-  transitionProgress: number;
-};
-
 const getPhotoLabel = (photo: PhotoItem) =>
   photo.kind === "edited" ? "편집 사진" : "원본 사진";
 
 const getPreviewUri = (photo: PhotoItem) => photo.previewUri ?? photo.uri;
-
-const getDefaultFrameDuration = (index: number) =>
-  index === 0 ? FIRST_FRAME_DURATION : DEFAULT_DURATION;
 
 const waitForPaint = () =>
   new Promise<void>((resolve) => {
@@ -295,67 +290,6 @@ const toFileUri = (pathOrUri: string) => {
   }
 
   return `file://${pathOrUri}`;
-};
-
-const getRecordingFrame = ({
-  frameIndex,
-  fps,
-  photos,
-  durations,
-  transition,
-  transitionDuration
-}: {
-  frameIndex: number;
-  fps: number;
-  photos: PhotoItem[];
-  durations: Record<string, number>;
-  transition: TripClipTransition;
-  transitionDuration: number;
-}): RecordingFrame => {
-  if (photos.length === 0) {
-    return {
-      currentPhoto: null,
-      nextPhoto: null,
-      transitionProgress: 0
-    };
-  }
-
-  const seconds = frameIndex / fps;
-  let elapsed = 0;
-
-  for (let index = 0; index < photos.length; index += 1) {
-    const photo = photos[index];
-    const duration = durations[photo.id] ?? getDefaultFrameDuration(index);
-    const isLast = index === photos.length - 1;
-
-    if (seconds < elapsed + duration || isLast) {
-      const localSeconds = Math.max(0, Math.min(duration, seconds - elapsed));
-      const nextPhoto = photos[index + 1] ?? null;
-      const transitionWindow =
-        transition === "none" || !nextPhoto
-          ? 0
-          : Math.max(0.1, Math.min(transitionDuration, duration * 0.5));
-      const transitionStart = duration - transitionWindow;
-      const transitionProgress =
-        transitionWindow > 0 && localSeconds >= transitionStart
-          ? Math.max(0, Math.min(1, (localSeconds - transitionStart) / transitionWindow))
-          : 0;
-
-      return {
-        currentPhoto: photo,
-        nextPhoto: transitionProgress > 0 ? nextPhoto : null,
-        transitionProgress
-      };
-    }
-
-    elapsed += duration;
-  }
-
-  return {
-    currentPhoto: photos[photos.length - 1] ?? null,
-    nextPhoto: null,
-    transitionProgress: 0
-  };
 };
 
 export default function TripClipScreen() {
@@ -1048,6 +982,29 @@ export default function TripClipScreen() {
           })
         )
       );
+      let backupFailureCount = 0;
+
+      for (const savedPhoto of savedPhotos) {
+        try {
+          await backupPhotoIfEnabled({
+            user,
+            subscription,
+            photo: savedPhoto
+          });
+        } catch (backupError) {
+          backupFailureCount += 1;
+          console.error("가져온 사진 자동 백업에 실패했습니다.", backupError);
+          await recordBackupFailure({
+            id: savedPhoto.id,
+            kind: "photo",
+            label: "가져온 사진",
+            message: getUserFacingErrorMessage(
+              backupError,
+              "클라우드 백업을 완료하지 못했습니다."
+            )
+          });
+        }
+      }
 
       setPhotos((current) => [...savedPhotos, ...current]);
       setSelectedIds((current) => [
@@ -1057,7 +1014,11 @@ export default function TripClipScreen() {
           .filter((id) => !current.includes(id))
       ]);
       setActiveIndex(0);
-      setExportMessage(null);
+      setExportMessage(
+        backupFailureCount > 0
+          ? `사진은 추가됐지만 ${backupFailureCount}장은 클라우드 백업을 설정에서 다시 시도할 수 있습니다.`
+          : null
+      );
     } catch (error) {
       setExportMessage(getUserFacingErrorMessage(error, "사진을 선택하지 못했습니다."));
     } finally {
@@ -2720,156 +2681,6 @@ export default function TripClipScreen() {
         onClose={() => setIsPostSaveAdVisible(false)}
       />
       <AppGuideOverlay tabKey="tripClip" />
-    </View>
-  );
-}
-
-const getRecordingPhotoAdjustmentStyle = (adjustment: TripClipPhotoAdjustment) => ({
-  transform: [
-    { translateX: adjustment.translateX },
-    { translateY: adjustment.translateY },
-    { scale: adjustment.scale }
-  ]
-});
-
-const getOriginalImageFrameStyle = (
-  photo: PhotoItem | null,
-  frameAspectRatio: number,
-  contentFit: "contain" | "cover"
-) => {
-  const imageAspectRatio =
-    photo?.width && photo?.height ? photo.width / photo.height : frameAspectRatio;
-
-  if (!Number.isFinite(imageAspectRatio) || imageAspectRatio <= 0) {
-    return {
-      width: "100%" as const,
-      height: "100%" as const
-    };
-  }
-
-  const shouldFitByWidth =
-    contentFit === "contain"
-      ? imageAspectRatio >= frameAspectRatio
-      : imageAspectRatio <= frameAspectRatio;
-
-  return shouldFitByWidth
-    ? {
-        width: "100%" as const,
-        aspectRatio: imageAspectRatio
-      }
-    : {
-        height: "100%" as const,
-        aspectRatio: imageAspectRatio
-      };
-};
-
-function TripClipRecordingCanvas({
-  frame,
-  template,
-  transition,
-  showWatermark,
-  frameAspectRatio,
-  guideVisible,
-  guide,
-  guideSize,
-  guideStrokeWidth,
-  guideColor,
-  guideOffsetX,
-  guideOffsetY,
-  photoAdjustments
-}: {
-  frame: RecordingFrame;
-  template: TripClipTemplate;
-  transition: TripClipTransition;
-  showWatermark: boolean;
-  frameAspectRatio: number;
-  guideVisible: boolean;
-  guide: GuideType;
-  guideSize: number;
-  guideStrokeWidth: number;
-  guideColor: string;
-  guideOffsetX: number;
-  guideOffsetY: number;
-  photoAdjustments: TripClipPhotoAdjustmentMap;
-}) {
-  const isFilm = template === "film-log";
-  const isCenter = template === "center-cut";
-  const contentFit = isFilm || isCenter ? "contain" : "cover";
-  const progress = frame.transitionProgress;
-  const currentAdjustmentStyle = getRecordingPhotoAdjustmentStyle(
-    getTripClipPhotoAdjustment(photoAdjustments, frame.currentPhoto?.id)
-  );
-  const nextAdjustmentStyle = getRecordingPhotoAdjustmentStyle(
-    getTripClipPhotoAdjustment(photoAdjustments, frame.nextPhoto?.id)
-  );
-  const nextLayerStyle =
-    transition === "slide"
-      ? { opacity: progress > 0 ? 1 : 0, transform: [{ translateX: (1 - progress) * 44 }] }
-      : transition === "zoom"
-        ? { opacity: progress > 0 ? 1 : 0, transform: [{ scale: 1.08 - progress * 0.08 }] }
-        : { opacity: transition === "fade" ? progress : progress > 0 ? 1 : 0 };
-
-  return (
-    <View style={[styles.recordingCanvasInner, isFilm && styles.recordingCanvasFilm]}>
-      {frame.currentPhoto ? (
-        <View style={styles.recordingLayer}>
-          <View style={[styles.recordingImageMotionLayer, currentAdjustmentStyle]}>
-            <Image
-              source={{ uri: getPreviewUri(frame.currentPhoto) }}
-              style={[
-                styles.recordingImage,
-                getOriginalImageFrameStyle(frame.currentPhoto, frameAspectRatio, contentFit),
-                isFilm && styles.recordingImageFilm
-              ]}
-              contentFit="fill"
-              cachePolicy="memory-disk"
-            />
-          </View>
-        </View>
-      ) : null}
-      {frame.nextPhoto ? (
-        <View style={[styles.recordingLayer, styles.recordingNextLayer, nextLayerStyle]}>
-          <View style={[styles.recordingImageMotionLayer, nextAdjustmentStyle]}>
-            <Image
-              source={{ uri: getPreviewUri(frame.nextPhoto) }}
-              style={[
-                styles.recordingImage,
-                getOriginalImageFrameStyle(frame.nextPhoto, frameAspectRatio, contentFit),
-                isFilm && styles.recordingImageFilm
-              ]}
-              contentFit="fill"
-              cachePolicy="memory-disk"
-            />
-          </View>
-        </View>
-      ) : null}
-      {isFilm ? (
-        <View style={styles.recordingFilmMeta}>
-          <Text selectable={false} style={styles.recordingFilmText}>
-            트래블프레임
-          </Text>
-          <Text selectable={false} style={styles.recordingFilmText}>
-            구도 편집
-          </Text>
-        </View>
-      ) : null}
-      {isCenter ? <View style={styles.recordingCenterGuide} /> : null}
-      <CameraGuideOverlay
-        guide={guide}
-        visible={guideVisible}
-        size={guideSize}
-        strokeWidth={guideStrokeWidth}
-        color={guideColor}
-        offsetX={guideOffsetX}
-        offsetY={guideOffsetY}
-      />
-      {showWatermark ? (
-        <View style={styles.recordingWatermark}>
-          <Text selectable={false} style={styles.recordingWatermarkText}>
-            트래블프레임
-          </Text>
-        </View>
-      ) : null}
     </View>
   );
 }

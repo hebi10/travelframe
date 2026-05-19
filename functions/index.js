@@ -25,7 +25,9 @@ const toHttpsError = (error) => {
     message.includes("storage path") ||
     message.includes("content type") ||
     message.includes("file size") ||
-    message.includes("media kind")
+    message.includes("media kind") ||
+    message.includes("music") ||
+    message.includes("Music")
   ) {
     return new HttpsError("failed-precondition", message);
   }
@@ -59,6 +61,42 @@ const getCreatorSubscription = async (uid) => {
 const getUsageRef = (uid) => db.doc(`users/${uid}/backupUsage/current`);
 const getSessionRef = (uid, sessionId) =>
   db.doc(`users/${uid}/backupUploadSessions/${sessionId}`);
+const getMusicSessionRef = (uid, sessionId) =>
+  db.doc(`users/${uid}/musicUploadSessions/${sessionId}`);
+
+const MAX_USER_MUSIC_TRACKS = 3;
+const MUSIC_UPLOAD_SESSION_TTL_MS = 15 * 60 * 1000;
+
+const assertMusicUploadAllowed = ({ uid, trackId, name, fileSize, contentType, storagePath }) => {
+  if (typeof trackId !== "string" || !/^music-\d+/.test(trackId)) {
+    throw new HttpsError("invalid-argument", "Valid trackId is required.");
+  }
+
+  if (typeof name !== "string" || !name.trim()) {
+    throw new HttpsError("invalid-argument", "Music track name is required.");
+  }
+
+  if (typeof storagePath !== "string" || storagePath.includes("..")) {
+    throw new HttpsError("invalid-argument", "Invalid music storage path.");
+  }
+
+  if (!storagePath.startsWith(`users/${uid}/music/`)) {
+    throw new HttpsError("invalid-argument", "Invalid music storage path.");
+  }
+
+  if (typeof contentType !== "string" || !/^audio\/.+$/.test(contentType)) {
+    throw new HttpsError("invalid-argument", "Invalid music content type.");
+  }
+
+  if (!Number.isFinite(fileSize) || fileSize <= 0 || fileSize > 50 * 1024 * 1024) {
+    throw new HttpsError("invalid-argument", "Invalid music file size.");
+  }
+};
+
+const getMusicTrackCount = async (transaction, uid) => {
+  const snapshot = await transaction.get(db.collection(`users/${uid}/musicTracks`));
+  return snapshot.size;
+};
 
 exports.reserveBackupUpload = onCall(async (request) => {
   try {
@@ -203,6 +241,177 @@ exports.releaseBackupUpload = onCall(async (request) => {
     }
 
     const sessionRef = getSessionRef(uid, backupSessionId);
+    await db.runTransaction(async (transaction) => {
+      const sessionSnapshot = await transaction.get(sessionRef);
+      if (!sessionSnapshot.exists) {
+        return;
+      }
+
+      const session = sessionSnapshot.data();
+      if (session.status === "reserved") {
+        transaction.update(sessionRef, {
+          status: "released",
+          releasedAt: FieldValue.serverTimestamp()
+        });
+      }
+    });
+
+    return { released: true };
+  } catch (error) {
+    throw toHttpsError(error);
+  }
+});
+
+exports.reserveMusicUpload = onCall(async (request) => {
+  try {
+    const uid = requireUid(request);
+    const { trackId, name, fileSize, contentType, storagePath } = request.data ?? {};
+
+    assertMusicUploadAllowed({
+      uid,
+      trackId,
+      name,
+      fileSize,
+      contentType,
+      storagePath
+    });
+
+    const sessionRef = db.collection(`users/${uid}/musicUploadSessions`).doc();
+
+    await db.runTransaction(async (transaction) => {
+      const trackCount = await getMusicTrackCount(transaction, uid);
+      if (trackCount >= MAX_USER_MUSIC_TRACKS) {
+        throw new HttpsError("failed-precondition", "User music track limit exceeded.");
+      }
+
+      transaction.set(sessionRef, {
+        userId: uid,
+        trackId,
+        name: name.trim(),
+        fileSize,
+        contentType,
+        storagePath,
+        status: "reserved",
+        createdAt: FieldValue.serverTimestamp(),
+        expiresAt: admin.firestore.Timestamp.fromMillis(Date.now() + MUSIC_UPLOAD_SESSION_TTL_MS)
+      });
+    });
+
+    return {
+      musicSessionId: sessionRef.id,
+      storagePath,
+      expiresInSeconds: MUSIC_UPLOAD_SESSION_TTL_MS / 1000
+    };
+  } catch (error) {
+    throw toHttpsError(error);
+  }
+});
+
+exports.completeMusicUpload = onCall(async (request) => {
+  try {
+    const uid = requireUid(request);
+    const { musicSessionId, trackId, name, downloadUrl, createdAt } = request.data ?? {};
+    if (typeof musicSessionId !== "string" || !musicSessionId) {
+      throw new HttpsError("invalid-argument", "musicSessionId is required.");
+    }
+
+    const sessionRef = getMusicSessionRef(uid, musicSessionId);
+    const sessionSnapshot = await sessionRef.get();
+    if (!sessionSnapshot.exists) {
+      throw new HttpsError("not-found", "Music upload session was not found.");
+    }
+
+    const session = sessionSnapshot.data();
+    if (session.status === "completed") {
+      return { trackId: session.trackId };
+    }
+
+    if (session.status !== "reserved") {
+      throw new HttpsError("failed-precondition", "Music upload session is not active.");
+    }
+
+    if (session.expiresAt?.toMillis && session.expiresAt.toMillis() < Date.now()) {
+      throw new HttpsError("deadline-exceeded", "Music upload session expired.");
+    }
+
+    if (session.trackId !== trackId || session.name !== String(name ?? "").trim()) {
+      throw new HttpsError("failed-precondition", "Music upload session metadata does not match.");
+    }
+
+    const [metadata] = await bucket.file(session.storagePath).getMetadata();
+    const objectSize = Number(metadata.size);
+    const objectContentType = metadata.contentType;
+    const objectSessionId = metadata.metadata?.musicSessionId;
+
+    if (
+      objectSize !== session.fileSize ||
+      objectContentType !== session.contentType ||
+      objectSessionId !== musicSessionId
+    ) {
+      throw new HttpsError("failed-precondition", "Uploaded music object does not match the reserved session.");
+    }
+
+    const safeDownloadUrl =
+      typeof downloadUrl === "string" &&
+      downloadUrl.startsWith("https://firebasestorage.googleapis.com/")
+        ? downloadUrl
+        : null;
+    const safeCreatedAt =
+      typeof createdAt === "string" && !Number.isNaN(new Date(createdAt).getTime())
+        ? createdAt
+        : new Date().toISOString();
+    const trackRef = db.doc(`users/${uid}/musicTracks/${trackId}`);
+
+    await db.runTransaction(async (transaction) => {
+      const [freshSessionSnapshot, existingTrackSnapshot] = await Promise.all([
+        transaction.get(sessionRef),
+        transaction.get(trackRef)
+      ]);
+      const freshSession = freshSessionSnapshot.data();
+      if (!freshSessionSnapshot.exists || freshSession.status !== "reserved") {
+        return;
+      }
+
+      if (!existingTrackSnapshot.exists) {
+        const trackCount = await getMusicTrackCount(transaction, uid);
+        if (trackCount >= MAX_USER_MUSIC_TRACKS) {
+          throw new HttpsError("failed-precondition", "User music track limit exceeded.");
+        }
+      }
+
+      transaction.set(trackRef, {
+        id: trackId,
+        userId: uid,
+        name: freshSession.name,
+        mimeType: freshSession.contentType,
+        size: freshSession.fileSize,
+        storagePath: freshSession.storagePath,
+        downloadUrl: safeDownloadUrl,
+        createdAt: safeCreatedAt,
+        updatedAt: FieldValue.serverTimestamp()
+      });
+      transaction.update(sessionRef, {
+        status: "completed",
+        completedAt: FieldValue.serverTimestamp(),
+        objectGeneration: metadata.generation ?? null
+      });
+    });
+
+    return { trackId };
+  } catch (error) {
+    throw toHttpsError(error);
+  }
+});
+
+exports.releaseMusicUpload = onCall(async (request) => {
+  try {
+    const uid = requireUid(request);
+    const { musicSessionId } = request.data ?? {};
+    if (typeof musicSessionId !== "string" || !musicSessionId) {
+      throw new HttpsError("invalid-argument", "musicSessionId is required.");
+    }
+
+    const sessionRef = getMusicSessionRef(uid, musicSessionId);
     await db.runTransaction(async (transaction) => {
       const sessionSnapshot = await transaction.get(sessionRef);
       if (!sessionSnapshot.exists) {

@@ -24,7 +24,6 @@ const homeSlides: {
   href: Href;
   label: string;
   detail: string;
-  tightImage?: boolean;
 }[] = [
   {
     image: require("../../assets/images/home-slide-camera.png"),
@@ -35,14 +34,12 @@ const homeSlides: {
   {
     image: require("../../assets/images/home-slide-edit.png"),
     href: "/studio",
-    tightImage: true,
     label: "사진 편집",
     detail: "촬영한 사진의 비율, 위치, 회전을 정리하고 저장합니다."
   },
   {
     image: require("../../assets/images/home-slide-video.png"),
     href: "/trip-clip",
-    tightImage: true,
     label: "영상 만들기",
     detail: "여러 사진의 순서와 전환을 정해 짧은 영상으로 저장합니다."
   }
@@ -120,7 +117,7 @@ export default function HomeScreen() {
               <View style={[styles.heroImageFrame, { backgroundColor: palette.surface }]}>
                 <Image
                   source={slide.image}
-                  style={[styles.heroImage, slide.tightImage && styles.heroImageTight]}
+                  style={styles.heroImage}
                   contentFit="contain"
                 />
               </View>
@@ -228,9 +225,6 @@ const styles = StyleSheet.create({
   heroImage: {
     width: "100%",
     aspectRatio: HOME_SLIDE_IMAGE_ASPECT_RATIO
-  },
-  heroImageTight: {
-    transform: [{ translateY: -20 }, { scale: 1.08 }]
   },
   heroCopy: {
     gap: 8,

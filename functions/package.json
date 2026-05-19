@@ -7,7 +7,6 @@
   "main": "index.js",
   "dependencies": {
     "firebase-admin": "^12.7.0",
-    "firebase-functions": "^6.2.0",
-    "travel-frame": "file:.."
+    "firebase-functions": "^6.2.0"
   }
 }

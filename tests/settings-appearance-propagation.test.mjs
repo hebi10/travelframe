@@ -40,10 +40,10 @@ assert.ok(
   "settings screen should react to global setting changes"
 );
 assert.ok(
-  accountScreen.includes("backgroundColor: isDark ? palette.ink : palette.text") &&
+  accountScreen.includes("backgroundColor: isDark ? palette.surfaceStrong : palette.text") &&
     accountScreen.includes("backgroundColor: palette.surfaceStrong") &&
-    accountScreen.includes("color: palette.inverse"),
-  "account login controls should keep visible dark-mode contrast"
+    accountScreen.includes("color: isDark ? palette.text : palette.inverse"),
+  "account active controls should keep visible dark-mode contrast without white fills"
 );
 assert.ok(
   tabsLayout.includes("fontSizeScale") &&

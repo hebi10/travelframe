@@ -1,6 +1,6 @@
 {
   "name": "travel-frame",
-  "version": "1.0.11",
+  "version": "1.0.12",
   "private": true,
   "main": "expo-router/entry",
   "scripts": {
@@ -16,7 +16,7 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "test": "node tests/no-legacy-renderer.test.mjs && node tests/media-library-availability.test.mjs && node tests/trip-clip-selection.test.mjs && node tests/trip-clip-photo-adjustment.test.mjs && node tests/trip-clip-original-frame-adjustment.test.mjs && node tests/trip-clip-music-border.test.mjs && node tests/trip-clip-music-add.test.mjs && node tests/export-settings-sync.test.mjs && node tests/trip-clip-export-quality-placement.test.mjs && node tests/trip-clip-image-export-rendering.test.mjs && node tests/trip-clip-guide-position-controls.test.mjs && node tests/trip-clip-empty-preview-text.test.mjs && node tests/home-slide-layout.test.mjs && node tests/home-bottom-gap.test.mjs && node tests/subscription-copy.test.mjs && node tests/subscription-products.test.mjs && node tests/subscription-security.test.mjs && node tests/account-backup-summary.test.mjs && node tests/bottom-tab-spacing.test.mjs && node tests/modal-safe-area.test.mjs && node tests/delete-request-modal.test.mjs && node tests/delete-account-page-copy.test.mjs && node tests/export-modal-copy.test.mjs && node tests/trip-clip-export-default.test.mjs && node tests/account-management-section-removed.test.mjs && node tests/cloud-backup-manual-delete-policy.test.mjs && node tests/server-backup-quota.test.mjs && node tests/firebase-backup-server-enforcement.test.mjs && node tests/firebase-security-rules.test.mjs && node tests/cloud-backup-limits.test.mjs && node tests/trip-clip-video-backup-option.test.mjs && node tests/studio-backup-usage.test.mjs && node tests/studio-multi-image-import-progress.test.mjs && node tests/studio-video-create-copy.test.mjs && node tests/studio-cta-text-wrap.test.mjs && node tests/edit-safe-area-straighten.test.mjs && node tests/video-utils.test.mjs && node tests/trip-clip-duration-quality.test.mjs && node tests/image-backup-utils.test.mjs && node tests/cloud-backup-image-optimization.test.mjs && node tests/settings-image-backup-quality.test.mjs && node tests/backup-sync-policy.test.mjs && node tests/backup-failure-retry.test.mjs && node tests/manual-device-qa-checklist.test.mjs && node tests/camera-permission-request.test.mjs && node tests/camera-ratio-setting.test.mjs && node tests/guide-offset-shared-surfaces.test.mjs && node tests/google-auth-redirect-route.test.mjs && node tests/settings-google-login.test.mjs && node tests/settings-backup-progress.test.mjs && node tests/camera-guide-position.test.mjs && node tests/camera-guide-entry-modal.test.mjs && node tests/android-signing-env-loader.test.mjs",
+    "test": "node scripts/run-tests.mjs",
     "security:secrets": "gitleaks detect --source . --verbose --redact",
     "typecheck": "tsc --noEmit",
     "firebase:deploy-rules": "firebase deploy --only firestore:rules,storage --project travelframe-4e1fb",

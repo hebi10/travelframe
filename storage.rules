@@ -34,6 +34,15 @@ service firebase.storage {
       return firestore.get(/databases/(default)/documents/users/$(userId)/backupUploadSessions/$(request.resource.metadata.backupSessionId));
     }
 
+    function hasMusicSession() {
+      return request.resource.metadata.musicSessionId is string
+        && request.resource.metadata.musicSessionId.size() > 0;
+    }
+
+    function musicUploadSession(userId) {
+      return firestore.get(/databases/(default)/documents/users/$(userId)/musicUploadSessions/$(request.resource.metadata.musicSessionId));
+    }
+
     function isReservedBackupUpload(userId, mediaKind) {
       return isOwner(userId)
         && hasBackupSession()
@@ -44,6 +53,17 @@ service firebase.storage {
         && backupSession(userId).data.fileSize == request.resource.size
         && backupSession(userId).data.contentType == request.resource.contentType
         && backupSession(userId).data.expiresAt > request.time;
+    }
+
+    function isReservedMusicUpload(userId) {
+      return isOwner(userId)
+        && hasMusicSession()
+        && musicUploadSession(userId).data.userId == userId
+        && musicUploadSession(userId).data.status == "reserved"
+        && musicUploadSession(userId).data.storagePath == request.resource.name
+        && musicUploadSession(userId).data.fileSize == request.resource.size
+        && musicUploadSession(userId).data.contentType == request.resource.contentType
+        && musicUploadSession(userId).data.expiresAt > request.time;
     }
 
     match /users/{userId}/backups/photos/{fileName} {
@@ -72,8 +92,7 @@ service firebase.storage {
 
     match /users/{userId}/music/{allPaths=**} {
       allow read: if isOwner(userId);
-      allow create, update: if isOwner(userId)
-        && isAudioUpload();
+      allow create, update: if isReservedMusicUpload(userId) && isAudioUpload();
       allow delete: if isOwner(userId);
     }
 

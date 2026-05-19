@@ -155,7 +155,7 @@ const callBackupFunction = async <Request, Response>(
       message.includes("Active creator subscription")
     ) {
       throw new Error(
-        "영상 내보내기 플랜이 활성화된 계정만 백업할 수 있습니다. 관리자 페이지에서 구독 상태를 확인해 주세요."
+        "구독이 활성화된 계정만 백업할 수 있습니다. 관리자 페이지에서 구독 상태를 확인해 주세요."
       );
     }
 

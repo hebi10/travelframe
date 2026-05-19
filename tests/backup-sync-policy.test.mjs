@@ -8,6 +8,7 @@ const cameraSource = fs.readFileSync("app/(tabs)/camera.tsx", "utf8");
 const capturePreviewSource = fs.readFileSync("app/capture-preview.tsx", "utf8");
 const editSource = fs.readFileSync("app/edit.tsx", "utf8");
 const studioSource = fs.readFileSync("app/(tabs)/studio.tsx", "utf8");
+const tripClipSource = fs.readFileSync("app/trip-clip.tsx", "utf8");
 const userMusicSource = fs.readFileSync("lib/user-music.ts", "utf8");
 
 for (const snippet of [
@@ -61,6 +62,22 @@ for (const [name, source] of [
 ]) {
   assert.ok(source.includes("backupPhotoIfEnabled"), `${name} should auto-backup saved photos`);
   assert.ok(source.includes("recordBackupFailure"), `${name} should record failed auto-backups for retry`);
+}
+
+const tripClipImportStart = tripClipSource.indexOf("const pickPhotosFromPreview = async () => {");
+const tripClipImportEnd = tripClipSource.indexOf("const handleAddUserMusic", tripClipImportStart);
+assert.ok(tripClipImportStart >= 0 && tripClipImportEnd > tripClipImportStart, "trip clip image import flow should exist");
+const tripClipImportSource = tripClipSource.slice(tripClipImportStart, tripClipImportEnd);
+
+for (const snippet of [
+  "backupPhotoIfEnabled",
+  "recordBackupFailure",
+  'kind: "photo"'
+]) {
+  assert.ok(
+    tripClipImportSource.includes(snippet),
+    `trip clip image import should auto-backup saved photos and queue failures: ${snippet}`
+  );
 }
 
 assert.ok(
