@@ -5,7 +5,7 @@ const cameraSource = fs.readFileSync("app/(tabs)/camera.tsx", "utf8");
 
 for (const snippet of [
   "const nextPermission = permission ?? (await getPermission());",
-  "nextPermission &&",
+  "!nextPermission ||",
   "!nextPermission.granted",
   "nextPermission.canAskAgain",
   "await requestPermission();"

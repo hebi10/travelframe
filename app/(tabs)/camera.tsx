@@ -216,9 +216,8 @@ export default function CameraScreen() {
 
         const nextPermission = permission ?? (await getPermission());
         if (
-          nextPermission &&
-          !nextPermission.granted &&
-          nextPermission.canAskAgain
+          !nextPermission ||
+          (!nextPermission.granted && nextPermission.canAskAgain)
         ) {
           hasRequestedPermissionOnFocus.current = true;
           await requestPermission();
