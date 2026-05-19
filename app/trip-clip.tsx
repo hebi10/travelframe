@@ -586,6 +586,9 @@ export default function TripClipScreen() {
     previewGuideOffsetYValue.value = settings.guideOffsetY;
     setCloudBackupEnabled(settings.cloudBackupEnabled);
     setImageQuality(settings.imageBackupQuality);
+    setVideoQuality(settings.videoQuality);
+    setExportFormat(settings.tripClipExportFormat);
+    setImageSaveFormat(settings.imageSaveFormat);
 
     if (videoId && restoredVideoIdRef.current !== videoId) {
       const storedVideo = await getMadeVideoById(videoId);
@@ -798,6 +801,28 @@ export default function TripClipScreen() {
   const updateImageQuality = (nextQuality: ImageQuality) => {
     setImageQuality(nextQuality);
     void updateAppSettings({ imageBackupQuality: nextQuality });
+  };
+
+  const updateTripClipRatio = (nextRatio: TripClipRatio) => {
+    setRatio(nextRatio);
+    void updateAppSettings({ defaultRatio: nextRatio });
+  };
+
+  const updateTripClipExportFormat = (nextFormat: ExportFormat) => {
+    setExportFormat(nextFormat);
+    setExportMessage(null);
+    void updateAppSettings({ tripClipExportFormat: nextFormat });
+  };
+
+  const updateTripClipVideoQuality = (nextQuality: VideoQualityId) => {
+    setVideoQuality(nextQuality);
+    setRenderedVideoUri(null);
+    void updateAppSettings({ videoQuality: nextQuality });
+  };
+
+  const updateTripClipImageSaveFormat = (nextFormat: ImageSaveFormat) => {
+    setImageSaveFormat(nextFormat);
+    void updateAppSettings({ imageSaveFormat: nextFormat });
   };
 
   const commitPreviewGuideSizeInput = () => {
@@ -1994,7 +2019,7 @@ export default function TripClipScreen() {
               key={item}
               label={item}
               active={ratio === item}
-              onPress={() => setRatio(item)}
+              onPress={() => updateTripClipRatio(item)}
             />
           ))}
         </OptionRow>
@@ -2311,10 +2336,7 @@ export default function TripClipScreen() {
                 <Pressable
                   key={option.value}
                   style={[styles.exportFormatOption, isActive && styles.exportFormatOptionActive]}
-                  onPress={() => {
-                    setExportFormat(option.value);
-                    setExportMessage(null);
-                  }}
+                  onPress={() => updateTripClipExportFormat(option.value)}
                 >
                   <View style={styles.exportFormatCopy}>
                     <Text
@@ -2353,10 +2375,7 @@ export default function TripClipScreen() {
                       key={option.id}
                       label={option.label}
                       active={videoQuality === option.id}
-                      onPress={() => {
-                        setVideoQuality(option.id);
-                        setRenderedVideoUri(null);
-                      }}
+                      onPress={() => updateTripClipVideoQuality(option.id)}
                     />
                   ))}
                 </OptionRow>
@@ -2434,7 +2453,7 @@ export default function TripClipScreen() {
                         styles.imageFormatButton,
                         isActive && styles.imageFormatButtonActive
                       ]}
-                      onPress={() => setImageSaveFormat(option.value)}
+                      onPress={() => updateTripClipImageSaveFormat(option.value)}
                     >
                       <Text
                         selectable={false}

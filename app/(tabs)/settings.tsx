@@ -32,6 +32,7 @@ import {
   PRIVACY_POLICY_URL
 } from "@/constants/legal-links";
 import { TRIP_CLIP_RATIOS, type TripClipRatio } from "@/constants/trip-clip";
+import { VIDEO_QUALITY_OPTIONS } from "@/constants/video";
 import {
   DEFAULT_GUIDE_COLOR,
   GUIDE_SIZE_MAX,
@@ -42,11 +43,13 @@ import {
   getAppSettings,
   saveAppSettings,
   subscribeAppSettings,
+  type AppImageSaveFormat,
   type AppSettings,
-  type ExportQuality,
+  type CameraSaveScope,
   type FontSize,
   type FontStyle,
   type ScreenLayout,
+  type TripClipExportFormat,
   type ThemeMode
 } from "@/lib/app-settings";
 import { type AppPalette, useAppAppearance } from "@/lib/app-appearance";
@@ -86,8 +89,12 @@ type SettingKey =
   | "guideStrokeWidth"
   | "guideColor"
   | "overlayOpacity"
+  | "cameraRatio"
+  | "cameraSaveScope"
   | "defaultRatio"
-  | "exportQuality"
+  | "videoQuality"
+  | "tripClipExportFormat"
+  | "imageSaveFormat"
   | "themeMode"
   | "fontStyle"
   | "fontSize"
@@ -96,6 +103,29 @@ type SettingKey =
   | "imageBackupQuality";
 
 const opacityOptions = [0.2, 0.3, 0.4, 0.5, 0.6, 0.7];
+const cameraRatioOptions = ["Original", "1:1", "3:4", "4:5", "9:16", "16:9"] as const;
+const cameraSaveScopeOptions: { value: CameraSaveScope; label: string; detail: string }[] = [
+  { value: "app", label: "앱", detail: "앱 사진 목록에만 저장합니다." },
+  { value: "device", label: "핸드폰", detail: "핸드폰 앨범에만 저장합니다." },
+  { value: "both", label: "앱, 핸드폰", detail: "앱과 핸드폰 앨범에 함께 저장합니다." }
+];
+const tripClipExportFormatOptions: {
+  value: TripClipExportFormat;
+  label: string;
+  detail: string;
+}[] = [
+  { value: "mp4", label: "MP4 영상", detail: "영상으로 저장하는 화면을 기본값으로 엽니다." },
+  { value: "images", label: "이미지 저장", detail: "개별 이미지 저장 화면을 기본값으로 엽니다." }
+];
+const imageSaveFormatOptions: {
+  value: AppImageSaveFormat;
+  label: string;
+  detail: string;
+}[] = [
+  { value: "original", label: "원본 형식", detail: "현재 앱에 저장된 이미지 형식을 유지합니다." },
+  { value: "png", label: "PNG", detail: "무손실 PNG로 저장합니다." },
+  { value: "jpeg", label: "JPG", detail: "호환성이 높은 JPG로 저장합니다." }
+];
 
 const emptyBackupOverview: CloudBackupOverview = {
   photoCount: 0,
@@ -140,28 +170,40 @@ const guideColorOptions = [
   { label: "검정", value: "rgba(17, 17, 17, 0.78)" }
 ] as const;
 
-const qualityOptions: {
-  value: ExportQuality;
-  label: string;
-  detail: string;
-}[] = [
-  { value: "standard", label: "표준", detail: "가볍게 저장하고 빠르게 내보냅니다." },
-  { value: "high", label: "높음", detail: "화질과 용량의 균형을 맞춥니다." },
-  { value: "max", label: "최대", detail: "가장 높은 품질로 저장합니다." }
-];
-
-const qualityLabel: Record<ExportQuality, string> = {
-  standard: "표준",
-  high: "높음",
-  max: "최대"
-};
-
 const imageQualityLabel = IMAGE_QUALITY_OPTIONS.reduce(
   (labels, option) => ({
     ...labels,
     [option.value]: option.label
   }),
   {} as Record<(typeof IMAGE_QUALITY_OPTIONS)[number]["value"], string>
+);
+const cameraSaveScopeLabel = cameraSaveScopeOptions.reduce(
+  (labels, option) => ({
+    ...labels,
+    [option.value]: option.label
+  }),
+  {} as Record<CameraSaveScope, string>
+);
+const tripClipExportFormatLabel = tripClipExportFormatOptions.reduce(
+  (labels, option) => ({
+    ...labels,
+    [option.value]: option.label
+  }),
+  {} as Record<TripClipExportFormat, string>
+);
+const imageSaveFormatLabel = imageSaveFormatOptions.reduce(
+  (labels, option) => ({
+    ...labels,
+    [option.value]: option.label
+  }),
+  {} as Record<AppImageSaveFormat, string>
+);
+const videoQualityLabel = VIDEO_QUALITY_OPTIONS.reduce(
+  (labels, option) => ({
+    ...labels,
+    [option.id]: option.label
+  }),
+  {} as Record<(typeof VIDEO_QUALITY_OPTIONS)[number]["id"], string>
 );
 
 const themeOptions: {
@@ -345,8 +387,24 @@ export default function SettingsScreen() {
       return "기본 비율";
     }
 
-    if (activeSetting === "exportQuality") {
-      return "저장 품질";
+    if (activeSetting === "cameraRatio") {
+      return "카메라 비율";
+    }
+
+    if (activeSetting === "cameraSaveScope") {
+      return "저장 범위";
+    }
+
+    if (activeSetting === "videoQuality") {
+      return "영상 화질";
+    }
+
+    if (activeSetting === "tripClipExportFormat") {
+      return "기본 저장 형식";
+    }
+
+    if (activeSetting === "imageSaveFormat") {
+      return "이미지 형식";
     }
 
     if (activeSetting === "themeMode") {
@@ -1339,22 +1397,46 @@ export default function SettingsScreen() {
 
         <SectionBlock title="내보내기">
           <ActionRow
+            label="카메라 비율"
+            detail="카메라 탭에서 촬영 후 저장할 기본 비율"
+            mark={settings.cameraRatio}
+            onPress={() => setActiveSetting("cameraRatio")}
+          />
+          <ActionRow
+            label="저장 범위"
+            detail="카메라 촬영 사진을 앱과 핸드폰 중 어디에 저장할지 선택"
+            mark={cameraSaveScopeLabel[settings.cameraSaveScope]}
+            onPress={() => setActiveSetting("cameraSaveScope")}
+          />
+          <ActionRow
             label="기본 비율"
             detail="여행 클립을 열 때 먼저 선택되는 화면 비율"
             mark={settings.defaultRatio}
             onPress={() => setActiveSetting("defaultRatio")}
           />
           <ActionRow
-            label="저장 품질"
-            detail="편집 사진과 영상 업로드 이미지 압축 품질"
-            mark={qualityLabel[settings.exportQuality]}
-            onPress={() => setActiveSetting("exportQuality")}
+            label="기본 저장 형식"
+            detail="동영상 만들기 내보내기 탭에서 먼저 보여줄 저장 방식"
+            mark={tripClipExportFormatLabel[settings.tripClipExportFormat]}
+            onPress={() => setActiveSetting("tripClipExportFormat")}
           />
           <ActionRow
-            label="이미지 백업 화질"
-            detail={IMAGE_BACKUP_OPTIMIZATION_MESSAGE}
+            label="영상 화질"
+            detail="동영상 만들기 MP4 저장 화질"
+            mark={videoQualityLabel[settings.videoQuality]}
+            onPress={() => setActiveSetting("videoQuality")}
+          />
+          <ActionRow
+            label="이미지 화질"
+            detail="이미지 저장과 백업에 함께 적용할 화질"
             mark={imageQualityLabel[settings.imageBackupQuality]}
             onPress={() => setActiveSetting("imageBackupQuality")}
+          />
+          <ActionRow
+            label="이미지 형식"
+            detail="동영상 만들기 이미지 저장 형식"
+            mark={imageSaveFormatLabel[settings.imageSaveFormat]}
+            onPress={() => setActiveSetting("imageSaveFormat")}
           />
         </SectionBlock>
       </ScreenShell>
@@ -1509,6 +1591,30 @@ export default function SettingsScreen() {
                   ))
                 : null}
 
+              {activeSetting === "cameraRatio"
+                ? cameraRatioOptions.map((ratio) => (
+                    <OptionButton
+                      key={ratio}
+                      label={ratio}
+                      detail="카메라 촬영 사진 저장 비율"
+                      active={settings.cameraRatio === ratio}
+                      onPress={() => updateSetting({ cameraRatio: ratio })}
+                    />
+                  ))
+                : null}
+
+              {activeSetting === "cameraSaveScope"
+                ? cameraSaveScopeOptions.map((scope) => (
+                    <OptionButton
+                      key={scope.value}
+                      label={scope.label}
+                      detail={scope.detail}
+                      active={settings.cameraSaveScope === scope.value}
+                      onPress={() => updateSetting({ cameraSaveScope: scope.value })}
+                    />
+                  ))
+                : null}
+
               {activeSetting === "defaultRatio"
                 ? TRIP_CLIP_RATIOS.map((ratio) => (
                     <OptionButton
@@ -1521,14 +1627,26 @@ export default function SettingsScreen() {
                   ))
                 : null}
 
-              {activeSetting === "exportQuality"
-                ? qualityOptions.map((quality) => (
+              {activeSetting === "tripClipExportFormat"
+                ? tripClipExportFormatOptions.map((format) => (
                     <OptionButton
-                      key={quality.value}
+                      key={format.value}
+                      label={format.label}
+                      detail={format.detail}
+                      active={settings.tripClipExportFormat === format.value}
+                      onPress={() => updateSetting({ tripClipExportFormat: format.value })}
+                    />
+                  ))
+                : null}
+
+              {activeSetting === "videoQuality"
+                ? VIDEO_QUALITY_OPTIONS.map((quality) => (
+                    <OptionButton
+                      key={quality.id}
                       label={quality.label}
-                      detail={quality.detail}
-                      active={settings.exportQuality === quality.value}
-                      onPress={() => updateSetting({ exportQuality: quality.value })}
+                      detail="동영상 만들기 MP4 저장 화질"
+                      active={settings.videoQuality === quality.id}
+                      onPress={() => updateSetting({ videoQuality: quality.id })}
                     />
                   ))
                 : null}
@@ -1552,6 +1670,18 @@ export default function SettingsScreen() {
                   ))}
                 </>
               ) : null}
+
+              {activeSetting === "imageSaveFormat"
+                ? imageSaveFormatOptions.map((format) => (
+                    <OptionButton
+                      key={format.value}
+                      label={format.label}
+                      detail={format.detail}
+                      active={settings.imageSaveFormat === format.value}
+                      onPress={() => updateSetting({ imageSaveFormat: format.value })}
+                    />
+                  ))
+                : null}
 
               {activeSetting === "themeMode"
                 ? themeOptions.map((theme) => (

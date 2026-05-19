@@ -5,6 +5,11 @@ import {
   type ImageQuality
 } from "@/constants/image";
 import type { TripClipRatio } from "@/constants/trip-clip";
+import {
+  DEFAULT_VIDEO_QUALITY,
+  VIDEO_QUALITY_OPTIONS,
+  type VideoQualityId
+} from "@/constants/video";
 import type { PhotoRatioLabel } from "@/types/photo";
 import { localStorageAdapter } from "@/lib/local-storage";
 
@@ -17,6 +22,8 @@ export type FontStyle = "standard" | "compact" | "bold";
 export type FontSize = "small" | "medium" | "large";
 export type ScreenLayout = "compact" | "balanced" | "comfortable";
 export type CameraSaveScope = "app" | "device" | "both";
+export type TripClipExportFormat = "mp4" | "images";
+export type AppImageSaveFormat = "original" | "png" | "jpeg";
 
 export const GUIDE_SIZE_MIN = 24;
 export const GUIDE_SIZE_MAX = 86;
@@ -37,6 +44,9 @@ export type AppSettings = {
   cameraSaveScope: CameraSaveScope;
   defaultRatio: TripClipRatio;
   exportQuality: ExportQuality;
+  videoQuality: VideoQualityId;
+  tripClipExportFormat: TripClipExportFormat;
+  imageSaveFormat: AppImageSaveFormat;
   themeMode: ThemeMode;
   fontStyle: FontStyle;
   fontSize: FontSize;
@@ -58,6 +68,9 @@ export const defaultAppSettings: AppSettings = {
   cameraSaveScope: "app",
   defaultRatio: "9:16",
   exportQuality: "high",
+  videoQuality: DEFAULT_VIDEO_QUALITY,
+  tripClipExportFormat: "mp4",
+  imageSaveFormat: "original",
   themeMode: "light",
   fontStyle: "compact",
   fontSize: "medium",
@@ -71,6 +84,9 @@ const fontStyles: FontStyle[] = ["standard", "compact", "bold"];
 const fontSizes: FontSize[] = ["small", "medium", "large"];
 const screenLayouts: ScreenLayout[] = ["compact", "balanced", "comfortable"];
 const exportQualities: ExportQuality[] = ["standard", "high", "max"];
+const videoQualities = VIDEO_QUALITY_OPTIONS.map((option) => option.id);
+const tripClipExportFormats: TripClipExportFormat[] = ["mp4", "images"];
+const imageSaveFormats: AppImageSaveFormat[] = ["original", "png", "jpeg"];
 const imageBackupQualities = IMAGE_QUALITY_OPTIONS.map((option) => option.value);
 const cameraRatios: PhotoRatioLabel[] = ["Original", "1:1", "3:4", "4:5", "9:16", "16:9"];
 const cameraSaveScopes: CameraSaveScope[] = ["app", "device", "both"];
@@ -133,6 +149,15 @@ const normalizeSettings = (value: Partial<AppSettings> | null): AppSettings => {
     exportQuality: exportQualities.includes(nextSettings.exportQuality)
       ? nextSettings.exportQuality
       : defaultAppSettings.exportQuality,
+    videoQuality: videoQualities.includes(nextSettings.videoQuality)
+      ? nextSettings.videoQuality
+      : defaultAppSettings.videoQuality,
+    tripClipExportFormat: tripClipExportFormats.includes(nextSettings.tripClipExportFormat)
+      ? nextSettings.tripClipExportFormat
+      : defaultAppSettings.tripClipExportFormat,
+    imageSaveFormat: imageSaveFormats.includes(nextSettings.imageSaveFormat)
+      ? nextSettings.imageSaveFormat
+      : defaultAppSettings.imageSaveFormat,
     themeMode: themeModes.includes(nextSettings.themeMode)
       ? nextSettings.themeMode
       : defaultAppSettings.themeMode,
