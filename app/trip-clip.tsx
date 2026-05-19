@@ -134,7 +134,9 @@ import {
   type WeeklyVideoExportUsage
 } from "@/lib/video-export-quota";
 import {
+  pickAndUploadUserMusicTrack,
   syncUserMusicTracks,
+  USER_MUSIC_LIMIT,
   type UserMusicTrack
 } from "@/lib/user-music";
 import type { PhotoItem } from "@/types/photo";
@@ -179,11 +181,6 @@ type CustomMusic = {
   mimeType?: string;
 };
 type EditorTab = "photos" | "timeline" | "video" | "guide" | "music" | "export";
-
-const MUSIC_MODE_OPTIONS: { label: string; value: MusicMode }[] = [
-  { label: "무음", value: "none" },
-  { label: "내 음악", value: "device" }
-];
 
 const EXPORT_FORMAT_OPTIONS: {
   label: string;
@@ -392,6 +389,7 @@ export default function TripClipScreen() {
   const [transitionDuration, setTransitionDuration] = useState(0.45);
   const [musicMode, setMusicMode] = useState<MusicMode>("none");
   const [userMusicTracks, setUserMusicTracks] = useState<UserMusicTrack[]>([]);
+  const [isMusicSubmitting, setIsMusicSubmitting] = useState(false);
   const [selectedUserMusicId, setSelectedUserMusicId] = useState<string | null>(null);
   const [volume] = useState(0.7);
   const [previewAdjustEnabled, setPreviewAdjustEnabled] = useState(false);
@@ -1041,6 +1039,34 @@ export default function TripClipScreen() {
       setIsImportingPhotos(false);
     }
   };
+
+  const handleAddUserMusic = useCallback(async () => {
+    if (isMusicSubmitting) {
+      return;
+    }
+
+    const previousTrackIds = new Set(userMusicTracks.map((track) => track.id));
+
+    try {
+      setIsMusicSubmitting(true);
+      setExportMessage(null);
+
+      const nextTracks = await pickAndUploadUserMusicTrack(user);
+      const uploadedTrack = nextTracks.find((track) => !previousTrackIds.has(track.id));
+
+      setUserMusicTracks(nextTracks);
+
+      if (uploadedTrack) {
+        setSelectedUserMusicId(uploadedTrack.id);
+        setMusicMode("device");
+        setExportMessage("내 음악을 추가했습니다.");
+      }
+    } catch (error) {
+      setExportMessage(getUserFacingErrorMessage(error, "내 음악을 추가하지 못했습니다."));
+    } finally {
+      setIsMusicSubmitting(false);
+    }
+  }, [isMusicSubmitting, user, userMusicTracks]);
 
   const movePhoto = (id: string, direction: -1 | 1) => {
     setSelectedIds((current) => {
@@ -1777,7 +1803,7 @@ export default function TripClipScreen() {
               ]}
               onPress={pickPhotosFromPreview}
             >
-              <Text selectable style={styles.emptyPreviewText}>
+              <Text selectable numberOfLines={2} style={styles.emptyPreviewText}>
                 {isImportingPhotos ? "사진을 불러오는 중" : "사진을 선택하세요"}
               </Text>
             </Pressable>
@@ -2153,88 +2179,68 @@ export default function TripClipScreen() {
       {activeEditorTab === "music" ? (
       <Section title="음악">
         <View style={styles.musicList}>
-          <View style={styles.musicModeRow}>
-            {MUSIC_MODE_OPTIONS.map((item) => {
-              const isActive = musicMode === item.value;
-
-              return (
-                <Pressable
-                  key={item.value}
-                  style={[styles.chip, isActive && styles.chipActive]}
-                  onPress={() => {
-                    if (item.value === "device" && userMusicTracks.length === 0) {
-                      setExportMessage("마이페이지에서 내 음악을 먼저 추가해 주세요.");
-                    }
-                    setMusicMode(item.value);
-                  }}
-                >
-                  <Text
-                    selectable={false}
-                    style={[styles.chipText, isActive && styles.chipTextActive]}
-                  >
-                    {item.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-          {musicMode === "none" ? (
-            <View style={[styles.musicRow, styles.musicRowActive]}>
-              <View style={styles.musicCopy}>
-                <Text selectable style={styles.musicTitle}>
-                  무음
-                </Text>
-                <Text selectable style={styles.musicDetail}>
-                  배경음악 없이 사진 전환만 재생합니다.
-                </Text>
-              </View>
-              <View style={styles.musicMark} />
+          <Pressable
+            style={[styles.musicRow, musicMode === "none" && styles.musicRowActive]}
+            onPress={() => {
+              setMusicMode("none");
+              setExportMessage(null);
+            }}
+          >
+            <View style={styles.musicCopy}>
+              <Text selectable style={styles.musicTitle}>
+                무음
+              </Text>
+              <Text selectable style={styles.musicDetail}>
+                배경음악 없이 사진 전환만 재생합니다.
+              </Text>
             </View>
-          ) : null}
-          {musicMode === "device" ? (
-            <View style={styles.musicUserPanel}>
-              {userMusicTracks.length > 0 ? (
-                userMusicTracks.map((track) => {
-                  const isActive = selectedUserMusic?.id === track.id;
+            {musicMode === "none" ? <View style={styles.musicMark} /> : null}
+          </Pressable>
+          {userMusicTracks.map((track) => {
+            const isActive = musicMode === "device" && selectedUserMusic?.id === track.id;
 
-                  return (
-                    <Pressable
-                      key={track.id}
-                      style={[styles.musicRow, isActive && styles.musicRowActive]}
-                      onPress={() => setSelectedUserMusicId(track.id)}
-                    >
-                      <View style={styles.musicCopy}>
-                        <Text selectable style={styles.musicTitle}>
-                          {track.name}
-                        </Text>
-                        <Text selectable style={styles.musicDetail}>
-                          마이페이지에 저장한 내 음악입니다.
-                        </Text>
-                      </View>
-                      {isActive ? <View style={styles.musicMark} /> : null}
-                    </Pressable>
-                  );
-                })
-              ) : (
-                <View style={styles.musicComingSoonCard}>
+            return (
+              <Pressable
+                key={track.id}
+                style={[styles.musicRow, isActive && styles.musicRowActive]}
+                onPress={() => {
+                  setSelectedUserMusicId(track.id);
+                  setMusicMode("device");
+                  setExportMessage(null);
+                }}
+              >
+                <View style={styles.musicCopy}>
                   <Text selectable style={styles.musicTitle}>
-                    저장한 음악이 없습니다
+                    {track.name}
                   </Text>
                   <Text selectable style={styles.musicDetail}>
-                    마이페이지에서 핸드폰 음악을 최대 3개까지 추가한 뒤 이곳에서 선택할 수 있습니다.
+                    추가된 음악
                   </Text>
-                  <Pressable
-                    style={styles.musicPickButton}
-                    onPress={() => router.push("/account" as Href)}
-                  >
-                    <Text selectable={false} style={styles.musicPickButtonText}>
-                      마이페이지로 이동
-                    </Text>
-                  </Pressable>
                 </View>
-              )}
+                {isActive ? <View style={styles.musicMark} /> : null}
+              </Pressable>
+            );
+          })}
+          <Pressable
+            disabled={isMusicSubmitting || userMusicTracks.length >= USER_MUSIC_LIMIT}
+            style={[
+              styles.musicRow,
+              styles.musicAddRow,
+              (isMusicSubmitting || userMusicTracks.length >= USER_MUSIC_LIMIT) &&
+                styles.disabledButton
+            ]}
+            onPress={handleAddUserMusic}
+          >
+            <View style={styles.musicCopy}>
+              <Text selectable style={styles.musicTitle}>
+                내 음악 추가
+              </Text>
+              <Text selectable style={styles.musicDetail}>
+                파일 앱의 오디오에서 음악 파일을 선택합니다.
+              </Text>
             </View>
-          ) : null}
+            {isMusicSubmitting ? <ActivityIndicator color={colors.text} /> : null}
+          </Pressable>
         </View>
         <View style={styles.volumeControls}>
           <Text selectable style={styles.musicTitle}>
@@ -3184,7 +3190,9 @@ const styles = StyleSheet.create({
   emptyPreview: {
     flex: 1,
     alignItems: "center",
-    justifyContent: "center"
+    justifyContent: "center",
+    paddingHorizontal: 24,
+    paddingVertical: 24
   },
   emptyPreviewPressed: {
     backgroundColor: "#161616"
@@ -3193,6 +3201,11 @@ const styles = StyleSheet.create({
     color: colors.inverse,
     fontSize: typography.section,
     fontWeight: "800",
+    maxWidth: "86%",
+    minHeight: 68,
+    lineHeight: 34,
+    textAlign: "center",
+    includeFontPadding: true,
     letterSpacing: 0
   },
   previewMeta: {
@@ -3700,6 +3713,9 @@ const styles = StyleSheet.create({
   musicRowActive: {
     borderColor: colors.text,
     backgroundColor: colors.surface
+  },
+  musicAddRow: {
+    borderStyle: "dashed"
   },
   musicComingSoonCard: {
     gap: 12,

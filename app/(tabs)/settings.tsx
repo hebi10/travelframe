@@ -263,6 +263,7 @@ export default function SettingsScreen() {
   const [guideExpanded, setGuideExpanded] = useState(false);
   const [guideReplaySignal, setGuideReplaySignal] = useState(0);
   const [isBackupSubmitting, setIsBackupSubmitting] = useState(false);
+  const [backupCheckMessage, setBackupCheckMessage] = useState<string | null>(null);
   const [backupProgress, setBackupProgress] =
     useState<BackupProgressUpdate | null>(null);
   const [backupFailures, setBackupFailures] = useState<BackupFailureRecord[]>([]);
@@ -406,21 +407,22 @@ export default function SettingsScreen() {
       return;
     }
 
-    await refreshUser().catch(() => undefined);
-    const latestSubscription = await getUserSubscription(user);
-
-    if (!isCreatorSubscriptionActive(latestSubscription)) {
-      await markBackupExpired({ user, subscription: latestSubscription });
-      setAuthMessage(
-        "구독 기간이 만료되었거나 활성화되지 않았습니다. 백업은 사용할 수 없고 기존 백업 데이터 삭제는 설정에서 직접 요청할 수 있습니다."
-      );
-      setActiveSetting(null);
-      return;
-    }
-
     try {
       setIsBackupSubmitting(true);
+      setBackupCheckMessage("백업 상태를 확인하고 있습니다.");
       setAuthMessage(null);
+      await refreshUser().catch(() => undefined);
+      const latestSubscription = await getUserSubscription(user);
+
+      if (!isCreatorSubscriptionActive(latestSubscription)) {
+        await markBackupExpired({ user, subscription: latestSubscription });
+        setAuthMessage(
+          "구독 기간이 만료되었거나 활성화되지 않았습니다. 백업은 사용할 수 없고 기존 백업 데이터 삭제는 설정에서 직접 요청할 수 있습니다."
+        );
+        setActiveSetting(null);
+        return;
+      }
+
       const [localSummary, cloudOverview] = await Promise.all([
         getLocalWorkspaceSummary(),
         getCloudBackupOverview({ user })
@@ -458,6 +460,7 @@ export default function SettingsScreen() {
       setAuthMessage(error instanceof Error ? error.message : "백업 상태를 확인하지 못했습니다.");
     } finally {
       setIsBackupSubmitting(false);
+      setBackupCheckMessage(null);
     }
   };
 
@@ -957,7 +960,7 @@ export default function SettingsScreen() {
                   mark={settings.cloudBackupEnabled ? "켜짐" : "꺼짐"}
                   onPress={() => setActiveSetting("cloudBackupEnabled")}
                 />
-                <View style={[styles.backupStatusPanel, themed.panel]}>
+                <View style={[styles.backupStatusPanel, themed.border]}>
                   <Text selectable style={[styles.backupStatusTitle, themed.text]}>
                     백업 데이터
                   </Text>
@@ -1600,7 +1603,7 @@ export default function SettingsScreen() {
 
               {activeSetting === "cloudBackupEnabled" ? (
                 <>
-                  <View style={[styles.backupStatusPanel, themed.panel]}>
+                  <View style={[styles.backupStatusPanel, themed.border]}>
                     <Text selectable style={[styles.backupStatusTitle, themed.text]}>
                       현재 백업
                     </Text>
@@ -1634,12 +1637,14 @@ export default function SettingsScreen() {
                     label="켜짐"
                     detail="저장한 영상과 여러 사진 작업을 Firebase에 백업합니다."
                     active={settings.cloudBackupEnabled}
+                    disabled={isBackupSubmitting}
                     onPress={handleEnableBackup}
                   />
                   <OptionButton
                     label="꺼짐"
                     detail="사진과 영상은 기기 안에만 저장합니다."
                     active={!settings.cloudBackupEnabled}
+                    disabled={isBackupSubmitting}
                     onPress={() => updateSetting({ cloudBackupEnabled: false })}
                   />
                   <Pressable
@@ -1658,6 +1663,29 @@ export default function SettingsScreen() {
                 </>
               ) : null}
             </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        animationType="fade"
+        transparent
+        visible={isBackupSubmitting && Boolean(backupCheckMessage)}
+        onRequestClose={() => undefined}
+      >
+        <View style={[styles.modalBackdrop, modalSafeStyle]}>
+          <View style={[styles.modalPanel, styles.backupProgressPanel, themed.modalPanel]}>
+            <View style={styles.backupProgressHeader}>
+              <ActivityIndicator color={palette.text} />
+              <View style={styles.backupProgressCopy}>
+                <Text selectable style={[styles.modalTitle, themed.text]}>
+                  백업 상태 확인 중
+                </Text>
+                <Text selectable style={[styles.optionDetail, themed.mutedText]}>
+                  {backupCheckMessage}
+                </Text>
+              </View>
+            </View>
           </View>
         </View>
       </Modal>
@@ -1767,11 +1795,13 @@ function OptionButton({
   label,
   detail,
   active,
+  disabled = false,
   onPress
 }: {
   label: string;
   detail: string;
   active: boolean;
+  disabled?: boolean;
   onPress: () => void;
 }) {
   const { palette, fontSizeScale, layoutScale, emphasisWeight } = useAppAppearance();
@@ -1781,7 +1811,7 @@ function OptionButton({
     <Pressable
       style={[
         styles.option,
-        themed.panel,
+        themed.border,
         {
           minHeight: Math.round(72 * layoutScale),
           gap: Math.round(14 * layoutScale),
@@ -1789,8 +1819,10 @@ function OptionButton({
           paddingHorizontal: Math.round(14 * layoutScale)
         },
         active && styles.optionActive,
-        active && themed.activeFill
+        active && themed.activeBorder,
+        disabled && styles.disabledButton
       ]}
+      disabled={disabled}
       onPress={onPress}
     >
       <View style={styles.optionCopy}>
@@ -1803,9 +1835,7 @@ function OptionButton({
               fontSize: Math.round(typography.body * fontSizeScale),
               lineHeight: Math.round(20 * fontSizeScale),
               fontWeight: emphasisWeight
-            },
-            active && styles.optionLabelActive,
-            active && themed.inverseText
+            }
           ]}
         >
           {label}
@@ -1818,9 +1848,7 @@ function OptionButton({
             {
               fontSize: Math.round(typography.small * fontSizeScale),
               lineHeight: Math.round(17 * fontSizeScale)
-            },
-            active && styles.optionDetailActive,
-            active && themed.inverseMutedText
+            }
           ]}
         >
           {detail}
@@ -1887,8 +1915,8 @@ const createThemedStyles = (palette: AppPalette) => {
       backgroundColor: "transparent"
     },
     optionMarkActive: {
-      borderColor: palette.inverse,
-      backgroundColor: palette.inverse
+      borderColor: palette.text,
+      backgroundColor: palette.text
     }
   });
 };
@@ -1950,11 +1978,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     borderWidth: 1,
     borderColor: colors.line,
-    backgroundColor: colors.background
+    backgroundColor: "transparent"
   },
   optionActive: {
-    borderColor: colors.text,
-    backgroundColor: colors.text
+    borderColor: colors.text
   },
   optionCopy: {
     flex: 1,
@@ -2307,7 +2334,7 @@ const styles = StyleSheet.create({
     padding: 12,
     borderWidth: 1,
     borderColor: colors.line,
-    backgroundColor: colors.background
+    backgroundColor: "transparent"
   },
   backupStatusTitle: {
     color: colors.text,
