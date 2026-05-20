@@ -33,13 +33,22 @@ for (const snippet of [
 for (const snippet of [
   "cameraSettingsScrollShell",
   "cameraSettingsScrollHint",
-  "아래로 스크롤",
+  "스크롤",
   "showsVerticalScrollIndicator",
   "persistentScrollbar",
   "cameraSettingsBottomHint",
-  "cameraSettingsGrabber"
+  "cameraSettingsGrabber",
+  "cameraSettingsScrollHintIcon",
+  "↓"
 ]) {
   assert.ok(cameraSource.includes(snippet), `camera settings scroll affordance missing: ${snippet}`);
+}
+
+for (const forbidden of ["아래로 스크롤"]) {
+  assert.ok(
+    !cameraSource.includes(forbidden),
+    `camera settings scroll label should only say scroll: ${forbidden}`
+  );
 }
 
 for (const forbidden of [

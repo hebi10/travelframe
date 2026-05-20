@@ -1208,7 +1208,7 @@ export default function SettingsScreen() {
               현재 플랜: {planEntitlements.label}
             </Text>
             <Text selectable style={[styles.backupStatusDetail, themed.mutedText]}>
-              영상 출력:{" "}
+              영상 출력 (주간 한도):{" "}
               {formatQuotaValue(
                 weeklyVideoExportUsage?.count ?? 0,
                 planEntitlements.weeklyVideoExportLimit

@@ -30,7 +30,7 @@ for (const snippet of [
   "musicSessionId",
   "musicUploadSession(userId)",
   "isReservedMusicUpload(userId)",
-  "allow create, update: if isReservedMusicUpload(userId) && isAudioUpload();"
+  "allow create, update: if (isReservedMusicUpload(userId) || isReservedAdminMusicUpload(userId)) && isAudioUpload();"
 ]) {
   assert.ok(storageRules.includes(snippet), `Storage Rules missing music upload session enforcement: ${snippet}`);
 }

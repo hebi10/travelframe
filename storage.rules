@@ -10,6 +10,11 @@ service firebase.storage {
       return signedIn() && request.auth.uid == userId;
     }
 
+    function isAdmin() {
+      return signedIn()
+        && firestore.exists(/databases/(default)/documents/admins/$(request.auth.uid));
+    }
+
     function isImageUpload() {
       return request.resource.size < 20 * 1024 * 1024
         && request.resource.contentType.matches('image/(jpeg|jpg|png|webp)');
@@ -39,8 +44,17 @@ service firebase.storage {
         && request.resource.metadata.musicSessionId.size() > 0;
     }
 
+    function hasAdminBackupSession() {
+      return request.resource.metadata.adminBackupSessionId is string
+        && request.resource.metadata.adminBackupSessionId.size() > 0;
+    }
+
     function musicUploadSession(userId) {
       return firestore.get(/databases/(default)/documents/users/$(userId)/musicUploadSessions/$(request.resource.metadata.musicSessionId));
+    }
+
+    function adminBackupSession(userId) {
+      return firestore.get(/databases/(default)/documents/users/$(userId)/adminBackupUploadSessions/$(request.resource.metadata.adminBackupSessionId));
     }
 
     function isReservedBackupUpload(userId, mediaKind) {
@@ -66,33 +80,50 @@ service firebase.storage {
         && musicUploadSession(userId).data.expiresAt > request.time;
     }
 
+    function isReservedAdminBackupUpload(userId, mediaKind) {
+      return isAdmin()
+        && hasAdminBackupSession()
+        && adminBackupSession(userId).data.targetUid == userId
+        && adminBackupSession(userId).data.adminUid == request.auth.uid
+        && adminBackupSession(userId).data.status == "reserved"
+        && adminBackupSession(userId).data.mediaKind == mediaKind
+        && adminBackupSession(userId).data.storagePath == request.resource.name
+        && adminBackupSession(userId).data.fileSize == request.resource.size
+        && adminBackupSession(userId).data.contentType == request.resource.contentType
+        && adminBackupSession(userId).data.expiresAt > request.time;
+    }
+
+    function isReservedAdminMusicUpload(userId) {
+      return isReservedAdminBackupUpload(userId, "audio");
+    }
+
     match /users/{userId}/backups/photos/{fileName} {
       allow read: if isOwner(userId);
-      allow create, update: if isReservedBackupUpload(userId, "image") && isImageUpload();
+      allow create, update: if (isReservedBackupUpload(userId, "image") || isReservedAdminBackupUpload(userId, "image")) && isImageUpload();
       allow delete: if false;
     }
 
     match /users/{userId}/backups/image-works/{workId}/{fileName} {
       allow read: if isOwner(userId);
-      allow create, update: if isReservedBackupUpload(userId, "image") && isImageUpload();
+      allow create, update: if (isReservedBackupUpload(userId, "image") || isReservedAdminBackupUpload(userId, "image")) && isImageUpload();
       allow delete: if false;
     }
 
     match /users/{userId}/backups/videos/{fileName} {
       allow read: if isOwner(userId);
-      allow create, update: if isReservedBackupUpload(userId, "video") && isVideoUpload();
+      allow create, update: if (isReservedBackupUpload(userId, "video") || isReservedAdminBackupUpload(userId, "video")) && isVideoUpload();
       allow delete: if false;
     }
 
     match /users/{userId}/backups/audio/{fileName} {
       allow read: if isOwner(userId);
-      allow create, update: if isReservedBackupUpload(userId, "audio") && isAudioUpload();
+      allow create, update: if (isReservedBackupUpload(userId, "audio") || isReservedAdminBackupUpload(userId, "audio")) && isAudioUpload();
       allow delete: if false;
     }
 
     match /users/{userId}/music/{allPaths=**} {
       allow read: if isOwner(userId);
-      allow create, update: if isReservedMusicUpload(userId) && isAudioUpload();
+      allow create, update: if (isReservedMusicUpload(userId) || isReservedAdminMusicUpload(userId)) && isAudioUpload();
       allow delete: if isOwner(userId);
     }
 

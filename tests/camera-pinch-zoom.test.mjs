@@ -9,7 +9,7 @@ for (const snippet of [
   "Gesture.Pinch()",
   "!referenceUri",
   "cameraPreviewGesture",
-  "Gesture.Simultaneous(cameraSwipeGesture, cameraPinchZoomGesture)",
+  "Gesture.Simultaneous(cameraSwipeGesture, cameraPinchZoomGesture, cameraTapFocusGesture)",
   "gesture={cameraPreviewGesture}"
 ]) {
   assert.ok(sourceIncludes(cameraSource, snippet), `camera pinch zoom missing: ${snippet}`);

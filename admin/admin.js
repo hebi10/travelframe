@@ -7,6 +7,7 @@ import {
   signInWithEmailAndPassword,
   signOut
 } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-auth.js";
+import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-functions.js";
 import {
   addDoc,
   collection,
@@ -21,6 +22,7 @@ import {
   setDoc,
   where
 } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore.js";
+import { getDownloadURL, getStorage, ref, uploadBytesResumable } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-storage.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDqRwnf6BYjp9Np2UcUA4wNvlK-rwpiLDM",
@@ -35,6 +37,8 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 auth.languageCode = "ko";
 const db = getFirestore(app);
+const functions = getFunctions(app);
+const storage = getStorage(app);
 
 const $ = (id) => document.getElementById(id);
 
@@ -53,10 +57,41 @@ let currentProductSubscriptions = {
   creator_monthly: null
 };
 let currentBackup = null;
+let activeBackupTab = "image";
+let backupItemsByTab = {
+  image: [],
+  video: [],
+  music: []
+};
+let backupPagesByTab = {
+  image: 1,
+  video: 1,
+  music: 1
+};
+let loadedBackupTabs = {
+  image: false,
+  video: false,
+  music: false
+};
 let isCreatingRegularAccount = false;
 let allUsers = [];
 let usersPage = 1;
 const usersPageSize = 10;
+const backupTabs = ["image", "video", "music"];
+const backupPageSize = 10;
+const backupTabLabels = {
+  image: "이미지",
+  video: "동영상",
+  music: "음악"
+};
+const backupUploadAccept = {
+  image: "image/jpeg,image/png,image/webp",
+  video: "video/mp4",
+  music: "audio/*"
+};
+const reserveAdminBackupUpload = httpsCallable(functions, "reserveAdminBackupUpload");
+const completeAdminBackupUpload = httpsCallable(functions, "completeAdminBackupUpload");
+const deleteAdminBackupItem = httpsCallable(functions, "deleteAdminBackupItem");
 
 const productMeta = {
   ad_remove: {
@@ -198,6 +233,19 @@ const formatDate = (value) => {
   }).format(date);
 };
 
+const formatBytes = (value) => {
+  const bytes = Number(value);
+  if (!Number.isFinite(bytes) || bytes <= 0) return "-";
+  const units = ["B", "KB", "MB", "GB"];
+  let size = bytes;
+  let unitIndex = 0;
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024;
+    unitIndex += 1;
+  }
+  return `${size.toFixed(size >= 10 || unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
+};
+
 const toDateInput = (value) => {
   const date = parseDate(value);
   return date ? date.toISOString().slice(0, 10) : "";
@@ -331,6 +379,30 @@ const showAdmin = (enabled) => {
   $("signOutButton").classList.toggle("hidden", !enabled);
 };
 
+const resetBackupManager = () => {
+  backupItemsByTab = {
+    image: [],
+    video: [],
+    music: []
+  };
+  backupPagesByTab = {
+    image: 1,
+    video: 1,
+    music: 1
+  };
+  loadedBackupTabs = {
+    image: false,
+    video: false,
+    music: false
+  };
+  if ($("backupItemList")) {
+    $("backupItemList").innerHTML = "";
+    $("backupItemsPageInfo").textContent = "-";
+    $("backupUploadInput").value = "";
+    setMessage("backupItemsMessage", "사용자를 선택한 뒤 탭을 클릭해 백업 데이터를 불러오세요.");
+  }
+};
+
 const resetUserPanels = () => {
   currentUserDoc = null;
   currentSubscription = null;
@@ -345,6 +417,7 @@ const resetUserPanels = () => {
   $("statPlan").textContent = "-";
   $("statBackups").textContent = "-";
   $("statStatus").textContent = "-";
+  resetBackupManager();
 };
 
 const requireAdmin = async (user) => {
@@ -353,11 +426,24 @@ const requireAdmin = async (user) => {
   return adminSnap.exists();
 };
 
+const getUserSearchText = (user) =>
+  [user.email, user.displayName, user.id].filter(Boolean).join(" ").toLowerCase();
+
+const findLoadedUserBySearchTerm = (term) => {
+  const keyword = term.toLowerCase();
+  return (
+    allUsers.find((user) =>
+      [user.email, user.displayName, user.id].some(
+        (value) => value?.toLowerCase() === keyword
+      )
+    ) ?? allUsers.find((user) => getUserSearchText(user).includes(keyword))
+  );
+};
+
 const renderUserList = () => {
   const keyword = $("userFilterInput").value.trim().toLowerCase();
   const filtered = allUsers.filter((user) => {
-    const target = [user.email, user.displayName, user.id].filter(Boolean).join(" ").toLowerCase();
-    return target.includes(keyword);
+    return getUserSearchText(user).includes(keyword);
   });
   const userList = $("userList");
   userList.innerHTML = "";
@@ -429,6 +515,285 @@ const loadUsers = async () => {
     );
   } catch (error) {
     setMessage("userListMessage", error?.message ?? "사용자 목록을 불러오지 못했습니다.");
+  }
+};
+
+const sortBackupItems = (items) =>
+  [...items].sort((a, b) => {
+    const aDate = parseDate(a.date) ?? new Date(0);
+    const bDate = parseDate(b.date) ?? new Date(0);
+    return bDate.getTime() - aDate.getTime();
+  });
+
+const toPhotoBackupItem = (docSnapshot) => {
+  const data = docSnapshot.data();
+  return {
+    id: docSnapshot.id,
+    itemType: "photo",
+    tab: "image",
+    title: data.name || data.title || data.localId || docSnapshot.id,
+    detail: `사진 · ${formatBytes(data.imageBackupSize ?? data.optimizedSize ?? data.fileSize)} · ${formatDate(
+      data.backedUpAt || data.lastBackedUpAt || data.backupEnabledAt
+    )}`,
+    date: data.backedUpAt || data.lastBackedUpAt || data.backupEnabledAt,
+    url: data.downloadURL || data.uri || data.previewUri,
+    storagePath: data.storagePath ?? "-"
+  };
+};
+
+const toImageWorkBackupItem = (docSnapshot) => {
+  const data = docSnapshot.data();
+  const imageCount = Array.isArray(data.imageUris) ? data.imageUris.length : 0;
+  return {
+    id: docSnapshot.id,
+    itemType: "imageWork",
+    tab: "image",
+    title: data.title || data.localId || docSnapshot.id,
+    detail: `이미지 작업 ${imageCount}장 · ${formatBytes(data.imageBackupSize ?? data.fileSize)} · ${formatDate(
+      data.backedUpAt || data.lastBackedUpAt || data.backupEnabledAt
+    )}`,
+    date: data.backedUpAt || data.lastBackedUpAt || data.backupEnabledAt,
+    url: Array.isArray(data.imageUris) ? data.imageUris[0] : null,
+    storagePath: Array.isArray(data.storagePaths) ? data.storagePaths[0] ?? "-" : "-"
+  };
+};
+
+const toVideoBackupItem = (docSnapshot) => {
+  const data = docSnapshot.data();
+  return {
+    id: docSnapshot.id,
+    itemType: "video",
+    tab: "video",
+    title: data.title || data.localId || docSnapshot.id,
+    detail: `동영상 · ${formatBytes(data.fileSize)} · ${formatDate(
+      data.backedUpAt || data.lastBackedUpAt || data.createdAt
+    )}`,
+    date: data.backedUpAt || data.lastBackedUpAt || data.createdAt,
+    url: data.downloadURL || data.uri,
+    storagePath: data.storagePath ?? "-"
+  };
+};
+
+const toMusicBackupItem = (docSnapshot) => {
+  const data = docSnapshot.data();
+  return {
+    id: docSnapshot.id,
+    itemType: "music",
+    tab: "music",
+    title: data.name || docSnapshot.id,
+    detail: `음악 · ${formatBytes(data.size)} · ${formatDate(data.createdAt || data.updatedAt)}`,
+    date: data.createdAt || data.updatedAt,
+    url: data.downloadUrl,
+    storagePath: data.storagePath ?? "-"
+  };
+};
+
+const renderBackupTabs = () => {
+  backupTabs.forEach((tab) => {
+    const button = document.querySelector(`[data-backup-tab="${tab}"]`);
+    button?.classList.toggle("active", activeBackupTab === tab);
+    button?.setAttribute("aria-selected", String(activeBackupTab === tab));
+  });
+  $("backupUploadInput").accept = backupUploadAccept[activeBackupTab] ?? "";
+};
+
+const renderBackupItems = () => {
+  renderBackupTabs();
+  const items = backupItemsByTab[activeBackupTab] ?? [];
+  const totalPages = Math.max(1, Math.ceil(items.length / backupPageSize));
+  backupPagesByTab[activeBackupTab] = Math.min(
+    Math.max(backupPagesByTab[activeBackupTab], 1),
+    totalPages
+  );
+  const page = backupPagesByTab[activeBackupTab];
+  const start = (page - 1) * backupPageSize;
+  const pageItems = items.slice(start, start + backupPageSize);
+  const list = $("backupItemList");
+  list.innerHTML = "";
+
+  if (!currentUserDoc) {
+    list.innerHTML = '<div class="empty">사용자를 먼저 선택하세요.</div>';
+    $("backupItemsPageInfo").textContent = "-";
+    $("prevBackupItemsPageButton").disabled = true;
+    $("nextBackupItemsPageButton").disabled = true;
+    return;
+  }
+
+  if (!loadedBackupTabs[activeBackupTab]) {
+    list.innerHTML = '<div class="empty">탭을 클릭하면 백업 데이터를 불러옵니다.</div>';
+    $("backupItemsPageInfo").textContent = "-";
+    $("prevBackupItemsPageButton").disabled = true;
+    $("nextBackupItemsPageButton").disabled = true;
+    return;
+  }
+
+  if (!items.length) {
+    list.innerHTML = '<div class="empty">표시할 백업 데이터가 없습니다.</div>';
+    $("backupItemsPageInfo").textContent = "0 / 0";
+    $("prevBackupItemsPageButton").disabled = true;
+    $("nextBackupItemsPageButton").disabled = true;
+    return;
+  }
+
+  pageItems.forEach((item) => {
+    const row = document.createElement("div");
+    row.className = "backup-item";
+
+    const copy = document.createElement("div");
+    copy.className = "backup-item-copy";
+    const title = document.createElement("strong");
+    title.textContent = item.title;
+    const detail = document.createElement("span");
+    detail.className = "meta";
+    detail.textContent = item.detail;
+    const path = document.createElement("span");
+    path.className = "uid";
+    path.textContent = item.storagePath;
+    copy.append(title, detail, path);
+
+    const actions = document.createElement("div");
+    actions.className = "backup-item-actions";
+    const openButton = document.createElement("button");
+    openButton.type = "button";
+    openButton.className = "secondary";
+    openButton.textContent = "확인";
+    openButton.addEventListener("click", () => openBackupItem(item));
+
+    const deleteButton = document.createElement("button");
+    deleteButton.type = "button";
+    deleteButton.textContent = "제거";
+    deleteButton.addEventListener("click", () => removeBackupItem(item));
+    actions.append(openButton, deleteButton);
+
+    row.append(copy, actions);
+    list.appendChild(row);
+  });
+
+  $("backupItemsPageInfo").textContent = `${page} / ${totalPages} · ${start + 1}-${Math.min(
+    start + backupPageSize,
+    items.length
+  )}개 표시`;
+  $("prevBackupItemsPageButton").disabled = page <= 1;
+  $("nextBackupItemsPageButton").disabled = page >= totalPages;
+};
+
+const loadBackupItems = async (tab = activeBackupTab) => {
+  if (!currentUserDoc) return;
+  activeBackupTab = tab;
+  backupPagesByTab[tab] = 1;
+  renderBackupItems();
+  setMessage("backupItemsMessage", `${backupTabLabels[tab]} 백업 데이터를 불러오는 중입니다.`);
+
+  try {
+    if (tab === "image") {
+      const [photoSnapshot, imageWorkSnapshot] = await Promise.all([
+        getDocs(collection(db, "users", currentUserDoc.id, "photoBackups")),
+        getDocs(collection(db, "users", currentUserDoc.id, "imageWorks"))
+      ]);
+      backupItemsByTab.image = sortBackupItems([
+        ...photoSnapshot.docs.map(toPhotoBackupItem),
+        ...imageWorkSnapshot.docs.map(toImageWorkBackupItem)
+      ]);
+    } else if (tab === "video") {
+      const snapshot = await getDocs(collection(db, "users", currentUserDoc.id, "videos"));
+      backupItemsByTab.video = sortBackupItems(snapshot.docs.map(toVideoBackupItem));
+    } else {
+      const snapshot = await getDocs(collection(db, "users", currentUserDoc.id, "musicTracks"));
+      backupItemsByTab.music = sortBackupItems(snapshot.docs.map(toMusicBackupItem));
+    }
+
+    loadedBackupTabs[tab] = true;
+    renderBackupItems();
+    setMessage(
+      "backupItemsMessage",
+      `${backupItemsByTab[tab].length}개의 ${backupTabLabels[tab]} 백업 데이터를 불러왔습니다.`
+    );
+  } catch (error) {
+    setMessage("backupItemsMessage", error?.message ?? "백업 데이터를 불러오지 못했습니다.");
+  }
+};
+
+const openBackupItem = (item) => {
+  const lines = [
+    `종류: ${backupTabLabels[item.tab]}`,
+    `ID: ${item.id}`,
+    `Storage: ${item.storagePath}`,
+    `URL: ${item.url ?? "-"}`
+  ];
+  if (item.url) {
+    window.open(item.url, "_blank", "noreferrer");
+  }
+  setMessage("backupItemsMessage", lines.join(" / "));
+};
+
+const removeBackupItem = async (item) => {
+  if (!currentUserDoc) return;
+  const confirmed = window.confirm(`${item.title} 백업 데이터를 제거할까요? Storage 파일과 문서가 함께 삭제됩니다.`);
+  if (!confirmed) return;
+
+  setMessage("backupItemsMessage", "백업 데이터를 제거하는 중입니다.");
+  try {
+    await deleteAdminBackupItem({
+      targetUid: currentUserDoc.id,
+      itemType: item.itemType,
+      itemId: item.id
+    });
+    loadedBackupTabs[activeBackupTab] = false;
+    await loadBackupItems(activeBackupTab);
+    await loadUserDetail({ preserveBackupItems: true });
+    setMessage("backupItemsMessage", "백업 데이터를 제거했습니다.");
+  } catch (error) {
+    setMessage("backupItemsMessage", error?.message ?? "백업 데이터 제거 중 문제가 발생했습니다.");
+  }
+};
+
+const uploadAdminBackupFile = async (file) => {
+  if (!currentUserDoc || !file) return;
+
+  const tab = activeBackupTab;
+  setMessage("backupItemsMessage", `${backupTabLabels[tab]} 파일 업로드를 준비하는 중입니다.`);
+  try {
+    const reservation = await reserveAdminBackupUpload({
+      targetUid: currentUserDoc.id,
+      itemKind: tab,
+      fileName: file.name,
+      fileSize: file.size,
+      contentType: file.type
+    });
+    const { uploadSessionId, storagePath } = reservation.data;
+    const uploadRef = ref(storage, storagePath);
+    const task = uploadBytesResumable(uploadRef, file, {
+      contentType: file.type,
+      customMetadata: {
+        adminBackupSessionId: uploadSessionId
+      }
+    });
+
+    await new Promise((resolve, reject) => {
+      task.on(
+        "state_changed",
+        (snapshot) => {
+          const percent = Math.round((snapshot.bytesTransferred / Math.max(1, snapshot.totalBytes)) * 100);
+          setMessage("backupItemsMessage", `${backupTabLabels[tab]} 파일 업로드 중입니다. ${percent}%`);
+        },
+        reject,
+        resolve
+      );
+    });
+
+    const downloadUrl = await getDownloadURL(task.snapshot.ref);
+    await completeAdminBackupUpload({
+      targetUid: currentUserDoc.id,
+      uploadSessionId,
+      downloadUrl
+    });
+    $("backupUploadInput").value = "";
+    loadedBackupTabs[tab] = false;
+    await loadBackupItems(tab);
+    await loadUserDetail({ preserveBackupItems: true });
+    setMessage("backupItemsMessage", "백업 파일을 업로드했습니다.");
+  } catch (error) {
+    setMessage("backupItemsMessage", error?.message ?? "백업 파일 업로드 중 문제가 발생했습니다.");
   }
 };
 
@@ -568,21 +933,33 @@ $("searchForm").addEventListener("submit", async (event) => {
   resetUserPanels();
 
   try {
-    let userSnap = await getDoc(doc(db, "users", term));
-    if (!userSnap.exists()) {
-      const found = await getDocs(
-        query(collection(db, "users"), where("email", "==", term), limit(1))
-      );
-      userSnap = found.docs[0] ?? null;
+    const loadedUser = findLoadedUserBySearchTerm(term);
+    let userSnap = null;
+
+    if (!loadedUser) {
+      userSnap = await getDoc(doc(db, "users", term));
+      if (!userSnap.exists()) {
+        const foundByEmail = await getDocs(
+          query(collection(db, "users"), where("email", "==", term), limit(1))
+        );
+        userSnap = foundByEmail.docs[0] ?? null;
+      }
+
+      if (!userSnap?.exists()) {
+        const foundByName = await getDocs(
+          query(collection(db, "users"), where("displayName", "==", term), limit(1))
+        );
+        userSnap = foundByName.docs[0] ?? null;
+      }
     }
 
-    if (!userSnap?.exists()) {
+    if (!loadedUser && !userSnap?.exists()) {
       setMessage("searchMessage", "사용자를 찾지 못했습니다.");
       renderUserList();
       return;
     }
 
-    currentUserDoc = {
+    currentUserDoc = loadedUser ?? {
       id: userSnap.id,
       ...userSnap.data()
     };
@@ -597,8 +974,11 @@ $("searchForm").addEventListener("submit", async (event) => {
   }
 });
 
-const loadUserDetail = async () => {
+const loadUserDetail = async ({ preserveBackupItems = false } = {}) => {
   if (!currentUserDoc) return;
+  if (!preserveBackupItems) {
+    resetBackupManager();
+  }
 
   const uid = currentUserDoc.id;
   const [
@@ -606,13 +986,15 @@ const loadUserDetail = async () => {
     adRemoveSnap,
     creatorMonthlySnap,
     backupSnap,
-    photoBackups
+    photoBackups,
+    musicTracks
   ] = await Promise.all([
     getDoc(doc(db, "users", uid, "subscriptions", "current")),
     getDoc(doc(db, "users", uid, "subscriptions", "ad_remove")),
     getDoc(doc(db, "users", uid, "subscriptions", "creator_monthly")),
     getDoc(doc(db, "users", uid, "backups", "current")),
-    getDocs(collection(db, "users", uid, "photoBackups"))
+    getDocs(collection(db, "users", uid, "photoBackups")),
+    getDocs(collection(db, "users", uid, "musicTracks"))
   ]);
 
   currentSubscription = subscriptionSnap.exists() ? subscriptionSnap.data() : null;
@@ -635,7 +1017,10 @@ const loadUserDetail = async () => {
   $("statPlan").textContent = activeProductIds.length
     ? activeProductIds.map((productId) => productMeta[productId]?.productName ?? productId).join(" + ")
     : "무료";
-  $("statBackups").textContent = String(photoBackups.size);
+  const imageBundleCount = currentBackup?.imageBundleCount ?? 0;
+  const videoCount = currentBackup?.videoCount ?? 0;
+  const musicCount = currentBackup?.musicCount ?? musicTracks.size;
+  $("statBackups").textContent = String(photoBackups.size + imageBundleCount + videoCount + musicCount);
   $("statStatus").textContent = activeProductIds.length
     ? `${activeProductIds.length}개 활성`
     : "비활성";
@@ -645,9 +1030,7 @@ const loadUserDetail = async () => {
 
   $("backupStatus").textContent = currentBackup?.status ?? "없음";
   $("backupDeleteAfter").textContent = formatDate(currentBackup?.deleteAfter);
-  $("backupCounts").textContent = `사진 ${photoBackups.size}개 / 작업 ${
-    currentBackup?.imageBundleCount ?? 0
-  }개 / 영상 ${currentBackup?.videoCount ?? 0}개`;
+  $("backupCounts").textContent = `사진 ${photoBackups.size}개 / 작업 ${imageBundleCount}개 / 동영상 ${videoCount}개 / 음악 ${musicCount}개`;
 
   userPanel.classList.remove("hidden");
   subscriptionPanel.classList.remove("hidden");
@@ -770,4 +1153,33 @@ $("deleteBackupButton").addEventListener("click", async () => {
   } catch (error) {
     setMessage("backupMessage", error?.message ?? "백업 삭제 중 문제가 발생했습니다.");
   }
+});
+
+backupTabs.forEach((tab) => {
+  document.querySelector(`[data-backup-tab="${tab}"]`)?.addEventListener("click", () => {
+    loadBackupItems(tab);
+  });
+});
+
+$("backupUploadButton").addEventListener("click", () => {
+  if (!currentUserDoc) {
+    setMessage("backupItemsMessage", "사용자를 먼저 선택하세요.");
+    return;
+  }
+  $("backupUploadInput").click();
+});
+
+$("backupUploadInput").addEventListener("change", (event) => {
+  const file = event.target.files?.[0];
+  uploadAdminBackupFile(file);
+});
+
+$("prevBackupItemsPageButton").addEventListener("click", () => {
+  backupPagesByTab[activeBackupTab] -= 1;
+  renderBackupItems();
+});
+
+$("nextBackupItemsPageButton").addEventListener("click", () => {
+  backupPagesByTab[activeBackupTab] += 1;
+  renderBackupItems();
 });

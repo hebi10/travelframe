@@ -1,9 +1,11 @@
 import {
   CameraView,
+  type CameraFocusPoint,
   type CameraType,
   type FlashMode,
   useCameraPermissions
 } from "expo-camera";
+import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 import { router, useFocusEffect } from "expo-router";
@@ -28,8 +30,10 @@ import {
 } from "react-native";
 import Animated, {
   runOnJS,
+  useAnimatedStyle,
   useDerivedValue,
-  useSharedValue
+  useSharedValue,
+  withTiming
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -53,6 +57,10 @@ import {
   calculateGuidePositionDragOffset,
   clampGuidePositionOffset
 } from "@/lib/camera-guide-position";
+import {
+  getTapExposureControlPosition,
+  getNormalizedCameraFocusPoint
+} from "@/lib/camera-focus-controls";
 import { backupPhotoIfEnabled } from "@/lib/cloud-backup";
 import {
   DEFAULT_GUIDE_COLOR,
@@ -147,16 +155,65 @@ const CAMERA_FLASH_OPTIONS: { label: string; value: FlashMode }[] = [
 
 const CAMERA_ZOOM_MIN = 0;
 const CAMERA_ZOOM_MAX = 100;
+const CAMERA_ZOOM_PRESETS = [
+  { label: "1x", value: 0 },
+  { label: "3x", value: 25 },
+  { label: "5x", value: 50 },
+  { label: "8x", value: 75 },
+  { label: "10x", value: 100 }
+] as const;
+const CAMERA_CONTROL_TABS = [
+  { id: "photo", label: "\uC0AC\uC9C4" },
+  { id: "zoom", label: "\uD655\uB300" },
+  { id: "guide", label: "\uAC00\uC774\uB4DC" },
+  { id: "light", label: "\uB77C\uC774\uD2B8" }
+] as const;
+const CAMERA_CONTROL_TAB_WIDTH = 78;
+const CAMERA_CONTROL_TAB_GAP = 6;
+const CAMERA_CONTROL_HORIZONTAL_PADDING = 16;
+const CAMERA_CONTROL_TRAY_HORIZONTAL_PADDING = 4;
+const CAMERA_CONTROL_ROW_GAP = 6;
+const CAMERA_CONTROL_RESET_BUTTON_WIDTH = 38;
+const CAMERA_EXPOSURE_BIAS_MIN = -1;
+const CAMERA_EXPOSURE_BIAS_MAX = 1;
 const CAMERA_FLIP_SWIPE_THRESHOLD = 70;
 const CAMERA_FLIP_HORIZONTAL_TOLERANCE = 1.4;
+const CAMERA_FOCUS_CONTROLS_DISMISS_MS = 2500;
+const CAMERA_FOCUS_CONTROLS_FADE_MS = 300;
+const CAMERA_FOCUS_INDICATOR_SIZE = 62;
+const CAMERA_FOCUS_INDICATOR_RADIUS = CAMERA_FOCUS_INDICATOR_SIZE / 2;
+const CAMERA_FOCUS_LOCK_BUTTON_SIZE = 22;
+const EXPOSURE_CONTROL_WIDTH = 106;
+const EXPOSURE_CONTROL_HEIGHT = 34;
+const EXPOSURE_CONTROL_OFFSET_Y = 34;
+const EXPOSURE_CONTROL_MARGIN = 16;
+const EXPOSURE_SUN_ICON_SIZE = 15;
+const EXPOSURE_CONTROL_GAP = 7;
+const EXPOSURE_TRACK_WIDTH = EXPOSURE_CONTROL_WIDTH - EXPOSURE_SUN_ICON_SIZE - EXPOSURE_CONTROL_GAP;
 
 type CameraTimerValue = (typeof CAMERA_TIMER_OPTIONS)[number]["value"];
 type CameraQualityValue = (typeof CAMERA_QUALITY_OPTIONS)[number]["value"];
+type CameraControlTab = (typeof CAMERA_CONTROL_TABS)[number]["id"];
 
 const sleep = (milliseconds: number) =>
   new Promise((resolve) => {
     setTimeout(resolve, milliseconds);
   });
+
+function getCameraControlTabOffset(index: number) {
+  "worklet";
+
+  return -index * (CAMERA_CONTROL_TAB_WIDTH + CAMERA_CONTROL_TAB_GAP);
+}
+
+function getNearestCameraControlTabIndex(offsetX: number) {
+  "worklet";
+
+  const tabStride = CAMERA_CONTROL_TAB_WIDTH + CAMERA_CONTROL_TAB_GAP;
+  const nearestIndex = Math.round(-offsetX / tabStride);
+
+  return Math.max(0, Math.min(CAMERA_CONTROL_TABS.length - 1, nearestIndex));
+}
 
 export default function CameraScreen() {
   const { user, subscription } = useAuth();
@@ -182,6 +239,9 @@ export default function CameraScreen() {
   const [cameraSettingsOpen, setCameraSettingsOpen] = useState(false);
   const [cameraMenuOpen, setCameraMenuOpen] = useState(false);
   const [navigationOpen, setNavigationOpen] = useState(false);
+  const [activeCameraControlTab, setActiveCameraControlTab] =
+    useState<CameraControlTab>("photo");
+  const [cameraControlPanelWidth, setCameraControlPanelWidth] = useState(0);
   const [shutterTimer, setShutterTimer] = useState<CameraTimerValue>(0);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [hapticEnabled, setHapticEnabled] = useState(true);
@@ -192,6 +252,11 @@ export default function CameraScreen() {
   const [flashMode, setFlashMode] = useState<FlashMode>("off");
   const [torchEnabled, setTorchEnabled] = useState(false);
   const [zoomPercent, setZoomPercent] = useState(0);
+  const [cameraFocusPoint, setCameraFocusPoint] = useState<CameraFocusPoint | null>(null);
+  const [cameraFocusTap, setCameraFocusTap] = useState<{ x: number; y: number } | null>(null);
+  const [focusIndicatorVisible, setFocusIndicatorVisible] = useState(false);
+  const [cameraFocusLocked, setCameraFocusLocked] = useState(false);
+  const [cameraExposureBias, setCameraExposureBias] = useState(0);
   const [shutterSoundEnabled, setShutterSoundEnabled] = useState(false);
   const [isCameraReady, setIsCameraReady] = useState(false);
   const [isCapturing, setIsCapturing] = useState(false);
@@ -209,6 +274,13 @@ export default function CameraScreen() {
   const guideDragStartX = useSharedValue(0);
   const guideDragStartY = useSharedValue(0);
   const cameraPinchStartZoomPercent = useSharedValue(0);
+  const cameraControlSlideX = useSharedValue(0);
+  const cameraControlTabSlideX = useSharedValue(0);
+  const cameraControlTabStartX = useSharedValue(0);
+  const focusControlsOpacity = useSharedValue(0);
+  const focusIndicatorScale = useSharedValue(1);
+  const cameraFocusLockedRef = useRef(false);
+  const focusIndicatorTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const insets = useSafeAreaInsets();
   const bottomSafePadding = Math.max(insets.bottom + 10, 24);
   const bottomModalPadding = Math.max(insets.bottom + 18, 28);
@@ -220,6 +292,64 @@ export default function CameraScreen() {
     [insets.bottom, insets.top]
   );
   const isCameraModalOpen = guideChoiceOpen || guideSettingsOpen || cameraSettingsOpen || navigationOpen;
+  const activeCameraControlTabIndex = CAMERA_CONTROL_TABS.findIndex(
+    (tab) => tab.id === activeCameraControlTab
+  );
+  const cameraControlTabViewportWidth = Math.max(
+    0,
+    cameraFrame.width -
+      CAMERA_CONTROL_HORIZONTAL_PADDING * 2 -
+      CAMERA_CONTROL_TRAY_HORIZONTAL_PADDING * 2 -
+      CAMERA_CONTROL_ROW_GAP -
+      CAMERA_CONTROL_RESET_BUTTON_WIDTH
+  );
+  const cameraControlTabCenterPadding = Math.max(
+    0,
+    cameraControlTabViewportWidth / 2 - CAMERA_CONTROL_TAB_WIDTH / 2
+  );
+  const focusIndicatorAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: focusControlsOpacity.value,
+    transform: [{ scale: focusIndicatorScale.value }]
+  }));
+  const focusControlsAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: focusControlsOpacity.value
+  }));
+  const cameraControlPagerAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: cameraControlSlideX.value }]
+  }));
+  const cameraControlTabTrackAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: cameraControlTabSlideX.value }]
+  }));
+
+  useEffect(() => {
+    if (cameraControlPanelWidth <= 0) {
+      return;
+    }
+
+    cameraControlSlideX.value = withTiming(
+      -activeCameraControlTabIndex * cameraControlPanelWidth,
+      { duration: 180 }
+    );
+  }, [
+    activeCameraControlTabIndex,
+    cameraControlPanelWidth,
+    cameraControlSlideX
+  ]);
+
+  useEffect(() => {
+    if (cameraControlTabViewportWidth <= 0) {
+      return;
+    }
+
+    cameraControlTabSlideX.value = withTiming(
+      getCameraControlTabOffset(activeCameraControlTabIndex),
+      { duration: 180 }
+    );
+  }, [
+    activeCameraControlTabIndex,
+    cameraControlTabSlideX,
+    cameraControlTabViewportWidth
+  ]);
 
   const returnFromPermissionScreen = useCallback(() => {
     if (router.canGoBack()) {
@@ -268,6 +398,15 @@ export default function CameraScreen() {
 
     return () => subscription.remove();
   }, [getPermission]);
+
+  useEffect(
+    () => () => {
+      if (focusIndicatorTimeout.current) {
+        clearTimeout(focusIndicatorTimeout.current);
+      }
+    },
+    []
+  );
 
   const applyGuideSize = useCallback((value: number) => {
     const nextSize = Math.round(
@@ -364,6 +503,9 @@ export default function CameraScreen() {
         guideOffsetXValue.value = settings.guideOffsetX;
         guideOffsetYValue.value = settings.guideOffsetY;
         setOverlayOpacity(settings.overlayOpacity);
+        setZoomPercent(settings.cameraZoomPercent);
+        setTorchEnabled(settings.cameraTorchEnabled && settings.cameraFacing === "back");
+        setCameraFacing(settings.cameraFacing);
         setCameraRatio(settings.cameraRatio);
         setCameraSaveScope(settings.cameraSaveScope);
         setRecentPhoto(latestPhoto);
@@ -538,11 +680,143 @@ export default function CameraScreen() {
     setZoomPercent(nextZoom);
   }, []);
 
+  const setZoomPreset = useCallback(
+    (value: number) => {
+      const nextZoom = Math.round(
+        Math.max(CAMERA_ZOOM_MIN, Math.min(CAMERA_ZOOM_MAX, value))
+      );
+      setZoomPercent(nextZoom);
+      void updateAppSettings({ cameraZoomPercent: nextZoom });
+      void triggerFeedback();
+    },
+    [triggerFeedback]
+  );
+
+  const setLightEnabled = useCallback(
+    (enabled: boolean) => {
+      const nextEnabled = enabled;
+      setTorchEnabled(nextEnabled);
+      void updateAppSettings({ cameraTorchEnabled: nextEnabled });
+      void triggerFeedback();
+    },
+    [triggerFeedback]
+  );
+
+  const applyCameraExposureBias = useCallback((value: number) => {
+    const nextBias = Math.max(
+      CAMERA_EXPOSURE_BIAS_MIN,
+      Math.min(CAMERA_EXPOSURE_BIAS_MAX, value)
+    );
+    setCameraExposureBias(Number(nextBias.toFixed(2)));
+  }, []);
+
+  const showFocusControls = useCallback(() => {
+    setFocusIndicatorVisible(true);
+    focusControlsOpacity.value = 0;
+    focusIndicatorScale.value = 1.5;
+    focusControlsOpacity.value = withTiming(1, {
+      duration: CAMERA_FOCUS_CONTROLS_FADE_MS
+    });
+    focusIndicatorScale.value = withTiming(1, {
+      duration: CAMERA_FOCUS_CONTROLS_FADE_MS
+    });
+  }, [focusControlsOpacity, focusIndicatorScale]);
+
+  const cancelFocusControlsDismiss = useCallback(() => {
+    if (focusIndicatorTimeout.current) {
+      clearTimeout(focusIndicatorTimeout.current);
+      focusIndicatorTimeout.current = null;
+    }
+    setFocusIndicatorVisible(true);
+    focusControlsOpacity.value = withTiming(1, {
+      duration: CAMERA_FOCUS_CONTROLS_FADE_MS
+    });
+    focusIndicatorScale.value = withTiming(1, {
+      duration: CAMERA_FOCUS_CONTROLS_FADE_MS
+    });
+  }, [focusControlsOpacity, focusIndicatorScale]);
+
+  const scheduleFocusControlsDismiss = useCallback(() => {
+    if (cameraFocusLockedRef.current) {
+      return;
+    }
+
+    if (focusIndicatorTimeout.current) {
+      clearTimeout(focusIndicatorTimeout.current);
+    }
+
+    focusIndicatorTimeout.current = setTimeout(() => {
+      focusIndicatorTimeout.current = null;
+      focusIndicatorScale.value = withTiming(1, {
+        duration: CAMERA_FOCUS_CONTROLS_FADE_MS
+      });
+      focusControlsOpacity.value = withTiming(
+        0,
+        { duration: CAMERA_FOCUS_CONTROLS_FADE_MS },
+        (finished) => {
+          if (finished) {
+            runOnJS(setFocusIndicatorVisible)(false);
+          }
+        }
+      );
+    }, CAMERA_FOCUS_CONTROLS_DISMISS_MS);
+  }, [focusControlsOpacity, focusIndicatorScale]);
+
+  const handleCameraTap = useCallback(
+    (x: number, y: number) => {
+      if (cameraFocusLockedRef.current) {
+        return;
+      }
+
+      const tap = { x, y };
+      const nextFocusPoint = getNormalizedCameraFocusPoint(tap, cameraFrame);
+
+      if (!nextFocusPoint) {
+        return;
+      }
+
+      cameraFocusLockedRef.current = false;
+      setCameraFocusLocked(false);
+      setCameraFocusPoint(nextFocusPoint);
+      setCameraFocusTap(tap);
+      showFocusControls();
+      void triggerFeedback();
+      scheduleFocusControlsDismiss();
+    },
+    [cameraFrame, scheduleFocusControlsDismiss, showFocusControls, triggerFeedback]
+  );
+
+  const toggleCameraFocusLock = useCallback(() => {
+    if (!cameraFocusTap) {
+      return;
+    }
+
+    const nextLocked = !cameraFocusLockedRef.current;
+    cameraFocusLockedRef.current = nextLocked;
+    setCameraFocusLocked(nextLocked);
+    setFocusIndicatorVisible(true);
+
+    if (nextLocked) {
+      cancelFocusControlsDismiss();
+    } else {
+      scheduleFocusControlsDismiss();
+    }
+
+    void triggerFeedback();
+  }, [cameraFocusTap, cancelFocusControlsDismiss, scheduleFocusControlsDismiss, triggerFeedback]);
+
   const changeCameraFacing = useCallback((value: CameraType) => {
     setCameraFacing(value);
     if (value === "front") {
       setTorchEnabled(false);
+      void updateAppSettings({
+        cameraFacing: value,
+        cameraTorchEnabled: false
+      });
+      return;
     }
+
+    void updateAppSettings({ cameraFacing: value });
   }, []);
 
   const updateCameraRatio = (nextRatio: PhotoRatioLabel) => {
@@ -561,6 +835,34 @@ export default function CameraScreen() {
     changeCameraFacing(cameraFacing === "back" ? "front" : "back");
     void triggerFeedback();
   }, [cameraFacing, changeCameraFacing, triggerFeedback]);
+
+  const toggleCameraFacing = useCallback(() => {
+    changeCameraFacing(cameraFacing === "back" ? "front" : "back");
+    void triggerFeedback();
+  }, [cameraFacing, changeCameraFacing, triggerFeedback]);
+
+  const resetCameraQuickControls = useCallback(() => {
+    setZoomPercent(0);
+    setTorchEnabled(false);
+    setGuide("circle");
+    setGuideVisible(true);
+    setGuideOffsetX(0);
+    setGuideOffsetY(0);
+    guideOffsetXValue.value = 0;
+    guideOffsetYValue.value = 0;
+    referenceOverlayRef.current?.reset();
+    setOverlayOpacity(defaultOverlayOpacity.current);
+    setOverlayResetKey((value) => value + 1);
+    void updateAppSettings({
+      cameraZoomPercent: 0,
+      cameraTorchEnabled: false,
+      defaultGuide: "circle",
+      guideVisible: true,
+      guideOffsetX: 0,
+      guideOffsetY: 0
+    });
+    void triggerFeedback();
+  }, [guideOffsetXValue, guideOffsetYValue, triggerFeedback]);
 
   const resetOverlay = () => {
     setOverlayOpacity(defaultOverlayOpacity.current);
@@ -601,11 +903,6 @@ export default function CameraScreen() {
   const openCameraSettingsMenu = () => {
     setCameraMenuOpen(false);
     setCameraSettingsOpen(true);
-  };
-
-  const openGuideChoiceMenu = () => {
-    setCameraMenuOpen(false);
-    setGuideChoiceOpen(true);
   };
 
   const openLineGuideSettings = () => {
@@ -677,6 +974,106 @@ export default function CameraScreen() {
     router.push("/studio");
   };
 
+  const selectCameraControlTab = useCallback(
+    (nextTab: CameraControlTab) => {
+      setActiveCameraControlTab(nextTab);
+      void triggerFeedback();
+    },
+    [triggerFeedback]
+  );
+
+  const selectCameraControlTabByIndex = useCallback(
+    (nextIndex: number) => {
+      const nextTab = CAMERA_CONTROL_TABS[nextIndex]?.id;
+      if (nextTab) {
+        selectCameraControlTab(nextTab);
+      }
+    },
+    [selectCameraControlTab]
+  );
+
+  const cameraControlTabPanGesture = useMemo(
+    () =>
+      Gesture.Pan()
+        .activeOffsetX([-10, 10])
+        .failOffsetY([-12, 12])
+        .onBegin(() => {
+          cameraControlTabStartX.value = cameraControlTabSlideX.value;
+        })
+        .onUpdate((event) => {
+          if (cameraControlTabViewportWidth <= 0) {
+            return;
+          }
+
+          const minOffset = getCameraControlTabOffset(CAMERA_CONTROL_TABS.length - 1);
+          const nextOffset = cameraControlTabStartX.value + event.translationX;
+          cameraControlTabSlideX.value = Math.max(
+            minOffset,
+            Math.min(0, nextOffset)
+          );
+        })
+        .onEnd((event) => {
+          if (cameraControlTabViewportWidth <= 0) {
+            return;
+          }
+
+          const minOffset = getCameraControlTabOffset(CAMERA_CONTROL_TABS.length - 1);
+          const dragEndOffset = Math.max(
+            minOffset,
+            Math.min(0, cameraControlTabStartX.value + event.translationX)
+          );
+          const nextIndex = getNearestCameraControlTabIndex(dragEndOffset);
+          cameraControlTabSlideX.value = withTiming(
+            getCameraControlTabOffset(nextIndex),
+            { duration: 160 }
+          );
+
+          if (nextIndex !== activeCameraControlTabIndex) {
+            runOnJS(selectCameraControlTabByIndex)(nextIndex);
+          }
+        }),
+    [
+      activeCameraControlTabIndex,
+      cameraControlTabSlideX,
+      cameraControlTabStartX,
+      cameraControlTabViewportWidth,
+      selectCameraControlTabByIndex
+    ]
+  );
+
+  const cameraControlTabTapGesture = useMemo(
+    () =>
+      Gesture.Tap()
+        .maxDuration(220)
+        .onEnd((event) => {
+          if (cameraControlTabViewportWidth <= 0) {
+            return;
+          }
+
+          const tabStride = CAMERA_CONTROL_TAB_WIDTH + CAMERA_CONTROL_TAB_GAP;
+          const centerPadding =
+            cameraControlTabViewportWidth / 2 - CAMERA_CONTROL_TAB_WIDTH / 2;
+          const tappedIndex = Math.round(
+            (event.x - centerPadding - cameraControlTabSlideX.value) / tabStride
+          );
+          const nextIndex = Math.max(
+            0,
+            Math.min(CAMERA_CONTROL_TABS.length - 1, tappedIndex)
+          );
+          runOnJS(selectCameraControlTabByIndex)(nextIndex);
+        }),
+    [
+      cameraControlTabSlideX,
+      cameraControlTabViewportWidth,
+      selectCameraControlTabByIndex
+    ]
+  );
+
+  const cameraControlTabGesture = useMemo(
+    () => Gesture.Exclusive(cameraControlTabPanGesture, cameraControlTabTapGesture),
+    [cameraControlTabPanGesture, cameraControlTabTapGesture]
+  );
+
   const cameraSwipeGesture = useMemo(
     () =>
       Gesture.Pan()
@@ -747,9 +1144,33 @@ export default function CameraScreen() {
     ]
   );
 
+  const cameraTapFocusGesture = useMemo(
+    () =>
+      Gesture.Tap()
+        .enabled(
+          !isCameraModalOpen &&
+            !cameraMenuOpen &&
+            !overlaySetupActive &&
+            !isGuidePositionAdjusting &&
+            !isCapturing
+        )
+        .maxDuration(250)
+        .onEnd((event) => {
+          runOnJS(handleCameraTap)(event.x, event.y);
+        }),
+    [
+      cameraMenuOpen,
+      handleCameraTap,
+      isCameraModalOpen,
+      isCapturing,
+      isGuidePositionAdjusting,
+      overlaySetupActive
+    ]
+  );
+
   const cameraPreviewGesture = useMemo(
-    () => Gesture.Simultaneous(cameraSwipeGesture, cameraPinchZoomGesture),
-    [cameraPinchZoomGesture, cameraSwipeGesture]
+    () => Gesture.Simultaneous(cameraSwipeGesture, cameraPinchZoomGesture, cameraTapFocusGesture),
+    [cameraPinchZoomGesture, cameraSwipeGesture, cameraTapFocusGesture]
   );
 
   const guidePositionGesture = useMemo(
@@ -784,6 +1205,21 @@ export default function CameraScreen() {
       isGuidePositionAdjusting,
       syncGuideOffsetFromGesture
     ]
+  );
+
+  const exposureControlPosition = useMemo(
+    () =>
+      cameraFocusTap
+        ? getTapExposureControlPosition({
+            tap: cameraFocusTap,
+            frame: cameraFrame,
+            controlWidth: EXPOSURE_CONTROL_WIDTH,
+            controlHeight: EXPOSURE_CONTROL_HEIGHT,
+            offsetY: EXPOSURE_CONTROL_OFFSET_Y,
+            margin: EXPOSURE_CONTROL_MARGIN
+          })
+        : null,
+    [cameraFocusTap, cameraFrame]
   );
 
   if (!permission) {
@@ -844,6 +1280,9 @@ export default function CameraScreen() {
         flash={flashMode}
         enableTorch={torchEnabled}
         zoom={zoomPercent / 100}
+        focusPoint={cameraFocusPoint}
+        focusLocked={cameraFocusLocked}
+        exposureBias={cameraExposureBias}
         mode="picture"
         onCameraReady={() => setIsCameraReady(true)}
         onMountError={(event) =>
@@ -900,6 +1339,73 @@ export default function CameraScreen() {
         </GestureDetector>
       )}
 
+      {cameraFocusTap && focusIndicatorVisible ? (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.focusIndicator,
+            focusIndicatorAnimatedStyle,
+            {
+              left: cameraFocusTap.x - CAMERA_FOCUS_INDICATOR_RADIUS,
+              top: cameraFocusTap.y - CAMERA_FOCUS_INDICATOR_RADIUS
+            }
+          ]}
+        />
+      ) : null}
+
+      {cameraFocusTap && focusIndicatorVisible ? (
+        <Animated.View
+          style={[
+            styles.focusLockButtonWrap,
+            focusControlsAnimatedStyle,
+            {
+              left: cameraFocusTap.x + CAMERA_FOCUS_INDICATOR_RADIUS - CAMERA_FOCUS_LOCK_BUTTON_SIZE,
+              top: cameraFocusTap.y - CAMERA_FOCUS_INDICATOR_RADIUS - 2
+            }
+          ]}
+        >
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={cameraFocusLocked ? "초점 고정 해제" : "초점 고정"}
+            onPress={toggleCameraFocusLock}
+            style={({ pressed }) => [
+              styles.focusLockButton,
+              cameraFocusLocked && styles.focusLockButtonActive,
+              pressed && styles.focusLockButtonPressed
+            ]}
+          >
+            <Feather
+              name={cameraFocusLocked ? "lock" : "unlock"}
+              size={12}
+              color={colors.inverse}
+            />
+          </Pressable>
+        </Animated.View>
+      ) : null}
+
+      {cameraFocusTap && focusIndicatorVisible && exposureControlPosition && !isCameraModalOpen && !isGuidePositionAdjusting ? (
+        <Animated.View
+          style={[
+            styles.exposureTapControl,
+            focusControlsAnimatedStyle,
+            {
+              left: exposureControlPosition.left,
+              top: exposureControlPosition.top
+            }
+          ]}
+        >
+          <ExposureBiasControl
+            value={cameraExposureBias}
+            min={CAMERA_EXPOSURE_BIAS_MIN}
+            max={CAMERA_EXPOSURE_BIAS_MAX}
+            onChange={applyCameraExposureBias}
+            onCommit={applyCameraExposureBias}
+            onInteractionStart={cancelFocusControlsDismiss}
+            onInteractionEnd={scheduleFocusControlsDismiss}
+          />
+        </Animated.View>
+      ) : null}
+
       {countdown ? (
         <View style={styles.countdownOverlay}>
           <Text selectable={false} style={styles.countdownText}>
@@ -910,6 +1416,14 @@ export default function CameraScreen() {
 
       {!isGuidePositionAdjusting ? (
       <View style={[styles.topBar, { paddingTop: insets.top + 12 }]}>
+        <Pressable
+          style={styles.homeIconButton}
+          onPress={() => router.push("/home")}
+          accessibilityRole="button"
+          accessibilityLabel="홈으로 이동"
+        >
+          <Feather name="home" size={22} color={colors.inverse} />
+        </Pressable>
         <Text selectable={false} style={styles.brand}>
           트래블프레임
         </Text>
@@ -1031,7 +1545,7 @@ export default function CameraScreen() {
             <View style={styles.cameraSettingsScrollShell}>
               <View pointerEvents="none" style={styles.cameraSettingsScrollHint}>
                 <Text selectable={false} style={styles.cameraSettingsScrollHintText}>
-                  아래로 스크롤
+                  스크롤
                 </Text>
                 <Text selectable={false} style={styles.cameraSettingsScrollHintIcon}>
                   ↓
@@ -1636,96 +2150,256 @@ export default function CameraScreen() {
             </View>
           </View>
         ) : (
-          <>
-            {referenceUri ? (
-              <View style={styles.captureOpacityControl}>
-                <SmoothValueSlider
-                  value={Math.round(overlayOpacity * 100)}
-                  min={OVERLAY_OPACITY_MIN}
-                  max={OVERLAY_OPACITY_MAX}
-                  label="투명도"
-                  compact
-                  onChange={applyOverlayOpacityPercent}
-                  onCommit={applyOverlayOpacityPercent}
-                />
-              </View>
-            ) : null}
-            <View style={styles.captureZoomControl}>
-              <SmoothValueSlider
-                value={zoomPercent}
-                min={CAMERA_ZOOM_MIN}
-                max={CAMERA_ZOOM_MAX}
-                label="줌"
-                compact
-                onChange={applyZoomPercent}
-                onCommit={applyZoomPercent}
-              />
-            </View>
-            <View style={styles.captureRow}>
-              <Pressable
-                style={styles.guideSettingsButton}
-                onPress={openGuideChoiceMenu}
-              >
-                <View style={styles.guideSettingsIcon}>
+          <View collapsable={false} style={styles.cameraControlDeck}>
+              {activeCameraControlTab !== "photo" ? (
+                <View
+                  pointerEvents="box-none"
+                  style={[
+                    styles.cameraFloatingPanelWrap,
+                    styles.cameraFloatingPanelRaised,
+                    { bottom: bottomSafePadding + 176 }
+                  ]}
+                >
                   <View
-                    style={[
-                      styles.guideSettingsSwatch,
-                      { backgroundColor: guideColor }
-                    ]}
-                  />
-                </View>
-                <View style={styles.guideSettingsCopy}>
-                  <Text selectable={false} style={styles.guideOnlyLabel}>
-                    가이드
-                  </Text>
-                </View>
-              </Pressable>
-              <Pressable
-                disabled={!isCameraReady || isCapturing}
-                style={[
-                  styles.shutterOuter,
-                  (!isCameraReady || isCapturing) && styles.shutterDisabled
-                ]}
-                onPress={takePhoto}
-              >
-                <View style={styles.shutterInner} />
-              </Pressable>
-              {referenceUri ? (
-                <View style={styles.opacityQuickControl}>
-                  <SmoothValueSlider
-                    value={Math.round(overlayOpacity * 100)}
-                    min={OVERLAY_OPACITY_MIN}
-                    max={OVERLAY_OPACITY_MAX}
-                    label="투명도"
-                    compact
-                    onChange={applyOverlayOpacityPercent}
-                    onCommit={applyOverlayOpacityPercent}
-                  />
-                </View>
-              ) : (
-                <View style={styles.captureSideSpacer} />
-              )}
-              <Pressable
-                style={styles.galleryButton}
-                onPress={openPersonalGallery}
-                accessibilityRole="button"
-                accessibilityLabel="개인 갤러리 열기"
-              >
-                {recentPhoto ? (
-                  <NativeImage
-                    source={{ uri: recentPhoto.uri }}
-                    style={styles.galleryThumb}
-                    resizeMode="cover"
-                  />
-                ) : (
-                  <View style={styles.galleryEmptyThumb}>
-                    <View style={styles.galleryEmptyLine} />
-                    <View style={styles.galleryEmptyDot} />
+                    style={styles.cameraControlPanelViewport}
+                    onLayout={(event) =>
+                      setCameraControlPanelWidth(event.nativeEvent.layout.width)
+                    }
+                  >
+                    <Animated.View
+                      style={[
+                        styles.cameraControlPager,
+                        cameraControlPagerAnimatedStyle
+                      ]}
+                    >
+                      {CAMERA_CONTROL_TABS.map((tab) => (
+                        <View
+                          key={tab.id}
+                          style={[
+                            styles.cameraControlPage,
+                            { width: cameraControlPanelWidth || 1 }
+                          ]}
+                        >
+                          {tab.id === "zoom" ? (
+                            <View style={styles.quickButtonRow}>
+                              {CAMERA_ZOOM_PRESETS.map((preset) => {
+                                const isActive = zoomPercent === preset.value;
+
+                                return (
+                                  <Pressable
+                                    key={preset.label}
+                                    style={[
+                                      styles.quickPillButton,
+                                      isActive && styles.quickPillButtonActive
+                                    ]}
+                                    onPress={() => setZoomPreset(preset.value)}
+                                  >
+                                    <Text
+                                      selectable={false}
+                                      style={[
+                                        styles.quickPillText,
+                                        isActive && styles.quickPillTextActive
+                                      ]}
+                                    >
+                                      {preset.label}
+                                    </Text>
+                                  </Pressable>
+                                );
+                              })}
+                            </View>
+                          ) : null}
+                          {tab.id === "guide" ? (
+                            <View style={styles.quickButtonRow}>
+                              <Pressable
+                                style={[
+                                  styles.quickPillButton,
+                                  guideVisible && !referenceUri && styles.quickPillButtonActive
+                                ]}
+                                onPress={openLineGuideSettings}
+                              >
+                                <Text
+                                  selectable={false}
+                                  style={[
+                                    styles.quickPillText,
+                                    guideVisible && !referenceUri && styles.quickPillTextActive
+                                  ]}
+                                >
+                                  {"\uB77C\uC778"}
+                                </Text>
+                              </Pressable>
+                              <Pressable
+                                style={[
+                                  styles.quickPillButton,
+                                  referenceUri && styles.quickPillButtonActive
+                                ]}
+                                onPress={openPhotoGuideSettings}
+                              >
+                                <Text
+                                  selectable={false}
+                                  style={[
+                                    styles.quickPillText,
+                                    referenceUri && styles.quickPillTextActive
+                                  ]}
+                                >
+                                  {"\uC774\uBBF8\uC9C0"}
+                                </Text>
+                              </Pressable>
+                            </View>
+                          ) : null}
+                          {tab.id === "light" ? (
+                            <View style={styles.quickButtonRow}>
+                              <Pressable
+                                style={[
+                                  styles.quickPillButton,
+                                  torchEnabled && styles.quickPillButtonActive
+                                ]}
+                                onPress={() => setLightEnabled(true)}
+                              >
+                                <Text
+                                  selectable={false}
+                                  style={[
+                                    styles.quickPillText,
+                                    torchEnabled && styles.quickPillTextActive
+                                  ]}
+                                >
+                                  on
+                                </Text>
+                              </Pressable>
+                              <Pressable
+                                style={[
+                                  styles.quickPillButton,
+                                  !torchEnabled && styles.quickPillButtonActive
+                                ]}
+                                onPress={() => setLightEnabled(false)}
+                              >
+                                <Text
+                                  selectable={false}
+                                  style={[
+                                    styles.quickPillText,
+                                    !torchEnabled && styles.quickPillTextActive
+                                  ]}
+                                >
+                                  off
+                                </Text>
+                              </Pressable>
+                            </View>
+                          ) : null}
+                        </View>
+                      ))}
+                    </Animated.View>
                   </View>
-                )}
-              </Pressable>
+                </View>
+              ) : null}
+
+              <View style={styles.cameraControlBottomTray}>
+                <View style={styles.cameraControlTabRow}>
+                  <GestureDetector gesture={cameraControlTabGesture}>
+                    <Animated.View
+                      collapsable={false}
+                      style={styles.cameraControlTabViewport}
+                    >
+                      <Animated.View
+                        style={[
+                          styles.cameraControlTabTrack,
+                          cameraControlTabTrackAnimatedStyle
+                        ]}
+                      >
+                        <View
+                          style={[
+                            styles.cameraControlTabCenterSpacer,
+                            { width: cameraControlTabCenterPadding }
+                          ]}
+                        />
+                        {CAMERA_CONTROL_TABS.map((tab) => {
+                          const isActive = activeCameraControlTab === tab.id;
+
+                          return (
+                            <View
+                              key={tab.id}
+                              style={[
+                                styles.cameraControlTab,
+                                isActive && styles.cameraControlTabActive
+                              ]}
+                            >
+                              <Text
+                                selectable={false}
+                                style={[
+                                  styles.cameraControlTabText,
+                                  isActive && styles.cameraControlTabTextActive
+                                ]}
+                              >
+                                {tab.label}
+                              </Text>
+                            </View>
+                          );
+                        })}
+                        <View
+                          style={[
+                            styles.cameraControlTabCenterSpacer,
+                            { width: cameraControlTabCenterPadding }
+                          ]}
+                        />
+                      </Animated.View>
+                    </Animated.View>
+                  </GestureDetector>
+                  <Pressable
+                    style={styles.cameraControlResetButton}
+                    onPress={resetCameraQuickControls}
+                    accessibilityRole="button"
+                    accessibilityLabel="\uCE74\uBA54\uB77C \uBE60\uB978 \uC124\uC815 \uCD08\uAE30\uD654"
+                  >
+                    <Feather name="rotate-ccw" size={15} color={colors.inverse} />
+                  </Pressable>
+                </View>
+
+                <View style={styles.captureRow}>
+                  <Pressable
+                    style={styles.galleryButton}
+                    onPress={openPersonalGallery}
+                    accessibilityRole="button"
+                    accessibilityLabel="\uAC1C\uC778 \uAC24\uB7EC\uB9AC \uC5F4\uAE30"
+                  >
+                    {recentPhoto ? (
+                      <NativeImage
+                        source={{ uri: recentPhoto.uri }}
+                        style={styles.galleryThumb}
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <View style={styles.galleryEmptyThumb}>
+                        <View style={styles.galleryEmptyLine} />
+                        <View style={styles.galleryEmptyDot} />
+                      </View>
+                    )}
+                  </Pressable>
+                  <Pressable
+                    disabled={!isCameraReady || isCapturing}
+                    style={[
+                      styles.shutterOuter,
+                      (!isCameraReady || isCapturing) && styles.shutterDisabled
+                    ]}
+                    onPress={takePhoto}
+                  >
+                    <View style={styles.shutterInner} />
+                  </Pressable>
+                  <Pressable
+                    style={[
+                      styles.cameraFlipButton,
+                      cameraFacing === "front" && styles.cameraFlipButtonActive
+                    ]}
+                    onPress={toggleCameraFacing}
+                    accessibilityRole="button"
+                    accessibilityLabel={
+                      cameraFacing === "front"
+                        ? "\uD6C4\uBA74 \uCE74\uBA54\uB77C\uB85C \uC804\uD658"
+                        : "\uC804\uBA74 \uCE74\uBA54\uB77C\uB85C \uC804\uD658"
+                    }
+                  >
+                    <Feather name="refresh-cw" size={26} color={colors.inverse} />
+                  </Pressable>
+                </View>
+              </View>
             </View>
-          </>
         )}
       </View>
       ) : null}
@@ -1787,6 +2461,142 @@ type SmoothValueSliderProps = {
   onChange?: (value: number) => void;
   onCommit: (value: number) => void;
 };
+
+type ExposureBiasControlProps = {
+  value: number;
+  min: number;
+  max: number;
+  onChange: (value: number) => void;
+  onCommit: (value: number) => void;
+  onInteractionStart: () => void;
+  onInteractionEnd: () => void;
+};
+
+function getExposureThumbX(value: number, min: number, max: number, width: number) {
+  if (width <= 0 || max === min) {
+    return 0;
+  }
+
+  const ratio = (value - min) / (max - min);
+  return Math.max(0, Math.min(1, ratio)) * width;
+}
+
+function ExposureBiasControl({
+  value,
+  min,
+  max,
+  onChange,
+  onCommit,
+  onInteractionStart,
+  onInteractionEnd
+}: ExposureBiasControlProps) {
+  const [trackWidth, setTrackWidth] = useState(EXPOSURE_TRACK_WIDTH);
+  const [isExposureThumbReady, setIsExposureThumbReady] = useState(true);
+  const thumbX = useSharedValue(getExposureThumbX(value, min, max, EXPOSURE_TRACK_WIDTH));
+  const dragStartThumbX = useSharedValue(0);
+  const isDragging = useSharedValue(false);
+  const thumbTranslateX = useDerivedValue(() => thumbX.value - 9);
+
+  const syncExposureThumbPosition = useCallback(
+    (width: number) => {
+      if (width <= 0) {
+        return false;
+      }
+
+      const nextX = getExposureThumbX(value, min, max, width);
+      if (!isDragging.value) {
+        thumbX.value = nextX;
+      }
+      return true;
+    },
+    [isDragging, max, min, thumbX, value]
+  );
+
+  useEffect(() => {
+    if (trackWidth <= 0) {
+      return;
+    }
+
+    if (syncExposureThumbPosition(trackWidth)) {
+      setIsExposureThumbReady(true);
+    }
+  }, [syncExposureThumbPosition, trackWidth]);
+
+  const sliderGesture = useMemo(
+    () =>
+      Gesture.Pan()
+        .enabled(trackWidth > 0)
+        .hitSlop({ top: 10, bottom: 10, left: 10, right: 10 })
+        .onBegin((event) => {
+          isDragging.value = true;
+          runOnJS(onInteractionStart)();
+          dragStartThumbX.value = Math.max(0, Math.min(trackWidth, event.x));
+          thumbX.value = dragStartThumbX.value;
+          const nextRatio =
+            trackWidth > 0
+              ? Math.max(0, Math.min(1, dragStartThumbX.value / trackWidth))
+              : 0;
+          runOnJS(onChange)(min + nextRatio * (max - min));
+        })
+        .onUpdate((event) => {
+          const nextX = Math.max(
+            0,
+            Math.min(trackWidth, dragStartThumbX.value + event.translationX)
+          );
+          thumbX.value = nextX;
+          const nextRatio =
+            trackWidth > 0 ? Math.max(0, Math.min(1, nextX / trackWidth)) : 0;
+          runOnJS(onChange)(min + nextRatio * (max - min));
+        })
+        .onFinalize(() => {
+          const nextRatio =
+            trackWidth > 0 ? Math.max(0, Math.min(1, thumbX.value / trackWidth)) : 0;
+          isDragging.value = false;
+          runOnJS(onCommit)(min + nextRatio * (max - min));
+          runOnJS(onInteractionEnd)();
+        }),
+    [
+      dragStartThumbX,
+      isDragging,
+      max,
+      min,
+      onChange,
+      onCommit,
+      onInteractionEnd,
+      onInteractionStart,
+      thumbX,
+      trackWidth
+    ]
+  );
+
+  return (
+    <View style={styles.exposureControl}>
+      <Feather name="sun" size={EXPOSURE_SUN_ICON_SIZE} color={colors.inverse} />
+      <GestureDetector gesture={sliderGesture}>
+        <Animated.View
+          collapsable={false}
+          style={styles.exposureTrack}
+          onLayout={(event) => {
+            const nextTrackWidth = event.nativeEvent.layout.width;
+            const isReady = syncExposureThumbPosition(nextTrackWidth);
+            setIsExposureThumbReady(isReady);
+            setTrackWidth(nextTrackWidth);
+          }}
+        >
+          <View style={styles.exposureTrackLine} />
+          <View style={styles.exposureCenterMark} />
+          <Animated.View
+            style={[
+              styles.exposureThumb,
+              !isExposureThumbReady && styles.exposureThumbHidden,
+              { transform: [{ translateX: thumbTranslateX }] }
+            ]}
+          />
+        </Animated.View>
+      </GestureDetector>
+    </View>
+  );
+}
 
 function SmoothValueSlider({
   value,
@@ -1932,10 +2742,86 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: 0,
     right: 0,
-    top: 92,
-    bottom: 188,
+    top: 0,
+    bottom: 0,
     zIndex: 4,
     backgroundColor: "transparent"
+  },
+  focusIndicator: {
+    position: "absolute",
+    width: CAMERA_FOCUS_INDICATOR_SIZE,
+    height: CAMERA_FOCUS_INDICATOR_SIZE,
+    borderRadius: CAMERA_FOCUS_INDICATOR_RADIUS,
+    borderWidth: 2,
+    borderColor: colors.inverse,
+    backgroundColor: "rgba(255, 255, 255, 0.08)",
+    zIndex: 12
+  },
+  focusLockButtonWrap: {
+    position: "absolute",
+    width: CAMERA_FOCUS_LOCK_BUTTON_SIZE,
+    height: CAMERA_FOCUS_LOCK_BUTTON_SIZE,
+    zIndex: 19
+  },
+  focusLockButton: {
+    width: CAMERA_FOCUS_LOCK_BUTTON_SIZE,
+    height: CAMERA_FOCUS_LOCK_BUTTON_SIZE,
+    borderRadius: CAMERA_FOCUS_LOCK_BUTTON_SIZE / 2,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.75)",
+    backgroundColor: "rgba(0, 0, 0, 0.5)"
+  },
+  focusLockButtonActive: {
+    borderColor: "rgba(255, 255, 255, 0.9)",
+    backgroundColor: "#E53935"
+  },
+  focusLockButtonPressed: {
+    opacity: 0.78
+  },
+  exposureTapControl: {
+    position: "absolute",
+    width: EXPOSURE_CONTROL_WIDTH,
+    height: EXPOSURE_CONTROL_HEIGHT,
+    zIndex: 18,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  exposureControl: {
+    width: "100%",
+    height: EXPOSURE_CONTROL_HEIGHT,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: EXPOSURE_CONTROL_GAP,
+    justifyContent: "center"
+  },
+  exposureTrack: {
+    width: EXPOSURE_TRACK_WIDTH,
+    justifyContent: "center"
+  },
+  exposureTrackLine: {
+    height: 2,
+    backgroundColor: "rgba(255, 255, 255, 0.45)"
+  },
+  exposureCenterMark: {
+    position: "absolute",
+    left: "50%",
+    width: 2,
+    height: 14,
+    backgroundColor: "rgba(255, 255, 255, 0.7)"
+  },
+  exposureThumb: {
+    position: "absolute",
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 2,
+    borderColor: colors.inverse,
+    backgroundColor: colors.background
+  },
+  exposureThumbHidden: {
+    opacity: 0
   },
   topBar: {
     position: "absolute",
@@ -1949,10 +2835,17 @@ const styles = StyleSheet.create({
     gap: 12
   },
   brand: {
+    display: "none",
     color: colors.inverse,
     fontSize: typography.small,
     fontWeight: "800",
     letterSpacing: 0
+  },
+  homeIconButton: {
+    width: 42,
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center"
   },
   cameraMenuWrap: {
     position: "relative",
@@ -2028,10 +2921,10 @@ const styles = StyleSheet.create({
     bottom: 0,
     zIndex: 12,
     alignItems: "center",
-    gap: 18,
-    paddingHorizontal: 16,
+    gap: 12,
+    paddingHorizontal: CAMERA_CONTROL_HORIZONTAL_PADDING,
     paddingTop: 10,
-    backgroundColor: "rgba(0, 0, 0, 0.52)"
+    backgroundColor: "transparent"
   },
   overlayPanel: {
     width: "100%",
@@ -2604,19 +3497,125 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center"
   },
-  captureZoomControl: {
-    width: "80%",
-    minHeight: 30,
-    justifyContent: "center",
-    paddingHorizontal: 2,
-    paddingVertical: 0
+  cameraControlDeck: {
+    width: "100%",
+    gap: 0
   },
-  captureOpacityControl: {
-    width: "80%",
-    minHeight: 30,
+  cameraFloatingPanelWrap: {
+    width: "100%",
+    minHeight: 44,
     justifyContent: "center",
-    paddingHorizontal: 2,
-    paddingVertical: 0
+    backgroundColor: "transparent"
+  },
+  cameraFloatingPanelRaised: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    zIndex: 22
+  },
+  cameraControlPanelViewport: {
+    width: "100%",
+    minHeight: 42,
+    overflow: "hidden"
+  },
+  cameraControlPager: {
+    flexDirection: "row",
+    alignItems: "center"
+  },
+  cameraControlPage: {
+    minHeight: 42,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  quickButtonRow: {
+    minHeight: 42,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10
+  },
+  quickPillButton: {
+    minWidth: 48,
+    minHeight: 38,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.36)",
+    backgroundColor: "rgba(0, 0, 0, 0.28)"
+  },
+  quickPillButtonActive: {
+    borderColor: colors.inverse,
+    backgroundColor: colors.inverse
+  },
+  quickPillText: {
+    color: colors.inverse,
+    fontSize: typography.button,
+    fontWeight: "900",
+    letterSpacing: 0
+  },
+  quickPillTextActive: {
+    color: colors.text
+  },
+  cameraControlBottomTray: {
+    width: "100%",
+    gap: 30,
+    paddingTop: 10,
+    paddingHorizontal: CAMERA_CONTROL_TRAY_HORIZONTAL_PADDING,
+    backgroundColor: "rgba(0, 0, 0, 0.52)"
+  },
+  cameraControlTabRow: {
+    width: "100%",
+    minHeight: 38,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: CAMERA_CONTROL_ROW_GAP
+  },
+  cameraControlTabViewport: {
+    flex: 1,
+    minHeight: 38,
+    overflow: "hidden"
+  },
+  cameraControlTabTrack: {
+    minHeight: 38,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: CAMERA_CONTROL_TAB_GAP
+  },
+  cameraControlTabCenterSpacer: {
+    height: 1
+  },
+  cameraControlTab: {
+    width: CAMERA_CONTROL_TAB_WIDTH,
+    minHeight: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 8,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.24)",
+    backgroundColor: "rgba(0, 0, 0, 0.18)"
+  },
+  cameraControlTabActive: {
+    borderColor: colors.inverse,
+    backgroundColor: "rgba(255, 255, 255, 0.18)"
+  },
+  cameraControlTabText: {
+    color: "rgba(255, 255, 255, 0.72)",
+    fontSize: 11,
+    fontWeight: "900",
+    letterSpacing: 0
+  },
+  cameraControlTabTextActive: {
+    color: colors.inverse
+  },
+  cameraControlResetButton: {
+    width: CAMERA_CONTROL_RESET_BUTTON_WIDTH,
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.34)",
+    backgroundColor: "rgba(0, 0, 0, 0.24)"
   },
   captureRow: {
     width: "100%",
@@ -2625,66 +3624,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center"
   },
-  guideSettingsButton: {
-    position: "absolute",
-    left: 0,
-    minWidth: 124,
-    minHeight: 52,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 9,
-    paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.38)",
-    backgroundColor: "rgba(0, 0, 0, 0.42)"
-  },
-  guideSettingsIcon: {
-    width: 24,
-    height: 24,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.42)"
-  },
-  guideSettingsSwatch: {
-    width: 12,
-    height: 12,
-    borderWidth: 1,
-    borderColor: "rgba(17, 17, 17, 0.32)"
-  },
-  guideSettingsCopy: {
-    gap: 3
-  },
-  guideSettingsLabel: {
-    color: "rgba(255, 255, 255, 0.62)",
-    fontSize: 10,
-    fontWeight: "800",
-    letterSpacing: 0
-  },
-  guideOnlyLabel: {
-    color: "rgba(255, 255, 255, 0.86)",
-    fontSize: 11,
-    fontWeight: "800",
-    letterSpacing: 0
-  },
-  captureSideSpacer: {
-    position: "absolute",
-    right: 0,
-    width: 92,
-    height: controls.height
-  },
-  opacityQuickControl: {
-    position: "absolute",
-    right: 0,
-    minWidth: 128,
-    minHeight: 30,
-    justifyContent: "center",
-    paddingHorizontal: 2,
-    display: "none"
-  },
   galleryButton: {
     position: "absolute",
-    right: 0,
+    left: 0,
     width: 54,
     height: 54,
     alignItems: "center",
@@ -2693,6 +3635,21 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.62)",
     backgroundColor: "rgba(0, 0, 0, 0.38)"
+  },
+  cameraFlipButton: {
+    position: "absolute",
+    right: 0,
+    width: 54,
+    height: 54,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.62)",
+    backgroundColor: "rgba(0, 0, 0, 0.38)"
+  },
+  cameraFlipButtonActive: {
+    borderColor: colors.inverse,
+    backgroundColor: "rgba(255, 255, 255, 0.16)"
   },
   galleryThumb: {
     width: "100%",

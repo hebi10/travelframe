@@ -1,12 +1,14 @@
 {
   "name": "travel-frame",
-  "version": "1.0.14",
+  "version": "1.0.16",
   "private": true,
   "main": "expo-router/entry",
   "scripts": {
+    "postinstall": "node scripts/apply-patches.mjs",
     "start": "expo start",
     "android": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-android.ps1",
     "android:dev": "expo start --dev-client --android",
+    "android:dev:clear": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start-android-dev-clear.ps1",
     "android:uninstall": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"adb uninstall com.haebi.photoguide; exit 0\"",
     "android:run-latest": "eas build:run --platform android --latest",
     "android:reset-install": "npm run android:uninstall && npm run android:run-latest",

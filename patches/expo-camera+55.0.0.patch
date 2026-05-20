@@ -1,0 +1,190 @@
+﻿diff --git a/node_modules/expo-camera/android/src/main/java/expo/modules/camera/CameraViewModule.kt b/node_modules/expo-camera/android/src/main/java/expo/modules/camera/CameraViewModule.kt
+index 7e50b98..a4d26a2 100644
+--- a/node_modules/expo-camera/android/src/main/java/expo/modules/camera/CameraViewModule.kt
++++ b/node_modules/expo-camera/android/src/main/java/expo/modules/camera/CameraViewModule.kt
+@@ -13,6 +13,7 @@ import expo.modules.camera.analyzers.MLKitBarCodeScanner
+ import expo.modules.camera.records.BarcodeSettings
+ import expo.modules.camera.records.BarcodeType
+ import expo.modules.camera.records.CameraMode
++import expo.modules.camera.records.CameraFocusPoint
+ import expo.modules.camera.records.CameraRatio
+ import expo.modules.camera.records.CameraType
+ import expo.modules.camera.records.FlashMode
+@@ -389,6 +390,14 @@ class CameraViewModule : Module() {
+         }
+       }
+ 
++      Prop("focusPoint") { view, focusPoint: CameraFocusPoint? ->
++        view.focusPoint = focusPoint
++      }
++
++      Prop("focusLocked") { view, focusLocked: Boolean? ->
++        view.focusLocked = focusLocked ?: false
++      }
++
++      Prop("exposureBias") { view, exposureBias: Float? ->
++        view.exposureBias = exposureBias ?: 0f
++      }
++
+       Prop("ratio") { view, ratio: CameraRatio? ->
+         ratio?.let {
+           if (view.ratio != it) {
+diff --git a/node_modules/expo-camera/android/src/main/java/expo/modules/camera/ExpoCameraView.kt b/node_modules/expo-camera/android/src/main/java/expo/modules/camera/ExpoCameraView.kt
+index 1ff8116..ab330a2 100644
+--- a/node_modules/expo-camera/android/src/main/java/expo/modules/camera/ExpoCameraView.kt
++++ b/node_modules/expo-camera/android/src/main/java/expo/modules/camera/ExpoCameraView.kt
+@@ -57,6 +57,7 @@ import expo.modules.camera.common.PictureSavedEvent
+ import expo.modules.camera.records.BarcodeSettings
+ import expo.modules.camera.records.BarcodeType
+ import expo.modules.camera.records.CameraMode
++import expo.modules.camera.records.CameraFocusPoint
+ import expo.modules.camera.records.CameraRatio
+ import expo.modules.camera.records.CameraType
+ import expo.modules.camera.records.FlashMode
+@@ -174,6 +175,20 @@ class ExpoCameraView(
+       }
+     }
+ 
++  var focusPoint: CameraFocusPoint? = null
++    set(value) {
++      field = value
++      value?.let {
++        startFocusMetering(it)
++      }
++    }
++
++  var focusLocked: Boolean = false
++    set(value) {
++      field = value
++      focusPoint?.let {
++        startFocusMetering(it)
++      }
++    }
++
++  var exposureBias: Float = 0f
++    set(value) {
++      field = value
++      setCameraExposureBias(value)
++    }
++
+   var videoQuality: VideoQuality = VideoQuality.VIDEO1080P
+     set(value) {
+       field = value
+@@ -520,6 +535,10 @@ class ExpoCameraView(
+       }
+       // Set the previous zoom level after recreating the camera
+       setCameraZoom(zoom)
++      setCameraExposureBias(exposureBias)
++      focusPoint?.let {
++        startFocusMetering(it)
++      }
+       this.cameraProvider = cameraProvider
+     } catch (_: Exception) {
+       onMountError(
+@@ -616,7 +635,7 @@ class ExpoCameraView(
+     }.build()
+   }
+ 
+-  private fun startFocusMetering() {
++  private fun startFocusMetering(point: CameraFocusPoint? = null) {
+     camera?.let {
+       val meteringPointFactory = DisplayOrientedMeteringPointFactory(
+         previewView.display,
+@@ -624,15 +643,39 @@ class ExpoCameraView(
+         previewView.width.toFloat(),
+         previewView.height.toFloat()
+       )
++      val pointX = if (point == null) {
++        previewView.width / 2f
++      } else {
++        point.x.coerceIn(0f, 1f) * previewView.width
++      }
++      val pointY = if (point == null) {
++        previewView.height / 2f
++      } else {
++        point.y.coerceIn(0f, 1f) * previewView.height
++      }
+      val actionBuilder = FocusMeteringAction.Builder(
+-        meteringPointFactory.createPoint(1f, 1f),
+-        FocusMeteringAction.FLAG_AF
++        meteringPointFactory.createPoint(pointX, pointY),
++        FocusMeteringAction.FLAG_AF or FocusMeteringAction.FLAG_AE
+      )
+      if (focusLocked) {
+        actionBuilder.disableAutoCancel()
+      }
+      val action = actionBuilder.build()
+      it.cameraControl.startFocusAndMetering(action)
+     }
+   }
+ 
++  private fun setCameraExposureBias(value: Float) {
++    val currentCamera = camera ?: return
++    val exposureState = currentCamera.cameraInfo.exposureState
++    if (!exposureState.isExposureCompensationSupported) {
++      return
++    }
++
++    val range = exposureState.exposureCompensationRange
++    val clampedBias = value.coerceIn(-1f, 1f)
++    val limit = if (clampedBias >= 0f) range.upper else -range.lower
++    val targetIndex = (clampedBias * limit).roundToInt().coerceIn(range.lower, range.upper)
++    currentCamera.cameraControl.setExposureCompensationIndex(targetIndex)
++  }
++
+   private fun setCameraZoom(value: Float) {
+     val maxZoomRatio = camera?.cameraInfo?.zoomState?.value?.maxZoomRatio ?: 1f
+     val targetZoomRatio = max(1f, min(maxZoomRatio, value.coerceIn(0f, 1f) * maxZoomRatio))
+diff --git a/node_modules/expo-camera/android/src/main/java/expo/modules/camera/records/CameraRecords.kt b/node_modules/expo-camera/android/src/main/java/expo/modules/camera/records/CameraRecords.kt
+index 044c4e9..2137301 100644
+--- a/node_modules/expo-camera/android/src/main/java/expo/modules/camera/records/CameraRecords.kt
++++ b/node_modules/expo-camera/android/src/main/java/expo/modules/camera/records/CameraRecords.kt
+@@ -71,6 +71,11 @@ enum class FocusMode(val value: String) : Enumerable {
+   OFF("off")
+ }
+ 
++data class CameraFocusPoint(
++  @Field val x: Float,
++  @Field val y: Float
++) : Record
++
+ enum class VideoStabilizationMode(val value: String) : Enumerable {
+   OFF("off"),
+   STANDARD("standard"),
+diff --git a/node_modules/expo-camera/build/Camera.types.d.ts b/node_modules/expo-camera/build/Camera.types.d.ts
+index 8ff7a92..16a60dc 100644
+--- a/node_modules/expo-camera/build/Camera.types.d.ts
++++ b/node_modules/expo-camera/build/Camera.types.d.ts
+@@ -240,6 +240,10 @@ export type Point = {
+     x: number;
+     y: number;
+ };
++export type CameraFocusPoint = {
++    x: number;
++    y: number;
++};
+ export type BarcodeSize = {
+     /**
+      * The height value.
+@@ -326,6 +330,16 @@ export type CameraViewProps = ViewProps & {
+      * @default 0
+      */
+     zoom?: number;
++    /**
++     * Normalized point, from 0 to 1 on each axis, used for Android focus and exposure metering.
++     * @platform android
++     */
++    focusPoint?: CameraFocusPoint | null;
++    /**
++     * Whether Android focus and exposure metering should remain locked at the current point.
++     * @platform android
++     */
++    focusLocked?: boolean;
++    /**
++     * Normalized exposure compensation bias from -1 to 1.
++     * @platform android
++     */
++    exposureBias?: number;
+     /**
+      * Used to select image or video output.
+      * @default 'picture'

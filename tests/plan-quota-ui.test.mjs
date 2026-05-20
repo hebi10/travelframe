@@ -9,7 +9,10 @@ for (const [name, source] of [
   ["settings", settingsSource]
 ]) {
   assert.ok(source.includes('SectionBlock title="플랜 한도"'), `${name} should show a plan quota section`);
-  assert.ok(source.includes("영상 출력"), `${name} should show weekly video export quota`);
+  assert.ok(
+    source.includes("영상 출력 (주간 한도)"),
+    `${name} should label weekly video export quota`
+  );
   assert.ok(source.includes("이미지 보관함"), `${name} should show image library quota`);
   assert.ok(source.includes("영상 보관함"), `${name} should show video library quota`);
   assert.ok(source.includes("음악 보관함"), `${name} should show music library quota`);

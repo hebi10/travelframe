@@ -183,8 +183,8 @@
               <h2>직접 검색</h2>
               <form id="searchForm" class="form">
                 <label>
-                  이메일 또는 UID
-                  <input id="searchInput" placeholder="user@example.com 또는 uid" required />
+                  이메일, 이름 또는 UID
+                  <input id="searchInput" placeholder="이름, user@example.com 또는 uid" required />
                 </label>
                 <button type="submit">검색</button>
               </form>
@@ -289,6 +289,30 @@
                 Storage 원본 파일의 완전 자동 삭제는 추후 Cloud Functions 또는 Scheduler로 분리하는 것이 안전합니다.
               </p>
               <p id="backupMessage" class="message"></p>
+              <div class="backup-manager">
+                <div id="backupTabs" class="tabs" role="tablist" aria-label="백업 데이터 종류">
+                  <button class="tab active" type="button" data-backup-tab="image" role="tab" aria-selected="true">
+                    이미지
+                  </button>
+                  <button class="tab" type="button" data-backup-tab="video" role="tab" aria-selected="false">
+                    동영상
+                  </button>
+                  <button class="tab" type="button" data-backup-tab="music" role="tab" aria-selected="false">
+                    음악
+                  </button>
+                </div>
+                <div class="backup-toolbar">
+                  <button id="backupUploadButton" class="secondary" type="button">업로드</button>
+                  <input id="backupUploadInput" class="hidden" type="file" />
+                </div>
+                <div id="backupItemList" class="backup-item-list" aria-live="polite"></div>
+                <div class="pagination" aria-label="백업 데이터 페이지 이동">
+                  <button id="prevBackupItemsPageButton" class="secondary" type="button">이전</button>
+                  <span id="backupItemsPageInfo" class="meta">-</span>
+                  <button id="nextBackupItemsPageButton" class="secondary" type="button">다음</button>
+                </div>
+                <p id="backupItemsMessage" class="message"></p>
+              </div>
             </section>
           </div>
         </div>

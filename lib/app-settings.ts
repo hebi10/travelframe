@@ -1,3 +1,4 @@
+import type { CameraType } from "expo-camera";
 import type { GuideType } from "@/constants/camera-guides";
 import {
   DEFAULT_IMAGE_QUALITY,
@@ -41,6 +42,9 @@ export type AppSettings = {
   guideOffsetX: number;
   guideOffsetY: number;
   overlayOpacity: number;
+  cameraZoomPercent: number;
+  cameraTorchEnabled: boolean;
+  cameraFacing: CameraType;
   cameraRatio: PhotoRatioLabel;
   cameraSaveScope: CameraSaveScope;
   defaultRatio: TripClipRatio;
@@ -66,6 +70,9 @@ export const defaultAppSettings: AppSettings = {
   guideOffsetX: 0,
   guideOffsetY: 0,
   overlayOpacity: 0.4,
+  cameraZoomPercent: 0,
+  cameraTorchEnabled: false,
+  cameraFacing: "back",
   cameraRatio: "Original",
   cameraSaveScope: "app",
   defaultRatio: "9:16",
@@ -94,6 +101,7 @@ const storageModes: StorageMode[] = ["local_only", "local_backup", "local_saver"
 const imageBackupQualities = IMAGE_QUALITY_OPTIONS.map((option) => option.value);
 const cameraRatios: PhotoRatioLabel[] = ["Original", "1:1", "3:4", "4:5", "9:16", "16:9"];
 const cameraSaveScopes: CameraSaveScope[] = ["app", "device", "both"];
+const cameraFacings: CameraType[] = ["back", "front"];
 const tripClipRatios: TripClipRatio[] = ["9:16", "4:5", "1:1", "16:9", "3:4"];
 
 const clampGuideSize = (value: unknown) => {
@@ -121,6 +129,15 @@ const normalizeGuideOffset = (value: unknown) => {
   return Number.isFinite(parsedValue) ? Math.round(parsedValue) : 0;
 };
 
+const normalizeCameraZoomPercent = (value: unknown) => {
+  const parsedValue = Number(value);
+  if (!Number.isFinite(parsedValue)) {
+    return defaultAppSettings.cameraZoomPercent;
+  }
+
+  return Math.round(Math.max(0, Math.min(100, parsedValue)));
+};
+
 const normalizeSettings = (value: Partial<AppSettings> | null): AppSettings => {
   const nextSettings = {
     ...defaultAppSettings,
@@ -143,6 +160,14 @@ const normalizeSettings = (value: Partial<AppSettings> | null): AppSettings => {
         : defaultAppSettings.guideColor,
     guideOffsetX: normalizeGuideOffset(nextSettings.guideOffsetX),
     guideOffsetY: normalizeGuideOffset(nextSettings.guideOffsetY),
+    cameraZoomPercent: normalizeCameraZoomPercent(nextSettings.cameraZoomPercent),
+    cameraTorchEnabled:
+      typeof nextSettings.cameraTorchEnabled === "boolean"
+        ? nextSettings.cameraTorchEnabled
+        : defaultAppSettings.cameraTorchEnabled,
+    cameraFacing: cameraFacings.includes(nextSettings.cameraFacing)
+      ? nextSettings.cameraFacing
+      : defaultAppSettings.cameraFacing,
     cameraRatio: cameraRatios.includes(nextSettings.cameraRatio)
       ? nextSettings.cameraRatio
       : defaultAppSettings.cameraRatio,

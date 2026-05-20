@@ -623,6 +623,364 @@ const commitDeleteBatch = async (refs) => {
   }
 };
 
+const requireAdminUid = async (request) => {
+  const adminUid = request.auth?.uid;
+  if (!adminUid) {
+    throw new HttpsError("unauthenticated", "Login is required for admin backup management.");
+  }
+
+  const adminSnapshot = await db.doc(`admins/${adminUid}`).get();
+  if (!adminSnapshot.exists) {
+    throw new HttpsError("permission-denied", "Admin permission is required.");
+  }
+
+  return adminUid;
+};
+
+const sanitizeAdminFileName = (fileName) =>
+  String(fileName ?? "backup-file")
+    .replace(/[\\/:*?"<>|#%{}^~[\]`]/g, "-")
+    .replace(/\s+/g, "-")
+    .slice(0, 96) || "backup-file";
+
+const getAdminUploadConfig = ({ targetUid, itemKind, fileName }) => {
+  const safeFileName = sanitizeAdminFileName(fileName);
+  if (itemKind === "image") {
+    return {
+      mediaKind: "image",
+      itemType: "photo",
+      storagePath: (sessionId) => `users/${targetUid}/backups/photos/${sessionId}-${safeFileName}`
+    };
+  }
+
+  if (itemKind === "video") {
+    return {
+      mediaKind: "video",
+      itemType: "video",
+      storagePath: (sessionId) => `users/${targetUid}/backups/videos/${sessionId}-${safeFileName}`
+    };
+  }
+
+  if (itemKind === "music") {
+    return {
+      mediaKind: "audio",
+      itemType: "music",
+      storagePath: (sessionId) => `users/${targetUid}/music/${sessionId}-${safeFileName}`
+    };
+  }
+
+  throw new HttpsError("invalid-argument", "Unsupported admin backup item kind.");
+};
+
+const validateAdminUploadRequest = ({ targetUid, itemKind, fileName, fileSize, contentType }) => {
+  if (typeof targetUid !== "string" || !targetUid) {
+    throw new HttpsError("invalid-argument", "targetUid is required.");
+  }
+
+  const config = getAdminUploadConfig({ targetUid, itemKind, fileName });
+  assertBackupUploadAllowed({
+    uid: targetUid,
+    subscription: {
+      plan: "premium",
+      productId: "creator_monthly",
+      status: "active"
+    },
+    usage: {},
+    mediaKind: config.mediaKind,
+    fileSize,
+    contentType,
+    storagePath:
+      config.mediaKind === "audio"
+        ? `users/${targetUid}/backups/audio/${sanitizeAdminFileName(fileName)}`
+        : config.storagePath("session")
+  });
+
+  return config;
+};
+
+const getBackupSnapshotsForSummary = async (uid) => {
+  const userRef = db.doc(`users/${uid}`);
+  const [photoSnapshot, imageWorkSnapshot, videoSnapshot, musicSnapshot] = await Promise.all([
+    userRef.collection("photoBackups").get(),
+    userRef.collection("imageWorks").get(),
+    userRef.collection("videos").get(),
+    userRef.collection("musicTracks").get()
+  ]);
+
+  return { userRef, photoSnapshot, imageWorkSnapshot, videoSnapshot, musicSnapshot };
+};
+
+const refreshAdminBackupOverview = async (uid) => {
+  const { userRef, photoSnapshot, imageWorkSnapshot, videoSnapshot, musicSnapshot } =
+    await getBackupSnapshotsForSummary(uid);
+
+  let imageBackupBytes = 0;
+  let videoTotalBytes = 0;
+  let audioTotalBytes = 0;
+  let latestBackedUpAt = null;
+  const rememberLatest = (value) => {
+    if (!value || Number.isNaN(new Date(value).getTime())) return;
+    if (!latestBackedUpAt || new Date(value).getTime() > new Date(latestBackedUpAt).getTime()) {
+      latestBackedUpAt = value;
+    }
+  };
+
+  for (const item of photoSnapshot.docs) {
+    const data = item.data();
+    imageBackupBytes += Number(data.imageBackupSize ?? data.optimizedSize ?? data.fileSize ?? 0);
+    rememberLatest(data.backedUpAt ?? data.lastBackedUpAt ?? data.backupEnabledAt);
+  }
+
+  for (const item of imageWorkSnapshot.docs) {
+    const data = item.data();
+    imageBackupBytes += Number(data.imageBackupSize ?? data.fileSize ?? 0);
+    rememberLatest(data.backedUpAt ?? data.lastBackedUpAt ?? data.backupEnabledAt);
+  }
+
+  for (const item of videoSnapshot.docs) {
+    const data = item.data();
+    videoTotalBytes += Number(data.fileSize ?? 0);
+    rememberLatest(data.backedUpAt ?? data.lastBackedUpAt ?? data.createdAt);
+  }
+
+  for (const item of musicSnapshot.docs) {
+    const data = item.data();
+    audioTotalBytes += Number(data.size ?? data.fileSize ?? 0);
+    rememberLatest(data.createdAt ?? data.updatedAt);
+  }
+
+  await Promise.all([
+    userRef.collection("backups").doc("current").set(
+      {
+        userId: uid,
+        status: photoSnapshot.size || imageWorkSnapshot.size || videoSnapshot.size ? "active" : "empty",
+        photoCount: photoSnapshot.size,
+        imageBundleCount: imageWorkSnapshot.size,
+        videoCount: videoSnapshot.size,
+        musicCount: musicSnapshot.size,
+        imageBackupBytes,
+        backedUpAt: latestBackedUpAt,
+        updatedAt: FieldValue.serverTimestamp()
+      },
+      { merge: true }
+    ),
+    getUsageRef(uid).set(
+      {
+        imageTotalBytes: imageBackupBytes,
+        videoCount: videoSnapshot.size,
+        videoTotalBytes,
+        audioTotalBytes,
+        updatedAt: FieldValue.serverTimestamp()
+      },
+      { merge: true }
+    )
+  ]);
+
+  return {
+    photoCount: photoSnapshot.size,
+    imageBundleCount: imageWorkSnapshot.size,
+    videoCount: videoSnapshot.size,
+    musicCount: musicSnapshot.size,
+    imageBackupBytes
+  };
+};
+
+exports.reserveAdminBackupUpload = onCall(async (request) => {
+  try {
+    const adminUid = await requireAdminUid(request);
+    const { targetUid, itemKind, fileName, fileSize, contentType } = request.data ?? {};
+    const config = validateAdminUploadRequest({
+      targetUid,
+      itemKind,
+      fileName,
+      fileSize,
+      contentType
+    });
+    const targetUserSnapshot = await db.doc(`users/${targetUid}`).get();
+    if (!targetUserSnapshot.exists) {
+      throw new HttpsError("not-found", "Target user was not found.");
+    }
+    const sessionRef = db.collection(`users/${targetUid}/adminBackupUploadSessions`).doc();
+    const storagePath = config.storagePath(sessionRef.id);
+
+    await sessionRef.set({
+      adminUid,
+      targetUid,
+      itemKind,
+      itemType: config.itemType,
+      mediaKind: config.mediaKind,
+      fileName: sanitizeAdminFileName(fileName),
+      fileSize,
+      contentType,
+      storagePath,
+      status: "reserved",
+      createdAt: FieldValue.serverTimestamp(),
+      expiresAt: admin.firestore.Timestamp.fromMillis(Date.now() + BACKUP_UPLOAD_SESSION_TTL_MS)
+    });
+
+    return {
+      uploadSessionId: sessionRef.id,
+      storagePath,
+      expiresInSeconds: BACKUP_UPLOAD_SESSION_TTL_MS / 1000
+    };
+  } catch (error) {
+    throw toHttpsError(error);
+  }
+});
+
+exports.completeAdminBackupUpload = onCall(async (request) => {
+  try {
+    const adminUid = await requireAdminUid(request);
+    const { targetUid, uploadSessionId, downloadUrl } = request.data ?? {};
+    if (typeof targetUid !== "string" || !targetUid || typeof uploadSessionId !== "string") {
+      throw new HttpsError("invalid-argument", "targetUid and uploadSessionId are required.");
+    }
+
+    const sessionRef = db.doc(`users/${targetUid}/adminBackupUploadSessions/${uploadSessionId}`);
+    const sessionSnapshot = await sessionRef.get();
+    if (!sessionSnapshot.exists) {
+      throw new HttpsError("not-found", "Admin upload session was not found.");
+    }
+
+    const session = sessionSnapshot.data();
+    if (session.adminUid !== adminUid || session.targetUid !== targetUid) {
+      throw new HttpsError("permission-denied", "Admin upload session does not belong to this request.");
+    }
+
+    if (session.status === "completed") {
+      return { itemId: session.itemId, itemType: session.itemType };
+    }
+
+    if (session.status !== "reserved") {
+      throw new HttpsError("failed-precondition", "Admin upload session is not active.");
+    }
+
+    const [metadata] = await bucket.file(session.storagePath).getMetadata();
+    if (
+      Number(metadata.size) !== Number(session.fileSize) ||
+      metadata.contentType !== session.contentType ||
+      metadata.metadata?.adminBackupSessionId !== uploadSessionId
+    ) {
+      throw new HttpsError("failed-precondition", "Uploaded admin backup file does not match the reserved session.");
+    }
+
+    const now = new Date().toISOString();
+    const itemId = `${session.itemType}-${Date.now()}`;
+    const safeDownloadUrl =
+      typeof downloadUrl === "string" &&
+      downloadUrl.startsWith("https://firebasestorage.googleapis.com/")
+        ? downloadUrl
+        : null;
+
+    if (session.itemType === "photo") {
+      await db.doc(`users/${targetUid}/photoBackups/${itemId}`).set({
+        id: itemId,
+        userId: targetUid,
+        localId: itemId,
+        name: session.fileName,
+        uri: safeDownloadUrl,
+        downloadURL: safeDownloadUrl,
+        previewUri: safeDownloadUrl,
+        storagePath: session.storagePath,
+        fileSize: session.fileSize,
+        imageBackupSize: session.fileSize,
+        fileType: session.contentType,
+        backupStatus: "backed_up",
+        backupEnabledAt: now,
+        lastBackedUpAt: now,
+        backedUpAt: now,
+        sourceDeviceId: "admin",
+        updatedAt: FieldValue.serverTimestamp()
+      });
+    } else if (session.itemType === "video") {
+      await db.doc(`users/${targetUid}/videos/${itemId}`).set({
+        id: itemId,
+        userId: targetUid,
+        localId: itemId,
+        title: session.fileName,
+        uri: safeDownloadUrl,
+        downloadURL: safeDownloadUrl,
+        storagePath: session.storagePath,
+        fileSize: session.fileSize,
+        fileType: session.contentType,
+        backupStatus: "backed_up",
+        backupEnabledAt: now,
+        lastBackedUpAt: now,
+        backedUpAt: now,
+        sourceDeviceId: "admin",
+        updatedAt: FieldValue.serverTimestamp()
+      });
+    } else {
+      await db.doc(`users/${targetUid}/musicTracks/${itemId}`).set({
+        id: itemId,
+        userId: targetUid,
+        name: session.fileName,
+        mimeType: session.contentType,
+        size: session.fileSize,
+        storagePath: session.storagePath,
+        downloadUrl: safeDownloadUrl,
+        createdAt: now,
+        updatedAt: FieldValue.serverTimestamp()
+      });
+    }
+
+    await sessionRef.set(
+      {
+        status: "completed",
+        itemId,
+        completedAt: FieldValue.serverTimestamp()
+      },
+      { merge: true }
+    );
+    await refreshAdminBackupOverview(targetUid);
+
+    return { itemId, itemType: session.itemType };
+  } catch (error) {
+    throw toHttpsError(error);
+  }
+});
+
+exports.deleteAdminBackupItem = onCall(async (request) => {
+  try {
+    await requireAdminUid(request);
+    const { targetUid, itemType, itemId } = request.data ?? {};
+    if (typeof targetUid !== "string" || !targetUid || typeof itemId !== "string" || !itemId) {
+      throw new HttpsError("invalid-argument", "targetUid and itemId are required.");
+    }
+
+    const refByType = {
+      photo: db.doc(`users/${targetUid}/photoBackups/${itemId}`),
+      imageWork: db.doc(`users/${targetUid}/imageWorks/${itemId}`),
+      video: db.doc(`users/${targetUid}/videos/${itemId}`),
+      music: db.doc(`users/${targetUid}/musicTracks/${itemId}`)
+    };
+    const itemRef = refByType[itemType];
+    if (!itemRef) {
+      throw new HttpsError("invalid-argument", "Unsupported backup item type.");
+    }
+
+    const snapshot = await itemRef.get();
+    if (!snapshot.exists) {
+      throw new HttpsError("not-found", "Backup item was not found.");
+    }
+
+    const data = snapshot.data();
+    const storagePaths = [
+      data.storagePath,
+      data.previewStoragePath,
+      ...(Array.isArray(data.storagePaths) ? data.storagePaths : [])
+    ].filter(Boolean);
+
+    await Promise.all(storagePaths.map(deleteStoragePath));
+    await itemRef.delete();
+    const summary = await refreshAdminBackupOverview(targetUid);
+
+    return { deleted: true, summary };
+  } catch (error) {
+    throw toHttpsError(error);
+  }
+});
+
 exports.deleteCloudBackupData = onCall(async (request) => {
   try {
     const uid = requireUid(request);

@@ -1,4 +1,5 @@
 const { getDefaultConfig } = require('expo/metro-config');
+const path = require('path');
 
 const config = getDefaultConfig(__dirname);
 
@@ -28,7 +29,10 @@ const defaultBlockList = Array.isArray(config.resolver.blockList)
 
 config.resolver.blockList = [
   ...defaultBlockList,
-  ...ignoredRootDirs.map((dir) => new RegExp(`^${escapeRegex(dir)}(?:[/\\\\].*)?$`)),
+  ...ignoredRootDirs.map((dir) => {
+    const absoluteDir = path.resolve(__dirname, dir);
+    return new RegExp(`^${escapeRegex(absoluteDir)}(?:[/\\\\].*)?$`);
+  }),
 ];
 
 module.exports = config;

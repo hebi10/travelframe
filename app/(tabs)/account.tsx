@@ -856,7 +856,7 @@ export default function AccountScreen() {
                 value={planEntitlements.label}
               />
               <InfoRow
-                label="영상 출력"
+                label="영상 출력 (주간 한도)"
                 value={formatQuotaValue(
                   weeklyVideoUsed,
                   planEntitlements.weeklyVideoExportLimit

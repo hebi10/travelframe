@@ -6,11 +6,12 @@ const cameraSource = fs.readFileSync("app/(tabs)/camera.tsx", "utf8");
 for (const snippet of [
   "guideChoiceOpen",
   "setGuideChoiceOpen",
-  "openGuideChoiceMenu",
   "openLineGuideSettings",
   "openPhotoGuideSettings",
   "visible={guideChoiceOpen}",
-  "onPress={openGuideChoiceMenu}",
+  'tab.id === "guide"',
+  "onPress={openLineGuideSettings}",
+  "onPress={openPhotoGuideSettings}",
   "가이드",
   "setGuideSettingsOpen(true)",
   "reopenOverlaySetup();"
@@ -23,16 +24,12 @@ assert.ok(
   "guide choice modal should block camera controls like other camera modals"
 );
 
-assert.ok(
-  cameraSource.includes("guideOnlyLabel"),
-  "camera guide launch button should show the simple guide label"
-);
-
 for (const removed of [
   "hiddenCameraDropdownItem",
   "guideLaunchLabel",
   "hiddenGuideSettingsLabel",
-  "guideSettingsValue"
+  "guideSettingsValue",
+  "guideOnlyLabel"
 ]) {
   assert.ok(!cameraSource.includes(removed), `camera guide UI should not keep hidden legacy code: ${removed}`);
 }
