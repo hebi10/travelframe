@@ -170,10 +170,8 @@ const CAMERA_CONTROL_TABS = [
 ] as const;
 const CAMERA_CONTROL_TAB_WIDTH = 78;
 const CAMERA_CONTROL_TAB_GAP = 6;
-const CAMERA_CONTROL_HORIZONTAL_PADDING = 16;
-const CAMERA_CONTROL_TRAY_HORIZONTAL_PADDING = 4;
-const CAMERA_CONTROL_ROW_GAP = 6;
-const CAMERA_CONTROL_RESET_BUTTON_WIDTH = 38;
+const CAMERA_CONTROL_HORIZONTAL_PADDING = 0;
+const CAMERA_CONTROL_TRAY_HORIZONTAL_PADDING = 16;
 const CAMERA_EXPOSURE_BIAS_MIN = -1;
 const CAMERA_EXPOSURE_BIAS_MAX = 1;
 const CAMERA_FLIP_SWIPE_THRESHOLD = 70;
@@ -248,6 +246,7 @@ export default function CameraScreen() {
   const [photoQuality, setPhotoQuality] = useState<CameraQualityValue>("high");
   const [cameraRatio, setCameraRatio] = useState<PhotoRatioLabel>("Original");
   const [cameraSaveScope, setCameraSaveScope] = useState<CameraSaveScope>("app");
+  const [cameraControlTabViewportWidth, setCameraControlTabViewportWidth] = useState(0);
   const [cameraFacing, setCameraFacing] = useState<CameraType>("back");
   const [flashMode, setFlashMode] = useState<FlashMode>("off");
   const [torchEnabled, setTorchEnabled] = useState(false);
@@ -280,6 +279,7 @@ export default function CameraScreen() {
   const focusControlsOpacity = useSharedValue(0);
   const focusIndicatorScale = useSharedValue(1);
   const cameraFocusLockedRef = useRef(false);
+  const cameraExposureBiasRef = useRef(0);
   const focusIndicatorTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const insets = useSafeAreaInsets();
   const bottomSafePadding = Math.max(insets.bottom + 10, 24);
@@ -294,14 +294,6 @@ export default function CameraScreen() {
   const isCameraModalOpen = guideChoiceOpen || guideSettingsOpen || cameraSettingsOpen || navigationOpen;
   const activeCameraControlTabIndex = CAMERA_CONTROL_TABS.findIndex(
     (tab) => tab.id === activeCameraControlTab
-  );
-  const cameraControlTabViewportWidth = Math.max(
-    0,
-    cameraFrame.width -
-      CAMERA_CONTROL_HORIZONTAL_PADDING * 2 -
-      CAMERA_CONTROL_TRAY_HORIZONTAL_PADDING * 2 -
-      CAMERA_CONTROL_ROW_GAP -
-      CAMERA_CONTROL_RESET_BUTTON_WIDTH
   );
   const cameraControlTabCenterPadding = Math.max(
     0,
@@ -539,7 +531,6 @@ export default function CameraScreen() {
     try {
       setIsCapturing(true);
       setErrorMessage(null);
-      await triggerFeedback();
       const quality =
         CAMERA_QUALITY_OPTIONS.find((option) => option.value === photoQuality)
           ?.quality ?? 0.92;
@@ -707,7 +698,13 @@ export default function CameraScreen() {
       CAMERA_EXPOSURE_BIAS_MIN,
       Math.min(CAMERA_EXPOSURE_BIAS_MAX, value)
     );
-    setCameraExposureBias(Number(nextBias.toFixed(2)));
+    const nextRoundedBias = Number(nextBias.toFixed(2));
+    if (cameraExposureBiasRef.current === nextRoundedBias) {
+      return;
+    }
+
+    cameraExposureBiasRef.current = nextRoundedBias;
+    setCameraExposureBias(nextRoundedBias);
   }, []);
 
   const showFocusControls = useCallback(() => {
@@ -840,29 +837,6 @@ export default function CameraScreen() {
     changeCameraFacing(cameraFacing === "back" ? "front" : "back");
     void triggerFeedback();
   }, [cameraFacing, changeCameraFacing, triggerFeedback]);
-
-  const resetCameraQuickControls = useCallback(() => {
-    setZoomPercent(0);
-    setTorchEnabled(false);
-    setGuide("circle");
-    setGuideVisible(true);
-    setGuideOffsetX(0);
-    setGuideOffsetY(0);
-    guideOffsetXValue.value = 0;
-    guideOffsetYValue.value = 0;
-    referenceOverlayRef.current?.reset();
-    setOverlayOpacity(defaultOverlayOpacity.current);
-    setOverlayResetKey((value) => value + 1);
-    void updateAppSettings({
-      cameraZoomPercent: 0,
-      cameraTorchEnabled: false,
-      defaultGuide: "circle",
-      guideVisible: true,
-      guideOffsetX: 0,
-      guideOffsetY: 0
-    });
-    void triggerFeedback();
-  }, [guideOffsetXValue, guideOffsetYValue, triggerFeedback]);
 
   const resetOverlay = () => {
     setOverlayOpacity(defaultOverlayOpacity.current);
@@ -2072,7 +2046,7 @@ export default function CameraScreen() {
       </Modal>
 
       {!isCameraModalOpen && !isGuidePositionAdjusting ? (
-      <View style={[styles.controls, { paddingBottom: bottomSafePadding }]}>
+      <View style={styles.controls}>
         {errorMessage ? (
           <Text selectable style={styles.errorText}>
             {errorMessage}
@@ -2157,7 +2131,7 @@ export default function CameraScreen() {
                   style={[
                     styles.cameraFloatingPanelWrap,
                     styles.cameraFloatingPanelRaised,
-                    { bottom: bottomSafePadding + 176 }
+                    { bottom: bottomSafePadding + 96 }
                   ]}
                 >
                   <View
@@ -2291,12 +2265,15 @@ export default function CameraScreen() {
                 </View>
               ) : null}
 
-              <View style={styles.cameraControlBottomTray}>
+              <View style={[styles.cameraControlBottomTray, { paddingBottom: bottomSafePadding }]}>
                 <View style={styles.cameraControlTabRow}>
                   <GestureDetector gesture={cameraControlTabGesture}>
                     <Animated.View
                       collapsable={false}
                       style={styles.cameraControlTabViewport}
+                      onLayout={(event) =>
+                        setCameraControlTabViewportWidth(event.nativeEvent.layout.width)
+                      }
                     >
                       <Animated.View
                         style={[
@@ -2342,14 +2319,6 @@ export default function CameraScreen() {
                       </Animated.View>
                     </Animated.View>
                   </GestureDetector>
-                  <Pressable
-                    style={styles.cameraControlResetButton}
-                    onPress={resetCameraQuickControls}
-                    accessibilityRole="button"
-                    accessibilityLabel="\uCE74\uBA54\uB77C \uBE60\uB978 \uC124\uC815 \uCD08\uAE30\uD654"
-                  >
-                    <Feather name="rotate-ccw" size={15} color={colors.inverse} />
-                  </Pressable>
                 </View>
 
                 <View style={styles.captureRow}>
@@ -2481,6 +2450,33 @@ function getExposureThumbX(value: number, min: number, max: number, width: numbe
   return Math.max(0, Math.min(1, ratio)) * width;
 }
 
+function getExposureTrackXFromControlX(controlX: number, trackWidth: number) {
+  "worklet";
+
+  if (trackWidth <= 0) {
+    return 0;
+  }
+
+  const trackStartX = EXPOSURE_SUN_ICON_SIZE + EXPOSURE_CONTROL_GAP;
+  return Math.max(0, Math.min(trackWidth, controlX - trackStartX));
+}
+
+function getExposureBiasFromTrackX(
+  trackX: number,
+  min: number,
+  max: number,
+  trackWidth: number
+) {
+  "worklet";
+
+  if (trackWidth <= 0) {
+    return min;
+  }
+
+  const ratio = Math.max(0, Math.min(1, trackX / trackWidth));
+  return min + ratio * (max - min);
+}
+
 function ExposureBiasControl({
   value,
   min,
@@ -2530,13 +2526,11 @@ function ExposureBiasControl({
         .onBegin((event) => {
           isDragging.value = true;
           runOnJS(onInteractionStart)();
-          dragStartThumbX.value = Math.max(0, Math.min(trackWidth, event.x));
+          dragStartThumbX.value = getExposureTrackXFromControlX(event.x, trackWidth);
           thumbX.value = dragStartThumbX.value;
-          const nextRatio =
-            trackWidth > 0
-              ? Math.max(0, Math.min(1, dragStartThumbX.value / trackWidth))
-              : 0;
-          runOnJS(onChange)(min + nextRatio * (max - min));
+          runOnJS(onChange)(
+            getExposureBiasFromTrackX(dragStartThumbX.value, min, max, trackWidth)
+          );
         })
         .onUpdate((event) => {
           const nextX = Math.max(
@@ -2544,15 +2538,13 @@ function ExposureBiasControl({
             Math.min(trackWidth, dragStartThumbX.value + event.translationX)
           );
           thumbX.value = nextX;
-          const nextRatio =
-            trackWidth > 0 ? Math.max(0, Math.min(1, nextX / trackWidth)) : 0;
-          runOnJS(onChange)(min + nextRatio * (max - min));
+          runOnJS(onChange)(getExposureBiasFromTrackX(nextX, min, max, trackWidth));
         })
         .onFinalize(() => {
-          const nextRatio =
-            trackWidth > 0 ? Math.max(0, Math.min(1, thumbX.value / trackWidth)) : 0;
           isDragging.value = false;
-          runOnJS(onCommit)(min + nextRatio * (max - min));
+          runOnJS(onCommit)(
+            getExposureBiasFromTrackX(thumbX.value, min, max, trackWidth)
+          );
           runOnJS(onInteractionEnd)();
         }),
     [
@@ -2569,10 +2561,42 @@ function ExposureBiasControl({
     ]
   );
 
+  const sliderTapGesture = useMemo(
+    () =>
+      Gesture.Tap()
+        .enabled(trackWidth > 0)
+        .maxDuration(220)
+        .hitSlop({ top: 10, bottom: 10, left: 10, right: 10 })
+        .onEnd((event) => {
+          const nextX = getExposureTrackXFromControlX(event.x, trackWidth);
+          thumbX.value = nextX;
+          const nextValue = getExposureBiasFromTrackX(nextX, min, max, trackWidth);
+          runOnJS(onInteractionStart)();
+          runOnJS(onChange)(nextValue);
+          runOnJS(onCommit)(nextValue);
+          runOnJS(onInteractionEnd)();
+        }),
+    [
+      max,
+      min,
+      onChange,
+      onCommit,
+      onInteractionEnd,
+      onInteractionStart,
+      thumbX,
+      trackWidth
+    ]
+  );
+
+  const exposureGesture = useMemo(
+    () => Gesture.Exclusive(sliderGesture, sliderTapGesture),
+    [sliderGesture, sliderTapGesture]
+  );
+
   return (
-    <View style={styles.exposureControl}>
-      <Feather name="sun" size={EXPOSURE_SUN_ICON_SIZE} color={colors.inverse} />
-      <GestureDetector gesture={sliderGesture}>
+    <GestureDetector gesture={exposureGesture}>
+      <Animated.View collapsable={false} style={styles.exposureControl}>
+        <Feather name="sun" size={EXPOSURE_SUN_ICON_SIZE} color={colors.inverse} />
         <Animated.View
           collapsable={false}
           style={styles.exposureTrack}
@@ -2593,8 +2617,8 @@ function ExposureBiasControl({
             ]}
           />
         </Animated.View>
-      </GestureDetector>
-    </View>
+      </Animated.View>
+    </GestureDetector>
   );
 }
 
@@ -3091,10 +3115,13 @@ const styles = StyleSheet.create({
     paddingBottom: 22,
     borderWidth: 1,
     borderColor: colors.darkLine,
-    backgroundColor: colors.background
+    backgroundColor: colors.background,
+    overflow: "hidden"
   },
   cameraSettingsScrollShell: {
     position: "relative",
+    flexShrink: 1,
+    minHeight: 0,
     gap: 10
   },
   cameraSettingsScrollHint: {
@@ -3122,6 +3149,7 @@ const styles = StyleSheet.create({
   },
   cameraSettingsScroll: {
     flexGrow: 0,
+    flexShrink: 1,
     maxHeight: 560
   },
   cameraSettingsContent: {
@@ -3568,8 +3596,7 @@ const styles = StyleSheet.create({
     width: "100%",
     minHeight: 38,
     flexDirection: "row",
-    alignItems: "center",
-    gap: CAMERA_CONTROL_ROW_GAP
+    alignItems: "center"
   },
   cameraControlTabViewport: {
     flex: 1,
@@ -3607,15 +3634,6 @@ const styles = StyleSheet.create({
   },
   cameraControlTabTextActive: {
     color: colors.inverse
-  },
-  cameraControlResetButton: {
-    width: CAMERA_CONTROL_RESET_BUTTON_WIDTH,
-    height: 36,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.34)",
-    backgroundColor: "rgba(0, 0, 0, 0.24)"
   },
   captureRow: {
     width: "100%",

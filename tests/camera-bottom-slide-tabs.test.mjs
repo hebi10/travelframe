@@ -26,9 +26,11 @@ for (const snippet of [
   "cameraControlTabTrack",
   "cameraControlTabCenterSpacer",
   "cameraControlTabCenterPadding",
+  "cameraControlTabViewportWidth",
+  "setCameraControlTabViewportWidth",
+  "event.nativeEvent.layout.width",
   "CAMERA_CONTROL_HORIZONTAL_PADDING",
   "CAMERA_CONTROL_TRAY_HORIZONTAL_PADDING",
-  "CAMERA_CONTROL_RESET_BUTTON_WIDTH",
   "CAMERA_CONTROL_TAB_WIDTH",
   "CAMERA_CONTROL_TAB_GAP",
   "selectCameraControlTab",
@@ -48,8 +50,7 @@ for (const snippet of [
   "setLightEnabled",
   "toggleCameraFacing",
   'name="refresh-cw"',
-  "size={26}",
-  "resetCameraQuickControls"
+  "size={26}"
 ]) {
   assert.ok(cameraSource.includes(snippet), `camera bottom slide tabs missing: ${snippet}`);
 }
@@ -57,7 +58,12 @@ for (const snippet of [
 for (const removed of [
   "captureZoomControl",
   'label="줌"',
-  "cameraFlipText"
+  "cameraFlipText",
+  "CAMERA_CONTROL_RESET_BUTTON_WIDTH",
+  "CAMERA_CONTROL_ROW_GAP",
+  "resetCameraQuickControls",
+  "cameraControlResetButton",
+  "rotate-ccw"
 ]) {
   assert.ok(!cameraSource.includes(removed), `legacy bottom control should be removed: ${removed}`);
 }
@@ -78,18 +84,23 @@ assert.ok(
 );
 
 assert.ok(
-  cameraSource.includes("cameraFrame.width -"),
-  "camera control tab center padding should be derived from the screen width instead of a fragile tab onLayout measurement"
+  cameraSource.includes("setCameraControlTabViewportWidth(event.nativeEvent.layout.width)"),
+  "camera control tab center padding should be derived from the actual rendered tab viewport width"
 );
 
 assert.ok(
-  !cameraSource.includes("setCameraControlTabViewportWidth"),
-  "camera control tabs should not depend on viewport onLayout state for initial centering"
+  cameraSource.includes("bottomSafePadding + 96"),
+  "camera quick action buttons should float close above the bottom tray without covering the camera preview"
 );
 
 assert.ok(
-  cameraSource.includes("bottomSafePadding + 176"),
-  "camera quick action buttons should float above the bottom tray instead of living inside it"
+  cameraSource.includes("const CAMERA_CONTROL_HORIZONTAL_PADDING = 0"),
+  "bottom camera controls should fill the full screen width"
+);
+
+assert.ok(
+  cameraSource.includes("paddingBottom: bottomSafePadding"),
+  "bottom tray background should include the safe-area padding instead of leaving an empty strip"
 );
 
 for (const snippet of [
