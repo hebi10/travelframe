@@ -14,6 +14,13 @@ assert.ok(
   "appearance hook should subscribe to saved setting changes"
 );
 assert.ok(
+  appAppearance.includes("let cachedAppSettings: AppSettings = defaultAppSettings") &&
+    appAppearance.includes("useState<AppSettings>(cachedAppSettings)") &&
+    appAppearance.includes("cachedAppSettings = storedSettings") &&
+    appAppearance.includes("cachedAppSettings = nextSettings"),
+  "appearance hook should reuse the last loaded settings when new screens mount"
+);
+assert.ok(
   appAppearance.includes("emphasisWeight"),
   "appearance hook should expose font style weight"
 );

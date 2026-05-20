@@ -28,7 +28,7 @@ import {
 } from "react-native";
 import Animated, {
   runOnJS,
-  useAnimatedStyle,
+  useDerivedValue,
   useSharedValue
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -784,13 +784,6 @@ export default function CameraScreen() {
     ]
   );
 
-  const guidePositionAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: guideOffsetXValue.value },
-      { translateY: guideOffsetYValue.value }
-    ]
-  }));
-
   if (!permission) {
     return (
       <View style={styles.permissionScreen}>
@@ -860,7 +853,15 @@ export default function CameraScreen() {
 
       <Animated.View
         pointerEvents="none"
-        style={[styles.guidePositionLayer, guidePositionAnimatedStyle]}
+        style={[
+          styles.guidePositionLayer,
+          {
+            transform: [
+              { translateX: guideOffsetXValue },
+              { translateY: guideOffsetYValue }
+            ]
+          }
+        ]}
       >
         <CameraGuideOverlay
           guide={guide}
@@ -1798,6 +1799,7 @@ function SmoothValueSlider({
   const thumbX = useSharedValue(0);
   const dragStartThumbX = useSharedValue(0);
   const isDragging = useSharedValue(false);
+  const thumbTranslateX = useDerivedValue(() => thumbX.value - 9);
   const previewValue = onChange ?? onCommit;
 
   useEffect(() => {
@@ -1846,14 +1848,6 @@ function SmoothValueSlider({
     [dragStartThumbX, isDragging, max, min, onCommit, previewValue, thumbX, trackWidth]
   );
 
-  const fillStyle = useAnimatedStyle(() => ({
-    width: thumbX.value
-  }));
-
-  const thumbStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: thumbX.value - 9 }]
-  }));
-
   if (compact) {
     return (
       <View style={[styles.sizeSliderArea, styles.compactSliderArea]}>
@@ -1868,8 +1862,13 @@ function SmoothValueSlider({
               onLayout={(event) => setTrackWidth(event.nativeEvent.layout.width)}
             >
               <View style={styles.sizeTrackFillBase} />
-              <Animated.View style={[styles.sizeTrackFill, fillStyle]} />
-              <Animated.View style={[styles.sizeThumb, thumbStyle]} />
+              <Animated.View style={[styles.sizeTrackFill, { width: thumbX }]} />
+              <Animated.View
+                style={[
+                  styles.sizeThumb,
+                  { transform: [{ translateX: thumbTranslateX }] }
+                ]}
+              />
             </Animated.View>
           </GestureDetector>
           <Text selectable={false} style={styles.compactSliderValue}>
@@ -1897,8 +1896,13 @@ function SmoothValueSlider({
           onLayout={(event) => setTrackWidth(event.nativeEvent.layout.width)}
         >
           <View style={styles.sizeTrackFillBase} />
-          <Animated.View style={[styles.sizeTrackFill, fillStyle]} />
-          <Animated.View style={[styles.sizeThumb, thumbStyle]} />
+          <Animated.View style={[styles.sizeTrackFill, { width: thumbX }]} />
+          <Animated.View
+            style={[
+              styles.sizeThumb,
+              { transform: [{ translateX: thumbTranslateX }] }
+            ]}
+          />
         </Animated.View>
       </GestureDetector>
     </View>

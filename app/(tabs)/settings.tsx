@@ -53,7 +53,11 @@ import {
   type TripClipExportFormat,
   type ThemeMode
 } from "@/lib/app-settings";
-import { type AppPalette, useAppAppearance } from "@/lib/app-appearance";
+import {
+  getFontWeightForStyle,
+  type AppPalette,
+  useAppAppearance
+} from "@/lib/app-appearance";
 import { useAuth } from "@/lib/auth-context";
 import {
   clearBackupFailure,
@@ -1704,6 +1708,7 @@ export default function SettingsScreen() {
                       label={font.label}
                       detail={font.detail}
                       active={settings.fontStyle === font.value}
+                      fontStylePreview={font.value}
                       onPress={() => updateSetting({ fontStyle: font.value })}
                     />
                   ))
@@ -1930,6 +1935,7 @@ function OptionButton({
   active,
   disabled = false,
   activeMarkFill = "filled",
+  fontStylePreview,
   fontSizePreview,
   onPress
 }: {
@@ -1938,12 +1944,14 @@ function OptionButton({
   active: boolean;
   disabled?: boolean;
   activeMarkFill?: "filled" | "transparent";
+  fontStylePreview?: FontStyle;
   fontSizePreview?: FontSize;
   onPress: () => void;
 }) {
   const { palette, fontSizeScale, layoutScale, emphasisWeight } = useAppAppearance();
   const themed = useMemo(() => createThemedStyles(palette), [palette]);
   const previewFontSizeScale = fontSizePreview ? getFontSizeScale(fontSizePreview) : fontSizeScale;
+  const previewFontWeight = fontStylePreview ? getFontWeightForStyle(fontStylePreview) : emphasisWeight;
 
   return (
     <Pressable
@@ -1972,7 +1980,7 @@ function OptionButton({
             {
               fontSize: Math.round(typography.body * previewFontSizeScale),
               lineHeight: Math.round(20 * previewFontSizeScale),
-              fontWeight: emphasisWeight
+              fontWeight: previewFontWeight
             }
           ]}
         >
@@ -1985,7 +1993,8 @@ function OptionButton({
             themed.mutedText,
             {
               fontSize: Math.round(typography.small * previewFontSizeScale),
-              lineHeight: Math.round(17 * previewFontSizeScale)
+              lineHeight: Math.round(17 * previewFontSizeScale),
+              fontWeight: previewFontWeight
             }
           ]}
         >

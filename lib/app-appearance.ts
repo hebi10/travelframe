@@ -16,6 +16,9 @@ export type AppPalette = Record<keyof typeof colors, string>;
 export type EffectiveThemeMode = "light" | "dark";
 export type AppFontWeight = "700" | "800" | "900";
 
+let cachedAppSettings: AppSettings = defaultAppSettings;
+let appSettingsCacheVersion = 0;
+
 const darkPalette: AppPalette = {
   background: "#0f0f0f",
   chrome: "#000000",
@@ -63,15 +66,23 @@ export const getFontWeightForStyle = (fontStyle: FontStyle): AppFontWeight => {
 
 export function useAppAppearance() {
   const systemScheme = useColorScheme();
-  const [settings, setSettings] = useState<AppSettings>(defaultAppSettings);
+  const [settings, setSettings] = useState<AppSettings>(cachedAppSettings);
 
   useEffect(() => {
     let isActive = true;
+    const loadVersion = appSettingsCacheVersion;
 
     const loadSettings = async () => {
       const storedSettings = await getAppSettings();
       if (isActive) {
-        setSettings(storedSettings);
+        if (appSettingsCacheVersion === loadVersion) {
+          cachedAppSettings = storedSettings;
+          appSettingsCacheVersion += 1;
+          setSettings(storedSettings);
+          return;
+        }
+
+        setSettings(cachedAppSettings);
       }
     };
 
@@ -85,6 +96,8 @@ export function useAppAppearance() {
   useEffect(
     () =>
       subscribeAppSettings((nextSettings) => {
+        cachedAppSettings = nextSettings;
+        appSettingsCacheVersion += 1;
         setSettings(nextSettings);
       }),
     []

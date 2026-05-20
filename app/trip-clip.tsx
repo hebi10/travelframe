@@ -1946,7 +1946,7 @@ export default function TripClipScreen() {
           여행클립 만들기
         </Text>
         <Text selectable style={styles.title}>
-          다중 편집
+          동영상
         </Text>
         <Text selectable style={styles.description}>
           사진을 고르고 순서를 정한 뒤 템플릿과 음악을 적용해 앱 안에서 영상처럼 재생합니다.
