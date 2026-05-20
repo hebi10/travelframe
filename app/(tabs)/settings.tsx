@@ -40,6 +40,7 @@ import {
   GUIDE_STROKE_WIDTH_MAX,
   GUIDE_STROKE_WIDTH_MIN,
   defaultAppSettings,
+  getFontSizeScale,
   getAppSettings,
   saveAppSettings,
   subscribeAppSettings,
@@ -1690,6 +1691,7 @@ export default function SettingsScreen() {
                       label={theme.label}
                       detail={theme.detail}
                       active={settings.themeMode === theme.value}
+                      activeMarkFill="transparent"
                       onPress={() => updateSetting({ themeMode: theme.value })}
                     />
                   ))
@@ -1714,6 +1716,7 @@ export default function SettingsScreen() {
                       label={fontSize.label}
                       detail={fontSize.detail}
                       active={settings.fontSize === fontSize.value}
+                      fontSizePreview={fontSize.value}
                       onPress={() => updateSetting({ fontSize: fontSize.value })}
                     />
                   ))
@@ -1926,16 +1929,21 @@ function OptionButton({
   detail,
   active,
   disabled = false,
+  activeMarkFill = "filled",
+  fontSizePreview,
   onPress
 }: {
   label: string;
   detail: string;
   active: boolean;
   disabled?: boolean;
+  activeMarkFill?: "filled" | "transparent";
+  fontSizePreview?: FontSize;
   onPress: () => void;
 }) {
   const { palette, fontSizeScale, layoutScale, emphasisWeight } = useAppAppearance();
   const themed = useMemo(() => createThemedStyles(palette), [palette]);
+  const previewFontSizeScale = fontSizePreview ? getFontSizeScale(fontSizePreview) : fontSizeScale;
 
   return (
     <Pressable
@@ -1962,8 +1970,8 @@ function OptionButton({
             styles.optionLabel,
             themed.text,
             {
-              fontSize: Math.round(typography.body * fontSizeScale),
-              lineHeight: Math.round(20 * fontSizeScale),
+              fontSize: Math.round(typography.body * previewFontSizeScale),
+              lineHeight: Math.round(20 * previewFontSizeScale),
               fontWeight: emphasisWeight
             }
           ]}
@@ -1976,15 +1984,24 @@ function OptionButton({
             styles.optionDetail,
             themed.mutedText,
             {
-              fontSize: Math.round(typography.small * fontSizeScale),
-              lineHeight: Math.round(17 * fontSizeScale)
+              fontSize: Math.round(typography.small * previewFontSizeScale),
+              lineHeight: Math.round(17 * previewFontSizeScale)
             }
           ]}
         >
           {detail}
         </Text>
       </View>
-      <View style={[styles.optionMark, themed.optionMark, active && themed.optionMarkActive]} />
+      <View
+        style={[
+          styles.optionMark,
+          themed.optionMark,
+          active &&
+            (activeMarkFill === "transparent"
+              ? themed.optionMarkActiveOutline
+              : themed.optionMarkActive)
+        ]}
+      />
     </Pressable>
   );
 }
@@ -2047,6 +2064,10 @@ const createThemedStyles = (palette: AppPalette) => {
     optionMarkActive: {
       borderColor: palette.text,
       backgroundColor: palette.text
+    },
+    optionMarkActiveOutline: {
+      borderColor: palette.text,
+      backgroundColor: "transparent"
     }
   });
 };

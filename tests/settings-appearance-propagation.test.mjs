@@ -40,6 +40,10 @@ assert.ok(
   "settings screen should react to global setting changes"
 );
 assert.ok(
+  settingsScreen.includes("activeMarkFill=\"transparent\""),
+  "theme mode modal should not draw a filled mode selection background"
+);
+assert.ok(
   accountScreen.includes("backgroundColor: isDark ? palette.surfaceStrong : palette.text") &&
     accountScreen.includes("backgroundColor: palette.surfaceStrong") &&
     accountScreen.includes("color: isDark ? palette.text : palette.inverse"),

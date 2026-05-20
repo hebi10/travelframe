@@ -73,6 +73,13 @@ import {
   shareVideo
 } from "@/lib/trip-clip-export";
 import {
+  clearTripClipDraft,
+  getTripClipDraft,
+  hasTripClipDraftContent,
+  saveTripClipDraft,
+  type TripClipDraft
+} from "@/lib/trip-clip-draft";
+import {
   DEFAULT_GUIDE_COLOR,
   GUIDE_SIZE_MAX,
   GUIDE_SIZE_MIN,
@@ -251,6 +258,7 @@ const EDITOR_TABS: { label: string; value: EditorTab }[] = [
 
 const VIEW_RECORDER_FPS = 24;
 const RECORDING_VIEW_WIDTH = 360;
+const TRIP_CLIP_DRAFT_AUTOSAVE_MS = 60000;
 
 const ratioAspect: Record<TripClipRatio, number> = {
   "9:16": 9 / 16,
@@ -291,6 +299,15 @@ const toFileUri = (pathOrUri: string) => {
 
   return `file://${pathOrUri}`;
 };
+
+const formatDraftTime = (value: string) =>
+  new Intl.DateTimeFormat("ko-KR", {
+    timeZone: "Asia/Seoul",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(new Date(value));
 
 export default function TripClipScreen() {
   const { bundleId, videoId } = useLocalSearchParams<{
@@ -355,6 +372,8 @@ export default function TripClipScreen() {
   const [isExporting, setIsExporting] = useState(false);
   const [renderedVideoUri, setRenderedVideoUri] = useState<string | null>(null);
   const [exportMessage, setExportMessage] = useState<string | null>(null);
+  const [availableDraft, setAvailableDraft] = useState<TripClipDraft | null>(null);
+  const [showDraftPrompt, setShowDraftPrompt] = useState(false);
   const [weeklyVideoExportUsage, setWeeklyVideoExportUsage] =
     useState<WeeklyVideoExportUsage | null>(null);
   const [exportProgress, setExportProgress] =
@@ -365,6 +384,7 @@ export default function TripClipScreen() {
   const [progressSeconds, setProgressSeconds] = useState(0);
   const [recordingFrameIndex, setRecordingFrameIndex] = useState(0);
   const [recordingViewAvailable] = useState(isRecordingViewAvailable);
+  const latestTripClipDraftRef = useRef<Omit<TripClipDraft, "updatedAt"> | null>(null);
   const restoredVideoIdRef = useRef<string | null>(null);
   const restoredBundleIdRef = useRef<string | null>(null);
   const autoDurationIdsRef = useRef<Set<string>>(new Set());
@@ -436,6 +456,164 @@ export default function TripClipScreen() {
     },
     []
   );
+  const createTripClipDraftPayload = useCallback(
+    (): Omit<TripClipDraft, "updatedAt"> => ({
+      selectedIds,
+      durations,
+      photoAdjustments,
+      ratio,
+      videoQuality,
+      imageQuality,
+      template,
+      transition,
+      transitionDuration,
+      musicMode,
+      selectedUserMusicId,
+      previewAdjustEnabled,
+      previewGuideVisible,
+      previewGuide,
+      previewGuideSize,
+      previewGuideStrokeWidth,
+      previewGuideColor,
+      previewGuideOffsetX,
+      previewGuideOffsetY,
+      activeEditorTab,
+      exportFormat,
+      imageSaveFormat,
+      shouldBackupVideoExport,
+      workTitle
+    }),
+    [
+      activeEditorTab,
+      durations,
+      exportFormat,
+      imageQuality,
+      imageSaveFormat,
+      musicMode,
+      photoAdjustments,
+      previewAdjustEnabled,
+      previewGuide,
+      previewGuideColor,
+      previewGuideOffsetX,
+      previewGuideOffsetY,
+      previewGuideSize,
+      previewGuideStrokeWidth,
+      previewGuideVisible,
+      ratio,
+      selectedIds,
+      selectedUserMusicId,
+      shouldBackupVideoExport,
+      template,
+      transition,
+      transitionDuration,
+      videoQuality,
+      workTitle
+    ]
+  );
+  const persistTripClipDraft = useCallback(
+    async (showMessage = false) => {
+      if (isLoading || isExporting || bundleId || videoId) {
+        return;
+      }
+
+      const draft = latestTripClipDraftRef.current;
+      if (!draft) {
+        return;
+      }
+
+      if (!hasTripClipDraftContent(draft)) {
+        if (showMessage) {
+          setExportMessage("임시 저장할 영상 만들기 작업이 없습니다.");
+        }
+        return;
+      }
+
+      try {
+        const savedDraft = await saveTripClipDraft(draft);
+        setAvailableDraft(savedDraft);
+        setShowDraftPrompt(false);
+        if (showMessage) {
+          setExportMessage("임시 저장했습니다.");
+        }
+      } catch (error) {
+        if (showMessage) {
+          setExportMessage(
+            getUserFacingErrorMessage(error, "임시 저장하지 못했습니다.")
+          );
+        }
+      }
+    },
+    [
+      bundleId,
+      isExporting,
+      isLoading,
+      videoId
+    ]
+  );
+  const resumeTripClipDraft = useCallback(() => {
+    if (!availableDraft) {
+      return;
+    }
+
+    const availablePhotoIds = new Set(photos.map((photo) => photo.id));
+    const nextSelectedIds = availableDraft.selectedIds.filter((id) =>
+      availablePhotoIds.has(id)
+    );
+
+    autoDurationIdsRef.current.clear();
+    setSelectedIds(nextSelectedIds);
+    setDurations(availableDraft.durations);
+    setPhotoAdjustments(availableDraft.photoAdjustments ?? {});
+    setRatio(availableDraft.ratio);
+    setVideoQuality(availableDraft.videoQuality);
+    setImageQuality(availableDraft.imageQuality);
+    setTemplate(availableDraft.template);
+    setTransition(availableDraft.transition);
+    setTransitionDuration(availableDraft.transitionDuration);
+    setMusicMode(availableDraft.musicMode);
+    setSelectedUserMusicId(availableDraft.selectedUserMusicId);
+    setPreviewAdjustEnabled(availableDraft.previewAdjustEnabled);
+    setPreviewGuideVisible(availableDraft.previewGuideVisible);
+    setPreviewGuide(availableDraft.previewGuide);
+    setPreviewGuideSize(availableDraft.previewGuideSize);
+    setPreviewGuideSizeInput(String(availableDraft.previewGuideSize));
+    setPreviewGuideStrokeWidth(availableDraft.previewGuideStrokeWidth);
+    setPreviewGuideColor(availableDraft.previewGuideColor);
+    setPreviewGuideOffsetX(availableDraft.previewGuideOffsetX);
+    setPreviewGuideOffsetY(availableDraft.previewGuideOffsetY);
+    previewGuideOffsetXValue.value = availableDraft.previewGuideOffsetX;
+    previewGuideOffsetYValue.value = availableDraft.previewGuideOffsetY;
+    setExportFormat(availableDraft.exportFormat);
+    setImageSaveFormat(availableDraft.imageSaveFormat);
+    setShouldBackupVideoExport(availableDraft.shouldBackupVideoExport);
+    setWorkTitle(availableDraft.workTitle);
+    setActiveEditorTab(
+      nextSelectedIds.length > 0 ? availableDraft.activeEditorTab : "photos"
+    );
+    setActiveIndex(0);
+    setProgressSeconds(0);
+    setRenderedVideoUri(null);
+    setShowDraftPrompt(false);
+    setExportMessage("임시 저장된 영상 만들기 작업을 불러왔습니다.");
+  }, [
+    availableDraft,
+    photos,
+    previewGuideOffsetXValue,
+    previewGuideOffsetYValue
+  ]);
+  const removeTripClipDraft = useCallback(async () => {
+    try {
+      await clearTripClipDraft();
+      setAvailableDraft(null);
+      setShowDraftPrompt(false);
+      setExportMessage("임시 저장을 삭제했습니다.");
+    } catch (error) {
+      setExportMessage(getUserFacingErrorMessage(error, "임시 저장을 삭제하지 못했습니다."));
+    }
+  }, []);
+  useEffect(() => {
+    latestTripClipDraftRef.current = createTripClipDraftPayload();
+  }, [createTripClipDraftPayload]);
   const recordingFrame = useMemo(
     () =>
       getRecordingFrame({
@@ -536,6 +714,7 @@ export default function TripClipScreen() {
         setTemplate(storedVideo.template);
         setTransition(storedVideo.transition);
         setTransitionDuration(storedVideo.transitionDuration);
+        setWorkTitle(storedVideo.title);
         restoredVideoIdRef.current = videoId;
         setIsLoading(false);
         return;
@@ -774,6 +953,49 @@ export default function TripClipScreen() {
       loadPhotos();
     }, [loadPhotos])
   );
+
+  useEffect(() => {
+    if (isLoading || bundleId || videoId) {
+      return;
+    }
+
+    let isMounted = true;
+
+    const loadTripClipDraft = async () => {
+      const draft = await getTripClipDraft();
+      if (!isMounted) {
+        return;
+      }
+
+      if (draft && hasTripClipDraftContent(draft)) {
+        setAvailableDraft(draft);
+        setShowDraftPrompt(true);
+      } else {
+        setAvailableDraft(null);
+        setShowDraftPrompt(false);
+      }
+    };
+
+    loadTripClipDraft();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [bundleId, isLoading, videoId]);
+
+  useEffect(() => {
+    if (isLoading || bundleId || videoId) {
+      return;
+    }
+
+    const interval = setInterval(() => {
+      void persistTripClipDraft(false);
+    }, TRIP_CLIP_DRAFT_AUTOSAVE_MS);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [bundleId, isLoading, persistTripClipDraft, videoId]);
 
   useEffect(
     () =>
@@ -1488,6 +1710,9 @@ export default function TripClipScreen() {
             ? `이미지 ${selectedPhotos.length}장은 저장됐고, 클라우드 백업은 나중에 다시 시도할 수 있습니다.`
             : `이미지 ${selectedPhotos.length}장이 ${getImageSaveFormatLabel(imageSaveFormat)}으로 핸드폰 앨범과 작업물에 저장되었습니다.`
         });
+        await clearTripClipDraft();
+        setAvailableDraft(null);
+        setShowDraftPrompt(false);
         return;
       }
 
@@ -1510,6 +1735,7 @@ export default function TripClipScreen() {
         return;
       }
 
+      const normalizedWorkTitle = workTitle.trim();
       setExportProgress({
         visible: true,
         percent: 88,
@@ -1526,6 +1752,7 @@ export default function TripClipScreen() {
       const savedVideo = await saveMadeVideo({
         uri: videoUri,
         coverUri: activePhoto?.uri,
+        title: normalizedWorkTitle || undefined,
         ratio,
         template,
         transition,
@@ -1588,6 +1815,9 @@ export default function TripClipScreen() {
           : "저장한 영상은 핸드폰 갤러리에 저장됐습니다.",
         completedVideoId: savedVideo.id
       });
+      await clearTripClipDraft();
+      setAvailableDraft(null);
+      setShowDraftPrompt(false);
       if (reservedWeeklyExport && user) {
         setWeeklyVideoExportUsage(await getWeeklyVideoExportUsage(user));
       }
@@ -1698,6 +1928,20 @@ export default function TripClipScreen() {
         ]}
       >
       <View style={styles.header}>
+        <View style={styles.headerActionRow}>
+          <Pressable
+            disabled={isLoading || isExporting}
+            style={[
+              styles.draftSaveButton,
+              (isLoading || isExporting) && styles.disabledButton
+            ]}
+            onPress={() => void persistTripClipDraft(true)}
+          >
+            <Text selectable={false} style={styles.draftSaveButtonText}>
+              임시 저장
+            </Text>
+          </Pressable>
+        </View>
         <Text selectable style={styles.eyebrow}>
           여행클립 만들기
         </Text>
@@ -1707,6 +1951,30 @@ export default function TripClipScreen() {
         <Text selectable style={styles.description}>
           사진을 고르고 순서를 정한 뒤 템플릿과 음악을 적용해 앱 안에서 영상처럼 재생합니다.
         </Text>
+        {availableDraft && showDraftPrompt ? (
+          <View style={styles.draftPanel}>
+            <View style={styles.draftCopy}>
+              <Text selectable style={styles.draftTitle}>
+                임시 저장된 영상 만들기 작업이 있습니다
+              </Text>
+              <Text selectable style={styles.draftDetail}>
+                {formatDraftTime(availableDraft.updatedAt)} 작업 상태에서 이어서 편집할 수 있습니다.
+              </Text>
+            </View>
+            <View style={styles.draftActions}>
+              <Pressable style={styles.draftButton} onPress={resumeTripClipDraft}>
+                <Text selectable={false} style={styles.draftButtonText}>
+                  이어서 작업하기
+                </Text>
+              </Pressable>
+              <Pressable style={styles.draftGhostButton} onPress={removeTripClipDraft}>
+                <Text selectable={false} style={styles.draftGhostButtonText}>
+                  삭제
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        ) : null}
         <View style={styles.workTitlePanel}>
           <Text selectable style={styles.settingLabel}>
             작업 이름
@@ -2902,6 +3170,25 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingTop: 6
   },
+  headerActionRow: {
+    minHeight: controls.compactHeight,
+    flexDirection: "row",
+    justifyContent: "flex-end"
+  },
+  draftSaveButton: {
+    minHeight: controls.compactHeight,
+    justifyContent: "center",
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: colors.text,
+    backgroundColor: colors.background
+  },
+  draftSaveButtonText: {
+    color: colors.text,
+    fontSize: typography.button,
+    fontWeight: "800",
+    letterSpacing: 0
+  },
   eyebrow: {
     color: colors.muted,
     fontSize: 12,
@@ -2920,6 +3207,60 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontSize: typography.body,
     lineHeight: 22,
+    letterSpacing: 0
+  },
+  draftPanel: {
+    gap: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: colors.text,
+    backgroundColor: colors.surface
+  },
+  draftCopy: {
+    gap: 4
+  },
+  draftTitle: {
+    color: colors.text,
+    fontSize: typography.body,
+    fontWeight: "800",
+    letterSpacing: 0
+  },
+  draftDetail: {
+    color: colors.muted,
+    fontSize: typography.small,
+    lineHeight: 17,
+    letterSpacing: 0
+  },
+  draftActions: {
+    flexDirection: "row",
+    gap: 8
+  },
+  draftButton: {
+    flex: 1,
+    minHeight: controls.compactHeight,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.text
+  },
+  draftButtonText: {
+    color: colors.inverse,
+    fontSize: typography.button,
+    fontWeight: "800",
+    letterSpacing: 0
+  },
+  draftGhostButton: {
+    minWidth: 72,
+    minHeight: controls.compactHeight,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.background
+  },
+  draftGhostButtonText: {
+    color: colors.text,
+    fontSize: typography.button,
+    fontWeight: "800",
     letterSpacing: 0
   },
   workTitlePanel: {
@@ -3864,11 +4205,9 @@ const styles = StyleSheet.create({
     width: "92%",
     maxWidth: 360,
     flexGrow: 0,
-    maxHeight: "78%",
     borderWidth: 1,
     borderColor: colors.text,
-    backgroundColor: colors.background,
-    overflow: "hidden"
+    backgroundColor: colors.background
   },
   exportModalContent: {
     gap: 12,

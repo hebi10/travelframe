@@ -183,7 +183,7 @@ export default function CameraScreen() {
   const [flashMode, setFlashMode] = useState<FlashMode>("off");
   const [torchEnabled, setTorchEnabled] = useState(false);
   const [zoomPercent, setZoomPercent] = useState(0);
-  const [shutterSoundEnabled, setShutterSoundEnabled] = useState(true);
+  const [shutterSoundEnabled, setShutterSoundEnabled] = useState(false);
   const [isCameraReady, setIsCameraReady] = useState(false);
   const [isCapturing, setIsCapturing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -199,6 +199,7 @@ export default function CameraScreen() {
   const guideOffsetYValue = useSharedValue(0);
   const guideDragStartX = useSharedValue(0);
   const guideDragStartY = useSharedValue(0);
+  const cameraPinchStartZoomPercent = useSharedValue(0);
   const insets = useSafeAreaInsets();
   const bottomSafePadding = Math.max(insets.bottom + 10, 24);
   const bottomModalPadding = Math.max(insets.bottom + 18, 28);
@@ -705,6 +706,48 @@ export default function CameraScreen() {
     ]
   );
 
+  const cameraPinchZoomGesture = useMemo(
+    () =>
+      Gesture.Pinch()
+        .enabled(
+          !referenceUri &&
+            !isCameraModalOpen &&
+            !cameraMenuOpen &&
+            !overlaySetupActive &&
+            !isGuidePositionAdjusting &&
+            !isCapturing
+        )
+        .onBegin(() => {
+          cameraPinchStartZoomPercent.value = zoomPercent;
+        })
+        .onUpdate((event) => {
+          const nextZoomPercent = Math.max(
+            CAMERA_ZOOM_MIN,
+            Math.min(
+              CAMERA_ZOOM_MAX,
+              cameraPinchStartZoomPercent.value + (event.scale - 1) * 45
+            )
+          );
+          runOnJS(applyZoomPercent)(nextZoomPercent);
+        }),
+    [
+      applyZoomPercent,
+      cameraMenuOpen,
+      cameraPinchStartZoomPercent,
+      isCameraModalOpen,
+      isCapturing,
+      isGuidePositionAdjusting,
+      overlaySetupActive,
+      referenceUri,
+      zoomPercent
+    ]
+  );
+
+  const cameraPreviewGesture = useMemo(
+    () => Gesture.Simultaneous(cameraSwipeGesture, cameraPinchZoomGesture),
+    [cameraPinchZoomGesture, cameraSwipeGesture]
+  );
+
   const guidePositionGesture = useMemo(
     () =>
       Gesture.Pan()
@@ -845,7 +888,7 @@ export default function CameraScreen() {
           />
         </GestureDetector>
       ) : (
-        <GestureDetector gesture={cameraSwipeGesture}>
+        <GestureDetector gesture={cameraPreviewGesture}>
           <View
             collapsable={false}
             pointerEvents={isCameraModalOpen || overlaySetupActive ? "none" : "box-only"}
@@ -2138,7 +2181,8 @@ const styles = StyleSheet.create({
     paddingBottom: 22,
     borderWidth: 1,
     borderColor: colors.darkLine,
-    backgroundColor: "rgba(255, 255, 255, 0.5)"
+    backgroundColor: "rgba(255, 255, 255, 0.5)",
+    overflow: "hidden"
   },
   navModal: {
     gap: 18,

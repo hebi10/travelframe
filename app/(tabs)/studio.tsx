@@ -629,6 +629,7 @@ function PhotoCard({
   const { palette } = useAppAppearance();
   const isDark = palette.background !== colors.background;
   const filledButtonStyle = {
+    borderWidth: isDark ? 1 : 0,
     borderColor: palette.text,
     backgroundColor: isDark ? "transparent" : palette.text
   };
@@ -1284,8 +1285,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 10,
     borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.surface
+    borderColor: colors.line
   },
   backupUsageText: {
     color: colors.muted,

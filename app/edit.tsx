@@ -48,6 +48,8 @@ type EditableSource = {
   sourcePhotoId?: string;
 };
 
+type SaveEditMode = "new" | "overwrite";
+
 const ratios: PhotoRatioLabel[] = ["Original", "1:1", "3:4", "4:5", "9:16", "16:9"];
 const GUIDE_SIZE_OPTIONS = [
   { label: "작게", value: 34 },
@@ -117,6 +119,7 @@ export default function EditScreen() {
   const [isCanvasExpanded, setIsCanvasExpanded] = useState(false);
   const originalAspectRatio =
     source?.width && source?.height ? source.width / source.height : undefined;
+  const canOverwriteSource = Boolean(sourcePhoto?.edited);
 
   useEffect(() => {
     let isMounted = true;
@@ -367,7 +370,7 @@ export default function EditScreen() {
     });
   };
 
-  const saveEdit = async () => {
+  const executeSaveEdit = async (mode: SaveEditMode) => {
     if (!source || isSaving) {
       setMessage("저장하기 전에 사진을 먼저 불러와 주세요.");
       return;
@@ -381,7 +384,10 @@ export default function EditScreen() {
 
       const savedPhoto = await saveEditedPhoto({
         sourceUri: source.uri,
-        sourcePhotoId: source.sourcePhotoId,
+        sourcePhotoId:
+          mode === "overwrite" ? sourcePhoto?.sourcePhotoId : source.sourcePhotoId,
+        targetPhotoId: mode === "overwrite" ? sourcePhoto?.id : undefined,
+        replaceCreatedAt: mode === "overwrite" ? sourcePhoto?.createdAt : undefined,
         width: source.width,
         height: source.height,
         transform
@@ -418,6 +424,27 @@ export default function EditScreen() {
     }
   };
 
+  const confirmSaveEdit = () => {
+    if (!canOverwriteSource) {
+      void executeSaveEdit("new");
+      return;
+    }
+
+    Alert.alert(
+      "저장 방식 선택",
+      "완료된 편집 작업물에 덮어쓸지, 새 작업물로 저장할지 선택해 주세요.",
+      [
+        { text: "취소", style: "cancel" },
+        { text: "새로 저장", onPress: () => executeSaveEdit("new") },
+        {
+          text: "덮어쓰기",
+          style: "destructive",
+          onPress: () => executeSaveEdit("overwrite")
+        }
+      ]
+    );
+  };
+
   return (
     <View style={styles.screen}>
       <View style={[styles.topBar, { paddingTop: insets.top + 10 }]}>
@@ -432,7 +459,7 @@ export default function EditScreen() {
         <Pressable
           disabled={isSaving || !source}
           style={[styles.saveButton, (!source || isSaving) && styles.disabledButton]}
-          onPress={saveEdit}
+          onPress={confirmSaveEdit}
         >
           <Text selectable={false} style={styles.saveButtonText}>
             {isSaving ? "저장 중" : "저장"}

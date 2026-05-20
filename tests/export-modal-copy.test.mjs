@@ -20,4 +20,20 @@ assert.equal(
   "export progress panel should not clip action buttons through ScrollView maxHeight"
 );
 
+const exportModalPanelMatch = source.match(
+  /exportModalPanel:\s*\{[\s\S]*?\n\s*\},/
+);
+
+assert.ok(exportModalPanelMatch, "export modal panel style should exist");
+assert.equal(
+  exportModalPanelMatch[0].includes("maxHeight"),
+  false,
+  "export modal panel should grow to fit completion actions without a max height"
+);
+assert.equal(
+  exportModalPanelMatch[0].includes('overflow: "hidden"'),
+  false,
+  "export modal panel should not clip completion actions"
+);
+
 console.log("ok - export modal completion copy and layout are stable");

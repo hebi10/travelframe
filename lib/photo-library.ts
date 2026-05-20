@@ -170,6 +170,10 @@ const createPhotoPreview = async ({
     }
   );
 
+  if (rendered.uri !== previewUri) {
+    await deleteLocalFile(previewUri);
+  }
+
   await FileSystem.copyAsync({
     from: rendered.uri,
     to: previewUri
@@ -396,6 +400,8 @@ export const saveCapturedPhoto = async ({
 export const saveEditedPhoto = async ({
   sourceUri,
   sourcePhotoId,
+  targetPhotoId,
+  replaceCreatedAt,
   width,
   height,
   transform,
@@ -403,7 +409,11 @@ export const saveEditedPhoto = async ({
   renderedWidth,
   renderedHeight
 }: SaveEditedPhotoInput) => {
-  const id = createPhotoId();
+  const photos = await getPhotos();
+  const existingPhoto = targetPhotoId
+    ? photos.find((photo) => photo.id === targetPhotoId)
+    : null;
+  const id = targetPhotoId ?? createPhotoId();
   const directory = await ensurePhotoDirectory();
   const destinationUri = `${directory}${id}-edited.jpg`;
   const rendered = renderedUri
@@ -418,6 +428,10 @@ export const saveEditedPhoto = async ({
         height,
         transform
       });
+
+  if (targetPhotoId && rendered.uri !== destinationUri) {
+    await deleteLocalFile(destinationUri);
+  }
 
   await FileSystem.copyAsync({
     from: rendered.uri,
@@ -435,7 +449,7 @@ export const saveEditedPhoto = async ({
     id,
     uri: destinationUri,
     previewUri,
-    createdAt: new Date().toISOString(),
+    createdAt: replaceCreatedAt ?? existingPhoto?.createdAt ?? new Date().toISOString(),
     width: rendered.width ?? 0,
     height: rendered.height ?? 0,
     ratioLabel:
@@ -444,13 +458,25 @@ export const saveEditedPhoto = async ({
         : transform.ratioLabel,
     kind: "edited",
     edited: true,
-    addedToVideo: false,
-    sourcePhotoId,
+    addedToVideo: existingPhoto?.addedToVideo ?? false,
+    sourcePhotoId: sourcePhotoId ?? existingPhoto?.sourcePhotoId,
     edit: transform
   };
 
-  const photos = await getPhotos();
-  await writePhotos([photo, ...photos]);
+  const nextPhotos =
+    targetPhotoId && existingPhoto
+      ? photos.map((item) => (item.id === targetPhotoId ? photo : item))
+      : [photo, ...photos];
+
+  if (existingPhoto?.uri && existingPhoto.uri !== destinationUri) {
+    await deleteLocalFile(existingPhoto.uri);
+  }
+
+  if (existingPhoto?.previewUri && existingPhoto.previewUri !== previewUri) {
+    await deleteLocalFile(existingPhoto.previewUri);
+  }
+
+  await writePhotos(nextPhotos);
   return photo;
 };
 

@@ -389,7 +389,7 @@ const assertImageBackupCapacity = async ({
   return totalSize;
 };
 
-const refreshBackupOverview = async (userId: string) => {
+const refreshBackupOverview = async (userId: string, backedUpAt?: string) => {
   if (!firestore) {
     return emptyBackupOverview;
   }
@@ -419,6 +419,7 @@ const refreshBackupOverview = async (userId: string) => {
       videoCount,
       imageBackupBytes,
       status: overview.status,
+      ...(backedUpAt ? { backedUpAt } : {}),
       updatedAt: serverTimestamp()
     },
     { merge: true }
@@ -873,7 +874,7 @@ export const backupPhoto = async ({
     { merge: true }
   );
 
-  await refreshBackupOverview(user.uid);
+  await refreshBackupOverview(user.uid, backedUpAt);
 
   return {
     ...photo,
@@ -988,7 +989,7 @@ export const backupImageBundleWork = async ({
     { merge: true }
   );
 
-  await refreshBackupOverview(user.uid);
+  await refreshBackupOverview(user.uid, backedUpAt);
 
   return {
     ...work,
@@ -1056,7 +1057,7 @@ export const backupMadeVideo = async ({
     { merge: true }
   );
 
-  await refreshBackupOverview(user.uid);
+  await refreshBackupOverview(user.uid, backedUpAt);
 
   return {
     ...video,

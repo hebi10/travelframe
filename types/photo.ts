@@ -51,6 +51,8 @@ export type SaveCapturedPhotoInput = {
 export type SaveEditedPhotoInput = {
   sourceUri: string;
   sourcePhotoId?: string;
+  targetPhotoId?: string;
+  replaceCreatedAt?: string;
   width?: number;
   height?: number;
   transform: PhotoEditTransform;

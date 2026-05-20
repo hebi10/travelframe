@@ -14,6 +14,7 @@ for (const snippet of [
   "const secondaryButtonStyle",
   "borderColor: palette.line",
   "backgroundColor: palette.background",
+  "borderWidth: isDark ? 1 : 0",
   "const secondaryButtonTextStyle",
   "color: palette.text",
   "const secondaryDeleteButtonTextStyle",
@@ -22,7 +23,7 @@ for (const snippet of [
   "style={[styles.cardLightButtonText, secondaryButtonTextStyle]}",
   "style={[styles.cardDeleteButtonText, secondaryDeleteButtonTextStyle]}"
 ]) {
-  assert.ok(source.includes(snippet), `studio dark photo action style missing: ${snippet}`);
+  assert.ok(photoCard.includes(snippet), `studio dark photo action style missing: ${snippet}`);
 }
 
 console.log("ok - studio photo action buttons use dark-mode palette colors");

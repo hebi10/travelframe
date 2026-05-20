@@ -37,6 +37,11 @@ assert.ok(
 );
 
 assert.ok(
+  /guideModal:\s*\{[\s\S]*?overflow:\s*"hidden"[\s\S]*?\n\s*\},/.test(cameraSource),
+  "guide settings modal should clip content that exceeds the panel"
+);
+
+assert.ok(
   cameraSource.includes("!isGuidePositionAdjusting ? (") &&
     cameraSource.includes("{isGuidePositionAdjusting ? ("),
   "camera chrome should be hidden while guide position adjustment is active"

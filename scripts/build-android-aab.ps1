@@ -63,6 +63,100 @@ function Remove-DuplicateLauncherPngResources {
   }
 }
 
+function Find-MatchingBrace {
+  param(
+    [string]$Text,
+    [int]$OpenBraceIndex
+  )
+
+  $depth = 0
+  for ($i = $OpenBraceIndex; $i -lt $Text.Length; $i++) {
+    if ($Text[$i] -eq "{") {
+      $depth += 1
+    } elseif ($Text[$i] -eq "}") {
+      $depth -= 1
+      if ($depth -eq 0) {
+        return $i
+      }
+    }
+  }
+
+  return -1
+}
+
+function Remove-ReleaseSigningConfigBlock {
+  param([string]$BuildGradle)
+
+  while ($true) {
+    $signingIndex = $BuildGradle.IndexOf("signingConfigs")
+    if ($signingIndex -lt 0) {
+      return $BuildGradle
+    }
+
+    $signingOpen = $BuildGradle.IndexOf("{", $signingIndex)
+    if ($signingOpen -lt 0) {
+      return $BuildGradle
+    }
+
+    $signingClose = Find-MatchingBrace -Text $BuildGradle -OpenBraceIndex $signingOpen
+    if ($signingClose -lt 0) {
+      return $BuildGradle
+    }
+
+    $cursor = $signingOpen + 1
+    $removed = $false
+
+    while ($cursor -lt $signingClose) {
+      while ($cursor -lt $signingClose -and [char]::IsWhiteSpace($BuildGradle[$cursor])) {
+        $cursor += 1
+      }
+
+      $remaining = $BuildGradle.Substring($cursor, $signingClose - $cursor)
+      $releaseMatch = [regex]::Match($remaining, "\Arelease\s*\{")
+      if ($releaseMatch.Success) {
+        $releaseOpen = $BuildGradle.IndexOf("{", $cursor)
+        $releaseClose = Find-MatchingBrace -Text $BuildGradle -OpenBraceIndex $releaseOpen
+        if ($releaseClose -lt 0) {
+          return $BuildGradle
+        }
+
+        $releaseBlock = $BuildGradle.Substring($cursor, $releaseClose - $cursor + 1)
+        if ($releaseBlock -match "TRAVELFRAME_UPLOAD_STORE_FILE") {
+          $cursor = $releaseClose + 1
+          continue
+        }
+
+        $removeEnd = $releaseClose + 1
+        if ($removeEnd + 1 -lt $BuildGradle.Length -and $BuildGradle.Substring($removeEnd, 2) -eq "`r`n") {
+          $removeEnd += 2
+        } elseif ($removeEnd -lt $BuildGradle.Length -and $BuildGradle[$removeEnd] -eq "`n") {
+          $removeEnd += 1
+        }
+
+        $BuildGradle = $BuildGradle.Remove($cursor, $removeEnd - $cursor)
+        $removed = $true
+        break
+      }
+
+      $nextOpen = $BuildGradle.IndexOf("{", $cursor)
+      if ($nextOpen -lt 0 -or $nextOpen -gt $signingClose) {
+        break
+      }
+
+      $nextClose = Find-MatchingBrace -Text $BuildGradle -OpenBraceIndex $nextOpen
+      if ($nextClose -lt 0) {
+        break
+      }
+
+      $cursor = $nextClose + 1
+    }
+
+    if (-not $removed) {
+      return $BuildGradle
+    }
+  }
+}
+
 function Import-SigningEnvFile {
   param([string]$Path)
 
@@ -177,6 +271,7 @@ if (-not (Test-Path $buildGradlePath)) {
 }
 
 $buildGradle = Get-Content -LiteralPath $buildGradlePath -Raw
+$buildGradle = Remove-ReleaseSigningConfigBlock -BuildGradle $buildGradle
 
 if ($buildGradle -notmatch "TRAVELFRAME_UPLOAD_STORE_FILE") {
   $releaseSigning = @"
@@ -224,7 +319,7 @@ Write-Utf8NoBom -Path $buildGradlePath -Value $buildGradle
 Write-Host "Building AAB with versionCode $VersionCode..." -ForegroundColor Cyan
 Push-Location (Join-Path $projectRoot "android")
 try {
-  Invoke-External ".\gradlew.bat" @("--no-daemon", "--max-workers=2", "--console=plain", "bundleRelease")
+  Invoke-External ".\gradlew.bat" @("--no-daemon", "--no-parallel", "--max-workers=2", "--console=plain", "bundleRelease")
 } finally {
   Pop-Location
 }
