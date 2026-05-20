@@ -1,9 +1,21 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import ts from "typescript";
 
 const cameraSource = fs.readFileSync("app/(tabs)/camera.tsx", "utf8");
+const guidePositionSource = fs.readFileSync("lib/camera-guide-position.ts", "utf8");
 const overlaySource = fs.readFileSync("components/camera-guide-overlay.tsx", "utf8");
 const settingsSource = fs.readFileSync("lib/app-settings.ts", "utf8");
+
+const { outputText } = ts.transpileModule(guidePositionSource, {
+  compilerOptions: {
+    module: ts.ModuleKind.ES2022,
+    target: ts.ScriptTarget.ES2022
+  }
+});
+const guidePositionModule = await import(
+  `data:text/javascript;base64,${Buffer.from(outputText).toString("base64")}`
+);
 
 for (const snippet of [
   "guideOffsetX",
@@ -13,7 +25,8 @@ for (const snippet of [
   "finishGuidePositionAdjustment",
   "resetGuidePositionToCenter",
   "guidePositionGesture",
-  "guidePositionAnimatedStyle",
+  "calculateGuidePositionDragOffset",
+  "clampGuidePositionOffset",
   "드래그 이동하기",
   "중앙",
   "완료",
@@ -27,6 +40,45 @@ for (const snippet of [
 assert.ok(
   cameraSource.includes("GestureDetector gesture={guidePositionGesture}"),
   "guide position adjustment should use a drag gesture detector"
+);
+
+assert.deepEqual(
+  guidePositionModule.getGuidePositionBounds({ width: 1000, height: 500 }),
+  { maxX: 420, maxY: 210 },
+  "guide position bounds should be based on the camera frame"
+);
+
+assert.deepEqual(
+  guidePositionModule.clampGuidePositionOffset(
+    { x: 999, y: -999 },
+    { width: 1000, height: 500 }
+  ),
+  { x: 420, y: -210 },
+  "guide position offset should stay inside the camera frame bounds"
+);
+
+assert.deepEqual(
+  guidePositionModule.calculateGuidePositionDragOffset({
+    startX: 100,
+    startY: -50,
+    translationX: 30.4,
+    translationY: 99.6,
+    frame: { width: 800, height: 600 }
+  }),
+  { x: 130, y: 50 },
+  "guide drag offset should be derived from drag start and translation"
+);
+
+assert.deepEqual(
+  guidePositionModule.calculateGuidePositionDragOffset({
+    startX: Number.NaN,
+    startY: 10,
+    translationX: Infinity,
+    translationY: -30,
+    frame: { width: 0, height: 0 }
+  }),
+  { x: 0, y: 0 },
+  "invalid guide drag values should fall back to the centered position"
 );
 
 assert.ok(

@@ -23,14 +23,18 @@ import {
 import { firebaseAuth, firestore, isFirebaseConfigured } from "@/lib/firebase";
 import {
   freeSubscription,
-  getUserSubscription,
+  getUserSubscriptionState,
   isPremiumSubscription,
+  type SubscriptionCheckStatus,
   type UserSubscription
 } from "@/lib/subscription";
 
 type AuthContextValue = {
   user: User | null;
   subscription: UserSubscription;
+  verifiedSubscription: UserSubscription;
+  cachedSubscription: UserSubscription;
+  subscriptionStatus: SubscriptionCheckStatus;
   isLoggedIn: boolean;
   hasFullAccess: boolean;
   isAuthLoading: boolean;
@@ -96,12 +100,18 @@ const ensureUserDocument = async (user: User) => {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [subscription, setSubscription] = useState<UserSubscription>(freeSubscription);
+  const [verifiedSubscription, setVerifiedSubscription] =
+    useState<UserSubscription>(freeSubscription);
+  const [cachedSubscription, setCachedSubscription] =
+    useState<UserSubscription>(freeSubscription);
+  const [subscriptionStatus, setSubscriptionStatus] =
+    useState<SubscriptionCheckStatus>("loading");
   const [isAuthLoading, setIsAuthLoading] = useState(true);
 
   useEffect(() => {
     if (!firebaseAuth) {
       setIsAuthLoading(false);
+      setSubscriptionStatus("failed");
       return;
     }
 
@@ -110,14 +120,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsAuthLoading(false);
 
       if (nextUser) {
+        setSubscriptionStatus("loading");
+        setVerifiedSubscription(freeSubscription);
         try {
           await ensureUserDocument(nextUser);
-          setSubscription(await getUserSubscription(nextUser));
         } catch {
           // User profile sync should not block local app usage.
         }
+
+        const nextSubscriptionState = await getUserSubscriptionState(nextUser);
+        setVerifiedSubscription(nextSubscriptionState.verifiedSubscription);
+        setCachedSubscription(nextSubscriptionState.cachedSubscription);
+        setSubscriptionStatus(nextSubscriptionState.subscriptionStatus);
       } else {
-        setSubscription(freeSubscription);
+        setVerifiedSubscription(freeSubscription);
+        setCachedSubscription(freeSubscription);
+        setSubscriptionStatus("verified");
       }
     });
   }, []);
@@ -161,18 +179,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const currentUser = ensureCurrentUser();
     await currentUser.reload();
     await ensureUserDocument(currentUser);
-    setSubscription(await getUserSubscription(currentUser));
+    setSubscriptionStatus("loading");
+    const nextSubscriptionState = await getUserSubscriptionState(currentUser);
+    setVerifiedSubscription(nextSubscriptionState.verifiedSubscription);
+    setCachedSubscription(nextSubscriptionState.cachedSubscription);
+    setSubscriptionStatus(nextSubscriptionState.subscriptionStatus);
     setUser(ensureFirebaseAuth().currentUser);
   }, []);
 
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
-      subscription,
+      subscription: verifiedSubscription,
+      verifiedSubscription,
+      cachedSubscription,
+      subscriptionStatus,
       isLoggedIn: Boolean(user),
       hasFullAccess:
-        hasTestAccountOverride(user) ||
-        (hasVerifiedProvider(user) && isPremiumSubscription(subscription)),
+        subscriptionStatus === "verified" &&
+        hasVerifiedProvider(user) &&
+        isPremiumSubscription(verifiedSubscription),
       isAuthLoading,
       isFirebaseReady: isFirebaseConfigured && Boolean(firebaseAuth),
       signIn,
@@ -184,6 +210,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       refreshUser
     }),
     [
+      cachedSubscription,
       isAuthLoading,
       logOut,
       refreshUser,
@@ -192,8 +219,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signIn,
       signInWithGoogleIdToken,
       signUp,
-      subscription,
-      user
+      subscriptionStatus,
+      user,
+      verifiedSubscription
     ]
   );
 

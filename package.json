@@ -17,6 +17,7 @@
     "web": "expo start --web",
     "lint": "expo lint",
     "test": "node scripts/run-tests.mjs",
+    "test:firebase-rules": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-firebase-rules-tests.ps1",
     "security:secrets": "gitleaks detect --source . --verbose --redact",
     "typecheck": "tsc --noEmit",
     "firebase:deploy-rules": "firebase deploy --only firestore:rules,storage --project travelframe-4e1fb",

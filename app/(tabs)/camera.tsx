@@ -48,6 +48,10 @@ import {
 } from "@/constants/camera-guides";
 import { useAuth } from "@/lib/auth-context";
 import { recordBackupFailure } from "@/lib/backup-failure-queue";
+import {
+  calculateGuidePositionDragOffset,
+  clampGuidePositionOffset
+} from "@/lib/camera-guide-position";
 import { backupPhotoIfEnabled } from "@/lib/cloud-backup";
 import {
   DEFAULT_GUIDE_COLOR,
@@ -610,15 +614,9 @@ export default function CameraScreen() {
 
   const getClampedGuideOffset = useCallback(
     (nextX: number, nextY: number) => {
-      const maxX = Math.max(0, cameraFrame.width * 0.42);
-      const maxY = Math.max(0, cameraFrame.height * 0.42);
-
-      return {
-        x: Math.round(Math.max(-maxX, Math.min(maxX, nextX))),
-        y: Math.round(Math.max(-maxY, Math.min(maxY, nextY)))
-      };
+      return clampGuidePositionOffset({ x: nextX, y: nextY }, cameraFrame);
     },
-    [cameraFrame.height, cameraFrame.width]
+    [cameraFrame]
   );
 
   const syncGuideOffsetFromGesture = useCallback(
@@ -757,16 +755,15 @@ export default function CameraScreen() {
           guideDragStartY.value = guideOffsetYValue.value;
         })
         .onUpdate((event) => {
-          const maxX = Math.max(0, cameraFrame.width * 0.42);
-          const maxY = Math.max(0, cameraFrame.height * 0.42);
-          guideOffsetXValue.value = Math.max(
-            -maxX,
-            Math.min(maxX, guideDragStartX.value + event.translationX)
-          );
-          guideOffsetYValue.value = Math.max(
-            -maxY,
-            Math.min(maxY, guideDragStartY.value + event.translationY)
-          );
+          const nextOffset = calculateGuidePositionDragOffset({
+            startX: guideDragStartX.value,
+            startY: guideDragStartY.value,
+            translationX: event.translationX,
+            translationY: event.translationY,
+            frame: cameraFrame
+          });
+          guideOffsetXValue.value = nextOffset.x;
+          guideOffsetYValue.value = nextOffset.y;
           runOnJS(syncGuideOffsetFromGesture)(
             guideOffsetXValue.value,
             guideOffsetYValue.value

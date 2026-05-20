@@ -72,7 +72,7 @@ for (const snippet of [
   'ratioLabel = "Original"',
   'const shouldApplyRatio = ratioLabel !== "Original"',
   "renderEditedPhotoFromTransform({",
-  "ratioLabel: shouldApplyRatio ? ratioLabel : getRatioLabel(width, height)"
+  "getRatioLabel(prepared.width, prepared.height)"
 ]) {
   assert.ok(photoLibrarySource.includes(snippet), `captured photo ratio save missing: ${snippet}`);
 }

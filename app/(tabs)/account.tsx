@@ -24,6 +24,7 @@ import {
 import { useAuth } from "@/lib/auth-context";
 import {
   getUserSubscriptionProducts,
+  isPremiumSubscription,
   type UserSubscriptionProducts
 } from "@/lib/subscription";
 import { getPhotos } from "@/lib/photo-library";
@@ -193,6 +194,8 @@ export default function AccountScreen() {
   const {
     user,
     subscription,
+    cachedSubscription,
+    subscriptionStatus,
     isLoggedIn,
     hasFullAccess,
     isAuthLoading,
@@ -227,6 +230,15 @@ export default function AccountScreen() {
   const googleWebClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
   const googleAndroidClientId = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;
   const isGoogleReady = Boolean(googleWebClientId && googleAndroidClientId);
+  const isSubscriptionCheckFailed = subscriptionStatus === "failed";
+  const displaySubscription = isSubscriptionCheckFailed ? cachedSubscription : subscription;
+  const subscriptionDisplayName = isSubscriptionCheckFailed
+    ? isPremiumSubscription(cachedSubscription)
+      ? `확인 불가 (최근 캐시: ${cachedSubscription.productName})`
+      : "확인 불가"
+    : subscription.status === "active"
+      ? subscription.productName
+      : "무료 플랜";
 
   useFocusEffect(
     useCallback(() => {
@@ -731,16 +743,14 @@ export default function AccountScreen() {
               <InfoRow label="마지막 로그인" value={formatDateTime(user?.metadata.lastSignInTime)} />
               <InfoRow
                 label="구독 상태"
-                value={
-                  subscription.status === "active"
-                    ? subscription.productName
-                    : "무료 플랜"
-                }
+                value={subscriptionDisplayName}
               />
               <InfoRow
                 label="광고 제거"
                 value={
-                  isSubscriptionProductsLoading
+                  isSubscriptionCheckFailed
+                    ? "확인 불가"
+                    : isSubscriptionProductsLoading
                     ? "확인 중..."
                     : subscriptionProducts.adRemove
                     ? "구매 완료"
@@ -752,7 +762,9 @@ export default function AccountScreen() {
               <InfoRow
                 label="구독"
                 value={
-                  isSubscriptionProductsLoading
+                  isSubscriptionCheckFailed
+                    ? "확인 불가"
+                    : isSubscriptionProductsLoading
                     ? "확인 중..."
                     : subscriptionProducts.creatorMonthly
                       ? "구독 중"
@@ -761,13 +773,22 @@ export default function AccountScreen() {
               />
               <InfoRow
                 label="구독 시작일"
-                value={subscription.startedAt ? formatDateTime(subscription.startedAt) : "아직 구독 전"}
+                value={displaySubscription.startedAt ? formatDateTime(displaySubscription.startedAt) : "아직 구독 전"}
               />
               <InfoRow
                 label="다음 갱신일"
-                value={subscription.expiresAt ? formatDateTime(subscription.expiresAt) : "없음"}
+                value={displaySubscription.expiresAt ? formatDateTime(displaySubscription.expiresAt) : "없음"}
               />
-              <InfoRow label="클라우드 백업" value={hasFullAccess ? "사용 가능" : "프리미엄 활성 후 사용 권장"} />
+              <InfoRow
+                label="클라우드 백업"
+                value={
+                  isSubscriptionCheckFailed
+                    ? "확인 불가"
+                    : hasFullAccess
+                      ? "사용 가능"
+                      : "프리미엄 활성 후 사용 권장"
+                }
+              />
             </View>
           </SectionBlock>
 
@@ -781,7 +802,9 @@ export default function AccountScreen() {
                 <InfoRow
                   label="백업 권한"
                   value={
-                    subscriptionProducts.creatorMonthly
+                    isSubscriptionCheckFailed
+                      ? "확인 불가"
+                      : subscriptionProducts.creatorMonthly
                       ? "사용 가능"
                       : isLoggedIn
                         ? "구독 후 사용 가능"

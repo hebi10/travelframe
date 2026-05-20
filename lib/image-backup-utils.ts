@@ -1,5 +1,6 @@
 import * as FileSystem from "expo-file-system/legacy";
 import { manipulateAsync, SaveFormat } from "expo-image-manipulator";
+import { Image } from "react-native";
 
 import {
   DEFAULT_IMAGE_QUALITY,
@@ -51,6 +52,35 @@ export const getImageResizeAction = ({
   };
 };
 
+export const resolveImageDimensions = async ({
+  uri,
+  width,
+  height
+}: {
+  uri: string;
+  width?: number | null;
+  height?: number | null;
+}) => {
+  if (width && height && width > 0 && height > 0) {
+    return { width, height };
+  }
+
+  return new Promise<{ width: number; height: number } | null>((resolve) => {
+    Image.getSize(
+      uri,
+      (resolvedWidth, resolvedHeight) => {
+        if (resolvedWidth > 0 && resolvedHeight > 0) {
+          resolve({ width: resolvedWidth, height: resolvedHeight });
+          return;
+        }
+
+        resolve(null);
+      },
+      () => resolve(null)
+    );
+  });
+};
+
 const getLocalFileSize = async (uri: string) => {
   const info = await FileSystem.getInfoAsync(uri);
   if (!info.exists || !("size" in info) || typeof info.size !== "number") {
@@ -60,25 +90,45 @@ const getLocalFileSize = async (uri: string) => {
   return info.size;
 };
 
-export const optimizeImageForBackup = async ({
+export const optimizeImageForStorage = async ({
   uri,
   width,
   height,
-  imageQuality
+  imageQuality,
+  sourceImageQuality
 }: {
   uri: string;
   width?: number | null;
   height?: number | null;
   imageQuality: ImageQuality;
+  sourceImageQuality?: ImageQuality | null;
 }): Promise<OptimizedBackupImage> => {
   try {
     const option = getImageQualityOption(imageQuality);
     const originalSize = await getLocalFileSize(uri);
+    const dimensions = await resolveImageDimensions({ uri, width, height });
     const resizeAction = getImageResizeAction({
-      width,
-      height,
+      width: dimensions?.width,
+      height: dimensions?.height,
       maxLongSide: option.maxLongSide
     });
+    const canReuseSource =
+      sourceImageQuality === option.value &&
+      !resizeAction &&
+      Boolean(dimensions?.width && dimensions.height);
+
+    if (canReuseSource) {
+      return {
+        uri,
+        width: dimensions?.width ?? null,
+        height: dimensions?.height ?? null,
+        size: originalSize,
+        quality: option.quality,
+        imageQuality: option.value,
+        originalSize
+      };
+    }
+
     const result = await manipulateAsync(
       uri,
       resizeAction ? [resizeAction] : [],
@@ -102,6 +152,8 @@ export const optimizeImageForBackup = async ({
     throw new Error(IMAGE_OPTIMIZATION_FAILED_MESSAGE);
   }
 };
+
+export const optimizeImageForBackup = optimizeImageForStorage;
 
 export const calculateCombinedImageBackupSize = (
   currentSize: number,

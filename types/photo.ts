@@ -1,3 +1,5 @@
+import type { ImageQuality } from "@/constants/image";
+
 export type PhotoKind = "original" | "edited";
 
 export type PhotoRatioLabel = "Original" | "1:1" | "3:4" | "4:5" | "9:16" | "16:9";
@@ -24,6 +26,11 @@ export type BackupMetadata = {
   storagePath?: string;
   downloadURL?: string;
   backupStatus?: "pending" | "backed_up" | "failed" | "restored";
+  imageQuality?: ImageQuality;
+  optimizedQuality?: number;
+  optimizedSize?: number;
+  originalSize?: number;
+  imageBackupSize?: number;
 };
 
 export type PhotoItem = BackupMetadata & {

@@ -18,6 +18,9 @@ const normalizeBackupUsage = (usage = {}) => ({
   audioTotalBytes: normalizeCount(usage.audioTotalBytes)
 });
 
+const normalizePendingBackupUsage = (usage = {}) =>
+  normalizeBackupUsage(usage.pendingUsage ?? {});
+
 const isCreatorSubscriptionActive = (subscription, now = Date.now()) => {
   if (
     !subscription ||
@@ -69,6 +72,45 @@ const subtractBackupUsage = (usage, delta) => ({
     normalizeCount(usage.audioTotalBytes) - normalizeCount(delta.audioTotalBytes)
   )
 });
+
+const assertBackupUsageWithinLimits = (usage) => {
+  const normalizedUsage = normalizeBackupUsage(usage);
+
+  if (normalizedUsage.imageTotalBytes > BACKUP_QUOTA_LIMITS.imageTotalBytes) {
+    throw new Error("Image backup quota exceeded.");
+  }
+
+  if (normalizedUsage.videoCount > BACKUP_QUOTA_LIMITS.videoCount) {
+    throw new Error("Video backup quota exceeded.");
+  }
+
+  if (normalizedUsage.audioTotalBytes > BACKUP_QUOTA_LIMITS.audioTotalBytes) {
+    throw new Error("Audio backup quota exceeded.");
+  }
+};
+
+const getReservedBackupUsage = (usage) =>
+  addBackupUsage(normalizeBackupUsage(usage), normalizePendingBackupUsage(usage));
+
+const reserveBackupUsage = (usage, delta) => ({
+  ...normalizeBackupUsage(usage),
+  pendingUsage: addBackupUsage(normalizePendingBackupUsage(usage), delta)
+});
+
+const releaseReservedBackupUsage = (usage, delta) => ({
+  ...normalizeBackupUsage(usage),
+  pendingUsage: subtractBackupUsage(normalizePendingBackupUsage(usage), delta)
+});
+
+const completeReservedBackupUsage = (usage, delta) => {
+  const updatedUsage = {
+    ...addBackupUsage(normalizeBackupUsage(usage), delta),
+    pendingUsage: subtractBackupUsage(normalizePendingBackupUsage(usage), delta)
+  };
+
+  assertBackupUsageWithinLimits(updatedUsage);
+  return updatedUsage;
+};
 
 const assertValidStoragePath = ({ uid, mediaKind, storagePath }) => {
   if (typeof storagePath !== "string" || storagePath.includes("..")) {
@@ -132,28 +174,24 @@ const assertBackupUploadAllowed = ({
   assertValidContentType({ mediaKind, contentType });
   assertValidFileSize({ mediaKind, fileSize });
 
-  const nextUsage = addBackupUsage(normalizeBackupUsage(usage), getBackupUsageDelta({
+  const nextUsage = addBackupUsage(getReservedBackupUsage(usage), getBackupUsageDelta({
     mediaKind,
     fileSize
   }));
 
-  if (nextUsage.imageTotalBytes > BACKUP_QUOTA_LIMITS.imageTotalBytes) {
-    throw new Error("Image backup quota exceeded.");
-  }
-
-  if (nextUsage.videoCount > BACKUP_QUOTA_LIMITS.videoCount) {
-    throw new Error("Video backup quota exceeded.");
-  }
-
-  if (nextUsage.audioTotalBytes > BACKUP_QUOTA_LIMITS.audioTotalBytes) {
-    throw new Error("Audio backup quota exceeded.");
-  }
+  assertBackupUsageWithinLimits(nextUsage);
 };
 
 exports.BACKUP_QUOTA_LIMITS = BACKUP_QUOTA_LIMITS;
 exports.normalizeBackupUsage = normalizeBackupUsage;
+exports.normalizePendingBackupUsage = normalizePendingBackupUsage;
 exports.isCreatorSubscriptionActive = isCreatorSubscriptionActive;
 exports.getBackupUsageDelta = getBackupUsageDelta;
 exports.addBackupUsage = addBackupUsage;
 exports.subtractBackupUsage = subtractBackupUsage;
+exports.assertBackupUsageWithinLimits = assertBackupUsageWithinLimits;
+exports.getReservedBackupUsage = getReservedBackupUsage;
+exports.reserveBackupUsage = reserveBackupUsage;
+exports.releaseReservedBackupUsage = releaseReservedBackupUsage;
+exports.completeReservedBackupUsage = completeReservedBackupUsage;
 exports.assertBackupUploadAllowed = assertBackupUploadAllowed;

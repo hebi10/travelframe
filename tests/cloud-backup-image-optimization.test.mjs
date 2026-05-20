@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 const source = readFileSync("lib/cloud-backup.ts", "utf8");
+const imageUtilsSource = readFileSync("lib/image-backup-utils.ts", "utf8");
 
 for (const snippet of [
   "optimizeImageForBackup",
@@ -18,6 +19,13 @@ for (const snippet of [
 ]) {
   assert.ok(source.includes(snippet), `cloud backup image optimization missing: ${snippet}`);
 }
+
+assert.ok(
+  imageUtilsSource.includes("resolveImageDimensions") &&
+    imageUtilsSource.indexOf("resolveImageDimensions") <
+      imageUtilsSource.indexOf("getImageResizeAction({"),
+  "image optimization should resolve real dimensions before resize decisions"
+);
 
 assert.ok(
   source.indexOf("optimizeImageForBackup") < source.indexOf("uploadLocalFile"),

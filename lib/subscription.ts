@@ -6,10 +6,7 @@ import {
 } from "firebase/firestore";
 
 import { firestore } from "@/lib/firebase";
-import {
-  emptySubscriptionProducts,
-  getSubscriptionProductsFromSubscription
-} from "@/lib/subscription-products";
+import { emptySubscriptionProducts } from "@/lib/subscription-products";
 
 export type SubscriptionPlan = "free" | "premium";
 export type SubscriptionStatus = "inactive" | "active" | "expired";
@@ -30,6 +27,14 @@ export type UserSubscription = {
 export type UserSubscriptionProducts = {
   adRemove: UserSubscription | null;
   creatorMonthly: UserSubscription | null;
+};
+
+export type SubscriptionCheckStatus = "loading" | "verified" | "failed";
+
+export type UserSubscriptionState = {
+  verifiedSubscription: UserSubscription;
+  cachedSubscription: UserSubscription;
+  subscriptionStatus: Exclude<SubscriptionCheckStatus, "loading">;
 };
 
 const createSubscriptionStorageKey = (uid: string) =>
@@ -108,45 +113,71 @@ export const getLocalSubscription = async (uid?: string | null) => {
   return parseSubscription(value);
 };
 
-export const getUserSubscription = async (user: User | null) => {
-  if (!user) {
-    return freeSubscription;
+const getVerifiedSubscriptionFromFirestore = async (user: User) => {
+  if (!firestore) {
+    throw new Error("Firestore is not configured.");
   }
 
-  if (!firestore) {
-    return getLocalSubscription(user.uid);
+  const [currentSnapshot, adRemoveSnapshot, creatorSnapshot] = await Promise.all([
+    getDoc(doc(firestore, "users", user.uid, "subscriptions", "current")),
+    getDoc(doc(firestore, "users", user.uid, "subscriptions", "ad_remove")),
+    getDoc(doc(firestore, "users", user.uid, "subscriptions", "creator_monthly"))
+  ]);
+  const currentSubscription = currentSnapshot.exists()
+    ? parseSubscription(JSON.stringify(currentSnapshot.data()))
+    : freeSubscription;
+  const adRemoveSubscription = adRemoveSnapshot.exists()
+    ? parseSubscription(JSON.stringify(adRemoveSnapshot.data()))
+    : null;
+  const creatorSubscription = creatorSnapshot.exists()
+    ? parseSubscription(JSON.stringify(creatorSnapshot.data()))
+    : null;
+
+  if (creatorSubscription && isSubscriptionProductActive(creatorSubscription, "creator_monthly")) {
+    return creatorSubscription;
   }
+
+  if (adRemoveSubscription && isSubscriptionProductActive(adRemoveSubscription, "ad_remove")) {
+    return adRemoveSubscription;
+  }
+
+  return currentSubscription;
+};
+
+export const getUserSubscriptionState = async (
+  user: User | null
+): Promise<UserSubscriptionState> => {
+  if (!user) {
+    return {
+      verifiedSubscription: freeSubscription,
+      cachedSubscription: freeSubscription,
+      subscriptionStatus: "verified"
+    };
+  }
+
+  const cachedSubscription = await getLocalSubscription(user.uid);
 
   try {
-    const snapshot = await getDoc(
-      doc(firestore, "users", user.uid, "subscriptions", "current")
-    );
+    const verifiedSubscription = await getVerifiedSubscriptionFromFirestore(user);
+    await saveLocalSubscription(user.uid, verifiedSubscription);
 
-    if (!snapshot.exists()) {
-      return getLocalSubscription(user.uid);
-    }
-
-    const subscription = parseSubscription(JSON.stringify(snapshot.data()));
-
-    if (!isCreatorSubscriptionActive(subscription)) {
-      const adRemoveSnapshot = await getDoc(
-        doc(firestore, "users", user.uid, "subscriptions", "ad_remove")
-      );
-      const adRemoveSubscription = adRemoveSnapshot.exists()
-        ? parseSubscription(JSON.stringify(adRemoveSnapshot.data()))
-        : null;
-
-      if (adRemoveSubscription && isAdFreeSubscription(adRemoveSubscription)) {
-        await saveLocalSubscription(user.uid, adRemoveSubscription);
-        return adRemoveSubscription;
-      }
-    }
-
-    await saveLocalSubscription(user.uid, subscription);
-    return subscription;
+    return {
+      verifiedSubscription,
+      cachedSubscription: verifiedSubscription,
+      subscriptionStatus: "verified"
+    };
   } catch {
-    return getLocalSubscription(user.uid);
+    return {
+      verifiedSubscription: freeSubscription,
+      cachedSubscription,
+      subscriptionStatus: "failed"
+    };
   }
+};
+
+export const getUserSubscription = async (user: User | null) => {
+  const { verifiedSubscription } = await getUserSubscriptionState(user);
+  return verifiedSubscription;
 };
 
 export const getUserSubscriptionProducts = async (
@@ -157,7 +188,7 @@ export const getUserSubscriptionProducts = async (
   }
 
   if (!firestore) {
-    return getSubscriptionProductsFromSubscription(await getLocalSubscription(user.uid));
+    return emptySubscriptionProducts;
   }
 
   try {
@@ -179,7 +210,7 @@ export const getUserSubscriptionProducts = async (
         : null
     };
   } catch {
-    return getSubscriptionProductsFromSubscription(await getLocalSubscription(user.uid));
+    return emptySubscriptionProducts;
   }
 };
 

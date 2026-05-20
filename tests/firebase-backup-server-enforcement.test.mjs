@@ -11,7 +11,10 @@ for (const snippet of [
   "completeBackupUpload",
   "releaseBackupUpload",
   "deleteCloudBackupData",
-  "backupUsage"
+  "backupUsage",
+  "pendingUsage",
+  "cleanupExpiredBackupUploadSessions",
+  "deleteStoragePath(session.storagePath)"
 ]) {
   assert.ok(functionsSource.includes(snippet), `Cloud Functions missing server backup enforcement: ${snippet}`);
 }

@@ -37,8 +37,8 @@ for (const snippet of [
 
 for (const snippet of [
   "saveCapturedPhotoToDevice",
-  "saveImageToLibrary(rendered.uri)",
-  "renderCapturedPhotoForSave({"
+  "saveImageToLibrary(prepared.uri)",
+  "prepareCapturedPhotoForStorage(input)"
 ]) {
   assert.ok(photoLibrarySource.includes(snippet), `camera device save helper missing: ${snippet}`);
 }

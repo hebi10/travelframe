@@ -322,6 +322,9 @@ export default function StudioScreen() {
     borderColor: palette.text,
     backgroundColor: palette.background
   };
+  const pressedPanelStyle = {
+    backgroundColor: palette.surfaceStrong
+  };
 
   return (
     <>
@@ -372,7 +375,7 @@ export default function StudioScreen() {
               style={({ pressed }) => [
                 styles.importImageCta,
                 panelStyle,
-                pressed && styles.pressed,
+                pressed && pressedPanelStyle,
                 isImportingImage && styles.disabledAction
               ]}
               onPress={importImageToApp}
@@ -425,7 +428,7 @@ export default function StudioScreen() {
         <>
           <SectionBlock title="영상 만들기">
             <Pressable
-              style={({ pressed }) => [styles.clipCta, panelStyle, pressed && styles.pressed]}
+              style={({ pressed }) => [styles.clipCta, panelStyle, pressed && pressedPanelStyle]}
               onPress={() => router.push("/trip-clip")}
             >
               <View style={styles.clipCopy}>
@@ -936,6 +939,11 @@ function WorkCard({
   router: ReturnType<typeof useRouter>;
   onDelete: (work: StudioWorkItem) => void;
 }) {
+  const { palette } = useAppAppearance();
+  const pressedPanelStyle = {
+    backgroundColor: palette.surfaceStrong
+  };
+
   if (work.kind === "single-image") {
     const photo = work.item;
 
@@ -943,7 +951,7 @@ function WorkCard({
       <View style={styles.videoCard}>
         <NativeImage source={{ uri: photo.uri }} style={styles.videoThumb} resizeMode="cover" />
         <Pressable
-          style={({ pressed }) => [styles.videoCopy, pressed && styles.pressed]}
+          style={({ pressed }) => [styles.videoCopy, pressed && pressedPanelStyle]}
           onPress={() => router.push(`/photo/${photo.id}` as Href)}
         >
           <Text selectable style={styles.videoKind}>
@@ -992,7 +1000,7 @@ function WorkCard({
           <View style={styles.videoThumbEmpty} />
         )}
         <Pressable
-          style={({ pressed }) => [styles.videoCopy, pressed && styles.pressed]}
+          style={({ pressed }) => [styles.videoCopy, pressed && pressedPanelStyle]}
           onPress={() => router.push(`/video/${video.id}` as Href)}
         >
           <Text selectable style={styles.videoKind}>
@@ -1040,7 +1048,7 @@ function WorkCard({
         <View style={styles.videoThumbEmpty} />
       )}
       <Pressable
-        style={({ pressed }) => [styles.videoCopy, pressed && styles.pressed]}
+        style={({ pressed }) => [styles.videoCopy, pressed && pressedPanelStyle]}
         onPress={() => router.push(`/trip-clip?bundleId=${bundle.id}` as Href)}
       >
         <Text selectable style={styles.videoKind}>
@@ -1180,9 +1188,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.text,
     backgroundColor: colors.background
-  },
-  pressed: {
-    backgroundColor: colors.surfaceStrong
   },
   disabledAction: {
     opacity: 0.45

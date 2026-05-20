@@ -2,6 +2,7 @@ import * as FileSystem from "expo-file-system/legacy";
 import { manipulateAsync, SaveFormat, type Action } from "expo-image-manipulator";
 
 import { localStorageAdapter } from "@/lib/local-storage";
+import { optimizeImageForStorage } from "@/lib/image-backup-utils";
 import type {
   PhotoEditTransform,
   PhotoItem,
@@ -320,18 +321,42 @@ const renderCapturedPhotoForSave = async ({
         uri,
         width: width ?? 0,
         height: height ?? 0
-      };
+    };
+};
+
+const deleteTemporaryFiles = async (uris: string[]) => {
+  await Promise.all(uris.map((uri) => deleteLocalFile(uri)));
+};
+
+const prepareCapturedPhotoForStorage = async (input: SaveCapturedPhotoInput) => {
+  const rendered = await renderCapturedPhotoForSave(input);
+  const settings = await getAppSettings();
+  const optimized = await optimizeImageForStorage({
+    uri: rendered.uri,
+    width: rendered.width,
+    height: rendered.height,
+    imageQuality: settings.imageBackupQuality
+  });
+  const temporaryUris = [
+    rendered.uri !== input.uri ? rendered.uri : null,
+    optimized.uri !== rendered.uri && optimized.uri !== input.uri ? optimized.uri : null
+  ].filter((uri): uri is string => Boolean(uri));
+
+  return {
+    ...optimized,
+    width: optimized.width ?? rendered.width,
+    height: optimized.height ?? rendered.height,
+    temporaryUris
+  };
 };
 
 export const saveCapturedPhotoToDevice = async (input: SaveCapturedPhotoInput) => {
-  const rendered = await renderCapturedPhotoForSave(input);
+  const prepared = await prepareCapturedPhotoForStorage(input);
 
   try {
-    return await saveImageToLibrary(rendered.uri);
+    return await saveImageToLibrary(prepared.uri);
   } finally {
-    if (rendered.uri !== input.uri) {
-      await deleteLocalFile(rendered.uri);
-    }
+    await deleteTemporaryFiles(prepared.temporaryUris);
   }
 };
 
@@ -343,58 +368,68 @@ export const saveCapturedPhoto = async ({
 }: SaveCapturedPhotoInput) => {
   const id = createPhotoId();
   const shouldApplyRatio = ratioLabel !== "Original";
-  const extension = shouldApplyRatio ? "jpg" : getFileExtension(uri);
+  const extension = "jpg";
   const directory = await ensurePhotoDirectory();
   const destinationUri = `${directory}${id}.${extension}`;
-  const rendered = await renderCapturedPhotoForSave({
+  const prepared = await prepareCapturedPhotoForStorage({
     uri,
     width,
     height,
     ratioLabel
   });
 
-  await FileSystem.copyAsync({
-    from: rendered.uri,
-    to: destinationUri
-  });
-
-  const previewUri = await createPhotoPreview({
-    sourceUri: destinationUri,
-    id,
-    width: rendered.width,
-    height: rendered.height
-  });
-
-  if (__DEV__) {
-    const [sourceInfo, destinationInfo, previewInfo] = await Promise.all([
-      FileSystem.getInfoAsync(uri),
-      FileSystem.getInfoAsync(destinationUri),
-      FileSystem.getInfoAsync(previewUri)
-    ]);
-    console.log("[photo-library] saved captured photo", {
-      ratioLabel,
-      sourceInfo,
-      destinationInfo,
-      previewInfo
+  try {
+    await FileSystem.copyAsync({
+      from: prepared.uri,
+      to: destinationUri
     });
+
+    const previewUri = await createPhotoPreview({
+      sourceUri: destinationUri,
+      id,
+      width: prepared.width,
+      height: prepared.height
+    });
+
+    if (__DEV__) {
+      const [sourceInfo, destinationInfo, previewInfo] = await Promise.all([
+        FileSystem.getInfoAsync(uri),
+        FileSystem.getInfoAsync(destinationUri),
+        FileSystem.getInfoAsync(previewUri)
+      ]);
+      console.log("[photo-library] saved captured photo", {
+        ratioLabel,
+        sourceInfo,
+        destinationInfo,
+        previewInfo
+      });
+    }
+
+    const photo: PhotoItem = {
+      id,
+      uri: destinationUri,
+      previewUri,
+      createdAt: new Date().toISOString(),
+      width: prepared.width ?? 0,
+      height: prepared.height ?? 0,
+      ratioLabel: shouldApplyRatio
+        ? ratioLabel
+        : getRatioLabel(prepared.width, prepared.height),
+      kind: "original",
+      edited: false,
+      addedToVideo: false,
+      imageQuality: prepared.imageQuality,
+      optimizedQuality: prepared.quality,
+      optimizedSize: prepared.size,
+      originalSize: prepared.originalSize
+    };
+
+    const photos = await getPhotos();
+    await writePhotos([photo, ...photos]);
+    return photo;
+  } finally {
+    await deleteTemporaryFiles(prepared.temporaryUris);
   }
-
-  const photo: PhotoItem = {
-    id,
-    uri: destinationUri,
-    previewUri,
-    createdAt: new Date().toISOString(),
-    width: rendered.width ?? 0,
-    height: rendered.height ?? 0,
-    ratioLabel: shouldApplyRatio ? ratioLabel : getRatioLabel(width, height),
-    kind: "original",
-    edited: false,
-    addedToVideo: false
-  };
-
-  const photos = await getPhotos();
-  await writePhotos([photo, ...photos]);
-  return photo;
 };
 
 export const saveEditedPhoto = async ({
@@ -428,56 +463,98 @@ export const saveEditedPhoto = async ({
         height,
         transform
       });
+  const prepared = await prepareEditedPhotoForStorage({
+    rendered,
+    sourceUri,
+    preserveRenderedUri: Boolean(renderedUri)
+  });
 
-  if (targetPhotoId && rendered.uri !== destinationUri) {
+  if (targetPhotoId && prepared.uri !== destinationUri) {
     await deleteLocalFile(destinationUri);
   }
 
-  await FileSystem.copyAsync({
-    from: rendered.uri,
-    to: destinationUri
-  });
+  try {
+    await FileSystem.copyAsync({
+      from: prepared.uri,
+      to: destinationUri
+    });
 
-  const previewUri = await createPhotoPreview({
-    sourceUri: destinationUri,
-    id,
+    const previewUri = await createPhotoPreview({
+      sourceUri: destinationUri,
+      id,
+      width: prepared.width,
+      height: prepared.height
+    });
+
+    const photo: PhotoItem = {
+      id,
+      uri: destinationUri,
+      previewUri,
+      createdAt: replaceCreatedAt ?? existingPhoto?.createdAt ?? new Date().toISOString(),
+      width: prepared.width ?? 0,
+      height: prepared.height ?? 0,
+      ratioLabel:
+        transform.ratioLabel === "Original"
+          ? getRatioLabel(prepared.width, prepared.height)
+          : transform.ratioLabel,
+      kind: "edited",
+      edited: true,
+      addedToVideo: existingPhoto?.addedToVideo ?? false,
+      sourcePhotoId: sourcePhotoId ?? existingPhoto?.sourcePhotoId,
+      edit: transform,
+      imageQuality: prepared.imageQuality,
+      optimizedQuality: prepared.quality,
+      optimizedSize: prepared.size,
+      originalSize: prepared.originalSize
+    };
+
+    const nextPhotos =
+      targetPhotoId && existingPhoto
+        ? photos.map((item) => (item.id === targetPhotoId ? photo : item))
+        : [photo, ...photos];
+
+    if (existingPhoto?.uri && existingPhoto.uri !== destinationUri) {
+      await deleteLocalFile(existingPhoto.uri);
+    }
+
+    if (existingPhoto?.previewUri && existingPhoto.previewUri !== previewUri) {
+      await deleteLocalFile(existingPhoto.previewUri);
+    }
+
+    await writePhotos(nextPhotos);
+    return photo;
+  } finally {
+    await deleteTemporaryFiles(prepared.temporaryUris);
+  }
+};
+
+const prepareEditedPhotoForStorage = async ({
+  rendered,
+  sourceUri,
+  preserveRenderedUri
+}: {
+  rendered: { uri: string; width: number; height: number };
+  sourceUri: string;
+  preserveRenderedUri: boolean;
+}) => {
+  const settings = await getAppSettings();
+  const optimized = await optimizeImageForStorage({
+    uri: rendered.uri,
     width: rendered.width,
-    height: rendered.height
+    height: rendered.height,
+    imageQuality: settings.imageBackupQuality
   });
+  const temporaryUris = [
+    !preserveRenderedUri && rendered.uri !== sourceUri ? rendered.uri : null,
+    optimized.uri !== rendered.uri && optimized.uri !== sourceUri ? optimized.uri : null
+  ].filter((uri): uri is string => Boolean(uri));
 
-  const photo: PhotoItem = {
-    id,
-    uri: destinationUri,
-    previewUri,
-    createdAt: replaceCreatedAt ?? existingPhoto?.createdAt ?? new Date().toISOString(),
-    width: rendered.width ?? 0,
-    height: rendered.height ?? 0,
-    ratioLabel:
-      transform.ratioLabel === "Original"
-        ? getRatioLabel(rendered.width, rendered.height)
-        : transform.ratioLabel,
-    kind: "edited",
-    edited: true,
-    addedToVideo: existingPhoto?.addedToVideo ?? false,
-    sourcePhotoId: sourcePhotoId ?? existingPhoto?.sourcePhotoId,
-    edit: transform
+  return {
+    ...optimized,
+    width: optimized.width ?? rendered.width,
+    height: optimized.height ?? rendered.height,
+    temporaryUris
   };
-
-  const nextPhotos =
-    targetPhotoId && existingPhoto
-      ? photos.map((item) => (item.id === targetPhotoId ? photo : item))
-      : [photo, ...photos];
-
-  if (existingPhoto?.uri && existingPhoto.uri !== destinationUri) {
-    await deleteLocalFile(existingPhoto.uri);
-  }
-
-  if (existingPhoto?.previewUri && existingPhoto.previewUri !== previewUri) {
-    await deleteLocalFile(existingPhoto.previewUri);
-  }
-
-  await writePhotos(nextPhotos);
-  return photo;
 };
 
 const renderEditedPhotoFromTransform = async ({

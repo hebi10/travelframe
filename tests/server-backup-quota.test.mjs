@@ -63,6 +63,29 @@ assert.throws(
     quota.assertBackupUploadAllowed({
       uid: "user-1",
       subscription: activeCreatorSubscription,
+      usage: {
+        imageTotalBytes: 1024 * 1024 * 1024 - 100,
+        videoCount: 0,
+        audioTotalBytes: 0,
+        pendingUsage: {
+          imageTotalBytes: 50,
+          videoCount: 0,
+          audioTotalBytes: 0
+        }
+      },
+      mediaKind: "image",
+      fileSize: 51,
+      contentType: "image/jpeg",
+      storagePath: "users/user-1/backups/photos/photo-pending.jpg"
+    }),
+  /image backup quota/i
+);
+
+assert.throws(
+  () =>
+    quota.assertBackupUploadAllowed({
+      uid: "user-1",
+      subscription: activeCreatorSubscription,
       usage: { imageTotalBytes: 0, videoCount: 50, audioTotalBytes: 0 },
       mediaKind: "video",
       fileSize: 1024,
@@ -110,5 +133,41 @@ assert.deepEqual(quota.getBackupUsageDelta({ mediaKind: "video", fileSize: 9999 
   videoCount: 1,
   audioTotalBytes: 0
 });
+
+assert.deepEqual(
+  quota.reserveBackupUsage(
+    {
+      imageTotalBytes: 200,
+      videoCount: 1,
+      audioTotalBytes: 0,
+      pendingUsage: { imageTotalBytes: 100, videoCount: 0, audioTotalBytes: 0 }
+    },
+    { imageTotalBytes: 50, videoCount: 0, audioTotalBytes: 0 }
+  ),
+  {
+    imageTotalBytes: 200,
+    videoCount: 1,
+    audioTotalBytes: 0,
+    pendingUsage: { imageTotalBytes: 150, videoCount: 0, audioTotalBytes: 0 }
+  }
+);
+
+assert.deepEqual(
+  quota.completeReservedBackupUsage(
+    {
+      imageTotalBytes: 200,
+      videoCount: 1,
+      audioTotalBytes: 0,
+      pendingUsage: { imageTotalBytes: 150, videoCount: 0, audioTotalBytes: 0 }
+    },
+    { imageTotalBytes: 50, videoCount: 0, audioTotalBytes: 0 }
+  ),
+  {
+    imageTotalBytes: 250,
+    videoCount: 1,
+    audioTotalBytes: 0,
+    pendingUsage: { imageTotalBytes: 100, videoCount: 0, audioTotalBytes: 0 }
+  }
+);
 
 console.log("ok - server backup quota checks enforce subscription, path, type, and limits");

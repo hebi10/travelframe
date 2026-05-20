@@ -1,7 +1,7 @@
 export type ImageQuality = "low" | "normal" | "high";
 
 export const MAX_TOTAL_IMAGE_BACKUP_SIZE_BYTES = 1024 * 1024 * 1024;
-export const DEFAULT_IMAGE_QUALITY: ImageQuality = "high";
+export const DEFAULT_IMAGE_QUALITY: ImageQuality = "normal";
 
 export const IMAGE_BACKUP_OPTIMIZATION_MESSAGE =
   "이미지는 백업 시 자동으로 최적화되어 저장됩니다.";

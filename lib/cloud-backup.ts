@@ -548,6 +548,7 @@ export const backupCurrentWorkspace = async ({
         uri: photo.uri,
         width: photo.width,
         height: photo.height,
+        sourceImageQuality: photo.imageQuality ?? null,
         imageQuality: settings.imageBackupQuality
       });
       updateOptimizationProgress();
@@ -560,9 +561,12 @@ export const backupCurrentWorkspace = async ({
     imageBundles.map(async (work) => ({
       work,
       images: await Promise.all(
-        work.imageUris.map(async (imageUri) => {
+        work.imageUris.map(async (imageUri, index) => {
           const optimized = await optimizeImageForBackup({
             uri: imageUri,
+            width: work.imageWidths?.[index] ?? null,
+            height: work.imageHeights?.[index] ?? null,
+            sourceImageQuality: work.imageQuality ?? null,
             imageQuality: settings.imageBackupQuality
           });
           updateOptimizationProgress();
@@ -822,6 +826,7 @@ export const backupPhoto = async ({
     uri: photo.uri,
     width: photo.width,
     height: photo.height,
+    sourceImageQuality: photo.imageQuality ?? null,
     imageQuality: settings.imageBackupQuality
   }).catch(() => {
     throw new Error(IMAGE_OPTIMIZATION_FAILED_MESSAGE);
@@ -928,9 +933,12 @@ export const backupImageBundleWork = async ({
   const sourceDeviceId = await getSourceDeviceId();
   const backedUpAt = new Date().toISOString();
   const optimizedImages = await Promise.all(
-    work.imageUris.map((imageUri) =>
+    work.imageUris.map((imageUri, index) =>
       optimizeImageForBackup({
         uri: imageUri,
+        width: work.imageWidths?.[index] ?? null,
+        height: work.imageHeights?.[index] ?? null,
+        sourceImageQuality: work.imageQuality ?? null,
         imageQuality: settings.imageBackupQuality
       })
     )

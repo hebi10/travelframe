@@ -13,7 +13,10 @@ const userMusicSource = fs.readFileSync("lib/user-music.ts", "utf8");
 
 for (const snippet of [
   "await ensureUserDocument(nextUser);",
-  "setSubscription(await getUserSubscription(nextUser));"
+  "getUserSubscriptionState(nextUser)",
+  "setVerifiedSubscription(nextSubscriptionState.verifiedSubscription);",
+  "setCachedSubscription(nextSubscriptionState.cachedSubscription);",
+  "setSubscriptionStatus(nextSubscriptionState.subscriptionStatus);"
 ]) {
   assert.ok(authSource.includes(snippet), `login flow missing expected account-only step: ${snippet}`);
 }

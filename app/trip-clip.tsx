@@ -93,6 +93,7 @@ import {
   getPhotos,
   saveCapturedPhoto
 } from "@/lib/photo-library";
+import { resolveImageDimensions } from "@/lib/image-backup-utils";
 import { deselectTripClipPhoto } from "@/lib/trip-clip-selection";
 import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 import { getMadeVideoById, saveMadeVideo } from "@/lib/video-library";
@@ -1621,6 +1622,8 @@ export default function TripClipScreen() {
         }
 
         const savedImageUris: string[] = [];
+        const savedImageWidths: (number | null)[] = [];
+        const savedImageHeights: (number | null)[] = [];
 
         for (let index = 0; index < selectedPhotos.length; index += 1) {
           const photo = selectedPhotos[index];
@@ -1642,6 +1645,9 @@ export default function TripClipScreen() {
             frameHeight: previewFrameSize.height
           });
           savedImageUris.push(savedImageUri);
+          const savedImageDimensions = await resolveImageDimensions({ uri: savedImageUri });
+          savedImageWidths.push(savedImageDimensions?.width ?? null);
+          savedImageHeights.push(savedImageDimensions?.height ?? null);
         }
 
         const normalizedWorkTitle = workTitle.trim();
@@ -1650,6 +1656,9 @@ export default function TripClipScreen() {
           ratio,
           photoIds: selectedPhotos.map((photo) => photo.id),
           imageUris: savedImageUris,
+          imageWidths: savedImageWidths,
+          imageHeights: savedImageHeights,
+          imageQuality,
           ...(normalizedWorkTitle ? { title: normalizedWorkTitle } : {})
         };
 
