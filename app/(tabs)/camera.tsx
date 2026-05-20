@@ -47,6 +47,7 @@ import {
   type GuideType
 } from "@/constants/camera-guides";
 import { useAuth } from "@/lib/auth-context";
+import { getPlanEntitlements } from "@/lib/plan-entitlements";
 import { recordBackupFailure } from "@/lib/backup-failure-queue";
 import {
   calculateGuidePositionDragOffset,
@@ -159,6 +160,10 @@ const sleep = (milliseconds: number) =>
 
 export default function CameraScreen() {
   const { user, subscription } = useAuth();
+  const planEntitlements = useMemo(
+    () => getPlanEntitlements({ isLoggedIn: Boolean(user), subscription }),
+    [subscription, user]
+  );
   const cameraRef = useRef<CameraView>(null);
   const referenceOverlayRef = useRef<PhotoReferenceOverlayHandle>(null);
   const [permission, requestPermission, getPermission] = useCameraPermissions();
@@ -405,7 +410,8 @@ export default function CameraScreen() {
         uri: photo.uri,
         width: photo.width,
         height: photo.height,
-        ratioLabel: cameraRatio
+        ratioLabel: cameraRatio,
+        localImageLimit: planEntitlements.localImageLimit
       };
       let savedPhoto: PhotoItem | null = null;
 
@@ -770,8 +776,7 @@ export default function CameraScreen() {
           );
         }),
     [
-      cameraFrame.height,
-      cameraFrame.width,
+      cameraFrame,
       guideDragStartX,
       guideDragStartY,
       guideOffsetXValue,

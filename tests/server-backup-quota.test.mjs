@@ -9,12 +9,14 @@ const activeCreatorSubscription = {
   expiresAt: new Date(Date.now() + 60_000).toISOString()
 };
 
-assert.equal(quota.BACKUP_QUOTA_LIMITS.imageTotalBytes, 1024 * 1024 * 1024);
+assert.equal(quota.BACKUP_QUOTA_LIMITS.imageTotalBytes, 2 * 1024 * 1024 * 1024);
+assert.equal(quota.BACKUP_QUOTA_LIMITS.totalBytes, 2 * 1024 * 1024 * 1024);
 assert.equal(quota.BACKUP_QUOTA_LIMITS.videoCount, 50);
 
 assert.deepEqual(quota.normalizeBackupUsage(), {
   imageTotalBytes: 0,
   videoCount: 0,
+  videoTotalBytes: 0,
   audioTotalBytes: 0
 });
 
@@ -22,7 +24,7 @@ assert.doesNotThrow(() => {
   quota.assertBackupUploadAllowed({
     uid: "user-1",
     subscription: activeCreatorSubscription,
-    usage: { imageTotalBytes: 1024, videoCount: 49, audioTotalBytes: 0 },
+    usage: { imageTotalBytes: 1024, videoCount: 49, videoTotalBytes: 1024, audioTotalBytes: 0 },
     mediaKind: "image",
     fileSize: 2048,
     contentType: "image/jpeg",
@@ -49,7 +51,7 @@ assert.throws(
     quota.assertBackupUploadAllowed({
       uid: "user-1",
       subscription: activeCreatorSubscription,
-      usage: { imageTotalBytes: 1024 * 1024 * 1024 - 100, videoCount: 0, audioTotalBytes: 0 },
+      usage: { imageTotalBytes: 2 * 1024 * 1024 * 1024 - 100, videoCount: 0, audioTotalBytes: 0 },
       mediaKind: "image",
       fileSize: 101,
       contentType: "image/jpeg",
@@ -64,7 +66,7 @@ assert.throws(
       uid: "user-1",
       subscription: activeCreatorSubscription,
       usage: {
-        imageTotalBytes: 1024 * 1024 * 1024 - 100,
+        imageTotalBytes: 2 * 1024 * 1024 * 1024 - 100,
         videoCount: 0,
         audioTotalBytes: 0,
         pendingUsage: {
@@ -86,7 +88,7 @@ assert.throws(
     quota.assertBackupUploadAllowed({
       uid: "user-1",
       subscription: activeCreatorSubscription,
-      usage: { imageTotalBytes: 0, videoCount: 50, audioTotalBytes: 0 },
+      usage: { imageTotalBytes: 0, videoCount: 50, videoTotalBytes: 0, audioTotalBytes: 0 },
       mediaKind: "video",
       fileSize: 1024,
       contentType: "video/mp4",
@@ -126,11 +128,13 @@ assert.throws(
 assert.deepEqual(quota.getBackupUsageDelta({ mediaKind: "image", fileSize: 1234 }), {
   imageTotalBytes: 1234,
   videoCount: 0,
+  videoTotalBytes: 0,
   audioTotalBytes: 0
 });
 assert.deepEqual(quota.getBackupUsageDelta({ mediaKind: "video", fileSize: 9999 }), {
   imageTotalBytes: 0,
   videoCount: 1,
+  videoTotalBytes: 9999,
   audioTotalBytes: 0
 });
 
@@ -139,16 +143,18 @@ assert.deepEqual(
     {
       imageTotalBytes: 200,
       videoCount: 1,
+      videoTotalBytes: 0,
       audioTotalBytes: 0,
-      pendingUsage: { imageTotalBytes: 100, videoCount: 0, audioTotalBytes: 0 }
+      pendingUsage: { imageTotalBytes: 100, videoCount: 0, videoTotalBytes: 0, audioTotalBytes: 0 }
     },
-    { imageTotalBytes: 50, videoCount: 0, audioTotalBytes: 0 }
+    { imageTotalBytes: 50, videoCount: 0, videoTotalBytes: 0, audioTotalBytes: 0 }
   ),
   {
     imageTotalBytes: 200,
     videoCount: 1,
+    videoTotalBytes: 0,
     audioTotalBytes: 0,
-    pendingUsage: { imageTotalBytes: 150, videoCount: 0, audioTotalBytes: 0 }
+    pendingUsage: { imageTotalBytes: 150, videoCount: 0, videoTotalBytes: 0, audioTotalBytes: 0 }
   }
 );
 
@@ -157,16 +163,18 @@ assert.deepEqual(
     {
       imageTotalBytes: 200,
       videoCount: 1,
+      videoTotalBytes: 0,
       audioTotalBytes: 0,
-      pendingUsage: { imageTotalBytes: 150, videoCount: 0, audioTotalBytes: 0 }
+      pendingUsage: { imageTotalBytes: 150, videoCount: 0, videoTotalBytes: 0, audioTotalBytes: 0 }
     },
-    { imageTotalBytes: 50, videoCount: 0, audioTotalBytes: 0 }
+    { imageTotalBytes: 50, videoCount: 0, videoTotalBytes: 0, audioTotalBytes: 0 }
   ),
   {
     imageTotalBytes: 250,
     videoCount: 1,
+    videoTotalBytes: 0,
     audioTotalBytes: 0,
-    pendingUsage: { imageTotalBytes: 100, videoCount: 0, audioTotalBytes: 0 }
+    pendingUsage: { imageTotalBytes: 100, videoCount: 0, videoTotalBytes: 0, audioTotalBytes: 0 }
   }
 );
 

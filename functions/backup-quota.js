@@ -1,5 +1,6 @@
 const BACKUP_QUOTA_LIMITS = {
-  imageTotalBytes: 1024 * 1024 * 1024,
+  totalBytes: 2 * 1024 * 1024 * 1024,
+  imageTotalBytes: 2 * 1024 * 1024 * 1024,
   videoCount: 50,
   audioTotalBytes: 200 * 1024 * 1024,
   imageFileBytes: 20 * 1024 * 1024,
@@ -15,6 +16,7 @@ const normalizeCount = (value) =>
 const normalizeBackupUsage = (usage = {}) => ({
   imageTotalBytes: normalizeCount(usage.imageTotalBytes),
   videoCount: normalizeCount(usage.videoCount),
+  videoTotalBytes: normalizeCount(usage.videoTotalBytes),
   audioTotalBytes: normalizeCount(usage.audioTotalBytes)
 });
 
@@ -41,15 +43,15 @@ const isCreatorSubscriptionActive = (subscription, now = Date.now()) => {
 const getBackupUsageDelta = ({ mediaKind, fileSize }) => {
   const size = normalizeCount(fileSize);
   if (mediaKind === "image") {
-    return { imageTotalBytes: size, videoCount: 0, audioTotalBytes: 0 };
+    return { imageTotalBytes: size, videoCount: 0, videoTotalBytes: 0, audioTotalBytes: 0 };
   }
 
   if (mediaKind === "video") {
-    return { imageTotalBytes: 0, videoCount: 1, audioTotalBytes: 0 };
+    return { imageTotalBytes: 0, videoCount: 1, videoTotalBytes: size, audioTotalBytes: 0 };
   }
 
   if (mediaKind === "audio") {
-    return { imageTotalBytes: 0, videoCount: 0, audioTotalBytes: size };
+    return { imageTotalBytes: 0, videoCount: 0, videoTotalBytes: 0, audioTotalBytes: size };
   }
 
   throw new Error("Unsupported backup media kind.");
@@ -58,6 +60,7 @@ const getBackupUsageDelta = ({ mediaKind, fileSize }) => {
 const addBackupUsage = (usage, delta) => ({
   imageTotalBytes: normalizeCount(usage.imageTotalBytes) + normalizeCount(delta.imageTotalBytes),
   videoCount: normalizeCount(usage.videoCount) + normalizeCount(delta.videoCount),
+  videoTotalBytes: normalizeCount(usage.videoTotalBytes) + normalizeCount(delta.videoTotalBytes),
   audioTotalBytes: normalizeCount(usage.audioTotalBytes) + normalizeCount(delta.audioTotalBytes)
 });
 
@@ -67,6 +70,10 @@ const subtractBackupUsage = (usage, delta) => ({
     normalizeCount(usage.imageTotalBytes) - normalizeCount(delta.imageTotalBytes)
   ),
   videoCount: Math.max(0, normalizeCount(usage.videoCount) - normalizeCount(delta.videoCount)),
+  videoTotalBytes: Math.max(
+    0,
+    normalizeCount(usage.videoTotalBytes) - normalizeCount(delta.videoTotalBytes)
+  ),
   audioTotalBytes: Math.max(
     0,
     normalizeCount(usage.audioTotalBytes) - normalizeCount(delta.audioTotalBytes)
@@ -75,7 +82,6 @@ const subtractBackupUsage = (usage, delta) => ({
 
 const assertBackupUsageWithinLimits = (usage) => {
   const normalizedUsage = normalizeBackupUsage(usage);
-
   if (normalizedUsage.imageTotalBytes > BACKUP_QUOTA_LIMITS.imageTotalBytes) {
     throw new Error("Image backup quota exceeded.");
   }
@@ -86,6 +92,15 @@ const assertBackupUsageWithinLimits = (usage) => {
 
   if (normalizedUsage.audioTotalBytes > BACKUP_QUOTA_LIMITS.audioTotalBytes) {
     throw new Error("Audio backup quota exceeded.");
+  }
+
+  const totalBytes =
+    normalizedUsage.imageTotalBytes +
+    normalizedUsage.videoTotalBytes +
+    normalizedUsage.audioTotalBytes;
+
+  if (totalBytes > BACKUP_QUOTA_LIMITS.totalBytes) {
+    throw new Error("Total backup quota exceeded.");
   }
 };
 
@@ -126,6 +141,47 @@ const assertValidStoragePath = ({ uid, mediaKind, storagePath }) => {
   if (!allowedPrefixes.some((prefix) => storagePath.startsWith(prefix))) {
     throw new Error("Invalid backup storage path.");
   }
+};
+
+const buildBackupSessionStoragePath = ({ uid, sessionId, storagePath }) => {
+  if (
+    typeof uid !== "string" ||
+    typeof sessionId !== "string" ||
+    !sessionId ||
+    typeof storagePath !== "string" ||
+    storagePath.includes("..")
+  ) {
+    throw new Error("Invalid backup storage path.");
+  }
+
+  const directPrefixes = [
+    `users/${uid}/backups/photos/`,
+    `users/${uid}/backups/videos/`,
+    `users/${uid}/backups/audio/`
+  ];
+  for (const prefix of directPrefixes) {
+    if (storagePath.startsWith(prefix)) {
+      const fileName = storagePath.slice(prefix.length);
+      if (!fileName || fileName.includes("/")) {
+        throw new Error("Invalid backup storage path.");
+      }
+
+      return `${prefix}${sessionId}-${fileName}`;
+    }
+  }
+
+  const imageWorkPrefix = `users/${uid}/backups/image-works/`;
+  if (storagePath.startsWith(imageWorkPrefix)) {
+    const rest = storagePath.slice(imageWorkPrefix.length);
+    const [workId, fileName, ...extra] = rest.split("/");
+    if (!workId || !fileName || extra.length > 0) {
+      throw new Error("Invalid backup storage path.");
+    }
+
+    return `${imageWorkPrefix}${workId}/${sessionId}-${fileName}`;
+  }
+
+  throw new Error("Invalid backup storage path.");
 };
 
 const assertValidContentType = ({ mediaKind, contentType }) => {
@@ -195,3 +251,4 @@ exports.reserveBackupUsage = reserveBackupUsage;
 exports.releaseReservedBackupUsage = releaseReservedBackupUsage;
 exports.completeReservedBackupUsage = completeReservedBackupUsage;
 exports.assertBackupUploadAllowed = assertBackupUploadAllowed;
+exports.buildBackupSessionStoragePath = buildBackupSessionStoragePath;

@@ -10,7 +10,7 @@ import { emptySubscriptionProducts } from "@/lib/subscription-products";
 
 export type SubscriptionPlan = "free" | "premium";
 export type SubscriptionStatus = "inactive" | "active" | "expired";
-export type SubscriptionProductId = "free" | "ad_remove" | "creator_monthly";
+export type SubscriptionProductId = "free" | "ad_remove" | "creator_monthly" | "expert_monthly";
 
 export type UserSubscription = {
   plan: SubscriptionPlan;
@@ -27,6 +27,7 @@ export type UserSubscription = {
 export type UserSubscriptionProducts = {
   adRemove: UserSubscription | null;
   creatorMonthly: UserSubscription | null;
+  expertMonthly: UserSubscription | null;
 };
 
 export type SubscriptionCheckStatus = "loading" | "verified" | "failed";
@@ -69,7 +70,10 @@ export const isCreatorSubscriptionActive = (subscription: UserSubscription | nul
     return false;
   }
 
-  return subscription?.productId === "creator_monthly";
+  return (
+    subscription?.productId === "creator_monthly" ||
+    subscription?.productId === "expert_monthly"
+  );
 };
 
 export const isAdFreeSubscription = (subscription: UserSubscription | null) => {
@@ -79,7 +83,8 @@ export const isAdFreeSubscription = (subscription: UserSubscription | null) => {
 
   return (
     subscription?.productId === "ad_remove" ||
-    subscription?.productId === "creator_monthly"
+    subscription?.productId === "creator_monthly" ||
+    subscription?.productId === "expert_monthly"
   );
 };
 
@@ -118,10 +123,11 @@ const getVerifiedSubscriptionFromFirestore = async (user: User) => {
     throw new Error("Firestore is not configured.");
   }
 
-  const [currentSnapshot, adRemoveSnapshot, creatorSnapshot] = await Promise.all([
+  const [currentSnapshot, adRemoveSnapshot, creatorSnapshot, expertSnapshot] = await Promise.all([
     getDoc(doc(firestore, "users", user.uid, "subscriptions", "current")),
     getDoc(doc(firestore, "users", user.uid, "subscriptions", "ad_remove")),
-    getDoc(doc(firestore, "users", user.uid, "subscriptions", "creator_monthly"))
+    getDoc(doc(firestore, "users", user.uid, "subscriptions", "creator_monthly")),
+    getDoc(doc(firestore, "users", user.uid, "subscriptions", "expert_monthly"))
   ]);
   const currentSubscription = currentSnapshot.exists()
     ? parseSubscription(JSON.stringify(currentSnapshot.data()))
@@ -132,6 +138,13 @@ const getVerifiedSubscriptionFromFirestore = async (user: User) => {
   const creatorSubscription = creatorSnapshot.exists()
     ? parseSubscription(JSON.stringify(creatorSnapshot.data()))
     : null;
+  const expertSubscription = expertSnapshot.exists()
+    ? parseSubscription(JSON.stringify(expertSnapshot.data()))
+    : null;
+
+  if (expertSubscription && isSubscriptionProductActive(expertSubscription, "expert_monthly")) {
+    return expertSubscription;
+  }
 
   if (creatorSubscription && isSubscriptionProductActive(creatorSubscription, "creator_monthly")) {
     return creatorSubscription;
@@ -192,9 +205,10 @@ export const getUserSubscriptionProducts = async (
   }
 
   try {
-    const [adRemoveSnapshot, creatorSnapshot] = await Promise.all([
+    const [adRemoveSnapshot, creatorSnapshot, expertSnapshot] = await Promise.all([
       getDoc(doc(firestore, "users", user.uid, "subscriptions", "ad_remove")),
-      getDoc(doc(firestore, "users", user.uid, "subscriptions", "creator_monthly"))
+      getDoc(doc(firestore, "users", user.uid, "subscriptions", "creator_monthly")),
+      getDoc(doc(firestore, "users", user.uid, "subscriptions", "expert_monthly"))
     ]);
     const adRemove = adRemoveSnapshot.exists()
       ? parseSubscription(JSON.stringify(adRemoveSnapshot.data()))
@@ -202,11 +216,17 @@ export const getUserSubscriptionProducts = async (
     const creatorMonthly = creatorSnapshot.exists()
       ? parseSubscription(JSON.stringify(creatorSnapshot.data()))
       : null;
+    const expertMonthly = expertSnapshot.exists()
+      ? parseSubscription(JSON.stringify(expertSnapshot.data()))
+      : null;
 
     return {
       adRemove: isSubscriptionProductActive(adRemove, "ad_remove") ? adRemove : null,
       creatorMonthly: isSubscriptionProductActive(creatorMonthly, "creator_monthly")
         ? creatorMonthly
+        : null,
+      expertMonthly: isSubscriptionProductActive(expertMonthly, "expert_monthly")
+        ? expertMonthly
         : null
     };
   } catch {

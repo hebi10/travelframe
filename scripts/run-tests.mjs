@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 const root = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const testsDirectory = path.join(root, "tests");
 const filters = process.argv.slice(2).map((value) => value.toLowerCase());
+const defaultExcludedTests = new Set(["firebase-rules-emulator.test.mjs"]);
 
 const testFiles = fs
   .readdirSync(testsDirectory)
@@ -13,9 +14,13 @@ const testFiles = fs
   .sort()
   .filter((name) =>
     filters.length === 0
-      ? true
+      ? !defaultExcludedTests.has(name)
       : filters.some((filter) => name.toLowerCase().includes(filter))
   );
+
+if (filters.length === 0) {
+  console.info("info - Firebase Rules emulator checks run via `npm run test:firebase-rules`.");
+}
 
 if (testFiles.length === 0) {
   console.error(

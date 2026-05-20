@@ -11,7 +11,7 @@ import {
 import { httpsCallable } from "firebase/functions";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 
-import { getAppSettings } from "@/lib/app-settings";
+import { getAppSettings, type AppSettings } from "@/lib/app-settings";
 import {
   IMAGE_BACKUP_SIZE_EXCEEDED_MESSAGE,
   IMAGE_OPTIMIZATION_FAILED_MESSAGE,
@@ -29,10 +29,11 @@ import {
   type OptimizedBackupImage
 } from "@/lib/image-backup-utils";
 import { localStorageAdapter } from "@/lib/local-storage";
-import { getPhotos, replacePhotosFromBackup } from "@/lib/photo-library";
+import { getPhotos, markPhotoCloudOnly, replacePhotosFromBackup } from "@/lib/photo-library";
 import { isCreatorSubscriptionActive, type UserSubscription } from "@/lib/subscription";
-import { getMadeVideos, replaceMadeVideosFromBackup } from "@/lib/video-library";
-import { getImageBundleWorks, replaceImageBundleWorksFromBackup } from "@/lib/work-library";
+import { isStorageSaverMode, shouldUseCloudBackupForStorageMode } from "@/lib/storage-mode";
+import { getMadeVideos, markMadeVideoCloudOnly, replaceMadeVideosFromBackup } from "@/lib/video-library";
+import { getImageBundleWorks, markImageBundleCloudOnly, replaceImageBundleWorksFromBackup } from "@/lib/work-library";
 import type { PhotoItem } from "@/types/photo";
 import type { MadeVideoItem } from "@/types/video";
 import type { ImageBundleWorkItem } from "@/types/work";
@@ -61,6 +62,40 @@ export type LocalWorkspaceSummary = {
   imageBundleCount: number;
   videoCount: number;
   totalCount: number;
+};
+
+const applyStorageSaverPolicy = async ({
+  settings,
+  photo,
+  photoBackup,
+  imageBundle,
+  imageBundleBackup,
+  video,
+  videoBackup
+}: {
+  settings: AppSettings;
+  photo?: PhotoItem;
+  photoBackup?: Partial<PhotoItem> | null;
+  imageBundle?: ImageBundleWorkItem;
+  imageBundleBackup?: Partial<ImageBundleWorkItem> | null;
+  video?: MadeVideoItem;
+  videoBackup?: Partial<MadeVideoItem> | null;
+}) => {
+  if (!isStorageSaverMode(settings.storageMode, true)) {
+    return;
+  }
+
+  if (photo) {
+    await markPhotoCloudOnly(photo.id, photoBackup ?? null);
+  }
+
+  if (imageBundle) {
+    await markImageBundleCloudOnly(imageBundle.id, imageBundleBackup ?? null);
+  }
+
+  if (video) {
+    await markMadeVideoCloudOnly(video.id, videoBackup ?? null);
+  }
 };
 
 const DEVICE_ID_STORAGE_KEY = "travel-frame.backup-device-id.v1";
@@ -119,6 +154,7 @@ type UploadedBackupFile = {
   downloadURL: string;
   fileSize: number;
   backupSessionId: string;
+  storagePath: string;
 };
 
 const callBackupFunction = async <Request, Response>(
@@ -242,7 +278,8 @@ const uploadLocalFile = async ({
     contentType,
     storagePath
   });
-  const fileRef = ref(firebaseStorage, storagePath);
+  const uploadStoragePath = reservation.storagePath;
+  const fileRef = ref(firebaseStorage, uploadStoragePath);
 
   try {
     await uploadBytes(fileRef, blob, {
@@ -258,7 +295,8 @@ const uploadLocalFile = async ({
     return {
       downloadURL: await getDownloadURL(fileRef),
       fileSize: blob.size,
-      backupSessionId: reservation.backupSessionId
+      backupSessionId: reservation.backupSessionId,
+      storagePath: uploadStoragePath
     };
   } catch (error) {
     await releaseBackupUpload({
@@ -622,7 +660,7 @@ export const backupCurrentWorkspace = async ({
       localId: photo.id,
       uri: photoDownloadUrl,
       localUri: photo.uri,
-      storagePath: photoPath,
+      storagePath: photoUpload.storagePath,
       downloadURL: photoDownloadUrl,
       previewUri: photoDownloadUrl,
       localPreviewUri: photo.previewUri ?? null,
@@ -644,6 +682,16 @@ export const backupCurrentWorkspace = async ({
       backedUpAt,
       updatedAt: serverTimestamp()
     });
+    await applyStorageSaverPolicy({
+      settings,
+      photo,
+      photoBackup: {
+        downloadURL: photoDownloadUrl,
+        storagePath: photoUpload.storagePath,
+        previewUri: photo.previewUri,
+        backupStatus: "backed_up"
+      }
+    });
     updateUploadProgress();
   }
 
@@ -660,7 +708,7 @@ export const backupCurrentWorkspace = async ({
         storagePath,
         mediaKind: "image"
       });
-      storagePaths.push(storagePath);
+      storagePaths.push(upload.storagePath);
       backupSessionIds.push(upload.backupSessionId);
       uploadedFileSize += upload.fileSize;
       backedUpImageUris.push(upload.downloadURL);
@@ -691,6 +739,15 @@ export const backupCurrentWorkspace = async ({
       },
       { merge: true }
     );
+    await applyStorageSaverPolicy({
+      settings,
+      imageBundle: work,
+      imageBundleBackup: {
+        imageUris: backedUpImageUris,
+        storagePath: storagePaths[0],
+        backupStatus: "backed_up"
+      }
+    });
   }
 
   for (const video of videos) {
@@ -732,7 +789,7 @@ export const backupCurrentWorkspace = async ({
         localId: video.id,
         localUri: video.uri,
         uri: downloadUrl,
-        storagePath,
+        storagePath: upload.storagePath,
         fileSize: upload.fileSize,
         backupSessionId: upload.backupSessionId,
         backupStatus: "backed_up",
@@ -745,6 +802,16 @@ export const backupCurrentWorkspace = async ({
       },
       { merge: true }
     );
+    await applyStorageSaverPolicy({
+      settings,
+      video,
+      videoBackup: {
+        downloadURL: downloadUrl,
+        uri: downloadUrl,
+        storagePath: upload.storagePath,
+        backupStatus: "backed_up"
+      }
+    });
     updateUploadProgress();
   }
 
@@ -855,7 +922,7 @@ export const backupPhoto = async ({
       localId: photo.id,
       uri: downloadURL,
       localUri: photo.uri,
-      storagePath,
+      storagePath: upload.storagePath,
       downloadURL,
       previewUri: downloadURL,
       localPreviewUri: photo.previewUri ?? null,
@@ -880,12 +947,23 @@ export const backupPhoto = async ({
   );
 
   await refreshBackupOverview(user.uid, backedUpAt);
+  await applyStorageSaverPolicy({
+    settings,
+    photo,
+    photoBackup: {
+      downloadURL,
+      uri: downloadURL,
+      storagePath: upload.storagePath,
+      previewUri: photo.previewUri,
+      backupStatus: "backed_up"
+    }
+  });
 
   return {
     ...photo,
     uri: downloadURL,
     previewUri: downloadURL,
-    storagePath,
+    storagePath: upload.storagePath,
     downloadURL,
     backupStatus: "backed_up" as const
   };
@@ -901,14 +979,22 @@ export const backupPhotoIfEnabled = async ({
   photo: PhotoItem;
 }) => {
   const settings = await getAppSettings();
-  if (!settings.cloudBackupEnabled || !isCreatorSubscriptionActive(subscription)) {
+  if (
+    !shouldUseCloudBackupForStorageMode(
+      settings.storageMode,
+      isCreatorSubscriptionActive(subscription)
+    )
+  ) {
     return null;
   }
 
   return backupPhoto({
     user,
     photo,
-    enabled: settings.cloudBackupEnabled
+    enabled: shouldUseCloudBackupForStorageMode(
+      settings.storageMode,
+      isCreatorSubscriptionActive(subscription)
+    )
   });
 };
 
@@ -963,7 +1049,7 @@ export const backupImageBundleWork = async ({
       storagePath,
       mediaKind: "image"
     });
-    storagePaths.push(storagePath);
+    storagePaths.push(upload.storagePath);
     backupSessionIds.push(upload.backupSessionId);
     uploadedFileSize += upload.fileSize;
     backedUpImageUris.push(upload.downloadURL);
@@ -998,6 +1084,15 @@ export const backupImageBundleWork = async ({
   );
 
   await refreshBackupOverview(user.uid, backedUpAt);
+  await applyStorageSaverPolicy({
+    settings,
+    imageBundle: work,
+    imageBundleBackup: {
+      imageUris: backedUpImageUris,
+      storagePath: storagePaths[0],
+      backupStatus: "backed_up"
+    }
+  });
 
   return {
     ...work,
@@ -1051,7 +1146,7 @@ export const backupMadeVideo = async ({
       localId: video.id,
       localUri: video.uri,
       uri: downloadUrl,
-      storagePath,
+      storagePath: upload.storagePath,
       fileSize: upload.fileSize,
       backupSessionId: upload.backupSessionId,
       backupStatus: "backed_up",
@@ -1066,10 +1161,21 @@ export const backupMadeVideo = async ({
   );
 
   await refreshBackupOverview(user.uid, backedUpAt);
+  await applyStorageSaverPolicy({
+    settings,
+    video,
+    videoBackup: {
+      downloadURL: downloadUrl,
+      uri: downloadUrl,
+      storagePath: upload.storagePath,
+      backupStatus: "backed_up"
+    }
+  });
 
   return {
     ...video,
-    uri: downloadUrl
+    uri: downloadUrl,
+    storagePath: upload.storagePath
   };
 };
 

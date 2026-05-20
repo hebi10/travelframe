@@ -10,6 +10,7 @@ export type ImageBundleWorkItem = BackupMetadata & {
   ratio: TripClipRatio;
   photoIds: string[];
   imageUris: string[];
+  localImageUris?: string[];
   imageWidths?: (number | null)[];
   imageHeights?: (number | null)[];
 };

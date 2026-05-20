@@ -25,6 +25,9 @@ export type BackupMetadata = {
   fileType?: string;
   storagePath?: string;
   downloadURL?: string;
+  localUri?: string;
+  localPreviewUri?: string;
+  localFileStatus?: "available" | "cloud_only";
   backupStatus?: "pending" | "backed_up" | "failed" | "restored";
   imageQuality?: ImageQuality;
   optimizedQuality?: number;
@@ -53,6 +56,7 @@ export type SaveCapturedPhotoInput = {
   width?: number;
   height?: number;
   ratioLabel?: PhotoRatioLabel;
+  localImageLimit?: number;
 };
 
 export type SaveEditedPhotoInput = {
@@ -66,4 +70,5 @@ export type SaveEditedPhotoInput = {
   renderedUri?: string;
   renderedWidth?: number;
   renderedHeight?: number;
+  localImageLimit?: number;
 };

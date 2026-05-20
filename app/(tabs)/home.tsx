@@ -114,12 +114,7 @@ export default function HomeScreen() {
               ]}
               onPress={() => router.push(slide.href)}
             >
-              <View style={[styles.heroImageFrame, { backgroundColor: palette.surface }]}>
-                <Image
-                  source={slide.image}
-                  style={styles.heroImage}
-                  contentFit="contain"
-                />
+              <View style={[styles.heroImageFrame, { backgroundColor: palette.surface }]}><Image source={slide.image} style={styles.heroImage} contentFit="contain" />
               </View>
               <View style={[styles.heroCopy, { borderTopColor: palette.line }]}>
                 <View style={styles.heroCopyHeader}>

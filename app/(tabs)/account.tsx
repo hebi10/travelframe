@@ -27,6 +27,11 @@ import {
   isPremiumSubscription,
   type UserSubscriptionProducts
 } from "@/lib/subscription";
+import { getPlanEntitlements } from "@/lib/plan-entitlements";
+import {
+  getEffectiveStorageMode,
+  getStorageModeLabel
+} from "@/lib/storage-mode";
 import { getPhotos } from "@/lib/photo-library";
 import { getMadeVideos } from "@/lib/video-library";
 import { getImageBundleWorks } from "@/lib/work-library";
@@ -34,16 +39,22 @@ import {
   deleteUserMusicTrack,
   pickAndUploadUserMusicTrack,
   syncUserMusicTracks,
-  USER_MUSIC_LIMIT,
   type UserMusicTrack
 } from "@/lib/user-music";
 import { type AppPalette, useAppAppearance } from "@/lib/app-appearance";
-import { getAppSettings } from "@/lib/app-settings";
+import { getAppSettings, type StorageMode } from "@/lib/app-settings";
 import {
   subscribeCloudBackupOverview,
   type CloudBackupOverview
 } from "@/lib/cloud-backup";
-import { formatImageBackupUsage } from "@/lib/image-backup-utils";
+import {
+  formatImageBackupSize,
+  formatImageBackupUsage
+} from "@/lib/image-backup-utils";
+import {
+  getWeeklyVideoExportUsage,
+  type WeeklyVideoExportUsage
+} from "@/lib/video-export-quota";
 
 type AuthMode = "signIn" | "signUp" | "recover";
 type PaymentPlanId = "adRemove" | "creator";
@@ -82,15 +93,39 @@ const initialBackupOverview: CloudBackupOverview = {
   deletedAt: null
 };
 
+const storageModeLegend =
+  "로컬 저장만 사용 / 로컬 저장 + 클라우드 백업 / 로컬 용량 절약 모드";
+
+const formatQuotaValue = (used: number, limit: number) => {
+  if (limit <= 0) {
+    return "사용 불가";
+  }
+
+  const safeUsed = Math.max(0, used);
+  const safeLimit = Math.max(0, limit);
+  const remaining = Math.max(0, safeLimit - safeUsed);
+  return `${safeUsed} / ${safeLimit} · 남은 ${remaining}`;
+};
+
+const formatStorageQuotaValue = (usedBytes: number, limitBytes: number) => {
+  if (limitBytes <= 0) {
+    return "사용 불가";
+  }
+
+  const remaining = Math.max(0, limitBytes - Math.max(0, usedBytes));
+  return `${formatImageBackupSize(usedBytes)} / ${formatImageBackupSize(limitBytes)} · 남은 ${formatImageBackupSize(remaining)}`;
+};
+
 const initialSubscriptionProducts: UserSubscriptionProducts = {
   adRemove: null,
-  creatorMonthly: null
+  creatorMonthly: null,
+  expertMonthly: null
 };
 
 const signedInBenefits = [
-  "기본 저장 한도를 6장에서 100장까지 확장",
-  "작업 기록과 계정 정보를 마이페이지에서 확인",
-  "향후 백업과 결제 기능 연결을 위한 계정 준비"
+  "주 1회 영상 출력과 기본 출력 제공",
+  "앱 내 보관함 이미지 100개, 영상 30개",
+  "워터마크 포함, 광고 표시"
 ];
 
 const paymentPlans: PaymentPlan[] = [
@@ -99,26 +134,27 @@ const paymentPlans: PaymentPlan[] = [
     title: "광고 제거",
     price: "3,900원",
     billing: "1회 결제",
-    summary: "한 번 결제로 광고 없이 앱을 사용합니다.",
+    summary: "한 번 결제하면 광고를 영구 제거합니다. 무료 플랜 기능은 그대로 유지됩니다.",
     benefits: [
-      "앱 전반의 광고 제거",
-      "촬영과 편집 화면을 방해 없이 사용",
-      "한 번 결제 후 계속 적용"
+      "앱 전반의 광고 영구 제거",
+      "무료 플랜 기능 유지",
+      "Pro 기능 미포함"
     ]
   },
   {
     id: "creator",
-    title: "구독",
+    title: "Pro",
     price: "월 3,900원",
-    billing: "월결제",
-    summary: "구독하면 영상 저장, 클라우드 백업, 광고 제거를 함께 사용할 수 있습니다.",
+    billing: "월 결제",
+    summary: "Pro는 주 15회 영상 출력, 워터마크 제거, 클라우드 백업, 광고 제거를 함께 제공합니다.",
     benefits: [
-      "편집 화면에서 영상으로 내보내기 가능",
+      "영상 출력 주 15회",
       "구독 기간 동안 앱 전반의 광고 제거",
-      "저장 한도를 200장까지 확장",
-      "여러 사진 작업과 영상 작업 백업 가능",
-      "빠른 영상 저장 지원",
-      "구독 기간 동안 워터마크 제거 옵션과 연동 가능"
+      "워터마크/브랜딩 제거",
+      "고급 출력 기능과 고해상도 저장",
+      "앱 내 보관함 이미지 200개, 영상 50개, 음악 10개",
+      "서버 백업 총 2GB",
+      "백업/복원 및 기기 변경 시 복원"
     ]
   }
 ];
@@ -218,7 +254,7 @@ export default function AccountScreen() {
   const [selectedPaymentPlan, setSelectedPaymentPlan] = useState<PaymentPlan | null>(null);
   const [showDeleteRequestInfo, setShowDeleteRequestInfo] = useState(false);
   const [stats, setStats] = useState<UsageStats>(initialStats);
-  const [cloudBackupEnabled, setCloudBackupEnabled] = useState(false);
+  const [storageMode, setStorageMode] = useState<StorageMode>("local_only");
   const [backupOverview, setBackupOverview] =
     useState<CloudBackupOverview>(initialBackupOverview);
   const [isSubscriptionProductsLoading, setIsSubscriptionProductsLoading] =
@@ -227,11 +263,25 @@ export default function AccountScreen() {
     initialSubscriptionProducts
   );
   const [musicTracks, setMusicTracks] = useState<UserMusicTrack[]>([]);
+  const [weeklyVideoExportUsage, setWeeklyVideoExportUsage] =
+    useState<WeeklyVideoExportUsage | null>(null);
   const googleWebClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
   const googleAndroidClientId = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;
   const isGoogleReady = Boolean(googleWebClientId && googleAndroidClientId);
   const isSubscriptionCheckFailed = subscriptionStatus === "failed";
   const displaySubscription = isSubscriptionCheckFailed ? cachedSubscription : subscription;
+  const planEntitlements = useMemo(
+    () => getPlanEntitlements({ isLoggedIn, subscription }),
+    [isLoggedIn, subscription]
+  );
+  const effectiveStorageMode = getEffectiveStorageMode(
+    storageMode,
+    planEntitlements.canBackupToCloud
+  );
+  const localImageUsage =
+    stats.originalPhotos + stats.editedPhotos + stats.imageBundles;
+  const weeklyVideoUsed =
+    weeklyVideoExportUsage?.count ?? 0;
   const subscriptionDisplayName = isSubscriptionCheckFailed
     ? isPremiumSubscription(cachedSubscription)
       ? `확인 불가 (최근 캐시: ${cachedSubscription.productName})`
@@ -252,14 +302,16 @@ export default function AccountScreen() {
           imageBundles,
           userMusicTracks,
           appSettings,
-          nextSubscriptionProducts
+          nextSubscriptionProducts,
+          nextWeeklyVideoExportUsage
         ] = await Promise.all([
           getPhotos(),
           getMadeVideos(),
           getImageBundleWorks(),
           user ? syncUserMusicTracks(user) : Promise.resolve([]),
           getAppSettings(),
-          getUserSubscriptionProducts(user)
+          getUserSubscriptionProducts(user),
+          getWeeklyVideoExportUsage(user, planEntitlements.weeklyVideoExportLimit)
         ]);
 
         if (!isActive) {
@@ -272,9 +324,10 @@ export default function AccountScreen() {
           imageBundles: imageBundles.length,
           videos: videos.length
         });
-        setCloudBackupEnabled(appSettings.cloudBackupEnabled);
+        setStorageMode(appSettings.storageMode);
         setMusicTracks(userMusicTracks);
         setSubscriptionProducts(nextSubscriptionProducts);
+        setWeeklyVideoExportUsage(nextWeeklyVideoExportUsage);
         setIsSubscriptionProductsLoading(false);
       };
 
@@ -287,7 +340,7 @@ export default function AccountScreen() {
       return () => {
         isActive = false;
       };
-    }, [user])
+    }, [planEntitlements.weeklyVideoExportLimit, user])
   );
 
   useEffect(
@@ -474,18 +527,22 @@ export default function AccountScreen() {
 
     if (plan.id === "adRemove") {
       return {
-        active: Boolean(subscriptionProducts.adRemove || subscriptionProducts.creatorMonthly),
+        active: Boolean(
+          subscriptionProducts.adRemove ||
+          subscriptionProducts.creatorMonthly ||
+          subscriptionProducts.expertMonthly
+        ),
         label: subscriptionProducts.adRemove
           ? "구매 완료"
-          : subscriptionProducts.creatorMonthly
+          : subscriptionProducts.creatorMonthly || subscriptionProducts.expertMonthly
             ? "구독 포함"
             : "준비 중"
       };
     }
 
     return {
-      active: Boolean(subscriptionProducts.creatorMonthly),
-      label: subscriptionProducts.creatorMonthly ? "구독 중" : "준비 중"
+      active: Boolean(subscriptionProducts.creatorMonthly || subscriptionProducts.expertMonthly),
+      label: subscriptionProducts.creatorMonthly || subscriptionProducts.expertMonthly ? "구독 중" : "준비 중"
     };
   };
 
@@ -497,7 +554,7 @@ export default function AccountScreen() {
     try {
       setIsMusicSubmitting(true);
       setMessage(null);
-      const nextTracks = await pickAndUploadUserMusicTrack(user);
+      const nextTracks = await pickAndUploadUserMusicTrack(user, planEntitlements.musicTrackLimit);
       setMusicTracks(nextTracks);
       setMessage("내 음악을 저장했습니다. 영상 만들기에서 선택할 수 있습니다.");
     } catch (error) {
@@ -792,12 +849,58 @@ export default function AccountScreen() {
             </View>
           </SectionBlock>
 
+          <SectionBlock title="플랜 한도">
+            <View style={styles.infoList}>
+              <InfoRow
+                label="현재 플랜"
+                value={planEntitlements.label}
+              />
+              <InfoRow
+                label="영상 출력"
+                value={formatQuotaValue(
+                  weeklyVideoUsed,
+                  planEntitlements.weeklyVideoExportLimit
+                )}
+              />
+              <InfoRow
+                label="이미지 보관함"
+                value={formatQuotaValue(localImageUsage, planEntitlements.localImageLimit)}
+              />
+              <InfoRow
+                label="영상 보관함"
+                value={formatQuotaValue(stats.videos, planEntitlements.localVideoLimit)}
+              />
+              <InfoRow
+                label="음악 보관함"
+                value={formatQuotaValue(
+                  musicTracks.length,
+                  planEntitlements.musicTrackLimit
+                )}
+              />
+              <InfoRow
+                label="서버 백업"
+                value={formatStorageQuotaValue(
+                  backupOverview.imageBackupBytes,
+                  planEntitlements.backupStorageBytes
+                )}
+              />
+            </View>
+          </SectionBlock>
+
           <SectionBlock title="클라우드 백업">
             <View style={[styles.backupSummaryPanel, themed.panel]}>
               <View style={styles.infoList}>
                 <InfoRow
                   label="백업 설정"
-                  value={cloudBackupEnabled ? "켜짐" : "꺼짐"}
+                  value={effectiveStorageMode === "local_only" ? "꺼짐" : "켜짐"}
+                />
+                <InfoRow
+                  label="저장 방식"
+                  value={getStorageModeLabel(effectiveStorageMode)}
+                />
+                <InfoRow
+                  label="저장 옵션"
+                  value={storageModeLegend}
                 />
                 <InfoRow
                   label="백업 권한"
@@ -902,19 +1005,25 @@ export default function AccountScreen() {
           <SectionBlock title="내 음악 관리">
             <View style={styles.musicPanel}>
               <Text selectable style={[styles.helpText, themed.mutedText]}>
-                핸드폰에 있는 음악을 최대 {USER_MUSIC_LIMIT}개까지 저장하고 영상 만들기에서 사용할 수 있습니다.
+                Pro 구독 중에는 핸드폰에 있는 음악을 최대 {planEntitlements.musicTrackLimit}개까지 저장하고 영상 만들기에서 사용할 수 있습니다.
               </Text>
               <View style={styles.musicHeader}>
                 <Text selectable style={[styles.musicCount, themed.text]}>
-                  {musicTracks.length} / {USER_MUSIC_LIMIT}
+                  {musicTracks.length} / {planEntitlements.musicTrackLimit}
                 </Text>
                 <Pressable
-                  disabled={isMusicSubmitting || musicTracks.length >= USER_MUSIC_LIMIT}
+                  disabled={
+                    isMusicSubmitting ||
+                    planEntitlements.musicTrackLimit <= 0 ||
+                    musicTracks.length >= planEntitlements.musicTrackLimit
+                  }
                   style={[
                     styles.secondaryButton,
                     themed.secondaryButton,
                     styles.musicUploadButton,
-                    (isMusicSubmitting || musicTracks.length >= USER_MUSIC_LIMIT) &&
+                    (isMusicSubmitting ||
+                      planEntitlements.musicTrackLimit <= 0 ||
+                      musicTracks.length >= planEntitlements.musicTrackLimit) &&
                       styles.disabledButton
                   ]}
                   onPress={handleUploadMusic}

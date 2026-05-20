@@ -11,9 +11,14 @@ for (const snippet of [
   "npm ci",
   "npm run typecheck",
   "npm run lint",
-  "npm test"
+  "npm test",
+  "name: Firebase Rules",
+  "actions/setup-java@v4",
+  "distribution: temurin",
+  "java-version: \"21\"",
+  "npm run test:firebase-rules"
 ]) {
   assert.ok(source.includes(snippet), `quality workflow missing: ${snippet}`);
 }
 
-console.log("ok - quality workflow runs typecheck, lint, and tests");
+console.log("ok - quality workflow runs app quality checks and Firebase Rules separately");

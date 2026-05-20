@@ -134,8 +134,7 @@ import {
   canBackupMoreVideos,
   getRemainingBackupSlots
 } from "@/lib/cloud-backup-limits";
-import { shouldShowAds } from "@/lib/ad-entitlement";
-import { isCreatorSubscriptionActive } from "@/lib/subscription";
+import { getPlanEntitlements } from "@/lib/plan-entitlements";
 import {
   getWeeklyVideoExportUsage,
   releaseWeeklyVideoExport,
@@ -144,8 +143,8 @@ import {
 } from "@/lib/video-export-quota";
 import {
   pickAndUploadUserMusicTrack,
+  restoreUserMusicTrackIfNeeded,
   syncUserMusicTracks,
-  USER_MUSIC_LIMIT,
   type UserMusicTrack
 } from "@/lib/user-music";
 import {
@@ -421,7 +420,12 @@ export default function TripClipScreen() {
     musicMode === "device"
       ? customMusic?.name ?? "내 음악 선택"
       : "무음";
-  const creatorExportActive = isCreatorSubscriptionActive(subscription);
+  const planEntitlements = useMemo(
+    () => getPlanEntitlements({ isLoggedIn, subscription }),
+    [isLoggedIn, subscription]
+  );
+  const weeklyVideoExportLimit = planEntitlements.weeklyVideoExportLimit;
+  const premiumExportActive = planEntitlements.canUseAdvancedOutput;
   const videoBackupRemaining = getRemainingBackupSlots(
     backupOverview.videoCount,
     CLOUD_BACKUP_VIDEO_LIMIT
@@ -429,7 +433,7 @@ export default function TripClipScreen() {
   const canBackupVideoExport =
     cloudBackupEnabled &&
     Boolean(user) &&
-    creatorExportActive &&
+    planEntitlements.canBackupToCloud &&
     canBackupMoreVideos(backupOverview.videoCount);
   const player = useAudioPlayer(activeMusicSource);
 
@@ -672,7 +676,7 @@ export default function TripClipScreen() {
       getPhotos().then(ensurePhotoPreviews),
       getAppSettings(),
       user ? syncUserMusicTracks(user) : Promise.resolve([]),
-      getWeeklyVideoExportUsage(user)
+      getWeeklyVideoExportUsage(user, weeklyVideoExportLimit)
     ]);
     setPhotos(storedPhotos);
     setUserMusicTracks(storedMusicTracks);
@@ -749,7 +753,14 @@ export default function TripClipScreen() {
         .map((photo) => photo.id);
     });
     setIsLoading(false);
-  }, [bundleId, previewGuideOffsetXValue, previewGuideOffsetYValue, user, videoId]);
+  }, [
+    bundleId,
+    previewGuideOffsetXValue,
+    previewGuideOffsetYValue,
+    user,
+    videoId,
+    weeklyVideoExportLimit
+  ]);
 
   const applyPreviewGuideSize = useCallback((value: number) => {
     const nextSize = Math.round(
@@ -1201,7 +1212,8 @@ export default function TripClipScreen() {
           saveCapturedPhoto({
             uri: asset.uri,
             width: asset.width,
-            height: asset.height
+            height: asset.height,
+            localImageLimit: planEntitlements.localImageLimit
           })
         )
       );
@@ -1254,13 +1266,24 @@ export default function TripClipScreen() {
       return;
     }
 
+    if (!isLoggedIn || !user) {
+      setExportProgress({
+        visible: true,
+        percent: 100,
+        title: "로그인이 필요합니다",
+        detail: "내 음악은 로그인 후 추가할 수 있습니다.",
+        error: "마이페이지에서 로그인한 뒤 다시 시도해 주세요."
+      });
+      return;
+    }
+
     const previousTrackIds = new Set(userMusicTracks.map((track) => track.id));
 
     try {
       setIsMusicSubmitting(true);
       setExportMessage(null);
 
-      const nextTracks = await pickAndUploadUserMusicTrack(user);
+      const nextTracks = await pickAndUploadUserMusicTrack(user, planEntitlements.musicTrackLimit);
       const uploadedTrack = nextTracks.find((track) => !previousTrackIds.has(track.id));
 
       setUserMusicTracks(nextTracks);
@@ -1275,7 +1298,13 @@ export default function TripClipScreen() {
     } finally {
       setIsMusicSubmitting(false);
     }
-  }, [isMusicSubmitting, user, userMusicTracks]);
+  }, [
+    isLoggedIn,
+    isMusicSubmitting,
+    planEntitlements.musicTrackLimit,
+    user,
+    userMusicTracks
+  ]);
 
   const movePhoto = (id: string, direction: -1 | 1) => {
     setSelectedIds((current) => {
@@ -1425,9 +1454,21 @@ export default function TripClipScreen() {
     const outputSize = getVideoQualityOutputSize(videoQuality, ratioAspect[ratio]);
     const outputUri = `${FileSystem.cacheDirectory}trip-clip-${Date.now()}.mp4`;
     const output = toNativeFilePath(outputUri);
+    let exportMusicUri = customMusic?.uri ?? null;
+    if (musicMode === "device" && selectedUserMusic) {
+      const restoredTrack = await restoreUserMusicTrackIfNeeded(user, selectedUserMusic);
+      exportMusicUri = restoredTrack.uri;
+      if (restoredTrack.uri !== selectedUserMusic.uri) {
+        setUserMusicTracks((currentTracks) =>
+          currentTracks.map((track) =>
+            track.id === restoredTrack.id ? restoredTrack : track
+          )
+        );
+      }
+    }
     const audioFilePath =
-      musicMode === "device" && customMusic?.uri?.startsWith("file")
-        ? toNativeFilePath(customMusic.uri)
+      musicMode === "device" && exportMusicUri?.startsWith("file")
+        ? toNativeFilePath(exportMusicUri)
         : null;
 
     await preloadSelectedPreviewImages();
@@ -1540,13 +1581,8 @@ export default function TripClipScreen() {
       return;
     }
 
-    if (creatorExportActive) {
-      await executeSelectedExport();
-      return;
-    }
-
     try {
-      const usage = await getWeeklyVideoExportUsage(user);
+      const usage = await getWeeklyVideoExportUsage(user, weeklyVideoExportLimit);
       setWeeklyVideoExportUsage(usage);
 
       if (usage && usage.remaining <= 0) {
@@ -1555,8 +1591,8 @@ export default function TripClipScreen() {
           visible: true,
           percent: 100,
           title: "무료 저장 한도 초과",
-          detail: "무료 로그인 사용자는 MP4 영상을 주 1개까지 만들 수 있습니다.",
-          error: `이번 주(${usage.weekLabel}) 무료 저장 1회를 이미 사용했습니다. 구독하면 제한 없이 만들 수 있고 광고도 제거됩니다.`
+          detail: `${planEntitlements.label} 플랜은 MP4 영상을 주 ${weeklyVideoExportLimit}회까지 만들 수 있습니다.`,
+          error: `이번 주(${usage.weekLabel}) MP4 저장 ${weeklyVideoExportLimit}회를 이미 사용했습니다. 다음 주에 다시 만들거나 플랜을 확인해 주세요.`
         });
         return;
       }
@@ -1610,9 +1646,9 @@ export default function TripClipScreen() {
       });
 
       if (countWeeklyMp4 && exportFormat === "mp4" && user) {
-        await reserveWeeklyVideoExport(user);
+        await reserveWeeklyVideoExport(user, weeklyVideoExportLimit);
         reservedWeeklyExport = true;
-        setWeeklyVideoExportUsage(await getWeeklyVideoExportUsage(user));
+        setWeeklyVideoExportUsage(await getWeeklyVideoExportUsage(user, weeklyVideoExportLimit));
       }
 
       if (exportFormat === "images") {
@@ -1666,17 +1702,21 @@ export default function TripClipScreen() {
         if (bundleId) {
           const updatedBundle = await updateImageBundleWork(bundleId, bundlePayload);
           if (!updatedBundle) {
-            savedBundle = await saveImageBundleWork(bundlePayload);
+            savedBundle = await saveImageBundleWork(bundlePayload, {
+              localImageLimit: planEntitlements.localImageLimit
+            });
           } else {
             savedBundle = updatedBundle;
           }
         } else {
-          savedBundle = await saveImageBundleWork(bundlePayload);
+          savedBundle = await saveImageBundleWork(bundlePayload, {
+            localImageLimit: planEntitlements.localImageLimit
+          });
         }
 
         let backupWarning: string | null = null;
 
-        if (savedBundle && cloudBackupEnabled && user && isCreatorSubscriptionActive(subscription)) {
+        if (savedBundle && cloudBackupEnabled && user && planEntitlements.canBackupToCloud) {
           try {
             setExportProgress({
               visible: true,
@@ -1774,10 +1814,10 @@ export default function TripClipScreen() {
         }, {}),
         musicId: musicMode === "device" && customMusic ? "custom" : "none",
         musicLabel: activeMusicLabel
-      });
+      }, { localVideoLimit: planEntitlements.localVideoLimit });
       let backupWarning: string | null = null;
       const wantsVideoBackup =
-        shouldBackupVideoExport && cloudBackupEnabled && user && creatorExportActive;
+        shouldBackupVideoExport && cloudBackupEnabled && user && planEntitlements.canBackupToCloud;
 
       if (wantsVideoBackup && !canBackupMoreVideos(backupOverview.videoCount)) {
         backupWarning = `영상 백업 한도 ${CLOUD_BACKUP_VIDEO_LIMIT}개를 모두 사용해 클라우드 백업은 건너뛰었습니다.`;
@@ -1828,15 +1868,17 @@ export default function TripClipScreen() {
       setAvailableDraft(null);
       setShowDraftPrompt(false);
       if (reservedWeeklyExport && user) {
-        setWeeklyVideoExportUsage(await getWeeklyVideoExportUsage(user));
+        setWeeklyVideoExportUsage(await getWeeklyVideoExportUsage(user, weeklyVideoExportLimit));
       }
-      if (shouldShowAds(subscription)) {
+      if (planEntitlements.showAds) {
         setIsPostSaveAdVisible(true);
       }
     } catch (error) {
       if (reservedWeeklyExport && user) {
         await releaseWeeklyVideoExport(user).catch(() => undefined);
-        setWeeklyVideoExportUsage(await getWeeklyVideoExportUsage(user).catch(() => null));
+        setWeeklyVideoExportUsage(
+          await getWeeklyVideoExportUsage(user, weeklyVideoExportLimit).catch(() => null)
+        );
       }
       const message = getUserFacingErrorMessage(error, "저장하지 못했습니다.");
       setExportMessage(message);
@@ -2485,11 +2527,17 @@ export default function TripClipScreen() {
             );
           })}
           <Pressable
-            disabled={isMusicSubmitting || userMusicTracks.length >= USER_MUSIC_LIMIT}
+            disabled={
+              isMusicSubmitting ||
+              planEntitlements.musicTrackLimit <= 0 ||
+              userMusicTracks.length >= planEntitlements.musicTrackLimit
+            }
             style={[
               styles.musicRow,
               styles.musicAddRow,
-              (isMusicSubmitting || userMusicTracks.length >= USER_MUSIC_LIMIT) &&
+              (isMusicSubmitting ||
+                planEntitlements.musicTrackLimit <= 0 ||
+                userMusicTracks.length >= planEntitlements.musicTrackLimit) &&
                 styles.disabledButton
             ]}
             onPress={handleAddUserMusic}
@@ -2546,9 +2594,9 @@ export default function TripClipScreen() {
             <Text selectable style={styles.exportNotice}>
               MP4 저장은 로그인 후 사용할 수 있습니다. 무료 로그인 사용자는 주 1개까지 만들 수 있습니다.
             </Text>
-          ) : exportFormat === "mp4" && creatorExportActive ? (
+          ) : exportFormat === "mp4" && premiumExportActive ? (
             <Text selectable style={styles.exportNotice}>
-              구독 이용 중입니다. MP4 영상을 제한 없이 저장하고 광고 없이 사용할 수 있습니다.
+              {planEntitlements.label} 이용 중입니다. MP4 영상을 주 {weeklyVideoExportLimit}회 저장하고 광고 없이 사용할 수 있습니다.
             </Text>
           ) : exportFormat === "mp4" ? (
             <Text selectable style={styles.exportNotice}>
@@ -2651,7 +2699,7 @@ export default function TripClipScreen() {
                     클라우드 백업
                   </Text>
                   <Text selectable style={styles.videoBackupDetail}>
-                    {cloudBackupEnabled && creatorExportActive
+                    {cloudBackupEnabled && planEntitlements.canBackupToCloud
                       ? `체크한 영상만 백업합니다. 남은 영상 백업 ${videoBackupRemaining}개 / ${CLOUD_BACKUP_VIDEO_LIMIT}개`
                       : "구독과 클라우드 백업 설정이 켜져 있을 때 사용할 수 있습니다."}
                   </Text>
@@ -2781,7 +2829,7 @@ export default function TripClipScreen() {
               frame={recordingFrame}
               template={template}
               transition={transition}
-              showWatermark={!creatorExportActive}
+              showWatermark={planEntitlements.showWatermark}
               frameAspectRatio={ratioAspect[ratio]}
               guideVisible={previewGuideVisible}
               guide={previewGuide}

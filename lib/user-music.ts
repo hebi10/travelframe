@@ -11,7 +11,9 @@ import { httpsCallable } from "firebase/functions";
 import { deleteObject, getDownloadURL, ref, uploadBytes } from "firebase/storage";
 
 import { firestore, firebaseFunctions, firebaseStorage } from "@/lib/firebase";
+import { getAppSettings } from "@/lib/app-settings";
 import { localStorageAdapter } from "@/lib/local-storage";
+import { isStorageSaverMode } from "@/lib/storage-mode";
 
 export type UserMusicTrack = {
   id: string;
@@ -25,7 +27,7 @@ export type UserMusicTrack = {
   createdAt: string;
 };
 
-const MAX_USER_MUSIC_TRACKS = 3;
+const MAX_USER_MUSIC_TRACKS = 10;
 const MUSIC_CACHE_PREFIX = "travel-frame:user-music:v1";
 
 const getMusicCacheKey = (userId: string) => `${MUSIC_CACHE_PREFIX}:${userId}`;
@@ -211,6 +213,7 @@ export const syncUserMusicTracks = async (user: User | null) => {
 
   const snapshot = await getDocs(collection(firestore, "users", user.uid, "musicTracks"));
   const directory = await ensureMusicDirectory(user.uid);
+  const settings = await getAppSettings();
   const nextTracks: UserMusicTrack[] = [];
 
   for (const item of snapshot.docs) {
@@ -228,7 +231,7 @@ export const syncUserMusicTracks = async (user: User | null) => {
       }
     }
 
-    if (!localUri && data.downloadUrl) {
+    if (!localUri && data.downloadUrl && !isStorageSaverMode(settings.storageMode, true)) {
       const extension = getExtension(data.name, data.mimeType);
       const fileName = `${item.id}-${sanitizeFileName(data.name)}.${extension}`;
       const destination = `${directory}${fileName}`;
@@ -258,7 +261,40 @@ export const syncUserMusicTracks = async (user: User | null) => {
   return sortedTracks;
 };
 
-export const pickAndUploadUserMusicTrack = async (user: User | null) => {
+export const deleteLocalMusicFile = async (track: UserMusicTrack) => {
+  if (track.uri?.startsWith("file://")) {
+    await FileSystem.deleteAsync(track.uri, { idempotent: true });
+  }
+};
+
+export const restoreUserMusicTrackIfNeeded = async (
+  user: User | null,
+  track: UserMusicTrack
+) => {
+  if (!user || track.uri?.startsWith("file://") || !track.downloadUrl) {
+    return track;
+  }
+
+  const directory = await ensureMusicDirectory(user.uid);
+  const extension = getExtension(track.name, track.mimeType);
+  const destination = `${directory}${track.id}-${sanitizeFileName(track.name)}.${extension}`;
+  const result = await FileSystem.downloadAsync(track.downloadUrl, destination);
+  const nextTrack = {
+    ...track,
+    uri: result.uri
+  };
+  const tracks = await getUserMusicTracks(user.uid);
+  await saveTracksToCache(
+    user.uid,
+    tracks.map((item) => (item.id === track.id ? nextTrack : item))
+  );
+  return nextTrack;
+};
+
+export const pickAndUploadUserMusicTrack = async (
+  user: User | null,
+  musicTrackLimit = 0
+) => {
   if (!user) {
     throw new Error("로그인 후 내 음악을 추가할 수 있습니다.");
   }
@@ -268,8 +304,17 @@ export const pickAndUploadUserMusicTrack = async (user: User | null) => {
   }
 
   const currentTracks = await syncUserMusicTracks(user);
-  if (currentTracks.length >= MAX_USER_MUSIC_TRACKS) {
-    throw new Error("내 음악은 최대 3개까지 저장할 수 있습니다.");
+  const safeMusicTrackLimit = Math.max(
+    0,
+    Math.min(MAX_USER_MUSIC_TRACKS, Math.floor(Number(musicTrackLimit) || 0))
+  );
+
+  if (safeMusicTrackLimit <= 0) {
+    throw new Error("Pro 구독 후 내 음악을 추가할 수 있습니다.");
+  }
+
+  if (currentTracks.length >= safeMusicTrackLimit) {
+    throw new Error(`내 음악은 최대 ${safeMusicTrackLimit}개까지 저장할 수 있습니다.`);
   }
 
   const result = await DocumentPicker.getDocumentAsync({
@@ -317,7 +362,19 @@ export const pickAndUploadUserMusicTrack = async (user: User | null) => {
     createdAt
   };
 
-  const nextTracks = [track, ...currentTracks].slice(0, MAX_USER_MUSIC_TRACKS);
+  const settings = await getAppSettings();
+  const savedTrack = isStorageSaverMode(settings.storageMode, true)
+    ? {
+        ...track,
+        uri: downloadUrl
+      }
+    : track;
+
+  if (isStorageSaverMode(settings.storageMode, true)) {
+    await deleteLocalMusicFile(track);
+  }
+
+  const nextTracks = [savedTrack, ...currentTracks].slice(0, safeMusicTrackLimit);
   await saveTracksToCache(user.uid, nextTracks);
   return nextTracks;
 };
@@ -341,9 +398,7 @@ export const deleteUserMusicTrack = async ({
     await deleteObject(ref(firebaseStorage, track.storagePath)).catch(() => undefined);
   }
 
-  if (track.uri?.startsWith("file://")) {
-    await FileSystem.deleteAsync(track.uri, { idempotent: true });
-  }
+  await deleteLocalMusicFile(track);
 
   const nextTracks = (await getUserMusicTracks(user.uid)).filter(
     (item) => item.id !== track.id

@@ -1,5 +1,5 @@
 import { router, type Href, useLocalSearchParams } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -12,6 +12,7 @@ import {
 
 import { colors, controls, typography } from "@/constants/app-theme";
 import { useAuth } from "@/lib/auth-context";
+import { getPlanEntitlements } from "@/lib/plan-entitlements";
 import { recordBackupFailure } from "@/lib/backup-failure-queue";
 import { backupPhotoIfEnabled } from "@/lib/cloud-backup";
 import { deleteLocalFile, getPhotoById, saveCapturedPhoto } from "@/lib/photo-library";
@@ -51,6 +52,10 @@ const getRouteParam = (value?: string | string[]) => {
 
 export default function CapturePreviewScreen() {
   const { user, subscription } = useAuth();
+  const planEntitlements = useMemo(
+    () => getPlanEntitlements({ isLoggedIn: Boolean(user), subscription }),
+    [subscription, user]
+  );
   const { id, uri, width, height, ratio } = useLocalSearchParams<{
     id?: string;
     uri?: string;
@@ -115,7 +120,8 @@ export default function CapturePreviewScreen() {
         uri: draftUri,
         width: Number.isFinite(parsedWidth) ? parsedWidth : undefined,
         height: Number.isFinite(parsedHeight) ? parsedHeight : undefined,
-        ratioLabel: selectedRatio
+        ratioLabel: selectedRatio,
+        localImageLimit: planEntitlements.localImageLimit
       });
       try {
         await backupPhotoIfEnabled({

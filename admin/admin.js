@@ -58,12 +58,6 @@ let allUsers = [];
 let usersPage = 1;
 const usersPageSize = 10;
 
-const planLabels = {
-  free: "무료",
-  ad_remove: "광고 제거",
-  creator_monthly: "영상 내보내기"
-};
-
 const productMeta = {
   ad_remove: {
     cardId: "adRemoveCard",
@@ -662,7 +656,6 @@ const loadUserDetail = async () => {
 
 const saveProductSubscription = async (event) => {
   event.preventDefault();
-  event.stopImmediatePropagation();
 
   if (!currentAdmin || !currentUserDoc) return;
 
@@ -728,56 +721,6 @@ $("productSelect").addEventListener("change", (event) => {
 });
 
 $("subscriptionForm").addEventListener("submit", saveProductSubscription);
-
-$("subscriptionForm").addEventListener("submit", async (event) => {
-  event.preventDefault();
-  if (!currentAdmin || !currentUserDoc) return;
-
-  setMessage("subscriptionMessage", "저장 중입니다.");
-
-  const productId = $("productSelect").value;
-  const selectedStatus = $("productStatusSelect").value;
-  const now = new Date();
-  const expiresValue = $("productExpiresInput").value;
-  const expiresAt = expiresValue ? new Date(`${expiresValue}T23:59:59`).toISOString() : null;
-  const isFree = productId === "free";
-
-  const subscription = {
-    plan: isFree ? "free" : "premium",
-    productId,
-    status: isFree ? "inactive" : selectedStatus,
-    provider: "admin",
-    startedAt: currentSubscription?.startedAt ?? now.toISOString(),
-    expiresAt: productId === "creator_monthly" ? expiresAt : null,
-    lastPaymentAt: isFree ? null : now.toISOString(),
-    priceLabel:
-      productId === "creator_monthly" ? "월 3,900원" : productId === "ad_remove" ? "3,900원" : "무료",
-    productName: planLabels[productId] ?? "무료",
-    adminNote: $("adminNoteInput").value.trim() || null,
-    updatedBy: currentAdmin.uid,
-    updatedAt: serverTimestamp()
-  };
-
-  try {
-    await setDoc(doc(db, "users", currentUserDoc.id, "subscriptions", "current"), subscription, {
-      merge: true
-    });
-    await addDoc(collection(db, "users", currentUserDoc.id, "paymentEvents"), {
-      type: "admin_subscription_updated",
-      productId,
-      status: subscription.status,
-      provider: "admin",
-      adminUid: currentAdmin.uid,
-      adminEmail: currentAdmin.email ?? null,
-      note: subscription.adminNote,
-      createdAt: serverTimestamp()
-    });
-    setMessage("subscriptionMessage", "구독 정보를 저장했습니다.");
-    await loadUserDetail();
-  } catch (error) {
-    setMessage("subscriptionMessage", error?.message ?? "구독 저장 중 문제가 발생했습니다.");
-  }
-});
 
 $("markBackupExpiredButton").addEventListener("click", async () => {
   if (!currentUserDoc) return;

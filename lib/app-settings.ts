@@ -24,6 +24,7 @@ export type ScreenLayout = "compact" | "balanced" | "comfortable";
 export type CameraSaveScope = "app" | "device" | "both";
 export type TripClipExportFormat = "mp4" | "images";
 export type AppImageSaveFormat = "original" | "png" | "jpeg";
+export type StorageMode = "local_only" | "local_backup" | "local_saver";
 
 export const GUIDE_SIZE_MIN = 24;
 export const GUIDE_SIZE_MAX = 86;
@@ -51,6 +52,7 @@ export type AppSettings = {
   fontStyle: FontStyle;
   fontSize: FontSize;
   screenLayout: ScreenLayout;
+  storageMode: StorageMode;
   cloudBackupEnabled: boolean;
   imageBackupQuality: ImageQuality;
 };
@@ -75,6 +77,7 @@ export const defaultAppSettings: AppSettings = {
   fontStyle: "compact",
   fontSize: "medium",
   screenLayout: "compact",
+  storageMode: "local_only",
   cloudBackupEnabled: false,
   imageBackupQuality: DEFAULT_IMAGE_QUALITY
 };
@@ -87,6 +90,7 @@ const exportQualities: ExportQuality[] = ["standard", "high", "max"];
 const videoQualities = VIDEO_QUALITY_OPTIONS.map((option) => option.id);
 const tripClipExportFormats: TripClipExportFormat[] = ["mp4", "images"];
 const imageSaveFormats: AppImageSaveFormat[] = ["original", "png", "jpeg"];
+const storageModes: StorageMode[] = ["local_only", "local_backup", "local_saver"];
 const imageBackupQualities = IMAGE_QUALITY_OPTIONS.map((option) => option.value);
 const cameraRatios: PhotoRatioLabel[] = ["Original", "1:1", "3:4", "4:5", "9:16", "16:9"];
 const cameraSaveScopes: CameraSaveScope[] = ["app", "device", "both"];
@@ -122,6 +126,8 @@ const normalizeSettings = (value: Partial<AppSettings> | null): AppSettings => {
     ...defaultAppSettings,
     ...(value ?? {})
   };
+  const hasStoredStorageMode =
+    value?.storageMode !== undefined && storageModes.includes(value.storageMode);
 
   return {
     ...nextSettings,
@@ -170,10 +176,17 @@ const normalizeSettings = (value: Partial<AppSettings> | null): AppSettings => {
     screenLayout: screenLayouts.includes(nextSettings.screenLayout)
       ? nextSettings.screenLayout
       : defaultAppSettings.screenLayout,
-    cloudBackupEnabled:
+    storageMode: hasStoredStorageMode
+      ? nextSettings.storageMode
+      : nextSettings.cloudBackupEnabled ? "local_backup" : "local_only",
+    cloudBackupEnabled: hasStoredStorageMode
+      ? nextSettings.storageMode !== "local_only"
+      :
       typeof nextSettings.cloudBackupEnabled === "boolean"
         ? nextSettings.cloudBackupEnabled
-        : defaultAppSettings.cloudBackupEnabled,
+        : storageModes.includes(nextSettings.storageMode)
+          ? nextSettings.storageMode !== "local_only"
+          : defaultAppSettings.cloudBackupEnabled,
     imageBackupQuality: imageBackupQualities.includes(nextSettings.imageBackupQuality)
       ? nextSettings.imageBackupQuality
       : defaultAppSettings.imageBackupQuality

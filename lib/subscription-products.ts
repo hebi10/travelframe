@@ -2,12 +2,13 @@ import type { UserSubscription, UserSubscriptionProducts } from "@/lib/subscript
 
 export const emptySubscriptionProducts: UserSubscriptionProducts = {
   adRemove: null,
-  creatorMonthly: null
+  creatorMonthly: null,
+  expertMonthly: null
 };
 
 const isActivePremiumProduct = (
   subscription: UserSubscription | null,
-  productId: "ad_remove" | "creator_monthly"
+  productId: "ad_remove" | "creator_monthly" | "expert_monthly"
 ) => {
   if (
     !subscription ||
@@ -30,6 +31,9 @@ export const getSubscriptionProductsFromSubscription = (
 ): UserSubscriptionProducts => ({
   adRemove: isActivePremiumProduct(subscription, "ad_remove") ? subscription : null,
   creatorMonthly: isActivePremiumProduct(subscription, "creator_monthly")
+    ? subscription
+    : null,
+  expertMonthly: isActivePremiumProduct(subscription, "expert_monthly")
     ? subscription
     : null
 });

@@ -1,7 +1,7 @@
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { type Href, useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -20,6 +20,7 @@ import { colors, controls, typography } from "@/constants/app-theme";
 import { useAppAppearance } from "@/lib/app-appearance";
 import { getAppSettings } from "@/lib/app-settings";
 import { useAuth } from "@/lib/auth-context";
+import { getPlanEntitlements } from "@/lib/plan-entitlements";
 import { recordBackupFailure } from "@/lib/backup-failure-queue";
 import {
   backupPhotoIfEnabled,
@@ -90,6 +91,10 @@ export default function StudioScreen() {
   const router = useRouter();
   const { palette } = useAppAppearance();
   const { user, subscription } = useAuth();
+  const planEntitlements = useMemo(
+    () => getPlanEntitlements({ isLoggedIn: Boolean(user), subscription }),
+    [subscription, user]
+  );
   const { tab } = useLocalSearchParams<{ tab?: string }>();
   const [activeTab, setActiveTab] = useState<StudioTab>("photos");
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
@@ -231,7 +236,8 @@ export default function StudioScreen() {
         const savedPhoto = await saveCapturedPhoto({
           uri: asset.uri,
           width: asset.width,
-          height: asset.height
+          height: asset.height,
+          localImageLimit: planEntitlements.localImageLimit
         });
 
         setImportProgress({

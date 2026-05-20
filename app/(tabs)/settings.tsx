@@ -50,6 +50,7 @@ import {
   type FontSize,
   type FontStyle,
   type ScreenLayout,
+  type StorageMode,
   type TripClipExportFormat,
   type ThemeMode
 } from "@/lib/app-settings";
@@ -59,6 +60,12 @@ import {
   useAppAppearance
 } from "@/lib/app-appearance";
 import { useAuth } from "@/lib/auth-context";
+import { getPlanEntitlements } from "@/lib/plan-entitlements";
+import {
+  getEffectiveStorageMode,
+  getStorageModeLabel,
+  STORAGE_MODE_OPTIONS
+} from "@/lib/storage-mode";
 import {
   clearBackupFailure,
   getBackupFailures,
@@ -80,11 +87,22 @@ import {
   type CloudBackupOverview,
   type LocalWorkspaceSummary
 } from "@/lib/cloud-backup";
-import { formatImageBackupUsage } from "@/lib/image-backup-utils";
+import {
+  formatImageBackupSize,
+  formatImageBackupUsage
+} from "@/lib/image-backup-utils";
 import { getPhotos } from "@/lib/photo-library";
 import { getUserSubscription, isCreatorSubscriptionActive } from "@/lib/subscription";
 import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
+import {
+  getWeeklyVideoExportUsage,
+  type WeeklyVideoExportUsage
+} from "@/lib/video-export-quota";
 import { getMadeVideos } from "@/lib/video-library";
+import {
+  syncUserMusicTracks,
+  type UserMusicTrack
+} from "@/lib/user-music";
 import { getImageBundleWorks } from "@/lib/work-library";
 
 type SettingKey =
@@ -104,11 +122,22 @@ type SettingKey =
   | "fontStyle"
   | "fontSize"
   | "screenLayout"
+  | "storageMode"
   | "cloudBackupEnabled"
   | "imageBackupQuality";
 
+type UsageStats = {
+  photos: number;
+  imageBundles: number;
+  videos: number;
+};
+
 const opacityOptions = [0.2, 0.3, 0.4, 0.5, 0.6, 0.7];
 const cameraRatioOptions = ["Original", "1:1", "3:4", "4:5", "9:16", "16:9"] as const;
+const storageModeLegend =
+  "로컬 저장만 사용 / 로컬 저장 + 클라우드 백업 / 로컬 용량 절약 모드";
+const storageSaverUpgradeMessage =
+  "로컬 용량 절약 모드는 Pro 이상에서만 사용 가능합니다.";
 const cameraSaveScopeOptions: { value: CameraSaveScope; label: string; detail: string }[] = [
   { value: "app", label: "앱", detail: "앱 사진 목록에만 저장합니다." },
   { value: "device", label: "핸드폰", detail: "핸드폰 앨범에만 저장합니다." },
@@ -141,6 +170,31 @@ const emptyBackupOverview: CloudBackupOverview = {
   status: "none",
   backedUpAt: null,
   deletedAt: null
+};
+
+const emptyUsageStats: UsageStats = {
+  photos: 0,
+  imageBundles: 0,
+  videos: 0
+};
+
+const formatQuotaValue = (used: number, limit: number) => {
+  if (limit <= 0) {
+    return "사용 불가";
+  }
+
+  const safeUsed = Math.max(0, used);
+  const safeLimit = Math.max(0, limit);
+  return `${safeUsed} / ${safeLimit} · 남은 ${Math.max(0, safeLimit - safeUsed)}`;
+};
+
+const formatStorageQuotaValue = (usedBytes: number, limitBytes: number) => {
+  if (limitBytes <= 0) {
+    return "사용 불가";
+  }
+
+  const remaining = Math.max(0, limitBytes - Math.max(0, usedBytes));
+  return `${formatImageBackupSize(usedBytes)} / ${formatImageBackupSize(limitBytes)} · 남은 ${formatImageBackupSize(remaining)}`;
 };
 
 const formatBackupDateTime = (value?: string | null) => {
@@ -306,6 +360,8 @@ export default function SettingsScreen() {
   const [isAuthSubmitting, setIsAuthSubmitting] = useState(false);
   const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false);
   const [showBackupConfirm, setShowBackupConfirm] = useState(false);
+  const [backupTargetStorageMode, setBackupTargetStorageMode] =
+    useState<StorageMode>("local_backup");
   const [showDeleteRequestInfo, setShowDeleteRequestInfo] = useState(false);
   const [guideExpanded, setGuideExpanded] = useState(false);
   const [guideReplaySignal, setGuideReplaySignal] = useState(0);
@@ -316,9 +372,22 @@ export default function SettingsScreen() {
   const [backupFailures, setBackupFailures] = useState<BackupFailureRecord[]>([]);
   const [backupOverview, setBackupOverview] =
     useState<CloudBackupOverview>(emptyBackupOverview);
+  const [usageStats, setUsageStats] = useState<UsageStats>(emptyUsageStats);
+  const [musicTracks, setMusicTracks] = useState<UserMusicTrack[]>([]);
+  const [weeklyVideoExportUsage, setWeeklyVideoExportUsage] =
+    useState<WeeklyVideoExportUsage | null>(null);
   const googleWebClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
   const googleAndroidClientId = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;
   const isGoogleReady = Boolean(googleWebClientId && googleAndroidClientId);
+  const planEntitlements = useMemo(
+    () => getPlanEntitlements({ isLoggedIn, subscription }),
+    [isLoggedIn, subscription]
+  );
+  const localImageUsage = usageStats.photos + usageStats.imageBundles;
+  const effectiveStorageMode = getEffectiveStorageMode(
+    settings.storageMode,
+    planEntitlements.canBackupToCloud
+  );
 
   const refreshBackupFailures = useCallback(async () => {
     setBackupFailures(await getBackupFailures());
@@ -336,14 +405,34 @@ export default function SettingsScreen() {
       let isActive = true;
 
       const loadSettings = async () => {
-        const [storedSettings, storedBackupFailures] = await Promise.all([
+        const [
+          storedSettings,
+          storedBackupFailures,
+          storedPhotos,
+          storedImageBundles,
+          storedVideos,
+          storedMusicTracks,
+          storedWeeklyVideoExportUsage
+        ] = await Promise.all([
           getAppSettings(),
-          getBackupFailures()
+          getBackupFailures(),
+          getPhotos(),
+          getImageBundleWorks(),
+          getMadeVideos(),
+          user ? syncUserMusicTracks(user) : Promise.resolve([]),
+          getWeeklyVideoExportUsage(user, planEntitlements.weeklyVideoExportLimit)
         ]);
         await markBackupExpired({ user, subscription });
         if (isActive) {
           setSettings(storedSettings);
           setBackupFailures(storedBackupFailures);
+          setUsageStats({
+            photos: storedPhotos.length,
+            imageBundles: storedImageBundles.length,
+            videos: storedVideos.length
+          });
+          setMusicTracks(storedMusicTracks);
+          setWeeklyVideoExportUsage(storedWeeklyVideoExportUsage);
         }
       };
 
@@ -352,7 +441,7 @@ export default function SettingsScreen() {
       return () => {
         isActive = false;
       };
-    }, [subscription, user])
+    }, [planEntitlements.weeklyVideoExportLimit, subscription, user])
   );
 
   useEffect(
@@ -428,6 +517,10 @@ export default function SettingsScreen() {
       return "화면 구성";
     }
 
+    if (activeSetting === "storageMode") {
+      return "저장 방식";
+    }
+
     if (activeSetting === "cloudBackupEnabled") {
       return "클라우드 백업";
     }
@@ -459,10 +552,12 @@ export default function SettingsScreen() {
     setGuideReplaySignal((value) => value + 1);
   };
 
-  const handleEnableBackup = async () => {
+  const handleEnableBackup = async (targetStorageMode: StorageMode = "local_backup") => {
     if (isBackupSubmitting) {
       return;
     }
+
+    setBackupTargetStorageMode(targetStorageMode);
 
     if (!isLoggedIn || !user) {
       setAuthMessage("로그인 후 백업을 사용할 수 있습니다.");
@@ -478,6 +573,17 @@ export default function SettingsScreen() {
       const latestSubscription = await getUserSubscription(user);
 
       if (!isCreatorSubscriptionActive(latestSubscription)) {
+        if (targetStorageMode === "local_backup") {
+          await updateSetting({
+            storageMode: "local_backup",
+            cloudBackupEnabled: true
+          });
+          setAuthMessage(
+            "저장 방식은 로컬 저장 + 클라우드 백업으로 설정했습니다. 서버 업로드는 Pro 이상에서 자동으로 실행됩니다."
+          );
+          return;
+        }
+
         await markBackupExpired({ user, subscription: latestSubscription });
         setAuthMessage(
           "구독 기간이 만료되었거나 활성화되지 않았습니다. 백업은 사용할 수 없고 기존 백업 데이터 삭제는 설정에서 직접 요청할 수 있습니다."
@@ -546,7 +652,10 @@ export default function SettingsScreen() {
         subscription: latestSubscription,
         onProgress: setBackupProgress
       });
-      await updateSetting({ cloudBackupEnabled: true });
+      await updateSetting({
+        storageMode: backupTargetStorageMode,
+        cloudBackupEnabled: true
+      });
       setShowBackupConfirm(false);
       setAuthMessage(
         `백업을 완료했습니다. 사진 ${summary.photoCount}장, 여러 사진 작업 ${summary.imageBundleCount}개, 영상 ${summary.videoCount}개와 설정을 저장했습니다.`
@@ -584,7 +693,10 @@ export default function SettingsScreen() {
       setIsBackupSubmitting(true);
       setAuthMessage(null);
       const summary = await restoreCloudBackupToLocal({ user });
-      await updateSetting({ cloudBackupEnabled: true });
+      await updateSetting({
+        storageMode: "local_backup",
+        cloudBackupEnabled: true
+      });
       setAuthMessage(
         `클라우드 백업을 불러왔습니다. 사진 ${summary.photoCount}장, 여러 사진 작업 ${summary.imageBundleCount}개, 영상 ${summary.videoCount}개를 현재 기기 목록에 반영했습니다.`
       );
@@ -736,7 +848,10 @@ export default function SettingsScreen() {
             try {
               setIsBackupSubmitting(true);
               const summary = await deleteCloudBackupData({ user });
-              await updateSetting({ cloudBackupEnabled: false });
+              await updateSetting({
+                storageMode: "local_only",
+                cloudBackupEnabled: false
+              });
               setShowBackupConfirm(false);
               setActiveSetting(null);
               setAuthMessage(
@@ -1018,10 +1133,10 @@ export default function SettingsScreen() {
             {isFirebaseReady && isLoggedIn ? (
               <View style={styles.loggedInActions}>
                 <ActionRow
-                  label="클라우드 백업"
-                  detail="켜면 저장한 영상과 여러 사진 작업을 계정에 백업합니다."
-                  mark={settings.cloudBackupEnabled ? "켜짐" : "꺼짐"}
-                  onPress={() => setActiveSetting("cloudBackupEnabled")}
+                  label="저장 방식"
+                  detail={storageModeLegend}
+                  mark={getStorageModeLabel(effectiveStorageMode)}
+                  onPress={() => setActiveSetting("storageMode")}
                 />
                 <View style={[styles.backupStatusPanel, themed.border]}>
                   <Text selectable style={[styles.backupStatusTitle, themed.text]}>
@@ -1084,6 +1199,40 @@ export default function SettingsScreen() {
                 {authMessage}
               </Text>
             ) : null}
+          </View>
+        </SectionBlock>
+
+        <SectionBlock title="플랜 한도">
+          <View style={[styles.backupStatusPanel, themed.border]}>
+            <Text selectable style={[styles.backupStatusTitle, themed.text]}>
+              현재 플랜: {planEntitlements.label}
+            </Text>
+            <Text selectable style={[styles.backupStatusDetail, themed.mutedText]}>
+              영상 출력:{" "}
+              {formatQuotaValue(
+                weeklyVideoExportUsage?.count ?? 0,
+                planEntitlements.weeklyVideoExportLimit
+              )}
+            </Text>
+            <Text selectable style={[styles.backupStatusDetail, themed.mutedText]}>
+              이미지 보관함:{" "}
+              {formatQuotaValue(localImageUsage, planEntitlements.localImageLimit)}
+            </Text>
+            <Text selectable style={[styles.backupStatusDetail, themed.mutedText]}>
+              영상 보관함:{" "}
+              {formatQuotaValue(usageStats.videos, planEntitlements.localVideoLimit)}
+            </Text>
+            <Text selectable style={[styles.backupStatusDetail, themed.mutedText]}>
+              음악 보관함:{" "}
+              {formatQuotaValue(musicTracks.length, planEntitlements.musicTrackLimit)}
+            </Text>
+            <Text selectable style={[styles.backupStatusDetail, themed.mutedText]}>
+              서버 백업:{" "}
+              {formatStorageQuotaValue(
+                backupOverview.imageBackupBytes,
+                planEntitlements.backupStorageBytes
+              )}
+            </Text>
           </View>
         </SectionBlock>
 
@@ -1739,11 +1888,14 @@ export default function SettingsScreen() {
                   ))
                 : null}
 
-              {activeSetting === "cloudBackupEnabled" ? (
+              {activeSetting === "storageMode" ? (
                 <>
                   <View style={[styles.backupStatusPanel, themed.border]}>
                     <Text selectable style={[styles.backupStatusTitle, themed.text]}>
-                      현재 백업
+                      현재 저장 방식
+                    </Text>
+                    <Text selectable style={[styles.backupStatusDetail, themed.mutedText]}>
+                      {getStorageModeLabel(effectiveStorageMode)}
                     </Text>
                     <Text selectable style={[styles.backupStatusDetail, themed.mutedText]}>
                       사진 {backupOverview.photoCount}장 / 여러 사진 작업{" "}
@@ -1771,20 +1923,38 @@ export default function SettingsScreen() {
                       </Pressable>
                     ) : null}
                   </View>
-                  <OptionButton
-                    label="켜짐"
-                    detail="저장한 영상과 여러 사진 작업을 Firebase에 백업합니다."
-                    active={settings.cloudBackupEnabled}
-                    disabled={isBackupSubmitting}
-                    onPress={handleEnableBackup}
-                  />
-                  <OptionButton
-                    label="꺼짐"
-                    detail="사진과 영상은 기기 안에만 저장합니다."
-                    active={!settings.cloudBackupEnabled}
-                    disabled={isBackupSubmitting}
-                    onPress={() => updateSetting({ cloudBackupEnabled: false })}
-                  />
+                  {STORAGE_MODE_OPTIONS.map((option) => {
+                    const isSaverOption = option.value === "local_saver";
+                    const isDisabled =
+                      isBackupSubmitting ||
+                      (isSaverOption && !planEntitlements.canBackupToCloud);
+                    const detail =
+                      isSaverOption && !planEntitlements.canBackupToCloud
+                        ? storageSaverUpgradeMessage
+                        : option.detail;
+                    const onPress = () => {
+                      if (option.value === "local_only") {
+                        void updateSetting({
+                          storageMode: "local_only",
+                          cloudBackupEnabled: false
+                        });
+                        return;
+                      }
+
+                      void handleEnableBackup(option.value);
+                    };
+
+                    return (
+                      <OptionButton
+                        key={option.value}
+                        label={option.label}
+                        detail={detail}
+                        active={settings.storageMode === option.value}
+                        disabled={isDisabled}
+                        onPress={onPress}
+                      />
+                    );
+                  })}
                   <Pressable
                     disabled={isBackupSubmitting}
                     style={[

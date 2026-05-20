@@ -2,6 +2,7 @@ import * as FileSystem from "expo-file-system/legacy";
 import { manipulateAsync, SaveFormat, type Action } from "expo-image-manipulator";
 
 import { localStorageAdapter } from "@/lib/local-storage";
+import { assertLocalLibraryCapacity } from "@/lib/local-library-limit";
 import { optimizeImageForStorage } from "@/lib/image-backup-utils";
 import type {
   PhotoEditTransform,
@@ -262,7 +263,8 @@ export const getPhotos = async () => {
 
 export const getPhotoById = async (id: string) => {
   const photos = await getPhotos();
-  return photos.find((photo) => photo.id === id) ?? null;
+  const photo = photos.find((item) => item.id === id) ?? null;
+  return photo ? restorePhotoOriginalIfNeeded(photo) : null;
 };
 
 export const getRecentPhoto = async () => {
@@ -294,7 +296,76 @@ export const deleteLocalFile = async (uri?: string | null) => {
     return;
   }
 
+  if (isRemoteUri(uri)) {
+    return;
+  }
+
   await FileSystem.deleteAsync(uri, { idempotent: true });
+};
+
+const isRemoteUri = (uri?: string | null) =>
+  typeof uri === "string" && /^https?:\/\//i.test(uri);
+
+export const restorePhotoOriginalIfNeeded = async (photo: PhotoItem) => {
+  if (photo.localFileStatus !== "cloud_only") {
+    return photo;
+  }
+
+  const sourceUri = photo.downloadURL ?? (isRemoteUri(photo.uri) ? photo.uri : null);
+  if (!sourceUri) {
+    return photo;
+  }
+
+  const directory = await ensurePhotoDirectory();
+  const destinationUri = `${directory}${photo.id}-restored.jpg`;
+  const result = await FileSystem.downloadAsync(sourceUri, destinationUri);
+  const photos = await getPhotos();
+  const restoredPhoto: PhotoItem = {
+    ...photo,
+    uri: result.uri,
+    localUri: result.uri,
+    localFileStatus: "available",
+    backupStatus: photo.backupStatus ?? "restored"
+  };
+
+  await writePhotos(
+    photos.map((item) => (item.id === photo.id ? restoredPhoto : item))
+  );
+  return restoredPhoto;
+};
+
+export const markPhotoCloudOnly = async (
+  id: string,
+  backup: Partial<PhotoItem> | null
+) => {
+  const photos = await getPhotos();
+  const photo = photos.find((item) => item.id === id);
+  const downloadURL = backup?.downloadURL ?? (isRemoteUri(backup?.uri) ? backup?.uri : undefined);
+
+  if (!photo || !downloadURL) {
+    return photo ?? null;
+  }
+
+  const originalUri = photo.uri;
+  const nextPhoto: PhotoItem = {
+    ...photo,
+    storagePath: backup?.storagePath ?? photo.storagePath,
+    downloadURL,
+    localUri: photo.localUri ?? originalUri,
+    localPreviewUri: photo.localPreviewUri ?? photo.previewUri,
+    localFileStatus: "cloud_only",
+    backupStatus: "backed_up",
+    uri: downloadURL,
+    previewUri: photo.previewUri ?? backup?.previewUri
+  };
+
+  await writePhotos(photos.map((item) => (item.id === id ? nextPhoto : item)));
+
+  if (!isRemoteUri(originalUri) && originalUri !== photo.previewUri) {
+    await deleteLocalFile(originalUri);
+  }
+
+  return nextPhoto;
 };
 
 const renderCapturedPhotoForSave = async ({
@@ -364,8 +435,15 @@ export const saveCapturedPhoto = async ({
   uri,
   width,
   height,
-  ratioLabel = "Original"
+  ratioLabel = "Original",
+  localImageLimit
 }: SaveCapturedPhotoInput) => {
+  const photos = await getPhotos();
+  assertLocalLibraryCapacity({
+    currentCount: photos.length,
+    limit: localImageLimit,
+    label: "이미지"
+  });
   const id = createPhotoId();
   const shouldApplyRatio = ratioLabel !== "Original";
   const extension = "jpg";
@@ -424,7 +502,6 @@ export const saveCapturedPhoto = async ({
       originalSize: prepared.originalSize
     };
 
-    const photos = await getPhotos();
     await writePhotos([photo, ...photos]);
     return photo;
   } finally {
@@ -442,12 +519,20 @@ export const saveEditedPhoto = async ({
   transform,
   renderedUri,
   renderedWidth,
-  renderedHeight
+  renderedHeight,
+  localImageLimit
 }: SaveEditedPhotoInput) => {
   const photos = await getPhotos();
   const existingPhoto = targetPhotoId
     ? photos.find((photo) => photo.id === targetPhotoId)
     : null;
+  if (!existingPhoto) {
+    assertLocalLibraryCapacity({
+      currentCount: photos.length,
+      limit: localImageLimit,
+      label: "이미지"
+    });
+  }
   const id = targetPhotoId ?? createPhotoId();
   const directory = await ensurePhotoDirectory();
   const destinationUri = `${directory}${id}-edited.jpg`;

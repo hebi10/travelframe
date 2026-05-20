@@ -6,7 +6,8 @@ const {
   normalizeBackupUsage,
   reserveBackupUsage,
   releaseReservedBackupUsage,
-  completeReservedBackupUsage
+  completeReservedBackupUsage,
+  buildBackupSessionStoragePath
 } = require("./backup-quota");
 
 admin.initializeApp();
@@ -67,7 +68,7 @@ const getMusicSessionRef = (uid, sessionId) =>
   db.doc(`users/${uid}/musicUploadSessions/${sessionId}`);
 const BACKUP_UPLOAD_SESSION_TTL_MS = 15 * 60 * 1000;
 
-const MAX_USER_MUSIC_TRACKS = 3;
+const MAX_USER_MUSIC_TRACKS = 10;
 const MUSIC_UPLOAD_SESSION_TTL_MS = 15 * 60 * 1000;
 
 const assertMusicUploadAllowed = ({ uid, trackId, name, fileSize, contentType, storagePath }) => {
@@ -119,6 +120,34 @@ const deleteStoragePath = async (storagePath) => {
   });
 };
 
+const deleteBackupSessionStorageObject = async ({ storagePath, backupSessionId }) => {
+  if (typeof storagePath !== "string" || !storagePath || typeof backupSessionId !== "string") {
+    return;
+  }
+
+  const file = bucket.file(storagePath);
+  let metadata;
+  try {
+    [metadata] = await file.getMetadata();
+  } catch (error) {
+    if (error?.code === 404) {
+      return;
+    }
+
+    throw error;
+  }
+
+  if (metadata.metadata?.backupSessionId !== backupSessionId) {
+    return;
+  }
+
+  await file.delete().catch((error) => {
+    if (error?.code !== 404) {
+      throw error;
+    }
+  });
+};
+
 const failBackupUploadSession = async ({ uid, sessionRef, reason, objectGeneration = null }) => {
   let sessionToDelete = null;
 
@@ -154,11 +183,14 @@ const failBackupUploadSession = async ({ uid, sessionRef, reason, objectGenerati
       objectGeneration
     });
 
-    sessionToDelete = session;
+    sessionToDelete = { ...session, backupSessionId: sessionSnapshot.id };
   });
 
   if (sessionToDelete) {
-    await deleteStoragePath(sessionToDelete.storagePath);
+    await deleteBackupSessionStorageObject({
+      storagePath: sessionToDelete.storagePath,
+      backupSessionId: sessionToDelete.backupSessionId
+    });
   }
 };
 
@@ -192,6 +224,11 @@ exports.reserveBackupUpload = onCall(async (request) => {
     await cleanupExpiredBackupUploadSessions(uid);
     const usageRef = getUsageRef(uid);
     const sessionRef = db.collection(`users/${uid}/backupUploadSessions`).doc();
+    const reservedStoragePath = buildBackupSessionStoragePath({
+      uid,
+      sessionId: sessionRef.id,
+      storagePath
+    });
 
     await db.runTransaction(async (transaction) => {
       const usageSnapshot = await transaction.get(usageRef);
@@ -204,7 +241,7 @@ exports.reserveBackupUpload = onCall(async (request) => {
         mediaKind,
         fileSize,
         contentType,
-        storagePath
+        storagePath: reservedStoragePath
       });
 
       const delta = getBackupUsageDelta({ mediaKind, fileSize });
@@ -214,7 +251,7 @@ exports.reserveBackupUpload = onCall(async (request) => {
         mediaKind,
         fileSize,
         contentType,
-        storagePath,
+        storagePath: reservedStoragePath,
         usageDelta: delta,
         status: "reserved",
         createdAt: FieldValue.serverTimestamp(),
@@ -233,7 +270,7 @@ exports.reserveBackupUpload = onCall(async (request) => {
 
     return {
       backupSessionId: sessionRef.id,
-      storagePath,
+      storagePath: reservedStoragePath,
       expiresInSeconds: BACKUP_UPLOAD_SESSION_TTL_MS / 1000
     };
   } catch (error) {
@@ -393,7 +430,10 @@ exports.releaseBackupUpload = onCall(async (request) => {
     const sessionSnapshot = await sessionRef.get();
     const session = sessionSnapshot.data();
     if (session?.status === "released" || session?.status === "failed") {
-      await deleteStoragePath(session.storagePath);
+      await deleteBackupSessionStorageObject({
+        storagePath: session.storagePath,
+        backupSessionId
+      });
     }
 
     return { released: true };

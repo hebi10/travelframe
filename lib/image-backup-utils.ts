@@ -179,4 +179,4 @@ export const formatImageBackupSize = (bytes: number) => {
 };
 
 export const formatImageBackupUsage = (bytes: number) =>
-  `이미지 백업 용량 ${formatImageBackupSize(bytes)} / 1GB`;
+  `서버 백업 용량 ${formatImageBackupSize(bytes)} / 2GB`;

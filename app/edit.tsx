@@ -1,6 +1,6 @@
 import * as ImagePicker from "expo-image-picker";
 import { router, type Href, useFocusEffect, useLocalSearchParams } from "expo-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -35,6 +35,7 @@ import {
   updateAppSettings
 } from "@/lib/app-settings";
 import { useAuth } from "@/lib/auth-context";
+import { getPlanEntitlements } from "@/lib/plan-entitlements";
 import { recordBackupFailure } from "@/lib/backup-failure-queue";
 import { backupPhotoIfEnabled } from "@/lib/cloud-backup";
 import { getPhotoById, saveEditedPhoto } from "@/lib/photo-library";
@@ -91,6 +92,10 @@ const getDraftSourceKey = (draft: Pick<PhotoEditDraft, "sourceUri" | "sourcePhot
 
 export default function EditScreen() {
   const { user, subscription } = useAuth();
+  const planEntitlements = useMemo(
+    () => getPlanEntitlements({ isLoggedIn: Boolean(user), subscription }),
+    [subscription, user]
+  );
   const { photoId } = useLocalSearchParams<{ photoId?: string }>();
   const canvasRef = useRef<EditablePhotoCanvasHandle>(null);
   const insets = useSafeAreaInsets();
@@ -390,7 +395,8 @@ export default function EditScreen() {
         replaceCreatedAt: mode === "overwrite" ? sourcePhoto?.createdAt : undefined,
         width: source.width,
         height: source.height,
-        transform
+        transform,
+        localImageLimit: planEntitlements.localImageLimit
       });
       try {
         await backupPhotoIfEnabled({

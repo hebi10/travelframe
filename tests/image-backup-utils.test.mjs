@@ -49,7 +49,7 @@ assert.equal(utilsModule.calculateCombinedImageBackupSize(100, [20, 30]), 150);
 assert.equal(utilsModule.isImageBackupSizeExceeded(1024 * 1024 * 1024), false);
 assert.equal(utilsModule.isImageBackupSizeExceeded(1024 * 1024 * 1024 + 1), true);
 assert.equal(utilsModule.formatImageBackupSize(384 * 1024 * 1024), "384MB");
-assert.equal(utilsModule.formatImageBackupUsage(384 * 1024 * 1024), "이미지 백업 용량 384MB / 1GB");
+assert.equal(utilsModule.formatImageBackupUsage(384 * 1024 * 1024), "서버 백업 용량 384MB / 2GB");
 assert.deepEqual(
   utilsModule.getImageResizeAction({ width: 4000, height: 2000, maxLongSide: 1920 }),
   { resize: { width: 1920, height: 960 } }

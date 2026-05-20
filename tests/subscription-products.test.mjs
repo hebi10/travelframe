@@ -32,6 +32,7 @@ const adProducts = getSubscriptionProductsFromSubscription({
 });
 assert.equal(adProducts.adRemove?.productId, "ad_remove");
 assert.equal(adProducts.creatorMonthly, null);
+assert.equal(adProducts.expertMonthly, null);
 
 const creatorProducts = getSubscriptionProductsFromSubscription({
   ...baseSubscription,
@@ -41,6 +42,18 @@ const creatorProducts = getSubscriptionProductsFromSubscription({
 });
 assert.equal(creatorProducts.adRemove, null);
 assert.equal(creatorProducts.creatorMonthly?.productId, "creator_monthly");
+assert.equal(creatorProducts.expertMonthly, null);
+
+const expertProducts = getSubscriptionProductsFromSubscription({
+  ...baseSubscription,
+  productId: "expert_monthly",
+  expiresAt: "2999-01-01T00:00:00.000Z",
+  priceLabel: "9,900원",
+  productName: "전문가"
+});
+assert.equal(expertProducts.adRemove, null);
+assert.equal(expertProducts.creatorMonthly, null);
+assert.equal(expertProducts.expertMonthly?.productId, "expert_monthly");
 
 const expiredCreatorProducts = getSubscriptionProductsFromSubscription({
   ...baseSubscription,
@@ -50,5 +63,6 @@ const expiredCreatorProducts = getSubscriptionProductsFromSubscription({
 });
 assert.equal(expiredCreatorProducts.adRemove, null);
 assert.equal(expiredCreatorProducts.creatorMonthly, null);
+assert.equal(expiredCreatorProducts.expertMonthly, null);
 
 console.log("ok - subscription products can be derived from active subscription");

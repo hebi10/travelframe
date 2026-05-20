@@ -11,9 +11,11 @@ const requiredCopy = [
   {
     file: "app/(tabs)/account.tsx",
     snippets: [
-      'title: "구독"',
-      "구독하면 영상 저장, 클라우드 백업, 광고 제거를 함께 사용할 수 있습니다.",
+      'title: "Pro"',
+      "Pro는 주 15회 영상 출력, 워터마크 제거, 클라우드 백업, 광고 제거를 함께 제공합니다.",
       "구독 기간 동안 앱 전반의 광고 제거",
+      "영상 출력 주 15회",
+      "서버 백업 총 2GB",
       '"구독 포함"',
       '"확인 중..."',
       '"준비 중"',
@@ -66,4 +68,4 @@ for (const requirement of requiredCopy) {
   }
 }
 
-console.log("ok - subscription copy describes ad removal benefit");
+console.log("ok - subscription copy describes Pro plan benefits and ad removal");

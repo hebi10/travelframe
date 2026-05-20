@@ -11,6 +11,8 @@ import {
 import { firestore } from "@/lib/firebase";
 
 export const FREE_WEEKLY_VIDEO_EXPORT_LIMIT = 1;
+export const PRO_WEEKLY_VIDEO_EXPORT_LIMIT = 15;
+export const EXPERT_WEEKLY_VIDEO_EXPORT_LIMIT = 30;
 
 export type WeeklyVideoExportUsage = {
   weekId: string;
@@ -58,8 +60,40 @@ const getWeeklyUsageRef = (user: User, weekId: string) => {
   return doc(firestore, "users", user.uid, "usage", "videoExports", "weeks", weekId);
 };
 
+export const buildWeeklyVideoExportUsage = ({
+  weekId,
+  weekLabel,
+  count,
+  limit
+}: {
+  weekId: string;
+  weekLabel: string;
+  count: number;
+  limit: number;
+}): WeeklyVideoExportUsage => {
+  const safeCount = Math.max(0, Number(count) || 0);
+  const safeLimit = Math.max(0, Number(limit) || 0);
+
+  return {
+    weekId,
+    weekLabel,
+    count: safeCount,
+    limit: safeLimit,
+    remaining: Math.max(0, safeLimit - safeCount)
+  };
+};
+
+export const canReserveWeeklyVideoExport = ({
+  count,
+  limit
+}: {
+  count: number;
+  limit: number;
+}) => Math.max(0, Number(limit) || 0) > 0 && Math.max(0, Number(count) || 0) < limit;
+
 export const getWeeklyVideoExportUsage = async (
-  user: User | null
+  user: User | null,
+  limit = FREE_WEEKLY_VIDEO_EXPORT_LIMIT
 ): Promise<WeeklyVideoExportUsage | null> => {
   if (!user) {
     return null;
@@ -71,16 +105,18 @@ export const getWeeklyVideoExportUsage = async (
     ? Math.max(0, Number(snapshot.data().count ?? 0))
     : 0;
 
-  return {
+  return buildWeeklyVideoExportUsage({
     weekId,
     weekLabel,
     count,
-    limit: FREE_WEEKLY_VIDEO_EXPORT_LIMIT,
-    remaining: Math.max(0, FREE_WEEKLY_VIDEO_EXPORT_LIMIT - count)
-  };
+    limit
+  });
 };
 
-export const reserveWeeklyVideoExport = async (user: User) => {
+export const reserveWeeklyVideoExport = async (
+  user: User,
+  limit = FREE_WEEKLY_VIDEO_EXPORT_LIMIT
+) => {
   const { weekId, weekLabel } = getCurrentVideoExportWeek();
   const usageRef = getWeeklyUsageRef(user, weekId);
 
@@ -90,9 +126,9 @@ export const reserveWeeklyVideoExport = async (user: User) => {
       ? Math.max(0, Number(snapshot.data().count ?? 0))
       : 0;
 
-    if (currentCount >= FREE_WEEKLY_VIDEO_EXPORT_LIMIT) {
+    if (!canReserveWeeklyVideoExport({ count: currentCount, limit })) {
       throw new Error(
-        `무료 사용자는 이번 주에 MP4 영상을 ${FREE_WEEKLY_VIDEO_EXPORT_LIMIT}개까지 만들 수 있습니다. 다음 주에 다시 만들거나 구독을 이용해 주세요.`
+        `이번 주에 MP4 영상을 ${limit}개까지 만들 수 있습니다. 다음 주에 다시 만들거나 플랜을 확인해 주세요.`
       );
     }
 
@@ -103,7 +139,7 @@ export const reserveWeeklyVideoExport = async (user: User) => {
         weekId,
         weekLabel,
         count: currentCount + 1,
-        limit: FREE_WEEKLY_VIDEO_EXPORT_LIMIT,
+        limit,
         updatedAt: serverTimestamp(),
         createdAt: snapshot.exists() ? snapshot.data().createdAt ?? serverTimestamp() : serverTimestamp()
       },
