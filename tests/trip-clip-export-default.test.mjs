@@ -1,7 +1,10 @@
-import assert from "node:assert/strict";
+﻿import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-const source = readFileSync("app/trip-clip.tsx", "utf8");
+const source = [
+  readFileSync("app/(tabs)/trip-clip.tsx", "utf8"),
+  readFileSync("features/trip-clip/trip-clip-screen.constants.ts", "utf8")
+].join("\n");
 
 assert.match(
   source,

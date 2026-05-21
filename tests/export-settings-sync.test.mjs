@@ -1,10 +1,10 @@
-import assert from "node:assert/strict";
+﻿import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const appSettingsSource = fs.readFileSync("lib/app-settings.ts", "utf8");
 const settingsSource = fs.readFileSync("app/(tabs)/settings.tsx", "utf8");
 const cameraSource = fs.readFileSync("app/(tabs)/camera.tsx", "utf8");
-const tripClipSource = fs.readFileSync("app/trip-clip.tsx", "utf8");
+const tripClipSource = fs.readFileSync("app/(tabs)/trip-clip.tsx", "utf8");
 
 for (const snippet of [
   "videoQuality: VideoQualityId",

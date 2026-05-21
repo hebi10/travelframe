@@ -9,7 +9,7 @@ assert.ok(
 );
 
 assert.ok(
-  source.includes("shutterSound: false"),
+  source.includes("enableShutterSound: false"),
   "camera capture should always request silent Android native capture"
 );
 

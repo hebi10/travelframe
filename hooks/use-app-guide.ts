@@ -21,7 +21,7 @@ export function useAppGuide(tabKey: AppGuideTabKey, replaySignal = 0) {
       let isActive = true;
 
       const loadGuide = async () => {
-        if (tabKey !== "home") {
+        if (tabKey !== "camera") {
           return;
         }
 

@@ -1,4 +1,3 @@
-import type { CameraType } from "expo-camera";
 import type { GuideType } from "@/constants/camera-guides";
 import {
   DEFAULT_IMAGE_QUALITY,
@@ -23,6 +22,7 @@ export type FontStyle = "standard" | "compact" | "bold";
 export type FontSize = "small" | "medium" | "large";
 export type ScreenLayout = "compact" | "balanced" | "comfortable";
 export type CameraSaveScope = "app" | "device" | "both";
+export type CameraFacing = "back" | "front";
 export type TripClipExportFormat = "mp4" | "images";
 export type AppImageSaveFormat = "original" | "png" | "jpeg";
 export type StorageMode = "local_only" | "local_backup" | "local_saver";
@@ -46,7 +46,7 @@ export type AppSettings = {
   overlayOpacity: number;
   cameraZoomPercent: number;
   cameraTorchEnabled: boolean;
-  cameraFacing: CameraType;
+  cameraFacing: CameraFacing;
   cameraRatio: PhotoRatioLabel;
   cameraSaveScope: CameraSaveScope;
   defaultRatio: TripClipRatio;
@@ -112,7 +112,7 @@ const storageModes: StorageMode[] = ["local_only", "local_backup", "local_saver"
 const imageBackupQualities = IMAGE_QUALITY_OPTIONS.map((option) => option.value);
 const cameraRatios: PhotoRatioLabel[] = ["Original", "1:1", "3:4", "4:5", "9:16", "16:9"];
 const cameraSaveScopes: CameraSaveScope[] = ["app", "device", "both"];
-const cameraFacings: CameraType[] = ["back", "front"];
+const cameraFacings: CameraFacing[] = ["back", "front"];
 const tripClipRatios: TripClipRatio[] = ["9:16", "4:5", "1:1", "16:9", "3:4"];
 const cloudBackupTargetKeys: CloudBackupTarget[] = [
   "photos",

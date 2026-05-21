@@ -1,8 +1,8 @@
-import assert from "node:assert/strict";
+﻿import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const editSource = fs.readFileSync("app/edit.tsx", "utf8");
-const tripClipSource = fs.readFileSync("app/trip-clip.tsx", "utf8");
+const tripClipSource = fs.readFileSync("app/(tabs)/trip-clip.tsx", "utf8");
 const viewRecorderNativeSource = fs.readFileSync(
   "node_modules/react-native-view-recorder/android/src/main/java/com/reactnativeviewrecorder/ViewRecorderModule.kt",
   "utf8"

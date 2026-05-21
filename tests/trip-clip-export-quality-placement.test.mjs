@@ -1,7 +1,7 @@
-import assert from "node:assert/strict";
+﻿import assert from "node:assert/strict";
 import fs from "node:fs";
 
-const tripClipSource = fs.readFileSync("app/trip-clip.tsx", "utf8");
+const tripClipSource = fs.readFileSync("app/(tabs)/trip-clip.tsx", "utf8");
 const exportSource = fs.readFileSync("lib/trip-clip-export.ts", "utf8");
 
 const videoTabStart = tripClipSource.indexOf('{activeEditorTab === "video"');

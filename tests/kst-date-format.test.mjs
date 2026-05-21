@@ -3,8 +3,6 @@ import fs from "node:fs";
 
 const files = [
   "app/(tabs)/studio.tsx",
-  "app/(tabs)/account.tsx",
-  "app/(tabs)/settings.tsx",
   "app/photo/[id].tsx",
   "app/video/[id].tsx",
   "app/edit.tsx",
@@ -16,6 +14,19 @@ for (const file of files) {
   assert.ok(
     source.includes('timeZone: "Asia/Seoul"'),
     `${file} should format visible app dates in Korean time`
+  );
+}
+
+for (const [screenFile, helperFile] of [
+  ["app/(tabs)/account.tsx", "features/account/account-screen.helpers.ts"],
+  ["app/(tabs)/settings.tsx", "features/settings/settings-screen.helpers.ts"]
+]) {
+  const source = [screenFile, helperFile]
+    .map((file) => fs.readFileSync(file, "utf8"))
+    .join("\n");
+  assert.ok(
+    source.includes('timeZone: "Asia/Seoul"'),
+    `${screenFile} should format visible app dates in Korean time`
   );
 }
 

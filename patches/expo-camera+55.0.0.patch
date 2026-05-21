@@ -58,6 +58,18 @@ index 7e50b98..a4d26a2 100644
 +        return@AsyncFunction view.getAvailableLenses()
 +      }
 +
++      AsyncFunction("focusAtPoint") { view: ExpoCameraView, x: Float, y: Float, locked: Boolean ->
++        view.focusAtPoint(x, y, locked)
++      }
++
++      AsyncFunction("setFocusLocked") { view: ExpoCameraView, locked: Boolean ->
++        view.focusLocked = locked
++      }
++
++      AsyncFunction("setExposureBias") { view: ExpoCameraView, exposureBias: Float ->
++        view.exposureBias = exposureBias
++      }
++
        AsyncFunction("record") { view: ExpoCameraView, options: RecordingOptions, promise: Promise ->
          if (!view.mute && !permissionsManager.hasGrantedPermissions(Manifest.permission.RECORD_AUDIO)) {
            throw Exceptions.MissingPermissions(Manifest.permission.RECORD_AUDIO)
@@ -128,6 +140,15 @@ index 1ff8116..ab330a2 100644
 +      field = value
 +      setCameraExposureBias(value)
 +    }
++
++  fun focusAtPoint(pointX: Float, pointY: Float, locked: Boolean) {
++    val nextPoint = CameraFocusPoint(
++      pointX.coerceIn(0f, 1f),
++      pointY.coerceIn(0f, 1f)
++    )
++    focusPoint = nextPoint
++    focusLocked = locked
++  }
 +
   var videoQuality: VideoQuality = VideoQuality.VIDEO1080P
     set(value) {
@@ -309,5 +330,55 @@ index 8ff7a92..16a60dc 100644
 +     */
 +    exposureBias?: number;
      /**
-      * Used to select image or video output.
-      * @default 'picture'
+     * Used to select image or video output.
+     * @default 'picture'
+@@ -480,6 +494,9 @@ export interface CameraViewRef {
+     readonly takePictureRef?: (options: CameraPictureOptions) => Promise<PictureRef>;
+     readonly getAvailablePictureSizes: () => Promise<string[]>;
+     readonly getAvailableLenses: () => Promise<string[]>;
++    readonly focusAtPoint: (x: number, y: number, locked: boolean) => Promise<void>;
++    readonly setFocusLocked: (locked: boolean) => Promise<void>;
++    readonly setExposureBias: (exposureBias: number) => Promise<void>;
+     readonly record: (options?: CameraRecordingOptions) => Promise<{
+         uri: string;
+     }>;
+diff --git a/node_modules/expo-camera/build/CameraView.js b/node_modules/expo-camera/build/CameraView.js
+index 5c0e88e..2ee87a1 100644
+--- a/node_modules/expo-camera/build/CameraView.js
++++ b/node_modules/expo-camera/build/CameraView.js
+@@ -88,6 +88,15 @@ export default class CameraView extends Component {
+     async getAvailableLensesAsync() {
+         return (await this._cameraRef.current?.getAvailableLenses()) ?? [];
+     }
++    async focusAtPointAsync(point, locked = false) {
++        return this._cameraRef.current?.focusAtPoint(point.x, point.y, locked);
++    }
++    async setFocusLockedAsync(locked) {
++        return this._cameraRef.current?.setFocusLocked(locked);
++    }
++    async setExposureBiasAsync(exposureBias) {
++        return this._cameraRef.current?.setExposureBias(exposureBias);
++    }
+     /**
+      * Returns an object with the supported features of the camera on the current device.
+      */
+diff --git a/node_modules/expo-camera/build/CameraView.d.ts b/node_modules/expo-camera/build/CameraView.d.ts
+index d11fdb9..cf3df4d 100644
+--- a/node_modules/expo-camera/build/CameraView.d.ts
++++ b/node_modules/expo-camera/build/CameraView.d.ts
+@@ -1,6 +1,6 @@
+ import { type EventSubscription } from 'expo-modules-core';
+ import { type Ref, Component } from 'react';
+-import { CameraCapturedPicture, CameraOrientation, CameraPictureOptions, CameraViewProps, CameraRecordingOptions, CameraViewRef, ScanningOptions, ScanningResult, VideoCodec, AvailableLenses } from './Camera.types';
++import { CameraCapturedPicture, CameraOrientation, CameraPictureOptions, CameraViewProps, CameraRecordingOptions, CameraViewRef, CameraFocusPoint, ScanningOptions, ScanningResult, VideoCodec, AvailableLenses } from './Camera.types';
+ import { PictureRef } from './PictureRef';
+ export default class CameraView extends Component<CameraViewProps> {
+@@ -35,6 +35,9 @@ export default class CameraView extends Component<CameraViewProps> {
+      * @platform ios
+      */
+     getAvailableLensesAsync(): Promise<string[]>;
++    focusAtPointAsync(point: CameraFocusPoint, locked?: boolean): Promise<void>;
++    setFocusLockedAsync(locked: boolean): Promise<void>;
++    setExposureBiasAsync(exposureBias: number): Promise<void>;
+     /**
+      * Returns an object with the supported features of the camera on the current device.

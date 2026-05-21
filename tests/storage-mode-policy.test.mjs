@@ -10,7 +10,7 @@ const workLibrarySource = fs.readFileSync("lib/work-library.ts", "utf8");
 const userMusicSource = fs.readFileSync("lib/user-music.ts", "utf8");
 const settingsSource = fs.readFileSync("app/(tabs)/settings.tsx", "utf8");
 const accountSource = fs.readFileSync("app/(tabs)/account.tsx", "utf8");
-const tripClipSource = fs.readFileSync("app/trip-clip.tsx", "utf8");
+const tripClipSource = fs.readFileSync("app/(tabs)/trip-clip.tsx", "utf8");
 
 for (const snippet of [
   'export type StorageMode = "local_only" | "local_backup" | "local_saver"',
@@ -73,19 +73,23 @@ assert.ok(
   "photo library should not try to delete remote backup URLs as local files"
 );
 
-for (const [name, source] of [
-  ["settings", settingsSource],
-  ["account", accountSource]
+for (const snippet of [
+  "저장 방식",
+  "로컬 저장만 사용",
+  "로컬 저장 + 클라우드 백업",
+  "로컬 용량 절약 모드",
+  "getEffectiveStorageMode",
+  "STORAGE_MODE_OPTIONS"
 ]) {
-  for (const snippet of [
-    "저장 방식",
-    "로컬 저장만 사용",
-    "로컬 저장 + 클라우드 백업",
-    "로컬 용량 절약 모드",
-    "getEffectiveStorageMode"
-  ]) {
-    assert.ok(source.includes(snippet), `${name} storage mode UI missing: ${snippet}`);
-  }
+  assert.ok(settingsSource.includes(snippet), `settings storage mode UI missing: ${snippet}`);
+}
+
+for (const snippet of [
+  "저장 방식",
+  "getStorageModeLabel(effectiveStorageMode)",
+  "getEffectiveStorageMode"
+]) {
+  assert.ok(accountSource.includes(snippet), `account storage mode UI missing: ${snippet}`);
 }
 
 console.log("ok - storage mode policy is wired through settings, backup, restore, and local cleanup");

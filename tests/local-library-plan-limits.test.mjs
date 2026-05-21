@@ -1,4 +1,4 @@
-import assert from "node:assert/strict";
+﻿import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const photoLibrarySource = fs.readFileSync("lib/photo-library.ts", "utf8");
@@ -9,7 +9,7 @@ const cameraSource = fs.readFileSync("app/(tabs)/camera.tsx", "utf8");
 const capturePreviewSource = fs.readFileSync("app/capture-preview.tsx", "utf8");
 const editSource = fs.readFileSync("app/edit.tsx", "utf8");
 const studioSource = fs.readFileSync("app/(tabs)/studio.tsx", "utf8");
-const tripClipSource = fs.readFileSync("app/trip-clip.tsx", "utf8");
+const tripClipSource = fs.readFileSync("app/(tabs)/trip-clip.tsx", "utf8");
 
 for (const [name, source] of [
   ["photo library", photoLibrarySource],

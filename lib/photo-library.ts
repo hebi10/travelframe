@@ -469,20 +469,6 @@ export const saveCapturedPhoto = async ({
       height: prepared.height
     });
 
-    if (__DEV__) {
-      const [sourceInfo, destinationInfo, previewInfo] = await Promise.all([
-        FileSystem.getInfoAsync(uri),
-        FileSystem.getInfoAsync(destinationUri),
-        FileSystem.getInfoAsync(previewUri)
-      ]);
-      console.log("[photo-library] saved captured photo", {
-        ratioLabel,
-        sourceInfo,
-        destinationInfo,
-        previewInfo
-      });
-    }
-
     const photo: PhotoItem = {
       id,
       uri: destinationUri,

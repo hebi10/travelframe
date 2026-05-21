@@ -1,5 +1,5 @@
 import { Redirect, type Href } from "expo-router";
 
 export default function IndexScreen() {
-  return <Redirect href={"/home" as Href} />;
+  return <Redirect href={"/camera" as Href} />;
 }

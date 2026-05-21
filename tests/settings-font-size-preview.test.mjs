@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-const settingsSource = readFileSync("app/(tabs)/settings.tsx", "utf8");
+const settingsSource = [
+  readFileSync("app/(tabs)/settings.tsx", "utf8"),
+  readFileSync("features/settings/settings-screen.components.tsx", "utf8")
+].join("\n");
 
 assert.ok(
   settingsSource.includes("getFontSizeScale"),

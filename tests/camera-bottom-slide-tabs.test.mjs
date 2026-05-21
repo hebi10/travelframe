@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 
-const cameraSource = fs.readFileSync("app/(tabs)/camera.tsx", "utf8");
+const cameraSource = [
+  fs.readFileSync("app/(tabs)/camera.tsx", "utf8"),
+  fs.readFileSync("features/camera/camera-screen.constants.ts", "utf8"),
+  fs.readFileSync("features/camera/camera-screen.styles.ts", "utf8")
+].join("\n");
 const settingsSource = fs.readFileSync("lib/app-settings.ts", "utf8");
 
 for (const snippet of [
@@ -145,7 +149,7 @@ assert.ok(
 for (const snippet of [
   "cameraZoomPercent: number;",
   "cameraTorchEnabled: boolean;",
-  "cameraFacing: CameraType;",
+  "cameraFacing: CameraFacing;",
   "cameraZoomPercent: 0",
   "cameraTorchEnabled: false",
   'cameraFacing: "back"'

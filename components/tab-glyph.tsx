@@ -3,7 +3,7 @@ import { StyleSheet, View } from "react-native";
 import { useAppAppearance } from "@/lib/app-appearance";
 
 type TabGlyphProps = {
-  kind: "home" | "camera" | "studio" | "settings" | "account";
+  kind: "camera" | "studio" | "account" | "settings";
   focused: boolean;
 };
 
@@ -23,12 +23,6 @@ export function TabGlyph({ kind, focused }: TabGlyphProps) {
         }
       ]}
     >
-      {kind === "home" ? (
-        <View style={styles.homeIcon}>
-          <View style={[styles.homeRoof, strokeStyle]} />
-          <View style={[styles.homeBody, strokeStyle]} />
-        </View>
-      ) : null}
       {kind === "camera" ? (
         <View style={[styles.cameraRing, strokeStyle]}>
           <View
@@ -86,22 +80,6 @@ const styles = StyleSheet.create({
     width: 4,
     height: 4,
     borderRadius: 999
-  },
-  homeIcon: {
-    width: 16,
-    height: 16,
-    alignItems: "center",
-    justifyContent: "flex-end"
-  },
-  homeRoof: {
-    width: 12,
-    height: 2,
-    transform: [{ rotate: "-45deg" }],
-    marginBottom: -1
-  },
-  homeBody: {
-    width: 12,
-    height: 9
   },
   gridIcon: {
     width: 14,

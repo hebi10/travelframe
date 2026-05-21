@@ -4,7 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
-const checkedDirs = ["app", "components", "lib"];
+const checkedDirs = ["app", "components", "features", "lib"];
 const checkedExtensions = new Set([".ts", ".tsx"]);
 const forbiddenProductName = "영상 내보내기";
 const requiredCopy = [
@@ -58,7 +58,12 @@ for (const directory of checkedDirs) {
 }
 
 for (const requirement of requiredCopy) {
-  const source = fs.readFileSync(path.join(root, requirement.file), "utf8");
+  const source = [
+    fs.readFileSync(path.join(root, requirement.file), "utf8"),
+    requirement.file === "app/(tabs)/account.tsx"
+      ? fs.readFileSync(path.join(root, "features/account/account-screen.constants.ts"), "utf8")
+      : ""
+  ].join("\n");
 
   for (const snippet of requirement.snippets) {
     assert.ok(

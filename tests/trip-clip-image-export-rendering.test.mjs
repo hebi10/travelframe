@@ -1,10 +1,10 @@
-import assert from "node:assert/strict";
+﻿import assert from "node:assert/strict";
 import fs from "node:fs";
 import ts from "typescript";
 
 const imageExportSourceUrl = new URL("../lib/trip-clip-image-export.ts", import.meta.url);
 const exportSourceUrl = new URL("../lib/trip-clip-export.ts", import.meta.url);
-const tripClipSourceUrl = new URL("../app/trip-clip.tsx", import.meta.url);
+const tripClipSourceUrl = new URL("../app/(tabs)/trip-clip.tsx", import.meta.url);
 const imageExportSource = fs.readFileSync(imageExportSourceUrl, "utf8");
 const exportSource = fs.readFileSync(exportSourceUrl, "utf8");
 const tripClipSource = fs.readFileSync(tripClipSourceUrl, "utf8");

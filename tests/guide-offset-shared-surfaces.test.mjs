@@ -1,9 +1,9 @@
-import assert from "node:assert/strict";
+﻿import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const editSource = fs.readFileSync("app/edit.tsx", "utf8");
 const editableCanvasSource = fs.readFileSync("components/editable-photo-canvas.tsx", "utf8");
-const tripClipSource = fs.readFileSync("app/trip-clip.tsx", "utf8");
+const tripClipSource = fs.readFileSync("app/(tabs)/trip-clip.tsx", "utf8");
 const previewPlayerSource = fs.readFileSync("components/trip-clip-preview-player.tsx", "utf8");
 const settingsSource = fs.readFileSync("app/(tabs)/settings.tsx", "utf8");
 

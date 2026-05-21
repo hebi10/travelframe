@@ -1,7 +1,10 @@
-import assert from "node:assert/strict";
+﻿import assert from "node:assert/strict";
 import fs from "node:fs";
 
-const source = fs.readFileSync("app/trip-clip.tsx", "utf8");
+const source = [
+  fs.readFileSync("app/(tabs)/trip-clip.tsx", "utf8"),
+  fs.readFileSync("features/trip-clip/trip-clip-screen.styles.ts", "utf8")
+].join("\n");
 const musicRowMatch = source.match(/musicRow: \{[\s\S]*?\n  \},/);
 
 assert.ok(musicRowMatch, "musicRow style should exist");

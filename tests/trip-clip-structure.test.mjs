@@ -1,7 +1,7 @@
-import assert from "node:assert/strict";
+﻿import assert from "node:assert/strict";
 import fs from "node:fs";
 
-const tripClipSource = fs.readFileSync("app/trip-clip.tsx", "utf8");
+const tripClipSource = fs.readFileSync("app/(tabs)/trip-clip.tsx", "utf8");
 
 for (const path of [
   "lib/trip-clip-playback.ts",
@@ -23,7 +23,7 @@ for (const snippet of [
 assert.equal(
   tripClipSource.includes("function TripClipRecordingCanvas"),
   false,
-  "recording canvas should not stay inside app/trip-clip.tsx"
+  "recording canvas should not stay inside app/(tabs)/trip-clip.tsx"
 );
 
 console.log("ok - trip clip has extracted playback and recording boundaries");

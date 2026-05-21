@@ -1,7 +1,6 @@
 export const APP_GUIDE_VERSION = 1;
 
 export type AppGuideTabKey =
-  | "home"
   | "camera"
   | "studio"
   | "tripClip"
@@ -19,29 +18,6 @@ export type AppGuideStep = {
 };
 
 export const APP_GUIDE_STEPS: Record<AppGuideTabKey, AppGuideStep[]> = {
-  home: [
-    {
-      id: "home-start",
-      title: "트래블프레임 시작하기",
-      description: "사진 가이드로 같은 구도 촬영을 시작하고, 편집과 영상 만들기까지 이어갈 수 있습니다.",
-      targetLabel: "홈 슬라이드",
-      placement: "center"
-    },
-    {
-      id: "home-camera",
-      title: "카메라 열기",
-      description: "사진 가이드로 같은 구도 촬영을 시작합니다.",
-      targetLabel: "카메라 열기",
-      placement: "bottom"
-    },
-    {
-      id: "home-video",
-      title: "영상 만들기",
-      description: "여러 사진을 선택해 짧은 영상으로 만들 수 있습니다.",
-      targetLabel: "영상 만들기",
-      placement: "bottom"
-    }
-  ],
   camera: [
     {
       id: "camera-photo-guide",

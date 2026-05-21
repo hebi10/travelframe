@@ -49,7 +49,7 @@ export function AppGuideOverlay({
     goNext,
     skip
   } = useAppGuide(tabKey, replaySignal);
-  const activeVisualIndex = stepIndex;
+  const activeVisualIndex = Math.min(stepIndex, guideVisualSlides.length - 1);
 
   useEffect(() => {
     requestAnimationFrame(() => {

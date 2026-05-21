@@ -17,7 +17,7 @@ assert.ok(
 );
 
 assert.ok(
-  capturePhotoSource.includes("shutterSound: false"),
+  capturePhotoSource.includes("enableShutterSound: false"),
   "camera capture should always request silent native capture"
 );
 

@@ -10,10 +10,21 @@ export type CameraGuideOffset = {
 
 const GUIDE_POSITION_BOUND_RATIO = 0.42;
 
-const finiteOrZero = (value: number) => (Number.isFinite(value) ? value : 0);
-const normalizeZero = (value: number) => (Object.is(value, -0) ? 0 : value);
+const finiteOrZero = (value: number) => {
+  "worklet";
+
+  return Number.isFinite(value) ? value : 0;
+};
+
+const normalizeZero = (value: number) => {
+  "worklet";
+
+  return value === 0 ? 0 : value;
+};
 
 export function getGuidePositionBounds(frame: CameraGuideFrame) {
+  "worklet";
+
   return {
     maxX: Math.max(0, finiteOrZero(frame.width) * GUIDE_POSITION_BOUND_RATIO),
     maxY: Math.max(0, finiteOrZero(frame.height) * GUIDE_POSITION_BOUND_RATIO)
@@ -24,6 +35,8 @@ export function clampGuidePositionOffset(
   offset: CameraGuideOffset,
   frame: CameraGuideFrame
 ): CameraGuideOffset {
+  "worklet";
+
   const { maxX, maxY } = getGuidePositionBounds(frame);
 
   return {
@@ -49,6 +62,8 @@ export function calculateGuidePositionDragOffset({
   translationY: number;
   frame: CameraGuideFrame;
 }): CameraGuideOffset {
+  "worklet";
+
   return clampGuidePositionOffset(
     {
       x: finiteOrZero(startX) + finiteOrZero(translationX),

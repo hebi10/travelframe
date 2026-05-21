@@ -1,10 +1,13 @@
-import assert from "node:assert/strict";
+﻿import assert from "node:assert/strict";
 import fs from "node:fs";
 
-const source = fs.readFileSync(
-  new URL("../app/trip-clip.tsx", import.meta.url),
-  "utf8"
-);
+const source = [
+  fs.readFileSync(new URL("../app/(tabs)/trip-clip.tsx", import.meta.url), "utf8"),
+  fs.readFileSync(
+    new URL("../features/trip-clip/trip-clip-screen.styles.ts", import.meta.url),
+    "utf8"
+  )
+].join("\n");
 
 assert.ok(
   source.includes("저장한 영상은 핸드폰 갤러리에 저장됐습니다."),

@@ -1,8 +1,8 @@
-import assert from "node:assert/strict";
+﻿import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const draftSource = fs.readFileSync("lib/trip-clip-draft.ts", "utf8");
-const tripClipSource = fs.readFileSync("app/trip-clip.tsx", "utf8");
+const tripClipSource = fs.readFileSync("app/(tabs)/trip-clip.tsx", "utf8");
 
 for (const snippet of [
   "TRIP_CLIP_DRAFT_STORAGE_KEY",

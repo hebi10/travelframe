@@ -93,7 +93,7 @@ export const markGuideTabSeen = async (tabKey: AppGuideTabKey) => {
   const progress = await getGuideProgress();
   return saveGuideProgress({
     ...progress,
-    seenIntro: tabKey === "home" ? true : progress.seenIntro,
+    seenIntro: tabKey === "camera" ? true : progress.seenIntro,
     seenTabs: {
       ...progress.seenTabs,
       [tabKey]: true

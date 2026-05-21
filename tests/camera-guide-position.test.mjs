@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import ts from "typescript";
 
-const cameraSource = fs.readFileSync("app/(tabs)/camera.tsx", "utf8");
+const cameraSource = [
+  fs.readFileSync("app/(tabs)/camera.tsx", "utf8"),
+  fs.readFileSync("features/camera/camera-screen.styles.ts", "utf8")
+].join("\n");
 const guidePositionSource = fs.readFileSync("lib/camera-guide-position.ts", "utf8");
 const overlaySource = fs.readFileSync("components/camera-guide-overlay.tsx", "utf8");
 const settingsSource = fs.readFileSync("lib/app-settings.ts", "utf8");
@@ -16,6 +19,19 @@ const { outputText } = ts.transpileModule(guidePositionSource, {
 const guidePositionModule = await import(
   `data:text/javascript;base64,${Buffer.from(outputText).toString("base64")}`
 );
+
+for (const [name, pattern] of [
+  ["finiteOrZero", /const finiteOrZero\s*=\s*\([^)]*\)\s*=>\s*\{\s*"worklet";/],
+  ["normalizeZero", /const normalizeZero\s*=\s*\([^)]*\)\s*=>\s*\{\s*"worklet";/],
+  ["getGuidePositionBounds", /export function getGuidePositionBounds[^{]*\{\s*"worklet";/],
+  ["clampGuidePositionOffset", /export function clampGuidePositionOffset[\s\S]*?\): CameraGuideOffset \{\s*"worklet";/],
+  ["calculateGuidePositionDragOffset", /export function calculateGuidePositionDragOffset[\s\S]*?\): CameraGuideOffset \{\s*"worklet";/]
+]) {
+  assert.ok(
+    pattern.test(guidePositionSource),
+    `${name} should be callable from Reanimated gesture worklets`
+  );
+}
 
 for (const snippet of [
   "guideOffsetX",

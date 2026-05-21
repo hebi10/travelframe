@@ -7,7 +7,7 @@
       "com.haebi.photoguide"
     ],
     "description": "여행 사진의 구도를 맞추고 쇼츠·릴스용 콘텐츠 제작을 돕는 촬영 가이드 앱입니다.",
-    "version": "1.0.19",
+    "version": "1.0.20",
     "runtimeVersion": {
       "policy": "appVersion"
     },
@@ -32,7 +32,7 @@
     },
     "android": {
       "package": "com.haebi.photoguide",
-      "versionCode": 21,
+      "versionCode": 22,
       "blockedPermissions": [
         "android.permission.RECORD_AUDIO"
       ],
@@ -63,15 +63,6 @@
     },
     "plugins": [
       "expo-router",
-      [
-        "expo-camera",
-        {
-          "cameraPermission": "트래블프레임에서 구도 가이드 촬영을 위해 카메라 접근 권한이 필요합니다.",
-          "microphonePermission": false,
-          "recordAudioAndroid": false,
-          "barcodeScannerEnabled": false
-        }
-      ],
       [
         "expo-image-picker",
         {

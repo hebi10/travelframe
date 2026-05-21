@@ -1,7 +1,7 @@
-import assert from "node:assert/strict";
+﻿import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-const source = readFileSync("app/trip-clip.tsx", "utf8");
+const source = readFileSync("app/(tabs)/trip-clip.tsx", "utf8");
 const backupSource = readFileSync("lib/cloud-backup.ts", "utf8");
 
 for (const snippet of [

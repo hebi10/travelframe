@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-const source = readFileSync("app/(tabs)/settings.tsx", "utf8");
+const source = [
+  readFileSync("app/(tabs)/settings.tsx", "utf8"),
+  readFileSync("features/settings/settings-screen.components.tsx", "utf8")
+].join("\n");
 const guidePanelStart = source.indexOf("<SectionBlock title=\"가이드\"");
 const guidePanelEnd = source.indexOf("<ActionRow", guidePanelStart);
 

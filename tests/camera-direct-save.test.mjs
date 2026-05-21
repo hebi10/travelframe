@@ -30,7 +30,8 @@ for (const snippet of [
   "setRecentPhoto(savedPhoto)",
   "backupPhotoIfEnabled({",
   "recordBackupFailure({",
-  "deleteLocalFile(photo.uri)"
+  "const photoUri = `file://${photo.filePath}`",
+  "deleteLocalFile(photoUri)"
 ]) {
   assert.ok(source.includes(snippet), `camera direct save flow missing: ${snippet}`);
 }

@@ -5,6 +5,19 @@ import { fileURLToPath } from "node:url";
 const root = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 
 const expoCameraRoot = path.join(root, "node_modules", "expo-camera");
+const packageJson = JSON.parse(
+  fs.readFileSync(path.join(root, "package.json"), "utf8")
+);
+
+if (!packageJson.dependencies?.["expo-camera"]) {
+  console.info("expo-camera is not declared; skipping local camera patch");
+  process.exit(0);
+}
+
+if (!fs.existsSync(expoCameraRoot)) {
+  console.info("expo-camera is not installed; skipping local camera patch");
+  process.exit(0);
+}
 
 function read(relativePath) {
   return fs.readFileSync(path.join(expoCameraRoot, relativePath), "utf8");
@@ -141,6 +154,27 @@ function patchCameraViewModule() {
 `
   );
 
+  source = insertAfter(
+    source,
+    `      AsyncFunction("getAvailableLenses") { view: ExpoCameraView ->
+        return@AsyncFunction view.getAvailableLenses()
+      }
+`,
+    `
+      AsyncFunction("focusAtPoint") { view: ExpoCameraView, x: Float, y: Float, locked: Boolean ->
+        view.focusAtPoint(x, y, locked)
+      }
+
+      AsyncFunction("setFocusLocked") { view: ExpoCameraView, locked: Boolean ->
+        view.focusLocked = locked
+      }
+
+      AsyncFunction("setExposureBias") { view: ExpoCameraView, exposureBias: Float ->
+        view.exposureBias = exposureBias
+      }
+`
+  );
+
   write(relativePath, source);
 }
 
@@ -225,6 +259,26 @@ const val CAMERA_LENS_WIDE = "builtInWideAngleCamera"
         startFocusMetering(it)
       }
     }
+`
+  );
+
+  source = insertAfter(
+    source,
+    `  var exposureBias: Float = 0f
+    set(value) {
+      field = value
+      setCameraExposureBias(value)
+    }
+`,
+    `
+  fun focusAtPoint(pointX: Float, pointY: Float, locked: Boolean) {
+    val nextPoint = CameraFocusPoint(
+      pointX.coerceIn(0f, 1f),
+      pointY.coerceIn(0f, 1f)
+    )
+    focusPoint = nextPoint
+    focusLocked = locked
+  }
 `
   );
 
@@ -559,7 +613,100 @@ export type CameraFocusPoint = {
 `
   );
 
+  source = insertAfter(
+    source,
+    relativePath.endsWith(".d.ts")
+      ? `    readonly getAvailableLenses: () => Promise<string[]>;
+`
+      : `  readonly getAvailableLenses: () => Promise<string[]>;
+`,
+    relativePath.endsWith(".d.ts")
+      ? `    readonly focusAtPoint: (x: number, y: number, locked: boolean) => Promise<void>;
+    readonly setFocusLocked: (locked: boolean) => Promise<void>;
+    readonly setExposureBias: (exposureBias: number) => Promise<void>;
+`
+      : `  readonly focusAtPoint: (x: number, y: number, locked: boolean) => Promise<void>;
+  readonly setFocusLocked: (locked: boolean) => Promise<void>;
+  readonly setExposureBias: (exposureBias: number) => Promise<void>;
+`
+  );
+
   write(relativePath, source);
+}
+
+function patchCameraViewWrapper() {
+  let source = read("src/CameraView.tsx");
+
+  source = replaceIfFound(
+    source,
+    `  CameraViewRef,
+  ScanningOptions,
+`,
+    `  CameraViewRef,
+  CameraFocusPoint,
+  ScanningOptions,
+`
+  );
+
+  source = insertAfter(
+    source,
+    `  async getAvailableLensesAsync(): Promise<string[]> {
+    return (await this._cameraRef.current?.getAvailableLenses()) ?? [];
+  }
+`,
+    `
+  async focusAtPointAsync(point: CameraFocusPoint, locked = false): Promise<void> {
+    return this._cameraRef.current?.focusAtPoint(point.x, point.y, locked);
+  }
+
+  async setFocusLockedAsync(locked: boolean): Promise<void> {
+    return this._cameraRef.current?.setFocusLocked(locked);
+  }
+
+  async setExposureBiasAsync(exposureBias: number): Promise<void> {
+    return this._cameraRef.current?.setExposureBias(exposureBias);
+  }
+`
+  );
+
+  write("src/CameraView.tsx", source);
+
+  source = read("build/CameraView.js");
+  source = insertAfter(
+    source,
+    `    async getAvailableLensesAsync() {
+        return (await this._cameraRef.current?.getAvailableLenses()) ?? [];
+    }
+`,
+    `    async focusAtPointAsync(point, locked = false) {
+        return this._cameraRef.current?.focusAtPoint(point.x, point.y, locked);
+    }
+    async setFocusLockedAsync(locked) {
+        return this._cameraRef.current?.setFocusLocked(locked);
+    }
+    async setExposureBiasAsync(exposureBias) {
+        return this._cameraRef.current?.setExposureBias(exposureBias);
+    }
+`
+  );
+  write("build/CameraView.js", source);
+
+  source = read("build/CameraView.d.ts");
+  source = replaceIfFound(
+    source,
+    "CameraRecordingOptions, CameraViewRef, ScanningOptions",
+    "CameraRecordingOptions, CameraViewRef, CameraFocusPoint, ScanningOptions"
+  );
+  source = insertAfter(
+    source,
+    `    getAvailableLensesAsync(): Promise<string[]>;
+`,
+    `    focusAtPointAsync(point: CameraFocusPoint, locked?: boolean): Promise<void>;
+    setFocusLockedAsync(locked: boolean): Promise<void>;
+    setExposureBiasAsync(exposureBias: number): Promise<void>;
+`
+  );
+  write("build/CameraView.d.ts", source);
 }
 
 function disableExpoCameraAndroidShutterSound() {
@@ -605,6 +752,7 @@ if (fs.existsSync(expoCameraRoot)) {
   patchCameraRecords();
   patchCameraTypes("build/Camera.types.d.ts");
   patchCameraTypes("src/Camera.types.ts");
+  patchCameraViewWrapper();
   disableExpoCameraAndroidShutterSound();
   console.info("applied local expo-camera Android focus, shutter, and zoom patch");
 }

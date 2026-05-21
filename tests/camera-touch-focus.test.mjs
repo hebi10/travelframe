@@ -6,13 +6,14 @@ const focusControlsPath = "lib/camera-focus-controls.ts";
 assert.ok(fs.existsSync(focusControlsPath), "camera focus control helpers should exist");
 
 const focusControlsSource = fs.readFileSync(focusControlsPath, "utf8");
-const cameraSource = fs.readFileSync("app/(tabs)/camera.tsx", "utf8");
-const nativeCameraSource = fs.readFileSync(
-  "node_modules/expo-camera/android/src/main/java/expo/modules/camera/ExpoCameraView.kt",
-  "utf8"
-);
+const cameraSource = [
+  fs.readFileSync("app/(tabs)/camera.tsx", "utf8"),
+  fs.readFileSync("features/camera/camera-screen.components.tsx", "utf8"),
+  fs.readFileSync("features/camera/camera-screen.constants.ts", "utf8"),
+  fs.readFileSync("features/camera/camera-screen.helpers.ts", "utf8"),
+  fs.readFileSync("features/camera/camera-screen.styles.ts", "utf8")
+].join("\n");
 const packageJson = JSON.parse(fs.readFileSync("package.json", "utf8"));
-const patchPath = "patches/expo-camera+55.0.0.patch";
 
 const { outputText } = ts.transpileModule(focusControlsSource, {
   compilerOptions: {
@@ -78,13 +79,33 @@ assert.deepEqual(
 );
 
 for (const snippet of [
-  "cameraFocusPoint",
+  'Camera,',
+  "useCameraPermission",
+  "useCameraDevice",
+  "usePhotoOutput",
+  "react-native-vision-camera",
+  "type CameraRef",
+  "type CameraPosition",
+  "type MeteringMode",
+  "photoOutput.capturePhotoToFile",
+  "enableShutterSound: false",
+  "cameraFocusTap",
   "cameraFocusLocked",
   "cameraExposureBias",
   "handleCameraTap",
-  "focusPoint={cameraFocusPoint}",
-  "focusLocked={cameraFocusLocked}",
-  "exposureBias={cameraExposureBias}",
+  "focusTo(tap,",
+  'CAMERA_FOCUS_METERING_MODES: MeteringMode[] = ["AF", "AE", "AWB"]',
+  "getCameraFocusMeteringModes(cameraDevice)",
+  'responsiveness: "snappy"',
+  'adaptiveness: cameraFocusLockedRef.current ? "locked" : "continuous"',
+  "autoResetAfter: cameraFocusLockedRef.current ? null : 5",
+  "focusTo(cameraFocusTap,",
+  'adaptiveness: "locked"',
+  "resetFocus()",
+  "exposure={cameraExposureBias}",
+  "cameraDevice.supportsExposureBias",
+  "cameraDevice.minExposureBias",
+  "cameraDevice.maxExposureBias",
   "toggleCameraFocusLock",
   "focusIndicator",
   "CAMERA_FOCUS_INDICATOR_SIZE",
@@ -96,9 +117,9 @@ for (const snippet of [
   "styles.exposureTapControl",
   "Feather",
   'name="sun"',
-  'name="home"',
-  'accessibilityLabel="홈으로 이동"',
-  'router.push("/home")',
+  'name="user"',
+  'user ? "마이페이지로 이동" : "로그인으로 이동"',
+  'router.push("/account")',
   "scheduleFocusControlsDismiss",
   "cancelFocusControlsDismiss",
   "useAnimatedStyle",
@@ -131,8 +152,13 @@ for (const snippet of [
   assert.ok(cameraSource.includes(snippet), `camera touch focus UI missing: ${snippet}`);
 }
 
+const handleCameraTapSource = cameraSource.slice(
+  cameraSource.indexOf("const handleCameraTap"),
+  cameraSource.indexOf("const toggleCameraFocusLock")
+);
+
 assert.equal(
-  cameraSource.includes("setCameraExposureBias(0)"),
+  handleCameraTapSource.includes("setCameraExposureBias(0)"),
   false,
   "tapping a new focus point should keep the existing exposure value"
 );
@@ -143,31 +169,38 @@ assert.equal(
   "exposure control should not use a fixed bottom position"
 );
 
-assert.equal(packageJson.scripts.postinstall, "node scripts/apply-patches.mjs");
-assert.ok(fs.existsSync("scripts/apply-patches.mjs"), "local patch apply script should exist");
-assert.ok(fs.existsSync(patchPath), "expo-camera patch should be committed");
-
-const patchSource = fs.readFileSync(patchPath, "utf8");
-for (const snippet of [
-  "focusPoint",
-  "focusLocked",
-  "exposureBias",
-  "disableAutoCancel",
-  "if (field == FocusMode.OFF && focusPoint == null)",
-  "focusPoint?.let {",
-  "startFocusMetering(it)",
-  "?: startFocusMetering()",
-  "previewView.meteringPointFactory.createPoint(pointX, pointY)",
-  "FocusMeteringAction.FLAG_AF or FocusMeteringAction.FLAG_AE or FocusMeteringAction.FLAG_AWB",
-  "setExposureCompensationIndex"
-]) {
-  assert.ok(patchSource.includes(snippet), `expo-camera Android patch missing: ${snippet}`);
-}
-
+assert.ok(
+  packageJson.dependencies["react-native-vision-camera"],
+  "VisionCamera dependency should be installed"
+);
+assert.ok(
+  packageJson.dependencies["react-native-nitro-modules"],
+  "VisionCamera v5 Nitro dependency should be installed"
+);
+assert.ok(
+  packageJson.dependencies["react-native-nitro-image"],
+  "VisionCamera v5 image dependency should be installed"
+);
 assert.equal(
-  nativeCameraSource.includes("DisplayOrientedMeteringPointFactory("),
-  false,
-  "expo-camera Android native code should let PreviewView map metering coordinates"
+  packageJson.dependencies["expo-camera"],
+  undefined,
+  "camera tab should no longer depend on expo-camera"
 );
 
-console.log("ok - camera touch focus and exposure control are wired");
+for (const snippet of [
+  "CameraView",
+  "expo-camera",
+  "focusPoint={cameraFocusPoint}",
+  "focusLocked={cameraFocusLocked}",
+  "exposureBias={cameraExposureBias}",
+  "focusAtPointAsync",
+  "setFocusLockedAsync",
+  "setExposureBiasAsync",
+  "selectedLens={selectedCameraLens}",
+  "getAvailableLensesAsync",
+  "onAvailableLensesChanged"
+]) {
+  assert.equal(cameraSource.includes(snippet), false, `expo-camera path should be removed: ${snippet}`);
+}
+
+console.log("ok - VisionCamera tap focus and exposure control are wired");

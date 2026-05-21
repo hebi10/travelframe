@@ -1,4 +1,4 @@
-import assert from "node:assert/strict";
+﻿import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const settingsSource = fs.readFileSync(
@@ -10,7 +10,7 @@ const accountSource = fs.readFileSync(
   "utf8"
 );
 const tripClipSource = fs.readFileSync(
-  new URL("../app/trip-clip.tsx", import.meta.url),
+  new URL("../app/(tabs)/trip-clip.tsx", import.meta.url),
   "utf8"
 );
 const cameraSource = fs.readFileSync(

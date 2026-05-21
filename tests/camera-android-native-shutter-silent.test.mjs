@@ -1,26 +1,27 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 
-const nativeSource = fs.readFileSync(
-  "node_modules/expo-camera/android/src/main/java/expo/modules/camera/ExpoCameraView.kt",
-  "utf8"
-);
-const patchScript = fs.readFileSync("scripts/apply-patches.mjs", "utf8");
-const patchFile = fs.readFileSync("patches/expo-camera+55.0.0.patch", "utf8");
+const cameraSource = fs.readFileSync("app/(tabs)/camera.tsx", "utf8");
+const packageJson = JSON.parse(fs.readFileSync("package.json", "utf8"));
 
 assert.ok(
-  !nativeSource.includes("MediaActionSound().play(MediaActionSound.SHUTTER_CLICK)"),
-  "Android expo-camera native code should not play the system shutter click"
+  packageJson.dependencies["react-native-vision-camera"],
+  "camera capture should use VisionCamera instead of an expo-camera patch"
 );
 
 assert.ok(
-  patchScript.includes("disableExpoCameraAndroidShutterSound"),
-  "local patch script should keep Android expo-camera shutter sound disabled after install"
+  cameraSource.includes("photoOutput.capturePhotoToFile"),
+  "camera should capture through VisionCamera photo output"
 );
 
 assert.ok(
-  patchFile.includes("+  @Field val shutterSound: Boolean = false,"),
-  "expo-camera patch file should default Android native shutter sound to disabled"
+  cameraSource.includes("enableShutterSound: false"),
+  "VisionCamera capture should explicitly request silent Android native capture"
 );
 
-console.log("ok - Android native camera shutter sound is disabled");
+assert.ok(
+  !cameraSource.includes("shutterSound: false"),
+  "expo-camera takePictureAsync shutter option should not remain after migration"
+);
+
+console.log("ok - Android VisionCamera capture disables native shutter sound");

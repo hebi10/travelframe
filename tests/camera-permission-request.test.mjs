@@ -4,11 +4,12 @@ import fs from "node:fs";
 const cameraSource = fs.readFileSync("app/(tabs)/camera.tsx", "utf8");
 
 for (const snippet of [
-  "const nextPermission = permission ?? (await getPermission());",
-  "!nextPermission ||",
-  "!nextPermission.granted",
-  "nextPermission.canAskAgain",
-  "await requestPermission();"
+  "useCameraPermission()",
+  "hasCameraPermission",
+  "canRequestCameraPermission",
+  "requestCameraPermission",
+  "if (!hasCameraPermission && canRequestCameraPermission)",
+  "await requestCameraPermission();"
 ]) {
   assert.ok(cameraSource.includes(snippet), `camera permission auto request missing: ${snippet}`);
 }

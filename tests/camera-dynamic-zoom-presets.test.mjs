@@ -2,15 +2,6 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const cameraSource = fs.readFileSync("app/(tabs)/camera.tsx", "utf8");
-const nativeCameraSource = fs.readFileSync(
-  "node_modules/expo-camera/android/src/main/java/expo/modules/camera/ExpoCameraView.kt",
-  "utf8"
-);
-const nativeModuleSource = fs.readFileSync(
-  "node_modules/expo-camera/android/src/main/java/expo/modules/camera/CameraViewModule.kt",
-  "utf8"
-);
-const patchSource = fs.readFileSync("patches/expo-camera+55.0.0.patch", "utf8");
 
 for (const snippet of [
   "getCameraZoomPresets",
@@ -18,20 +9,24 @@ for (const snippet of [
   "CAMERA_BACK_ZOOM_PRESETS_DEFAULT",
   "CAMERA_FRONT_ZOOM_PRESETS",
   '"0.5x"',
+  '"ultra-wide-angle"',
+  '"wide-angle"',
+  '"telephoto"',
+  "CAMERA_BACK_PHYSICAL_DEVICES",
+  "getCameraDeviceFilter(cameraFacing)",
+  "useCameraDevice(cameraFacing, cameraDeviceFilter)",
+  "getCameraDeviceLensTypes(cameraDevice)",
   "availableCameraLenses",
-  "setAvailableCameraLenses",
-  "selectedCameraLens",
-  "setSelectedCameraLens",
-  "setSelectedCameraLens(getCameraZoomPresetLens(preset, availableCameraLenses))",
-  'setSelectedCameraLens(\n      getCameraZoomPresetLens({ label: "manual", value: nextZoom }, availableCameraLenses)\n    )',
+  "cameraZoomFactor",
+  "getCameraZoomFactorFromPercent",
+  "getCameraZoomPresetFactor",
+  "getCameraZoomPercentFromFactor",
   "cameraZoomPresets",
   "cameraZoomPresets.map",
   "setZoomPreset(preset)",
-  "onAvailableLensesChanged",
-  "getAvailableLensesAsync",
-  "selectedLens={selectedCameraLens}"
+  "zoom={cameraZoomFactor}"
 ]) {
-  assert.ok(cameraSource.includes(snippet), `dynamic zoom presets missing: ${snippet}`);
+  assert.ok(cameraSource.includes(snippet), `dynamic VisionCamera zoom missing: ${snippet}`);
 }
 
 assert.ok(
@@ -49,23 +44,20 @@ assert.ok(
   "back camera should expose 0.5x only when an ultra-wide lens is available"
 );
 
-for (const snippet of [
-  "var selectedLens: String? = null",
-  "fun getAvailableLenses(): List<String>",
-  "zoomState.minZoomRatio < 1f",
-  "selectedLens == CAMERA_LENS_ULTRA_WIDE",
-  "targetZoomRatio = if (usesUltraWideZoom)"
+for (const removed of [
+  "selectedCameraLens",
+  "setSelectedCameraLens",
+  "selectedLens={selectedCameraLens}",
+  "onAvailableLensesChanged",
+  "getAvailableLensesAsync",
+  "builtInUltraWideCamera",
+  "builtInWideAngleCamera"
 ]) {
-  assert.ok(nativeCameraSource.includes(snippet), `Android camera zoom native support missing: ${snippet}`);
-  assert.ok(patchSource.includes(snippet), `Android camera zoom patch missing: ${snippet}`);
+  assert.equal(
+    cameraSource.includes(removed),
+    false,
+    `expo-camera lens path should be removed: ${removed}`
+  );
 }
 
-for (const snippet of [
-  'Prop("selectedLens")',
-  'AsyncFunction("getAvailableLenses")'
-]) {
-  assert.ok(nativeModuleSource.includes(snippet), `Android camera zoom module support missing: ${snippet}`);
-  assert.ok(patchSource.includes(snippet), `Android camera zoom patch missing: ${snippet}`);
-}
-
-console.log("ok - camera zoom presets are derived from camera facing and available lenses");
+console.log("ok - VisionCamera zoom presets are derived from facing and physical lenses");

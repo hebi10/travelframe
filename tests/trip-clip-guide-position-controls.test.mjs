@@ -1,7 +1,7 @@
-import assert from "node:assert/strict";
+﻿import assert from "node:assert/strict";
 import fs from "node:fs";
 
-const source = fs.readFileSync("app/trip-clip.tsx", "utf8");
+const source = fs.readFileSync("app/(tabs)/trip-clip.tsx", "utf8");
 
 for (const snippet of [
   "isPreviewGuideMoving",

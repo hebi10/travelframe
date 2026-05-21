@@ -54,18 +54,26 @@ export default function TabsLayout() {
       }}
     >
       <Tabs.Screen
-        name="home"
+        name="camera"
         options={{
-          title: "홈",
-          tabBarIcon: ({ focused }) => <TabGlyph kind="home" focused={focused} />
+          title: "촬영",
+          tabBarStyle: { display: "none" },
+          tabBarIcon: ({ focused }) => <TabGlyph kind="camera" focused={focused} />
         }}
       />
       <Tabs.Screen
-        name="camera"
+        name="studio"
         options={{
-          title: "카메라",
+          title: "보관함",
+          tabBarIcon: ({ focused }) => <TabGlyph kind="studio" focused={focused} />
+        }}
+      />
+      <Tabs.Screen
+        name="trip-clip"
+        options={{
+          title: "클립",
+          href: null,
           tabBarStyle: { display: "none" },
-          tabBarIcon: ({ focused }) => <TabGlyph kind="camera" focused={focused} />
         }}
       />
       <Tabs.Screen
@@ -73,13 +81,6 @@ export default function TabsLayout() {
         options={{
           title: isLoggedIn ? "마이페이지" : "로그인",
           tabBarIcon: ({ focused }) => <TabGlyph kind="account" focused={focused} />
-        }}
-      />
-      <Tabs.Screen
-        name="studio"
-        options={{
-          title: "편집",
-          tabBarIcon: ({ focused }) => <TabGlyph kind="studio" focused={focused} />
         }}
       />
       <Tabs.Screen
