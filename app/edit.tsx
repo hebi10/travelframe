@@ -594,6 +594,7 @@ export default function EditScreen() {
           사진 편집
         </Text>
         <Pressable
+          android_disableSound
           disabled={isSaving || !source}
           style={[styles.saveButton, (!source || isSaving) && styles.disabledButton]}
           onPress={confirmSaveEdit}

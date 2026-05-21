@@ -2779,6 +2779,7 @@ export default function TripClipScreen() {
           ) : null}
           <View style={styles.previewActions}>
             <Pressable
+              android_disableSound
               disabled={isExporting || selectedPhotos.length === 0 || videoDurationTooLong}
               style={[
                 styles.primaryButton,
@@ -2798,6 +2799,7 @@ export default function TripClipScreen() {
               </Text>
             </Pressable>
             <Pressable
+              android_disableSound
               disabled={
                 isExporting ||
                 selectedPhotos.length === 0 ||

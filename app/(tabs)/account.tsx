@@ -97,9 +97,6 @@ const initialBackupOverview: CloudBackupOverview = {
   deletedAt: null
 };
 
-const storageModeLegend =
-  "로컬 저장만 사용 / 로컬 저장 + 클라우드 백업 / 로컬 용량 절약 모드";
-
 const formatQuotaValue = (used: number, limit: number) => {
   if (limit <= 0) {
     return "사용 불가";
@@ -907,10 +904,6 @@ export default function AccountScreen() {
                 <InfoRow
                   label="저장 방식"
                   value={getStorageModeLabel(effectiveStorageMode)}
-                />
-                <InfoRow
-                  label="저장 옵션"
-                  value={storageModeLegend}
                 />
                 <InfoRow
                   label="백업 권한"

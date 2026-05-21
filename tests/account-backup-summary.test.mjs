@@ -20,4 +20,9 @@ for (const snippet of [
   assert.ok(accountSource.includes(snippet), `account backup summary missing: ${snippet}`);
 }
 
+assert.ok(
+  !accountSource.includes('label="저장 옵션"'),
+  "account backup summary should not include storage options"
+);
+
 console.log("ok - account page includes cloud backup summary");

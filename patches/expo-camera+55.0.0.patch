@@ -28,7 +28,13 @@ index 7e50b98..a4d26a2 100644
 @@ -389,6 +390,14 @@ class CameraViewModule : Module() {
          }
        }
- 
+
++      Prop("selectedLens") { view, selectedLens: String? ->
++        if (view.selectedLens != selectedLens) {
++          view.selectedLens = selectedLens
++        }
++      }
++
 +      Prop("focusPoint") { view, focusPoint: CameraFocusPoint? ->
 +        view.focusPoint = focusPoint
 +      }
@@ -44,6 +50,17 @@ index 7e50b98..a4d26a2 100644
        Prop("ratio") { view, ratio: CameraRatio? ->
          ratio?.let {
            if (view.ratio != it) {
+@@ -462,6 +471,10 @@ class CameraViewModule : Module() {
+         return@AsyncFunction view.getAvailablePictureSizes()
+       }
+
++      AsyncFunction("getAvailableLenses") { view: ExpoCameraView ->
++        return@AsyncFunction view.getAvailableLenses()
++      }
++
+       AsyncFunction("record") { view: ExpoCameraView, options: RecordingOptions, promise: Promise ->
+         if (!view.mute && !permissionsManager.hasGrantedPermissions(Manifest.permission.RECORD_AUDIO)) {
+           throw Exceptions.MissingPermissions(Manifest.permission.RECORD_AUDIO)
 diff --git a/node_modules/expo-camera/android/src/main/java/expo/modules/camera/ExpoCameraView.kt b/node_modules/expo-camera/android/src/main/java/expo/modules/camera/ExpoCameraView.kt
 index 1ff8116..ab330a2 100644
 --- a/node_modules/expo-camera/android/src/main/java/expo/modules/camera/ExpoCameraView.kt
@@ -56,6 +73,13 @@ index 1ff8116..ab330a2 100644
  import android.os.Bundle
  import android.util.Log
  import android.util.Size
+@@ -23,7 +21,6 @@ import androidx.camera.core.CameraInfo
+ import androidx.camera.core.CameraSelector
+ import androidx.camera.core.CameraState
+-import androidx.camera.core.DisplayOrientedMeteringPointFactory
+ import androidx.camera.core.FocusMeteringAction
+ import androidx.camera.core.ImageAnalysis
+ import androidx.camera.core.ImageCapture
 @@ -57,6 +57,7 @@ import expo.modules.camera.common.PictureSavedEvent
  import expo.modules.camera.records.BarcodeSettings
  import expo.modules.camera.records.BarcodeType
@@ -64,10 +88,25 @@ index 1ff8116..ab330a2 100644
  import expo.modules.camera.records.CameraRatio
  import expo.modules.camera.records.CameraType
  import expo.modules.camera.records.FlashMode
+@@ -86,6 +87,8 @@ import kotlin.properties.Delegates
+
+ const val ANIMATION_FAST_MILLIS = 50L
+ const val ANIMATION_SLOW_MILLIS = 100L
++const val CAMERA_LENS_ULTRA_WIDE = "builtInUltraWideCamera"
++const val CAMERA_LENS_WIDE = "builtInWideAngleCamera"
+
+ @SuppressLint("ViewConstructor")
+ class ExpoCameraView(
 @@ -174,6 +175,20 @@ class ExpoCameraView(
        }
      }
  
++  var selectedLens: String? = null
++    set(value) {
++      field = value
++      setCameraZoom(zoom)
++    }
++
 +  var focusPoint: CameraFocusPoint? = null
 +    set(value) {
 +      field = value
@@ -129,12 +168,16 @@ index 1ff8116..ab330a2 100644
 -  private fun startFocusMetering() {
 +  private fun startFocusMetering(point: CameraFocusPoint? = null) {
      camera?.let {
-       val meteringPointFactory = DisplayOrientedMeteringPointFactory(
-         previewView.display,
-@@ -624,15 +643,39 @@ class ExpoCameraView(
-         previewView.width.toFloat(),
-         previewView.height.toFloat()
-       )
+-      val meteringPointFactory = DisplayOrientedMeteringPointFactory(
+-        previewView.display,
+-        it.cameraInfo,
+-        previewView.width.toFloat(),
+-        previewView.height.toFloat()
+-      )
++      if (previewView.width <= 0 || previewView.height <= 0) {
++        return
++      }
++
 +      val pointX = if (point == null) {
 +        previewView.width / 2f
 +      } else {
@@ -145,11 +188,12 @@ index 1ff8116..ab330a2 100644
 +      } else {
 +        point.y.coerceIn(0f, 1f) * previewView.height
 +      }
++      val meteringPoint = previewView.meteringPointFactory.createPoint(pointX, pointY)
       val actionBuilder = FocusMeteringAction.Builder(
 -        meteringPointFactory.createPoint(1f, 1f),
 -        FocusMeteringAction.FLAG_AF
-+        meteringPointFactory.createPoint(pointX, pointY),
-+        FocusMeteringAction.FLAG_AF or FocusMeteringAction.FLAG_AE
++        meteringPoint,
++        FocusMeteringAction.FLAG_AF or FocusMeteringAction.FLAG_AE or FocusMeteringAction.FLAG_AWB
       )
       if (focusLocked) {
         actionBuilder.disableAutoCancel()
@@ -173,9 +217,34 @@ index 1ff8116..ab330a2 100644
 +    currentCamera.cameraControl.setExposureCompensationIndex(targetIndex)
 +  }
 +
++  fun getAvailableLenses(): List<String> {
++    if (lensFacing != CameraType.BACK) {
++      return emptyList()
++    }
++
++    val zoomState = camera?.cameraInfo?.zoomState?.value ?: return listOf(CAMERA_LENS_WIDE)
++    return if (zoomState.minZoomRatio < 1f) {
++      listOf(CAMERA_LENS_ULTRA_WIDE, CAMERA_LENS_WIDE)
++    } else {
++      listOf(CAMERA_LENS_WIDE)
++    }
++  }
++
    private fun setCameraZoom(value: Float) {
-     val maxZoomRatio = camera?.cameraInfo?.zoomState?.value?.maxZoomRatio ?: 1f
-     val targetZoomRatio = max(1f, min(maxZoomRatio, value.coerceIn(0f, 1f) * maxZoomRatio))
+-    val maxZoomRatio = camera?.cameraInfo?.zoomState?.value?.maxZoomRatio ?: 1f
+-    val targetZoomRatio = max(1f, min(maxZoomRatio, value.coerceIn(0f, 1f) * maxZoomRatio))
++    val zoomState = camera?.cameraInfo?.zoomState?.value
++    val minZoomRatio = zoomState?.minZoomRatio ?: 1f
++    val maxZoomRatio = zoomState?.maxZoomRatio ?: 1f
++    val usesUltraWideZoom =
++      lensFacing == CameraType.BACK && selectedLens == CAMERA_LENS_ULTRA_WIDE && minZoomRatio < 1f
++    val targetZoomRatio = if (usesUltraWideZoom) {
++      minZoomRatio
++    } else {
++      max(1f, min(maxZoomRatio, value.coerceIn(0f, 1f) * maxZoomRatio))
++    }
+     camera?.cameraControl?.setZoomRatio(targetZoomRatio)
+   }
 diff --git a/node_modules/expo-camera/android/src/main/java/expo/modules/camera/records/CameraRecords.kt b/node_modules/expo-camera/android/src/main/java/expo/modules/camera/records/CameraRecords.kt
 index 044c4e9..2137301 100644
 --- a/node_modules/expo-camera/android/src/main/java/expo/modules/camera/records/CameraRecords.kt

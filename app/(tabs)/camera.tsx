@@ -743,8 +743,11 @@ export default function CameraScreen() {
     const nextZoom = Math.round(
       Math.max(CAMERA_ZOOM_MIN, Math.min(CAMERA_ZOOM_MAX, value))
     );
+    setSelectedCameraLens(
+      getCameraZoomPresetLens({ label: "manual", value: nextZoom }, availableCameraLenses)
+    );
     setZoomPercent(nextZoom);
-  }, []);
+  }, [availableCameraLenses]);
 
   const setZoomPreset = useCallback(
     (preset: CameraZoomPreset) => {
@@ -2401,6 +2404,7 @@ export default function CameraScreen() {
                     )}
                   </Pressable>
                   <Pressable
+                    android_disableSound
                     disabled={!isCameraReady || isCapturing}
                     onLayout={(event) => {
                       const { x, width } = event.nativeEvent.layout;

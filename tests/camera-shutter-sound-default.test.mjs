@@ -13,4 +13,9 @@ assert.ok(
   "camera capture should always request silent Android native capture"
 );
 
+assert.ok(
+  source.includes("android_disableSound"),
+  "camera shutter pressable should disable Android touch click sound"
+);
+
 console.log("ok - camera shutter sound is forced off");

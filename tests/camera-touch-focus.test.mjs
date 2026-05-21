@@ -7,6 +7,10 @@ assert.ok(fs.existsSync(focusControlsPath), "camera focus control helpers should
 
 const focusControlsSource = fs.readFileSync(focusControlsPath, "utf8");
 const cameraSource = fs.readFileSync("app/(tabs)/camera.tsx", "utf8");
+const nativeCameraSource = fs.readFileSync(
+  "node_modules/expo-camera/android/src/main/java/expo/modules/camera/ExpoCameraView.kt",
+  "utf8"
+);
 const packageJson = JSON.parse(fs.readFileSync("package.json", "utf8"));
 const patchPath = "patches/expo-camera+55.0.0.patch";
 
@@ -153,10 +157,17 @@ for (const snippet of [
   "focusPoint?.let {",
   "startFocusMetering(it)",
   "?: startFocusMetering()",
-  "FocusMeteringAction.FLAG_AF or FocusMeteringAction.FLAG_AE",
+  "previewView.meteringPointFactory.createPoint(pointX, pointY)",
+  "FocusMeteringAction.FLAG_AF or FocusMeteringAction.FLAG_AE or FocusMeteringAction.FLAG_AWB",
   "setExposureCompensationIndex"
 ]) {
   assert.ok(patchSource.includes(snippet), `expo-camera Android patch missing: ${snippet}`);
 }
+
+assert.equal(
+  nativeCameraSource.includes("DisplayOrientedMeteringPointFactory("),
+  false,
+  "expo-camera Android native code should let PreviewView map metering coordinates"
+);
 
 console.log("ok - camera touch focus and exposure control are wired");

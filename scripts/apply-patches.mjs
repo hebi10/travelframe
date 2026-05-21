@@ -65,6 +65,29 @@ function patchCameraViewModule() {
 
   source = insertAfter(
     source,
+    `      Prop("zoom") { view, zoom: Float? ->
+        zoom?.let {
+          if (view.zoom != it) {
+            view.zoom = it
+          }
+        } ?: run {
+          if (view.zoom != 0f) {
+            view.zoom = 0f
+          }
+        }
+      }
+`,
+    `
+      Prop("selectedLens") { view, selectedLens: String? ->
+        if (view.selectedLens != selectedLens) {
+          view.selectedLens = selectedLens
+        }
+      }
+`
+  );
+
+  source = insertAfter(
+    source,
     `      Prop("autoFocus") { view, autoFocus: FocusMode? ->
         autoFocus?.let {
           if (view.autoFocus != it) {
@@ -105,6 +128,19 @@ function patchCameraViewModule() {
 `
   );
 
+  source = insertAfter(
+    source,
+    `      AsyncFunction("getAvailablePictureSizes") { view: ExpoCameraView ->
+        return@AsyncFunction view.getAvailablePictureSizes()
+      }
+`,
+    `
+      AsyncFunction("getAvailableLenses") { view: ExpoCameraView ->
+        return@AsyncFunction view.getAvailableLenses()
+      }
+`
+  );
+
   write(relativePath, source);
 }
 
@@ -116,6 +152,20 @@ function patchExpoCameraView() {
     source,
     "import expo.modules.camera.records.CameraMode\n",
     "import expo.modules.camera.records.CameraFocusPoint\n"
+  );
+  source = replaceIfFound(
+    source,
+    "import androidx.camera.core.DisplayOrientedMeteringPointFactory\n",
+    ""
+  );
+
+  source = insertAfter(
+    source,
+    `const val ANIMATION_SLOW_MILLIS = 100L
+`,
+    `const val CAMERA_LENS_ULTRA_WIDE = "builtInUltraWideCamera"
+const val CAMERA_LENS_WIDE = "builtInWideAngleCamera"
+`
   );
 
   source = insertAfter(
@@ -198,6 +248,23 @@ function patchExpoCameraView() {
 
   source = insertAfter(
     source,
+    `  var zoom: Float = 0f
+    set(value) {
+      field = value
+      setCameraZoom(value)
+    }
+`,
+    `
+  var selectedLens: String? = null
+    set(value) {
+      field = value
+      setCameraZoom(zoom)
+    }
+`
+  );
+
+  source = insertAfter(
+    source,
     "      setCameraZoom(zoom)\n",
     `      setCameraExposureBias(exposureBias)
       focusPoint?.let {
@@ -206,7 +273,7 @@ function patchExpoCameraView() {
 `
   );
 
-  source = replaceOnce(
+  source = replaceIfFound(
     source,
     `  private fun startFocusMetering() {
     camera?.let {
@@ -227,12 +294,10 @@ function patchExpoCameraView() {
 `,
     `  private fun startFocusMetering(point: CameraFocusPoint? = null) {
     camera?.let {
-      val meteringPointFactory = DisplayOrientedMeteringPointFactory(
-        previewView.display,
-        it.cameraInfo,
-        previewView.width.toFloat(),
-        previewView.height.toFloat()
-      )
+      if (previewView.width <= 0 || previewView.height <= 0) {
+        return
+      }
+
       val pointX = if (point == null) {
         previewView.width / 2f
       } else {
@@ -243,9 +308,10 @@ function patchExpoCameraView() {
       } else {
         point.y.coerceIn(0f, 1f) * previewView.height
       }
+      val meteringPoint = previewView.meteringPointFactory.createPoint(pointX, pointY)
       val actionBuilder = FocusMeteringAction.Builder(
-        meteringPointFactory.createPoint(pointX, pointY),
-        FocusMeteringAction.FLAG_AF or FocusMeteringAction.FLAG_AE
+        meteringPoint,
+        FocusMeteringAction.FLAG_AF or FocusMeteringAction.FLAG_AE or FocusMeteringAction.FLAG_AWB
       )
       if (focusLocked) {
         actionBuilder.disableAutoCancel()
@@ -271,7 +337,7 @@ function patchExpoCameraView() {
 `
   );
 
-  source = replaceOnce(
+  source = replaceIfFound(
     source,
     `      val action = FocusMeteringAction.Builder(
         meteringPointFactory.createPoint(pointX, pointY),
@@ -281,14 +347,70 @@ function patchExpoCameraView() {
       it.cameraControl.startFocusAndMetering(action)
 `,
     `      val actionBuilder = FocusMeteringAction.Builder(
-        meteringPointFactory.createPoint(pointX, pointY),
-        FocusMeteringAction.FLAG_AF or FocusMeteringAction.FLAG_AE
+        previewView.meteringPointFactory.createPoint(pointX, pointY),
+        FocusMeteringAction.FLAG_AF or FocusMeteringAction.FLAG_AE or FocusMeteringAction.FLAG_AWB
       )
       if (focusLocked) {
         actionBuilder.disableAutoCancel()
       }
       val action = actionBuilder.build()
       it.cameraControl.startFocusAndMetering(action)
+`
+  );
+
+  source = insertAfter(
+    source,
+    `  private fun setCameraExposureBias(value: Float) {
+    val currentCamera = camera ?: return
+    val exposureState = currentCamera.cameraInfo.exposureState
+    if (!exposureState.isExposureCompensationSupported) {
+      return
+    }
+
+    val range = exposureState.exposureCompensationRange
+    val clampedBias = value.coerceIn(-1f, 1f)
+    val limit = if (clampedBias >= 0f) range.upper else -range.lower
+    val targetIndex = (clampedBias * limit).roundToInt().coerceIn(range.lower, range.upper)
+    currentCamera.cameraControl.setExposureCompensationIndex(targetIndex)
+  }
+`,
+    `
+  fun getAvailableLenses(): List<String> {
+    if (lensFacing != CameraType.BACK) {
+      return emptyList()
+    }
+
+    val zoomState = camera?.cameraInfo?.zoomState?.value ?: return listOf(CAMERA_LENS_WIDE)
+    return if (zoomState.minZoomRatio < 1f) {
+      listOf(CAMERA_LENS_ULTRA_WIDE, CAMERA_LENS_WIDE)
+    } else {
+      listOf(CAMERA_LENS_WIDE)
+    }
+  }
+`
+  );
+
+  source = replaceIfFound(
+    source,
+    `  private fun setCameraZoom(value: Float) {
+    val maxZoomRatio = camera?.cameraInfo?.zoomState?.value?.maxZoomRatio ?: 1f
+    val targetZoomRatio = max(1f, min(maxZoomRatio, value.coerceIn(0f, 1f) * maxZoomRatio))
+    camera?.cameraControl?.setZoomRatio(targetZoomRatio)
+  }
+`,
+    `  private fun setCameraZoom(value: Float) {
+    val zoomState = camera?.cameraInfo?.zoomState?.value
+    val minZoomRatio = zoomState?.minZoomRatio ?: 1f
+    val maxZoomRatio = zoomState?.maxZoomRatio ?: 1f
+    val usesUltraWideZoom =
+      lensFacing == CameraType.BACK && selectedLens == CAMERA_LENS_ULTRA_WIDE && minZoomRatio < 1f
+    val targetZoomRatio = if (usesUltraWideZoom) {
+      minZoomRatio
+    } else {
+      max(1f, min(maxZoomRatio, value.coerceIn(0f, 1f) * maxZoomRatio))
+    }
+    camera?.cameraControl?.setZoomRatio(targetZoomRatio)
+  }
 `
   );
 
@@ -484,5 +606,5 @@ if (fs.existsSync(expoCameraRoot)) {
   patchCameraTypes("build/Camera.types.d.ts");
   patchCameraTypes("src/Camera.types.ts");
   disableExpoCameraAndroidShutterSound();
-  console.info("applied local expo-camera Android focus and shutter patch");
+  console.info("applied local expo-camera Android focus, shutter, and zoom patch");
 }
