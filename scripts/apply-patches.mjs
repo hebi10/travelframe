@@ -178,6 +178,24 @@ function patchExpoCameraView() {
 `
   );
 
+  source = replaceIfFound(
+    source,
+    `        if (field == FocusMode.OFF) {
+          it.cancelFocusAndMetering()
+        } else {
+          startFocusMetering()
+        }
+`,
+    `        if (field == FocusMode.OFF && focusPoint == null) {
+          it.cancelFocusAndMetering()
+        } else {
+          focusPoint?.let {
+            startFocusMetering(it)
+          } ?: startFocusMetering()
+        }
+`
+  );
+
   source = insertAfter(
     source,
     "      setCameraZoom(zoom)\n",
@@ -422,11 +440,49 @@ export type CameraFocusPoint = {
   write(relativePath, source);
 }
 
+function disableExpoCameraAndroidShutterSound() {
+  const optionsPath = "android/src/main/java/expo/modules/camera/Options.kt";
+  let optionsSource = read(optionsPath);
+  optionsSource = replaceIfFound(
+    optionsSource,
+    "  @Field val shutterSound: Boolean = true,\n",
+    "  @Field val shutterSound: Boolean = false,\n"
+  );
+  write(optionsPath, optionsSource);
+
+  const cameraViewPath = "android/src/main/java/expo/modules/camera/ExpoCameraView.kt";
+  let cameraViewSource = read(cameraViewPath);
+  cameraViewSource = replaceIfFound(
+    cameraViewSource,
+    "import android.media.AudioManager\nimport android.media.MediaActionSound\n",
+    ""
+  );
+  cameraViewSource = replaceIfFound(
+    cameraViewSource,
+    `    val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+    val volume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+    val hasShutterSound = options.shutterSound
+
+`,
+    ""
+  );
+  cameraViewSource = replaceIfFound(
+    cameraViewSource,
+    `          if (hasShutterSound && volume != 0) {
+            MediaActionSound().play(MediaActionSound.SHUTTER_CLICK)
+          }
+`,
+    ""
+  );
+  write(cameraViewPath, cameraViewSource);
+}
+
 if (fs.existsSync(expoCameraRoot)) {
   patchCameraViewModule();
   patchExpoCameraView();
   patchCameraRecords();
   patchCameraTypes("build/Camera.types.d.ts");
   patchCameraTypes("src/Camera.types.ts");
-  console.info("applied local expo-camera Android focus patch");
+  disableExpoCameraAndroidShutterSound();
+  console.info("applied local expo-camera Android focus and shutter patch");
 }

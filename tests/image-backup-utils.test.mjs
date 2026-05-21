@@ -28,7 +28,7 @@ const utilsModule = await import(
   `data:text/javascript,${encodeURIComponent(rewrittenUtils)}`
 );
 
-assert.equal(constantsModule.MAX_TOTAL_IMAGE_BACKUP_SIZE_BYTES, 1024 * 1024 * 1024);
+assert.equal(constantsModule.MAX_TOTAL_IMAGE_BACKUP_SIZE_BYTES, 2 * 1024 * 1024 * 1024);
 assert.equal(constantsModule.DEFAULT_IMAGE_QUALITY, "normal");
 assert.deepEqual(
   constantsModule.IMAGE_QUALITY_OPTIONS.map((option) => [
@@ -46,10 +46,13 @@ assert.deepEqual(
 assert.equal(utilsModule.getImageQualityOption("high").quality, 0.94);
 assert.equal(utilsModule.getImageQualityOption("unknown").quality, 0.88);
 assert.equal(utilsModule.calculateCombinedImageBackupSize(100, [20, 30]), 150);
-assert.equal(utilsModule.isImageBackupSizeExceeded(1024 * 1024 * 1024), false);
-assert.equal(utilsModule.isImageBackupSizeExceeded(1024 * 1024 * 1024 + 1), true);
+assert.equal(utilsModule.isImageBackupSizeExceeded(2 * 1024 * 1024 * 1024), false);
+assert.equal(utilsModule.isImageBackupSizeExceeded(2 * 1024 * 1024 * 1024 + 1), true);
 assert.equal(utilsModule.formatImageBackupSize(384 * 1024 * 1024), "384MB");
-assert.equal(utilsModule.formatImageBackupUsage(384 * 1024 * 1024), "서버 백업 용량 384MB / 2GB");
+assert.equal(utilsModule.formatBackupStorageUsage(5 * 1024 * 1024, 2 * 1024 * 1024 * 1024), "5MB / 2GB (0.2%)");
+assert.equal(utilsModule.formatBackupStorageUsage(384 * 1024 * 1024, 2 * 1024 * 1024 * 1024), "384MB / 2GB (18.8%)");
+assert.equal(utilsModule.formatBackupStorageUsage(2 * 1024 * 1024 * 1024, 2 * 1024 * 1024 * 1024), "2GB / 2GB (100%)");
+assert.equal(utilsModule.formatImageBackupUsage(384 * 1024 * 1024), "서버 백업 용량 384MB / 2GB (18.8%)");
 assert.deepEqual(
   utilsModule.getImageResizeAction({ width: 4000, height: 2000, maxLongSide: 1920 }),
   { resize: { width: 1920, height: 960 } }

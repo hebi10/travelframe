@@ -23,12 +23,12 @@ const normalizeBackupUsage = (usage = {}) => ({
 const normalizePendingBackupUsage = (usage = {}) =>
   normalizeBackupUsage(usage.pendingUsage ?? {});
 
-const isCreatorSubscriptionActive = (subscription, now = Date.now()) => {
+const isBackupSubscriptionActive = (subscription, now = Date.now()) => {
   if (
     !subscription ||
     subscription.plan !== "premium" ||
     subscription.status !== "active" ||
-    subscription.productId !== "creator_monthly"
+    !["creator_monthly", "expert_monthly"].includes(subscription.productId)
   ) {
     return false;
   }
@@ -218,8 +218,8 @@ const assertBackupUploadAllowed = ({
   storagePath,
   now
 }) => {
-  if (!isCreatorSubscriptionActive(subscription, now)) {
-    throw new Error("Active creator subscription is required for backup uploads.");
+  if (!isBackupSubscriptionActive(subscription, now)) {
+    throw new Error("Active backup subscription is required for backup uploads.");
   }
 
   if (!VALID_MEDIA_KINDS.has(mediaKind)) {
@@ -241,7 +241,7 @@ const assertBackupUploadAllowed = ({
 exports.BACKUP_QUOTA_LIMITS = BACKUP_QUOTA_LIMITS;
 exports.normalizeBackupUsage = normalizeBackupUsage;
 exports.normalizePendingBackupUsage = normalizePendingBackupUsage;
-exports.isCreatorSubscriptionActive = isCreatorSubscriptionActive;
+exports.isBackupSubscriptionActive = isBackupSubscriptionActive;
 exports.getBackupUsageDelta = getBackupUsageDelta;
 exports.addBackupUsage = addBackupUsage;
 exports.subtractBackupUsage = subtractBackupUsage;

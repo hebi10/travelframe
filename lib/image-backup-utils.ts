@@ -178,5 +178,32 @@ export const formatImageBackupSize = (bytes: number) => {
   return `${Number.isInteger(gb) ? gb : gb.toFixed(1)}GB`;
 };
 
-export const formatImageBackupUsage = (bytes: number) =>
-  `서버 백업 용량 ${formatImageBackupSize(bytes)} / 2GB`;
+const formatStorageUsagePercent = (usedBytes: number, limitBytes: number) => {
+  if (limitBytes <= 0) {
+    return "0%";
+  }
+
+  const percent = (Math.max(0, usedBytes) / limitBytes) * 100;
+  if (percent === 0) {
+    return "0%";
+  }
+
+  if (Number.isInteger(percent)) {
+    return `${percent}%`;
+  }
+
+  return `${percent.toFixed(1)}%`;
+};
+
+export const formatBackupStorageUsage = (usedBytes: number, limitBytes: number) => {
+  if (limitBytes <= 0) {
+    return "사용 불가";
+  }
+
+  return `${formatImageBackupSize(usedBytes)} / ${formatImageBackupSize(limitBytes)} (${formatStorageUsagePercent(usedBytes, limitBytes)})`;
+};
+
+export const formatImageBackupUsage = (
+  bytes: number,
+  limitBytes = MAX_TOTAL_IMAGE_BACKUP_SIZE_BYTES
+) => `서버 백업 용량 ${formatBackupStorageUsage(bytes, limitBytes)}`;

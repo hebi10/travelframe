@@ -16,7 +16,9 @@ for (const snippet of [
   "cleanupExpiredBackupUploadSessions",
   "buildBackupSessionStoragePath",
   "deleteBackupSessionStorageObject",
-  "metadata.metadata?.backupSessionId !== backupSessionId"
+  "metadata.metadata?.backupSessionId !== backupSessionId",
+  "getBackupSubscription",
+  "subscriptions/expert_monthly"
 ]) {
   assert.ok(functionsSource.includes(snippet), `Cloud Functions missing server backup enforcement: ${snippet}`);
 }

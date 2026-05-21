@@ -9,6 +9,12 @@ import {
   Text,
   View
 } from "react-native";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import Animated, {
+  runOnJS,
+  useDerivedValue,
+  useSharedValue
+} from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
@@ -34,6 +40,11 @@ import {
   getAppSettings,
   updateAppSettings
 } from "@/lib/app-settings";
+import {
+  calculateGuidePositionDragOffset,
+  clampGuidePositionOffset,
+  type CameraGuideFrame
+} from "@/lib/camera-guide-position";
 import { useAuth } from "@/lib/auth-context";
 import { getPlanEntitlements } from "@/lib/plan-entitlements";
 import { recordBackupFailure } from "@/lib/backup-failure-queue";
@@ -66,6 +77,23 @@ const GUIDE_COLOR_OPTIONS = [
   { label: "빨강", value: "#FF5A5F" },
   { label: "검정", value: "rgba(17, 17, 17, 0.78)" }
 ] as const;
+
+const clampEditGuideSize = (value: number) => {
+  "worklet";
+
+  return Math.round(Math.max(GUIDE_SIZE_MIN, Math.min(GUIDE_SIZE_MAX, value)));
+};
+
+const getGuideSizeFromTrackX = (trackX: number, trackWidth: number) => {
+  "worklet";
+
+  if (!Number.isFinite(trackX) || trackWidth <= 0) {
+    return GUIDE_SIZE_MIN;
+  }
+
+  const ratio = Math.max(0, Math.min(1, trackX / trackWidth));
+  return clampEditGuideSize(GUIDE_SIZE_MIN + ratio * (GUIDE_SIZE_MAX - GUIDE_SIZE_MIN));
+};
 
 const ratioDisplayLabel = (value: PhotoRatioLabel) =>
   value === "Original" ? "원본" : value;
@@ -122,6 +150,15 @@ export default function EditScreen() {
   const [guideOffsetY, setGuideOffsetY] = useState(defaultAppSettings.guideOffsetY);
   const [guidePanelOpen, setGuidePanelOpen] = useState(false);
   const [isCanvasExpanded, setIsCanvasExpanded] = useState(false);
+  const [isGuidePositionAdjusting, setIsGuidePositionAdjusting] = useState(false);
+  const [guideMoveFrame, setGuideMoveFrame] = useState<CameraGuideFrame>({
+    width: 0,
+    height: 0
+  });
+  const guideOffsetXValue = useSharedValue(defaultAppSettings.guideOffsetX);
+  const guideOffsetYValue = useSharedValue(defaultAppSettings.guideOffsetY);
+  const guideDragStartX = useSharedValue(0);
+  const guideDragStartY = useSharedValue(0);
   const originalAspectRatio =
     source?.width && source?.height ? source.width / source.height : undefined;
   const canOverwriteSource = Boolean(sourcePhoto?.edited);
@@ -175,6 +212,8 @@ export default function EditScreen() {
         setGuideColor(settings.guideColor);
         setGuideOffsetX(settings.guideOffsetX);
         setGuideOffsetY(settings.guideOffsetY);
+        guideOffsetXValue.value = settings.guideOffsetX;
+        guideOffsetYValue.value = settings.guideOffsetY;
       };
 
       loadGuideSettings();
@@ -182,7 +221,7 @@ export default function EditScreen() {
       return () => {
         isActive = false;
       };
-    }, [])
+    }, [guideOffsetXValue, guideOffsetYValue])
   );
 
   useEffect(() => {
@@ -340,15 +379,22 @@ export default function EditScreen() {
   };
 
   const updateGuideSize = (nextSize: number) => {
-    const clampedSize = Math.round(
-      Math.max(GUIDE_SIZE_MIN, Math.min(GUIDE_SIZE_MAX, nextSize))
-    );
+    const clampedSize = clampEditGuideSize(nextSize);
     setGuideSize(clampedSize);
     setGuideVisible(true);
     void updateAppSettings({
       guideSize: clampedSize,
       guideVisible: true
     });
+  };
+
+  const previewGuideSize = (nextSize: number) => {
+    setGuideSize(clampEditGuideSize(nextSize));
+    setGuideVisible(true);
+  };
+
+  const commitGuideSize = (nextSize: number) => {
+    updateGuideSize(nextSize);
   };
 
   const updateGuideStrokeWidth = (nextStrokeWidth: number) => {
@@ -374,6 +420,91 @@ export default function EditScreen() {
       guideVisible: true
     });
   };
+
+  const getClampedGuideOffset = useCallback(
+    (nextX: number, nextY: number) =>
+      clampGuidePositionOffset({ x: nextX, y: nextY }, guideMoveFrame),
+    [guideMoveFrame]
+  );
+
+  const syncGuideOffsetFromGesture = useCallback(
+    (nextX: number, nextY: number) => {
+      const clampedOffset = getClampedGuideOffset(nextX, nextY);
+      setGuideOffsetX(clampedOffset.x);
+      setGuideOffsetY(clampedOffset.y);
+    },
+    [getClampedGuideOffset]
+  );
+
+  const finishGuidePositionAdjustment = useCallback(
+    (nextX: number, nextY: number) => {
+      const clampedOffset = getClampedGuideOffset(nextX, nextY);
+      guideOffsetXValue.value = clampedOffset.x;
+      guideOffsetYValue.value = clampedOffset.y;
+      setGuideOffsetX(clampedOffset.x);
+      setGuideOffsetY(clampedOffset.y);
+      setGuideVisible(true);
+      setIsGuidePositionAdjusting(false);
+      setGuidePanelOpen(true);
+      void updateAppSettings({
+        guideOffsetX: clampedOffset.x,
+        guideOffsetY: clampedOffset.y,
+        guideVisible: true
+      });
+    },
+    [getClampedGuideOffset, guideOffsetXValue, guideOffsetYValue]
+  );
+
+  const startGuidePositionAdjustment = () => {
+    setGuideVisible(true);
+    setGuidePanelOpen(false);
+    guideOffsetXValue.value = guideOffsetX;
+    guideOffsetYValue.value = guideOffsetY;
+    setIsGuidePositionAdjusting(true);
+    void updateAppSettings({ guideVisible: true });
+  };
+
+  const stopGuidePositionAdjustment = () => {
+    finishGuidePositionAdjustment(guideOffsetXValue.value, guideOffsetYValue.value);
+  };
+
+  const guidePositionGesture = useMemo(
+    () =>
+      Gesture.Pan()
+        .enabled(isGuidePositionAdjusting)
+        .onBegin(() => {
+          guideDragStartX.value = guideOffsetXValue.value;
+          guideDragStartY.value = guideOffsetYValue.value;
+        })
+        .onUpdate((event) => {
+          const nextOffset = calculateGuidePositionDragOffset({
+            startX: guideDragStartX.value,
+            startY: guideDragStartY.value,
+            translationX: event.translationX,
+            translationY: event.translationY,
+            frame: guideMoveFrame
+          });
+          guideOffsetXValue.value = nextOffset.x;
+          guideOffsetYValue.value = nextOffset.y;
+          runOnJS(syncGuideOffsetFromGesture)(nextOffset.x, nextOffset.y);
+        })
+        .onFinalize(() => {
+          runOnJS(finishGuidePositionAdjustment)(
+            guideOffsetXValue.value,
+            guideOffsetYValue.value
+          );
+        }),
+    [
+      finishGuidePositionAdjustment,
+      guideDragStartX,
+      guideDragStartY,
+      guideMoveFrame,
+      guideOffsetXValue,
+      guideOffsetYValue,
+      isGuidePositionAdjusting,
+      syncGuideOffsetFromGesture
+    ]
+  );
 
   const executeSaveEdit = async (mode: SaveEditMode) => {
     if (!source || isSaving) {
@@ -473,7 +604,13 @@ export default function EditScreen() {
         </Pressable>
       </View>
 
-      <View style={[styles.canvasWrap, isCanvasExpanded && styles.canvasWrapExpanded]}>
+      <View
+        style={[styles.canvasWrap, isCanvasExpanded && styles.canvasWrapExpanded]}
+        onLayout={(event) => {
+          const { width, height } = event.nativeEvent.layout;
+          setGuideMoveFrame({ width, height });
+        }}
+      >
         {isLoading ? (
           <View style={styles.loading}>
             <ActivityIndicator color={colors.inverse} />
@@ -495,9 +632,45 @@ export default function EditScreen() {
             guideOffsetY={guideOffsetY}
           />
         )}
+        {isCanvasExpanded && isGuidePositionAdjusting ? (
+          <GestureDetector gesture={guidePositionGesture}>
+            <View
+              collapsable={false}
+              pointerEvents="box-only"
+              style={styles.guideMoveLayer}
+            >
+              <Text selectable={false} style={styles.guideMoveText}>
+                라인을 드래그하세요
+              </Text>
+            </View>
+          </GestureDetector>
+        ) : null}
+        {isCanvasExpanded ? (
+          <Pressable
+            style={[
+              styles.guideMoveButton,
+              isGuidePositionAdjusting && styles.expandCanvasButtonActive,
+              { bottom: bottomSafePadding }
+            ]}
+            onPress={
+              isGuidePositionAdjusting
+                ? stopGuidePositionAdjustment
+                : startGuidePositionAdjustment
+            }
+          >
+            <Text selectable={false} style={styles.expandCanvasButtonText}>
+              {isGuidePositionAdjusting ? "이동 완료" : "라인 이동"}
+            </Text>
+          </Pressable>
+        ) : null}
         <Pressable
           style={[styles.expandCanvasButton, { bottom: bottomSafePadding }]}
-          onPress={() => setIsCanvasExpanded((value) => !value)}
+          onPress={() => {
+            if (isCanvasExpanded && isGuidePositionAdjusting) {
+              stopGuidePositionAdjustment();
+            }
+            setIsCanvasExpanded((value) => !value);
+          }}
         >
           <Text selectable={false} style={styles.expandCanvasButtonText}>
             {isCanvasExpanded ? "설정 열기" : "이미지만 보기"}
@@ -632,6 +805,11 @@ export default function EditScreen() {
                   </Pressable>
                 ))}
               </View>
+              <EditGuideSizeSlider
+                value={guideSize}
+                onChange={previewGuideSize}
+                onCommit={commitGuideSize}
+              />
               <View style={styles.guideOptionRow}>
                 {GUIDE_STROKE_WIDTH_OPTIONS.map((strokeWidth) => {
                   const isActive = guideStrokeWidth === strokeWidth;
@@ -744,6 +922,98 @@ export default function EditScreen() {
   );
 }
 
+function EditGuideSizeSlider({
+  value,
+  onChange,
+  onCommit
+}: {
+  value: number;
+  onChange: (value: number) => void;
+  onCommit: (value: number) => void;
+}) {
+  const [trackWidth, setTrackWidth] = useState(0);
+  const thumbX = useSharedValue(0);
+  const dragStartThumbX = useSharedValue(0);
+  const isDragging = useSharedValue(false);
+  const thumbTranslateX = useDerivedValue(() => thumbX.value - 9);
+
+  useEffect(() => {
+    if (trackWidth <= 0) {
+      return;
+    }
+
+    const ratio =
+      (clampEditGuideSize(value) - GUIDE_SIZE_MIN) / (GUIDE_SIZE_MAX - GUIDE_SIZE_MIN);
+    const nextX = Math.max(0, Math.min(1, ratio)) * trackWidth;
+    if (!isDragging.value) {
+      thumbX.value = nextX;
+    }
+  }, [isDragging, thumbX, trackWidth, value]);
+
+  const sliderGesture = useMemo(
+    () =>
+      Gesture.Pan()
+        .enabled(trackWidth > 0)
+        .hitSlop({ top: 10, bottom: 10, left: 10, right: 10 })
+        .onBegin((event) => {
+          isDragging.value = true;
+          dragStartThumbX.value = Math.max(0, Math.min(trackWidth, event.x));
+          thumbX.value = dragStartThumbX.value;
+          runOnJS(onChange)(getGuideSizeFromTrackX(dragStartThumbX.value, trackWidth));
+        })
+        .onUpdate((event) => {
+          const nextX = Math.max(
+            0,
+            Math.min(trackWidth, dragStartThumbX.value + event.translationX)
+          );
+          thumbX.value = nextX;
+          runOnJS(onChange)(getGuideSizeFromTrackX(nextX, trackWidth));
+        })
+        .onFinalize(() => {
+          isDragging.value = false;
+          runOnJS(onCommit)(getGuideSizeFromTrackX(thumbX.value, trackWidth));
+        }),
+    [dragStartThumbX, isDragging, onChange, onCommit, thumbX, trackWidth]
+  );
+
+  return (
+    <View style={styles.guideSizeSlider}>
+      <View style={styles.guideSizeSliderHeader}>
+        <Text selectable={false} style={styles.guideSizeSliderLabel}>
+          드래그로 크기 조절
+        </Text>
+        <Text selectable={false} style={styles.guideSizeSliderValue}>
+          {Math.round(value)}
+        </Text>
+      </View>
+      <GestureDetector gesture={sliderGesture}>
+        <Animated.View
+          collapsable={false}
+          style={styles.guideSizeTrack}
+          onLayout={(event) => setTrackWidth(event.nativeEvent.layout.width)}
+        >
+          <View style={styles.guideSizeTrackBase} />
+          <Animated.View style={[styles.guideSizeTrackFill, { width: thumbX }]} />
+          <Animated.View
+            style={[
+              styles.guideSizeThumb,
+              { transform: [{ translateX: thumbTranslateX }] }
+            ]}
+          />
+        </Animated.View>
+      </GestureDetector>
+      <View style={styles.guideSizeSliderRange}>
+        <Text selectable={false} style={styles.guideSizeSliderRangeText}>
+          {GUIDE_SIZE_MIN}
+        </Text>
+        <Text selectable={false} style={styles.guideSizeSliderRangeText}>
+          {GUIDE_SIZE_MAX}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
@@ -806,6 +1076,7 @@ const styles = StyleSheet.create({
   },
   expandCanvasButton: {
     position: "absolute",
+    zIndex: 10,
     right: 14,
     bottom: 14,
     minHeight: 38,
@@ -815,11 +1086,45 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255, 255, 255, 0.78)",
     backgroundColor: "rgba(0, 0, 0, 0.72)"
   },
+  guideMoveButton: {
+    position: "absolute",
+    zIndex: 10,
+    right: 112,
+    bottom: 14,
+    minHeight: 38,
+    justifyContent: "center",
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.78)",
+    backgroundColor: "rgba(0, 0, 0, 0.72)"
+  },
+  expandCanvasButtonActive: {
+    borderColor: colors.inverse,
+    backgroundColor: "rgba(255, 255, 255, 0.18)"
+  },
   expandCanvasButtonText: {
     color: colors.inverse,
     fontSize: typography.button,
     fontWeight: "800",
     letterSpacing: 0
+  },
+  guideMoveLayer: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 6,
+    alignItems: "center",
+    justifyContent: "flex-end",
+    paddingHorizontal: 16,
+    paddingBottom: 74,
+    backgroundColor: "rgba(0, 0, 0, 0.03)"
+  },
+  guideMoveText: {
+    color: colors.inverse,
+    fontSize: typography.small,
+    fontWeight: "800",
+    letterSpacing: 0,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: "rgba(0, 0, 0, 0.72)"
   },
   loading: {
     flex: 1,
@@ -1011,6 +1316,65 @@ const styles = StyleSheet.create({
   },
   guideChipTextActive: {
     color: colors.inverse
+  },
+  guideSizeSlider: {
+    gap: 8
+  },
+  guideSizeSliderHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12
+  },
+  guideSizeSliderLabel: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 0
+  },
+  guideSizeSliderValue: {
+    minWidth: 34,
+    color: colors.text,
+    textAlign: "right",
+    fontSize: 11,
+    fontWeight: "900",
+    letterSpacing: 0,
+    fontVariant: ["tabular-nums"]
+  },
+  guideSizeTrack: {
+    height: 30,
+    justifyContent: "center",
+    position: "relative"
+  },
+  guideSizeTrackBase: {
+    height: 2,
+    backgroundColor: colors.line
+  },
+  guideSizeTrackFill: {
+    position: "absolute",
+    left: 0,
+    height: 2,
+    backgroundColor: colors.text
+  },
+  guideSizeThumb: {
+    position: "absolute",
+    width: 18,
+    height: 18,
+    marginLeft: -9,
+    borderWidth: 2,
+    borderColor: colors.text,
+    backgroundColor: colors.background
+  },
+  guideSizeSliderRange: {
+    flexDirection: "row",
+    justifyContent: "space-between"
+  },
+  guideSizeSliderRangeText: {
+    color: colors.muted,
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 0,
+    fontVariant: ["tabular-nums"]
   },
   guideColorRow: {
     flexDirection: "row",

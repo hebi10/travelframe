@@ -19,7 +19,6 @@ export function CameraGuideOverlay({
   color = "rgba(255, 255, 255, 0.72)",
   size = 44,
   strokeWidth = 1,
-  aspectRatio = 1,
   offsetX = 0,
   offsetY = 0
 }: CameraGuideOverlayProps) {
@@ -27,13 +26,44 @@ export function CameraGuideOverlay({
     return null;
   }
 
-  const safeSize = Math.max(24, Math.min(86, size));
   const safeStrokeWidth = Math.max(1, Math.min(5, Math.round(strokeWidth)));
-  const safeAspectRatio =
-    Number.isFinite(aspectRatio) && aspectRatio > 0 ? aspectRatio : 1;
+  const secondaryGuideLineStyle = {
+    backgroundColor: color,
+    opacity: 0.45,
+    width: safeStrokeWidth
+  };
+  const secondaryHorizontalGuideLineStyle = {
+    backgroundColor: color,
+    height: safeStrokeWidth,
+    opacity: 0.45
+  };
+
+  if (guide === "grid") {
+    return (
+      <View style={styles.gridOverlay}>
+        <View style={[styles.gridVertical, styles.gridVerticalOne, secondaryGuideLineStyle]} />
+        <View style={[styles.gridVertical, styles.gridVerticalTwo, secondaryGuideLineStyle]} />
+        <View
+          style={[
+            styles.gridHorizontal,
+            styles.gridHorizontalOne,
+            secondaryHorizontalGuideLineStyle
+          ]}
+        />
+        <View
+          style={[
+            styles.gridHorizontal,
+            styles.gridHorizontalTwo,
+            secondaryHorizontalGuideLineStyle
+          ]}
+        />
+      </View>
+    );
+  }
+
+  const safeSize = Math.max(24, Math.min(86, size));
   const inset = `${(100 - safeSize) / 2}%` as DimensionValue;
   const guideWidth = `${safeSize}%` as DimensionValue;
-  const guideHeight = `${safeSize}%` as DimensionValue;
   const lineLengthStyle = {
     left: inset,
     right: inset
@@ -50,26 +80,6 @@ export function CameraGuideOverlay({
     backgroundColor: color,
     width: safeStrokeWidth
   };
-  const secondaryGuideLineStyle = {
-    backgroundColor: color,
-    opacity: 0.45,
-    width: safeStrokeWidth
-  };
-  const secondaryHorizontalGuideLineStyle = {
-    backgroundColor: color,
-    height: safeStrokeWidth,
-    opacity: 0.45
-  };
-  const gridFrameStyle =
-    safeAspectRatio >= 1
-      ? {
-          width: guideWidth,
-          aspectRatio: safeAspectRatio
-        }
-      : {
-          height: guideHeight,
-          aspectRatio: safeAspectRatio
-        };
   const offsetStyle = {
     transform: [
       { translateX: Number.isFinite(offsetX) ? offsetX : 0 },
@@ -117,26 +127,6 @@ export function CameraGuideOverlay({
           />
         </>
       ) : null}
-      {guide === "grid" ? (
-        <View style={[styles.gridFrame, gridFrameStyle]}>
-          <View style={[styles.gridVertical, styles.gridVerticalOne, secondaryGuideLineStyle]} />
-          <View style={[styles.gridVertical, styles.gridVerticalTwo, secondaryGuideLineStyle]} />
-          <View
-            style={[
-              styles.gridHorizontal,
-              styles.gridHorizontalOne,
-              secondaryHorizontalGuideLineStyle
-            ]}
-          />
-          <View
-            style={[
-              styles.gridHorizontal,
-              styles.gridHorizontalTwo,
-              secondaryHorizontalGuideLineStyle
-            ]}
-          />
-        </View>
-      ) : null}
       {guide === "horizon" ? (
         <View style={[styles.horizon, lineLengthStyle, guideLineStyle]} />
       ) : null}
@@ -149,6 +139,10 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     alignItems: "center",
     justifyContent: "center",
+    pointerEvents: "none"
+  },
+  gridOverlay: {
+    ...StyleSheet.absoluteFillObject,
     pointerEvents: "none"
   },
   centerDot: {
@@ -184,10 +178,6 @@ const styles = StyleSheet.create({
     left: "50%",
     width: 1,
     backgroundColor: "rgba(255, 255, 255, 0.72)"
-  },
-  gridFrame: {
-    aspectRatio: 1,
-    position: "relative"
   },
   gridVertical: {
     position: "absolute",

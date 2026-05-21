@@ -36,12 +36,20 @@ for (const snippet of [
   "스크롤",
   "showsVerticalScrollIndicator",
   "persistentScrollbar",
-  "cameraSettingsBottomHint",
-  "cameraSettingsGrabber",
   "cameraSettingsScrollHintIcon",
   "↓"
 ]) {
   assert.ok(cameraSource.includes(snippet), `camera settings scroll affordance missing: ${snippet}`);
+}
+
+for (const forbidden of [
+  "cameraSettingsBottomHint",
+  "cameraSettingsGrabber"
+]) {
+  assert.ok(
+    !cameraSource.includes(forbidden),
+    `camera settings should not keep the bottom white affordance: ${forbidden}`
+  );
 }
 
 for (const forbidden of ["아래로 스크롤"]) {

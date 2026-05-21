@@ -10,6 +10,21 @@ index 7e50b98..a4d26a2 100644
  import expo.modules.camera.records.CameraRatio
  import expo.modules.camera.records.CameraType
  import expo.modules.camera.records.FlashMode
+@@ -166,11 +167,15 @@ class ExpoCameraView(
+     set(value) {
+       field = value
+       camera?.cameraControl?.let {
+-        if (field == FocusMode.OFF) {
++        if (field == FocusMode.OFF && focusPoint == null) {
+           it.cancelFocusAndMetering()
+         } else {
+-          startFocusMetering()
++          focusPoint?.let {
++            startFocusMetering(it)
++          } ?: startFocusMetering()
+         }
+       }
+     }
 @@ -389,6 +390,14 @@ class CameraViewModule : Module() {
          }
        }
@@ -33,6 +48,14 @@ diff --git a/node_modules/expo-camera/android/src/main/java/expo/modules/camera/
 index 1ff8116..ab330a2 100644
 --- a/node_modules/expo-camera/android/src/main/java/expo/modules/camera/ExpoCameraView.kt
 +++ b/node_modules/expo-camera/android/src/main/java/expo/modules/camera/ExpoCameraView.kt
+@@ -7,8 +7,6 @@ import android.graphics.ImageFormat
+ import android.graphics.SurfaceTexture
+ import android.hardware.camera2.CameraCharacteristics
+-import android.media.AudioManager
+-import android.media.MediaActionSound
+ import android.os.Bundle
+ import android.util.Log
+ import android.util.Size
 @@ -57,6 +57,7 @@ import expo.modules.camera.common.PictureSavedEvent
  import expo.modules.camera.records.BarcodeSettings
  import expo.modules.camera.records.BarcodeType
@@ -67,13 +90,31 @@ index 1ff8116..ab330a2 100644
 +      setCameraExposureBias(value)
 +    }
 +
-   var videoQuality: VideoQuality = VideoQuality.VIDEO1080P
-     set(value) {
-       field = value
+  var videoQuality: VideoQuality = VideoQuality.VIDEO1080P
+    set(value) {
+      field = value
+@@ -300,15 +315,8 @@ class ExpoCameraView(
+   }
+ 
+   fun takePicture(options: PictureOptions, promise: Promise, cacheDirectory: File, runtimeContext: RuntimeContext) {
+-    val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+-    val volume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+-    val hasShutterSound = options.shutterSound
+-
+     imageCaptureUseCase?.takePicture(
+       ContextCompat.getMainExecutor(context),
+       object : ImageCapture.OnImageCapturedCallback() {
+         override fun onCaptureStarted() {
+-          if (hasShutterSound && volume != 0) {
+-            MediaActionSound().play(MediaActionSound.SHUTTER_CLICK)
+-          }
+           if (!animateShutter) {
+             return
+           }
 @@ -520,6 +535,10 @@ class ExpoCameraView(
-       }
-       // Set the previous zoom level after recreating the camera
-       setCameraZoom(zoom)
+      }
+      // Set the previous zoom level after recreating the camera
+      setCameraZoom(zoom)
 +      setCameraExposureBias(exposureBias)
 +      focusPoint?.let {
 +        startFocusMetering(it)
@@ -151,6 +192,19 @@ index 044c4e9..2137301 100644
  enum class VideoStabilizationMode(val value: String) : Enumerable {
    OFF("off"),
    STANDARD("standard"),
+diff --git a/node_modules/expo-camera/android/src/main/java/expo/modules/camera/Options.kt b/node_modules/expo-camera/android/src/main/java/expo/modules/camera/Options.kt
+index f03af67..51284f0 100644
+--- a/node_modules/expo-camera/android/src/main/java/expo/modules/camera/Options.kt
++++ b/node_modules/expo-camera/android/src/main/java/expo/modules/camera/Options.kt
+@@ -15,7 +15,7 @@ data class PictureOptions(
+   @Field val fastMode: Boolean = false,
+   @Field val id: Int? = null,
+   @Field val maxDownsampling: Int = 1,
+-  @Field val shutterSound: Boolean = true,
++  @Field val shutterSound: Boolean = false,
+   @Field val pictureRef: Boolean = false
+ ) : Record
+ 
 diff --git a/node_modules/expo-camera/build/Camera.types.d.ts b/node_modules/expo-camera/build/Camera.types.d.ts
 index 8ff7a92..16a60dc 100644
 --- a/node_modules/expo-camera/build/Camera.types.d.ts

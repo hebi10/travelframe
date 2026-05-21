@@ -11,7 +11,8 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  View
+  View,
+  type GestureResponderEvent
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -47,6 +48,7 @@ import {
   type AppImageSaveFormat,
   type AppSettings,
   type CameraSaveScope,
+  type CloudBackupTarget,
   type FontSize,
   type FontStyle,
   type ScreenLayout,
@@ -88,7 +90,7 @@ import {
   type LocalWorkspaceSummary
 } from "@/lib/cloud-backup";
 import {
-  formatImageBackupSize,
+  formatBackupStorageUsage,
   formatImageBackupUsage
 } from "@/lib/image-backup-utils";
 import { getPhotos } from "@/lib/photo-library";
@@ -124,6 +126,7 @@ type SettingKey =
   | "screenLayout"
   | "storageMode"
   | "cloudBackupEnabled"
+  | "cloudBackupTargets"
   | "imageBackupQuality";
 
 type UsageStats = {
@@ -134,10 +137,45 @@ type UsageStats = {
 
 const opacityOptions = [0.2, 0.3, 0.4, 0.5, 0.6, 0.7];
 const cameraRatioOptions = ["Original", "1:1", "3:4", "4:5", "9:16", "16:9"] as const;
+const clampSettingsGuideSize = (value: number) =>
+  Math.round(Math.max(GUIDE_SIZE_MIN, Math.min(GUIDE_SIZE_MAX, value)));
+const getGuideSizeFromTrackX = (locationX: number, trackWidth: number) => {
+  if (!Number.isFinite(locationX) || trackWidth <= 0) {
+    return GUIDE_SIZE_MIN;
+  }
+
+  const ratio = Math.max(0, Math.min(1, locationX / trackWidth));
+  return clampSettingsGuideSize(
+    GUIDE_SIZE_MIN + ratio * (GUIDE_SIZE_MAX - GUIDE_SIZE_MIN)
+  );
+};
 const storageModeLegend =
   "로컬 저장만 사용 / 로컬 저장 + 클라우드 백업 / 로컬 용량 절약 모드";
 const storageSaverUpgradeMessage =
   "로컬 용량 절약 모드는 Pro 이상에서만 사용 가능합니다.";
+const backupTargetOptions: {
+  value: CloudBackupTarget;
+  label: string;
+  detail: string;
+}[] = [
+  { value: "photos", label: "사진", detail: "앱 사진 목록을 백업합니다." },
+  { value: "imageBundles", label: "여러 사진 작업", detail: "편집/여행 클립 이미지 작업을 백업합니다." },
+  { value: "videos", label: "영상", detail: "완성된 MP4 영상을 백업합니다." },
+  { value: "music", label: "음악", detail: "사용자 음악 파일을 백업합니다." }
+];
+
+const getBackupTargetsSummary = (targets: AppSettings["cloudBackupTargets"]) => {
+  const selectedLabels = backupTargetOptions
+    .filter((option) => targets[option.value] !== false)
+    .map((option) => option.label);
+
+  if (selectedLabels.length === backupTargetOptions.length) {
+    return "전체";
+  }
+
+  return selectedLabels.length > 0 ? selectedLabels.join(", ") : "선택 없음";
+};
+
 const cameraSaveScopeOptions: { value: CameraSaveScope; label: string; detail: string }[] = [
   { value: "app", label: "앱", detail: "앱 사진 목록에만 저장합니다." },
   { value: "device", label: "핸드폰", detail: "핸드폰 앨범에만 저장합니다." },
@@ -193,8 +231,7 @@ const formatStorageQuotaValue = (usedBytes: number, limitBytes: number) => {
     return "사용 불가";
   }
 
-  const remaining = Math.max(0, limitBytes - Math.max(0, usedBytes));
-  return `${formatImageBackupSize(usedBytes)} / ${formatImageBackupSize(limitBytes)} · 남은 ${formatImageBackupSize(remaining)}`;
+  return formatBackupStorageUsage(usedBytes, limitBytes);
 };
 
 const formatBackupDateTime = (value?: string | null) => {
@@ -525,6 +562,10 @@ export default function SettingsScreen() {
       return "클라우드 백업";
     }
 
+    if (activeSetting === "cloudBackupTargets") {
+      return "백업 대상";
+    }
+
     if (activeSetting === "imageBackupQuality") {
       return "이미지 백업 화질";
     }
@@ -540,6 +581,34 @@ export default function SettingsScreen() {
     setSettings(nextSettings);
     await saveAppSettings(nextSettings);
     setActiveSetting(null);
+  };
+
+  const previewGuideSize = (value: number) => {
+    setSettings((current) => ({
+      ...current,
+      guideSize: clampSettingsGuideSize(value),
+      guideVisible: true
+    }));
+  };
+
+  const commitGuideSize = (value: number) => {
+    void updateSetting({
+      guideSize: clampSettingsGuideSize(value),
+      guideVisible: true
+    });
+  };
+
+  const toggleCloudBackupTarget = async (target: CloudBackupTarget) => {
+    const nextTargets = {
+      ...settings.cloudBackupTargets,
+      [target]: settings.cloudBackupTargets[target] === false
+    };
+    const nextSettings = {
+      ...settings,
+      cloudBackupTargets: nextTargets
+    };
+    setSettings(nextSettings);
+    await saveAppSettings(nextSettings);
   };
 
   const openDeleteRequestPage = () => {
@@ -698,7 +767,7 @@ export default function SettingsScreen() {
         cloudBackupEnabled: true
       });
       setAuthMessage(
-        `클라우드 백업을 불러왔습니다. 사진 ${summary.photoCount}장, 여러 사진 작업 ${summary.imageBundleCount}개, 영상 ${summary.videoCount}개를 현재 기기 목록에 반영했습니다.`
+        `클라우드 백업에서 현재 앱에 없는 항목만 불러왔습니다. 사진 ${summary.photoCount}장, 여러 사진 작업 ${summary.imageBundleCount}개, 영상 ${summary.videoCount}개를 추가했습니다.`
       );
     } catch (error) {
       setAuthMessage(error instanceof Error ? error.message : "클라우드 백업을 불러오지 못했습니다.");
@@ -711,7 +780,7 @@ export default function SettingsScreen() {
     const showWarning = () =>
       Alert.alert(
         "클라우드 데이터 불러오기",
-        "클라우드 백업 데이터를 불러오면 현재 기기의 사진, 작업물, 영상 목록이 클라우드 백업 기준으로 변경됩니다. 자동 병합하지 않습니다. 계속하시겠습니까?",
+        "클라우드 백업 데이터 중 현재 앱에 없는 사진, 작업물, 영상만 불러옵니다. 이미 저장된 항목은 그대로 둡니다. 계속하시겠습니까?",
         [
           { text: "취소", style: "cancel" },
           {
@@ -1138,6 +1207,12 @@ export default function SettingsScreen() {
                   mark={getStorageModeLabel(effectiveStorageMode)}
                   onPress={() => setActiveSetting("storageMode")}
                 />
+                <ActionRow
+                  label="백업 대상"
+                  detail="클라우드 백업에 포함할 데이터를 선택합니다."
+                  mark={getBackupTargetsSummary(settings.cloudBackupTargets)}
+                  onPress={() => setActiveSetting("cloudBackupTargets")}
+                />
                 <View style={[styles.backupStatusPanel, themed.border]}>
                   <Text selectable style={[styles.backupStatusTitle, themed.text]}>
                     백업 데이터
@@ -1474,6 +1549,11 @@ export default function SettingsScreen() {
                   </Pressable>
                 ))}
               </View>
+              <SettingsGuideSizeSlider
+                value={settings.guideSize}
+                onChange={previewGuideSize}
+                onCommit={commitGuideSize}
+              />
             </View>
 
             <View style={styles.compactGroup}>
@@ -1888,6 +1968,18 @@ export default function SettingsScreen() {
                   ))
                 : null}
 
+              {activeSetting === "cloudBackupTargets"
+                ? backupTargetOptions.map((option) => (
+                    <OptionButton
+                      key={option.value}
+                      label={option.label}
+                      detail={option.detail}
+                      active={settings.cloudBackupTargets[option.value] !== false}
+                      onPress={() => toggleCloudBackupTarget(option.value)}
+                    />
+                  ))
+                : null}
+
               {activeSetting === "storageMode" ? (
                 <>
                   <View style={[styles.backupStatusPanel, themed.border]}>
@@ -1986,7 +2078,7 @@ export default function SettingsScreen() {
             <View style={styles.backupProgressHeader}>
               <ActivityIndicator color={palette.text} />
               <View style={styles.backupProgressCopy}>
-                <Text selectable style={[styles.modalTitle, themed.text]}>
+                <Text selectable={false} style={[styles.modalTitle, themed.text]}>
                   백업 상태 확인 중
                 </Text>
                 <Text selectable style={[styles.optionDetail, themed.mutedText]}>
@@ -2182,6 +2274,80 @@ function OptionButton({
         ]}
       />
     </Pressable>
+  );
+}
+
+function SettingsGuideSizeSlider({
+  value,
+  onChange,
+  onCommit
+}: {
+  value: number;
+  onChange: (value: number) => void;
+  onCommit: (value: number) => void;
+}) {
+  const { palette } = useAppAppearance();
+  const [trackWidth, setTrackWidth] = useState(1);
+  const progress =
+    ((clampSettingsGuideSize(value) - GUIDE_SIZE_MIN) /
+      (GUIDE_SIZE_MAX - GUIDE_SIZE_MIN)) *
+    100;
+  const getEventValue = (event: GestureResponderEvent) =>
+    getGuideSizeFromTrackX(event.nativeEvent.locationX, trackWidth);
+
+  const handlePreview = (event: GestureResponderEvent) => {
+    onChange(getEventValue(event));
+  };
+
+  const handleCommit = (event: GestureResponderEvent) => {
+    onCommit(getEventValue(event));
+  };
+
+  return (
+    <View style={styles.settingsGuideSizeSlider}>
+      <View style={styles.settingsGuideSizeSliderHeader}>
+        <Text selectable={false} style={[styles.settingsGuideSizeSliderLabel, { color: palette.muted }]}>
+          드래그로 크기 조절
+        </Text>
+        <Text selectable={false} style={[styles.settingsGuideSizeSliderValue, { color: palette.text }]}>
+          {Math.round(value)}
+        </Text>
+      </View>
+      <View
+        style={styles.settingsGuideSizeTrack}
+        onLayout={(event) => setTrackWidth(Math.max(1, event.nativeEvent.layout.width))}
+        onStartShouldSetResponder={() => true}
+        onResponderGrant={handlePreview}
+        onResponderMove={handlePreview}
+        onResponderRelease={handleCommit}
+      >
+        <View style={[styles.settingsGuideSizeTrackBase, { backgroundColor: palette.line }]} />
+        <View
+          style={[
+            styles.settingsGuideSizeTrackFill,
+            { backgroundColor: palette.text, width: `${progress}%` }
+          ]}
+        />
+        <View
+          style={[
+            styles.settingsGuideSizeThumb,
+            {
+              borderColor: palette.text,
+              backgroundColor: palette.background,
+              left: `${progress}%`
+            }
+          ]}
+        />
+      </View>
+      <View style={styles.settingsGuideSizeSliderRange}>
+        <Text selectable={false} style={[styles.settingsGuideSizeSliderRangeText, { color: palette.muted }]}>
+          {GUIDE_SIZE_MIN}
+        </Text>
+        <Text selectable={false} style={[styles.settingsGuideSizeSliderRangeText, { color: palette.muted }]}>
+          {GUIDE_SIZE_MAX}
+        </Text>
+      </View>
+    </View>
   );
 }
 
@@ -2548,6 +2714,59 @@ const styles = StyleSheet.create({
   },
   compactOptionTextActive: {
     color: colors.inverse
+  },
+  settingsGuideSizeSlider: {
+    gap: 8,
+    paddingTop: 2
+  },
+  settingsGuideSizeSliderHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12
+  },
+  settingsGuideSizeSliderLabel: {
+    fontSize: typography.small,
+    fontWeight: "800",
+    letterSpacing: 0
+  },
+  settingsGuideSizeSliderValue: {
+    minWidth: 34,
+    textAlign: "right",
+    fontSize: typography.small,
+    fontWeight: "900",
+    letterSpacing: 0,
+    fontVariant: ["tabular-nums"]
+  },
+  settingsGuideSizeTrack: {
+    height: 30,
+    justifyContent: "center",
+    position: "relative"
+  },
+  settingsGuideSizeTrackBase: {
+    height: 2
+  },
+  settingsGuideSizeTrackFill: {
+    position: "absolute",
+    left: 0,
+    height: 2
+  },
+  settingsGuideSizeThumb: {
+    position: "absolute",
+    width: 18,
+    height: 18,
+    marginLeft: -9,
+    borderWidth: 2
+  },
+  settingsGuideSizeSliderRange: {
+    flexDirection: "row",
+    justifyContent: "space-between"
+  },
+  settingsGuideSizeSliderRangeText: {
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 0,
+    fontVariant: ["tabular-nums"]
   },
   colorGrid: {
     flexDirection: "row",

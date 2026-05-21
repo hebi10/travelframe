@@ -9,7 +9,7 @@ for (const snippet of [
   "openLineGuideSettings",
   "openPhotoGuideSettings",
   "visible={guideChoiceOpen}",
-  'tab.id === "guide"',
+  'activeCameraControlTab === "guide"',
   "onPress={openLineGuideSettings}",
   "onPress={openPhotoGuideSettings}",
   "가이드",

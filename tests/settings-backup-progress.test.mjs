@@ -39,4 +39,17 @@ assert.ok(
   "settings option selections should use border emphasis without filled text backgrounds"
 );
 
+const backupCheckModalStart = settingsSource.indexOf(
+  "visible={isBackupSubmitting && Boolean(backupCheckMessage)}"
+);
+const backupCheckModalEnd = settingsSource.indexOf("</Modal>", backupCheckModalStart);
+const backupCheckModal = settingsSource.slice(backupCheckModalStart, backupCheckModalEnd);
+
+assert.ok(
+  backupCheckModal.includes(
+    "selectable={false} style={[styles.modalTitle, themed.text]}"
+  ),
+  "backup check modal title should not render Android selectable text background"
+);
+
 console.log("ok - settings shows initial backup progress");

@@ -8,6 +8,10 @@ const activeCreatorSubscription = {
   productId: "creator_monthly",
   expiresAt: new Date(Date.now() + 60_000).toISOString()
 };
+const activeExpertSubscription = {
+  ...activeCreatorSubscription,
+  productId: "expert_monthly"
+};
 
 assert.equal(quota.BACKUP_QUOTA_LIMITS.imageTotalBytes, 2 * 1024 * 1024 * 1024);
 assert.equal(quota.BACKUP_QUOTA_LIMITS.totalBytes, 2 * 1024 * 1024 * 1024);
@@ -32,6 +36,18 @@ assert.doesNotThrow(() => {
   });
 });
 
+assert.doesNotThrow(() => {
+  quota.assertBackupUploadAllowed({
+    uid: "user-1",
+    subscription: activeExpertSubscription,
+    usage: { imageTotalBytes: 1024, videoCount: 0, videoTotalBytes: 0, audioTotalBytes: 0 },
+    mediaKind: "image",
+    fileSize: 2048,
+    contentType: "image/jpeg",
+    storagePath: "users/user-1/backups/photos/photo-expert.jpg"
+  });
+});
+
 assert.throws(
   () =>
     quota.assertBackupUploadAllowed({
@@ -43,7 +59,7 @@ assert.throws(
       contentType: "image/jpeg",
       storagePath: "users/user-1/backups/photos/photo-1.jpg"
     }),
-  /creator subscription/i
+  /backup subscription/i
 );
 
 assert.throws(

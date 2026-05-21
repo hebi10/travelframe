@@ -11,13 +11,17 @@ import {
 import { httpsCallable } from "firebase/functions";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 
-import { getAppSettings, type AppSettings } from "@/lib/app-settings";
+import {
+  getAppSettings,
+  isCloudBackupTargetEnabled,
+  type AppSettings
+} from "@/lib/app-settings";
 import {
   IMAGE_BACKUP_SIZE_EXCEEDED_MESSAGE,
-  IMAGE_OPTIMIZATION_FAILED_MESSAGE,
-  MAX_TOTAL_IMAGE_BACKUP_SIZE_BYTES
+  IMAGE_OPTIMIZATION_FAILED_MESSAGE
 } from "@/constants/image";
 import {
+  CLOUD_BACKUP_STORAGE_LIMIT_BYTES,
   CLOUD_BACKUP_VIDEO_LIMIT,
   canBackupMoreVideos
 } from "@/lib/cloud-backup-limits";
@@ -188,7 +192,7 @@ const callBackupFunction = async <Request, Response>(
 
     if (
       code.includes("permission-denied") ||
-      message.includes("Active creator subscription")
+      message.includes("Active backup subscription")
     ) {
       throw new Error(
         "구독이 활성화된 계정만 백업할 수 있습니다. 관리자 페이지에서 구독 상태를 확인해 주세요."
@@ -420,7 +424,7 @@ const assertImageBackupCapacity = async ({
     newImages.map((image) => image.size)
   );
 
-  if (isImageBackupSizeExceeded(totalSize, MAX_TOTAL_IMAGE_BACKUP_SIZE_BYTES)) {
+  if (isImageBackupSizeExceeded(totalSize, CLOUD_BACKUP_STORAGE_LIMIT_BYTES)) {
     throw new Error(IMAGE_BACKUP_SIZE_EXCEEDED_MESSAGE);
   }
 
@@ -565,12 +569,21 @@ export const backupCurrentWorkspace = async ({
     getImageBundleWorks(),
     getMadeVideos()
   ]);
+  const selectedPhotoBackups = isCloudBackupTargetEnabled(settings, "photos")
+    ? photos
+    : [];
+  const selectedImageBundleBackups = isCloudBackupTargetEnabled(settings, "imageBundles")
+    ? imageBundles
+    : [];
+  const selectedVideoBackups = isCloudBackupTargetEnabled(settings, "videos")
+    ? videos
+    : [];
   emitBackupProgress(onProgress, 8, "백업할 데이터를 확인하고 있습니다.");
   const backedUpAt = new Date().toISOString();
   const sourceDeviceId = await getSourceDeviceId();
   const totalOptimizeItems =
-    photos.length +
-    imageBundles.reduce((sum, work) => sum + work.imageUris.length, 0);
+    selectedPhotoBackups.length +
+    selectedImageBundleBackups.reduce((sum, work) => sum + work.imageUris.length, 0);
   let optimizedItemCount = 0;
   const updateOptimizationProgress = () => {
     optimizedItemCount += 1;
@@ -581,7 +594,7 @@ export const backupCurrentWorkspace = async ({
     );
   };
   const optimizedPhotos = await Promise.all(
-    photos.map(async (photo) => {
+    selectedPhotoBackups.map(async (photo) => {
       const optimized = await optimizeImageForBackup({
         uri: photo.uri,
         width: photo.width,
@@ -596,7 +609,7 @@ export const backupCurrentWorkspace = async ({
     throw new Error(IMAGE_OPTIMIZATION_FAILED_MESSAGE);
   });
   const optimizedImageBundles = await Promise.all(
-    imageBundles.map(async (work) => ({
+    selectedImageBundleBackups.map(async (work) => ({
       work,
       images: await Promise.all(
         work.imageUris.map(async (imageUri, index) => {
@@ -625,15 +638,15 @@ export const backupCurrentWorkspace = async ({
   const imageBackupBytes = await assertImageBackupCapacity({
     userId: user.uid,
     newImages: allOptimizedImages,
-    excludePhotoIds: photos.map((photo) => photo.id),
-    excludeImageWorkIds: imageBundles.map((work) => work.id)
+    excludePhotoIds: selectedPhotoBackups.map((photo) => photo.id),
+    excludeImageWorkIds: selectedImageBundleBackups.map((work) => work.id)
   });
   emitBackupProgress(onProgress, 50, "백업 용량을 확인했습니다.");
 
   const totalUploadItems =
-    photos.length +
+    selectedPhotoBackups.length +
     optimizedImageBundles.reduce((sum, item) => sum + item.images.length, 0) +
-    videos.length;
+    selectedVideoBackups.length;
   let uploadedItemCount = 0;
   const updateUploadProgress = () => {
     uploadedItemCount += 1;
@@ -750,7 +763,7 @@ export const backupCurrentWorkspace = async ({
     });
   }
 
-  for (const video of videos) {
+  for (const video of selectedVideoBackups) {
     const videoSnapshot = await getDoc(
       doc(firestore, "users", user.uid, "videos", video.id)
     );
@@ -827,9 +840,9 @@ export const backupCurrentWorkspace = async ({
       settings,
       imageBundles,
       videos,
-      photoCount: photos.length,
-      imageBundleCount: imageBundles.length,
-      videoCount: videos.length,
+      photoCount: selectedPhotoBackups.length,
+      imageBundleCount: selectedImageBundleBackups.length,
+      videoCount: selectedVideoBackups.length,
       imageBackupBytes,
       status: "active",
       backedUpAt,
@@ -841,9 +854,9 @@ export const backupCurrentWorkspace = async ({
   emitBackupProgress(onProgress, 100, "백업을 완료했습니다.");
 
   return {
-    photoCount: photos.length,
-    imageBundleCount: imageBundles.length,
-    videoCount: videos.length,
+    photoCount: selectedPhotoBackups.length,
+    imageBundleCount: selectedImageBundleBackups.length,
+    videoCount: selectedVideoBackups.length,
     imageBackupBytes,
     deleteAfter: null
   };
@@ -983,7 +996,8 @@ export const backupPhotoIfEnabled = async ({
     !shouldUseCloudBackupForStorageMode(
       settings.storageMode,
       isCreatorSubscriptionActive(subscription)
-    )
+    ) ||
+    !isCloudBackupTargetEnabled(settings, "photos")
   ) {
     return null;
   }
@@ -1016,6 +1030,10 @@ export const backupImageBundleWork = async ({
   }
 
   const settings = await getAppSettings();
+  if (!isCloudBackupTargetEnabled(settings, "imageBundles")) {
+    return null;
+  }
+
   const sourceDeviceId = await getSourceDeviceId();
   const backedUpAt = new Date().toISOString();
   const optimizedImages = await Promise.all(
@@ -1121,6 +1139,10 @@ export const backupMadeVideo = async ({
     getSourceDeviceId(),
     getAppSettings()
   ]);
+  if (!isCloudBackupTargetEnabled(settings, "videos")) {
+    return null;
+  }
+
   const backedUpAt = new Date().toISOString();
   const currentVideoCount = await getCollectionSize(user.uid, "videos");
   if (!canBackupMoreVideos(currentVideoCount)) {
@@ -1272,17 +1294,28 @@ export const restoreCloudBackupToLocal = async ({ user }: { user: User | null })
   const videos = videoSnapshot.docs.map((item) =>
     normalizeVideoBackup(item.data(), item.id)
   );
+  const [localPhotos, localImageWorks, localVideos] = await Promise.all([
+    getPhotos(),
+    getImageBundleWorks(),
+    getMadeVideos()
+  ]);
+  const existingPhotoIds = new Set(localPhotos.map((item) => item.id));
+  const existingImageWorkIds = new Set(localImageWorks.map((item) => item.id));
+  const existingVideoIds = new Set(localVideos.map((item) => item.id));
+  const missingPhotos = photos.filter((item) => !existingPhotoIds.has(item.id));
+  const missingImageWorks = imageWorks.filter((item) => !existingImageWorkIds.has(item.id));
+  const missingVideos = videos.filter((item) => !existingVideoIds.has(item.id));
 
   await Promise.all([
-    replacePhotosFromBackup(photos),
-    replaceImageBundleWorksFromBackup(imageWorks),
-    replaceMadeVideosFromBackup(videos)
+    replacePhotosFromBackup([...localPhotos, ...missingPhotos]),
+    replaceImageBundleWorksFromBackup([...localImageWorks, ...missingImageWorks]),
+    replaceMadeVideosFromBackup([...localVideos, ...missingVideos])
   ]);
 
   return {
-    photoCount: photos.length,
-    imageBundleCount: imageWorks.length,
-    videoCount: videos.length,
+    photoCount: missingPhotos.length,
+    imageBundleCount: missingImageWorks.length,
+    videoCount: missingVideos.length,
     imageBackupBytes: await getCurrentImageBackupSize({ userId: user.uid }),
     deleteAfter: null
   };

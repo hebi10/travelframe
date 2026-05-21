@@ -15,7 +15,8 @@ for (const snippet of [
 }
 
 assert.ok(
-  source.includes("shouldBackupVideoExport && cloudBackupEnabled"),
+  source.includes("shouldBackupVideoExport && videoBackupTargetEnabled") &&
+    source.includes("cloudBackupEnabled"),
   "video backup should require the export backup checkbox"
 );
 

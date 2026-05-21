@@ -149,6 +149,10 @@ for (const snippet of [
   "focusLocked",
   "exposureBias",
   "disableAutoCancel",
+  "if (field == FocusMode.OFF && focusPoint == null)",
+  "focusPoint?.let {",
+  "startFocusMetering(it)",
+  "?: startFocusMetering()",
   "FocusMeteringAction.FLAG_AF or FocusMeteringAction.FLAG_AE",
   "setExposureCompensationIndex"
 ]) {

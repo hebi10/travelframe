@@ -294,7 +294,7 @@ export default function StudioScreen() {
     }
   };
 
-  const capturedPhotos = photos.filter((photo) => photo.kind === "original");
+  const photoLibraryItems = photos;
   const editedPhotos = photos.filter((photo) => photo.edited);
   const singleImageWorks: StudioWorkItem[] = editedPhotos.map((item) => ({
     kind: "single-image",
@@ -311,9 +311,10 @@ export default function StudioScreen() {
     item,
     createdAt: item.createdAt
   }));
+  const savedVideoWorks = videoWorks;
   const workCount =
     singleImageWorks.length + imageBundleWorks.length + videoWorks.length;
-  const videoWorkCount = imageBundleWorks.length + videoWorks.length;
+  const videoWorkCount = imageBundleWorks.length + savedVideoWorks.length;
   const shouldShowBackupUsage =
     Boolean(user) && cloudBackupEnabled && isCreatorSubscriptionActive(subscription);
   const isDark = palette.background !== colors.background;
@@ -411,9 +412,9 @@ export default function StudioScreen() {
           ) : null}
           {isLoading ? (
             <LoadingState />
-          ) : capturedPhotos.length > 0 ? (
+          ) : photoLibraryItems.length > 0 ? (
             <PaginatedPhotoGrid
-              items={capturedPhotos}
+              items={photoLibraryItems}
               page={pages.photos ?? 0}
               pageSize={pageSize}
               router={router}
@@ -480,7 +481,7 @@ export default function StudioScreen() {
               <WorkSection
                 title="저장한 영상"
                 emptyDetail="여행 클립을 저장하면 이곳에 표시됩니다."
-                items={videoWorks}
+                items={savedVideoWorks}
                 page={pages.videoWorks ?? 0}
                 pageSize={pageSize}
                 router={router}
@@ -1316,7 +1317,7 @@ const styles = StyleSheet.create({
   },
   thumbnail: {
     width: "100%",
-    aspectRatio: 4 / 5,
+    aspectRatio: 1,
     borderWidth: 1,
     borderColor: colors.line,
     backgroundColor: colors.surface

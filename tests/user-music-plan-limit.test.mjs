@@ -19,11 +19,13 @@ assert.ok(
   "music upload should block plans without a music entitlement"
 );
 assert.ok(
-  tripClipSource.includes("pickAndUploadUserMusicTrack(user, planEntitlements.musicTrackLimit)"),
+  tripClipSource.includes("pickAndUploadUserMusicTrack(") &&
+    tripClipSource.includes("planEntitlements.musicTrackLimit"),
   "trip clip should pass the active plan music limit"
 );
 assert.ok(
-  accountSource.includes("pickAndUploadUserMusicTrack(user, planEntitlements.musicTrackLimit)"),
+  accountSource.includes("pickAndUploadUserMusicTrack(") &&
+    accountSource.includes("planEntitlements.musicTrackLimit"),
   "account should pass the active plan music limit"
 );
 assert.ok(

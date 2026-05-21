@@ -42,13 +42,17 @@ import {
   type UserMusicTrack
 } from "@/lib/user-music";
 import { type AppPalette, useAppAppearance } from "@/lib/app-appearance";
-import { getAppSettings, type StorageMode } from "@/lib/app-settings";
+import {
+  getAppSettings,
+  isCloudBackupTargetEnabled,
+  type StorageMode
+} from "@/lib/app-settings";
 import {
   subscribeCloudBackupOverview,
   type CloudBackupOverview
 } from "@/lib/cloud-backup";
 import {
-  formatImageBackupSize,
+  formatBackupStorageUsage,
   formatImageBackupUsage
 } from "@/lib/image-backup-utils";
 import {
@@ -112,8 +116,7 @@ const formatStorageQuotaValue = (usedBytes: number, limitBytes: number) => {
     return "사용 불가";
   }
 
-  const remaining = Math.max(0, limitBytes - Math.max(0, usedBytes));
-  return `${formatImageBackupSize(usedBytes)} / ${formatImageBackupSize(limitBytes)} · 남은 ${formatImageBackupSize(remaining)}`;
+  return formatBackupStorageUsage(usedBytes, limitBytes);
 };
 
 const initialSubscriptionProducts: UserSubscriptionProducts = {
@@ -554,7 +557,14 @@ export default function AccountScreen() {
     try {
       setIsMusicSubmitting(true);
       setMessage(null);
-      const nextTracks = await pickAndUploadUserMusicTrack(user, planEntitlements.musicTrackLimit);
+      const appSettings = await getAppSettings();
+      const nextTracks = await pickAndUploadUserMusicTrack(
+        user,
+        planEntitlements.musicTrackLimit,
+        {
+          uploadToCloud: isCloudBackupTargetEnabled(appSettings, "music")
+        }
+      );
       setMusicTracks(nextTracks);
       setMessage("내 음악을 저장했습니다. 영상 만들기에서 선택할 수 있습니다.");
     } catch (error) {

@@ -12,6 +12,7 @@ const readStyleBlock = (name) => {
 const navModalStyle = readStyleBlock("navModal");
 const cameraSettingsScrollShellStyle = readStyleBlock("cameraSettingsScrollShell");
 const cameraSettingsScrollStyle = readStyleBlock("cameraSettingsScroll");
+const cameraSettingsContentStyle = readStyleBlock("cameraSettingsContent");
 
 assert.ok(
   navModalStyle.includes('maxHeight: "88%"') && navModalStyle.includes('overflow: "hidden"'),
@@ -27,6 +28,11 @@ assert.ok(
 assert.ok(
   cameraSettingsScrollStyle.includes("flexShrink: 1"),
   "camera settings scroll view should shrink instead of overflowing the panel"
+);
+
+assert.ok(
+  cameraSettingsContentStyle.includes("paddingBottom: 28"),
+  "camera settings content should keep bottom padding so the last item is not clipped"
 );
 
 console.log("ok - camera settings modal clips overflow and keeps scrolling inside the panel");

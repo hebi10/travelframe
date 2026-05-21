@@ -20,6 +20,7 @@ for (const [name, source] of [
   assert.ok(source.includes("getWeeklyVideoExportUsage"), `${name} should load weekly video usage`);
   assert.ok(source.includes("planEntitlements.backupStorageBytes"), `${name} should use the plan backup storage limit`);
   assert.ok(source.includes("formatQuotaValue"), `${name} should format used and remaining quotas`);
+  assert.ok(source.includes("formatBackupStorageUsage"), `${name} should show backup storage percentage`);
 }
 
 console.log("ok - account and settings show plan quota usage");

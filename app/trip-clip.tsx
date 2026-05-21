@@ -86,6 +86,7 @@ import {
   GUIDE_STROKE_WIDTH_MAX,
   GUIDE_STROKE_WIDTH_MIN,
   getAppSettings,
+  isCloudBackupTargetEnabled,
   updateAppSettings
 } from "@/lib/app-settings";
 import {
@@ -365,6 +366,7 @@ export default function TripClipScreen() {
   const [imageSaveFormat, setImageSaveFormat] =
     useState<ImageSaveFormat>("original");
   const [cloudBackupEnabled, setCloudBackupEnabled] = useState(false);
+  const [videoBackupTargetEnabled, setVideoBackupTargetEnabled] = useState(true);
   const [backupOverview, setBackupOverview] =
     useState<CloudBackupOverview>(initialBackupOverview);
   const [shouldBackupVideoExport, setShouldBackupVideoExport] = useState(true);
@@ -431,6 +433,7 @@ export default function TripClipScreen() {
     CLOUD_BACKUP_VIDEO_LIMIT
   );
   const canBackupVideoExport =
+    videoBackupTargetEnabled &&
     cloudBackupEnabled &&
     Boolean(user) &&
     planEntitlements.canBackupToCloud &&
@@ -702,6 +705,7 @@ export default function TripClipScreen() {
     previewGuideOffsetXValue.value = settings.guideOffsetX;
     previewGuideOffsetYValue.value = settings.guideOffsetY;
     setCloudBackupEnabled(settings.cloudBackupEnabled);
+    setVideoBackupTargetEnabled(isCloudBackupTargetEnabled(settings, "videos"));
     setImageQuality(settings.imageBackupQuality);
     setVideoQuality(settings.videoQuality);
     setExportFormat(settings.tripClipExportFormat);
@@ -1283,7 +1287,14 @@ export default function TripClipScreen() {
       setIsMusicSubmitting(true);
       setExportMessage(null);
 
-      const nextTracks = await pickAndUploadUserMusicTrack(user, planEntitlements.musicTrackLimit);
+      const appSettings = await getAppSettings();
+      const nextTracks = await pickAndUploadUserMusicTrack(
+        user,
+        planEntitlements.musicTrackLimit,
+        {
+          uploadToCloud: isCloudBackupTargetEnabled(appSettings, "music")
+        }
+      );
       const uploadedTrack = nextTracks.find((track) => !previousTrackIds.has(track.id));
 
       setUserMusicTracks(nextTracks);
@@ -1817,7 +1828,10 @@ export default function TripClipScreen() {
       }, { localVideoLimit: planEntitlements.localVideoLimit });
       let backupWarning: string | null = null;
       const wantsVideoBackup =
-        shouldBackupVideoExport && cloudBackupEnabled && user && planEntitlements.canBackupToCloud;
+        shouldBackupVideoExport && videoBackupTargetEnabled &&
+        cloudBackupEnabled &&
+        user &&
+        planEntitlements.canBackupToCloud;
 
       if (wantsVideoBackup && !canBackupMoreVideos(backupOverview.videoCount)) {
         backupWarning = `영상 백업 한도 ${CLOUD_BACKUP_VIDEO_LIMIT}개를 모두 사용해 클라우드 백업은 건너뛰었습니다.`;
@@ -2699,7 +2713,7 @@ export default function TripClipScreen() {
                     클라우드 백업
                   </Text>
                   <Text selectable style={styles.videoBackupDetail}>
-                    {cloudBackupEnabled && planEntitlements.canBackupToCloud
+                    {cloudBackupEnabled && planEntitlements.canBackupToCloud && videoBackupTargetEnabled
                       ? `체크한 영상만 백업합니다. 남은 영상 백업 ${videoBackupRemaining}개 / ${CLOUD_BACKUP_VIDEO_LIMIT}개`
                       : "구독과 클라우드 백업 설정이 켜져 있을 때 사용할 수 있습니다."}
                   </Text>

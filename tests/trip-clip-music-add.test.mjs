@@ -13,7 +13,8 @@ for (const snippet of [
 }
 
 for (const snippet of [
-  "pickAndUploadUserMusicTrack(user, planEntitlements.musicTrackLimit)",
+  "pickAndUploadUserMusicTrack(",
+  'uploadToCloud: isCloudBackupTargetEnabled(appSettings, "music")',
   "음악 추가"
 ]) {
   assert.ok(accountSource.includes(snippet), `account music upload missing: ${snippet}`);

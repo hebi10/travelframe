@@ -26,6 +26,8 @@ export type CameraSaveScope = "app" | "device" | "both";
 export type TripClipExportFormat = "mp4" | "images";
 export type AppImageSaveFormat = "original" | "png" | "jpeg";
 export type StorageMode = "local_only" | "local_backup" | "local_saver";
+export type CloudBackupTarget = "photos" | "imageBundles" | "videos" | "music";
+export type CloudBackupTargets = Record<CloudBackupTarget, boolean>;
 
 export const GUIDE_SIZE_MIN = 24;
 export const GUIDE_SIZE_MAX = 86;
@@ -58,7 +60,15 @@ export type AppSettings = {
   screenLayout: ScreenLayout;
   storageMode: StorageMode;
   cloudBackupEnabled: boolean;
+  cloudBackupTargets: CloudBackupTargets;
   imageBackupQuality: ImageQuality;
+};
+
+export const defaultCloudBackupTargets: CloudBackupTargets = {
+  photos: true,
+  imageBundles: true,
+  videos: true,
+  music: true
 };
 
 export const defaultAppSettings: AppSettings = {
@@ -86,6 +96,7 @@ export const defaultAppSettings: AppSettings = {
   screenLayout: "compact",
   storageMode: "local_only",
   cloudBackupEnabled: false,
+  cloudBackupTargets: defaultCloudBackupTargets,
   imageBackupQuality: DEFAULT_IMAGE_QUALITY
 };
 
@@ -103,6 +114,12 @@ const cameraRatios: PhotoRatioLabel[] = ["Original", "1:1", "3:4", "4:5", "9:16"
 const cameraSaveScopes: CameraSaveScope[] = ["app", "device", "both"];
 const cameraFacings: CameraType[] = ["back", "front"];
 const tripClipRatios: TripClipRatio[] = ["9:16", "4:5", "1:1", "16:9", "3:4"];
+const cloudBackupTargetKeys: CloudBackupTarget[] = [
+  "photos",
+  "imageBundles",
+  "videos",
+  "music"
+];
 
 const clampGuideSize = (value: unknown) => {
   const parsedValue = Number(value);
@@ -137,6 +154,29 @@ const normalizeCameraZoomPercent = (value: unknown) => {
 
   return Math.round(Math.max(0, Math.min(100, parsedValue)));
 };
+
+export const normalizeCloudBackupTargets = (value: unknown): CloudBackupTargets => {
+  const storedTargets =
+    value && typeof value === "object" && !Array.isArray(value)
+      ? (value as Partial<CloudBackupTargets>)
+      : {};
+
+  return cloudBackupTargetKeys.reduce<CloudBackupTargets>(
+    (targets, target) => ({
+      ...targets,
+      [target]:
+        typeof storedTargets[target] === "boolean"
+          ? storedTargets[target]
+          : defaultCloudBackupTargets[target]
+    }),
+    { ...defaultCloudBackupTargets }
+  );
+};
+
+export const isCloudBackupTargetEnabled = (
+  settings: Pick<AppSettings, "cloudBackupTargets">,
+  target: CloudBackupTarget
+) => settings.cloudBackupTargets[target] !== false;
 
 const normalizeSettings = (value: Partial<AppSettings> | null): AppSettings => {
   const nextSettings = {
@@ -212,6 +252,7 @@ const normalizeSettings = (value: Partial<AppSettings> | null): AppSettings => {
         : storageModes.includes(nextSettings.storageMode)
           ? nextSettings.storageMode !== "local_only"
           : defaultAppSettings.cloudBackupEnabled,
+    cloudBackupTargets: normalizeCloudBackupTargets(nextSettings.cloudBackupTargets),
     imageBackupQuality: imageBackupQualities.includes(nextSettings.imageBackupQuality)
       ? nextSettings.imageBackupQuality
       : defaultAppSettings.imageBackupQuality

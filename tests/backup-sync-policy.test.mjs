@@ -49,7 +49,7 @@ for (const snippet of [
   "클라우드 데이터 불러오기",
   "나중에 선택",
   "현재 기기의 데이터로 백업을 시작합니다. 기존 클라우드 백업과 중복될 수 있습니다. 계속하시겠습니까?",
-  "클라우드 백업 데이터를 불러오면 현재 기기의 사진, 작업물, 영상 목록이 클라우드 백업 기준으로 변경됩니다. 자동 병합하지 않습니다. 계속하시겠습니까?",
+  "클라우드 백업 데이터 중 현재 앱에 없는 사진, 작업물, 영상만 불러옵니다. 이미 저장된 항목은 그대로 둡니다. 계속하시겠습니까?",
   "실패한 백업 다시 시도",
   "getCloudBackupOverview",
   "restoreCloudBackupToLocal"
@@ -83,12 +83,19 @@ for (const snippet of [
   );
 }
 
-assert.ok(
-  backupSource.includes("replacePhotosFromBackup") &&
-    backupSource.includes("replaceImageBundleWorksFromBackup") &&
-    backupSource.includes("replaceMadeVideosFromBackup"),
-  "explicit cloud restore should replace local data only after user confirmation"
-);
+for (const snippet of [
+  "const existingPhotoIds = new Set(localPhotos.map((item) => item.id));",
+  "const missingPhotos = photos.filter((item) => !existingPhotoIds.has(item.id));",
+  "replacePhotosFromBackup([...localPhotos, ...missingPhotos])",
+  "const existingImageWorkIds = new Set(localImageWorks.map((item) => item.id));",
+  "const missingImageWorks = imageWorks.filter((item) => !existingImageWorkIds.has(item.id));",
+  "replaceImageBundleWorksFromBackup([...localImageWorks, ...missingImageWorks])",
+  "const existingVideoIds = new Set(localVideos.map((item) => item.id));",
+  "const missingVideos = videos.filter((item) => !existingVideoIds.has(item.id));",
+  "replaceMadeVideosFromBackup([...localVideos, ...missingVideos])"
+]) {
+  assert.ok(backupSource.includes(snippet), `explicit cloud restore should import only missing local data: ${snippet}`);
+}
 
 assert.ok(
   userMusicSource.includes("syncUserMusicTracks"),

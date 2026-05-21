@@ -29,6 +29,7 @@ import {
   AppState
 } from "react-native";
 import Animated, {
+  FadeIn,
   runOnJS,
   useAnimatedStyle,
   useDerivedValue,
@@ -155,13 +156,33 @@ const CAMERA_FLASH_OPTIONS: { label: string; value: FlashMode }[] = [
 
 const CAMERA_ZOOM_MIN = 0;
 const CAMERA_ZOOM_MAX = 100;
-const CAMERA_ZOOM_PRESETS = [
+type CameraZoomPreset = {
+  label: string;
+  value: number;
+  lens?: string;
+};
+
+const CAMERA_LENS_ULTRA_WIDE = "builtInUltraWideCamera";
+const CAMERA_LENS_WIDE = "builtInWideAngleCamera";
+const CAMERA_BACK_ZOOM_PRESETS_WITH_ULTRA_WIDE: CameraZoomPreset[] = [
+  { label: "0.5x", value: 0, lens: CAMERA_LENS_ULTRA_WIDE },
+  { label: "1x", value: 0, lens: CAMERA_LENS_WIDE },
+  { label: "2x", value: 14, lens: CAMERA_LENS_WIDE },
+  { label: "3x", value: 25, lens: CAMERA_LENS_WIDE },
+  { label: "5x", value: 50, lens: CAMERA_LENS_WIDE }
+];
+const CAMERA_BACK_ZOOM_PRESETS_DEFAULT: CameraZoomPreset[] = [
   { label: "1x", value: 0 },
+  { label: "2x", value: 14 },
   { label: "3x", value: 25 },
   { label: "5x", value: 50 },
-  { label: "8x", value: 75 },
   { label: "10x", value: 100 }
-] as const;
+];
+const CAMERA_FRONT_ZOOM_PRESETS: CameraZoomPreset[] = [
+  { label: "1x", value: 0 },
+  { label: "2x", value: 14 },
+  { label: "3x", value: 25 }
+];
 const CAMERA_CONTROL_TABS = [
   { id: "photo", label: "\uC0AC\uC9C4" },
   { id: "zoom", label: "\uD655\uB300" },
@@ -213,6 +234,54 @@ function getNearestCameraControlTabIndex(offsetX: number) {
   return Math.max(0, Math.min(CAMERA_CONTROL_TABS.length - 1, nearestIndex));
 }
 
+function getCameraControlTabCenterPadding(
+  viewportWidth: number,
+  measuredCenterX = 0
+) {
+  "worklet";
+
+  const targetCenterX = measuredCenterX > 0 ? measuredCenterX : viewportWidth / 2;
+
+  return Math.max(
+    0,
+    targetCenterX - CAMERA_CONTROL_TAB_WIDTH / 2 - CAMERA_CONTROL_TAB_GAP
+  );
+}
+
+function hasCameraLens(availableLenses: string[], lens: string) {
+  return availableLenses.includes(lens);
+}
+
+function getCameraZoomPresets(
+  cameraFacing: CameraType,
+  availableLenses: string[]
+) {
+  if (cameraFacing === "front") {
+    return CAMERA_FRONT_ZOOM_PRESETS;
+  }
+
+  if (hasCameraLens(availableLenses, CAMERA_LENS_ULTRA_WIDE)) {
+    return CAMERA_BACK_ZOOM_PRESETS_WITH_ULTRA_WIDE;
+  }
+
+  return CAMERA_BACK_ZOOM_PRESETS_DEFAULT;
+}
+
+function getCameraZoomPresetLens(
+  preset: CameraZoomPreset,
+  availableLenses: string[]
+) {
+  if (preset.lens && hasCameraLens(availableLenses, preset.lens)) {
+    return preset.lens;
+  }
+
+  if (preset.lens && hasCameraLens(availableLenses, CAMERA_LENS_WIDE)) {
+    return CAMERA_LENS_WIDE;
+  }
+
+  return undefined;
+}
+
 export default function CameraScreen() {
   const { user, subscription } = useAuth();
   const planEntitlements = useMemo(
@@ -239,7 +308,6 @@ export default function CameraScreen() {
   const [navigationOpen, setNavigationOpen] = useState(false);
   const [activeCameraControlTab, setActiveCameraControlTab] =
     useState<CameraControlTab>("photo");
-  const [cameraControlPanelWidth, setCameraControlPanelWidth] = useState(0);
   const [shutterTimer, setShutterTimer] = useState<CameraTimerValue>(0);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [hapticEnabled, setHapticEnabled] = useState(true);
@@ -247,7 +315,10 @@ export default function CameraScreen() {
   const [cameraRatio, setCameraRatio] = useState<PhotoRatioLabel>("Original");
   const [cameraSaveScope, setCameraSaveScope] = useState<CameraSaveScope>("app");
   const [cameraControlTabViewportWidth, setCameraControlTabViewportWidth] = useState(0);
+  const [cameraControlShutterCenterX, setCameraControlShutterCenterX] = useState(0);
   const [cameraFacing, setCameraFacing] = useState<CameraType>("back");
+  const [availableCameraLenses, setAvailableCameraLenses] = useState<string[]>([]);
+  const [selectedCameraLens, setSelectedCameraLens] = useState<string | undefined>();
   const [flashMode, setFlashMode] = useState<FlashMode>("off");
   const [torchEnabled, setTorchEnabled] = useState(false);
   const [zoomPercent, setZoomPercent] = useState(0);
@@ -256,7 +327,6 @@ export default function CameraScreen() {
   const [focusIndicatorVisible, setFocusIndicatorVisible] = useState(false);
   const [cameraFocusLocked, setCameraFocusLocked] = useState(false);
   const [cameraExposureBias, setCameraExposureBias] = useState(0);
-  const [shutterSoundEnabled, setShutterSoundEnabled] = useState(false);
   const [isCameraReady, setIsCameraReady] = useState(false);
   const [isCapturing, setIsCapturing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -273,7 +343,6 @@ export default function CameraScreen() {
   const guideDragStartX = useSharedValue(0);
   const guideDragStartY = useSharedValue(0);
   const cameraPinchStartZoomPercent = useSharedValue(0);
-  const cameraControlSlideX = useSharedValue(0);
   const cameraControlTabSlideX = useSharedValue(0);
   const cameraControlTabStartX = useSharedValue(0);
   const focusControlsOpacity = useSharedValue(0);
@@ -295,9 +364,13 @@ export default function CameraScreen() {
   const activeCameraControlTabIndex = CAMERA_CONTROL_TABS.findIndex(
     (tab) => tab.id === activeCameraControlTab
   );
-  const cameraControlTabCenterPadding = Math.max(
-    0,
-    cameraControlTabViewportWidth / 2 - CAMERA_CONTROL_TAB_WIDTH / 2
+  const cameraZoomPresets = useMemo(
+    () => getCameraZoomPresets(cameraFacing, availableCameraLenses),
+    [availableCameraLenses, cameraFacing]
+  );
+  const cameraControlTabCenterPadding = getCameraControlTabCenterPadding(
+    cameraControlTabViewportWidth,
+    cameraControlShutterCenterX
   );
   const focusIndicatorAnimatedStyle = useAnimatedStyle(() => ({
     opacity: focusControlsOpacity.value,
@@ -306,27 +379,9 @@ export default function CameraScreen() {
   const focusControlsAnimatedStyle = useAnimatedStyle(() => ({
     opacity: focusControlsOpacity.value
   }));
-  const cameraControlPagerAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: cameraControlSlideX.value }]
-  }));
   const cameraControlTabTrackAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: cameraControlTabSlideX.value }]
   }));
-
-  useEffect(() => {
-    if (cameraControlPanelWidth <= 0) {
-      return;
-    }
-
-    cameraControlSlideX.value = withTiming(
-      -activeCameraControlTabIndex * cameraControlPanelWidth,
-      { duration: 180 }
-    );
-  }, [
-    activeCameraControlTabIndex,
-    cameraControlPanelWidth,
-    cameraControlSlideX
-  ]);
 
   useEffect(() => {
     if (cameraControlTabViewportWidth <= 0) {
@@ -342,6 +397,26 @@ export default function CameraScreen() {
     cameraControlTabSlideX,
     cameraControlTabViewportWidth
   ]);
+
+  useEffect(() => {
+    if (cameraFacing === "front") {
+      setSelectedCameraLens(undefined);
+      return;
+    }
+
+    if (
+      selectedCameraLens &&
+      hasCameraLens(availableCameraLenses, selectedCameraLens)
+    ) {
+      return;
+    }
+
+    setSelectedCameraLens(
+      hasCameraLens(availableCameraLenses, CAMERA_LENS_WIDE)
+        ? CAMERA_LENS_WIDE
+        : undefined
+    );
+  }, [availableCameraLenses, cameraFacing, selectedCameraLens]);
 
   const returnFromPermissionScreen = useCallback(() => {
     if (router.canGoBack()) {
@@ -537,7 +612,7 @@ export default function CameraScreen() {
       const photo = await cameraRef.current.takePictureAsync({
         quality,
         exif: false,
-        shutterSound: shutterSoundEnabled
+        shutterSound: false
       });
       const captureInput = {
         uri: photo.uri,
@@ -672,15 +747,16 @@ export default function CameraScreen() {
   }, []);
 
   const setZoomPreset = useCallback(
-    (value: number) => {
+    (preset: CameraZoomPreset) => {
       const nextZoom = Math.round(
-        Math.max(CAMERA_ZOOM_MIN, Math.min(CAMERA_ZOOM_MAX, value))
+        Math.max(CAMERA_ZOOM_MIN, Math.min(CAMERA_ZOOM_MAX, preset.value))
       );
+      setSelectedCameraLens(getCameraZoomPresetLens(preset, availableCameraLenses));
       setZoomPercent(nextZoom);
       void updateAppSettings({ cameraZoomPercent: nextZoom });
       void triggerFeedback();
     },
-    [triggerFeedback]
+    [availableCameraLenses, triggerFeedback]
   );
 
   const setLightEnabled = useCallback(
@@ -692,6 +768,13 @@ export default function CameraScreen() {
     },
     [triggerFeedback]
   );
+
+  const syncAvailableCameraLenses = useCallback(() => {
+    void cameraRef.current
+      ?.getAvailableLensesAsync()
+      .then((lenses) => setAvailableCameraLenses(lenses))
+      .catch(() => setAvailableCameraLenses([]));
+  }, []);
 
   const applyCameraExposureBias = useCallback((value: number) => {
     const nextBias = Math.max(
@@ -1025,10 +1108,15 @@ export default function CameraScreen() {
           }
 
           const tabStride = CAMERA_CONTROL_TAB_WIDTH + CAMERA_CONTROL_TAB_GAP;
-          const centerPadding =
-            cameraControlTabViewportWidth / 2 - CAMERA_CONTROL_TAB_WIDTH / 2;
+          const firstTabCenter =
+            getCameraControlTabCenterPadding(
+              cameraControlTabViewportWidth,
+              cameraControlShutterCenterX
+            ) +
+            CAMERA_CONTROL_TAB_GAP +
+            CAMERA_CONTROL_TAB_WIDTH / 2;
           const tappedIndex = Math.round(
-            (event.x - centerPadding - cameraControlTabSlideX.value) / tabStride
+            (event.x - firstTabCenter - cameraControlTabSlideX.value) / tabStride
           );
           const nextIndex = Math.max(
             0,
@@ -1039,6 +1127,7 @@ export default function CameraScreen() {
     [
       cameraControlTabSlideX,
       cameraControlTabViewportWidth,
+      cameraControlShutterCenterX,
       selectCameraControlTabByIndex
     ]
   );
@@ -1251,6 +1340,7 @@ export default function CameraScreen() {
         ref={cameraRef}
         style={styles.camera}
         facing={cameraFacing}
+        selectedLens={selectedCameraLens}
         flash={flashMode}
         enableTorch={torchEnabled}
         zoom={zoomPercent / 100}
@@ -1258,7 +1348,11 @@ export default function CameraScreen() {
         focusLocked={cameraFocusLocked}
         exposureBias={cameraExposureBias}
         mode="picture"
-        onCameraReady={() => setIsCameraReady(true)}
+        onCameraReady={() => {
+          setIsCameraReady(true);
+          syncAvailableCameraLenses();
+        }}
+        onAvailableLensesChanged={(event) => setAvailableCameraLenses(event.lenses)}
         onMountError={(event) =>
           setErrorMessage(
             getUserFacingErrorMessage(event.message, "카메라를 시작하지 못했습니다.")
@@ -1270,12 +1364,14 @@ export default function CameraScreen() {
         pointerEvents="none"
         style={[
           styles.guidePositionLayer,
-          {
-            transform: [
-              { translateX: guideOffsetXValue },
-              { translateY: guideOffsetYValue }
-            ]
-          }
+          guide !== "grid"
+            ? {
+                transform: [
+                  { translateX: guideOffsetXValue },
+                  { translateY: guideOffsetYValue }
+                ]
+              }
+            : null
         ]}
       >
         <CameraGuideOverlay
@@ -1762,28 +1858,9 @@ export default function CameraScreen() {
                     {hapticEnabled ? "켜짐" : "꺼짐"}
                   </Text>
                 </Pressable>
-                <Pressable
-                  style={styles.settingToggleRow}
-                  onPress={() => setShutterSoundEnabled((value) => !value)}
-                >
-                  <View style={styles.settingToggleCopy}>
-                    <Text selectable={false} style={styles.settingToggleTitle}>
-                      셔터음
-                    </Text>
-                    <Text selectable={false} style={styles.settingToggleDetail}>
-                      사진 촬영 시 기본 셔터음을 재생합니다.
-                    </Text>
-                  </View>
-                  <Text selectable={false} style={styles.settingToggleValue}>
-                    {shutterSoundEnabled ? "켜짐" : "꺼짐"}
-                  </Text>
-                </Pressable>
                 </View>
               </ScrollView>
 
-              <View pointerEvents="none" style={styles.cameraSettingsBottomHint}>
-                <View style={styles.cameraSettingsGrabber} />
-              </View>
             </View>
           </View>
         </View>
@@ -1879,6 +1956,7 @@ export default function CameraScreen() {
                 contentContainerStyle={styles.guideSettingsContent}
                 showsVerticalScrollIndicator={false}
               >
+                {guide !== "grid" ? (
                 <View style={styles.modalSection}>
                   <Text selectable={false} style={styles.modalSectionTitle}>
                     가이드라인
@@ -1908,6 +1986,7 @@ export default function CameraScreen() {
                     ))}
                   </View>
                 </View>
+                ) : null}
 
                 <View style={styles.modalSection}>
                   <Text selectable={false} style={styles.modalSectionTitle}>
@@ -2016,6 +2095,7 @@ export default function CameraScreen() {
                   </View>
                 </View>
 
+                {guide !== "grid" ? (
                 <Pressable
                   style={styles.guidePositionButton}
                   onPress={startGuidePositionAdjustment}
@@ -2024,6 +2104,7 @@ export default function CameraScreen() {
                     드래그 이동하기
                   </Text>
                 </Pressable>
+                ) : null}
 
                 <Pressable
                   style={[styles.visibilityButton, guideVisible && styles.visibilityButtonActive]}
@@ -2130,136 +2211,113 @@ export default function CameraScreen() {
                   pointerEvents="box-none"
                   style={[
                     styles.cameraFloatingPanelWrap,
-                    styles.cameraFloatingPanelRaised,
-                    { bottom: bottomSafePadding + 96 }
+                    styles.cameraFloatingPanelRaised
                   ]}
                 >
-                  <View
-                    style={styles.cameraControlPanelViewport}
-                    onLayout={(event) =>
-                      setCameraControlPanelWidth(event.nativeEvent.layout.width)
-                    }
-                  >
+                  <View style={styles.cameraControlPanelViewport}>
                     <Animated.View
-                      style={[
-                        styles.cameraControlPager,
-                        cameraControlPagerAnimatedStyle
-                      ]}
+                      key={activeCameraControlTab}
+                      entering={FadeIn.duration(140)}
+                      style={styles.cameraControlPage}
                     >
-                      {CAMERA_CONTROL_TABS.map((tab) => (
-                        <View
-                          key={tab.id}
-                          style={[
-                            styles.cameraControlPage,
-                            { width: cameraControlPanelWidth || 1 }
-                          ]}
-                        >
-                          {tab.id === "zoom" ? (
-                            <View style={styles.quickButtonRow}>
-                              {CAMERA_ZOOM_PRESETS.map((preset) => {
-                                const isActive = zoomPercent === preset.value;
+                      {activeCameraControlTab === "zoom" ? (
+                        <View style={styles.quickButtonRow}>
+                          {cameraZoomPresets.map((preset) => {
+                            const presetLens = getCameraZoomPresetLens(
+                              preset,
+                              availableCameraLenses
+                            );
+                            const isActive =
+                              zoomPercent === preset.value &&
+                              (!presetLens || selectedCameraLens === presetLens);
 
-                                return (
-                                  <Pressable
-                                    key={preset.label}
-                                    style={[
-                                      styles.quickPillButton,
-                                      isActive && styles.quickPillButtonActive
-                                    ]}
-                                    onPress={() => setZoomPreset(preset.value)}
-                                  >
-                                    <Text
-                                      selectable={false}
-                                      style={[
-                                        styles.quickPillText,
-                                        isActive && styles.quickPillTextActive
-                                      ]}
-                                    >
-                                      {preset.label}
-                                    </Text>
-                                  </Pressable>
-                                );
-                              })}
-                            </View>
-                          ) : null}
-                          {tab.id === "guide" ? (
-                            <View style={styles.quickButtonRow}>
+                            return (
                               <Pressable
+                                key={preset.label}
                                 style={[
                                   styles.quickPillButton,
-                                  guideVisible && !referenceUri && styles.quickPillButtonActive
+                                  isActive && styles.quickPillButtonActive
                                 ]}
-                                onPress={openLineGuideSettings}
+                                onPress={() => setZoomPreset(preset)}
                               >
                                 <Text
                                   selectable={false}
                                   style={[
                                     styles.quickPillText,
-                                    guideVisible && !referenceUri && styles.quickPillTextActive
+                                    isActive && styles.quickPillTextActive
                                   ]}
                                 >
-                                  {"\uB77C\uC778"}
+                                  {preset.label}
                                 </Text>
                               </Pressable>
-                              <Pressable
-                                style={[
-                                  styles.quickPillButton,
-                                  referenceUri && styles.quickPillButtonActive
-                                ]}
-                                onPress={openPhotoGuideSettings}
-                              >
-                                <Text
-                                  selectable={false}
-                                  style={[
-                                    styles.quickPillText,
-                                    referenceUri && styles.quickPillTextActive
-                                  ]}
-                                >
-                                  {"\uC774\uBBF8\uC9C0"}
-                                </Text>
-                              </Pressable>
-                            </View>
-                          ) : null}
-                          {tab.id === "light" ? (
-                            <View style={styles.quickButtonRow}>
-                              <Pressable
-                                style={[
-                                  styles.quickPillButton,
-                                  torchEnabled && styles.quickPillButtonActive
-                                ]}
-                                onPress={() => setLightEnabled(true)}
-                              >
-                                <Text
-                                  selectable={false}
-                                  style={[
-                                    styles.quickPillText,
-                                    torchEnabled && styles.quickPillTextActive
-                                  ]}
-                                >
-                                  on
-                                </Text>
-                              </Pressable>
-                              <Pressable
-                                style={[
-                                  styles.quickPillButton,
-                                  !torchEnabled && styles.quickPillButtonActive
-                                ]}
-                                onPress={() => setLightEnabled(false)}
-                              >
-                                <Text
-                                  selectable={false}
-                                  style={[
-                                    styles.quickPillText,
-                                    !torchEnabled && styles.quickPillTextActive
-                                  ]}
-                                >
-                                  off
-                                </Text>
-                              </Pressable>
-                            </View>
-                          ) : null}
+                            );
+                          })}
                         </View>
-                      ))}
+                      ) : null}
+                      {activeCameraControlTab === "guide" ? (
+                        <View style={styles.quickButtonRow}>
+                          <Pressable
+                            style={styles.quickPillButton}
+                            onPress={openLineGuideSettings}
+                          >
+                            <Text
+                              selectable={false}
+                              style={styles.quickPillText}
+                            >
+                              {"\uB77C\uC778"}
+                            </Text>
+                          </Pressable>
+                          <Pressable
+                            style={styles.quickPillButton}
+                            onPress={openPhotoGuideSettings}
+                          >
+                            <Text
+                              selectable={false}
+                              style={styles.quickPillText}
+                            >
+                              {"\uC774\uBBF8\uC9C0"}
+                            </Text>
+                          </Pressable>
+                        </View>
+                      ) : null}
+                      {activeCameraControlTab === "light" ? (
+                        <View style={styles.quickButtonRow}>
+                          <Pressable
+                            style={[
+                              styles.quickPillButton,
+                              torchEnabled && styles.quickPillButtonActive
+                            ]}
+                            onPress={() => setLightEnabled(true)}
+                          >
+                            <Text
+                              selectable={false}
+                              style={[
+                                styles.quickPillText,
+                                torchEnabled && styles.quickPillTextActive
+                              ]}
+                            >
+                              on
+                            </Text>
+                          </Pressable>
+                          <Pressable
+                            style={[
+                              styles.quickPillButton,
+                              !torchEnabled && styles.quickPillButtonActive
+                            ]}
+                            onPress={() => setLightEnabled(false)}
+                          >
+                            <Text
+                              selectable={false}
+                              style={[
+                                styles.quickPillText,
+                                !torchEnabled && styles.quickPillTextActive
+                              ]}
+                            >
+                              off
+                            </Text>
+                          </Pressable>
+                        </View>
+                      ) : null}
                     </Animated.View>
                   </View>
                 </View>
@@ -2291,12 +2349,13 @@ export default function CameraScreen() {
                           const isActive = activeCameraControlTab === tab.id;
 
                           return (
-                            <View
+                            <Pressable
                               key={tab.id}
                               style={[
                                 styles.cameraControlTab,
                                 isActive && styles.cameraControlTabActive
                               ]}
+                              onPress={() => selectCameraControlTab(tab.id)}
                             >
                               <Text
                                 selectable={false}
@@ -2307,7 +2366,7 @@ export default function CameraScreen() {
                               >
                                 {tab.label}
                               </Text>
-                            </View>
+                            </Pressable>
                           );
                         })}
                         <View
@@ -2343,6 +2402,10 @@ export default function CameraScreen() {
                   </Pressable>
                   <Pressable
                     disabled={!isCameraReady || isCapturing}
+                    onLayout={(event) => {
+                      const { x, width } = event.nativeEvent.layout;
+                      setCameraControlShutterCenterX(x + width / 2);
+                    }}
                     style={[
                       styles.shutterOuter,
                       (!isCameraReady || isCapturing) && styles.shutterDisabled
@@ -3156,23 +3219,6 @@ const styles = StyleSheet.create({
     gap: 18,
     paddingBottom: 28
   },
-  cameraSettingsBottomHint: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    minHeight: 24,
-    alignItems: "center",
-    justifyContent: "flex-end",
-    paddingBottom: 4,
-    backgroundColor: "rgba(255, 255, 255, 0.82)"
-  },
-  cameraSettingsGrabber: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.darkLine
-  },
   guideSettingsScroll: {
     flexGrow: 0
   },
@@ -3536,19 +3582,13 @@ const styles = StyleSheet.create({
     backgroundColor: "transparent"
   },
   cameraFloatingPanelRaised: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    zIndex: 22
+    zIndex: 22,
+    marginBottom: 10
   },
   cameraControlPanelViewport: {
     width: "100%",
     minHeight: 42,
     overflow: "hidden"
-  },
-  cameraControlPager: {
-    flexDirection: "row",
-    alignItems: "center"
   },
   cameraControlPage: {
     minHeight: 42,

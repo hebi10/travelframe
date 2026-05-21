@@ -22,8 +22,9 @@ export type UserMusicTrack = {
   uri: string;
   mimeType?: string;
   size?: number;
-  storagePath: string;
+  storagePath?: string;
   downloadUrl?: string;
+  backupStatus?: "backed_up" | "local_only";
   createdAt: string;
 };
 
@@ -212,6 +213,7 @@ export const syncUserMusicTracks = async (user: User | null) => {
   }
 
   const snapshot = await getDocs(collection(firestore, "users", user.uid, "musicTracks"));
+  const remoteTrackIds = new Set(snapshot.docs.map((item) => item.id));
   const directory = await ensureMusicDirectory(user.uid);
   const settings = await getAppSettings();
   const nextTracks: UserMusicTrack[] = [];
@@ -252,11 +254,17 @@ export const syncUserMusicTracks = async (user: User | null) => {
       size: data.size,
       storagePath: data.storagePath,
       downloadUrl: data.downloadUrl,
+      backupStatus: data.backupStatus ?? "backed_up",
       createdAt: data.createdAt
     });
   }
 
-  const sortedTracks = nextTracks.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const localOnlyTracks = cachedTracks.filter(
+    (track) => track.backupStatus === "local_only" && !remoteTrackIds.has(track.id)
+  );
+  const sortedTracks = [...nextTracks, ...localOnlyTracks].sort((a, b) =>
+    b.createdAt.localeCompare(a.createdAt)
+  );
   await saveTracksToCache(user.uid, sortedTracks);
   return sortedTracks;
 };
@@ -293,13 +301,16 @@ export const restoreUserMusicTrackIfNeeded = async (
 
 export const pickAndUploadUserMusicTrack = async (
   user: User | null,
-  musicTrackLimit = 0
+  musicTrackLimit = 0,
+  options: { uploadToCloud?: boolean } = {}
 ) => {
   if (!user) {
     throw new Error("로그인 후 내 음악을 추가할 수 있습니다.");
   }
 
-  if (!firestore || !firebaseStorage) {
+  const { uploadToCloud = true } = options;
+
+  if (uploadToCloud && (!firestore || !firebaseStorage)) {
     throw new Error("Firebase 연결 정보가 아직 설정되지 않았습니다.");
   }
 
@@ -341,6 +352,23 @@ export const pickAndUploadUserMusicTrack = async (
     to: localUri
   });
 
+  if (!uploadToCloud) {
+    const track: UserMusicTrack = {
+      id,
+      userId: user.uid,
+      name,
+      uri: localUri,
+      mimeType: asset.mimeType ?? getContentType(asset.mimeType),
+      size: asset.size,
+      storagePath: "",
+      backupStatus: "local_only",
+      createdAt
+    };
+    const nextTracks = [track, ...currentTracks].slice(0, safeMusicTrackLimit);
+    await saveTracksToCache(user.uid, nextTracks);
+    return nextTracks;
+  }
+
   const storagePath = `users/${user.uid}/music/${fileName}`;
   const downloadUrl = await uploadLocalAudioFile({
     uri: localUri,
@@ -359,6 +387,7 @@ export const pickAndUploadUserMusicTrack = async (
     size: asset.size,
     storagePath,
     downloadUrl,
+    backupStatus: "backed_up",
     createdAt
   };
 

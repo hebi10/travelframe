@@ -47,15 +47,20 @@ const requireUid = (request) => {
   return uid;
 };
 
-const getCreatorSubscription = async (uid) => {
-  const [currentSnapshot, creatorSnapshot] = await Promise.all([
+const getBackupSubscription = async (uid) => {
+  const [currentSnapshot, creatorSnapshot, expertSnapshot] = await Promise.all([
     db.doc(`users/${uid}/subscriptions/current`).get(),
-    db.doc(`users/${uid}/subscriptions/creator_monthly`).get()
+    db.doc(`users/${uid}/subscriptions/creator_monthly`).get(),
+    db.doc(`users/${uid}/subscriptions/expert_monthly`).get()
   ]);
 
   const current = currentSnapshot.exists ? currentSnapshot.data() : null;
-  if (current?.productId === "creator_monthly") {
+  if (current?.productId === "creator_monthly" || current?.productId === "expert_monthly") {
     return current;
+  }
+
+  if (expertSnapshot.exists) {
+    return expertSnapshot.data();
   }
 
   return creatorSnapshot.exists ? creatorSnapshot.data() : current;
@@ -220,7 +225,7 @@ exports.reserveBackupUpload = onCall(async (request) => {
   try {
     const uid = requireUid(request);
     const { mediaKind, fileSize, contentType, storagePath } = request.data ?? {};
-    const subscription = await getCreatorSubscription(uid);
+    const subscription = await getBackupSubscription(uid);
     await cleanupExpiredBackupUploadSessions(uid);
     const usageRef = getUsageRef(uid);
     const sessionRef = db.collection(`users/${uid}/backupUploadSessions`).doc();
