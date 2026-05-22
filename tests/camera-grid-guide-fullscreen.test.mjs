@@ -54,7 +54,7 @@ assert.ok(
 assert.ok(
   cameraSource.includes('{guide === "grid" ? (') &&
     cameraSource.includes("startGridLineControl") &&
-    cameraSource.includes("선 컨트롤"),
+    cameraSource.includes("선 위치 조절"),
   "grid guide should expose a dedicated line control instead of shared movement"
 );
 

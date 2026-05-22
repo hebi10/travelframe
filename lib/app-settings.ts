@@ -43,9 +43,16 @@ export type GuideShapePoints = Record<GuideShapeKey, GuideShapePoint[]>;
 
 export const GUIDE_SIZE_MIN = 24;
 export const GUIDE_SIZE_MAX = 86;
+export const SHAPE_GUIDE_SIZE_MIN = 4;
+export const SHAPE_GUIDE_SIZE_MAX = 160;
 export const GUIDE_STROKE_WIDTH_MIN = 1;
 export const GUIDE_STROKE_WIDTH_MAX = 5;
 export const DEFAULT_GUIDE_COLOR = "rgba(255, 255, 255, 0.78)";
+
+export const getGuideSizeBounds = (guide: GuideType) =>
+  guide === "triangle" || guide === "square"
+    ? { min: SHAPE_GUIDE_SIZE_MIN, max: SHAPE_GUIDE_SIZE_MAX }
+    : { min: GUIDE_SIZE_MIN, max: GUIDE_SIZE_MAX };
 export const defaultGridGuideLinePositions: GridGuideLinePositions = {
   verticalStart: 28,
   verticalEnd: 72,
@@ -162,13 +169,16 @@ const cloudBackupTargetKeys: CloudBackupTarget[] = [
   "music"
 ];
 
-const clampGuideSize = (value: unknown) => {
+const clampGuideSize = (value: unknown, guide: GuideType) => {
+  const guideSizeBounds = getGuideSizeBounds(guide);
   const parsedValue = Number(value);
   if (!Number.isFinite(parsedValue)) {
     return defaultAppSettings.guideSize;
   }
 
-  return Math.round(Math.max(GUIDE_SIZE_MIN, Math.min(GUIDE_SIZE_MAX, parsedValue)));
+  return Math.round(
+    Math.max(guideSizeBounds.min, Math.min(guideSizeBounds.max, parsedValue))
+  );
 };
 
 const clampGuideStrokeWidth = (value: unknown) => {
@@ -336,7 +346,7 @@ const normalizeSettings = (value: Partial<AppSettings> | null): AppSettings => {
       typeof nextSettings.guideVisible === "boolean"
         ? nextSettings.guideVisible
         : defaultAppSettings.guideVisible,
-    guideSize: clampGuideSize(nextSettings.guideSize),
+    guideSize: clampGuideSize(nextSettings.guideSize, nextSettings.defaultGuide),
     guideStrokeWidth: clampGuideStrokeWidth(nextSettings.guideStrokeWidth),
     guideColor:
       typeof nextSettings.guideColor === "string" && nextSettings.guideColor.trim()

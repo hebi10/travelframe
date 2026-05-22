@@ -15,7 +15,7 @@ for (const snippet of [
   "selectedGridGuideLine",
   "getNearestGridGuideLine",
   "updateGridGuideLineFromPoint",
-  "선 컨트롤"
+  "선 위치 조절"
 ]) {
   assert.ok(cameraSource.includes(snippet), `camera grid line control missing: ${snippet}`);
 }

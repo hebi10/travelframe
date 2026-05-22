@@ -4,7 +4,10 @@ import { Pressable, Text, View, type GestureResponderEvent } from "react-native"
 import { typography } from "@/constants/app-theme";
 import { GUIDE_SIZE_MAX, GUIDE_SIZE_MIN, getFontSizeScale, type FontSize, type FontStyle } from "@/lib/app-settings";
 import { getFontWeightForStyle, useAppAppearance } from "@/lib/app-appearance";
-import { getGuideSizeFromTrackX, clampSettingsGuideSize } from "@/features/settings/settings-screen.helpers";
+import {
+  clampSettingsGuideSizeInRange,
+  getGuideSizeFromTrackX
+} from "@/features/settings/settings-screen.helpers";
 import { createThemedStyles, styles } from "@/features/settings/settings-screen.styles";
 
 export function OptionButton({
@@ -95,21 +98,25 @@ export function OptionButton({
 
 export function SettingsGuideSizeSlider({
   value,
+  min = GUIDE_SIZE_MIN,
+  max = GUIDE_SIZE_MAX,
   onChange,
   onCommit
 }: {
   value: number;
+  min?: number;
+  max?: number;
   onChange: (value: number) => void;
   onCommit: (value: number) => void;
 }) {
   const { palette } = useAppAppearance();
   const [trackWidth, setTrackWidth] = useState(1);
   const progress =
-    ((clampSettingsGuideSize(value) - GUIDE_SIZE_MIN) /
-      (GUIDE_SIZE_MAX - GUIDE_SIZE_MIN)) *
+    ((clampSettingsGuideSizeInRange(value, min, max) - min) /
+      (max - min)) *
     100;
   const getEventValue = (event: GestureResponderEvent) =>
-    getGuideSizeFromTrackX(event.nativeEvent.locationX, trackWidth);
+    getGuideSizeFromTrackX(event.nativeEvent.locationX, trackWidth, min, max);
 
   const handlePreview = (event: GestureResponderEvent) => {
     onChange(getEventValue(event));
@@ -157,10 +164,10 @@ export function SettingsGuideSizeSlider({
       </View>
       <View style={styles.settingsGuideSizeSliderRange}>
         <Text selectable={false} style={[styles.settingsGuideSizeSliderRangeText, { color: palette.muted }]}>
-          {GUIDE_SIZE_MIN}
+          {min}
         </Text>
         <Text selectable={false} style={[styles.settingsGuideSizeSliderRangeText, { color: palette.muted }]}>
-          {GUIDE_SIZE_MAX}
+          {max}
         </Text>
       </View>
     </View>

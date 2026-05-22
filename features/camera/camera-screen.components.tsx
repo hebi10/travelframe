@@ -20,6 +20,8 @@ import { GUIDE_SIZE_MAX, GUIDE_SIZE_MIN } from "@/lib/app-settings";
 
 export type GuideSizeSliderProps = {
   value: number;
+  min?: number;
+  max?: number;
   compact?: boolean;
   onChange: (value: number) => void;
   onCommit: (value: number) => void;
@@ -27,6 +29,8 @@ export type GuideSizeSliderProps = {
 
 export function GuideSizeSlider({
   value,
+  min = GUIDE_SIZE_MIN,
+  max = GUIDE_SIZE_MAX,
   compact = false,
   onChange,
   onCommit
@@ -34,8 +38,8 @@ export function GuideSizeSlider({
   return (
     <SmoothValueSlider
       value={value}
-      min={GUIDE_SIZE_MIN}
-      max={GUIDE_SIZE_MAX}
+      min={min}
+      max={max}
       compact={compact}
       label="미세 조정"
       onChange={onChange}

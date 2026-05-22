@@ -79,12 +79,11 @@ import {
 } from "@/lib/trip-clip-draft";
 import {
   DEFAULT_GUIDE_COLOR,
-  GUIDE_SIZE_MAX,
-  GUIDE_SIZE_MIN,
   GUIDE_STROKE_WIDTH_MAX,
   GUIDE_STROKE_WIDTH_MIN,
   defaultGuideShapePoints,
   getAppSettings,
+  getGuideSizeBounds,
   isCloudBackupTargetEnabled,
   updateAppSettings,
   type GuideShapePoints
@@ -338,6 +337,10 @@ export default function TripClipScreen() {
   const [previewGuideOffsetY, setPreviewGuideOffsetY] = useState(0);
   const [previewGuideShapePoints, setPreviewGuideShapePoints] =
     useState<GuideShapePoints>(defaultGuideShapePoints);
+  const previewGuideSizeBounds = useMemo(
+    () => getGuideSizeBounds(previewGuide),
+    [previewGuide]
+  );
   const [isPreviewGuideMoving, setIsPreviewGuideMoving] = useState(false);
   const [previewFrameSize, setPreviewFrameSize] = useState({ width: 0, height: 0 });
   const [activeEditorTab, setActiveEditorTab] = useState<EditorTab>("photos");
@@ -762,7 +765,10 @@ export default function TripClipScreen() {
 
   const applyPreviewGuideSize = useCallback((value: number) => {
     const nextSize = Math.round(
-      Math.max(GUIDE_SIZE_MIN, Math.min(GUIDE_SIZE_MAX, value))
+      Math.max(
+        previewGuideSizeBounds.min,
+        Math.min(previewGuideSizeBounds.max, value)
+      )
     );
     setPreviewGuideSize(nextSize);
     setPreviewGuideSizeInput(String(nextSize));
@@ -771,13 +777,25 @@ export default function TripClipScreen() {
       guideSize: nextSize,
       guideVisible: true
     });
-  }, []);
+  }, [previewGuideSizeBounds.max, previewGuideSizeBounds.min]);
 
   const updatePreviewGuideType = (nextGuide: GuideType) => {
+    const nextGuideSizeBounds = getGuideSizeBounds(nextGuide);
+    const nextGuideSize = Math.round(
+      Math.max(
+        nextGuideSizeBounds.min,
+        Math.min(nextGuideSizeBounds.max, previewGuideSize)
+      )
+    );
     setPreviewGuide(nextGuide);
+    if (nextGuideSize !== previewGuideSize) {
+      setPreviewGuideSize(nextGuideSize);
+      setPreviewGuideSizeInput(String(nextGuideSize));
+    }
     setPreviewGuideVisible(true);
     void updateAppSettings({
       defaultGuide: nextGuide,
+      guideSize: nextGuideSize,
       guideVisible: true
     });
   };
@@ -2443,12 +2461,12 @@ export default function TripClipScreen() {
         </OptionRow>
         <View style={styles.guideSizeInputRow}>
           <Text selectable style={styles.settingDetail}>
-            {GUIDE_SIZE_MIN}-{GUIDE_SIZE_MAX}
+            {previewGuideSizeBounds.min}-{previewGuideSizeBounds.max}
           </Text>
           <TextInput
             value={previewGuideSizeInput}
             keyboardType="number-pad"
-            maxLength={2}
+            maxLength={String(previewGuideSizeBounds.max).length}
             selectTextOnFocus
             style={styles.guideSizeInput}
             onChangeText={(value) =>

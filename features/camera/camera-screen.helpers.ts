@@ -3,6 +3,7 @@ import { EXPOSURE_CONTROL_GAP, EXPOSURE_SUN_ICON_SIZE } from "@/features/camera/
 import {
   GUIDE_SIZE_MAX,
   GUIDE_SIZE_MIN,
+  getGuideSizeBounds,
   type GridGuideLineKey,
   type GridGuideLinePositions,
   type GuideShapeKey,
@@ -132,15 +133,21 @@ export function clampGuideShapePointPercent(value: number) {
 }
 
 export function getGuideShapeFrame({
+  guide,
   frame,
   guideSize,
   offset
 }: {
+  guide: GuideType;
   frame: CameraFrame;
   guideSize: number;
   offset: GuideOffset;
 }) {
-  const safeSize = Math.max(GUIDE_SIZE_MIN, Math.min(GUIDE_SIZE_MAX, guideSize));
+  const guideSizeBounds = getGuideSizeBounds(guide);
+  const safeSize = Math.max(
+    guideSizeBounds.min,
+    Math.min(guideSizeBounds.max, guideSize)
+  );
   const side = frame.width > 0 ? (frame.width * safeSize) / 100 : 0;
   const centerX = frame.width / 2 + offset.x;
   const centerY = frame.height / 2 + offset.y;
@@ -190,7 +197,7 @@ export function getNearestGuideShapePoint({
     return null;
   }
 
-  const shapeFrame = getGuideShapeFrame({ frame, guideSize, offset });
+  const shapeFrame = getGuideShapeFrame({ guide, frame, guideSize, offset });
   return shapePoints[guide].reduce(
     (nearest, point, index) => {
       const distance = getGuideShapePointDistance({ point, x, y, shapeFrame });
@@ -223,7 +230,7 @@ export function updateGuideShapePointFromPoint({
     return shapePoints;
   }
 
-  const shapeFrame = getGuideShapeFrame({ frame, guideSize, offset });
+  const shapeFrame = getGuideShapeFrame({ guide, frame, guideSize, offset });
   if (shapeFrame.side <= 0) {
     return shapePoints;
   }

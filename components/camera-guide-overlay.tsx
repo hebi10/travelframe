@@ -6,7 +6,7 @@ import type {
   GridGuideLinePositions,
   GuideShapePoints
 } from "@/lib/app-settings";
-import { defaultGuideShapePoints } from "@/lib/app-settings";
+import { defaultGuideShapePoints, getGuideSizeBounds } from "@/lib/app-settings";
 
 type GuideShapePoint = {
   x: number;
@@ -198,7 +198,8 @@ export function CameraGuideOverlay({
     );
   }
 
-  const safeSize = Math.max(24, Math.min(86, size));
+  const guideSizeBounds = getGuideSizeBounds(guide);
+  const safeSize = Math.max(guideSizeBounds.min, Math.min(guideSizeBounds.max, size));
   const inset = `${(100 - safeSize) / 2}%` as DimensionValue;
   const guideWidth = `${safeSize}%` as DimensionValue;
   const shapeGuidePoints = getShapeGuidePoints(guide, shapePoints);

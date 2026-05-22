@@ -7,7 +7,7 @@
       "com.haebi.photoguide"
     ],
     "description": "여행 사진의 구도를 맞추고 쇼츠·릴스용 콘텐츠 제작을 돕는 촬영 가이드 앱입니다.",
-    "version": "1.0.24",
+    "version": "1.0.25",
     "runtimeVersion": {
       "policy": "appVersion"
     },
@@ -32,7 +32,7 @@
     },
     "android": {
       "package": "com.haebi.photoguide",
-      "versionCode": 26,
+      "versionCode": 27,
       "blockedPermissions": [
         "android.permission.RECORD_AUDIO"
       ],

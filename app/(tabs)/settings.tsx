@@ -33,12 +33,11 @@ import { TRIP_CLIP_RATIOS, type TripClipRatio } from "@/constants/trip-clip";
 import { VIDEO_QUALITY_OPTIONS } from "@/constants/video";
 import {
   DEFAULT_GUIDE_COLOR,
-  GUIDE_SIZE_MAX,
-  GUIDE_SIZE_MIN,
   GUIDE_STROKE_WIDTH_MAX,
   GUIDE_STROKE_WIDTH_MIN,
   defaultAppSettings,
   getAppSettings,
+  getGuideSizeBounds,
   saveAppSettings,
   subscribeAppSettings,
   type AppImageSaveFormat,
@@ -102,7 +101,7 @@ import { getImageBundleWorks } from "@/lib/work-library";
 import { OptionButton, SettingsGuideSizeSlider } from "@/features/settings/settings-screen.components";
 import { emptyBackupOverview, emptyUsageStats, type UsageStats } from "@/features/settings/settings-screen.constants";
 import {
-  clampSettingsGuideSize,
+  clampSettingsGuideSizeInRange,
   formatBackupDateTime,
   formatQuotaValue,
   formatStorageQuotaValue
@@ -339,6 +338,10 @@ export default function SettingsScreen() {
   const [guideExpanded, setGuideExpanded] = useState(false);
   const [guideReplaySignal, setGuideReplaySignal] = useState(0);
   const [isBackupSubmitting, setIsBackupSubmitting] = useState(false);
+  const guideSizeBounds = useMemo(
+    () => getGuideSizeBounds(settings.defaultGuide),
+    [settings.defaultGuide]
+  );
   const [backupCheckMessage, setBackupCheckMessage] = useState<string | null>(null);
   const [backupProgress, setBackupProgress] =
     useState<BackupProgressUpdate | null>(null);
@@ -522,14 +525,22 @@ export default function SettingsScreen() {
   const previewGuideSize = (value: number) => {
     setSettings((current) => ({
       ...current,
-      guideSize: clampSettingsGuideSize(value),
+      guideSize: clampSettingsGuideSizeInRange(
+        value,
+        guideSizeBounds.min,
+        guideSizeBounds.max
+      ),
       guideVisible: true
     }));
   };
 
   const commitGuideSize = (value: number) => {
     void updateSetting({
-      guideSize: clampSettingsGuideSize(value),
+      guideSize: clampSettingsGuideSizeInRange(
+        value,
+        guideSizeBounds.min,
+        guideSizeBounds.max
+      ),
       guideVisible: true
     });
   };
@@ -1433,7 +1444,18 @@ export default function SettingsScreen() {
                       settings.defaultGuide === guide && styles.compactOptionActive,
                       settings.defaultGuide === guide && themed.activeFill
                     ]}
-                    onPress={() => updateSetting({ defaultGuide: guide, guideVisible: true })}
+                    onPress={() => {
+                      const nextGuideSizeBounds = getGuideSizeBounds(guide);
+                      updateSetting({
+                        defaultGuide: guide,
+                        guideSize: clampSettingsGuideSizeInRange(
+                          settings.guideSize,
+                          nextGuideSizeBounds.min,
+                          nextGuideSizeBounds.max
+                        ),
+                        guideVisible: true
+                      });
+                    }}
                   >
                     <Text
                       selectable={false}
@@ -1483,6 +1505,8 @@ export default function SettingsScreen() {
               </View>
               <SettingsGuideSizeSlider
                 value={settings.guideSize}
+                min={guideSizeBounds.min}
+                max={guideSizeBounds.max}
                 onChange={previewGuideSize}
                 onCommit={commitGuideSize}
               />
@@ -1682,7 +1706,17 @@ export default function SettingsScreen() {
                       label={GUIDE_LABELS[guide]}
                       detail="카메라 구도 가이드"
                       active={settings.defaultGuide === guide}
-                      onPress={() => updateSetting({ defaultGuide: guide })}
+                      onPress={() => {
+                        const nextGuideSizeBounds = getGuideSizeBounds(guide);
+                        updateSetting({
+                          defaultGuide: guide,
+                          guideSize: clampSettingsGuideSizeInRange(
+                            settings.guideSize,
+                            nextGuideSizeBounds.min,
+                            nextGuideSizeBounds.max
+                          )
+                        });
+                      }}
                     />
                   ))
                 : null}
@@ -1709,7 +1743,7 @@ export default function SettingsScreen() {
                     <OptionButton
                       key={size.value}
                       label={size.label}
-                      detail={`${GUIDE_SIZE_MIN}-${GUIDE_SIZE_MAX} 범위의 공통 가이드 크기`}
+                      detail={`${guideSizeBounds.min}-${guideSizeBounds.max} 범위의 공통 가이드 크기`}
                       active={settings.guideSize === size.value}
                       onPress={() => updateSetting({ guideSize: size.value, guideVisible: true })}
                     />

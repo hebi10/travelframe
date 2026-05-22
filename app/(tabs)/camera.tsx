@@ -88,13 +88,13 @@ import {
 import { backupPhotoIfEnabled } from "@/lib/cloud-backup";
 import {
   DEFAULT_GUIDE_COLOR,
-  GUIDE_SIZE_MAX,
-  GUIDE_SIZE_MIN,
   GUIDE_STROKE_WIDTH_MAX,
   GUIDE_STROKE_WIDTH_MIN,
+  defaultAppSettings,
   defaultGridGuideLinePositions,
   defaultGuideShapePoints,
   getAppSettings,
+  getGuideSizeBounds,
   updateAppSettings,
   type CameraFacing,
   type CameraSaveScope,
@@ -459,6 +459,7 @@ export default function CameraScreen() {
     : styles.controls;
   const isLineGuideActive = guideVisible;
   const isPhotoGuideActive = Boolean(referenceUri);
+  const guideSizeBounds = useMemo(() => getGuideSizeBounds(guide), [guide]);
   const applyGridGuideLinePositionsState = useCallback(
     (nextPositions: GridGuideLinePositions) => {
       const clampedPositions = clampGridGuideLinePositions(nextPositions);
@@ -637,55 +638,53 @@ export default function CameraScreen() {
 
   const applyGuideSize = useCallback(
     (value: number) => {
-      const nextSize = Math.round(Math.max(GUIDE_SIZE_MIN, Math.min(GUIDE_SIZE_MAX, value)));
+      const nextSize = Math.round(Math.max(guideSizeBounds.min, Math.min(guideSizeBounds.max, value)));
       const nextGridGuideLinePositions =
-        guide === "grid"
-          ? getDefaultGridGuideLinePositions(nextSize)
-          : gridGuideLinePositionsRef.current;
+        guide === "grid" ? getDefaultGridGuideLinePositions(nextSize) : gridGuideLinePositionsRef.current;
       guideSizeRef.current = nextSize;
-      setGuideSize(nextSize);
-      setGuideSizeInput(String(nextSize));
+      setGuideSize(nextSize); setGuideSizeInput(String(nextSize));
       setGuideVisible(true);
-
       if (guide === "grid") {
         applyGridGuideLinePositionsState(nextGridGuideLinePositions);
       }
-
       void updateAppSettings({
         guideSize: nextSize,
         guideVisible: true,
-        ...(guide === "grid"
-          ? { gridGuideLinePositions: nextGridGuideLinePositions }
-          : {})
+        ...(guide === "grid" ? { gridGuideLinePositions: nextGridGuideLinePositions } : {})
       });
     },
-    [applyGridGuideLinePositionsState, guide]
+    [applyGridGuideLinePositionsState, guide, guideSizeBounds.max, guideSizeBounds.min]
   );
 
   const previewGuideSize = useCallback(
     (value: number) => {
-      const nextSize = Math.round(Math.max(GUIDE_SIZE_MIN, Math.min(GUIDE_SIZE_MAX, value)));
+      const nextSize = Math.round(Math.max(guideSizeBounds.min, Math.min(guideSizeBounds.max, value)));
       guideSizeRef.current = nextSize;
-      setGuideSize(nextSize);
-      setGuideSizeInput(String(nextSize));
+      setGuideSize(nextSize); setGuideSizeInput(String(nextSize));
       setGuideVisible(true);
-
       if (guide === "grid") {
         applyGridGuideLinePositionsState(getDefaultGridGuideLinePositions(nextSize));
       }
     },
-    [applyGridGuideLinePositionsState, guide]
+    [applyGridGuideLinePositionsState, guide, guideSizeBounds.max, guideSizeBounds.min]
   );
 
   const updateGuideType = (nextGuide: GuideType) => {
+    const nextGuideSizeBounds = getGuideSizeBounds(nextGuide);
+    const nextGuideSize = Math.round(
+      Math.max(nextGuideSizeBounds.min, Math.min(nextGuideSizeBounds.max, guideSizeRef.current))
+    );
     setGuide(nextGuide);
+    if (nextGuideSize !== guideSizeRef.current) {
+      guideSizeRef.current = nextGuideSize;
+      setGuideSize(nextGuideSize); setGuideSizeInput(String(nextGuideSize));
+    }
     setGuideVisible(true);
     if (!isShapeGuide(nextGuide)) {
       setIsGuideShapePointAdjusting(false);
-      setSelectedGuideShapePointIndex(null);
-      selectedGuideShapePointIndexRef.current = null;
+      setSelectedGuideShapePointIndex(null); selectedGuideShapePointIndexRef.current = null;
     }
-    void updateAppSettings({ defaultGuide: nextGuide, guideVisible: true });
+    void updateAppSettings({ defaultGuide: nextGuide, guideSize: nextGuideSize, guideVisible: true });
   };
 
   const updateGuideVisibility = (nextVisible: boolean) => {
@@ -1045,6 +1044,16 @@ export default function CameraScreen() {
     setGuideOffsetY(0);
   };
 
+  const resetGuideSizeToDefault = () => {
+    const defaultGuideSize = Math.round(
+      Math.max(guideSizeBounds.min, Math.min(guideSizeBounds.max, defaultAppSettings.guideSize))
+    );
+    guideSizeRef.current = defaultGuideSize;
+    guidePinchStartSize.value = defaultGuideSize;
+    setGuideSize(defaultGuideSize); setGuideSizeInput(String(defaultGuideSize));
+    return defaultGuideSize;
+  };
+
   const startGridLineControl = () => {
     setGuideSettingsOpen(false);
     setGuide("grid");
@@ -1062,14 +1071,27 @@ export default function CameraScreen() {
     void updateAppSettings({
       defaultGuide: "grid",
       guideVisible: true,
+      guideSize: guideSizeRef.current,
       gridGuideLinePositions: gridGuideLinePositionsRef.current
     });
   };
 
-  const resetGridLineControlToDefault = () => {
-    applyGridGuideLinePositionsState(getDefaultGridGuideLinePositions(guideSize));
+  const resetGridLineControlToDefault = (nextGuideSize = guideSize) => {
+    applyGridGuideLinePositionsState(getDefaultGridGuideLinePositions(nextGuideSize));
     selectedGridGuideLineRef.current = null;
     setSelectedGridGuideLine(null);
+  };
+
+  const resetCurrentGuideAdjustment = () => {
+    const defaultGuideSize = resetGuideSizeToDefault();
+    resetGuidePositionToCenter();
+    if (guide === "grid") {
+      resetGridLineControlToDefault(defaultGuideSize);
+    }
+    if (isShapeGuide(guide)) {
+      applyGuideShapePointsState({ ...guideShapePointsRef.current, [guide]: defaultGuideShapePoints[guide].map((point) => ({ ...point })) });
+      selectedGuideShapePointIndexRef.current = null; setSelectedGuideShapePointIndex(null);
+    }
   };
 
   const startGuideShapePointControl = () => {
@@ -2163,13 +2185,15 @@ export default function CameraScreen() {
                     <GuideSizeSlider
                       compact
                       value={guideSize}
+                      min={guideSizeBounds.min}
+                      max={guideSizeBounds.max}
                       onChange={previewGuideSize}
                       onCommit={applyGuideSize}
                     />
                     <TextInput
                       value={guideSizeInput}
                       keyboardType="number-pad"
-                      maxLength={2}
+                      maxLength={String(guideSizeBounds.max).length}
                       selectTextOnFocus
                       style={styles.sizeInput}
                       onChangeText={(value) => setGuideSizeInput(value.replace(/[^0-9]/g, ""))}
@@ -2178,6 +2202,22 @@ export default function CameraScreen() {
                     />
                   </View>
                 </View>
+
+                {guide !== "grid" ? (
+                  <Pressable style={styles.guidePositionButton} onPress={startGuidePositionAdjustment}>
+                    <Text selectable={false} style={styles.guidePositionButtonText}>
+                      위치·모양 조절
+                    </Text>
+                  </Pressable>
+                ) : null}
+
+                {guide === "grid" ? (
+                  <Pressable style={styles.guidePositionButton} onPress={startGridLineControl}>
+                    <Text selectable={false} style={styles.guidePositionButtonText}>
+                      선 위치 조절
+                    </Text>
+                  </Pressable>
+                ) : null}
 
                 <View style={[styles.modalSection, styles.modalSectionSpaced]}>
                   <Text selectable={false} style={styles.modalSectionTitle}>선 두께</Text>
@@ -2220,22 +2260,6 @@ export default function CameraScreen() {
                     ))}
                   </View>
                 </View>
-
-                {guide !== "grid" ? (
-                  <Pressable style={styles.guidePositionButton} onPress={startGuidePositionAdjustment}>
-                    <Text selectable={false} style={styles.guidePositionButtonText}>
-                      위치·모양 조절
-                    </Text>
-                  </Pressable>
-                ) : null}
-
-                {guide === "grid" ? (
-                  <Pressable style={styles.guidePositionButton} onPress={startGridLineControl}>
-                    <Text selectable={false} style={styles.guidePositionButtonText}>
-                      선 컨트롤
-                    </Text>
-                  </Pressable>
-                ) : null}
 
                 <Pressable
                   style={[styles.visibilityButton, guideVisible && styles.visibilityButtonActive]}
@@ -2540,33 +2564,30 @@ export default function CameraScreen() {
         <View style={[styles.guidePositionActionGroup, { right: 16, bottom: bottomSafePadding }]}>
           <Pressable
             style={styles.guidePositionSecondaryButton}
-            onPress={
-              isGridLineControlAdjusting
-                ? resetGridLineControlToDefault
-                : resetGuidePositionToCenter
-            }
+            onPress={() => {
+              if (isGridLineControlAdjusting) {
+                resetGridLineControlToDefault();
+                return;
+              }
+              resetGuidePositionToCenter();
+            }}
           >
             <Text selectable={false} style={styles.guidePositionSecondaryText}>중앙</Text>
+          </Pressable>
+          <Pressable style={styles.guidePositionSecondaryButton} onPress={resetCurrentGuideAdjustment}>
+            <Text selectable={false} style={styles.guidePositionSecondaryText}>초기화</Text>
           </Pressable>
           {isGuidePositionAdjusting && isShapeGuide(guide) ? (
             <Pressable
               style={styles.guidePositionSecondaryButton}
-              onPress={
-                isGuideShapePointAdjusting
-                  ? finishGuideShapePointControl
-                  : startGuideShapePointControl
-              }
+              onPress={isGuideShapePointAdjusting ? finishGuideShapePointControl : startGuideShapePointControl}
             >
               <Text selectable={false} style={styles.guidePositionSecondaryText}>선 설정</Text>
             </Pressable>
           ) : null}
           <Pressable
             style={styles.guidePositionDoneButton}
-            onPress={
-              isGridLineControlAdjusting
-                ? finishGridLineControl
-                : finishGuidePositionAdjustment
-            }
+            onPress={isGridLineControlAdjusting ? finishGridLineControl : finishGuidePositionAdjustment}
           >
             <Text selectable={false} style={styles.guidePositionDoneText}>완료</Text>
           </Pressable>
