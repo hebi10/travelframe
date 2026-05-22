@@ -11,6 +11,7 @@ import {
   subscribeAppSettings,
   type AppSettings
 } from "@/lib/app-settings";
+import { getFontFamilyForStyle, useAppFontsReady } from "@/lib/app-fonts";
 
 export type AppPalette = Record<keyof typeof colors, string>;
 export type EffectiveThemeMode = "light" | "dark";
@@ -53,11 +54,11 @@ export const getAppPalette = (
 };
 
 export const getFontWeightForStyle = (fontStyle: FontStyle): AppFontWeight => {
-  if (fontStyle === "bold") {
+  if (fontStyle === "black_han_sans") {
     return "900";
   }
 
-  if (fontStyle === "standard") {
+  if (fontStyle === "gowun_dodum") {
     return "700";
   }
 
@@ -66,6 +67,7 @@ export const getFontWeightForStyle = (fontStyle: FontStyle): AppFontWeight => {
 
 export function useAppAppearance() {
   const systemScheme = useColorScheme();
+  const fontsReady = useAppFontsReady();
   const [settings, setSettings] = useState<AppSettings>(cachedAppSettings);
 
   useEffect(() => {
@@ -118,6 +120,7 @@ export function useAppAppearance() {
     palette,
     fontSizeScale: getFontSizeScale(settings.fontSize),
     layoutScale: getScreenLayoutScale(settings.screenLayout),
-    emphasisWeight: getFontWeightForStyle(settings.fontStyle)
+    emphasisWeight: getFontWeightForStyle(settings.fontStyle),
+    fontFamily: getFontFamilyForStyle(settings.fontStyle, fontsReady)
   };
 }

@@ -358,7 +358,7 @@ export default function AccountScreen() {
         message.includes("ExpoWebBrowser") ||
           message.includes("native module") ||
           message.includes("Cannot find native module")
-          ? "Google 로그인 모듈이 현재 앱 빌드에 포함되지 않았습니다. Android 개발 빌드를 다시 만든 뒤 시도해 주세요."
+          ? "Google 로그인을 사용할 수 없습니다. 앱을 최신 버전으로 업데이트한 뒤 다시 시도해 주세요."
           : getAuthErrorMessage(error)
       );
     }).finally(() => {
@@ -459,10 +459,10 @@ export default function AccountScreen() {
         <SectionBlock title="연결 필요">
           <View style={[styles.noticePanel, themed.panel]}>
             <Text selectable style={[styles.noticeTitle, themed.text]}>
-              Firebase 설정이 필요합니다.
+              로그인 기능을 사용할 수 없습니다.
             </Text>
             <Text selectable style={[styles.noticeText, themed.mutedText]}>
-              .env에 Firebase 웹 앱 config를 넣고 Metro 서버를 다시 시작하면 로그인 기능이 활성화됩니다.
+              잠시 후 다시 시도해 주세요. 문제가 계속되면 고객센터로 문의해 주세요.
             </Text>
           </View>
         </SectionBlock>

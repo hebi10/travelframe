@@ -22,9 +22,9 @@ for (const snippet of [
 
 for (const snippet of [
   "STORAGE_MODE_OPTIONS",
-  "로컬 저장만 사용",
-  "로컬 저장 + 클라우드 백업",
-  "로컬 용량 절약 모드",
+  "앱에서만 저장",
+  "앱에 저장 + 클라우드 백업",
+  "앱 용량 절약 모드",
   "isCloudBackupStorageMode",
   "isStorageSaverMode",
   "getEffectiveStorageMode"
@@ -75,9 +75,9 @@ assert.ok(
 
 for (const snippet of [
   "저장 방식",
-  "로컬 저장만 사용",
-  "로컬 저장 + 클라우드 백업",
-  "로컬 용량 절약 모드",
+  "앱에서만 저장",
+  "앱에 저장 + 클라우드 백업",
+  "앱 용량 절약 모드",
   "getEffectiveStorageMode",
   "STORAGE_MODE_OPTIONS"
 ]) {

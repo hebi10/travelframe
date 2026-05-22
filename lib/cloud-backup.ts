@@ -173,7 +173,7 @@ const callBackupFunction = async <Request, Response>(
   data: Request
 ): Promise<Response> => {
   if (!firebaseFunctions) {
-    throw new Error("Firebase Functions가 설정되지 않았습니다.");
+    throw new Error("클라우드 백업을 지금 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.");
   }
 
   const callable = httpsCallable<Request, Response>(firebaseFunctions, name);
@@ -192,9 +192,7 @@ const callBackupFunction = async <Request, Response>(
       message.includes("not-found") ||
       message.includes("NOT_FOUND")
     ) {
-      throw new Error(
-        "백업 서버 함수가 아직 배포되지 않았습니다. npm run firebase:deploy-functions 실행 후 다시 시도해 주세요."
-      );
+      throw new Error("클라우드 백업을 지금 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.");
     }
 
     if (
@@ -277,7 +275,7 @@ const uploadLocalFile = async ({
   mediaKind: BackupMediaKind;
 }): Promise<UploadedBackupFile> => {
   if (!firebaseStorage) {
-    throw new Error("Firebase Storage가 설정되지 않았습니다.");
+    throw new Error("클라우드 백업을 지금 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.");
   }
 
   const response = await fetch(uri);

@@ -4,6 +4,7 @@ import { Pressable, Text, View, type GestureResponderEvent } from "react-native"
 import { typography } from "@/constants/app-theme";
 import { GUIDE_SIZE_MAX, GUIDE_SIZE_MIN, getFontSizeScale, type FontSize, type FontStyle } from "@/lib/app-settings";
 import { getFontWeightForStyle, useAppAppearance } from "@/lib/app-appearance";
+import { getFontFamilyForStyle, useAppFontsReady } from "@/lib/app-fonts";
 import {
   clampSettingsGuideSizeInRange,
   getGuideSizeFromTrackX
@@ -17,6 +18,7 @@ export function OptionButton({
   disabled = false,
   activeMarkFill = "filled",
   fontStylePreview,
+  fontFamilyPreview,
   fontSizePreview,
   onPress
 }: {
@@ -26,13 +28,17 @@ export function OptionButton({
   disabled?: boolean;
   activeMarkFill?: "filled" | "transparent";
   fontStylePreview?: FontStyle;
+  fontFamilyPreview?: FontStyle;
   fontSizePreview?: FontSize;
   onPress: () => void;
 }) {
-  const { palette, fontSizeScale, layoutScale, emphasisWeight } = useAppAppearance();
+  const { palette, fontSizeScale, layoutScale, emphasisWeight, fontFamily } = useAppAppearance();
+  const fontsReady = useAppFontsReady();
   const themed = useMemo(() => createThemedStyles(palette), [palette]);
   const previewFontSizeScale = fontSizePreview ? getFontSizeScale(fontSizePreview) : fontSizeScale;
   const previewFontWeight = fontStylePreview ? getFontWeightForStyle(fontStylePreview) : emphasisWeight;
+  const previewFontFamily =
+    fontFamilyPreview ? getFontFamilyForStyle(fontFamilyPreview, fontsReady) : fontFamily;
 
   return (
     <Pressable
@@ -61,6 +67,7 @@ export function OptionButton({
             {
               fontSize: Math.round(typography.body * previewFontSizeScale),
               lineHeight: Math.round(20 * previewFontSizeScale),
+              fontFamily: previewFontFamily,
               fontWeight: previewFontWeight
             }
           ]}
@@ -75,6 +82,7 @@ export function OptionButton({
             {
               fontSize: Math.round(typography.small * previewFontSizeScale),
               lineHeight: Math.round(17 * previewFontSizeScale),
+              fontFamily: previewFontFamily,
               fontWeight: previewFontWeight
             }
           ]}

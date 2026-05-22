@@ -27,7 +27,7 @@ export function ScreenShell({
   children
 }: ScreenShellProps) {
   const insets = useSafeAreaInsets();
-  const { settings, palette, fontSizeScale, layoutScale } = useAppAppearance();
+  const { settings, palette, fontSizeScale, layoutScale, fontFamily } = useAppAppearance();
   const screenPadding = Math.round(spacing.screen * layoutScale);
   const sectionGap = Math.round(spacing.section * layoutScale);
 
@@ -49,7 +49,7 @@ export function ScreenShell({
     >
       <View style={styles.header}>
         {eyebrow ? (
-          <Text selectable style={[styles.eyebrow, { color: palette.muted }]}>
+          <Text selectable style={[styles.eyebrow, { color: palette.muted, fontFamily }]}>
             {eyebrow}
           </Text>
         ) : null}
@@ -58,7 +58,7 @@ export function ScreenShell({
           style={[
             styles.title,
             { color: palette.text },
-            getTitleStyle(settings.fontStyle, fontSizeScale)
+            getTitleStyle(settings.fontStyle, fontSizeScale, fontFamily)
           ]}
         >
           {title}
@@ -71,7 +71,8 @@ export function ScreenShell({
               {
                 color: palette.muted,
                 fontSize: Math.round(typography.body * fontSizeScale),
-                lineHeight: Math.round(21 * fontSizeScale)
+                lineHeight: Math.round(21 * fontSizeScale),
+                fontFamily
               }
             ]}
           >
@@ -117,25 +118,38 @@ const styles = StyleSheet.create({
 });
 
 const titleStyleByFont: Record<FontStyle, { fontSize: number; lineHeight: number }> = {
-  standard: {
+  noto_sans_kr: {
     fontSize: 28,
     lineHeight: 34
   },
-  compact: {
+  nanum_gothic: {
     fontSize: 26,
     lineHeight: 32
   },
-  bold: {
+  gowun_dodum: {
+    fontSize: 28,
+    lineHeight: 34
+  },
+  gugi: {
+    fontSize: 28,
+    lineHeight: 34
+  },
+  black_han_sans: {
     fontSize: typography.title,
     lineHeight: 36
   }
 };
 
-const getTitleStyle = (fontStyle: FontStyle, scale: number): TextStyle => {
+const getTitleStyle = (
+  fontStyle: FontStyle,
+  scale: number,
+  fontFamily?: string
+): TextStyle => {
   const style = titleStyleByFont[fontStyle];
   return {
     fontSize: Math.round(style.fontSize * scale),
     lineHeight: Math.round(style.lineHeight * scale),
-    fontWeight: fontStyle === "bold" ? "900" : "800"
+    fontFamily,
+    fontWeight: fontStyle === "black_han_sans" ? "900" : "800"
   };
 };

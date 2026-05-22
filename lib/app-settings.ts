@@ -18,7 +18,7 @@ const settingsListeners = new Set<(settings: AppSettings) => void>();
 
 export type ExportQuality = "standard" | "high" | "max";
 export type ThemeMode = "light" | "dark" | "system";
-export type FontStyle = "standard" | "compact" | "bold";
+export type FontStyle = "noto_sans_kr" | "nanum_gothic" | "gowun_dodum" | "gugi" | "black_han_sans";
 export type FontSize = "small" | "medium" | "large";
 export type ScreenLayout = "compact" | "balanced" | "comfortable";
 export type CameraSaveScope = "app" | "device" | "both";
@@ -139,7 +139,7 @@ export const defaultAppSettings: AppSettings = {
   tripClipExportFormat: "mp4",
   imageSaveFormat: "original",
   themeMode: "light",
-  fontStyle: "compact",
+  fontStyle: "noto_sans_kr",
   fontSize: "medium",
   screenLayout: "compact",
   storageMode: "local_only",
@@ -149,7 +149,14 @@ export const defaultAppSettings: AppSettings = {
 };
 
 const themeModes: ThemeMode[] = ["light", "dark", "system"];
-const fontStyles: FontStyle[] = ["standard", "compact", "bold"];
+const fontStyles: FontStyle[] = [
+  "noto_sans_kr",
+  "nanum_gothic",
+  "gowun_dodum",
+  "gugi",
+  "black_han_sans"
+];
+const legacyFontStyles = ["standard", "compact", "bold"];
 const fontSizes: FontSize[] = ["small", "medium", "large"];
 const screenLayouts: ScreenLayout[] = ["compact", "balanced", "comfortable"];
 const exportQualities: ExportQuality[] = ["standard", "high", "max"];
@@ -390,6 +397,8 @@ const normalizeSettings = (value: Partial<AppSettings> | null): AppSettings => {
       : defaultAppSettings.themeMode,
     fontStyle: fontStyles.includes(nextSettings.fontStyle)
       ? nextSettings.fontStyle
+      : legacyFontStyles.includes(String(nextSettings.fontStyle))
+        ? defaultAppSettings.fontStyle
       : defaultAppSettings.fontStyle,
     fontSize: fontSizes.includes(nextSettings.fontSize)
       ? nextSettings.fontSize
@@ -489,7 +498,7 @@ export const getFontSizeScale = (fontSize: FontSize) => {
   }
 
   if (fontSize === "large") {
-    return 1.1;
+    return 1.22;
   }
 
   return 1;

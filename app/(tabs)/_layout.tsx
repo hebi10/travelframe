@@ -9,7 +9,7 @@ const MAX_APP_WIDTH = 750;
 
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
-  const { palette, fontSizeScale, layoutScale, emphasisWeight } = useAppAppearance();
+  const { palette, fontSizeScale, layoutScale, emphasisWeight, fontFamily } = useAppAppearance();
   const { isLoggedIn } = useAuth();
   const tabBarBottomPadding = Math.max(insets.bottom + 8, 16);
   const tabBarHeight = 58 + tabBarBottomPadding;
@@ -23,6 +23,7 @@ export default function TabsLayout() {
         headerTintColor: palette.text,
         headerTitleStyle: {
           fontSize: 14,
+          fontFamily,
           fontWeight: "800"
         },
         tabBarActiveTintColor: palette.text,
@@ -47,6 +48,7 @@ export default function TabsLayout() {
         },
         tabBarLabelStyle: {
           fontSize: Math.round(11 * fontSizeScale),
+          fontFamily,
           fontWeight: emphasisWeight,
           lineHeight: Math.round(14 * fontSizeScale),
           letterSpacing: 0

@@ -7,26 +7,26 @@ const settingsSource = [
 ].join("\n");
 
 assert.ok(
-  settingsSource.includes("getFontWeightForStyle"),
-  "settings screen should reuse the shared font style weight helper"
+  settingsSource.includes("getFontFamilyForStyle"),
+  "settings screen should reuse the shared font family helper"
 );
 assert.ok(
-  settingsSource.includes("fontStylePreview?: FontStyle"),
-  "option buttons should accept a font style preview value"
+  settingsSource.includes("fontFamilyPreview?: FontStyle"),
+  "option buttons should accept a font family preview value"
 );
 assert.ok(
   settingsSource.includes(
-    "const previewFontWeight = fontStylePreview ? getFontWeightForStyle(fontStylePreview) : emphasisWeight"
+    "fontFamilyPreview ? getFontFamilyForStyle(fontFamilyPreview, fontsReady) : fontFamily"
   ),
-  "option buttons should derive preview font weight from the option value"
+  "option buttons should derive preview font family from the option value"
 );
 assert.ok(
-  settingsSource.includes("fontStylePreview={font.value}"),
-  "font style modal should pass each option style into its option button"
+  settingsSource.includes("fontFamilyPreview={font.value}"),
+  "font style modal should pass each option font family into its option button"
 );
 assert.ok(
-  settingsSource.includes("fontWeight: previewFontWeight"),
-  "font style modal button label and detail text should render with the preview weight"
+  settingsSource.includes("fontFamily: previewFontFamily"),
+  "font style modal button label and detail text should render with the preview font family"
 );
 
-console.log("ok - settings font style modal previews each option text weight");
+console.log("ok - settings font style modal previews each option font family");

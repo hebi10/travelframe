@@ -10,7 +10,7 @@ type SectionBlockProps = {
 };
 
 export function SectionBlock({ title, children }: SectionBlockProps) {
-  const { palette, fontSizeScale, layoutScale, emphasisWeight } = useAppAppearance();
+  const { palette, fontSizeScale, layoutScale, emphasisWeight, fontFamily } = useAppAppearance();
 
   return (
     <View style={[styles.section, { gap: Math.round(14 * layoutScale) }]}>
@@ -22,6 +22,7 @@ export function SectionBlock({ title, children }: SectionBlockProps) {
             color: palette.text,
             fontSize: Math.round(typography.section * fontSizeScale),
             lineHeight: Math.round(22 * fontSizeScale),
+            fontFamily,
             fontWeight: emphasisWeight
           }
         ]}

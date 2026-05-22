@@ -1,5 +1,5 @@
 export const MEDIA_LIBRARY_SAVE_UNAVAILABLE_MESSAGE =
-  "현재 실행 환경에서는 앨범 직접 저장을 사용할 수 없습니다. Android 개발 빌드 또는 Play Store 빌드에서 다시 시도하거나 공유 기능으로 저장해 주세요.";
+  "앨범 직접 저장을 사용할 수 없습니다. 앱을 최신 버전으로 업데이트하거나 공유 기능으로 저장해 주세요.";
 
 type MediaLibrarySaveCandidate = {
   saveToLibraryAsync?: unknown;

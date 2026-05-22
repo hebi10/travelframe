@@ -10,20 +10,20 @@ export type StorageModeOption = {
 export const STORAGE_MODE_OPTIONS: StorageModeOption[] = [
   {
     value: "local_only",
-    label: "로컬 저장만 사용",
-    detail: "출력 결과를 기기에만 저장하고 클라우드 백업은 사용하지 않습니다.",
+    label: "앱에서만 저장",
+    detail: "출력 결과를 이 앱에만 저장하고 클라우드 백업은 사용하지 않습니다.",
     requiresBackupPlan: false
   },
   {
     value: "local_backup",
-    label: "로컬 저장 + 클라우드 백업",
-    detail: "먼저 기기에 저장하고 백업 가능 플랜이면 서버에도 업로드합니다.",
+    label: "앱에 저장 + 클라우드 백업",
+    detail: "먼저 이 앱에 저장하고 백업 가능 플랜이면 서버에도 업로드합니다.",
     requiresBackupPlan: false
   },
   {
     value: "local_saver",
-    label: "로컬 용량 절약 모드",
-    detail: "백업 완료 후 원본 로컬 파일을 비우고 썸네일과 메타데이터를 유지합니다.",
+    label: "앱 용량 절약 모드",
+    detail: "백업 완료 후 앱에 저장된 원본 파일을 정리하고 썸네일과 메타데이터를 유지합니다.",
     requiresBackupPlan: true
   }
 ];

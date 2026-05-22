@@ -45,8 +45,6 @@ import {
   type CameraSaveScope,
   type CloudBackupTarget,
   type FontSize,
-  type FontStyle,
-  type ScreenLayout,
   type StorageMode,
   type TripClipExportFormat,
   type ThemeMode
@@ -54,6 +52,7 @@ import {
 import {
   useAppAppearance
 } from "@/lib/app-appearance";
+import { APP_FONT_OPTIONS, getFontOptionLabel } from "@/lib/app-fonts";
 import { useAuth } from "@/lib/auth-context";
 import { getPlanEntitlements } from "@/lib/plan-entitlements";
 import {
@@ -124,7 +123,6 @@ type SettingKey =
   | "themeMode"
   | "fontStyle"
   | "fontSize"
-  | "screenLayout"
   | "storageMode"
   | "cloudBackupEnabled"
   | "cloudBackupTargets"
@@ -135,9 +133,9 @@ const cameraRatioOptions = ["Original", "1:1", "3:4", "4:5", "9:16", "16:9"] as 
 
 
 const storageModeLegend =
-  "로컬 저장만 사용 / 로컬 저장 + 클라우드 백업 / 로컬 용량 절약 모드";
+  "앱에서만 저장 / 앱에 저장 + 클라우드 백업 / 앱 용량 절약 모드";
 const storageSaverUpgradeMessage =
-  "로컬 용량 절약 모드는 Pro 이상에서만 사용 가능합니다.";
+  "앱 용량 절약 모드는 Pro 이상에서만 사용 가능합니다.";
 const backupTargetOptions: {
   value: CloudBackupTarget;
   label: string;
@@ -253,22 +251,6 @@ const themeLabel: Record<ThemeMode, string> = {
   system: "시스템"
 };
 
-const fontOptions: {
-  value: FontStyle;
-  label: string;
-  detail: string;
-}[] = [
-  { value: "compact", label: "컴팩트", detail: "제목을 낮고 단정하게 표시합니다." },
-  { value: "standard", label: "기본", detail: "읽기 편한 표준 크기로 표시합니다." },
-  { value: "bold", label: "강조", detail: "큰 제목으로 화면 위계를 강하게 둡니다." }
-];
-
-const fontLabel: Record<FontStyle, string> = {
-  compact: "컴팩트",
-  standard: "기본",
-  bold: "강조"
-};
-
 const fontSizeOptions: {
   value: FontSize;
   label: string;
@@ -283,22 +265,6 @@ const fontSizeLabel: Record<FontSize, string> = {
   small: "작게",
   medium: "기본",
   large: "크게"
-};
-
-const screenLayoutOptions: {
-  value: ScreenLayout;
-  label: string;
-  detail: string;
-}[] = [
-  { value: "compact", label: "간결", detail: "여백을 줄여 정보를 빠르게 확인합니다." },
-  { value: "balanced", label: "기본", detail: "여백과 정보 밀도의 균형을 맞춥니다." },
-  { value: "comfortable", label: "여유", detail: "화면 사이 간격을 넓혀 편하게 봅니다." }
-];
-
-const screenLayoutLabel: Record<ScreenLayout, string> = {
-  compact: "간결",
-  balanced: "기본",
-  comfortable: "여유"
 };
 
 export default function SettingsScreen() {
@@ -489,10 +455,6 @@ export default function SettingsScreen() {
       return "폰트 크기";
     }
 
-    if (activeSetting === "screenLayout") {
-      return "화면 구성";
-    }
-
     if (activeSetting === "storageMode") {
       return "저장 방식";
     }
@@ -595,7 +557,7 @@ export default function SettingsScreen() {
             cloudBackupEnabled: true
           });
           setAuthMessage(
-            "저장 방식은 로컬 저장 + 클라우드 백업으로 설정했습니다. 서버 업로드는 Pro 이상에서 자동으로 실행됩니다."
+            "저장 방식은 앱에 저장 + 클라우드 백업으로 설정했습니다. 서버 업로드는 Pro 이상에서 자동으로 실행됩니다."
           );
           return;
         }
@@ -642,7 +604,7 @@ export default function SettingsScreen() {
         ]
       );
     } catch (error) {
-      setAuthMessage(error instanceof Error ? error.message : "백업 상태를 확인하지 못했습니다.");
+      setAuthMessage(getUserFacingErrorMessage(error, "백업 상태를 확인하지 못했습니다."));
     } finally {
       setIsBackupSubmitting(false);
       setBackupCheckMessage(null);
@@ -677,7 +639,7 @@ export default function SettingsScreen() {
         `백업을 완료했습니다. 사진 ${summary.photoCount}장, 여러 사진 작업 ${summary.imageBundleCount}개, 영상 ${summary.videoCount}개와 설정을 저장했습니다.`
       );
     } catch (error) {
-      setAuthMessage(error instanceof Error ? error.message : "백업 중 문제가 발생했습니다.");
+      setAuthMessage(getUserFacingErrorMessage(error, "백업 중 문제가 발생했습니다."));
     } finally {
       setIsBackupSubmitting(false);
       setBackupProgress(null);
@@ -717,7 +679,7 @@ export default function SettingsScreen() {
         `클라우드 백업에서 현재 앱에 없는 항목만 불러왔습니다. 사진 ${summary.photoCount}장, 여러 사진 작업 ${summary.imageBundleCount}개, 영상 ${summary.videoCount}개를 추가했습니다.`
       );
     } catch (error) {
-      setAuthMessage(error instanceof Error ? error.message : "클라우드 백업을 불러오지 못했습니다.");
+      setAuthMessage(getUserFacingErrorMessage(error, "클라우드 백업을 불러오지 못했습니다."));
     } finally {
       setIsBackupSubmitting(false);
     }
@@ -840,7 +802,7 @@ export default function SettingsScreen() {
           : `실패한 백업 ${successCount}개를 다시 완료했습니다.`
       );
     } catch (error) {
-      setAuthMessage(error instanceof Error ? error.message : "백업을 다시 시도하지 못했습니다.");
+      setAuthMessage(getUserFacingErrorMessage(error, "백업을 다시 시도하지 못했습니다."));
     } finally {
       setIsBackupSubmitting(false);
     }
@@ -874,11 +836,7 @@ export default function SettingsScreen() {
                 `백업 데이터를 삭제했습니다. 사진 ${summary.photoCount}장, 여러 사진 작업 ${summary.imageBundleCount}개, 영상 ${summary.videoCount}개가 정리되었습니다.`
               );
             } catch (error) {
-              setAuthMessage(
-                error instanceof Error
-                  ? error.message
-                  : "백업 데이터를 삭제하지 못했습니다."
-              );
+              setAuthMessage(getUserFacingErrorMessage(error, "백업 데이터를 삭제하지 못했습니다."));
             } finally {
               setIsBackupSubmitting(false);
             }
@@ -929,7 +887,7 @@ export default function SettingsScreen() {
             : message.includes("auth/invalid-email")
               ? "이메일 형식을 확인해 주세요."
               : message.includes("Firebase 연결 정보")
-                ? "Firebase 연결 정보가 아직 설정되지 않았습니다."
+                ? "로그인 기능을 사용할 수 없습니다. 잠시 후 다시 시도해 주세요."
                 : "로그인 처리 중 문제가 발생했습니다."
       );
     } finally {
@@ -939,7 +897,7 @@ export default function SettingsScreen() {
 
   const handleGoogleSignIn = () => {
     if (!isGoogleReady) {
-      setAuthMessage("Google 濡쒓렇???ㅼ젙媛믪쓣 ?뺤씤??二쇱꽭??");
+      setAuthMessage("Google 로그인 설정값을 확인해 주세요.");
       return;
     }
 
@@ -979,7 +937,7 @@ export default function SettingsScreen() {
 
         const code = result.params.code;
         if (!code) {
-          throw new Error("Google 濡쒓렇???뱀씤 肄붾뱶瑜?諛쏆? 紐삵뻽?듬땲??");
+          throw new Error("Google 로그인 승인 코드를 받지 못했습니다.");
         }
 
         const token = await AuthSession.exchangeCodeAsync(
@@ -996,30 +954,30 @@ export default function SettingsScreen() {
         );
         const idToken = token.idToken;
         if (!idToken) {
-          throw new Error("Google 濡쒓렇???좏겙??諛쏆? 紐삵뻽?듬땲??");
+          throw new Error("Google 로그인 토큰을 받지 못했습니다.");
         }
 
         await signInWithGoogleIdToken(idToken);
-        setAuthMessage("Google 怨꾩젙?쇰줈 濡쒓렇?명뻽?듬땲??");
+        setAuthMessage("Google 계정으로 로그인했습니다.");
         return;
       }
 
       if (result.type === "cancel" || result.type === "dismiss") {
-        setAuthMessage("Google 濡쒓렇?몄쓣 痍⑥냼?덉뒿?덈떎.");
+        setAuthMessage("Google 로그인을 취소했습니다.");
         return;
       }
 
-      throw new Error("Google 濡쒓렇??以?臾몄젣媛 諛쒖깮?덉뒿?덈떎.");
+      throw new Error("Google 로그인 중 문제가 발생했습니다.");
     };
 
     runGoogleLogin().catch((error) => {
       setIsGoogleSubmitting(false);
       const message = error instanceof Error ? error.message : String(error);
       setAuthMessage(
-        message.includes("ExpoWebBrowser") ||
+          message.includes("ExpoWebBrowser") ||
           message.includes("native module") ||
           message.includes("Cannot find native module")
-          ? "Google 濡쒓렇??紐⑤뱢???꾩옱 ??鍮뚮뱶???ы븿?섏? ?딆븯?듬땲?? Android 媛쒕컻 鍮뚮뱶瑜??ㅼ떆 留뚮뱺 ???쒕룄??二쇱꽭??"
+          ? "Google 로그인을 사용할 수 없습니다. 앱을 최신 버전으로 업데이트한 뒤 다시 시도해 주세요."
           : message
       );
     }).finally(() => {
@@ -1072,7 +1030,7 @@ export default function SettingsScreen() {
 
             {!isFirebaseReady ? (
               <Text selectable style={[styles.accountNotice, themed.mutedText]}>
-                Firebase 웹 앱 config를 .env에 넣으면 로그인 기능이 활성화됩니다.
+                로그인 기능을 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.
               </Text>
             ) : null}
 
@@ -1262,8 +1220,8 @@ export default function SettingsScreen() {
           />
           <ActionRow
             label="폰트 스타일"
-            detail="화면 제목의 크기와 밀도"
-            mark={fontLabel[settings.fontStyle]}
+            detail="앱에서 사용할 글꼴"
+            mark={getFontOptionLabel(settings.fontStyle)}
             onPress={() => setActiveSetting("fontStyle")}
           />
           <ActionRow
@@ -1271,12 +1229,6 @@ export default function SettingsScreen() {
             detail="앱 화면의 글자 크기"
             mark={fontSizeLabel[settings.fontSize]}
             onPress={() => setActiveSetting("fontSize")}
-          />
-          <ActionRow
-            label="화면 구성"
-            detail="선, 여백, 타이포 중심의 정돈된 스타일"
-            mark={screenLayoutLabel[settings.screenLayout]}
-            onPress={() => setActiveSetting("screenLayout")}
           />
           <View style={[styles.guidePopupPanel, themed.panel]}>
             <View style={styles.guidePopupCopy}>
@@ -1640,7 +1592,7 @@ export default function SettingsScreen() {
         <View style={[styles.modalBackdrop, modalSafeStyle]}>
           <View style={[styles.modalPanel, themed.modalPanel]}>
             <View style={styles.modalHeader}>
-              <Text selectable style={[styles.modalTitle, themed.text]}>
+              <Text selectable={false} style={[styles.modalTitle, themed.text]}>
                 계정 및 데이터 삭제 요청
               </Text>
               <Pressable
@@ -1681,7 +1633,7 @@ export default function SettingsScreen() {
         <View style={[styles.modalBackdrop, modalSafeStyle]}>
           <View style={[styles.modalPanel, themed.modalPanel]}>
             <View style={styles.modalHeader}>
-              <Text selectable style={[styles.modalTitle, themed.text]}>
+              <Text selectable={false} style={[styles.modalTitle, themed.text]}>
                 {modalTitle}
               </Text>
               <Pressable
@@ -1897,13 +1849,13 @@ export default function SettingsScreen() {
                 : null}
 
               {activeSetting === "fontStyle"
-                ? fontOptions.map((font) => (
+                ? APP_FONT_OPTIONS.map((font) => (
                     <OptionButton
                       key={font.value}
                       label={font.label}
                       detail={font.detail}
                       active={settings.fontStyle === font.value}
-                      fontStylePreview={font.value}
+                      fontFamilyPreview={font.value}
                       onPress={() => updateSetting({ fontStyle: font.value })}
                     />
                   ))
@@ -1918,18 +1870,6 @@ export default function SettingsScreen() {
                       active={settings.fontSize === fontSize.value}
                       fontSizePreview={fontSize.value}
                       onPress={() => updateSetting({ fontSize: fontSize.value })}
-                    />
-                  ))
-                : null}
-
-              {activeSetting === "screenLayout"
-                ? screenLayoutOptions.map((layout) => (
-                    <OptionButton
-                      key={layout.value}
-                      label={layout.label}
-                      detail={layout.detail}
-                      active={settings.screenLayout === layout.value}
-                      onPress={() => updateSetting({ screenLayout: layout.value })}
                     />
                   ))
                 : null}
@@ -2065,7 +2005,7 @@ export default function SettingsScreen() {
         <View style={[styles.modalBackdrop, modalSafeStyle]}>
           <View style={[styles.modalPanel, themed.modalPanel]}>
             <View style={styles.modalHeader}>
-              <Text selectable style={[styles.modalTitle, themed.text]}>
+              <Text selectable={false} style={[styles.modalTitle, themed.text]}>
                 기존 작업을 백업할까요?
               </Text>
               <Pressable
@@ -2125,7 +2065,7 @@ export default function SettingsScreen() {
                 <View style={styles.backupProgressHeader}>
                   <ActivityIndicator color={palette.text} />
                   <View style={styles.backupProgressCopy}>
-                    <Text selectable style={[styles.modalTitle, themed.text]}>
+                    <Text selectable={false} style={[styles.modalTitle, themed.text]}>
                       백업 중
                     </Text>
                     <Text selectable style={[styles.optionDetail, themed.mutedText]}>

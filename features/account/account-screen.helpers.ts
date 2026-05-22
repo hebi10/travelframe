@@ -62,7 +62,7 @@ export const getAuthErrorMessage = (error: unknown) => {
   }
 
   if (message.includes("Firebase 연결 정보") || message.includes("Firebase Storage")) {
-    return "Firebase 연결 정보가 아직 설정되지 않았습니다.";
+    return "로그인 기능을 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.";
   }
 
   if (message.includes("최대 3개")) {

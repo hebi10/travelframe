@@ -1465,7 +1465,7 @@ export default function TripClipScreen() {
   ) => {
     if (!recordingViewAvailable) {
       throw new Error(
-        "MP4 저장 기능이 현재 앱에 연결되지 않았습니다. 최신 Android 개발 빌드를 설치한 뒤 다시 시도해 주세요."
+        "MP4 저장 기능을 사용할 수 없습니다. 앱을 최신 버전으로 업데이트한 뒤 다시 시도해 주세요."
       );
     }
 
@@ -1562,7 +1562,7 @@ export default function TripClipScreen() {
         message.includes("TurboModule")
       ) {
         throw new Error(
-          "react-native-view-recorder가 현재 앱에 연결되지 않았습니다. EAS Android 개발 빌드를 설치한 뒤 다시 실행해 주세요."
+          "MP4 영상을 만들지 못했습니다. 앱을 최신 버전으로 업데이트한 뒤 다시 시도해 주세요."
         );
       }
 

@@ -14,7 +14,7 @@ type ActionRowProps = {
 };
 
 export function ActionRow({ href, label, detail, mark = ">", onPress }: ActionRowProps) {
-  const { palette, fontSizeScale, layoutScale, emphasisWeight } = useAppAppearance();
+  const { palette, fontSizeScale, layoutScale, emphasisWeight, fontFamily } = useAppAppearance();
   const isDark = palette.background !== colors.background;
   const content = (
     <Pressable
@@ -40,6 +40,7 @@ export function ActionRow({ href, label, detail, mark = ">", onPress }: ActionRo
               color: palette.text,
               fontSize: Math.round(typography.body * fontSizeScale),
               lineHeight: Math.round(21 * fontSizeScale),
+              fontFamily,
               fontWeight: emphasisWeight
             }
           ]}
@@ -54,7 +55,8 @@ export function ActionRow({ href, label, detail, mark = ">", onPress }: ActionRo
               {
                 color: palette.muted,
                 fontSize: Math.round(typography.small * fontSizeScale),
-                lineHeight: Math.round(18 * fontSizeScale)
+                lineHeight: Math.round(18 * fontSizeScale),
+                fontFamily
               }
             ]}
           >
@@ -83,6 +85,7 @@ export function ActionRow({ href, label, detail, mark = ">", onPress }: ActionRo
                 color: isDark ? palette.text : palette.inverse,
                 fontSize: Math.round(typography.button * fontSizeScale),
                 lineHeight: Math.round(18 * fontSizeScale),
+                fontFamily,
                 fontWeight: emphasisWeight
               }
             ]}

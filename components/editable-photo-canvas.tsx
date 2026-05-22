@@ -263,7 +263,7 @@ export const EditablePhotoCanvas = forwardRef<
     captureEditedImage: async () => {
       if (!recordingViewAvailable) {
         throw new Error(
-          "편집 이미지 저장 기능이 현재 앱에 연결되지 않았습니다. 최신 Android 개발 빌드를 설치한 뒤 다시 시도해 주세요."
+          "편집 이미지 저장 기능을 사용할 수 없습니다. 앱을 최신 버전으로 업데이트한 뒤 다시 시도해 주세요."
         );
       }
 

@@ -62,20 +62,21 @@ assert.ok(
 assert.ok(
   tabsLayout.includes("fontSizeScale") &&
     tabsLayout.includes("layoutScale") &&
-    tabsLayout.includes("emphasisWeight"),
-  "bottom tabs should apply font size, font style, and layout settings"
+    tabsLayout.includes("emphasisWeight") &&
+    tabsLayout.includes("fontFamily"),
+  "bottom tabs should apply font size, selected font family, and layout settings"
 );
 assert.ok(
-  screenShell.includes("getTitleStyle(settings.fontStyle, fontSizeScale)"),
-  "screen shell should apply font style and font size to page titles"
+  screenShell.includes("getTitleStyle(settings.fontStyle, fontSizeScale, fontFamily)"),
+  "screen shell should apply selected font family and font size to page titles"
 );
 assert.ok(
-  actionRow.includes("fontSizeScale") && actionRow.includes("layoutScale"),
-  "action rows should apply font size and layout settings"
+  actionRow.includes("fontSizeScale") && actionRow.includes("layoutScale") && actionRow.includes("fontFamily"),
+  "action rows should apply font size, selected font family, and layout settings"
 );
 assert.ok(
-  sectionBlock.includes("fontSizeScale") && sectionBlock.includes("layoutScale"),
-  "section blocks should apply font size and layout settings"
+  sectionBlock.includes("fontSizeScale") && sectionBlock.includes("layoutScale") && sectionBlock.includes("fontFamily"),
+  "section blocks should apply font size, selected font family, and layout settings"
 );
 
 console.log("ok - app appearance settings propagate to shared UI");

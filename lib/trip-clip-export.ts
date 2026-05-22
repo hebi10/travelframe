@@ -292,7 +292,7 @@ const normalizeMediaSaveError = (error: unknown, fallback: string) => {
     message.includes("requestPermissionsAsync has been rejected")
   ) {
     return new Error(
-      "Expo Go Android에서는 앨범 저장 권한이 제한될 수 있습니다. 개발 빌드에서 테스트하거나 공유 기능으로 저장해 주세요."
+      "앨범 저장 권한이 제한되어 있습니다. 공유 기능으로 저장하거나 앱을 최신 버전으로 업데이트해 주세요."
     );
   }
 

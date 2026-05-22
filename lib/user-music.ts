@@ -94,7 +94,7 @@ const callMusicFunction = async <Request, Response>(
   data: Request
 ): Promise<Response> => {
   if (!firebaseFunctions) {
-    throw new Error("Firebase Functions가 설정되지 않았습니다.");
+    throw new Error("음악 백업을 지금 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.");
   }
 
   const callable = httpsCallable<Request, Response>(firebaseFunctions, name);
@@ -162,7 +162,7 @@ const uploadLocalAudioFile = async ({
   createdAt: string;
 }) => {
   if (!firebaseStorage) {
-    throw new Error("Firebase Storage가 설정되지 않았습니다.");
+    throw new Error("음악 백업을 지금 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.");
   }
 
   const response = await fetch(uri);
