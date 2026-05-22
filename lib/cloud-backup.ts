@@ -1,6 +1,7 @@
 import { type User } from "firebase/auth";
 import {
   collection,
+  deleteDoc,
   doc,
   getDoc,
   getDocs,
@@ -33,7 +34,13 @@ import {
   type OptimizedBackupImage
 } from "@/lib/image-backup-utils";
 import { localStorageAdapter } from "@/lib/local-storage";
-import { getPhotos, markPhotoCloudOnly, replacePhotosFromBackup } from "@/lib/photo-library";
+import {
+  getDeletedPhotoIds,
+  getPhotos,
+  markPhotoCloudOnly,
+  replacePhotosFromBackup,
+  wasPhotoDeletedLocally
+} from "@/lib/photo-library";
 import { isCreatorSubscriptionActive, type UserSubscription } from "@/lib/subscription";
 import { isStorageSaverMode, shouldUseCloudBackupForStorageMode } from "@/lib/storage-mode";
 import { getMadeVideos, markMadeVideoCloudOnly, replaceMadeVideosFromBackup } from "@/lib/video-library";
@@ -470,6 +477,40 @@ const refreshBackupOverview = async (userId: string, backedUpAt?: string) => {
   return overview;
 };
 
+const isPhotoStillBackupEligible = async (photoId: string) => {
+  if (await wasPhotoDeletedLocally(photoId)) {
+    return false;
+  }
+
+  const photos = await getPhotos();
+  return photos.some((photo) => photo.id === photoId);
+};
+
+const removeBackupIfPhotoWasDeleted = async ({
+  user,
+  photo,
+  backupSessionId
+}: {
+  user: User;
+  photo: PhotoItem;
+  backupSessionId?: string | null;
+}) => {
+  if (!(await wasPhotoDeletedLocally(photo.id))) {
+    return false;
+  }
+
+  if (!firestore) {
+    return false;
+  }
+
+  await deleteDoc(doc(firestore, "users", user.uid, "photoBackups", photo.id));
+  if (backupSessionId) {
+    await releaseBackupUpload({ backupSessionId });
+  }
+  await refreshBackupOverview(user.uid);
+  return true;
+};
+
 export const subscribeCloudBackupOverview = ({
   user,
   onChange
@@ -578,11 +619,18 @@ export const backupCurrentWorkspace = async ({
   const selectedVideoBackups = isCloudBackupTargetEnabled(settings, "videos")
     ? videos
     : [];
+  const backupablePhotoBackups: PhotoItem[] = [];
+  for (const photo of selectedPhotoBackups) {
+    if (!(await isPhotoStillBackupEligible(photo.id))) {
+      continue;
+    }
+    backupablePhotoBackups.push(photo);
+  }
   emitBackupProgress(onProgress, 8, "백업할 데이터를 확인하고 있습니다.");
   const backedUpAt = new Date().toISOString();
   const sourceDeviceId = await getSourceDeviceId();
   const totalOptimizeItems =
-    selectedPhotoBackups.length +
+    backupablePhotoBackups.length +
     selectedImageBundleBackups.reduce((sum, work) => sum + work.imageUris.length, 0);
   let optimizedItemCount = 0;
   const updateOptimizationProgress = () => {
@@ -593,8 +641,12 @@ export const backupCurrentWorkspace = async ({
       "이미지를 최적화하고 있습니다."
     );
   };
-  const optimizedPhotos = await Promise.all(
-    selectedPhotoBackups.map(async (photo) => {
+  const optimizedPhotos = (await Promise.all(
+    backupablePhotoBackups.map(async (photo) => {
+      if (!(await isPhotoStillBackupEligible(photo.id))) {
+        return null;
+      }
+
       const optimized = await optimizeImageForBackup({
         uri: photo.uri,
         width: photo.width,
@@ -607,7 +659,9 @@ export const backupCurrentWorkspace = async ({
     })
   ).catch(() => {
     throw new Error(IMAGE_OPTIMIZATION_FAILED_MESSAGE);
-  });
+  })).filter((item): item is { photo: PhotoItem; optimized: OptimizedBackupImage } =>
+    Boolean(item)
+  );
   const optimizedImageBundles = await Promise.all(
     selectedImageBundleBackups.map(async (work) => ({
       work,
@@ -638,7 +692,7 @@ export const backupCurrentWorkspace = async ({
   const imageBackupBytes = await assertImageBackupCapacity({
     userId: user.uid,
     newImages: allOptimizedImages,
-    excludePhotoIds: selectedPhotoBackups.map((photo) => photo.id),
+    excludePhotoIds: optimizedPhotos.map(({ photo }) => photo.id),
     excludeImageWorkIds: selectedImageBundleBackups.map((work) => work.id)
   });
   emitBackupProgress(onProgress, 50, "백업 용량을 확인했습니다.");
@@ -658,6 +712,10 @@ export const backupCurrentWorkspace = async ({
   };
 
   for (const { photo, optimized } of optimizedPhotos) {
+    if (!(await isPhotoStillBackupEligible(photo.id))) {
+      continue;
+    }
+
     const photoFileName = fileNameFromUri(photo.uri, `${photo.id}.jpg`);
     const photoPath = `users/${user.uid}/backups/photos/${photo.id}-${photoFileName}.jpg`;
     const photoUpload = await uploadLocalFile({
@@ -666,6 +724,13 @@ export const backupCurrentWorkspace = async ({
       mediaKind: "image"
     });
     const photoDownloadUrl = photoUpload.downloadURL;
+
+    if (!(await isPhotoStillBackupEligible(photo.id))) {
+      await releaseBackupUpload({
+        backupSessionId: photoUpload.backupSessionId
+      });
+      continue;
+    }
 
     await setDoc(doc(firestore, "users", user.uid, "photoBackups", photo.id), {
       ...photo,
@@ -695,6 +760,16 @@ export const backupCurrentWorkspace = async ({
       backedUpAt,
       updatedAt: serverTimestamp()
     });
+    if (
+      await removeBackupIfPhotoWasDeleted({
+        user,
+        photo,
+        backupSessionId: photoUpload.backupSessionId
+      })
+    ) {
+      continue;
+    }
+
     await applyStorageSaverPolicy({
       settings,
       photo,
@@ -833,6 +908,7 @@ export const backupCurrentWorkspace = async ({
   }
 
   emitBackupProgress(onProgress, 96, "백업을 마무리하고 있습니다.");
+  const overview = await refreshBackupOverview(user.uid, backedUpAt);
   await setDoc(
     doc(firestore, "users", user.uid, "backups", "current"),
     {
@@ -840,12 +916,6 @@ export const backupCurrentWorkspace = async ({
       settings,
       imageBundles,
       videos,
-      photoCount: selectedPhotoBackups.length,
-      imageBundleCount: selectedImageBundleBackups.length,
-      videoCount: selectedVideoBackups.length,
-      imageBackupBytes,
-      status: "active",
-      backedUpAt,
       deleteAfter: null,
       updatedAt: serverTimestamp()
     },
@@ -854,10 +924,10 @@ export const backupCurrentWorkspace = async ({
   emitBackupProgress(onProgress, 100, "백업을 완료했습니다.");
 
   return {
-    photoCount: selectedPhotoBackups.length,
-    imageBundleCount: selectedImageBundleBackups.length,
-    videoCount: selectedVideoBackups.length,
-    imageBackupBytes,
+    photoCount: overview.photoCount,
+    imageBundleCount: overview.imageBundleCount,
+    videoCount: overview.videoCount,
+    imageBackupBytes: overview.imageBackupBytes,
     deleteAfter: null
   };
 };
@@ -879,6 +949,11 @@ export const backupPhoto = async ({
 
   if (!firestore || !firebaseStorage) {
     throw new Error("Firebase 연결 정보가 아직 설정되지 않았습니다.");
+  }
+
+  if (!(await isPhotoStillBackupEligible(photo.id))) {
+    await removeBackupIfPhotoWasDeleted({ user, photo });
+    return null;
   }
 
   const existingSnapshot = await getDoc(
@@ -925,6 +1000,14 @@ export const backupPhoto = async ({
     storagePath,
     mediaKind: "image"
   });
+
+  if (!(await isPhotoStillBackupEligible(photo.id))) {
+    await releaseBackupUpload({
+      backupSessionId: upload.backupSessionId
+    });
+    return null;
+  }
+
   const downloadURL = upload.downloadURL;
 
   await setDoc(
@@ -958,6 +1041,15 @@ export const backupPhoto = async ({
     },
     { merge: true }
   );
+  if (
+    await removeBackupIfPhotoWasDeleted({
+      user,
+      photo,
+      backupSessionId: upload.backupSessionId
+    })
+  ) {
+    return null;
+  }
 
   await refreshBackupOverview(user.uid, backedUpAt);
   await applyStorageSaverPolicy({
@@ -1300,9 +1392,12 @@ export const restoreCloudBackupToLocal = async ({ user }: { user: User | null })
     getMadeVideos()
   ]);
   const existingPhotoIds = new Set(localPhotos.map((item) => item.id));
+  const deletedPhotoIds = await getDeletedPhotoIds();
   const existingImageWorkIds = new Set(localImageWorks.map((item) => item.id));
   const existingVideoIds = new Set(localVideos.map((item) => item.id));
-  const missingPhotos = photos.filter((item) => !existingPhotoIds.has(item.id));
+  const missingPhotos = photos.filter(
+    (item) => !existingPhotoIds.has(item.id) && !deletedPhotoIds.has(item.id)
+  );
   const missingImageWorks = imageWorks.filter((item) => !existingImageWorkIds.has(item.id));
   const missingVideos = videos.filter((item) => !existingVideoIds.has(item.id));
 

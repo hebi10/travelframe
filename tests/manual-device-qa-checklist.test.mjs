@@ -6,7 +6,7 @@ const checklist = fs.readFileSync("docs/manual-device-qa.md", "utf8");
 for (const snippet of [
   "Android 실기기",
   "카메라 가이드",
-  "드래그 이동하기",
+  "위치·모양 조절",
   "MediaLibrary",
   "Firebase 백업",
   "백업 데이터 삭제",

@@ -148,6 +148,28 @@ const validPhotoBackup = (uid = ownerUid, photoId = "photo-1") => ({
   backupStatus: "backed_up"
 });
 
+const validSubscription = (productId) => ({
+  plan: "premium",
+  provider: "admin",
+  productId,
+  status: "active",
+  startedAt: "2026-05-18T00:00:00.000Z",
+  expiresAt: null,
+  lastPaymentAt: "2026-05-18T00:00:00.000Z",
+  priceLabel: "test",
+  productName: productId
+});
+
+const weeklyVideoUsage = ({ uid = ownerUid, weekId = "2026-05-18", count, limit }) => ({
+  userId: uid,
+  weekId,
+  weekLabel: "5월 18일 - 5월 24일",
+  count,
+  limit,
+  createdAt: new Date("2026-05-18T00:00:00.000Z"),
+  updatedAt: new Date("2026-05-18T00:00:00.000Z")
+});
+
 const storageRequest = async (method, name, { uid, contentType, metadata, bytes } = {}) => {
   const uploadUrl = `${storageBase}?uploadType=media&name=${encodeURIComponent(name)}`;
   const objectUrl = `${storageBase}/${encodeStorageName(name)}?alt=media`;
@@ -236,6 +258,44 @@ await expectDenied(
 await expectDenied(
   "users without admin documents cannot read another user's document",
   firestoreRequest("GET", `users/${ownerUid}`, { uid: otherUid })
+);
+
+await expectAllowed(
+  "owners can record the free weekly video export limit",
+  firestoreRequest("PATCH", `users/${ownerUid}/usage/videoExports/weeks/2026-05-18`, {
+    uid: ownerUid,
+    data: weeklyVideoUsage({ count: 1, limit: 1 })
+  })
+);
+await expectDenied(
+  "owners without a creator subscription cannot record the pro weekly video export limit",
+  firestoreRequest("PATCH", `users/${ownerUid}/usage/videoExports/weeks/2026-05-18`, {
+    uid: ownerUid,
+    data: weeklyVideoUsage({ count: 1, limit: 15 })
+  })
+);
+await seedDoc(`users/${ownerUid}/subscriptions/creator_monthly`, validSubscription("creator_monthly"));
+await expectAllowed(
+  "active creator subscriptions can record the pro weekly video export limit",
+  firestoreRequest("PATCH", `users/${ownerUid}/usage/videoExports/weeks/2026-05-18`, {
+    uid: ownerUid,
+    data: weeklyVideoUsage({ count: 15, limit: 15 })
+  })
+);
+await expectDenied(
+  "weekly video export usage cannot exceed the recorded plan limit",
+  firestoreRequest("PATCH", `users/${ownerUid}/usage/videoExports/weeks/2026-05-18`, {
+    uid: ownerUid,
+    data: weeklyVideoUsage({ count: 16, limit: 15 })
+  })
+);
+await seedDoc(`users/${ownerUid}/subscriptions/expert_monthly`, validSubscription("expert_monthly"));
+await expectAllowed(
+  "active expert subscriptions can record the expert weekly video export limit",
+  firestoreRequest("PATCH", `users/${ownerUid}/usage/videoExports/weeks/2026-05-18`, {
+    uid: ownerUid,
+    data: weeklyVideoUsage({ count: 30, limit: 30 })
+  })
 );
 
 await seedDoc(`admins/${adminUid}`, { role: "admin" });

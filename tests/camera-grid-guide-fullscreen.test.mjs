@@ -48,7 +48,14 @@ assert.ok(
 assert.ok(
   cameraSource.includes('{guide !== "grid" ? (') &&
     cameraSource.includes("startGuidePositionAdjustment"),
-  "grid guide should still hide drag movement because it is fixed to the full camera frame"
+  "non-grid guides should keep the shared drag movement control"
+);
+
+assert.ok(
+  cameraSource.includes('{guide === "grid" ? (') &&
+    cameraSource.includes("startGridLineControl") &&
+    cameraSource.includes("선 컨트롤"),
+  "grid guide should expose a dedicated line control instead of shared movement"
 );
 
 assert.ok(

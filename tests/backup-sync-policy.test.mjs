@@ -85,7 +85,8 @@ for (const snippet of [
 
 for (const snippet of [
   "const existingPhotoIds = new Set(localPhotos.map((item) => item.id));",
-  "const missingPhotos = photos.filter((item) => !existingPhotoIds.has(item.id));",
+  "const deletedPhotoIds = await getDeletedPhotoIds();",
+  "(item) => !existingPhotoIds.has(item.id) && !deletedPhotoIds.has(item.id)",
   "replacePhotosFromBackup([...localPhotos, ...missingPhotos])",
   "const existingImageWorkIds = new Set(localImageWorks.map((item) => item.id));",
   "const missingImageWorks = imageWorks.filter((item) => !existingImageWorkIds.has(item.id));",

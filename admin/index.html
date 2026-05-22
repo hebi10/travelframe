@@ -313,8 +313,26 @@
                 <p>사용자를 선택하면 상품 상태 저장과 주간 영상 출력 초기화를 사용할 수 있습니다.</p>
               </section>
             <section id="subscriptionPanel" class="panel hidden">
-              <h2>구독 관리</h2>
-              <form id="subscriptionForm" class="form">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">SUBSCRIPTION</p>
+                  <h2>구독 관리</h2>
+                </div>
+                <span id="weeklyVideoUsageMeta" class="pill">-</span>
+              </div>
+              <div id="weeklyVideoUsageCard" class="usage-strip">
+                <div>
+                  <span class="meta">이번 주 영상 출력</span>
+                  <strong id="weeklyVideoRemaining">-</strong>
+                </div>
+                <div class="usage-progress">
+                  <div class="usage-meter" aria-hidden="true">
+                    <span id="weeklyVideoUsageFill"></span>
+                  </div>
+                  <span id="weeklyVideoUsageDetail" class="meta">사용량을 불러오면 표시됩니다.</span>
+                </div>
+              </div>
+              <form id="subscriptionForm" class="form form-grid">
                 <label>
                   플랜
                   <select id="planSelect">
@@ -335,11 +353,11 @@
                   만료일
                   <input id="expiresInput" type="date" />
                 </label>
-                <label>
+                <label class="full">
                   관리자 메모
                   <textarea id="adminNoteInput" placeholder="처리 사유, 테스트 계정 메모 등을 남겨 주세요."></textarea>
                 </label>
-                <div class="row">
+                <div class="row form-actions full">
                   <button type="submit">구독 저장</button>
                   <button id="resetWeeklyVideoExportButton" class="secondary" type="button">
                     주간 영상 출력 초기화

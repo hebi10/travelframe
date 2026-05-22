@@ -38,7 +38,8 @@ import {
   GUIDE_STROKE_WIDTH_MIN,
   defaultAppSettings,
   getAppSettings,
-  updateAppSettings
+  updateAppSettings,
+  type GuideShapePoints
 } from "@/lib/app-settings";
 import {
   calculateGuidePositionDragOffset,
@@ -148,6 +149,8 @@ export default function EditScreen() {
   const [guideColor, setGuideColor] = useState(defaultAppSettings.guideColor);
   const [guideOffsetX, setGuideOffsetX] = useState(defaultAppSettings.guideOffsetX);
   const [guideOffsetY, setGuideOffsetY] = useState(defaultAppSettings.guideOffsetY);
+  const [guideShapePoints, setGuideShapePoints] =
+    useState<GuideShapePoints>(defaultAppSettings.guideShapePoints);
   const [guidePanelOpen, setGuidePanelOpen] = useState(false);
   const [isCanvasExpanded, setIsCanvasExpanded] = useState(false);
   const [isGuidePositionAdjusting, setIsGuidePositionAdjusting] = useState(false);
@@ -212,6 +215,7 @@ export default function EditScreen() {
         setGuideColor(settings.guideColor);
         setGuideOffsetX(settings.guideOffsetX);
         setGuideOffsetY(settings.guideOffsetY);
+        setGuideShapePoints(settings.guideShapePoints);
         guideOffsetXValue.value = settings.guideOffsetX;
         guideOffsetYValue.value = settings.guideOffsetY;
       };
@@ -631,6 +635,7 @@ export default function EditScreen() {
             guideColor={guideColor}
             guideOffsetX={guideOffsetX}
             guideOffsetY={guideOffsetY}
+            guideShapePoints={guideShapePoints}
           />
         )}
         {isCanvasExpanded && isGuidePositionAdjusting ? (

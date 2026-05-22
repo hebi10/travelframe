@@ -43,7 +43,7 @@ for (const snippet of [
   "guidePositionGesture",
   "calculateGuidePositionDragOffset",
   "clampGuidePositionOffset",
-  "드래그 이동하기",
+  "위치·모양 조절",
   "중앙",
   "완료",
   "setGuideSettingsOpen(true)",
@@ -54,8 +54,9 @@ for (const snippet of [
 }
 
 assert.ok(
-  cameraSource.includes("GestureDetector gesture={guidePositionGesture}"),
-  "guide position adjustment should use a drag gesture detector"
+  cameraSource.includes("GestureDetector gesture={guidePositionAdjustmentGesture}") &&
+    cameraSource.includes("guidePositionGesture"),
+  "guide position adjustment should use the combined drag and pinch gesture detector"
 );
 
 assert.deepEqual(
@@ -110,9 +111,9 @@ assert.ok(
 );
 
 assert.ok(
-  cameraSource.includes("!isGuidePositionAdjusting ? (") &&
-    cameraSource.includes("{isGuidePositionAdjusting ? ("),
-  "camera chrome should be hidden while guide position adjustment is active"
+  cameraSource.includes("!isGuidePositionAdjusting && !isGridLineControlAdjusting ? (") &&
+    cameraSource.includes("{isGuidePositionAdjusting && !isGuideShapePointAdjusting ? ("),
+  "camera chrome should be hidden while guide, shape-point, or grid-line adjustment is active"
 );
 
 for (const snippet of [

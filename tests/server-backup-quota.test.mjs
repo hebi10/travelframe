@@ -194,4 +194,24 @@ assert.deepEqual(
   }
 );
 
+assert.deepEqual(
+  quota.releaseCompletedBackupUsage(
+    {
+      imageTotalBytes: 250,
+      videoCount: 1,
+      videoTotalBytes: 0,
+      audioTotalBytes: 0,
+      pendingUsage: { imageTotalBytes: 100, videoCount: 0, videoTotalBytes: 0, audioTotalBytes: 0 }
+    },
+    { imageTotalBytes: 50, videoCount: 0, videoTotalBytes: 0, audioTotalBytes: 0 }
+  ),
+  {
+    imageTotalBytes: 200,
+    videoCount: 1,
+    videoTotalBytes: 0,
+    audioTotalBytes: 0,
+    pendingUsage: { imageTotalBytes: 100, videoCount: 0, videoTotalBytes: 0, audioTotalBytes: 0 }
+  }
+);
+
 console.log("ok - server backup quota checks enforce subscription, path, type, and limits");

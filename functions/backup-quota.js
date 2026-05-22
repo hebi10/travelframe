@@ -117,6 +117,11 @@ const releaseReservedBackupUsage = (usage, delta) => ({
   pendingUsage: subtractBackupUsage(normalizePendingBackupUsage(usage), delta)
 });
 
+const releaseCompletedBackupUsage = (usage, delta) => ({
+  ...subtractBackupUsage(normalizeBackupUsage(usage), delta),
+  pendingUsage: normalizePendingBackupUsage(usage)
+});
+
 const completeReservedBackupUsage = (usage, delta) => {
   const updatedUsage = {
     ...addBackupUsage(normalizeBackupUsage(usage), delta),
@@ -249,6 +254,7 @@ exports.assertBackupUsageWithinLimits = assertBackupUsageWithinLimits;
 exports.getReservedBackupUsage = getReservedBackupUsage;
 exports.reserveBackupUsage = reserveBackupUsage;
 exports.releaseReservedBackupUsage = releaseReservedBackupUsage;
+exports.releaseCompletedBackupUsage = releaseCompletedBackupUsage;
 exports.completeReservedBackupUsage = completeReservedBackupUsage;
 exports.assertBackupUploadAllowed = assertBackupUploadAllowed;
 exports.buildBackupSessionStoragePath = buildBackupSessionStoragePath;

@@ -15,6 +15,7 @@ import { getAppSettings, getExportQualityCompression } from "@/lib/app-settings"
 import { saveImageToLibrary } from "@/lib/trip-clip-export";
 
 const PHOTO_STORAGE_KEY = "travel-frame.photos.v1";
+const PHOTO_DELETION_MARKER_KEY = "travel-frame.photo-deletion-markers.v1";
 const PHOTO_DIRECTORY = "photos/";
 const PHOTO_PREVIEW_DIRECTORY = "photo-previews/";
 const CAPTURE_DRAFT_DIRECTORY = "capture-drafts/";
@@ -249,6 +250,23 @@ const parsePhotos = (value: string | null): PhotoItem[] => {
   }
 };
 
+const parseDeletedPhotoIds = (value: string | null) => {
+  if (!value) {
+    return new Set<string>();
+  }
+
+  try {
+    const parsed = JSON.parse(value);
+    return new Set(
+      Array.isArray(parsed)
+        ? parsed.filter((item): item is string => typeof item === "string" && item.length > 0)
+        : []
+    );
+  } catch {
+    return new Set<string>();
+  }
+};
+
 const writePhotos = async (photos: PhotoItem[]) => {
   await localStorageAdapter.setItem(
     PHOTO_STORAGE_KEY,
@@ -260,6 +278,23 @@ export const getPhotos = async () => {
   const value = await localStorageAdapter.getItem(PHOTO_STORAGE_KEY);
   return parsePhotos(value);
 };
+
+export const getDeletedPhotoIds = async () => {
+  const value = await localStorageAdapter.getItem(PHOTO_DELETION_MARKER_KEY);
+  return parseDeletedPhotoIds(value);
+};
+
+export const recordPhotoLocalDeletion = async (id: string) => {
+  const deletedPhotoIds = await getDeletedPhotoIds();
+  deletedPhotoIds.add(id);
+  await localStorageAdapter.setItem(
+    PHOTO_DELETION_MARKER_KEY,
+    JSON.stringify([...deletedPhotoIds])
+  );
+};
+
+export const wasPhotoDeletedLocally = async (id: string) =>
+  (await getDeletedPhotoIds()).has(id);
 
 export const getPhotoById = async (id: string) => {
   const photos = await getPhotos();
@@ -667,6 +702,7 @@ const renderEditedPhotoFromTransform = async ({
 };
 
 export const deletePhoto = async (id: string) => {
+  await recordPhotoLocalDeletion(id);
   const photos = await getPhotos();
   const photo = photos.find((item) => item.id === id);
 

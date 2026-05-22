@@ -6,6 +6,7 @@ const {
   normalizeBackupUsage,
   reserveBackupUsage,
   releaseReservedBackupUsage,
+  releaseCompletedBackupUsage,
   completeReservedBackupUsage,
   buildBackupSessionStoragePath
 } = require("./backup-quota");
@@ -416,6 +417,23 @@ exports.releaseBackupUpload = onCall(async (request) => {
         const usageSnapshot = await transaction.get(getUsageRef(uid));
         const usageDelta = getBackupSessionUsageDelta(session);
         const releasedUsage = releaseReservedBackupUsage(usageSnapshot.data(), usageDelta);
+        transaction.set(
+          getUsageRef(uid),
+          {
+            ...releasedUsage,
+            pendingUsage: releasedUsage.pendingUsage,
+            updatedAt: FieldValue.serverTimestamp()
+          },
+          { merge: true }
+        );
+        transaction.update(sessionRef, {
+          status: "released",
+          releasedAt: FieldValue.serverTimestamp()
+        });
+      } else if (session.status === "completed") {
+        const usageSnapshot = await transaction.get(getUsageRef(uid));
+        const usageDelta = getBackupSessionUsageDelta(session);
+        const releasedUsage = releaseCompletedBackupUsage(usageSnapshot.data(), usageDelta);
         transaction.set(
           getUsageRef(uid),
           {

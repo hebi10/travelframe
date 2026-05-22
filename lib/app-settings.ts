@@ -28,12 +28,49 @@ export type AppImageSaveFormat = "original" | "png" | "jpeg";
 export type StorageMode = "local_only" | "local_backup" | "local_saver";
 export type CloudBackupTarget = "photos" | "imageBundles" | "videos" | "music";
 export type CloudBackupTargets = Record<CloudBackupTarget, boolean>;
+export type GridGuideLineKey =
+  | "verticalStart"
+  | "verticalEnd"
+  | "horizontalStart"
+  | "horizontalEnd";
+export type GridGuideLinePositions = Record<GridGuideLineKey, number>;
+export type GuideShapeKey = "cross" | "triangle" | "square";
+export type GuideShapePoint = {
+  x: number;
+  y: number;
+};
+export type GuideShapePoints = Record<GuideShapeKey, GuideShapePoint[]>;
 
 export const GUIDE_SIZE_MIN = 24;
 export const GUIDE_SIZE_MAX = 86;
 export const GUIDE_STROKE_WIDTH_MIN = 1;
 export const GUIDE_STROKE_WIDTH_MAX = 5;
 export const DEFAULT_GUIDE_COLOR = "rgba(255, 255, 255, 0.78)";
+export const defaultGridGuideLinePositions: GridGuideLinePositions = {
+  verticalStart: 28,
+  verticalEnd: 72,
+  horizontalStart: 28,
+  horizontalEnd: 72
+};
+export const defaultGuideShapePoints: GuideShapePoints = {
+  cross: [
+    { x: 16, y: 50 },
+    { x: 84, y: 50 },
+    { x: 50, y: 16 },
+    { x: 50, y: 84 }
+  ],
+  triangle: [
+    { x: 50, y: 14 },
+    { x: 84, y: 82 },
+    { x: 16, y: 82 }
+  ],
+  square: [
+    { x: 18, y: 18 },
+    { x: 82, y: 18 },
+    { x: 82, y: 82 },
+    { x: 18, y: 82 }
+  ]
+};
 
 export type AppSettings = {
   defaultGuide: GuideType;
@@ -43,6 +80,8 @@ export type AppSettings = {
   guideColor: string;
   guideOffsetX: number;
   guideOffsetY: number;
+  gridGuideLinePositions: GridGuideLinePositions;
+  guideShapePoints: GuideShapePoints;
   overlayOpacity: number;
   cameraZoomPercent: number;
   cameraTorchEnabled: boolean;
@@ -79,6 +118,8 @@ export const defaultAppSettings: AppSettings = {
   guideColor: DEFAULT_GUIDE_COLOR,
   guideOffsetX: 0,
   guideOffsetY: 0,
+  gridGuideLinePositions: defaultGridGuideLinePositions,
+  guideShapePoints: defaultGuideShapePoints,
   overlayOpacity: 0.4,
   cameraZoomPercent: 0,
   cameraTorchEnabled: false,
@@ -146,6 +187,109 @@ const normalizeGuideOffset = (value: unknown) => {
   return Number.isFinite(parsedValue) ? Math.round(parsedValue) : 0;
 };
 
+const normalizeGridGuideLinePosition = (
+  value: unknown,
+  fallback: number
+) => {
+  const parsedValue = Number(value);
+  if (!Number.isFinite(parsedValue)) {
+    return fallback;
+  }
+
+  return Math.round(Math.max(2, Math.min(98, parsedValue)) * 10) / 10;
+};
+
+const normalizeGridGuideLinePositions = (
+  value: unknown
+): GridGuideLinePositions => {
+  const storedPositions =
+    value && typeof value === "object" && !Array.isArray(value)
+      ? (value as Partial<GridGuideLinePositions>)
+      : {};
+  const verticalStart = normalizeGridGuideLinePosition(
+    storedPositions.verticalStart,
+    defaultGridGuideLinePositions.verticalStart
+  );
+  const verticalEnd = normalizeGridGuideLinePosition(
+    storedPositions.verticalEnd,
+    defaultGridGuideLinePositions.verticalEnd
+  );
+  const horizontalStart = normalizeGridGuideLinePosition(
+    storedPositions.horizontalStart,
+    defaultGridGuideLinePositions.horizontalStart
+  );
+  const horizontalEnd = normalizeGridGuideLinePosition(
+    storedPositions.horizontalEnd,
+    defaultGridGuideLinePositions.horizontalEnd
+  );
+  const boundedVerticalStart = Math.min(verticalStart, 94);
+  const boundedHorizontalStart = Math.min(horizontalStart, 94);
+
+  return {
+    verticalStart: boundedVerticalStart,
+    verticalEnd: Math.max(verticalEnd, boundedVerticalStart + 4),
+    horizontalStart: boundedHorizontalStart,
+    horizontalEnd: Math.max(horizontalEnd, boundedHorizontalStart + 4)
+  };
+};
+
+const normalizeGuideShapePointValue = (value: unknown, fallback: number) => {
+  const parsedValue = Number(value);
+  if (!Number.isFinite(parsedValue)) {
+    return fallback;
+  }
+
+  return Math.round(Math.max(2, Math.min(98, parsedValue)) * 10) / 10;
+};
+
+const normalizeGuideShapePoint = (
+  value: unknown,
+  fallback: GuideShapePoint
+): GuideShapePoint => {
+  const storedPoint =
+    value && typeof value === "object" && !Array.isArray(value)
+      ? (value as Partial<GuideShapePoint>)
+      : {};
+
+  return {
+    x: normalizeGuideShapePointValue(storedPoint.x, fallback.x),
+    y: normalizeGuideShapePointValue(storedPoint.y, fallback.y)
+  };
+};
+
+const normalizeGuideShapePointList = (
+  value: unknown,
+  fallback: GuideShapePoint[]
+) => {
+  const storedPoints = Array.isArray(value) ? value : [];
+
+  return fallback.map((fallbackPoint, index) =>
+    normalizeGuideShapePoint(storedPoints[index], fallbackPoint)
+  );
+};
+
+const normalizeGuideShapePoints = (value: unknown): GuideShapePoints => {
+  const storedShapes =
+    value && typeof value === "object" && !Array.isArray(value)
+      ? (value as Partial<GuideShapePoints>)
+      : {};
+
+  return {
+    cross: normalizeGuideShapePointList(
+      storedShapes.cross,
+      defaultGuideShapePoints.cross
+    ),
+    triangle: normalizeGuideShapePointList(
+      storedShapes.triangle,
+      defaultGuideShapePoints.triangle
+    ),
+    square: normalizeGuideShapePointList(
+      storedShapes.square,
+      defaultGuideShapePoints.square
+    )
+  };
+};
+
 const normalizeCameraZoomPercent = (value: unknown) => {
   const parsedValue = Number(value);
   if (!Number.isFinite(parsedValue)) {
@@ -200,6 +344,8 @@ const normalizeSettings = (value: Partial<AppSettings> | null): AppSettings => {
         : defaultAppSettings.guideColor,
     guideOffsetX: normalizeGuideOffset(nextSettings.guideOffsetX),
     guideOffsetY: normalizeGuideOffset(nextSettings.guideOffsetY),
+    gridGuideLinePositions: normalizeGridGuideLinePositions(nextSettings.gridGuideLinePositions),
+    guideShapePoints: normalizeGuideShapePoints(nextSettings.guideShapePoints),
     cameraZoomPercent: normalizeCameraZoomPercent(nextSettings.cameraZoomPercent),
     cameraTorchEnabled:
       typeof nextSettings.cameraTorchEnabled === "boolean"

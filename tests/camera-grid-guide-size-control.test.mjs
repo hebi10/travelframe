@@ -15,10 +15,14 @@ for (const snippet of [
   "const safeGridSize = Math.max(24, Math.min(86, size));",
   "const gridLineInset = `${(100 - safeGridSize) / 2}%` as DimensionValue;",
   "const gridLineFarInset = `${100 - (100 - safeGridSize) / 2}%` as DimensionValue;",
-  "{ left: gridLineInset }",
-  "{ left: gridLineFarInset }",
-  "{ top: gridLineInset }",
-  "{ top: gridLineFarInset }"
+  "gridLinePositions?.verticalStart",
+  "gridLinePositions?.verticalEnd",
+  "gridLinePositions?.horizontalStart",
+  "gridLinePositions?.horizontalEnd",
+  "{ left: verticalStartPosition }",
+  "{ left: verticalEndPosition }",
+  "{ top: horizontalStartPosition }",
+  "{ top: horizontalEndPosition }"
 ]) {
   assert.ok(guideOverlaySource.includes(snippet), `grid guide size behavior missing: ${snippet}`);
 }

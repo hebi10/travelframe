@@ -65,6 +65,15 @@ import {
   EXPOSURE_CONTROL_OFFSET_Y,
   EXPOSURE_CONTROL_WIDTH
 } from "@/features/camera/camera-screen.constants";
+import {
+  clampGridGuideLinePositions,
+  getDefaultGridGuideLinePositions,
+  getNearestGridGuideLine,
+  getNearestGuideShapePoint,
+  isShapeGuide,
+  updateGridGuideLineFromPoint,
+  updateGuideShapePointFromPoint
+} from "@/features/camera/camera-screen.helpers";
 import { styles } from "@/features/camera/camera-screen.styles";
 import { useAuth } from "@/lib/auth-context";
 import { recordBackupFailure } from "@/lib/backup-failure-queue";
@@ -83,10 +92,15 @@ import {
   GUIDE_SIZE_MIN,
   GUIDE_STROKE_WIDTH_MAX,
   GUIDE_STROKE_WIDTH_MIN,
+  defaultGridGuideLinePositions,
+  defaultGuideShapePoints,
   getAppSettings,
   updateAppSettings,
   type CameraFacing,
-  type CameraSaveScope
+  type CameraSaveScope,
+  type GridGuideLineKey,
+  type GridGuideLinePositions,
+  type GuideShapePoints
 } from "@/lib/app-settings";
 import { getPlanEntitlements } from "@/lib/plan-entitlements";
 import {
@@ -360,7 +374,17 @@ export default function CameraScreen() {
   const [guideColor, setGuideColor] = useState<string>(GUIDE_COLOR_OPTIONS[0].value);
   const [guideOffsetX, setGuideOffsetX] = useState(0);
   const [guideOffsetY, setGuideOffsetY] = useState(0);
+  const [gridGuideLinePositions, setGridGuideLinePositions] =
+    useState<GridGuideLinePositions>(defaultGridGuideLinePositions);
+  const [guideShapePoints, setGuideShapePoints] =
+    useState<GuideShapePoints>(defaultGuideShapePoints);
   const [isGuidePositionAdjusting, setIsGuidePositionAdjusting] = useState(false);
+  const [isGuideShapePointAdjusting, setIsGuideShapePointAdjusting] = useState(false);
+  const [isGridLineControlAdjusting, setIsGridLineControlAdjusting] = useState(false);
+  const [selectedGridGuideLine, setSelectedGridGuideLine] =
+    useState<GridGuideLineKey | null>(null);
+  const [selectedGuideShapePointIndex, setSelectedGuideShapePointIndex] =
+    useState<number | null>(null);
   const [guideChoiceOpen, setGuideChoiceOpen] = useState(false);
   const [guideSettingsOpen, setGuideSettingsOpen] = useState(false);
   const [cameraSettingsOpen, setCameraSettingsOpen] = useState(false);
@@ -401,11 +425,20 @@ export default function CameraScreen() {
   const guideOffsetYValue = useSharedValue(0);
   const guideDragStartX = useSharedValue(0);
   const guideDragStartY = useSharedValue(0);
+  const guidePinchStartSize = useSharedValue(44);
   const cameraPinchStartZoomPercent = useSharedValue(0);
   const cameraControlTabSlideX = useSharedValue(0);
   const cameraControlTabStartX = useSharedValue(0);
   const focusControlsOpacity = useSharedValue(0);
   const focusIndicatorScale = useSharedValue(1);
+  const guideSizeRef = useRef(44);
+  const guideOffsetRef = useRef({ x: 0, y: 0 });
+  const gridGuideLinePositionsRef = useRef<GridGuideLinePositions>(
+    defaultGridGuideLinePositions
+  );
+  const guideShapePointsRef = useRef<GuideShapePoints>(defaultGuideShapePoints);
+  const selectedGridGuideLineRef = useRef<GridGuideLineKey | null>(null);
+  const selectedGuideShapePointIndexRef = useRef<number | null>(null);
   const cameraFocusLockedRef = useRef(false);
   const cameraExposureBiasRef = useRef(0);
   const focusIndicatorTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -426,6 +459,20 @@ export default function CameraScreen() {
     : styles.controls;
   const isLineGuideActive = guideVisible;
   const isPhotoGuideActive = Boolean(referenceUri);
+  const applyGridGuideLinePositionsState = useCallback(
+    (nextPositions: GridGuideLinePositions) => {
+      const clampedPositions = clampGridGuideLinePositions(nextPositions);
+      gridGuideLinePositionsRef.current = clampedPositions;
+      setGridGuideLinePositions(clampedPositions);
+      return clampedPositions;
+    },
+    []
+  );
+  const applyGuideShapePointsState = useCallback((nextShapePoints: GuideShapePoints) => {
+    guideShapePointsRef.current = nextShapePoints;
+    setGuideShapePoints(nextShapePoints);
+    return nextShapePoints;
+  }, []);
   const cameraDeviceFilter = useMemo(() => getCameraDeviceFilter(cameraFacing), [cameraFacing]);
   const cameraDevice = useCameraDevice(cameraFacing, cameraDeviceFilter);
   const availableCameraLenses = useMemo(
@@ -512,11 +559,17 @@ export default function CameraScreen() {
         setGuide(settings.defaultGuide);
         setGuideVisible(settings.guideVisible);
         setGuideSize(settings.guideSize);
+        guideSizeRef.current = settings.guideSize;
         setGuideSizeInput(String(settings.guideSize));
         setGuideStrokeWidth(settings.guideStrokeWidth);
         setGuideColor(settings.guideColor);
         setGuideOffsetX(settings.guideOffsetX);
         setGuideOffsetY(settings.guideOffsetY);
+        guideOffsetRef.current = { x: settings.guideOffsetX, y: settings.guideOffsetY };
+        setGridGuideLinePositions(settings.gridGuideLinePositions);
+        gridGuideLinePositionsRef.current = settings.gridGuideLinePositions;
+        setGuideShapePoints(settings.guideShapePoints);
+        guideShapePointsRef.current = settings.guideShapePoints;
         guideOffsetXValue.value = settings.guideOffsetX;
         guideOffsetYValue.value = settings.guideOffsetY;
         setOverlayOpacity(settings.overlayOpacity);
@@ -582,24 +635,56 @@ export default function CameraScreen() {
     }
   }, [hapticEnabled]);
 
-  const applyGuideSize = useCallback((value: number) => {
-    const nextSize = Math.round(Math.max(GUIDE_SIZE_MIN, Math.min(GUIDE_SIZE_MAX, value)));
-    setGuideSize(nextSize);
-    setGuideSizeInput(String(nextSize));
-    setGuideVisible(true);
-    void updateAppSettings({ guideSize: nextSize, guideVisible: true });
-  }, []);
+  const applyGuideSize = useCallback(
+    (value: number) => {
+      const nextSize = Math.round(Math.max(GUIDE_SIZE_MIN, Math.min(GUIDE_SIZE_MAX, value)));
+      const nextGridGuideLinePositions =
+        guide === "grid"
+          ? getDefaultGridGuideLinePositions(nextSize)
+          : gridGuideLinePositionsRef.current;
+      guideSizeRef.current = nextSize;
+      setGuideSize(nextSize);
+      setGuideSizeInput(String(nextSize));
+      setGuideVisible(true);
 
-  const previewGuideSize = useCallback((value: number) => {
-    const nextSize = Math.round(Math.max(GUIDE_SIZE_MIN, Math.min(GUIDE_SIZE_MAX, value)));
-    setGuideSize(nextSize);
-    setGuideSizeInput(String(nextSize));
-    setGuideVisible(true);
-  }, []);
+      if (guide === "grid") {
+        applyGridGuideLinePositionsState(nextGridGuideLinePositions);
+      }
+
+      void updateAppSettings({
+        guideSize: nextSize,
+        guideVisible: true,
+        ...(guide === "grid"
+          ? { gridGuideLinePositions: nextGridGuideLinePositions }
+          : {})
+      });
+    },
+    [applyGridGuideLinePositionsState, guide]
+  );
+
+  const previewGuideSize = useCallback(
+    (value: number) => {
+      const nextSize = Math.round(Math.max(GUIDE_SIZE_MIN, Math.min(GUIDE_SIZE_MAX, value)));
+      guideSizeRef.current = nextSize;
+      setGuideSize(nextSize);
+      setGuideSizeInput(String(nextSize));
+      setGuideVisible(true);
+
+      if (guide === "grid") {
+        applyGridGuideLinePositionsState(getDefaultGridGuideLinePositions(nextSize));
+      }
+    },
+    [applyGridGuideLinePositionsState, guide]
+  );
 
   const updateGuideType = (nextGuide: GuideType) => {
     setGuide(nextGuide);
     setGuideVisible(true);
+    if (!isShapeGuide(nextGuide)) {
+      setIsGuideShapePointAdjusting(false);
+      setSelectedGuideShapePointIndex(null);
+      selectedGuideShapePointIndexRef.current = null;
+    }
     void updateAppSettings({ defaultGuide: nextGuide, guideVisible: true });
   };
 
@@ -912,6 +997,7 @@ export default function CameraScreen() {
   const syncGuideOffsetFromGesture = useCallback(
     (nextX: number, nextY: number) => {
       const clampedOffset = getClampedGuideOffset(nextX, nextY);
+      guideOffsetRef.current = clampedOffset;
       setGuideOffsetX(clampedOffset.x);
       setGuideOffsetY(clampedOffset.y);
     },
@@ -921,8 +1007,12 @@ export default function CameraScreen() {
   const startGuidePositionAdjustment = () => {
     setGuideSettingsOpen(false);
     setGuideVisible(true);
+    setIsGuideShapePointAdjusting(false);
+    setSelectedGuideShapePointIndex(null);
+    selectedGuideShapePointIndexRef.current = null;
     guideOffsetXValue.value = guideOffsetX;
     guideOffsetYValue.value = guideOffsetY;
+    guidePinchStartSize.value = guideSizeRef.current;
     setIsGuidePositionAdjusting(true);
   };
 
@@ -930,13 +1020,19 @@ export default function CameraScreen() {
     const clampedOffset = getClampedGuideOffset(guideOffsetXValue.value, guideOffsetYValue.value);
     guideOffsetXValue.value = clampedOffset.x;
     guideOffsetYValue.value = clampedOffset.y;
+    guideOffsetRef.current = clampedOffset;
     setGuideOffsetX(clampedOffset.x);
     setGuideOffsetY(clampedOffset.y);
     setIsGuidePositionAdjusting(false);
+    setIsGuideShapePointAdjusting(false);
+    setSelectedGuideShapePointIndex(null);
+    selectedGuideShapePointIndexRef.current = null;
     setGuideSettingsOpen(true);
     void updateAppSettings({
       guideOffsetX: clampedOffset.x,
       guideOffsetY: clampedOffset.y,
+      guideSize: guideSizeRef.current,
+      guideShapePoints: guideShapePointsRef.current,
       guideVisible: true
     });
   };
@@ -944,9 +1040,153 @@ export default function CameraScreen() {
   const resetGuidePositionToCenter = () => {
     guideOffsetXValue.value = 0;
     guideOffsetYValue.value = 0;
+    guideOffsetRef.current = { x: 0, y: 0 };
     setGuideOffsetX(0);
     setGuideOffsetY(0);
   };
+
+  const startGridLineControl = () => {
+    setGuideSettingsOpen(false);
+    setGuide("grid");
+    setGuideVisible(true);
+    selectedGridGuideLineRef.current = null;
+    setSelectedGridGuideLine(null);
+    setIsGridLineControlAdjusting(true);
+  };
+
+  const finishGridLineControl = () => {
+    setIsGridLineControlAdjusting(false);
+    selectedGridGuideLineRef.current = null;
+    setSelectedGridGuideLine(null);
+    setGuideSettingsOpen(true);
+    void updateAppSettings({
+      defaultGuide: "grid",
+      guideVisible: true,
+      gridGuideLinePositions: gridGuideLinePositionsRef.current
+    });
+  };
+
+  const resetGridLineControlToDefault = () => {
+    applyGridGuideLinePositionsState(getDefaultGridGuideLinePositions(guideSize));
+    selectedGridGuideLineRef.current = null;
+    setSelectedGridGuideLine(null);
+  };
+
+  const startGuideShapePointControl = () => {
+    if (!isShapeGuide(guide)) {
+      return;
+    }
+
+    setIsGuideShapePointAdjusting(true);
+    selectedGuideShapePointIndexRef.current = null;
+    setSelectedGuideShapePointIndex(null);
+  };
+
+  const finishGuideShapePointControl = () => {
+    setIsGuideShapePointAdjusting(false);
+    selectedGuideShapePointIndexRef.current = null;
+    setSelectedGuideShapePointIndex(null);
+    void updateAppSettings({
+      guideShapePoints: guideShapePointsRef.current,
+      guideVisible: true
+    });
+  };
+
+  const handleGuideShapePointStart = useCallback(
+    (x: number, y: number) => {
+      const selectedIndex = getNearestGuideShapePoint({
+        guide,
+        x,
+        y,
+        frame: cameraFrame,
+        guideSize: guideSizeRef.current,
+        offset: guideOffsetRef.current,
+        shapePoints: guideShapePointsRef.current
+      });
+      const nextShapePoints = updateGuideShapePointFromPoint({
+        guide,
+        pointIndex: selectedIndex,
+        x,
+        y,
+        frame: cameraFrame,
+        guideSize: guideSizeRef.current,
+        offset: guideOffsetRef.current,
+        shapePoints: guideShapePointsRef.current
+      });
+
+      selectedGuideShapePointIndexRef.current = selectedIndex;
+      setSelectedGuideShapePointIndex(selectedIndex);
+      applyGuideShapePointsState(nextShapePoints);
+    },
+    [applyGuideShapePointsState, cameraFrame, guide]
+  );
+
+  const handleGuideShapePointMove = useCallback(
+    (x: number, y: number) => {
+      const selectedIndex = selectedGuideShapePointIndexRef.current;
+      const nextShapePoints = updateGuideShapePointFromPoint({
+        guide,
+        pointIndex: selectedIndex,
+        x,
+        y,
+        frame: cameraFrame,
+        guideSize: guideSizeRef.current,
+        offset: guideOffsetRef.current,
+        shapePoints: guideShapePointsRef.current
+      });
+
+      applyGuideShapePointsState(nextShapePoints);
+    },
+    [applyGuideShapePointsState, cameraFrame, guide]
+  );
+
+  const handleGridLineControlStart = useCallback(
+    (x: number, y: number) => {
+      const selectedLine = getNearestGridGuideLine({
+        x,
+        y,
+        frame: cameraFrame,
+        positions: gridGuideLinePositionsRef.current
+      });
+      const nextPositions = updateGridGuideLineFromPoint({
+        line: selectedLine,
+        x,
+        y,
+        frame: cameraFrame,
+        positions: gridGuideLinePositionsRef.current
+      });
+
+      selectedGridGuideLineRef.current = selectedLine;
+      setSelectedGridGuideLine(selectedLine);
+      applyGridGuideLinePositionsState(nextPositions);
+    },
+    [applyGridGuideLinePositionsState, cameraFrame]
+  );
+
+  const handleGridLineControlMove = useCallback(
+    (x: number, y: number) => {
+      const selectedLine =
+        selectedGridGuideLineRef.current ??
+        getNearestGridGuideLine({
+          x,
+          y,
+          frame: cameraFrame,
+          positions: gridGuideLinePositionsRef.current
+        });
+      const nextPositions = updateGridGuideLineFromPoint({
+        line: selectedLine,
+        x,
+        y,
+        frame: cameraFrame,
+        positions: gridGuideLinePositionsRef.current
+      });
+
+      selectedGridGuideLineRef.current = selectedLine;
+      setSelectedGridGuideLine(selectedLine);
+      applyGridGuideLinePositionsState(nextPositions);
+    },
+    [applyGridGuideLinePositionsState, cameraFrame]
+  );
 
   const openPersonalGallery = () => {
     router.push("/studio");
@@ -1057,6 +1297,7 @@ export default function CameraScreen() {
           !isCameraModalOpen &&
             !overlaySetupActive &&
             !isGuidePositionAdjusting &&
+            !isGridLineControlAdjusting &&
             !isCapturing
         )
         .activeOffsetY([-CAMERA_FLIP_SWIPE_THRESHOLD, CAMERA_FLIP_SWIPE_THRESHOLD])
@@ -1071,17 +1312,25 @@ export default function CameraScreen() {
             runOnJS(toggleCameraFacingBySwipe)();
           }
         }),
-    [isCameraModalOpen, isCapturing, isGuidePositionAdjusting, overlaySetupActive, toggleCameraFacingBySwipe]
+    [
+      isCameraModalOpen,
+      isCapturing,
+      isGridLineControlAdjusting,
+      isGuidePositionAdjusting,
+      overlaySetupActive,
+      toggleCameraFacingBySwipe
+    ]
   );
 
   const cameraPinchZoomGesture = useMemo(
     () =>
       Gesture.Pinch()
         .enabled(
-          !referenceUri &&
+            !referenceUri &&
             !isCameraModalOpen &&
             !overlaySetupActive &&
             !isGuidePositionAdjusting &&
+            !isGridLineControlAdjusting &&
             !isCapturing
         )
         .onBegin(() => {
@@ -1099,6 +1348,7 @@ export default function CameraScreen() {
       cameraPinchStartZoomPercent,
       isCameraModalOpen,
       isCapturing,
+      isGridLineControlAdjusting,
       isGuidePositionAdjusting,
       overlaySetupActive,
       referenceUri,
@@ -1109,12 +1359,25 @@ export default function CameraScreen() {
   const cameraTapFocusGesture = useMemo(
     () =>
       Gesture.Tap()
-        .enabled(!isCameraModalOpen && !overlaySetupActive && !isGuidePositionAdjusting && !isCapturing)
+        .enabled(
+          !isCameraModalOpen &&
+            !overlaySetupActive &&
+            !isGuidePositionAdjusting &&
+            !isGridLineControlAdjusting &&
+            !isCapturing
+        )
         .maxDuration(250)
         .onEnd((event) => {
           runOnJS(handleCameraTap)(event.x, event.y);
         }),
-    [handleCameraTap, isCameraModalOpen, isCapturing, isGuidePositionAdjusting, overlaySetupActive]
+    [
+      handleCameraTap,
+      isCameraModalOpen,
+      isCapturing,
+      isGridLineControlAdjusting,
+      isGuidePositionAdjusting,
+      overlaySetupActive
+    ]
   );
 
   const cameraPreviewGesture = useMemo(
@@ -1125,6 +1388,7 @@ export default function CameraScreen() {
   const guidePositionGesture = useMemo(
     () =>
       Gesture.Pan()
+        .maxPointers(1)
         .enabled(isGuidePositionAdjusting)
         .onBegin(() => {
           guideDragStartX.value = guideOffsetXValue.value;
@@ -1151,6 +1415,50 @@ export default function CameraScreen() {
       isGuidePositionAdjusting,
       syncGuideOffsetFromGesture
     ]
+  );
+
+  const guidePositionPinchGesture = useMemo(
+    () =>
+      Gesture.Pinch()
+        .enabled(isGuidePositionAdjusting)
+        .onBegin(() => {
+          guidePinchStartSize.value = guideSize;
+        })
+        .onUpdate((event) => {
+          runOnJS(previewGuideSize)(guidePinchStartSize.value * event.scale);
+        }),
+    [guidePinchStartSize, guideSize, isGuidePositionAdjusting, previewGuideSize]
+  );
+
+  const guidePositionAdjustmentGesture = useMemo(
+    () => Gesture.Simultaneous(guidePositionGesture, guidePositionPinchGesture),
+    [guidePositionGesture, guidePositionPinchGesture]
+  );
+
+  const guideShapePointGesture = useMemo(
+    () =>
+      Gesture.Pan()
+        .enabled(isGuideShapePointAdjusting)
+        .onBegin((event) => {
+          runOnJS(handleGuideShapePointStart)(event.x, event.y);
+        })
+        .onUpdate((event) => {
+          runOnJS(handleGuideShapePointMove)(event.x, event.y);
+        }),
+    [handleGuideShapePointMove, handleGuideShapePointStart, isGuideShapePointAdjusting]
+  );
+
+  const gridLineControlGesture = useMemo(
+    () =>
+      Gesture.Pan()
+        .enabled(isGridLineControlAdjusting)
+        .onBegin((event) => {
+          runOnJS(handleGridLineControlStart)(event.x, event.y);
+        })
+        .onUpdate((event) => {
+          runOnJS(handleGridLineControlMove)(event.x, event.y);
+        }),
+    [handleGridLineControlMove, handleGridLineControlStart, isGridLineControlAdjusting]
   );
 
   const exposureControlPosition = useMemo(
@@ -1349,6 +1657,11 @@ export default function CameraScreen() {
           size={guideSize}
           strokeWidth={guideStrokeWidth}
           color={guideColor}
+          gridLinePositions={gridGuideLinePositions}
+          selectedGridLine={selectedGridGuideLine}
+          shapePoints={guideShapePoints}
+          showShapeControlPoints={isGuideShapePointAdjusting}
+          selectedShapePointIndex={selectedGuideShapePointIndex}
           aspectRatio={cameraRatioAspect[cameraRatio] ?? 1}
         />
       </Animated.View>
@@ -1360,11 +1673,25 @@ export default function CameraScreen() {
         resetKey={overlayResetKey}
       />
 
-      {isGuidePositionAdjusting ? (
-        <GestureDetector gesture={guidePositionGesture}>
+      {isGuideShapePointAdjusting ? (
+        <GestureDetector gesture={guideShapePointGesture}>
           <View collapsable={false} pointerEvents="box-only" style={styles.guidePositionDragLayer} />
         </GestureDetector>
-      ) : (
+      ) : null}
+
+      {isGuidePositionAdjusting && !isGuideShapePointAdjusting ? (
+        <GestureDetector gesture={guidePositionAdjustmentGesture}>
+          <View collapsable={false} pointerEvents="box-only" style={styles.guidePositionDragLayer} />
+        </GestureDetector>
+      ) : null}
+
+      {isGridLineControlAdjusting ? (
+        <GestureDetector gesture={gridLineControlGesture}>
+          <View collapsable={false} pointerEvents="box-only" style={styles.guidePositionDragLayer} />
+        </GestureDetector>
+      ) : null}
+
+      {!isGuidePositionAdjusting && !isGridLineControlAdjusting ? (
         <GestureDetector gesture={cameraPreviewGesture}>
           <View
             collapsable={false}
@@ -1372,7 +1699,7 @@ export default function CameraScreen() {
             style={styles.cameraSwipeLayer}
           />
         </GestureDetector>
-      )}
+      ) : null}
 
       {cameraFocusTap && focusIndicatorVisible ? (
         <Animated.View
@@ -1414,7 +1741,11 @@ export default function CameraScreen() {
         </Animated.View>
       ) : null}
 
-      {cameraFocusTap && focusIndicatorVisible && exposureControlPosition && !isCameraModalOpen && !isGuidePositionAdjusting && cameraSupportsExposureBias ? (
+      {cameraFocusTap && focusIndicatorVisible && exposureControlPosition &&
+      !isCameraModalOpen &&
+      !isGuidePositionAdjusting &&
+      !isGridLineControlAdjusting &&
+      cameraSupportsExposureBias ? (
         <Animated.View
           style={[
             styles.exposureTapControl,
@@ -1445,7 +1776,7 @@ export default function CameraScreen() {
         </View>
       ) : null}
 
-      {!isGuidePositionAdjusting ? (
+      {!isGuidePositionAdjusting && !isGridLineControlAdjusting ? (
         <View style={[styles.topBar, { paddingTop: insets.top + 12 }]}>
           <Pressable
             style={styles.accountIconButton}
@@ -1893,7 +2224,15 @@ export default function CameraScreen() {
                 {guide !== "grid" ? (
                   <Pressable style={styles.guidePositionButton} onPress={startGuidePositionAdjustment}>
                     <Text selectable={false} style={styles.guidePositionButtonText}>
-                      드래그 이동하기
+                      위치·모양 조절
+                    </Text>
+                  </Pressable>
+                ) : null}
+
+                {guide === "grid" ? (
+                  <Pressable style={styles.guidePositionButton} onPress={startGridLineControl}>
+                    <Text selectable={false} style={styles.guidePositionButtonText}>
+                      선 컨트롤
                     </Text>
                   </Pressable>
                 ) : null}
@@ -1918,7 +2257,7 @@ export default function CameraScreen() {
         </GestureHandlerRootView>
       </Modal>
 
-      {!isCameraModalOpen && !isGuidePositionAdjusting ? (
+      {!isCameraModalOpen && !isGuidePositionAdjusting && !isGridLineControlAdjusting ? (
         <View style={controlsStyle}>
           {errorMessage ? <Text selectable style={styles.errorText}>{errorMessage}</Text> : null}
 
@@ -2197,12 +2536,38 @@ export default function CameraScreen() {
         </View>
       ) : null}
 
-      {isGuidePositionAdjusting ? (
+      {isGuidePositionAdjusting || isGridLineControlAdjusting ? (
         <View style={[styles.guidePositionActionGroup, { right: 16, bottom: bottomSafePadding }]}>
-          <Pressable style={styles.guidePositionSecondaryButton} onPress={resetGuidePositionToCenter}>
+          <Pressable
+            style={styles.guidePositionSecondaryButton}
+            onPress={
+              isGridLineControlAdjusting
+                ? resetGridLineControlToDefault
+                : resetGuidePositionToCenter
+            }
+          >
             <Text selectable={false} style={styles.guidePositionSecondaryText}>중앙</Text>
           </Pressable>
-          <Pressable style={styles.guidePositionDoneButton} onPress={finishGuidePositionAdjustment}>
+          {isGuidePositionAdjusting && isShapeGuide(guide) ? (
+            <Pressable
+              style={styles.guidePositionSecondaryButton}
+              onPress={
+                isGuideShapePointAdjusting
+                  ? finishGuideShapePointControl
+                  : startGuideShapePointControl
+              }
+            >
+              <Text selectable={false} style={styles.guidePositionSecondaryText}>선 설정</Text>
+            </Pressable>
+          ) : null}
+          <Pressable
+            style={styles.guidePositionDoneButton}
+            onPress={
+              isGridLineControlAdjusting
+                ? finishGridLineControl
+                : finishGuidePositionAdjustment
+            }
+          >
             <Text selectable={false} style={styles.guidePositionDoneText}>완료</Text>
           </Pressable>
         </View>

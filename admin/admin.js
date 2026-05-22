@@ -54,7 +54,8 @@ let currentUserDoc = null;
 let currentSubscription = null;
 let currentProductSubscriptions = {
   ad_remove: null,
-  creator_monthly: null
+  creator_monthly: null,
+  expert_monthly: null
 };
 let currentBackup = null;
 let activeBackupTab = "image";
@@ -120,10 +121,42 @@ const statusLabels = {
   expired: "만료"
 };
 
+const weeklyVideoExportLimits = {
+  free: 1,
+  ad_remove: 1,
+  pro: 15,
+  expert: 30
+};
+
+const adminPlanLabels = {
+  free: "무료",
+  ad_remove: "광고 제거",
+  pro: "Pro",
+  expert: "Expert"
+};
+
 const setupSubscriptionPanel = () => {
   subscriptionPanel.innerHTML = `
-    <h2>구독 관리</h2>
-    <form id="subscriptionForm" class="form">
+    <div class="panel-header">
+      <div>
+        <p class="eyebrow">SUBSCRIPTION</p>
+        <h2>구독 관리</h2>
+      </div>
+      <span id="weeklyVideoUsageMeta" class="pill">-</span>
+    </div>
+    <div id="weeklyVideoUsageCard" class="usage-strip">
+      <div>
+        <span class="meta">이번 주 영상 출력</span>
+        <strong id="weeklyVideoRemaining">-</strong>
+      </div>
+      <div class="usage-progress">
+        <div class="usage-meter" aria-hidden="true">
+          <span id="weeklyVideoUsageFill"></span>
+        </div>
+        <span id="weeklyVideoUsageDetail" class="meta">사용량을 불러오면 표시됩니다.</span>
+      </div>
+    </div>
+    <form id="subscriptionForm" class="form form-grid">
       <label>
         관리할 상품
         <select id="productSelect">
@@ -143,11 +176,11 @@ const setupSubscriptionPanel = () => {
         만료일
         <input id="productExpiresInput" type="date" />
       </label>
-      <label>
+      <label class="full">
         관리자 메모
         <textarea id="adminNoteInput" placeholder="처리 사유, 테스트 계정 메모 등을 남겨 주세요."></textarea>
       </label>
-      <div class="row">
+      <div class="row form-actions full">
         <button type="submit">상품 상태 저장</button>
         <button id="resetWeeklyVideoExportButton" class="secondary" type="button">
           주간 영상 출력 초기화
@@ -320,6 +353,37 @@ const isSubscriptionActive = (subscription) => {
   return !expiresAt || expiresAt.getTime() > Date.now();
 };
 
+const isActiveProduct = (subscription, productId) =>
+  isSubscriptionActive(subscription) && subscription.productId === productId;
+
+const getAdminPlanTier = () => {
+  if (
+    isActiveProduct(currentProductSubscriptions.expert_monthly, "expert_monthly") ||
+    isActiveProduct(currentSubscription, "expert_monthly")
+  ) {
+    return "expert";
+  }
+
+  if (
+    isActiveProduct(currentProductSubscriptions.creator_monthly, "creator_monthly") ||
+    isActiveProduct(currentSubscription, "creator_monthly")
+  ) {
+    return "pro";
+  }
+
+  if (
+    isActiveProduct(currentProductSubscriptions.ad_remove, "ad_remove") ||
+    isActiveProduct(currentSubscription, "ad_remove")
+  ) {
+    return "ad_remove";
+  }
+
+  return "free";
+};
+
+const getWeeklyVideoExportLimitForCurrentUser = () =>
+  weeklyVideoExportLimits[getAdminPlanTier()] ?? weeklyVideoExportLimits.free;
+
 const resolveProductSubscription = (productId, productSnap, current) => {
   if (productSnap.exists()) {
     return {
@@ -335,8 +399,8 @@ const resolveProductSubscription = (productId, productSnap, current) => {
 
   if (currentProductId === productId) {
     return {
-      productId,
-      ...current
+      ...current,
+      productId
     };
   }
 
@@ -463,6 +527,50 @@ const resetBackupManager = () => {
   }
 };
 
+const resetWeeklyVideoUsageSummary = () => {
+  if (!$("weeklyVideoRemaining")) return;
+  $("weeklyVideoRemaining").textContent = "-";
+  $("weeklyVideoUsageDetail").textContent = "사용량을 불러오면 표시됩니다.";
+  $("weeklyVideoUsageMeta").textContent = "-";
+  $("weeklyVideoUsageFill").style.width = "0%";
+  $("weeklyVideoUsageCard")?.classList.remove("usage-warning");
+};
+
+const renderWeeklyVideoExportUsage = async () => {
+  if (!currentUserDoc) {
+    resetWeeklyVideoUsageSummary();
+    return;
+  }
+
+  const { weekId, weekLabel } = getCurrentVideoExportWeek();
+  const planTier = getAdminPlanTier();
+  const limit = getWeeklyVideoExportLimitForCurrentUser();
+
+  try {
+    const snapshot = await getDoc(
+      doc(db, "users", currentUserDoc.id, "usage", "videoExports", "weeks", weekId)
+    );
+    const count = snapshot.exists()
+      ? Math.max(0, Number(snapshot.data().count ?? 0))
+      : 0;
+    const remaining = Math.max(0, limit - count);
+    const usagePercent = limit > 0 ? Math.min(100, Math.round((count / limit) * 100)) : 0;
+
+    $("weeklyVideoRemaining").textContent = `${remaining}개 남음`;
+    $("weeklyVideoUsageDetail").textContent = `${count}개 사용 / 주 ${limit}개 한도`;
+    $("weeklyVideoUsageMeta").textContent = `${adminPlanLabels[planTier]} · ${weekLabel}`;
+    $("weeklyVideoUsageFill").style.width = `${usagePercent}%`;
+    $("weeklyVideoUsageCard")?.classList.toggle("usage-warning", limit > 0 && remaining <= 0);
+  } catch (error) {
+    $("weeklyVideoRemaining").textContent = "-";
+    $("weeklyVideoUsageDetail").textContent =
+      error?.message ?? "주간 영상 출력 사용량을 불러오지 못했습니다.";
+    $("weeklyVideoUsageMeta").textContent = `${adminPlanLabels[planTier]} · ${weekLabel}`;
+    $("weeklyVideoUsageFill").style.width = "0%";
+    $("weeklyVideoUsageCard")?.classList.remove("usage-warning");
+  }
+};
+
 const setSelectedUserPanelsVisible = (hasSelectedUser) => {
   $("userEmptyPanel")?.classList.toggle("hidden", hasSelectedUser);
   $("subscriptionEmptyPanel")?.classList.toggle("hidden", hasSelectedUser);
@@ -477,10 +585,12 @@ const resetUserPanels = () => {
   currentSubscription = null;
   currentProductSubscriptions = {
     ad_remove: null,
-    creator_monthly: null
+    creator_monthly: null,
+    expert_monthly: null
   };
   currentBackup = null;
   setSelectedUserPanelsVisible(false);
+  resetWeeklyVideoUsageSummary();
   $("statPlan").textContent = "-";
   $("statBackups").textContent = "-";
   $("statStatus").textContent = "-";
@@ -1052,6 +1162,7 @@ const loadUserDetail = async ({ preserveBackupItems = false } = {}) => {
     subscriptionSnap,
     adRemoveSnap,
     creatorMonthlySnap,
+    expertMonthlySnap,
     backupSnap,
     photoBackups,
     musicTracks
@@ -1059,6 +1170,7 @@ const loadUserDetail = async ({ preserveBackupItems = false } = {}) => {
     getDoc(doc(db, "users", uid, "subscriptions", "current")),
     getDoc(doc(db, "users", uid, "subscriptions", "ad_remove")),
     getDoc(doc(db, "users", uid, "subscriptions", "creator_monthly")),
+    getDoc(doc(db, "users", uid, "subscriptions", "expert_monthly")),
     getDoc(doc(db, "users", uid, "backups", "current")),
     getDocs(collection(db, "users", uid, "photoBackups")),
     getDocs(collection(db, "users", uid, "musicTracks"))
@@ -1070,6 +1182,11 @@ const loadUserDetail = async ({ preserveBackupItems = false } = {}) => {
     creator_monthly: resolveProductSubscription(
       "creator_monthly",
       creatorMonthlySnap,
+      currentSubscription
+    ),
+    expert_monthly: resolveProductSubscription(
+      "expert_monthly",
+      expertMonthlySnap,
       currentSubscription
     )
   };
@@ -1099,6 +1216,7 @@ const loadUserDetail = async ({ preserveBackupItems = false } = {}) => {
   $("backupDeleteAfter").textContent = formatDate(currentBackup?.deleteAfter);
   $("backupCounts").textContent = `사진 ${photoBackups.size}개 / 작업 ${imageBundleCount}개 / 동영상 ${videoCount}개 / 음악 ${musicCount}개`;
 
+  await renderWeeklyVideoExportUsage();
   setSelectedUserPanelsVisible(true);
 };
 
@@ -1178,6 +1296,7 @@ const resetWeeklyVideoExport = async () => {
 
   try {
     await deleteDoc(doc(db, "users", currentUserDoc.id, "usage", "videoExports", "weeks", weekId));
+    await renderWeeklyVideoExportUsage();
     setMessage("subscriptionMessage", `${weekLabel} 주간 영상 출력 횟수를 초기화했습니다.`);
   } catch (error) {
     setMessage("subscriptionMessage", error?.message ?? "주간 영상 출력 초기화 중 문제가 발생했습니다.");

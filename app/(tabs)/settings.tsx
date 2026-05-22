@@ -1366,6 +1366,7 @@ export default function SettingsScreen() {
                   strokeWidth={settings.guideStrokeWidth}
                   offsetX={settings.guideOffsetX}
                   offsetY={settings.guideOffsetY}
+                  shapePoints={settings.guideShapePoints}
                 />
                 {!settings.guideVisible ? (
                   <View style={styles.guidePreviewDisabled}>

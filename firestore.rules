@@ -47,6 +47,21 @@ service cloud.firestore {
       return status in ["none", "active", "expired", "deleted", "backed_up", "failed", "restored"];
     }
 
+    function isActiveSubscription(userId, productId) {
+      return exists(/databases/$(database)/documents/users/$(userId)/subscriptions/$(productId))
+        && get(/databases/$(database)/documents/users/$(userId)/subscriptions/$(productId)).data.plan == "premium"
+        && get(/databases/$(database)/documents/users/$(userId)/subscriptions/$(productId)).data.status == "active"
+        && get(/databases/$(database)/documents/users/$(userId)/subscriptions/$(productId)).data.productId == productId;
+    }
+
+    function weeklyVideoExportLimitForUser(userId) {
+      return isActiveSubscription(userId, "expert_monthly")
+        ? 30
+        : isActiveSubscription(userId, "creator_monthly")
+          ? 15
+          : 1;
+    }
+
     function hasValidBackupOwner(userId) {
       return request.resource.data.userId == userId;
     }
@@ -169,8 +184,8 @@ service cloud.firestore {
           && request.resource.data.weekId == weekId
           && request.resource.data.count is int
           && request.resource.data.count >= 0
-          && request.resource.data.count <= 1
-          && request.resource.data.limit == 1;
+          && request.resource.data.count <= weeklyVideoExportLimitForUser(userId)
+          && request.resource.data.limit == weeklyVideoExportLimitForUser(userId);
         allow delete: if isAdmin();
       }
 

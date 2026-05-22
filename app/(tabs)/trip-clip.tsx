@@ -83,9 +83,11 @@ import {
   GUIDE_SIZE_MIN,
   GUIDE_STROKE_WIDTH_MAX,
   GUIDE_STROKE_WIDTH_MIN,
+  defaultGuideShapePoints,
   getAppSettings,
   isCloudBackupTargetEnabled,
-  updateAppSettings
+  updateAppSettings,
+  type GuideShapePoints
 } from "@/lib/app-settings";
 import {
   ensurePhotoPreviews,
@@ -334,6 +336,8 @@ export default function TripClipScreen() {
   );
   const [previewGuideOffsetX, setPreviewGuideOffsetX] = useState(0);
   const [previewGuideOffsetY, setPreviewGuideOffsetY] = useState(0);
+  const [previewGuideShapePoints, setPreviewGuideShapePoints] =
+    useState<GuideShapePoints>(defaultGuideShapePoints);
   const [isPreviewGuideMoving, setIsPreviewGuideMoving] = useState(false);
   const [previewFrameSize, setPreviewFrameSize] = useState({ width: 0, height: 0 });
   const [activeEditorTab, setActiveEditorTab] = useState<EditorTab>("photos");
@@ -691,6 +695,7 @@ export default function TripClipScreen() {
     setPreviewGuideColor(settings.guideColor);
     setPreviewGuideOffsetX(settings.guideOffsetX);
     setPreviewGuideOffsetY(settings.guideOffsetY);
+    setPreviewGuideShapePoints(settings.guideShapePoints);
     previewGuideOffsetXValue.value = settings.guideOffsetX;
     previewGuideOffsetYValue.value = settings.guideOffsetY;
     setCloudBackupEnabled(settings.cloudBackupEnabled);
@@ -2079,6 +2084,7 @@ export default function TripClipScreen() {
                 guideColor={previewGuideColor}
                 guideOffsetX={previewGuideOffsetX}
                 guideOffsetY={previewGuideOffsetY}
+                guideShapePoints={previewGuideShapePoints}
                 photoAdjustments={photoAdjustments}
                 onPhotoAdjustmentChange={updatePhotoAdjustment}
               />
@@ -2855,6 +2861,7 @@ export default function TripClipScreen() {
               guideColor={previewGuideColor}
               guideOffsetX={previewGuideOffsetX}
               guideOffsetY={previewGuideOffsetY}
+              guideShapePoints={previewGuideShapePoints}
               photoAdjustments={photoAdjustments}
             />
           </OptionalRecordingView>

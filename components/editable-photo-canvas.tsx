@@ -11,6 +11,7 @@ import Animated, {
 import { CameraGuideOverlay } from "@/components/camera-guide-overlay";
 import { colors } from "@/constants/app-theme";
 import type { GuideType } from "@/constants/camera-guides";
+import type { GuideShapePoints } from "@/lib/app-settings";
 import {
   isRecordingViewAvailable,
   OptionalRecordingView,
@@ -31,6 +32,7 @@ type EditablePhotoCanvasProps = {
   guideColor: string;
   guideOffsetX?: number;
   guideOffsetY?: number;
+  guideShapePoints: GuideShapePoints;
 };
 
 export type EditablePhotoCanvasHandle = {
@@ -199,7 +201,8 @@ export const EditablePhotoCanvas = forwardRef<
   guideStrokeWidth,
   guideColor,
   guideOffsetX = 0,
-  guideOffsetY = 0
+  guideOffsetY = 0,
+  guideShapePoints
 }, ref) {
   const recorder = useOptionalViewRecorder();
   const [frameSize, setFrameSize] = useState({ width: 0, height: 0 });
@@ -475,6 +478,7 @@ export const EditablePhotoCanvas = forwardRef<
                 aspectRatio={frameAspectRatio}
                 offsetX={guideOffsetX}
                 offsetY={guideOffsetY}
+                shapePoints={guideShapePoints}
               />
             </View>
 
