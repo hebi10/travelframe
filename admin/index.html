@@ -158,29 +158,37 @@
 
         <div class="grid">
           <div class="stack">
-            <section class="panel strong">
+            <div id="leftAdminTabs" class="admin-tabs tabs" role="tablist" aria-label="좌측 관리 영역">
+              <button
+                class="tab active"
+                type="button"
+                data-admin-tab="userSearch"
+                role="tab"
+                aria-selected="true"
+                aria-controls="userSearchPanel"
+              >
+                사용자
+              </button>
+              <button
+                class="tab"
+                type="button"
+                data-admin-tab="operationLinks"
+                role="tab"
+                aria-selected="false"
+                aria-controls="operationLinksPanel"
+              >
+                운영 링크
+              </button>
+            </div>
+
+            <section id="userSearchPanel" class="panel strong admin-tab-panel" role="tabpanel">
               <div class="section-heading">
                 <div>
-                  <h2>사용자 선택</h2>
-                  <p>가입한 사용자를 자동으로 불러옵니다. 목록에서 사용자를 선택해 관리하세요.</p>
+                  <h2>직접 검색</h2>
+                  <p>사용자를 빠르게 찾은 뒤 아래 목록에서 선택 상태를 확인합니다.</p>
                 </div>
                 <button id="refreshUsersButton" class="secondary" type="button">새로고침</button>
               </div>
-              <label>
-                사용자 필터
-                <input id="userFilterInput" placeholder="이메일, 이름, UID로 필터" />
-              </label>
-              <div id="userList" class="user-list" aria-live="polite"></div>
-              <div class="pagination" aria-label="사용자 목록 페이지 이동">
-                <button id="prevUsersPageButton" class="secondary" type="button">이전</button>
-                <span id="usersPageInfo" class="meta">-</span>
-                <button id="nextUsersPageButton" class="secondary" type="button">다음</button>
-              </div>
-              <p id="userListMessage" class="message"></p>
-            </section>
-
-            <section class="panel">
-              <h2>직접 검색</h2>
               <form id="searchForm" class="form">
                 <label>
                   이메일, 이름 또는 UID
@@ -189,9 +197,23 @@
                 <button type="submit">검색</button>
               </form>
               <p id="searchMessage" class="message"></p>
+              <div class="subsection">
+                <h3>사용자 선택</h3>
+                <label>
+                  사용자 필터
+                  <input id="userFilterInput" placeholder="이메일, 이름, UID로 필터" />
+                </label>
+                <div id="userList" class="user-list" aria-live="polite"></div>
+                <div class="pagination" aria-label="사용자 목록 페이지 이동">
+                  <button id="prevUsersPageButton" class="secondary" type="button">이전</button>
+                  <span id="usersPageInfo" class="meta">-</span>
+                  <button id="nextUsersPageButton" class="secondary" type="button">다음</button>
+                </div>
+                <p id="userListMessage" class="message"></p>
+              </div>
             </section>
 
-            <section class="panel">
+            <section id="operationLinksPanel" class="panel admin-tab-panel hidden" role="tabpanel">
               <h2>운영 링크</h2>
               <div class="list">
                 <a class="item" href="/privacy/">
@@ -211,6 +233,44 @@
           </div>
 
           <div class="stack">
+            <div id="rightAdminTabs" class="admin-tabs tabs" role="tablist" aria-label="우측 관리 영역">
+              <button
+                class="tab active"
+                type="button"
+                data-admin-tab="userDetail"
+                role="tab"
+                aria-selected="true"
+                aria-controls="userDetailPanel"
+              >
+                사용자 상세
+              </button>
+              <button
+                class="tab"
+                type="button"
+                data-admin-tab="subscriptionManage"
+                role="tab"
+                aria-selected="false"
+                aria-controls="subscriptionManagePanel"
+              >
+                구독 관리
+              </button>
+              <button
+                class="tab"
+                type="button"
+                data-admin-tab="backupManage"
+                role="tab"
+                aria-selected="false"
+                aria-controls="backupManagePanel"
+              >
+                백업 관리
+              </button>
+            </div>
+
+            <div id="userDetailPanel" class="admin-tab-panel" role="tabpanel">
+              <section id="userEmptyPanel" class="panel empty-state">
+                <h2>사용자를 선택해 주세요</h2>
+                <p>왼쪽의 직접 검색 또는 사용자 목록에서 관리할 사용자를 선택하면 상세 정보와 구독 내역이 표시됩니다.</p>
+              </section>
             <section id="userPanel" class="panel strong hidden">
               <h2>사용자 상세</h2>
               <div class="list compact">
@@ -231,8 +291,27 @@
                   <strong id="userLastSignIn">-</strong>
                 </div>
               </div>
+              <h3 class="subsection-title">구독 내역</h3>
+              <div id="userSubscriptionSummary" class="subscription-summary" aria-label="상품별 구독 내역">
+                <div id="adRemoveCard" class="subscription-product-card">
+                  <span class="meta">광고 제거</span>
+                  <strong id="adRemoveStatusLabel">-</strong>
+                  <span id="adRemoveDetail" class="meta">-</span>
+                </div>
+                <div id="creatorMonthlyCard" class="subscription-product-card">
+                  <span class="meta">영상 내보내기</span>
+                  <strong id="creatorMonthlyStatusLabel">-</strong>
+                  <span id="creatorMonthlyDetail" class="meta">-</span>
+                </div>
+              </div>
             </section>
+            </div>
 
+            <div id="subscriptionManagePanel" class="admin-tab-panel hidden" role="tabpanel">
+              <section id="subscriptionEmptyPanel" class="panel empty-state">
+                <h2>구독을 관리할 사용자를 선택해 주세요</h2>
+                <p>사용자를 선택하면 상품 상태 저장과 주간 영상 출력 초기화를 사용할 수 있습니다.</p>
+              </section>
             <section id="subscriptionPanel" class="panel hidden">
               <h2>구독 관리</h2>
               <form id="subscriptionForm" class="form">
@@ -260,11 +339,22 @@
                   관리자 메모
                   <textarea id="adminNoteInput" placeholder="처리 사유, 테스트 계정 메모 등을 남겨 주세요."></textarea>
                 </label>
-                <button type="submit">구독 저장</button>
+                <div class="row">
+                  <button type="submit">구독 저장</button>
+                  <button id="resetWeeklyVideoExportButton" class="secondary" type="button">
+                    주간 영상 출력 초기화
+                  </button>
+                </div>
               </form>
               <p id="subscriptionMessage" class="message"></p>
             </section>
+            </div>
 
+            <div id="backupManagePanel" class="admin-tab-panel hidden" role="tabpanel">
+              <section id="backupEmptyPanel" class="panel empty-state">
+                <h2>백업을 관리할 사용자를 선택해 주세요</h2>
+                <p>사용자를 선택하면 백업 상태와 사진, 작업, 동영상, 음악 백업 데이터를 확인할 수 있습니다.</p>
+              </section>
             <section id="backupPanel" class="panel hidden">
               <h2>백업 관리</h2>
               <div class="list compact">
@@ -314,6 +404,7 @@
                 <p id="backupItemsMessage" class="message"></p>
               </div>
             </section>
+            </div>
           </div>
         </div>
       </section>

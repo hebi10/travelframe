@@ -10,6 +10,7 @@ import {
   Text,
   View
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { colors, controls, spacing, typography } from "@/constants/app-theme";
 import { deletePhoto, getPhotoById } from "@/lib/photo-library";
@@ -57,6 +58,8 @@ const getPhotoAspectRatio = (photo: PhotoItem) => {
 
 export default function PhotoDetailScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
+  const insets = useSafeAreaInsets();
+  const bottomSafePadding = Math.max(insets.bottom + spacing.screen, spacing.screen);
   const [photo, setPhoto] = useState<PhotoItem | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -148,7 +151,7 @@ export default function PhotoDetailScreen() {
   return (
     <ScrollView
       style={styles.screen}
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[styles.content, { paddingBottom: bottomSafePadding }]}
       contentInsetAdjustmentBehavior="automatic"
     >
       <NativeImage

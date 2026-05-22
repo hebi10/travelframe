@@ -123,18 +123,6 @@ const statusLabels = {
 const setupSubscriptionPanel = () => {
   subscriptionPanel.innerHTML = `
     <h2>구독 관리</h2>
-    <div class="subscription-summary" aria-label="상품별 구독 상태">
-      <div id="adRemoveCard" class="subscription-product-card">
-        <span class="meta">광고 제거</span>
-        <strong id="adRemoveStatusLabel">-</strong>
-        <span id="adRemoveDetail" class="meta">-</span>
-      </div>
-      <div id="creatorMonthlyCard" class="subscription-product-card">
-        <span class="meta">영상 내보내기</span>
-        <strong id="creatorMonthlyStatusLabel">-</strong>
-        <span id="creatorMonthlyDetail" class="meta">-</span>
-      </div>
-    </div>
     <form id="subscriptionForm" class="form">
       <label>
         관리할 상품
@@ -159,7 +147,12 @@ const setupSubscriptionPanel = () => {
         관리자 메모
         <textarea id="adminNoteInput" placeholder="처리 사유, 테스트 계정 메모 등을 남겨 주세요."></textarea>
       </label>
-      <button type="submit">상품 상태 저장</button>
+      <div class="row">
+        <button type="submit">상품 상태 저장</button>
+        <button id="resetWeeklyVideoExportButton" class="secondary" type="button">
+          주간 영상 출력 초기화
+        </button>
+      </div>
     </form>
     <p class="meta">
       두 상품은 별도로 저장됩니다. 앱 호환을 위해 현재 활성 상품 정보도 함께 갱신합니다.
@@ -179,6 +172,47 @@ const setAuthTab = (target) => {
   $("adminAuthPanel").classList.toggle("hidden", !isAdminTab);
   $("signupAuthPanel").classList.toggle("hidden", isAdminTab);
 };
+
+const adminTabPanelIds = {
+  userSearch: "userSearchPanel",
+  operationLinks: "operationLinksPanel",
+  userDetail: "userDetailPanel",
+  subscriptionManage: "subscriptionManagePanel",
+  backupManage: "backupManagePanel"
+};
+
+const setAdminSectionTab = (tabListId, target) => {
+  document.querySelectorAll(`#${tabListId} [data-admin-tab]`).forEach((button) => {
+    const isActive = button.dataset.adminTab === target;
+    button.classList.toggle("active", isActive);
+    button.setAttribute("aria-selected", String(isActive));
+  });
+
+  const panelIds =
+    tabListId === "leftAdminTabs"
+      ? ["userSearchPanel", "operationLinksPanel"]
+      : ["userDetailPanel", "subscriptionManagePanel", "backupManagePanel"];
+
+  panelIds.forEach((panelId) => {
+    $(panelId)?.classList.toggle("hidden", panelId !== adminTabPanelIds[target]);
+  });
+};
+
+document.querySelectorAll("[data-admin-tab]").forEach((button) => {
+  button.setAttribute("type", "button");
+});
+
+document.querySelectorAll("#leftAdminTabs [data-admin-tab]").forEach((button) => {
+  button.addEventListener("click", () => {
+    setAdminSectionTab("leftAdminTabs", button.dataset.adminTab);
+  });
+});
+
+document.querySelectorAll("#rightAdminTabs [data-admin-tab]").forEach((button) => {
+  button.addEventListener("click", () => {
+    setAdminSectionTab("rightAdminTabs", button.dataset.adminTab);
+  });
+});
 
 const setMessage = (id, message) => {
   $(id).textContent = message;
@@ -249,6 +283,32 @@ const formatBytes = (value) => {
 const toDateInput = (value) => {
   const date = parseDate(value);
   return date ? date.toISOString().slice(0, 10) : "";
+};
+
+const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+const getCurrentVideoExportWeek = (date = new Date()) => {
+  const kstDate = new Date(date.getTime() + KST_OFFSET_MS);
+  const kstDay = kstDate.getUTCDay();
+  const daysFromMonday = (kstDay + 6) % 7;
+  const weekStart = new Date(
+    Date.UTC(
+      kstDate.getUTCFullYear(),
+      kstDate.getUTCMonth(),
+      kstDate.getUTCDate() - daysFromMonday
+    )
+  );
+  const weekEnd = new Date(weekStart.getTime() + 6 * DAY_MS);
+  const format = new Intl.DateTimeFormat("ko-KR", {
+    month: "long",
+    day: "numeric"
+  });
+
+  return {
+    weekId: weekStart.toISOString().slice(0, 10),
+    weekLabel: `${format.format(weekStart)} - ${format.format(weekEnd)}`
+  };
 };
 
 const isSubscriptionActive = (subscription) => {
@@ -403,6 +463,15 @@ const resetBackupManager = () => {
   }
 };
 
+const setSelectedUserPanelsVisible = (hasSelectedUser) => {
+  $("userEmptyPanel")?.classList.toggle("hidden", hasSelectedUser);
+  $("subscriptionEmptyPanel")?.classList.toggle("hidden", hasSelectedUser);
+  $("backupEmptyPanel")?.classList.toggle("hidden", hasSelectedUser);
+  userPanel.classList.toggle("hidden", !hasSelectedUser);
+  subscriptionPanel.classList.toggle("hidden", !hasSelectedUser);
+  backupPanel.classList.toggle("hidden", !hasSelectedUser);
+};
+
 const resetUserPanels = () => {
   currentUserDoc = null;
   currentSubscription = null;
@@ -411,9 +480,7 @@ const resetUserPanels = () => {
     creator_monthly: null
   };
   currentBackup = null;
-  userPanel.classList.add("hidden");
-  subscriptionPanel.classList.add("hidden");
-  backupPanel.classList.add("hidden");
+  setSelectedUserPanelsVisible(false);
   $("statPlan").textContent = "-";
   $("statBackups").textContent = "-";
   $("statStatus").textContent = "-";
@@ -1032,9 +1099,7 @@ const loadUserDetail = async ({ preserveBackupItems = false } = {}) => {
   $("backupDeleteAfter").textContent = formatDate(currentBackup?.deleteAfter);
   $("backupCounts").textContent = `사진 ${photoBackups.size}개 / 작업 ${imageBundleCount}개 / 동영상 ${videoCount}개 / 음악 ${musicCount}개`;
 
-  userPanel.classList.remove("hidden");
-  subscriptionPanel.classList.remove("hidden");
-  backupPanel.classList.remove("hidden");
+  setSelectedUserPanelsVisible(true);
 };
 
 const saveProductSubscription = async (event) => {
@@ -1099,11 +1164,32 @@ const saveProductSubscription = async (event) => {
   }
 };
 
+const resetWeeklyVideoExport = async () => {
+  if (!currentUserDoc) {
+    setMessage("subscriptionMessage", "사용자를 먼저 선택해 주세요.");
+    return;
+  }
+
+  const { weekId, weekLabel } = getCurrentVideoExportWeek();
+  const confirmed = window.confirm(`${weekLabel} 주간 영상 출력 횟수를 초기화할까요?`);
+  if (!confirmed) return;
+
+  setMessage("subscriptionMessage", "주간 영상 출력 횟수를 초기화하는 중입니다.");
+
+  try {
+    await deleteDoc(doc(db, "users", currentUserDoc.id, "usage", "videoExports", "weeks", weekId));
+    setMessage("subscriptionMessage", `${weekLabel} 주간 영상 출력 횟수를 초기화했습니다.`);
+  } catch (error) {
+    setMessage("subscriptionMessage", error?.message ?? "주간 영상 출력 초기화 중 문제가 발생했습니다.");
+  }
+};
+
 $("productSelect").addEventListener("change", (event) => {
   fillSubscriptionForm(event.target.value);
 });
 
 $("subscriptionForm").addEventListener("submit", saveProductSubscription);
+$("resetWeeklyVideoExportButton").addEventListener("click", resetWeeklyVideoExport);
 
 $("markBackupExpiredButton").addEventListener("click", async () => {
   if (!currentUserDoc) return;

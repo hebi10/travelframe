@@ -671,9 +671,9 @@ export const deletePhoto = async (id: string) => {
   const photo = photos.find((item) => item.id === id);
 
   if (photo) {
-    await FileSystem.deleteAsync(photo.uri, { idempotent: true });
+    await deleteLocalFile(photo.uri);
     if (photo.previewUri) {
-      await FileSystem.deleteAsync(photo.previewUri, { idempotent: true });
+      await deleteLocalFile(photo.previewUri);
     }
   }
 

@@ -9,6 +9,7 @@ import {
   Text,
   View
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { colors, controls, typography } from "@/constants/app-theme";
 import { useAuth } from "@/lib/auth-context";
@@ -52,6 +53,8 @@ const getRouteParam = (value?: string | string[]) => {
 
 export default function CapturePreviewScreen() {
   const { user, subscription } = useAuth();
+  const insets = useSafeAreaInsets();
+  const bottomSafePadding = Math.max(insets.bottom + 20, 24);
   const planEntitlements = useMemo(
     () => getPlanEntitlements({ isLoggedIn: Boolean(user), subscription }),
     [subscription, user]
@@ -201,7 +204,7 @@ export default function CapturePreviewScreen() {
         </View>
       )}
 
-      <View style={styles.footer}>
+      <View style={[styles.footer, { paddingBottom: bottomSafePadding }]}>
         <Text selectable style={styles.title}>
           촬영 미리보기
         </Text>

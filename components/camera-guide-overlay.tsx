@@ -37,23 +37,28 @@ export function CameraGuideOverlay({
     height: safeStrokeWidth,
     opacity: 0.45
   };
+  const safeGridSize = Math.max(24, Math.min(86, size));
+  const gridLineInset = `${(100 - safeGridSize) / 2}%` as DimensionValue;
+  const gridLineFarInset = `${100 - (100 - safeGridSize) / 2}%` as DimensionValue;
 
   if (guide === "grid") {
     return (
       <View style={styles.gridOverlay}>
-        <View style={[styles.gridVertical, styles.gridVerticalOne, secondaryGuideLineStyle]} />
-        <View style={[styles.gridVertical, styles.gridVerticalTwo, secondaryGuideLineStyle]} />
+        <View style={[styles.gridVertical, { left: gridLineInset }, secondaryGuideLineStyle]} />
+        <View
+          style={[styles.gridVertical, { left: gridLineFarInset }, secondaryGuideLineStyle]}
+        />
         <View
           style={[
             styles.gridHorizontal,
-            styles.gridHorizontalOne,
+            { top: gridLineInset },
             secondaryHorizontalGuideLineStyle
           ]}
         />
         <View
           style={[
             styles.gridHorizontal,
-            styles.gridHorizontalTwo,
+            { top: gridLineFarInset },
             secondaryHorizontalGuideLineStyle
           ]}
         />
@@ -192,18 +197,6 @@ const styles = StyleSheet.create({
     right: 0,
     height: 1,
     backgroundColor: "rgba(255, 255, 255, 0.32)"
-  },
-  gridVerticalOne: {
-    left: "33.333%"
-  },
-  gridVerticalTwo: {
-    left: "66.666%"
-  },
-  gridHorizontalOne: {
-    top: "33.333%"
-  },
-  gridHorizontalTwo: {
-    top: "66.666%"
   },
   horizon: {
     position: "absolute",

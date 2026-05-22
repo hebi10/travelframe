@@ -175,6 +175,22 @@ button:disabled {
   border-color: #111111;
 }
 
+.admin-tabs {
+  margin-bottom: 0;
+}
+
+#rightAdminTabs {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.admin-tab-panel {
+  display: block;
+}
+
+.admin-tab-panel.hidden {
+  display: none !important;
+}
+
 .auth-tab-panel {
   display: grid;
   gap: 18px;
@@ -183,6 +199,7 @@ button:disabled {
 .stack {
   display: grid;
   gap: 12px;
+  align-content: start;
 }
 
 .panel {
@@ -272,6 +289,20 @@ textarea {
   margin-bottom: 6px;
 }
 
+.subsection {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid #e5e5e5;
+}
+
+.subsection-title {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid #e5e5e5;
+}
+
 .list {
   display: grid;
   border-top: 1px solid #e5e5e5;
@@ -349,6 +380,21 @@ textarea {
   font-size: 13px;
 }
 
+.empty-state {
+  min-height: 132px;
+  display: grid;
+  align-content: center;
+  gap: 8px;
+}
+
+.empty-state h2 {
+  margin-bottom: 0;
+}
+
+.empty-state p {
+  max-width: 440px;
+}
+
 .pagination {
   display: grid;
   grid-template-columns: 82px 1fr 82px;
@@ -373,6 +419,11 @@ textarea {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
   margin-bottom: 14px;
+}
+
+#userSubscriptionSummary {
+  margin-top: 14px;
+  margin-bottom: 0;
 }
 
 .subscription-product-card {
@@ -491,6 +542,10 @@ textarea {
   }
 
   .subscription-summary {
+    grid-template-columns: 1fr;
+  }
+
+  #rightAdminTabs {
     grid-template-columns: 1fr;
   }
 

@@ -5,6 +5,8 @@ import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  AppState,
+  type AppStateStatus,
   Image as NativeImage,
   Linking,
   Modal,
@@ -194,6 +196,7 @@ const CAMERA_EXPOSURE_BIAS_MAX = 1;
 const CAMERA_FLIP_SWIPE_THRESHOLD = 70;
 const CAMERA_FLIP_HORIZONTAL_TOLERANCE = 1.4;
 const CAMERA_FOCUS_METERING_MODES: MeteringMode[] = ["AF", "AE", "AWB"];
+const CAMERA_SESSION_RECOVERY_DELAY_MS = 700;
 
 type CameraTimerValue = (typeof CAMERA_TIMER_OPTIONS)[number]["value"];
 type CameraQualityValue = (typeof CAMERA_QUALITY_OPTIONS)[number]["value"];
@@ -380,6 +383,10 @@ export default function CameraScreen() {
   const [cameraFocusLocked, setCameraFocusLocked] = useState(false);
   const [cameraExposureBias, setCameraExposureBias] = useState(0);
   const [isCameraReady, setIsCameraReady] = useState(false);
+  const [isCameraScreenFocused, setIsCameraScreenFocused] = useState(false);
+  const [appState, setAppState] = useState<AppStateStatus>(AppState.currentState);
+  const [cameraRecoveryPending, setCameraRecoveryPending] = useState(false);
+  const [cameraSessionRestartKey, setCameraSessionRestartKey] = useState(0);
   const [isCapturing, setIsCapturing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [referenceUri, setReferenceUri] = useState<string | null>(null);
@@ -402,6 +409,7 @@ export default function CameraScreen() {
   const cameraFocusLockedRef = useRef(false);
   const cameraExposureBiasRef = useRef(0);
   const focusIndicatorTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cameraRecoveryTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const insets = useSafeAreaInsets();
   const bottomSafePadding = Math.max(insets.bottom + 10, 24);
   const bottomModalPadding = Math.max(insets.bottom + 18, 28);
@@ -413,6 +421,9 @@ export default function CameraScreen() {
     [insets.bottom, insets.top]
   );
   const isCameraModalOpen = guideChoiceOpen || guideSettingsOpen || cameraSettingsOpen;
+  const controlsStyle = overlaySetupActive
+    ? [styles.controls, { paddingBottom: bottomSafePadding }]
+    : styles.controls;
   const isLineGuideActive = guideVisible;
   const isPhotoGuideActive = Boolean(referenceUri);
   const cameraDeviceFilter = useMemo(() => getCameraDeviceFilter(cameraFacing), [cameraFacing]);
@@ -450,6 +461,12 @@ export default function CameraScreen() {
     cameraDevice && cameraDevice.supportsExposureBias
       ? cameraDevice.maxExposureBias
       : CAMERA_EXPOSURE_BIAS_MAX;
+  const isCameraSessionActive =
+    hasCameraPermission &&
+    Boolean(cameraDevice) &&
+    isCameraScreenFocused &&
+    appState === "active" &&
+    !cameraRecoveryPending;
 
   const focusIndicatorAnimatedStyle = useAnimatedStyle(() => ({
     opacity: focusControlsOpacity.value,
@@ -464,6 +481,8 @@ export default function CameraScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      setIsCameraScreenFocused(true);
+
       const requestCameraPermissionOnFocus = async () => {
         if (!hasCameraPermission && canRequestCameraPermission) {
           await requestCameraPermission();
@@ -471,6 +490,11 @@ export default function CameraScreen() {
       };
 
       void requestCameraPermissionOnFocus();
+
+      return () => {
+        setIsCameraScreenFocused(false);
+        setIsCameraReady(false);
+      };
     }, [canRequestCameraPermission, hasCameraPermission, requestCameraPermission])
   );
 
@@ -528,9 +552,23 @@ export default function CameraScreen() {
       if (focusIndicatorTimeout.current) {
         clearTimeout(focusIndicatorTimeout.current);
       }
+      if (cameraRecoveryTimeout.current) {
+        clearTimeout(cameraRecoveryTimeout.current);
+      }
     },
     []
   );
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (nextState) => {
+      setAppState(nextState);
+      if (nextState !== "active") {
+        setIsCameraReady(false);
+      }
+    });
+
+    return () => subscription.remove();
+  }, []);
 
   const triggerFeedback = useCallback(async () => {
     if (!hapticEnabled) {
@@ -771,6 +809,26 @@ export default function CameraScreen() {
     changeCameraFacing(cameraFacing === "back" ? "front" : "back");
     void triggerFeedback();
   }, [cameraFacing, changeCameraFacing, triggerFeedback]);
+
+  const handleCameraSessionError = useCallback((error: Error) => {
+    if (__DEV__) {
+      console.warn("[camera] VisionCamera session error", error);
+    }
+
+    setIsCameraReady(false);
+    setErrorMessage("카메라 연결이 불안정해 다시 시작합니다.");
+
+    if (cameraRecoveryTimeout.current) {
+      clearTimeout(cameraRecoveryTimeout.current);
+    }
+
+    setCameraRecoveryPending(true);
+    cameraRecoveryTimeout.current = setTimeout(() => {
+      cameraRecoveryTimeout.current = null;
+      setCameraSessionRestartKey((value) => value + 1);
+      setCameraRecoveryPending(false);
+    }, CAMERA_SESSION_RECOVERY_DELAY_MS);
+  }, []);
 
   const pickReferencePhoto = useCallback(async () => {
     try {
@@ -1242,21 +1300,25 @@ export default function CameraScreen() {
     >
       {cameraDevice ? (
         <Camera
+          key={`${cameraDevice.id}-${cameraSessionRestartKey}`}
           ref={cameraRef}
           style={styles.camera}
           device={cameraDevice}
-          isActive={hasCameraPermission && Boolean(cameraDevice)}
+          isActive={isCameraSessionActive}
           outputs={cameraOutputs}
           torchMode={torchEnabled && cameraDevice.hasTorch ? "on" : "off"}
           zoom={cameraZoomFactor}
           exposure={cameraExposureBias}
           getInitialZoom={() => cameraZoomFactor}
           getInitialExposureBias={() => cameraExposureBias}
-          onStarted={() => setIsCameraReady(true)}
+          onStarted={() => {
+            setIsCameraReady(true);
+            if (errorMessage === "카메라 연결이 불안정해 다시 시작합니다.") {
+              setErrorMessage(null);
+            }
+          }}
           onStopped={() => setIsCameraReady(false)}
-          onError={(error) =>
-            setErrorMessage(getUserFacingErrorMessage(error, "카메라를 시작하지 못했습니다."))
-          }
+          onError={handleCameraSessionError}
         />
       ) : (
         <View style={styles.permissionScreen}>
@@ -1857,7 +1919,7 @@ export default function CameraScreen() {
       </Modal>
 
       {!isCameraModalOpen && !isGuidePositionAdjusting ? (
-        <View style={styles.controls}>
+        <View style={controlsStyle}>
           {errorMessage ? <Text selectable style={styles.errorText}>{errorMessage}</Text> : null}
 
           {overlaySetupActive && referenceUri ? (

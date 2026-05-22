@@ -53,6 +53,11 @@ type ImportProgress = {
   detail: string;
 };
 
+type DeleteProgress = {
+  title: string;
+  detail: string;
+};
+
 const tabs: { label: string; value: StudioTab }[] = [
   { label: "사진", value: "photos" },
   { label: "동영상", value: "videos" },
@@ -87,6 +92,12 @@ const formatDuration = (seconds: number) => {
   return `${String(minutes).padStart(2, "0")}:${String(restSeconds).padStart(2, "0")}`;
 };
 
+const isSyncedPhoto = (photo: PhotoItem) =>
+  photo.backupStatus === "backed_up" ||
+  photo.localFileStatus === "cloud_only" ||
+  Boolean(photo.storagePath) ||
+  Boolean(photo.downloadURL);
+
 export default function StudioScreen() {
   const router = useRouter();
   const { palette } = useAppAppearance();
@@ -103,6 +114,7 @@ export default function StudioScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isImportingImage, setIsImportingImage] = useState(false);
   const [importProgress, setImportProgress] = useState<ImportProgress | null>(null);
+  const [deleteProgress, setDeleteProgress] = useState<DeleteProgress | null>(null);
   const [pageSize, setPageSize] = useState<PageSize>(6);
   const [pages, setPages] = useState<Record<string, number>>({});
   const [cloudBackupEnabled, setCloudBackupEnabled] = useState(false);
@@ -161,16 +173,31 @@ export default function StudioScreen() {
     setPages({});
   };
 
+  const deletePhotoFromLibrary = async (photo: PhotoItem) => {
+    setDeleteProgress({
+      title: "사진 삭제 중",
+      detail: isSyncedPhoto(photo)
+        ? "동기화된 사진 기록을 정리하고 있습니다."
+        : "사진을 삭제하고 있습니다."
+    });
+
+    try {
+      await deletePhoto(photo.id);
+      await loadStudio();
+    } catch (error) {
+      Alert.alert("삭제 실패", getUserFacingErrorMessage(error, "사진을 삭제하지 못했습니다."));
+    } finally {
+      setDeleteProgress(null);
+    }
+  };
+
   const confirmDeletePhoto = (photo: PhotoItem) => {
     Alert.alert("사진을 삭제할까요?", "앱에 저장된 사진이 삭제됩니다.", [
       { text: "취소", style: "cancel" },
       {
         text: "삭제",
         style: "destructive",
-        onPress: async () => {
-          await deletePhoto(photo.id);
-          await loadStudio();
-        }
+        onPress: () => deletePhotoFromLibrary(photo)
       }
     ]);
   };
@@ -617,6 +644,30 @@ export default function StudioScreen() {
                   {Math.round(importProgress.percent)}%
                 </Text>
               </>
+            ) : null}
+          </View>
+        </View>
+      </Modal>
+      <Modal
+        animationType="fade"
+        transparent
+        visible={Boolean(deleteProgress)}
+        onRequestClose={() => undefined}
+      >
+        <View style={styles.importProgressBackdrop}>
+          <View style={[styles.importProgressPanel, panelStyle]}>
+            {deleteProgress ? (
+              <View style={styles.importProgressHeader}>
+                <ActivityIndicator color={palette.text} />
+                <View style={styles.importProgressCopy}>
+                  <Text selectable style={styles.importProgressTitle}>
+                    {deleteProgress.title}
+                  </Text>
+                  <Text selectable style={styles.importProgressDetail}>
+                    {deleteProgress.detail}
+                  </Text>
+                </View>
+              </View>
             ) : null}
           </View>
         </View>

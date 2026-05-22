@@ -10,6 +10,7 @@ import {
   Text,
   View
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AdBanner } from "@/components/ad-banner";
 import { colors, controls, spacing, typography } from "@/constants/app-theme";
@@ -36,6 +37,8 @@ const formatDuration = (seconds: number) => {
 
 export default function VideoDetailScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
+  const insets = useSafeAreaInsets();
+  const bottomSafePadding = Math.max(insets.bottom + spacing.screen, spacing.screen);
   const [video, setVideo] = useState<MadeVideoItem | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
@@ -103,7 +106,7 @@ export default function VideoDetailScreen() {
       <Stack.Screen options={{ title: headerTitle }} />
       <ScrollView
         style={styles.screen}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, { paddingBottom: bottomSafePadding }]}
         contentInsetAdjustmentBehavior="automatic"
       >
         <View
