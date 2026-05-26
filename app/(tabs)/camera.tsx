@@ -50,6 +50,7 @@ import { colors } from "@/constants/app-theme";
 import { GUIDE_LABELS, GUIDE_TYPES, type GuideType } from "@/constants/camera-guides";
 import {
   CameraSettingToggleRow,
+  CameraShutterSoundChoice,
   ExposureBiasControl,
   GuideSizeSlider,
   SmoothValueSlider
@@ -98,6 +99,7 @@ import {
   getGuideSizeBounds,
   updateAppSettings,
   type CameraFacing,
+  type CameraShutterSoundMode,
   type CameraSaveScope,
   type GridGuideLineKey,
   type GridGuideLinePositions,
@@ -397,7 +399,8 @@ export default function CameraScreen() {
   const [photoQuality, setPhotoQuality] = useState<CameraQualityValue>("high");
   const [cameraRatio, setCameraRatio] = useState<PhotoRatioLabel>("Original");
   const [cameraSaveScope, setCameraSaveScope] = useState<CameraSaveScope>("app");
-  const [cameraSilentCaptureEnabled, setCameraSilentCaptureEnabled] = useState(true);
+  const [cameraShutterSoundMode, setCameraShutterSoundMode] =
+    useState<CameraShutterSoundMode>("silent");
   const [cameraControlTabViewportWidth, setCameraControlTabViewportWidth] = useState(0);
   const [cameraControlShutterCenterX, setCameraControlShutterCenterX] = useState(0);
   const [cameraFacing, setCameraFacing] = useState<CameraFacing>("back");
@@ -581,7 +584,7 @@ export default function CameraScreen() {
         setCameraFacing(settings.cameraFacing);
         setCameraRatio(settings.cameraRatio);
         setCameraSaveScope(settings.cameraSaveScope);
-        setCameraSilentCaptureEnabled(settings.cameraSilentCaptureEnabled);
+        setCameraShutterSoundMode(settings.cameraShutterSoundMode);
         setRecentPhoto(latestPhoto);
       };
 
@@ -887,9 +890,9 @@ export default function CameraScreen() {
     void triggerFeedback();
   };
 
-  const updateCameraSilentCapture = (nextEnabled: boolean) => {
-    setCameraSilentCaptureEnabled(nextEnabled);
-    void updateAppSettings({ cameraSilentCaptureEnabled: nextEnabled });
+  const updateCameraShutterSoundMode = (nextMode: CameraShutterSoundMode) => {
+    setCameraShutterSoundMode(nextMode);
+    void updateAppSettings({ cameraShutterSoundMode: nextMode });
     void triggerFeedback();
   };
 
@@ -1518,7 +1521,7 @@ export default function CameraScreen() {
       const photo = await photoOutput.capturePhotoToFile(
         {
           flashMode: cameraDevice.hasFlash ? flashMode : "off",
-          enableShutterSound: !cameraSilentCaptureEnabled
+          enableShutterSound: cameraShutterSoundMode === "sound"
         },
         {}
       );
@@ -1529,6 +1532,8 @@ export default function CameraScreen() {
         localImageLimit: planEntitlements.localImageLimit
       };
       let savedPhoto: PhotoItem | null = null;
+
+      setIsCapturing(false);
 
       if (cameraSaveScope !== "device") {
         savedPhoto = await saveCapturedPhoto(captureInput);
@@ -2074,11 +2079,9 @@ export default function CameraScreen() {
 
                 <View style={styles.cameraSettingBlock}>
                   <Text selectable={false} style={styles.modalSectionTitle}>촬영 보조</Text>
-                  <CameraSettingToggleRow
-                    title="무음 촬영"
-                    detail="사진 촬영 시 셔터음을 요청하지 않습니다."
-                    valueLabel={cameraSilentCaptureEnabled ? "켜짐" : "꺼짐"}
-                    onPress={() => updateCameraSilentCapture(!cameraSilentCaptureEnabled)}
+                  <CameraShutterSoundChoice
+                    mode={cameraShutterSoundMode}
+                    onChange={updateCameraShutterSoundMode}
                   />
                   <CameraSettingToggleRow
                     title="가이드 표시"

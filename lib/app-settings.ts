@@ -23,6 +23,7 @@ export type FontSize = "small" | "medium" | "large";
 export type ScreenLayout = "compact" | "balanced" | "comfortable";
 export type CameraSaveScope = "app" | "device" | "both";
 export type CameraFacing = "back" | "front";
+export type CameraShutterSoundMode = "silent" | "sound";
 export type TripClipExportFormat = "mp4" | "images";
 export type AppImageSaveFormat = "original" | "png" | "jpeg";
 export type StorageMode = "local_only" | "local_backup" | "local_saver";
@@ -95,7 +96,7 @@ export type AppSettings = {
   cameraFacing: CameraFacing;
   cameraRatio: PhotoRatioLabel;
   cameraSaveScope: CameraSaveScope;
-  cameraSilentCaptureEnabled: boolean;
+  cameraShutterSoundMode: CameraShutterSoundMode;
   defaultRatio: TripClipRatio;
   exportQuality: ExportQuality;
   videoQuality: VideoQualityId;
@@ -134,7 +135,7 @@ export const defaultAppSettings: AppSettings = {
   cameraFacing: "back",
   cameraRatio: "Original",
   cameraSaveScope: "app",
-  cameraSilentCaptureEnabled: true,
+  cameraShutterSoundMode: "silent",
   defaultRatio: "9:16",
   exportQuality: "high",
   videoQuality: DEFAULT_VIDEO_QUALITY,
@@ -170,6 +171,7 @@ const imageBackupQualities = IMAGE_QUALITY_OPTIONS.map((option) => option.value)
 const cameraRatios: PhotoRatioLabel[] = ["Original", "1:1", "3:4", "4:5", "9:16", "16:9"];
 const cameraSaveScopes: CameraSaveScope[] = ["app", "device", "both"];
 const cameraFacings: CameraFacing[] = ["back", "front"];
+const cameraShutterSoundModes: CameraShutterSoundMode[] = ["silent", "sound"];
 const tripClipRatios: TripClipRatio[] = ["9:16", "4:5", "1:1", "16:9", "3:4"];
 const cloudBackupTargetKeys: CloudBackupTarget[] = [
   "photos",
@@ -379,10 +381,9 @@ const normalizeSettings = (value: Partial<AppSettings> | null): AppSettings => {
     cameraSaveScope: cameraSaveScopes.includes(nextSettings.cameraSaveScope)
       ? nextSettings.cameraSaveScope
       : defaultAppSettings.cameraSaveScope,
-    cameraSilentCaptureEnabled:
-      typeof nextSettings.cameraSilentCaptureEnabled === "boolean"
-        ? nextSettings.cameraSilentCaptureEnabled
-        : defaultAppSettings.cameraSilentCaptureEnabled,
+    cameraShutterSoundMode: cameraShutterSoundModes.includes(nextSettings.cameraShutterSoundMode)
+      ? nextSettings.cameraShutterSoundMode
+      : defaultAppSettings.cameraShutterSoundMode,
     defaultRatio: tripClipRatios.includes(nextSettings.defaultRatio)
       ? nextSettings.defaultRatio
       : defaultAppSettings.defaultRatio,

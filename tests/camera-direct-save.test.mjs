@@ -36,6 +36,24 @@ for (const snippet of [
   assert.ok(source.includes(snippet), `camera direct save flow missing: ${snippet}`);
 }
 
+const capturePhotoStart = source.indexOf("  const capturePhoto = async () => {");
+const takePhotoStart = source.indexOf("  const takePhoto = async () => {", capturePhotoStart);
+assert.ok(capturePhotoStart >= 0 && takePhotoStart > capturePhotoStart, "camera capture flow should exist");
+const capturePhotoSource = source.slice(capturePhotoStart, takePhotoStart);
+const nativeCaptureEnd = capturePhotoSource.indexOf("const photoUri = `file://${photo.filePath}`");
+const unlockAfterNativeCapture = capturePhotoSource.indexOf("setIsCapturing(false)", nativeCaptureEnd);
+const appSaveStart = capturePhotoSource.indexOf("saveCapturedPhoto(captureInput)");
+const deviceSaveStart = capturePhotoSource.indexOf("saveCapturedPhotoToDevice(captureInput)");
+assert.ok(nativeCaptureEnd >= 0, "camera should derive a photo URI after native capture");
+assert.ok(
+  unlockAfterNativeCapture > nativeCaptureEnd,
+  "camera should unlock the shutter after native capture completes"
+);
+assert.ok(
+  unlockAfterNativeCapture < appSaveStart && unlockAfterNativeCapture < deviceSaveStart,
+  "camera should not keep the shutter blocked while saving captured photos"
+);
+
 for (const snippet of [
   "saveCapturedPhotoToDevice",
   "saveImageToLibrary(prepared.uri)",

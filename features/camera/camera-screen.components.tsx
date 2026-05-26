@@ -16,7 +16,11 @@ import {
   getExposureTrackXFromControlX
 } from "@/features/camera/camera-screen.helpers";
 import { styles } from "@/features/camera/camera-screen.styles";
-import { GUIDE_SIZE_MAX, GUIDE_SIZE_MIN } from "@/lib/app-settings";
+import {
+  GUIDE_SIZE_MAX,
+  GUIDE_SIZE_MIN,
+  type CameraShutterSoundMode
+} from "@/lib/app-settings";
 
 export type GuideSizeSliderProps = {
   value: number;
@@ -95,6 +99,46 @@ export function CameraSettingToggleRow({
       </View>
       <Text selectable={false} style={styles.settingToggleValue}>{valueLabel}</Text>
     </Pressable>
+  );
+}
+
+export type CameraShutterSoundChoiceProps = {
+  mode: CameraShutterSoundMode;
+  onChange: (mode: CameraShutterSoundMode) => void;
+};
+
+export function CameraShutterSoundChoice({
+  mode,
+  onChange
+}: CameraShutterSoundChoiceProps) {
+  return (
+    <View>
+      <Text selectable={false} style={styles.settingToggleTitle}>촬영 소리</Text>
+      <View style={styles.optionRow}>
+        <Pressable
+          style={[styles.optionButton, mode === "silent" ? styles.optionButtonActive : null]}
+          onPress={() => onChange("silent")}
+        >
+          <Text
+            selectable={false}
+            style={[styles.optionButtonText, mode === "silent" ? styles.optionButtonTextActive : null]}
+          >
+            무음
+          </Text>
+        </Pressable>
+        <Pressable
+          style={[styles.optionButton, mode === "sound" && styles.optionButtonActive]}
+          onPress={() => onChange("sound")}
+        >
+          <Text
+            selectable={false}
+            style={[styles.optionButtonText, mode === "sound" && styles.optionButtonTextActive]}
+          >
+            소리
+          </Text>
+        </Pressable>
+      </View>
+    </View>
   );
 }
 

@@ -41,6 +41,32 @@ function Write-Utf8NoBom {
   [System.IO.File]::WriteAllText($Path, $Value, $encoding)
 }
 
+function Set-GradleProperty {
+  param(
+    [string]$Path,
+    [string]$Name,
+    [string]$Value
+  )
+
+  if (Test-Path -LiteralPath $Path) {
+    $content = Get-Content -LiteralPath $Path -Raw
+  } else {
+    $content = ""
+  }
+
+  $line = "$Name=$Value"
+  if ($content -match "(?m)^$([regex]::Escape($Name))=") {
+    $content = [regex]::Replace($content, "(?m)^$([regex]::Escape($Name))=.*$", $line, 1)
+  } else {
+    if ($content.Length -gt 0 -and -not $content.EndsWith("`n")) {
+      $content += "`r`n"
+    }
+    $content += "$line`r`n"
+  }
+
+  Write-Utf8NoBom -Path $Path -Value $content
+}
+
 function Remove-DuplicateLauncherPngResources {
   param([string]$ProjectRoot)
 
@@ -265,6 +291,10 @@ Write-Host "Preparing Android project..." -ForegroundColor Cyan
 Invoke-External "npx" @("expo", "prebuild", "--platform", "android", "--no-install")
 Remove-DuplicateLauncherPngResources -ProjectRoot $projectRoot
 
+$gradlePropertiesPath = Join-Path $projectRoot "android\gradle.properties"
+Set-GradleProperty -Path $gradlePropertiesPath -Name "android.enableMinifyInReleaseBuilds" -Value "true"
+Set-GradleProperty -Path $gradlePropertiesPath -Name "android.enableShrinkResourcesInReleaseBuilds" -Value "true"
+
 $buildGradlePath = Join-Path $projectRoot "android\app\build.gradle"
 if (-not (Test-Path $buildGradlePath)) {
   Stop-WithMessage "android\app\build.gradle was not generated."
@@ -332,3 +362,13 @@ if (-not (Test-Path $aabPath)) {
 Write-Host ""
 Write-Host "AAB created:" -ForegroundColor Green
 Write-Host $aabPath
+
+$mappingPath = Join-Path $projectRoot "android\app\build\outputs\mapping\release\mapping.txt"
+if (Test-Path -LiteralPath $mappingPath) {
+  Write-Host ""
+  Write-Host "R8 mapping file created for Google Play:" -ForegroundColor Green
+  Write-Host $mappingPath
+} else {
+  Write-Host ""
+  Write-Host "R8 mapping file was not found. Check the release minify settings before uploading to Google Play." -ForegroundColor Yellow
+}

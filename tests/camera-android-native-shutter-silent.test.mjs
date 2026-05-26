@@ -15,7 +15,7 @@ assert.ok(
 );
 
 assert.ok(
-  cameraSource.includes("enableShutterSound: !cameraSilentCaptureEnabled"),
+  cameraSource.includes('enableShutterSound: cameraShutterSoundMode === "sound"'),
   "VisionCamera capture should request native shutter sound only when silent capture is off"
 );
 

@@ -17,7 +17,7 @@ assert.ok(
 );
 
 assert.ok(
-  capturePhotoSource.includes("enableShutterSound: !cameraSilentCaptureEnabled"),
+  capturePhotoSource.includes('enableShutterSound: cameraShutterSoundMode === "sound"'),
   "camera capture should stay silent by default while honoring the silent setting"
 );
 

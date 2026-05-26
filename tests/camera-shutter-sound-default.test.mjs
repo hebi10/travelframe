@@ -2,30 +2,42 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const source = fs.readFileSync("app/(tabs)/camera.tsx", "utf8");
+const componentSource = fs.readFileSync("features/camera/camera-screen.components.tsx", "utf8");
 const appSettingsSource = fs.readFileSync("lib/app-settings.ts", "utf8");
+const cameraUiSource = `${source}\n${componentSource}`;
 
 assert.ok(
-  appSettingsSource.includes("cameraSilentCaptureEnabled: boolean"),
-  "camera silent capture should be persisted in app settings"
+  appSettingsSource.includes('export type CameraShutterSoundMode = "silent" | "sound"'),
+  "camera shutter sound should be persisted as an explicit mode"
 );
 
 assert.ok(
-  appSettingsSource.includes("cameraSilentCaptureEnabled: true"),
+  appSettingsSource.includes('cameraShutterSoundMode: "silent"'),
   "camera silent capture should be enabled by default"
 );
 
 assert.ok(
-  source.includes("const updateCameraSilentCapture = (nextEnabled: boolean)"),
-  "camera settings should expose a silent capture toggle handler"
+  source.includes("const updateCameraShutterSoundMode = (nextMode: CameraShutterSoundMode)"),
+  "camera settings should expose an explicit shutter sound mode handler"
 );
 
 assert.ok(
-  source.includes("무음 촬영"),
-  "camera settings should show the silent capture option"
+  cameraUiSource.includes("촬영 소리"),
+  "camera settings should show the shutter sound choice"
 );
 
 assert.ok(
-  source.includes("enableShutterSound: !cameraSilentCaptureEnabled"),
+  cameraUiSource.includes("무음") && cameraUiSource.includes("소리"),
+  "camera shutter sound choice should use explicit silent and sound labels"
+);
+
+assert.ok(
+  cameraUiSource.includes('mode === "silent" ? styles.optionButtonActive'),
+  "camera shutter sound choice should mark silent as the default active option"
+);
+
+assert.ok(
+  source.includes('enableShutterSound: cameraShutterSoundMode === "sound"'),
   "camera capture should map silent capture to the native shutter sound option"
 );
 

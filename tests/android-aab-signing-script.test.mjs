@@ -25,4 +25,19 @@ assert.ok(
   "AAB build should disable Gradle parallel execution to avoid Windows transform cache move races"
 );
 
-console.log("ok - Android AAB signing script avoids duplicate release signing configs");
+assert.ok(
+  source.includes('Set-GradleProperty -Path $gradlePropertiesPath -Name "android.enableMinifyInReleaseBuilds" -Value "true"'),
+  "AAB build should enable release minification so R8 generates mapping.txt"
+);
+
+assert.ok(
+  source.includes('Set-GradleProperty -Path $gradlePropertiesPath -Name "android.enableShrinkResourcesInReleaseBuilds" -Value "true"'),
+  "AAB build should enable release resource shrinking alongside R8"
+);
+
+assert.ok(
+  source.includes("android\\app\\build\\outputs\\mapping\\release\\mapping.txt"),
+  "AAB build should print the generated R8 mapping file path"
+);
+
+console.log("ok - Android AAB signing script configures release signing and R8 mapping output");
