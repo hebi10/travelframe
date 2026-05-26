@@ -43,9 +43,7 @@ export default function VideoDetailScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
   const videoSource = video?.uri || null;
-  const player = useVideoPlayer(videoSource, (instance) => {
-    instance.loop = true;
-  });
+  const hasPlayableVideoSource = Boolean(videoSource);
 
   const loadVideo = useCallback(async () => {
     if (!id) {
@@ -113,12 +111,23 @@ export default function VideoDetailScreen() {
         <View
           style={[styles.videoFrame, { aspectRatio: video.ratio === "16:9" ? 16 / 9 : 9 / 16 }]}
         >
-          <VideoView
-            player={player}
-            style={styles.video}
-            fullscreenOptions={{ enable: true }}
-            allowsPictureInPicture
-          />
+          {hasPlayableVideoSource ? (
+            <VideoPlayerFrame source={videoSource as string} />
+          ) : (
+            <View style={styles.videoUnavailable}>
+              <Text selectable style={styles.videoUnavailableText}>
+                영상을 재생할 파일을 찾지 못했습니다.
+              </Text>
+              <Pressable
+                style={styles.lightButton}
+                onPress={() => router.replace("/studio?tab=works" as Href)}
+              >
+                <Text selectable={false} style={styles.lightButtonText}>
+                  보관함으로 돌아가기
+                </Text>
+              </Pressable>
+            </View>
+          )}
         </View>
 
         <View style={styles.header}>
@@ -170,6 +179,23 @@ export default function VideoDetailScreen() {
   );
 }
 
+function VideoPlayerFrame({ source }: { source: string }) {
+  const player = useVideoPlayer(source, (instance) => {
+    instance.loop = true;
+  });
+
+  return (
+    <VideoView
+      player={player}
+      style={styles.video}
+      nativeControls
+      contentFit="contain"
+      fullscreenOptions={{ enable: true }}
+      useExoShutter
+    />
+  );
+}
+
 function MetaRow({ label, value }: { label: string; value: string }) {
   return (
     <View style={styles.metaRow}>
@@ -210,6 +236,22 @@ const styles = StyleSheet.create({
   video: {
     width: "100%",
     height: "100%"
+  },
+  videoUnavailable: {
+    flex: 1,
+    minHeight: 180,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 12,
+    padding: spacing.screen
+  },
+  videoUnavailableText: {
+    color: colors.inverse,
+    fontSize: typography.body,
+    fontWeight: "800",
+    lineHeight: 22,
+    textAlign: "center",
+    letterSpacing: 0
   },
   header: {
     gap: 8

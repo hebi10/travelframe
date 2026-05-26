@@ -18,7 +18,8 @@ for (const snippet of [
 
 assert.ok(
   videoDetailSource.includes("const videoSource = video?.uri || null;") &&
-    videoDetailSource.includes("useVideoPlayer(videoSource"),
+    videoDetailSource.includes("function VideoPlayerFrame({ source }: { source: string })") &&
+    videoDetailSource.includes("useVideoPlayer(source"),
   "video detail should pass null, not an empty string, to expo-video"
 );
 
