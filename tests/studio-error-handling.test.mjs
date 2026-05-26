@@ -4,8 +4,9 @@ import fs from "node:fs";
 const source = fs.readFileSync("app/(tabs)/studio.tsx", "utf8");
 
 for (const snippet of [
-  "const showStudioLoadError =",
-  "보관함 데이터를 불러오지 못했습니다. 기기 저장 공간을 확인한 뒤 다시 시도해 주세요.",
+  "const [studioLoadErrorMessage, setStudioLoadErrorMessage] = useState<string | null>(null);",
+  "보관함 데이터를 불러오지 못했습니다. 기기 저장 공간이나 권한 상태를 확인한 뒤 다시 시도해 주세요.",
+  "<LibraryErrorState message={studioLoadErrorMessage} onRetry={loadStudio} />",
   "try {",
   "setIsLoading(false);",
   "const deleteWorkFromLibrary = async (work: StudioWorkItem) =>",
@@ -13,7 +14,7 @@ for (const snippet of [
   "작업물을 삭제하지 못했습니다. 저장 공간이나 권한 상태를 확인한 뒤 다시 시도해 주세요.",
   "const importSummary =",
   "일부 이미지는 클라우드 백업을 완료하지 못했습니다.",
-  "Alert.alert(\"저장 완료\", importSummary);",
+  "Alert.alert(importSuccessCount > 0 ? \"저장 완료\" : \"저장 실패\", importSummary);",
   "{imageBundleWorks.length > 0 ? (",
   "{savedVideoWorks.length > 0 ? ("
 ]) {
@@ -24,6 +25,12 @@ assert.equal(
   source.includes('Alert.alert("백업 실패"'),
   false,
   "studio import should not show a second backup-failure alert after save"
+);
+
+assert.equal(
+  source.includes("showStudioLoadError(error);"),
+  false,
+  "studio load errors should not repeatedly open alerts on focus"
 );
 
 console.log("ok - studio handles library errors with customer-facing guidance");

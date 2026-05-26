@@ -98,16 +98,6 @@ const isSyncedPhoto = (photo: PhotoItem) =>
   Boolean(photo.storagePath) ||
   Boolean(photo.downloadURL);
 
-const showStudioLoadError = (error: unknown) => {
-  Alert.alert(
-    "보관함을 불러오지 못했습니다",
-    getUserFacingErrorMessage(
-      error,
-      "보관함 데이터를 불러오지 못했습니다. 기기 저장 공간을 확인한 뒤 다시 시도해 주세요."
-    )
-  );
-};
-
 export default function StudioScreen() {
   const router = useRouter();
   const { palette } = useAppAppearance();
@@ -125,6 +115,7 @@ export default function StudioScreen() {
   const [isImportingImage, setIsImportingImage] = useState(false);
   const [importProgress, setImportProgress] = useState<ImportProgress | null>(null);
   const [deleteProgress, setDeleteProgress] = useState<DeleteProgress | null>(null);
+  const [studioLoadErrorMessage, setStudioLoadErrorMessage] = useState<string | null>(null);
   const [pageSize, setPageSize] = useState<PageSize>(6);
   const [pages, setPages] = useState<Record<string, number>>({});
   const [cloudBackupEnabled, setCloudBackupEnabled] = useState(false);
@@ -134,6 +125,7 @@ export default function StudioScreen() {
   const loadStudio = useCallback(async () => {
     try {
       setIsLoading(true);
+      setStudioLoadErrorMessage(null);
       const [storedPhotos, storedVideos, storedImageBundles, settings] = await Promise.all([
         getPhotos(),
         getMadeVideos(),
@@ -145,7 +137,12 @@ export default function StudioScreen() {
       setImageBundles(storedImageBundles);
       setCloudBackupEnabled(settings.cloudBackupEnabled);
     } catch (error) {
-      showStudioLoadError(error);
+      setStudioLoadErrorMessage(
+        getUserFacingErrorMessage(
+          error,
+          "보관함 데이터를 불러오지 못했습니다. 기기 저장 공간이나 권한 상태를 확인한 뒤 다시 시도해 주세요."
+        )
+      );
     } finally {
       setIsLoading(false);
     }
@@ -287,6 +284,8 @@ export default function StudioScreen() {
         return;
       }
 
+      let importSuccessCount = 0;
+      let importFailureCount = 0;
       let backupFailureCount = 0;
       setImportProgress({
         percent: 0,
@@ -294,12 +293,25 @@ export default function StudioScreen() {
       });
 
       for (const [index, asset] of importAssets.entries()) {
-        const savedPhoto = await saveCapturedPhoto({
-          uri: asset.uri,
-          width: asset.width,
-          height: asset.height,
-          localImageLimit: planEntitlements.localImageLimit
-        });
+        let savedPhoto: PhotoItem;
+
+        try {
+          savedPhoto = await saveCapturedPhoto({
+            uri: asset.uri,
+            width: asset.width,
+            height: asset.height,
+            localImageLimit: planEntitlements.localImageLimit
+          });
+          importSuccessCount += 1;
+        } catch (importError) {
+          importFailureCount += 1;
+          console.error("가져온 사진을 저장하지 못했습니다.", importError);
+          setImportProgress({
+            percent: ((index + 1) / importAssets.length) * 100,
+            detail: `일부 이미지를 저장하지 못했습니다. ${index + 1}/${importAssets.length}`
+          });
+          continue;
+        }
 
         setImportProgress({
           percent: ((index + 0.5) / importAssets.length) * 100,
@@ -333,12 +345,23 @@ export default function StudioScreen() {
       }
 
       await loadStudio();
-      setActiveTab("photos");
+      if (importSuccessCount > 0) {
+        setActiveTab("photos");
+      }
+
       const importSummary =
-        backupFailureCount > 0
-          ? `선택한 이미지 ${importAssets.length}장을 앱 사진 목록에 저장했습니다. 일부 이미지는 클라우드 백업을 완료하지 못했습니다. 인터넷 연결이나 계정 상태를 확인한 뒤 설정에서 백업을 다시 시도해 주세요.`
-          : `선택한 이미지 ${importAssets.length}장을 앱 사진 목록에 저장했습니다.`;
-      Alert.alert("저장 완료", importSummary);
+        importFailureCount > 0
+          ? importSuccessCount > 0
+            ? `선택한 이미지 ${importSuccessCount}장은 저장했습니다. ${importFailureCount}장은 기기 저장 공간이나 파일 접근 문제로 저장하지 못했습니다. 다시 가져오기 전에 저장 공간과 사진 권한을 확인해 주세요.${
+                backupFailureCount > 0
+                  ? " 일부 이미지는 클라우드 백업을 완료하지 못했습니다. 인터넷 연결이나 계정 상태를 확인한 뒤 설정에서 백업을 다시 시도해 주세요."
+                  : ""
+              }`
+            : `선택한 이미지 ${importAssets.length}장을 저장하지 못했습니다. 기기 저장 공간이나 사진 권한을 확인한 뒤 다시 시도해 주세요.`
+          : backupFailureCount > 0
+            ? `선택한 이미지 ${importSuccessCount}장을 앱 사진 목록에 저장했습니다. 일부 이미지는 클라우드 백업을 완료하지 못했습니다. 인터넷 연결이나 계정 상태를 확인한 뒤 설정에서 백업을 다시 시도해 주세요.`
+            : `선택한 이미지 ${importSuccessCount}장을 앱 사진 목록에 저장했습니다.`;
+      Alert.alert(importSuccessCount > 0 ? "저장 완료" : "저장 실패", importSummary);
     } catch (error) {
       Alert.alert(
         "저장 실패",
@@ -430,6 +453,12 @@ export default function StudioScreen() {
 
       <PageSizeSelector value={pageSize} onChange={changePageSize} />
 
+      {!isLoading && studioLoadErrorMessage ? (
+        <SectionBlock title="보관함 상태">
+          <LibraryErrorState message={studioLoadErrorMessage} onRetry={loadStudio} />
+        </SectionBlock>
+      ) : null}
+
       {activeTab === "photos" ? (
         <>
           <SectionBlock title="이미지 저장">
@@ -444,10 +473,10 @@ export default function StudioScreen() {
               onPress={importImageToApp}
             >
               <View style={styles.clipCopy}>
-                <Text selectable style={styles.clipTitle}>
+                <Text selectable={false} style={styles.clipTitle}>
                   앱에 이미지 저장
                 </Text>
-                <Text selectable style={styles.clipDetail}>
+                <Text selectable={false} style={styles.clipDetail}>
                   핸드폰 앨범에서 이미지를 여러 장 골라 앱 사진 목록에 보관합니다.
                 </Text>
               </View>
@@ -468,7 +497,7 @@ export default function StudioScreen() {
           ) : null}
           {isLoading ? (
             <LoadingState />
-          ) : photoLibraryItems.length > 0 ? (
+          ) : studioLoadErrorMessage ? null : photoLibraryItems.length > 0 ? (
             <PaginatedPhotoGrid
               items={photoLibraryItems}
               page={pages.photos ?? 0}
@@ -495,10 +524,10 @@ export default function StudioScreen() {
               onPress={() => router.push("/trip-clip")}
             >
               <View style={styles.clipCopy}>
-                <Text selectable style={styles.clipTitle}>
+                <Text selectable={false} style={styles.clipTitle}>
                   영상 만들기
                 </Text>
-                <Text selectable style={styles.clipDetail}>
+                <Text selectable={false} style={styles.clipDetail}>
                   여러 사진을 선택해 순서, 비율, 음악을 정하고 영상으로 저장합니다.
                 </Text>
               </View>
@@ -514,7 +543,7 @@ export default function StudioScreen() {
             <SectionBlock title="동영상 작업">
               <LoadingState />
             </SectionBlock>
-          ) : videoWorkCount > 0 ? (
+          ) : studioLoadErrorMessage ? null : videoWorkCount > 0 ? (
             <>
               {imageBundleWorks.length > 0 ? (
                 <WorkSection
@@ -574,62 +603,68 @@ export default function StudioScreen() {
             <SectionBlock title="작업물">
               <LoadingState />
             </SectionBlock>
-          ) : workCount > 0 ? (
+          ) : studioLoadErrorMessage ? null : workCount > 0 ? (
             <>
-              <WorkSection
-                title="단일 이미지"
-                emptyDetail="사진을 편집하면 이곳에 단일 이미지 작업물이 표시됩니다."
-                items={singleImageWorks}
-                page={pages.singleImages ?? 0}
-                pageSize={pageSize}
-                router={router}
-                onDeleteWork={confirmDeleteWork}
-                onPageChange={(page) => setSectionPage("singleImages", page)}
-                backupUsage={
-                  shouldShowBackupUsage
-                    ? {
-                        count: backupOverview.photoCount,
-                        limit: CLOUD_BACKUP_PHOTO_LIMIT
-                      }
-                    : null
-                }
-              />
-              <WorkSection
-                title="영상 만들기 작업"
-                emptyDetail="영상 만들기에서 저장한 이미지 작업이 이곳에 표시됩니다."
-                items={imageBundleWorks}
-                page={pages.imageBundles ?? 0}
-                pageSize={pageSize}
-                router={router}
-                onDeleteWork={confirmDeleteWork}
-                onPageChange={(page) => setSectionPage("imageBundles", page)}
-                backupUsage={
-                  shouldShowBackupUsage
-                    ? {
-                        count: backupOverview.imageBundleCount,
-                        limit: CLOUD_BACKUP_IMAGE_WORK_LIMIT
-                      }
-                    : null
-                }
-              />
-              <WorkSection
-                title="영상"
-                emptyDetail="여행 클립을 저장하면 이곳에 표시됩니다."
-                items={videoWorks}
-                page={pages.videos ?? 0}
-                pageSize={pageSize}
-                router={router}
-                onDeleteWork={confirmDeleteWork}
-                onPageChange={(page) => setSectionPage("videos", page)}
-                backupUsage={
-                  shouldShowBackupUsage
-                    ? {
-                        count: backupOverview.videoCount,
-                        limit: CLOUD_BACKUP_VIDEO_LIMIT
-                      }
-                    : null
-                }
-              />
+              {singleImageWorks.length > 0 ? (
+                <WorkSection
+                  title="단일 이미지"
+                  emptyDetail="사진을 편집하면 이곳에 단일 이미지 작업물이 표시됩니다."
+                  items={singleImageWorks}
+                  page={pages.singleImages ?? 0}
+                  pageSize={pageSize}
+                  router={router}
+                  onDeleteWork={confirmDeleteWork}
+                  onPageChange={(page) => setSectionPage("singleImages", page)}
+                  backupUsage={
+                    shouldShowBackupUsage
+                      ? {
+                          count: backupOverview.photoCount,
+                          limit: CLOUD_BACKUP_PHOTO_LIMIT
+                        }
+                      : null
+                  }
+                />
+              ) : null}
+              {imageBundleWorks.length > 0 ? (
+                <WorkSection
+                  title="영상 만들기 작업"
+                  emptyDetail="영상 만들기에서 저장한 이미지 작업이 이곳에 표시됩니다."
+                  items={imageBundleWorks}
+                  page={pages.imageBundles ?? 0}
+                  pageSize={pageSize}
+                  router={router}
+                  onDeleteWork={confirmDeleteWork}
+                  onPageChange={(page) => setSectionPage("imageBundles", page)}
+                  backupUsage={
+                    shouldShowBackupUsage
+                      ? {
+                          count: backupOverview.imageBundleCount,
+                          limit: CLOUD_BACKUP_IMAGE_WORK_LIMIT
+                        }
+                      : null
+                  }
+                />
+              ) : null}
+              {videoWorks.length > 0 ? (
+                <WorkSection
+                  title="영상"
+                  emptyDetail="여행 클립을 저장하면 이곳에 표시됩니다."
+                  items={videoWorks}
+                  page={pages.videos ?? 0}
+                  pageSize={pageSize}
+                  router={router}
+                  onDeleteWork={confirmDeleteWork}
+                  onPageChange={(page) => setSectionPage("videos", page)}
+                  backupUsage={
+                    shouldShowBackupUsage
+                      ? {
+                          count: backupOverview.videoCount,
+                          limit: CLOUD_BACKUP_VIDEO_LIMIT
+                        }
+                      : null
+                  }
+                />
+              ) : null}
             </>
           ) : (
             <SectionBlock title="작업물">
@@ -654,15 +689,15 @@ export default function StudioScreen() {
                 <View style={styles.importProgressHeader}>
                   <ActivityIndicator color={palette.text} />
                   <View style={styles.importProgressCopy}>
-                    <Text selectable style={styles.importProgressTitle}>
+                    <Text selectable={false} style={styles.importProgressTitle}>
                       이미지 저장 중
                     </Text>
-                    <Text selectable style={styles.importProgressDetail}>
+                    <Text selectable={false} style={styles.importProgressDetail}>
                       이미지를 앱에 저장하는 중입니다.
                     </Text>
                   </View>
                 </View>
-                <Text selectable style={styles.importProgressDetail}>
+                <Text selectable={false} style={styles.importProgressDetail}>
                   {importProgress.detail}
                 </Text>
                 <View style={styles.importProgressTrack}>
@@ -673,7 +708,7 @@ export default function StudioScreen() {
                     ]}
                   />
                 </View>
-                <Text selectable style={styles.importProgressText}>
+                <Text selectable={false} style={styles.importProgressText}>
                   {Math.round(importProgress.percent)}%
                 </Text>
               </>
@@ -693,10 +728,10 @@ export default function StudioScreen() {
               <View style={styles.importProgressHeader}>
                 <ActivityIndicator color={palette.text} />
                 <View style={styles.importProgressCopy}>
-                  <Text selectable style={styles.importProgressTitle}>
+                  <Text selectable={false} style={styles.importProgressTitle}>
                     {deleteProgress.title}
                   </Text>
-                  <Text selectable style={styles.importProgressDetail}>
+                  <Text selectable={false} style={styles.importProgressDetail}>
                     {deleteProgress.detail}
                   </Text>
                 </View>
@@ -761,10 +796,10 @@ function PhotoCard({
         />
       </Pressable>
       <View style={styles.photoMeta}>
-        <Text selectable style={[styles.photoDate, primaryMetaTextStyle]}>
+        <Text selectable={false} style={[styles.photoDate, primaryMetaTextStyle]}>
           {formatDate(photo.createdAt)}
         </Text>
-        <Text selectable style={[styles.metaText, secondaryMetaTextStyle]}>
+        <Text selectable={false} style={[styles.metaText, secondaryMetaTextStyle]}>
           {photo.ratioLabel} / {photo.edited ? "편집됨" : "원본"}
         </Text>
       </View>
@@ -911,7 +946,7 @@ function PaginatedPhotoGrid({
 function BackupUsageBadge({ count, limit }: { count: number; limit: number }) {
   return (
     <View style={styles.backupUsageBadge}>
-      <Text selectable style={styles.backupUsageText}>
+      <Text selectable={false} style={styles.backupUsageText}>
         클라우드 백업 {count}/{limit}
       </Text>
     </View>
@@ -1045,16 +1080,16 @@ function WorkCard({
           style={({ pressed }) => [styles.videoCopy, pressed && pressedPanelStyle]}
           onPress={() => router.push(`/photo/${photo.id}` as Href)}
         >
-          <Text selectable style={styles.videoKind}>
+          <Text selectable={false} style={styles.videoKind}>
             단일 이미지
           </Text>
-          <Text selectable style={styles.videoTitle}>
+          <Text selectable={false} style={styles.videoTitle}>
             편집 이미지
           </Text>
-          <Text selectable style={styles.metaText}>
+          <Text selectable={false} style={styles.metaText}>
             {formatDate(photo.createdAt)} / {photo.ratioLabel}
           </Text>
-          <Text selectable style={styles.metaText}>
+          <Text selectable={false} style={styles.metaText}>
             사진 편집 결과
           </Text>
         </Pressable>
@@ -1094,16 +1129,16 @@ function WorkCard({
           style={({ pressed }) => [styles.videoCopy, pressed && pressedPanelStyle]}
           onPress={() => router.push(`/video/${video.id}` as Href)}
         >
-          <Text selectable style={styles.videoKind}>
+          <Text selectable={false} style={styles.videoKind}>
             저장한 영상
           </Text>
-          <Text selectable style={styles.videoTitle}>
+          <Text selectable={false} style={styles.videoTitle}>
             {video.title}
           </Text>
-          <Text selectable style={styles.metaText}>
+          <Text selectable={false} style={styles.metaText}>
             {formatDate(video.createdAt)} / {video.ratio} / {formatDuration(video.duration)}
           </Text>
-          <Text selectable style={styles.metaText}>
+          <Text selectable={false} style={styles.metaText}>
             사진 {video.photoIds.length}장 / {video.musicLabel}
           </Text>
         </Pressable>
@@ -1142,16 +1177,16 @@ function WorkCard({
         style={({ pressed }) => [styles.videoCopy, pressed && pressedPanelStyle]}
         onPress={() => router.push(`/trip-clip?bundleId=${bundle.id}` as Href)}
       >
-        <Text selectable style={styles.videoKind}>
+        <Text selectable={false} style={styles.videoKind}>
           영상 만들기 작업
         </Text>
-        <Text selectable style={styles.videoTitle}>
+        <Text selectable={false} style={styles.videoTitle}>
           {bundle.title}
         </Text>
-        <Text selectable style={styles.metaText}>
+        <Text selectable={false} style={styles.metaText}>
           {formatDate(bundle.createdAt)} / {bundle.ratio}
         </Text>
-        <Text selectable style={styles.metaText}>
+        <Text selectable={false} style={styles.metaText}>
           이미지 {bundle.photoIds.length}장
         </Text>
       </Pressable>
@@ -1185,13 +1220,46 @@ function LoadingState() {
   );
 }
 
+function LibraryErrorState({
+  message,
+  onRetry
+}: {
+  message: string;
+  onRetry: () => void;
+}) {
+  const { palette } = useAppAppearance();
+  const retryButtonStyle = {
+    borderColor: palette.text,
+    backgroundColor: palette.text
+  };
+  const retryButtonTextStyle = {
+    color: palette.inverse
+  };
+
+  return (
+    <View style={styles.libraryErrorState}>
+      <Text selectable={false} style={[styles.emptyTitle, { color: palette.text }]}>
+        보관함을 불러오지 못했습니다
+      </Text>
+      <Text selectable={false} style={[styles.emptyDetail, { color: palette.muted }]}>
+        {message}
+      </Text>
+      <Pressable style={[styles.retryButton, retryButtonStyle]} onPress={onRetry}>
+        <Text selectable={false} style={[styles.retryButtonText, retryButtonTextStyle]}>
+          다시 시도
+        </Text>
+      </Pressable>
+    </View>
+  );
+}
+
 function EmptyState({ title, detail }: { title: string; detail: string }) {
   return (
     <View style={styles.emptyState}>
-      <Text selectable style={styles.emptyTitle}>
+      <Text selectable={false} style={styles.emptyTitle}>
         {title}
       </Text>
-      <Text selectable style={styles.emptyDetail}>
+      <Text selectable={false} style={styles.emptyDetail}>
         {detail}
       </Text>
     </View>
@@ -1396,7 +1464,9 @@ const styles = StyleSheet.create({
     paddingTop: 4
   },
   photoCard: {
-    width: "47.8%",
+    flexBasis: "47%",
+    flexGrow: 1,
+    minWidth: 156,
     gap: 10
   },
   thumbnail: {
@@ -1560,6 +1630,28 @@ const styles = StyleSheet.create({
   workDeleteButtonText: {
     color: colors.muted,
     fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 0
+  },
+  libraryErrorState: {
+    minHeight: 96,
+    gap: 10,
+    alignItems: "flex-start",
+    paddingTop: 2,
+    paddingBottom: 10
+  },
+  retryButton: {
+    minHeight: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: colors.text,
+    backgroundColor: colors.text
+  },
+  retryButtonText: {
+    color: colors.inverse,
+    fontSize: typography.button,
     fontWeight: "800",
     letterSpacing: 0
   },
