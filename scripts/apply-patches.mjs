@@ -5,26 +5,29 @@ import { fileURLToPath } from "node:url";
 const root = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 
 const expoCameraRoot = path.join(root, "node_modules", "expo-camera");
+const reactNativeVisionCameraRoot = path.join(
+  root,
+  "node_modules",
+  "react-native-vision-camera"
+);
 const packageJson = JSON.parse(
   fs.readFileSync(path.join(root, "package.json"), "utf8")
 );
 
-if (!packageJson.dependencies?.["expo-camera"]) {
-  console.info("expo-camera is not declared; skipping local camera patch");
-  process.exit(0);
+function readFrom(packageRoot, relativePath) {
+  return fs.readFileSync(path.join(packageRoot, relativePath), "utf8");
 }
 
-if (!fs.existsSync(expoCameraRoot)) {
-  console.info("expo-camera is not installed; skipping local camera patch");
-  process.exit(0);
+function writeTo(packageRoot, relativePath, source) {
+  fs.writeFileSync(path.join(packageRoot, relativePath), source);
 }
 
 function read(relativePath) {
-  return fs.readFileSync(path.join(expoCameraRoot, relativePath), "utf8");
+  return readFrom(expoCameraRoot, relativePath);
 }
 
 function write(relativePath, source) {
-  fs.writeFileSync(path.join(expoCameraRoot, relativePath), source);
+  writeTo(expoCameraRoot, relativePath, source);
 }
 
 function insertAfter(source, anchor, insertion) {
@@ -746,7 +749,39 @@ function disableExpoCameraAndroidShutterSound() {
   write(cameraViewPath, cameraViewSource);
 }
 
-if (fs.existsSync(expoCameraRoot)) {
+function patchVisionCameraAndroidShutterSound() {
+  if (!packageJson.dependencies?.["react-native-vision-camera"]) {
+    console.info("react-native-vision-camera is not declared; skipping local VisionCamera patch");
+    return;
+  }
+
+  if (!fs.existsSync(reactNativeVisionCameraRoot)) {
+    console.info("react-native-vision-camera is not installed; skipping local VisionCamera patch");
+    return;
+  }
+
+  const relativePath =
+    "android/src/main/java/com/margelo/nitro/camera/hybrids/outputs/HybridPhotoOutput.kt";
+  let source = readFrom(reactNativeVisionCameraRoot, relativePath);
+  source = replaceIfFound(
+    source,
+    "      val enableShutterSound = (settings.enableShutterSound ?: true) || CameraInfo.mustPlayShutterSound()\n",
+    "      val enableShutterSound = settings.enableShutterSound ?: true\n"
+  );
+  source = replaceIfFound(
+    source,
+    `      val enableShutterSound =
+        (settings.enableShutterSound ?: true) || CameraInfo.mustPlayShutterSound()
+`,
+    `      val enableShutterSound = settings.enableShutterSound ?: true
+`
+  );
+  source = replaceIfFound(source, "import androidx.camera.core.CameraInfo\n", "");
+  writeTo(reactNativeVisionCameraRoot, relativePath, source);
+  console.info("applied local VisionCamera Android shutter sound patch");
+}
+
+if (packageJson.dependencies?.["expo-camera"] && fs.existsSync(expoCameraRoot)) {
   patchCameraViewModule();
   patchExpoCameraView();
   patchCameraRecords();
@@ -755,4 +790,8 @@ if (fs.existsSync(expoCameraRoot)) {
   patchCameraViewWrapper();
   disableExpoCameraAndroidShutterSound();
   console.info("applied local expo-camera Android focus, shutter, and zoom patch");
+} else {
+  console.info("expo-camera is not declared or installed; skipping local expo-camera patch");
 }
+
+patchVisionCameraAndroidShutterSound();

@@ -435,6 +435,42 @@ export const styles = StyleSheet.create({
     textAlign: "right",
     letterSpacing: 0
   },
+  shutterSoundPanel: {
+    gap: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.background
+  },
+  shutterSoundHeader: {
+    minHeight: 34,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12
+  },
+  shutterSoundIcon: {
+    width: 34,
+    height: 34,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.surface
+  },
+  shutterSoundCopy: {
+    flex: 1,
+    gap: 4
+  },
+  shutterSoundDetail: {
+    color: colors.muted,
+    fontSize: typography.small,
+    lineHeight: 18,
+    letterSpacing: 0
+  },
+  shutterSoundOptions: {
+    flexDirection: "row",
+    gap: 8
+  },
   modalHeader: {
     flexDirection: "row",
     alignItems: "flex-start",

@@ -403,6 +403,39 @@ export const markPhotoCloudOnly = async (
   return nextPhoto;
 };
 
+const normalizeCapturedPhotoForRatio = async ({
+  uri,
+  width,
+  height
+}: {
+  uri: string;
+  width?: number;
+  height?: number;
+}) => {
+  const dimensions = await resolveImageDimensions({ uri, width, height });
+
+  if (dimensions?.width && dimensions.height) {
+    return {
+      uri,
+      width: dimensions.width,
+      height: dimensions.height,
+      temporaryUris: [] as string[]
+    };
+  }
+
+  const normalized = await manipulateAsync(uri, [], {
+    compress: 1,
+    format: SaveFormat.JPEG
+  });
+
+  return {
+    uri: normalized.uri,
+    width: normalized.width ?? width ?? 0,
+    height: normalized.height ?? height ?? 0,
+    temporaryUris: normalized.uri !== uri ? [normalized.uri] : []
+  };
+};
+
 const renderCapturedPhotoForSave = async ({
   uri,
   width,
@@ -412,24 +445,39 @@ const renderCapturedPhotoForSave = async ({
   const shouldApplyRatio = ratioLabel !== "Original";
   const capturedDimensions = await resolveImageDimensions({ uri, width, height });
 
-  return shouldApplyRatio
-    ? await renderEditedPhotoFromTransform({
-        sourceUri: uri,
-        width: capturedDimensions?.width ?? width,
-        height: capturedDimensions?.height ?? height,
-        transform: {
-          ratioLabel,
-          translateX: 0,
-          translateY: 0,
-          scale: 1,
-          rotation: 0
-        }
-      })
-    : {
-        uri,
-        width: capturedDimensions?.width ?? width ?? 0,
-        height: capturedDimensions?.height ?? height ?? 0
+  if (shouldApplyRatio) {
+    const normalizedSource = await normalizeCapturedPhotoForRatio({
+      uri,
+      width: capturedDimensions?.width ?? width,
+      height: capturedDimensions?.height ?? height
+    });
+    const rendered = await renderEditedPhotoFromTransform({
+      sourceUri: normalizedSource.uri,
+      width: normalizedSource.width,
+      height: normalizedSource.height,
+      transform: {
+        ratioLabel,
+        translateX: 0,
+        translateY: 0,
+        scale: 1,
+        rotation: 0
+      }
+    });
+
+    return {
+      ...rendered,
+      temporaryUris: [
+        ...normalizedSource.temporaryUris
+      ]
     };
+  }
+
+  return {
+    uri,
+    width: capturedDimensions?.width ?? width ?? 0,
+    height: capturedDimensions?.height ?? height ?? 0,
+    temporaryUris: [] as string[]
+  };
 };
 
 const deleteTemporaryFiles = async (uris: string[]) => {
@@ -446,6 +494,7 @@ const prepareCapturedPhotoForStorage = async (input: SaveCapturedPhotoInput) => 
     imageQuality: settings.imageBackupQuality
   });
   const temporaryUris = [
+    ...rendered.temporaryUris,
     rendered.uri !== input.uri ? rendered.uri : null,
     optimized.uri !== rendered.uri && optimized.uri !== input.uri ? optimized.uri : null
   ].filter((uri): uri is string => Boolean(uri));

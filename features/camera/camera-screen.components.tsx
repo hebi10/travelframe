@@ -112,9 +112,19 @@ export function CameraShutterSoundChoice({
   onChange
 }: CameraShutterSoundChoiceProps) {
   return (
-    <View>
-      <Text selectable={false} style={styles.settingToggleTitle}>촬영 소리</Text>
-      <View style={styles.optionRow}>
+    <View style={styles.shutterSoundPanel}>
+      <View style={styles.shutterSoundHeader}>
+        <View style={styles.shutterSoundIcon}>
+          <Feather name={mode === "silent" ? "volume-x" : "volume-2"} size={18} color={colors.text} />
+        </View>
+        <View style={styles.shutterSoundCopy}>
+          <Text selectable={false} style={styles.settingToggleTitle}>촬영 소리</Text>
+          <Text selectable={false} style={styles.shutterSoundDetail}>
+            기본은 무음입니다. 필요한 경우 셔터음을 켤 수 있습니다.
+          </Text>
+        </View>
+      </View>
+      <View style={styles.shutterSoundOptions}>
         <Pressable
           style={[styles.optionButton, mode === "silent" ? styles.optionButtonActive : null]}
           onPress={() => onChange("silent")}

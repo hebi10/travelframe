@@ -125,6 +125,53 @@ const ensureVideoDirectory = async () => {
 const isRemoteUri = (uri?: string | null) =>
   typeof uri === "string" && /^https?:\/\//i.test(uri);
 
+const isFileUri = (uri?: string | null) =>
+  typeof uri === "string" && uri.startsWith("file://");
+
+const getVideoFileExtension = (uri: string) => {
+  const cleanUri = uri.split("?")[0] ?? uri;
+  const fileName = cleanUri.split("/").pop() ?? "";
+  const extension = fileName.includes(".") ? fileName.split(".").pop() : null;
+  return extension && /^[a-z0-9]+$/i.test(extension) ? extension.toLowerCase() : "mp4";
+};
+
+const isLocalVideoAvailable = async (uri?: string | null) => {
+  if (!uri || isRemoteUri(uri)) {
+    return true;
+  }
+
+  if (!isFileUri(uri)) {
+    return true;
+  }
+
+  const fileInfo = await FileSystem.getInfoAsync(uri);
+  return fileInfo.exists;
+};
+
+const persistMadeVideoFile = async (uri: string, videoId: string) => {
+  if (isRemoteUri(uri) || !isFileUri(uri)) {
+    return uri;
+  }
+
+  const directory = await ensureVideoDirectory();
+  if (uri.startsWith(directory)) {
+    return uri;
+  }
+
+  const destinationUri = `${directory}${videoId}.${getVideoFileExtension(uri)}`;
+  const existingDestination = await FileSystem.getInfoAsync(destinationUri);
+  if (!existingDestination.exists) {
+    await FileSystem.copyAsync({ from: uri, to: destinationUri });
+  }
+
+  return destinationUri;
+};
+
+const updateStoredVideo = async (video: MadeVideoItem) => {
+  const videos = await getMadeVideos();
+  await writeVideos(videos.map((item) => (item.id === video.id ? video : item)));
+};
+
 export const getMadeVideos = async () => {
   const value = await localStorageAdapter.getItem(VIDEO_STORAGE_KEY);
   return parseVideos(value);
@@ -153,10 +200,14 @@ export const saveMadeVideo = async (
     limit: options.localVideoLimit,
     label: "영상"
   });
+  const videoId = createVideoId();
   const createdAt = new Date().toISOString();
+  const persistedUri = await persistMadeVideoFile(video.uri, videoId);
   const savedVideo: MadeVideoItem = {
     ...video,
-    id: createVideoId(),
+    id: videoId,
+    uri: persistedUri,
+    localUri: isRemoteUri(persistedUri) ? video.localUri : persistedUri,
     createdAt,
     title: video.title ?? `여행 클립 ${videos.length + 1}`
   };
@@ -165,8 +216,32 @@ export const saveMadeVideo = async (
   return savedVideo;
 };
 
-export const restoreMadeVideoIfNeeded = async (video: MadeVideoItem) => {
+export const restoreMadeVideoIfNeeded = async (video: MadeVideoItem): Promise<MadeVideoItem> => {
   if (video.localFileStatus !== "cloud_only") {
+    if (!(await isLocalVideoAvailable(video.uri))) {
+      if (!video.downloadURL) {
+        return { ...video, uri: "", localFileStatus: undefined };
+      }
+
+      return restoreMadeVideoIfNeeded({
+        ...video,
+        uri: video.downloadURL,
+        localFileStatus: "cloud_only"
+      });
+    }
+
+    const persistedUri = await persistMadeVideoFile(video.uri, video.id);
+    if (persistedUri !== video.uri) {
+      const persistedVideo: MadeVideoItem = {
+        ...video,
+        uri: persistedUri,
+        localUri: persistedUri,
+        localFileStatus: "available"
+      };
+      await updateStoredVideo(persistedVideo);
+      return persistedVideo;
+    }
+
     return video;
   }
 
