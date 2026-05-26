@@ -16,6 +16,66 @@ const sortImageBundles = (items: ImageBundleWorkItem[]) =>
       new Date(second.createdAt).getTime() - new Date(first.createdAt).getTime()
   );
 
+const validRatios = new Set(["1:1", "3:4", "4:5", "9:16", "16:9"]);
+
+const normalizeText = (value: unknown, fallback: string) =>
+  typeof value === "string" && value.trim().length > 0 ? value : fallback;
+
+const normalizeStringArray = (value: unknown) =>
+  Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+    : [];
+
+const normalizeNullableNumberArray = (value: unknown) =>
+  Array.isArray(value)
+    ? value.map((item) => (typeof item === "number" && Number.isFinite(item) ? item : null))
+    : undefined;
+
+const normalizeDate = (value: unknown) => {
+  if (typeof value !== "string") {
+    return new Date(0).toISOString();
+  }
+
+  const timestamp = new Date(value).getTime();
+  return Number.isFinite(timestamp) ? value : new Date(0).toISOString();
+};
+
+const normalizeImageBundleWorkItem = (
+  work: Partial<ImageBundleWorkItem> & Record<string, unknown>,
+  index: number
+): ImageBundleWorkItem => ({
+  ...work,
+  id: normalizeText(work.id, `stored-image-bundle-${index + 1}`),
+  kind: "image-bundle",
+  title: normalizeText(work.title, `영상 만들기 작업 ${index + 1}`),
+  createdAt: normalizeDate(work.createdAt),
+  coverUri:
+    typeof work.coverUri === "string" && work.coverUri.length > 0
+      ? work.coverUri
+      : undefined,
+  ratio: validRatios.has(work.ratio ?? "") ? work.ratio! : "9:16",
+  photoIds: normalizeStringArray(work.photoIds),
+  imageUris: normalizeStringArray(work.imageUris),
+  localImageUris: Array.isArray(work.localImageUris)
+    ? normalizeStringArray(work.localImageUris)
+    : undefined,
+  imageWidths: normalizeNullableNumberArray(work.imageWidths),
+  imageHeights: normalizeNullableNumberArray(work.imageHeights),
+  storagePath: typeof work.storagePath === "string" ? work.storagePath : undefined,
+  downloadURL: typeof work.downloadURL === "string" ? work.downloadURL : undefined,
+  localFileStatus:
+    work.localFileStatus === "available" || work.localFileStatus === "cloud_only"
+      ? work.localFileStatus
+      : undefined,
+  backupStatus:
+    work.backupStatus === "pending" ||
+    work.backupStatus === "backed_up" ||
+    work.backupStatus === "failed" ||
+    work.backupStatus === "restored"
+      ? work.backupStatus
+      : undefined
+});
+
 const parseImageBundles = (value: string | null): ImageBundleWorkItem[] => {
   if (!value) {
     return [];
@@ -24,7 +84,7 @@ const parseImageBundles = (value: string | null): ImageBundleWorkItem[] => {
   try {
     const parsed = JSON.parse(value);
     return Array.isArray(parsed)
-      ? sortImageBundles(parsed as ImageBundleWorkItem[])
+      ? sortImageBundles(parsed.map(normalizeImageBundleWorkItem))
       : [];
   } catch {
     return [];

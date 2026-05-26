@@ -5,7 +5,7 @@ import { CameraGuideOverlay } from "@/components/camera-guide-overlay";
 import { colors } from "@/constants/app-theme";
 import type { GuideType } from "@/constants/camera-guides";
 import type { TripClipTemplate, TripClipTransition } from "@/constants/trip-clip";
-import type { GuideShapePoints } from "@/lib/app-settings";
+import type { GridGuideLinePositions, GuideShapePoints } from "@/lib/app-settings";
 import {
   getTripClipPhotoAdjustment,
   type TripClipPhotoAdjustment,
@@ -68,6 +68,7 @@ export function TripClipRecordingCanvas({
   guideColor,
   guideOffsetX,
   guideOffsetY,
+  gridGuideLinePositions,
   guideShapePoints,
   photoAdjustments
 }: {
@@ -83,6 +84,7 @@ export function TripClipRecordingCanvas({
   guideColor: string;
   guideOffsetX: number;
   guideOffsetY: number;
+  gridGuideLinePositions: GridGuideLinePositions;
   guideShapePoints: GuideShapePoints;
   photoAdjustments: TripClipPhotoAdjustmentMap;
 }) {
@@ -156,6 +158,7 @@ export function TripClipRecordingCanvas({
         color={guideColor}
         offsetX={guideOffsetX}
         offsetY={guideOffsetY}
+        gridLinePositions={gridGuideLinePositions}
         shapePoints={guideShapePoints}
       />
       {showWatermark ? (

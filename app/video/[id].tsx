@@ -42,7 +42,8 @@ export default function VideoDetailScreen() {
   const [video, setVideo] = useState<MadeVideoItem | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
-  const player = useVideoPlayer(video?.uri ?? null, (instance) => {
+  const videoSource = video?.uri || null;
+  const player = useVideoPlayer(videoSource, (instance) => {
     instance.loop = true;
   });
 

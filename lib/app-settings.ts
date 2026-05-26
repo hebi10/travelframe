@@ -95,6 +95,7 @@ export type AppSettings = {
   cameraFacing: CameraFacing;
   cameraRatio: PhotoRatioLabel;
   cameraSaveScope: CameraSaveScope;
+  cameraSilentCaptureEnabled: boolean;
   defaultRatio: TripClipRatio;
   exportQuality: ExportQuality;
   videoQuality: VideoQualityId;
@@ -133,6 +134,7 @@ export const defaultAppSettings: AppSettings = {
   cameraFacing: "back",
   cameraRatio: "Original",
   cameraSaveScope: "app",
+  cameraSilentCaptureEnabled: true,
   defaultRatio: "9:16",
   exportQuality: "high",
   videoQuality: DEFAULT_VIDEO_QUALITY,
@@ -377,6 +379,10 @@ const normalizeSettings = (value: Partial<AppSettings> | null): AppSettings => {
     cameraSaveScope: cameraSaveScopes.includes(nextSettings.cameraSaveScope)
       ? nextSettings.cameraSaveScope
       : defaultAppSettings.cameraSaveScope,
+    cameraSilentCaptureEnabled:
+      typeof nextSettings.cameraSilentCaptureEnabled === "boolean"
+        ? nextSettings.cameraSilentCaptureEnabled
+        : defaultAppSettings.cameraSilentCaptureEnabled,
     defaultRatio: tripClipRatios.includes(nextSettings.defaultRatio)
       ? nextSettings.defaultRatio
       : defaultAppSettings.defaultRatio,

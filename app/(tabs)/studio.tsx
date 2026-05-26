@@ -98,6 +98,16 @@ const isSyncedPhoto = (photo: PhotoItem) =>
   Boolean(photo.storagePath) ||
   Boolean(photo.downloadURL);
 
+const showStudioLoadError = (error: unknown) => {
+  Alert.alert(
+    "보관함을 불러오지 못했습니다",
+    getUserFacingErrorMessage(
+      error,
+      "보관함 데이터를 불러오지 못했습니다. 기기 저장 공간을 확인한 뒤 다시 시도해 주세요."
+    )
+  );
+};
+
 export default function StudioScreen() {
   const router = useRouter();
   const { palette } = useAppAppearance();
@@ -122,18 +132,23 @@ export default function StudioScreen() {
     useState<CloudBackupOverview>(initialBackupOverview);
 
   const loadStudio = useCallback(async () => {
-    setIsLoading(true);
-    const [storedPhotos, storedVideos, storedImageBundles, settings] = await Promise.all([
-      getPhotos(),
-      getMadeVideos(),
-      getImageBundleWorks(),
-      getAppSettings()
-    ]);
-    setPhotos(storedPhotos);
-    setVideos(storedVideos);
-    setImageBundles(storedImageBundles);
-    setCloudBackupEnabled(settings.cloudBackupEnabled);
-    setIsLoading(false);
+    try {
+      setIsLoading(true);
+      const [storedPhotos, storedVideos, storedImageBundles, settings] = await Promise.all([
+        getPhotos(),
+        getMadeVideos(),
+        getImageBundleWorks(),
+        getAppSettings()
+      ]);
+      setPhotos(storedPhotos);
+      setVideos(storedVideos);
+      setImageBundles(storedImageBundles);
+      setCloudBackupEnabled(settings.cloudBackupEnabled);
+    } catch (error) {
+      showStudioLoadError(error);
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
 
   useFocusEffect(
@@ -202,22 +217,41 @@ export default function StudioScreen() {
     ]);
   };
 
+  const deleteWorkFromLibrary = async (work: StudioWorkItem) => {
+    setDeleteProgress({
+      title: "작업물 삭제 중",
+      detail: "작업물을 삭제하는 중입니다. 앱에 저장된 기록과 연결된 파일을 정리하고 있습니다."
+    });
+
+    try {
+      if (work.kind === "video") {
+        await deleteMadeVideo(work.item.id);
+      } else if (work.kind === "image-bundle") {
+        await deleteImageBundleWork(work.item.id);
+      } else {
+        await deletePhoto(work.item.id);
+      }
+      await loadStudio();
+    } catch (error) {
+      Alert.alert(
+        "삭제 실패",
+        getUserFacingErrorMessage(
+          error,
+          "작업물을 삭제하지 못했습니다. 저장 공간이나 권한 상태를 확인한 뒤 다시 시도해 주세요."
+        )
+      );
+    } finally {
+      setDeleteProgress(null);
+    }
+  };
+
   const confirmDeleteWork = (work: StudioWorkItem) => {
     Alert.alert("작업물을 삭제할까요?", "앱에 저장된 작업물 기록이 삭제됩니다.", [
       { text: "취소", style: "cancel" },
       {
         text: "삭제",
         style: "destructive",
-        onPress: async () => {
-          if (work.kind === "video") {
-            await deleteMadeVideo(work.item.id);
-          } else if (work.kind === "image-bundle") {
-            await deleteImageBundleWork(work.item.id);
-          } else {
-            await deletePhoto(work.item.id);
-          }
-          await loadStudio();
-        }
+        onPress: () => deleteWorkFromLibrary(work)
       }
     ]);
   };
@@ -300,16 +334,11 @@ export default function StudioScreen() {
 
       await loadStudio();
       setActiveTab("photos");
-      if (backupFailureCount > 0) {
-        Alert.alert(
-          "백업 실패",
-          `선택한 이미지는 현재 기기에 저장되었습니다. ${backupFailureCount}장은 클라우드 백업을 설정에서 다시 시도할 수 있습니다.`
-        );
-      }
-      Alert.alert(
-        "저장 완료",
-        `선택한 이미지 ${importAssets.length}장을 앱 사진 목록에 저장했습니다.`
-      );
+      const importSummary =
+        backupFailureCount > 0
+          ? `선택한 이미지 ${importAssets.length}장을 앱 사진 목록에 저장했습니다. 일부 이미지는 클라우드 백업을 완료하지 못했습니다. 인터넷 연결이나 계정 상태를 확인한 뒤 설정에서 백업을 다시 시도해 주세요.`
+          : `선택한 이미지 ${importAssets.length}장을 앱 사진 목록에 저장했습니다.`;
+      Alert.alert("저장 완료", importSummary);
     } catch (error) {
       Alert.alert(
         "저장 실패",
@@ -487,42 +516,46 @@ export default function StudioScreen() {
             </SectionBlock>
           ) : videoWorkCount > 0 ? (
             <>
-              <WorkSection
-                title="영상 만들기 작업"
-                emptyDetail="영상 만들기에서 저장한 이미지 작업이 이곳에 표시됩니다."
-                items={imageBundleWorks}
-                page={pages.videoImageBundles ?? 0}
-                pageSize={pageSize}
-                router={router}
-                onDeleteWork={confirmDeleteWork}
-                onPageChange={(page) => setSectionPage("videoImageBundles", page)}
-                backupUsage={
-                  shouldShowBackupUsage
-                    ? {
-                        count: backupOverview.imageBundleCount,
-                        limit: CLOUD_BACKUP_IMAGE_WORK_LIMIT
-                      }
-                    : null
-                }
-              />
-              <WorkSection
-                title="저장한 영상"
-                emptyDetail="여행 클립을 저장하면 이곳에 표시됩니다."
-                items={savedVideoWorks}
-                page={pages.videoWorks ?? 0}
-                pageSize={pageSize}
-                router={router}
-                onDeleteWork={confirmDeleteWork}
-                onPageChange={(page) => setSectionPage("videoWorks", page)}
-                backupUsage={
-                  shouldShowBackupUsage
-                    ? {
-                        count: backupOverview.videoCount,
-                        limit: CLOUD_BACKUP_VIDEO_LIMIT
-                      }
-                    : null
-                }
-              />
+              {imageBundleWorks.length > 0 ? (
+                <WorkSection
+                  title="영상 만들기 작업"
+                  emptyDetail="영상 만들기에서 저장한 이미지 작업이 이곳에 표시됩니다."
+                  items={imageBundleWorks}
+                  page={pages.videoImageBundles ?? 0}
+                  pageSize={pageSize}
+                  router={router}
+                  onDeleteWork={confirmDeleteWork}
+                  onPageChange={(page) => setSectionPage("videoImageBundles", page)}
+                  backupUsage={
+                    shouldShowBackupUsage
+                      ? {
+                          count: backupOverview.imageBundleCount,
+                          limit: CLOUD_BACKUP_IMAGE_WORK_LIMIT
+                        }
+                      : null
+                  }
+                />
+              ) : null}
+              {savedVideoWorks.length > 0 ? (
+                <WorkSection
+                  title="저장한 영상"
+                  emptyDetail="여행 클립을 저장하면 이곳에 표시됩니다."
+                  items={savedVideoWorks}
+                  page={pages.videoWorks ?? 0}
+                  pageSize={pageSize}
+                  router={router}
+                  onDeleteWork={confirmDeleteWork}
+                  onPageChange={(page) => setSectionPage("videoWorks", page)}
+                  backupUsage={
+                    shouldShowBackupUsage
+                      ? {
+                          count: backupOverview.videoCount,
+                          limit: CLOUD_BACKUP_VIDEO_LIMIT
+                        }
+                      : null
+                  }
+                />
+              ) : null}
             </>
           ) : (
             <SectionBlock title="동영상 작업">

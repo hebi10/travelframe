@@ -112,6 +112,7 @@ export function CameraGuideOverlay({
   color = "rgba(255, 255, 255, 0.72)",
   size = 44,
   strokeWidth = 1,
+  aspectRatio,
   offsetX = 0,
   offsetY = 0,
   gridLinePositions,
@@ -125,6 +126,16 @@ export function CameraGuideOverlay({
   }
 
   const safeStrokeWidth = Math.max(1, Math.min(5, Math.round(strokeWidth)));
+  const safeAspectRatio = Number.isFinite(aspectRatio) && Number(aspectRatio) > 0
+    ? Number(aspectRatio)
+    : null;
+  const constrainedFrameStyle = safeAspectRatio
+    ? {
+        width: "100%" as DimensionValue,
+        maxHeight: "100%" as DimensionValue,
+        aspectRatio: safeAspectRatio
+      }
+    : styles.fillFrame;
   const secondaryGuideLineStyle = {
     backgroundColor: color,
     opacity: 0.45,
@@ -161,39 +172,43 @@ export function CameraGuideOverlay({
 
   if (guide === "grid") {
     return (
-      <View style={styles.gridOverlay}>
-        <View
-          style={[
-            styles.gridVertical,
-            { left: verticalStartPosition },
-            secondaryGuideLineStyle,
-            selectedGridLine === "verticalStart" && styles.gridLineSelected
-          ]}
-        />
-        <View
-          style={[
-            styles.gridVertical,
-            { left: verticalEndPosition },
-            secondaryGuideLineStyle,
-            selectedGridLine === "verticalEnd" && styles.gridLineSelected
-          ]}
-        />
-        <View
-          style={[
-            styles.gridHorizontal,
-            { top: horizontalStartPosition },
-            secondaryHorizontalGuideLineStyle,
-            selectedGridLine === "horizontalStart" && styles.gridLineSelected
-          ]}
-        />
-        <View
-          style={[
-            styles.gridHorizontal,
-            { top: horizontalEndPosition },
-            secondaryHorizontalGuideLineStyle,
-            selectedGridLine === "horizontalEnd" && styles.gridLineSelected
-          ]}
-        />
+      <View style={styles.overlayViewport}>
+        <View style={[styles.constrainedFrame, constrainedFrameStyle]}>
+          <View style={styles.gridOverlay}>
+            <View
+              style={[
+                styles.gridVertical,
+                { left: verticalStartPosition },
+                secondaryGuideLineStyle,
+                selectedGridLine === "verticalStart" && styles.gridLineSelected
+              ]}
+            />
+            <View
+              style={[
+                styles.gridVertical,
+                { left: verticalEndPosition },
+                secondaryGuideLineStyle,
+                selectedGridLine === "verticalEnd" && styles.gridLineSelected
+              ]}
+            />
+            <View
+              style={[
+                styles.gridHorizontal,
+                { top: horizontalStartPosition },
+                secondaryHorizontalGuideLineStyle,
+                selectedGridLine === "horizontalStart" && styles.gridLineSelected
+              ]}
+            />
+            <View
+              style={[
+                styles.gridHorizontal,
+                { top: horizontalEndPosition },
+                secondaryHorizontalGuideLineStyle,
+                selectedGridLine === "horizontalEnd" && styles.gridLineSelected
+              ]}
+            />
+          </View>
+        </View>
       </View>
     );
   }
@@ -219,85 +234,103 @@ export function CameraGuideOverlay({
   };
 
   return (
-    <View style={[styles.overlay, offsetStyle]}>
-      {guide === "dot" ? (
-        <View
-          style={[
-            styles.centerDot,
-            {
-              backgroundColor: color,
-              width: (safeStrokeWidth + 3) * 2,
-              height: (safeStrokeWidth + 3) * 2,
-              marginLeft: -(safeStrokeWidth + 3),
-              marginTop: -(safeStrokeWidth + 3)
-            }
-          ]}
-        />
-      ) : null}
-      {guide === "circle" ? (
-        <View
-          style={[
-            styles.centerCircle,
-            {
-              width: guideWidth,
-              borderWidth: safeStrokeWidth,
-              borderColor: color
-            }
-          ]}
-        />
-      ) : null}
-      {guide === "cross" ? (
-        <View style={[styles.crossFrame, { width: guideWidth }]}>
-          {shapeGuidePoints ? renderCrossGuideLines(shapeGuidePoints, safeStrokeWidth, color) : null}
-          {showShapeControlPoints && shapeGuidePoints
-            ? shapeGuidePoints.map((point, index) => (
-                <View
-                  key={`cross-point-${index}`}
-                  style={[
-                    styles.guideShapePoint,
-                    {
-                      left: `${point.x}%`,
-                      top: `${point.y}%`,
-                      borderColor: color,
-                      backgroundColor: color
-                    },
-                    selectedShapePointIndex === index && styles.guideShapePointSelected
-                  ]}
-                />
-              ))
-            : null}
+    <View style={styles.overlayViewport}>
+      <View style={[styles.constrainedFrame, constrainedFrameStyle, offsetStyle]}>
+        <View style={styles.overlay}>
+          {guide === "dot" ? (
+            <View
+              style={[
+                styles.centerDot,
+                {
+                  backgroundColor: color,
+                  width: (safeStrokeWidth + 3) * 2,
+                  height: (safeStrokeWidth + 3) * 2,
+                  marginLeft: -(safeStrokeWidth + 3),
+                  marginTop: -(safeStrokeWidth + 3)
+                }
+              ]}
+            />
+          ) : null}
+          {guide === "circle" ? (
+            <View
+              style={[
+                styles.centerCircle,
+                {
+                  width: guideWidth,
+                  borderWidth: safeStrokeWidth,
+                  borderColor: color
+                }
+              ]}
+            />
+          ) : null}
+          {guide === "cross" ? (
+            <View style={[styles.crossFrame, { width: guideWidth }]}>
+              {shapeGuidePoints ? renderCrossGuideLines(shapeGuidePoints, safeStrokeWidth, color) : null}
+              {showShapeControlPoints && shapeGuidePoints
+                ? shapeGuidePoints.map((point, index) => (
+                    <View
+                      key={`cross-point-${index}`}
+                      style={[
+                        styles.guideShapePoint,
+                        {
+                          left: `${point.x}%`,
+                          top: `${point.y}%`,
+                          borderColor: color,
+                          backgroundColor: color
+                        },
+                        selectedShapePointIndex === index && styles.guideShapePointSelected
+                      ]}
+                    />
+                  ))
+                : null}
+            </View>
+          ) : null}
+          {shapeGuidePoints && guide !== "cross" ? (
+            <View style={[styles.guideShapeFrame, { width: guideWidth }]}>
+              {renderShapeGuideLines(shapeGuidePoints, safeStrokeWidth, color)}
+              {showShapeControlPoints
+                ? shapeGuidePoints.map((point, index) => (
+                    <View
+                      key={`shape-point-${index}`}
+                      style={[
+                        styles.guideShapePoint,
+                        {
+                          left: `${point.x}%`,
+                          top: `${point.y}%`,
+                          borderColor: color,
+                          backgroundColor: color
+                        },
+                        selectedShapePointIndex === index && styles.guideShapePointSelected
+                      ]}
+                    />
+                  ))
+                : null}
+            </View>
+          ) : null}
+          {guide === "horizon" ? (
+            <View style={[styles.horizon, lineLengthStyle, guideLineStyle]} />
+          ) : null}
         </View>
-      ) : null}
-      {shapeGuidePoints && guide !== "cross" ? (
-        <View style={[styles.guideShapeFrame, { width: guideWidth }]}>
-          {renderShapeGuideLines(shapeGuidePoints, safeStrokeWidth, color)}
-          {showShapeControlPoints
-            ? shapeGuidePoints.map((point, index) => (
-                <View
-                  key={`shape-point-${index}`}
-                  style={[
-                    styles.guideShapePoint,
-                    {
-                      left: `${point.x}%`,
-                      top: `${point.y}%`,
-                      borderColor: color,
-                      backgroundColor: color
-                    },
-                    selectedShapePointIndex === index && styles.guideShapePointSelected
-                  ]}
-                />
-              ))
-            : null}
-        </View>
-      ) : null}
-      {guide === "horizon" ? (
-        <View style={[styles.horizon, lineLengthStyle, guideLineStyle]} />
-      ) : null}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  overlayViewport: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+    pointerEvents: "none"
+  },
+  constrainedFrame: {
+    position: "relative",
+    overflow: "hidden"
+  },
+  fillFrame: {
+    width: "100%",
+    height: "100%"
+  },
   overlay: {
     ...StyleSheet.absoluteFillObject,
     alignItems: "center",

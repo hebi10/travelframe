@@ -16,6 +16,81 @@ const sortVideos = (videos: MadeVideoItem[]) =>
       new Date(second.createdAt).getTime() - new Date(first.createdAt).getTime()
   );
 
+const validRatios = new Set(["1:1", "3:4", "4:5", "9:16", "16:9"]);
+const validTemplates = new Set(["minimal", "film-log", "center-cut", "reel-basic"]);
+const validTransitions = new Set(["fade", "zoom", "slide", "none"]);
+
+const normalizeText = (value: unknown, fallback: string) =>
+  typeof value === "string" && value.trim().length > 0 ? value : fallback;
+
+const normalizeFiniteNumber = (value: unknown, fallback: number) =>
+  typeof value === "number" && Number.isFinite(value) ? value : fallback;
+
+const normalizeStringArray = (value: unknown) =>
+  Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+    : [];
+
+const normalizeDate = (value: unknown) => {
+  if (typeof value !== "string") {
+    return new Date(0).toISOString();
+  }
+
+  const timestamp = new Date(value).getTime();
+  return Number.isFinite(timestamp) ? value : new Date(0).toISOString();
+};
+
+const normalizeVideoDurations = (value: unknown) => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(value).filter(
+      (entry): entry is [string, number] =>
+        typeof entry[1] === "number" && Number.isFinite(entry[1])
+    )
+  );
+};
+
+const normalizeMadeVideoItem = (
+  video: Partial<MadeVideoItem> & Record<string, unknown>,
+  index: number
+): MadeVideoItem => ({
+  ...video,
+  id: normalizeText(video.id, `stored-video-${index + 1}`),
+  uri: normalizeText(video.uri, ""),
+  coverUri:
+    typeof video.coverUri === "string" && video.coverUri.length > 0
+      ? video.coverUri
+      : undefined,
+  createdAt: normalizeDate(video.createdAt),
+  title: normalizeText(video.title, `여행 클립 ${index + 1}`),
+  ratio: validRatios.has(video.ratio ?? "") ? video.ratio! : "9:16",
+  template: validTemplates.has(video.template ?? "") ? video.template! : "minimal",
+  transition: validTransitions.has(video.transition ?? "") ? video.transition! : "fade",
+  transitionDuration: normalizeFiniteNumber(video.transitionDuration, 0.45),
+  duration: normalizeFiniteNumber(video.duration, 0),
+  photoIds: normalizeStringArray(video.photoIds),
+  durations: normalizeVideoDurations(video.durations),
+  musicId: normalizeText(video.musicId, "none") as MadeVideoItem["musicId"],
+  musicLabel: normalizeText(video.musicLabel, "무음"),
+  storagePath: typeof video.storagePath === "string" ? video.storagePath : undefined,
+  downloadURL: typeof video.downloadURL === "string" ? video.downloadURL : undefined,
+  localUri: typeof video.localUri === "string" ? video.localUri : undefined,
+  localFileStatus:
+    video.localFileStatus === "available" || video.localFileStatus === "cloud_only"
+      ? video.localFileStatus
+      : undefined,
+  backupStatus:
+    video.backupStatus === "pending" ||
+    video.backupStatus === "backed_up" ||
+    video.backupStatus === "failed" ||
+    video.backupStatus === "restored"
+      ? video.backupStatus
+      : undefined
+});
+
 const parseVideos = (value: string | null): MadeVideoItem[] => {
   if (!value) {
     return [];
@@ -23,7 +98,7 @@ const parseVideos = (value: string | null): MadeVideoItem[] => {
 
   try {
     const parsed = JSON.parse(value);
-    return Array.isArray(parsed) ? sortVideos(parsed as MadeVideoItem[]) : [];
+    return Array.isArray(parsed) ? sortVideos(parsed.map(normalizeMadeVideoItem)) : [];
   } catch {
     return [];
   }

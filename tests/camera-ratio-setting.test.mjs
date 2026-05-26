@@ -6,6 +6,7 @@ const previewSource = fs.readFileSync("app/capture-preview.tsx", "utf8");
 const settingsSource = fs.readFileSync("lib/app-settings.ts", "utf8");
 const photoLibrarySource = fs.readFileSync("lib/photo-library.ts", "utf8");
 const photoTypesSource = fs.readFileSync("types/photo.ts", "utf8");
+const guideOverlaySource = fs.readFileSync("components/camera-guide-overlay.tsx", "utf8");
 
 for (const snippet of [
   "cameraRatio: PhotoRatioLabel",
@@ -25,9 +26,19 @@ for (const snippet of [
   "void updateAppSettings({ cameraRatio: nextRatio })",
   "카메라 비율",
   "ratioLabel: cameraRatio",
-  "aspectRatio={cameraRatioAspect[cameraRatio] ?? 1}"
+  "aspectRatio={cameraRatioAspect[cameraRatio] ?? undefined}"
 ]) {
   assert.ok(cameraSource.includes(snippet), `camera ratio UI/wiring missing: ${snippet}`);
+}
+
+for (const snippet of [
+  "aspectRatio,",
+  "const constrainedFrameStyle",
+  "aspectRatio: safeAspectRatio",
+  "styles.overlayViewport",
+  "styles.constrainedFrame"
+]) {
+  assert.ok(guideOverlaySource.includes(snippet), `guide overlay aspect-ratio frame missing: ${snippet}`);
 }
 
 for (const snippet of [
@@ -86,8 +97,12 @@ assert.ok(
 );
 
 for (const snippet of [
+  "resolveImageDimensions",
+  "const capturedDimensions = await resolveImageDimensions({ uri, width, height });",
   'ratioLabel = "Original"',
   'const shouldApplyRatio = ratioLabel !== "Original"',
+  "width: capturedDimensions?.width ?? width",
+  "height: capturedDimensions?.height ?? height",
   "renderEditedPhotoFromTransform({",
   "getRatioLabel(prepared.width, prepared.height)"
 ]) {

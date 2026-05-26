@@ -3,7 +3,7 @@ import { manipulateAsync, SaveFormat, type Action } from "expo-image-manipulator
 
 import { localStorageAdapter } from "@/lib/local-storage";
 import { assertLocalLibraryCapacity } from "@/lib/local-library-limit";
-import { optimizeImageForStorage } from "@/lib/image-backup-utils";
+import { optimizeImageForStorage, resolveImageDimensions } from "@/lib/image-backup-utils";
 import type {
   PhotoEditTransform,
   PhotoItem,
@@ -410,11 +410,13 @@ const renderCapturedPhotoForSave = async ({
   ratioLabel = "Original"
 }: SaveCapturedPhotoInput) => {
   const shouldApplyRatio = ratioLabel !== "Original";
+  const capturedDimensions = await resolveImageDimensions({ uri, width, height });
+
   return shouldApplyRatio
     ? await renderEditedPhotoFromTransform({
         sourceUri: uri,
-        width,
-        height,
+        width: capturedDimensions?.width ?? width,
+        height: capturedDimensions?.height ?? height,
         transform: {
           ratioLabel,
           translateX: 0,
@@ -425,8 +427,8 @@ const renderCapturedPhotoForSave = async ({
       })
     : {
         uri,
-        width: width ?? 0,
-        height: height ?? 0
+        width: capturedDimensions?.width ?? width ?? 0,
+        height: capturedDimensions?.height ?? height ?? 0
     };
 };
 

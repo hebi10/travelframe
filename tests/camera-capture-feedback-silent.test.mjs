@@ -17,8 +17,8 @@ assert.ok(
 );
 
 assert.ok(
-  capturePhotoSource.includes("enableShutterSound: false"),
-  "camera capture should always request silent native capture"
+  capturePhotoSource.includes("enableShutterSound: !cameraSilentCaptureEnabled"),
+  "camera capture should stay silent by default while honoring the silent setting"
 );
 
 console.log("ok - camera capture stays silent by default");

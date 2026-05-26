@@ -81,11 +81,13 @@ import {
   DEFAULT_GUIDE_COLOR,
   GUIDE_STROKE_WIDTH_MAX,
   GUIDE_STROKE_WIDTH_MIN,
+  defaultGridGuideLinePositions,
   defaultGuideShapePoints,
   getAppSettings,
   getGuideSizeBounds,
   isCloudBackupTargetEnabled,
   updateAppSettings,
+  type GridGuideLinePositions,
   type GuideShapePoints
 } from "@/lib/app-settings";
 import {
@@ -335,6 +337,8 @@ export default function TripClipScreen() {
   );
   const [previewGuideOffsetX, setPreviewGuideOffsetX] = useState(0);
   const [previewGuideOffsetY, setPreviewGuideOffsetY] = useState(0);
+  const [previewGridGuideLinePositions, setPreviewGridGuideLinePositions] =
+    useState<GridGuideLinePositions>(defaultGridGuideLinePositions);
   const [previewGuideShapePoints, setPreviewGuideShapePoints] =
     useState<GuideShapePoints>(defaultGuideShapePoints);
   const previewGuideSizeBounds = useMemo(
@@ -698,6 +702,7 @@ export default function TripClipScreen() {
     setPreviewGuideColor(settings.guideColor);
     setPreviewGuideOffsetX(settings.guideOffsetX);
     setPreviewGuideOffsetY(settings.guideOffsetY);
+    setPreviewGridGuideLinePositions(settings.gridGuideLinePositions);
     setPreviewGuideShapePoints(settings.guideShapePoints);
     previewGuideOffsetXValue.value = settings.guideOffsetX;
     previewGuideOffsetYValue.value = settings.guideOffsetY;
@@ -2102,6 +2107,7 @@ export default function TripClipScreen() {
                 guideColor={previewGuideColor}
                 guideOffsetX={previewGuideOffsetX}
                 guideOffsetY={previewGuideOffsetY}
+                gridGuideLinePositions={previewGridGuideLinePositions}
                 guideShapePoints={previewGuideShapePoints}
                 photoAdjustments={photoAdjustments}
                 onPhotoAdjustmentChange={updatePhotoAdjustment}
@@ -2879,6 +2885,7 @@ export default function TripClipScreen() {
               guideColor={previewGuideColor}
               guideOffsetX={previewGuideOffsetX}
               guideOffsetY={previewGuideOffsetY}
+              gridGuideLinePositions={previewGridGuideLinePositions}
               guideShapePoints={previewGuideShapePoints}
               photoAdjustments={photoAdjustments}
             />

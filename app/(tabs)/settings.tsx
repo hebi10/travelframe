@@ -1329,6 +1329,7 @@ export default function SettingsScreen() {
                   strokeWidth={settings.guideStrokeWidth}
                   offsetX={settings.guideOffsetX}
                   offsetY={settings.guideOffsetY}
+                  gridLinePositions={settings.gridGuideLinePositions}
                   shapePoints={settings.guideShapePoints}
                 />
                 {!settings.guideVisible ? (

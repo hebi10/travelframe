@@ -88,7 +88,7 @@ for (const snippet of [
   "type CameraPosition",
   "type MeteringMode",
   "photoOutput.capturePhotoToFile",
-  "enableShutterSound: false",
+  "enableShutterSound: !cameraSilentCaptureEnabled",
   "cameraFocusTap",
   "cameraFocusLocked",
   "cameraExposureBias",

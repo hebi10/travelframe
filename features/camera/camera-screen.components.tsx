@@ -1,6 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { runOnJS, useDerivedValue, useSharedValue } from "react-native-reanimated";
 
@@ -67,6 +67,36 @@ export type ExposureBiasControlProps = {
   onInteractionStart: () => void;
   onInteractionEnd: () => void;
 };
+
+export type CameraSettingToggleRowProps = {
+  title: string;
+  detail: string;
+  valueLabel: string;
+  disabled?: boolean;
+  onPress: () => void;
+};
+
+export function CameraSettingToggleRow({
+  title,
+  detail,
+  valueLabel,
+  disabled = false,
+  onPress
+}: CameraSettingToggleRowProps) {
+  return (
+    <Pressable
+      disabled={disabled}
+      style={[styles.settingToggleRow, disabled && styles.settingToggleRowDisabled]}
+      onPress={onPress}
+    >
+      <View style={styles.settingToggleCopy}>
+        <Text selectable={false} style={styles.settingToggleTitle}>{title}</Text>
+        <Text selectable={false} style={styles.settingToggleDetail}>{detail}</Text>
+      </View>
+      <Text selectable={false} style={styles.settingToggleValue}>{valueLabel}</Text>
+    </Pressable>
+  );
+}
 
 export function ExposureBiasControl({
   value,

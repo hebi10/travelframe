@@ -15,7 +15,7 @@ import { CameraGuideOverlay } from "@/components/camera-guide-overlay";
 import { colors } from "@/constants/app-theme";
 import type { GuideType } from "@/constants/camera-guides";
 import type { TripClipTemplate, TripClipTransition } from "@/constants/trip-clip";
-import type { GuideShapePoints } from "@/lib/app-settings";
+import type { GridGuideLinePositions, GuideShapePoints } from "@/lib/app-settings";
 import {
   getTripClipPhotoAdjustment,
   type TripClipPhotoAdjustment,
@@ -39,6 +39,7 @@ type TripClipPreviewPlayerProps = {
   guideColor: string;
   guideOffsetX?: number;
   guideOffsetY?: number;
+  gridGuideLinePositions: GridGuideLinePositions;
   guideShapePoints: GuideShapePoints;
   photoAdjustments: TripClipPhotoAdjustmentMap;
   onPhotoAdjustmentChange: (
@@ -109,6 +110,7 @@ export function TripClipPreviewPlayer({
   guideColor,
   guideOffsetX = 0,
   guideOffsetY = 0,
+  gridGuideLinePositions,
   guideShapePoints,
   photoAdjustments,
   onPhotoAdjustmentChange
@@ -364,6 +366,7 @@ export function TripClipPreviewPlayer({
         color={guideColor}
         offsetX={guideOffsetX}
         offsetY={guideOffsetY}
+        gridLinePositions={gridGuideLinePositions}
         shapePoints={guideShapePoints}
       />
     </View>

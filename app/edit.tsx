@@ -39,6 +39,7 @@ import {
   defaultAppSettings,
   getAppSettings,
   updateAppSettings,
+  type GridGuideLinePositions,
   type GuideShapePoints
 } from "@/lib/app-settings";
 import {
@@ -149,6 +150,8 @@ export default function EditScreen() {
   const [guideColor, setGuideColor] = useState(defaultAppSettings.guideColor);
   const [guideOffsetX, setGuideOffsetX] = useState(defaultAppSettings.guideOffsetX);
   const [guideOffsetY, setGuideOffsetY] = useState(defaultAppSettings.guideOffsetY);
+  const [gridGuideLinePositions, setGridGuideLinePositions] =
+    useState<GridGuideLinePositions>(defaultAppSettings.gridGuideLinePositions);
   const [guideShapePoints, setGuideShapePoints] =
     useState<GuideShapePoints>(defaultAppSettings.guideShapePoints);
   const [guidePanelOpen, setGuidePanelOpen] = useState(false);
@@ -215,6 +218,7 @@ export default function EditScreen() {
         setGuideColor(settings.guideColor);
         setGuideOffsetX(settings.guideOffsetX);
         setGuideOffsetY(settings.guideOffsetY);
+        setGridGuideLinePositions(settings.gridGuideLinePositions);
         setGuideShapePoints(settings.guideShapePoints);
         guideOffsetXValue.value = settings.guideOffsetX;
         guideOffsetYValue.value = settings.guideOffsetY;
@@ -635,6 +639,7 @@ export default function EditScreen() {
             guideColor={guideColor}
             guideOffsetX={guideOffsetX}
             guideOffsetY={guideOffsetY}
+            gridGuideLinePositions={gridGuideLinePositions}
             guideShapePoints={guideShapePoints}
           />
         )}
