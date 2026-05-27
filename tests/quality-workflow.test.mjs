@@ -16,7 +16,10 @@ for (const snippet of [
   "actions/setup-java@v4",
   "distribution: temurin",
   "java-version: \"21\"",
-  "npm run test:firebase-rules"
+  "npm run test:firebase-rules",
+  "name: Android Kotlin Verify",
+  "runs-on: windows-latest",
+  "npm run android:verify:kotlin"
 ]) {
   assert.ok(source.includes(snippet), `quality workflow missing: ${snippet}`);
 }

@@ -49,6 +49,8 @@ import {
 } from "@/lib/camera-guide-position";
 import { useAuth } from "@/lib/auth-context";
 import { getPlanEntitlements } from "@/lib/plan-entitlements";
+import { isMediaLibraryAccessGranted } from "@/lib/media-library-permissions";
+import { requestMediaLibraryAccess } from "@/lib/request-media-library-access";
 import { recordBackupFailure } from "@/lib/backup-failure-queue";
 import { backupPhotoIfEnabled } from "@/lib/cloud-backup";
 import { getPhotoById, saveEditedPhoto } from "@/lib/photo-library";
@@ -298,10 +300,11 @@ export default function EditScreen() {
 
   const pickPhoto = async () => {
     setMessage(null);
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync(false);
-
-    if (!permission.granted) {
-      setMessage("사진을 불러오려면 앨범 접근 권한이 필요합니다.");
+    const mediaAccessState = await requestMediaLibraryAccess({
+      fallbackMessage: "사진을 불러오려면 앨범 접근 권한이 필요합니다.",
+      onMessage: setMessage
+    });
+    if (!isMediaLibraryAccessGranted(mediaAccessState)) {
       return;
     }
 

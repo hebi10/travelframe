@@ -13,9 +13,12 @@ const activeExpertSubscription = {
   productId: "expert_monthly"
 };
 
-assert.equal(quota.BACKUP_QUOTA_LIMITS.imageTotalBytes, 2 * 1024 * 1024 * 1024);
-assert.equal(quota.BACKUP_QUOTA_LIMITS.totalBytes, 2 * 1024 * 1024 * 1024);
-assert.equal(quota.BACKUP_QUOTA_LIMITS.videoCount, 50);
+assert.equal(quota.getBackupQuotaLimits(activeCreatorSubscription).imageTotalBytes, 2 * 1024 * 1024 * 1024);
+assert.equal(quota.getBackupQuotaLimits(activeCreatorSubscription).totalBytes, 2 * 1024 * 1024 * 1024);
+assert.equal(quota.getBackupQuotaLimits(activeCreatorSubscription).videoCount, 50);
+assert.equal(quota.getBackupQuotaLimits(activeExpertSubscription).imageTotalBytes, 5 * 1024 * 1024 * 1024);
+assert.equal(quota.getBackupQuotaLimits(activeExpertSubscription).totalBytes, 5 * 1024 * 1024 * 1024);
+assert.equal(quota.getBackupQuotaLimits(activeExpertSubscription).videoCount, 100);
 
 assert.deepEqual(quota.normalizeBackupUsage(), {
   imageTotalBytes: 0,
@@ -33,6 +36,23 @@ assert.doesNotThrow(() => {
     fileSize: 2048,
     contentType: "image/jpeg",
     storagePath: "users/user-1/backups/photos/photo-1.jpg"
+  });
+});
+
+assert.doesNotThrow(() => {
+  quota.assertBackupUploadAllowed({
+    uid: "user-1",
+    subscription: activeExpertSubscription,
+    usage: {
+      imageTotalBytes: 2 * 1024 * 1024 * 1024 + 100,
+      videoCount: 50,
+      videoTotalBytes: 0,
+      audioTotalBytes: 0
+    },
+    mediaKind: "video",
+    fileSize: 1024,
+    contentType: "video/mp4",
+    storagePath: "users/user-1/backups/videos/expert-video-51.mp4"
   });
 });
 
@@ -111,6 +131,25 @@ assert.throws(
       storagePath: "users/user-1/backups/videos/video-1.mp4"
     }),
   /video backup quota/i
+);
+
+assert.throws(
+  () =>
+    quota.assertBackupUploadAllowed({
+      uid: "user-1",
+      subscription: activeExpertSubscription,
+      usage: {
+        imageTotalBytes: 5 * 1024 * 1024 * 1024,
+        videoCount: 0,
+        videoTotalBytes: 0,
+        audioTotalBytes: 0
+      },
+      mediaKind: "image",
+      fileSize: 1,
+      contentType: "image/jpeg",
+      storagePath: "users/user-1/backups/photos/expert-over.jpg"
+    }),
+  /image backup quota/i
 );
 
 assert.throws(

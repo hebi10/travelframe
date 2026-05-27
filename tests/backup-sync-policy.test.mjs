@@ -89,10 +89,12 @@ for (const snippet of [
   "(item) => !existingPhotoIds.has(item.id) && !deletedPhotoIds.has(item.id)",
   "replacePhotosFromBackup([...localPhotos, ...missingPhotos])",
   "const existingImageWorkIds = new Set(localImageWorks.map((item) => item.id));",
-  "const missingImageWorks = imageWorks.filter((item) => !existingImageWorkIds.has(item.id));",
+  "const deletedImageWorkIds = await getDeletedImageWorkIds();",
+  "(item) => !existingImageWorkIds.has(item.id) && !deletedImageWorkIds.has(item.id)",
   "replaceImageBundleWorksFromBackup([...localImageWorks, ...missingImageWorks])",
   "const existingVideoIds = new Set(localVideos.map((item) => item.id));",
-  "const missingVideos = videos.filter((item) => !existingVideoIds.has(item.id));",
+  "const deletedVideoIds = await getDeletedVideoIds();",
+  "(item) => !existingVideoIds.has(item.id) && !deletedVideoIds.has(item.id)",
   "replaceMadeVideosFromBackup([...localVideos, ...missingVideos])"
 ]) {
   assert.ok(backupSource.includes(snippet), `explicit cloud restore should import only missing local data: ${snippet}`);

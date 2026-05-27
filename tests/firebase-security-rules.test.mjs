@@ -36,7 +36,7 @@ for (const snippet of [
   "allow read, write: if false;",
   "function isOwner(userId)",
   "return signedIn() && request.auth.uid == userId;",
-  "allow create: if isOwner(userId) && isCurrentUserDocument(userId);"
+  "allow create: if isOwner(userId) && isValidUserWrite(userId);"
 ]) {
   assertIncludes(firestoreRules, snippet, "Firestore owner/default deny rule missing");
 }
@@ -60,6 +60,16 @@ assertIncludes(
   firestoreRules,
   "request.resource.data.userId == userId",
   "backup metadata must bind userId to request path"
+);
+assertIncludes(
+  firestoreRules,
+  "request.resource.data.keys().hasOnly",
+  "backup metadata must reject unexpected client fields"
+);
+assertIncludes(
+  firestoreRules,
+  "request.resource.data.diff(resource.data).affectedKeys().hasOnly",
+  "backup metadata updates must restrict mutable fields"
 );
 assertIncludes(
   firestoreRules,
@@ -87,6 +97,12 @@ for (const snippet of [
 ]) {
   assertIncludes(storageRules, snippet, "Storage media limit rule missing");
 }
+
+assertIncludes(
+  storageRules,
+  "allow update: if false;",
+  "Storage backup objects must not be overwritten after create"
+);
 
 const markExpiredSection = backupSource.slice(
   backupSource.indexOf("export const markBackupExpired"),

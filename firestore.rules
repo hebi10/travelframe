@@ -47,6 +47,251 @@ service cloud.firestore {
       return status in ["none", "active", "expired", "deleted", "backed_up", "failed", "restored"];
     }
 
+    function userDocumentKeys() {
+      return [
+        "uid",
+        "email",
+        "displayName",
+        "emailVerified",
+        "providerIds",
+        "lastSignInAt",
+        "createdAt",
+        "updatedAt"
+      ];
+    }
+
+    function userDocumentMutableKeys() {
+      return [
+        "email",
+        "displayName",
+        "emailVerified",
+        "providerIds",
+        "lastSignInAt",
+        "updatedAt"
+      ];
+    }
+
+    function backupOverviewKeys() {
+      return [
+        "userId",
+        "photoCount",
+        "imageBundleCount",
+        "videoCount",
+        "imageBackupBytes",
+        "status",
+        "deleteAfter",
+        "backedUpAt",
+        "deletedAt",
+        "updatedAt",
+        "settings",
+        "imageBundles",
+        "videos"
+      ];
+    }
+
+    function backupOverviewMutableKeys() {
+      return [
+        "photoCount",
+        "imageBundleCount",
+        "videoCount",
+        "imageBackupBytes",
+        "status",
+        "deleteAfter",
+        "backedUpAt",
+        "deletedAt",
+        "updatedAt",
+        "settings",
+        "imageBundles",
+        "videos"
+      ];
+    }
+
+    function photoBackupKeys() {
+      return [
+        "id",
+        "userId",
+        "localId",
+        "uri",
+        "localUri",
+        "previewUri",
+        "localPreviewUri",
+        "previewStoragePath",
+        "localFileStatus",
+        "createdAt",
+        "updatedAt",
+        "width",
+        "height",
+        "ratioLabel",
+        "kind",
+        "edited",
+        "addedToVideo",
+        "sourcePhotoId",
+        "edit",
+        "storagePath",
+        "downloadURL",
+        "fileSize",
+        "fileType",
+        "backupSessionId",
+        "backupStatus",
+        "backupEnabledAt",
+        "lastBackedUpAt",
+        "sourceDeviceId",
+        "backedUpAt",
+        "optimizedWidth",
+        "optimizedHeight",
+        "optimizedSize",
+        "optimizedQuality",
+        "imageQuality",
+        "originalSize",
+        "imageBackupSize"
+      ];
+    }
+
+    function photoBackupMutableKeys() {
+      return [
+        "uri",
+        "localUri",
+        "previewUri",
+        "localPreviewUri",
+        "localFileStatus",
+        "downloadURL",
+        "fileSize",
+        "fileType",
+        "backupStatus",
+        "backupEnabledAt",
+        "lastBackedUpAt",
+        "backedUpAt",
+        "updatedAt",
+        "optimizedWidth",
+        "optimizedHeight",
+        "optimizedSize",
+        "optimizedQuality",
+        "imageQuality",
+        "originalSize",
+        "imageBackupSize"
+      ];
+    }
+
+    function imageWorkBackupKeys() {
+      return [
+        "id",
+        "kind",
+        "title",
+        "createdAt",
+        "updatedAt",
+        "coverUri",
+        "ratio",
+        "photoIds",
+        "imageUris",
+        "localImageUris",
+        "imageWidths",
+        "imageHeights",
+        "userId",
+        "localId",
+        "storagePath",
+        "storagePaths",
+        "backupSessionIds",
+        "optimizedImages",
+        "imageBackupSize",
+        "originalBackupSize",
+        "imageQuality",
+        "fileSize",
+        "fileType",
+        "backupStatus",
+        "backupEnabledAt",
+        "lastBackedUpAt",
+        "sourceDeviceId",
+        "backedUpAt"
+      ];
+    }
+
+    function imageWorkBackupMutableKeys() {
+      return [
+        "title",
+        "updatedAt",
+        "coverUri",
+        "ratio",
+        "photoIds",
+        "imageUris",
+        "localImageUris",
+        "imageWidths",
+        "imageHeights",
+        "optimizedImages",
+        "imageBackupSize",
+        "originalBackupSize",
+        "imageQuality",
+        "fileSize",
+        "fileType",
+        "backupStatus",
+        "backupEnabledAt",
+        "lastBackedUpAt",
+        "sourceDeviceId",
+        "backedUpAt"
+      ];
+    }
+
+    function videoBackupKeys() {
+      return [
+        "id",
+        "userId",
+        "localId",
+        "uri",
+        "localUri",
+        "coverUri",
+        "createdAt",
+        "updatedAt",
+        "title",
+        "ratio",
+        "template",
+        "transition",
+        "transitionDuration",
+        "duration",
+        "photoIds",
+        "durations",
+        "musicId",
+        "musicLabel",
+        "storagePath",
+        "downloadURL",
+        "fileSize",
+        "fileType",
+        "backupSessionId",
+        "backupStatus",
+        "backupEnabledAt",
+        "lastBackedUpAt",
+        "sourceDeviceId",
+        "backedUpAt",
+        "localFileStatus"
+      ];
+    }
+
+    function videoBackupMutableKeys() {
+      return [
+        "uri",
+        "localUri",
+        "coverUri",
+        "updatedAt",
+        "title",
+        "ratio",
+        "template",
+        "transition",
+        "transitionDuration",
+        "duration",
+        "photoIds",
+        "durations",
+        "musicId",
+        "musicLabel",
+        "downloadURL",
+        "fileSize",
+        "fileType",
+        "backupStatus",
+        "backupEnabledAt",
+        "lastBackedUpAt",
+        "sourceDeviceId",
+        "backedUpAt",
+        "localFileStatus"
+      ];
+    }
+
     function isActiveSubscription(userId, productId) {
       return exists(/databases/$(database)/documents/users/$(userId)/subscriptions/$(productId))
         && get(/databases/$(database)/documents/users/$(userId)/subscriptions/$(productId)).data.plan == "premium"
@@ -66,8 +311,20 @@ service cloud.firestore {
       return request.resource.data.userId == userId;
     }
 
+    function isValidUserWrite(userId) {
+      return request.resource.data.keys().hasOnly(userDocumentKeys())
+        && request.resource.data.uid == userId;
+    }
+
+    function isValidUserUpdate(userId) {
+      return isValidUserWrite(userId)
+        && resource.data.uid == userId
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(userDocumentMutableKeys());
+    }
+
     function isValidBackupOverview(userId, backupId) {
       return backupId == "current"
+        && request.resource.data.keys().hasOnly(backupOverviewKeys())
         && hasValidBackupOwner(userId)
         && isNonNegativeCount(request.resource.data.photoCount)
         && isNonNegativeCount(request.resource.data.imageBundleCount)
@@ -78,6 +335,7 @@ service cloud.firestore {
 
     function isValidPhotoBackup(userId, photoId) {
       return hasValidBackupOwner(userId)
+        && request.resource.data.keys().hasOnly(photoBackupKeys())
         && request.resource.data.localId == photoId
         && request.resource.data.storagePath is string
         && request.resource.data.storagePath.matches('users/' + userId + '/backups/photos/.+')
@@ -90,6 +348,7 @@ service cloud.firestore {
 
     function isValidImageWorkBackup(userId, workId) {
       return hasValidBackupOwner(userId)
+        && request.resource.data.keys().hasOnly(imageWorkBackupKeys())
         && request.resource.data.localId == workId
         && request.resource.data.storagePaths is list
         && request.resource.data.storagePaths.size() > 0
@@ -104,6 +363,7 @@ service cloud.firestore {
 
     function isValidVideoBackup(userId, videoId) {
       return hasValidBackupOwner(userId)
+        && request.resource.data.keys().hasOnly(videoBackupKeys())
         && request.resource.data.localId == videoId
         && isValidBackupStoragePath(userId, request.resource.data.storagePath)
         && isValidBackupFileSize(request.resource.data.fileSize)
@@ -116,8 +376,41 @@ service cloud.firestore {
       return isValidPhotoBackup(userId, photoId);
     }
 
+    function isValidBackupOverviewUpdate(userId, backupId) {
+      return isValidBackupOverview(userId, backupId)
+        && request.resource.data.userId == resource.data.userId
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(backupOverviewMutableKeys());
+    }
+
+    function isValidPhotoBackupUpdate(userId, photoId) {
+      return isValidPhotoBackup(userId, photoId)
+        && request.resource.data.userId == resource.data.userId
+        && request.resource.data.localId == resource.data.localId
+        && request.resource.data.storagePath == resource.data.storagePath
+        && request.resource.data.backupSessionId == resource.data.backupSessionId
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(photoBackupMutableKeys());
+    }
+
+    function isValidImageWorkBackupUpdate(userId, workId) {
+      return isValidImageWorkBackup(userId, workId)
+        && request.resource.data.userId == resource.data.userId
+        && request.resource.data.localId == resource.data.localId
+        && request.resource.data.storagePaths == resource.data.storagePaths
+        && request.resource.data.backupSessionIds == resource.data.backupSessionIds
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(imageWorkBackupMutableKeys());
+    }
+
     function isValidVideoBackupMetadata(userId, videoId) {
       return isValidVideoBackup(userId, videoId);
+    }
+
+    function isValidVideoBackupUpdate(userId, videoId) {
+      return isValidVideoBackup(userId, videoId)
+        && request.resource.data.userId == resource.data.userId
+        && request.resource.data.localId == resource.data.localId
+        && request.resource.data.storagePath == resource.data.storagePath
+        && request.resource.data.backupSessionId == resource.data.backupSessionId
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(videoBackupMutableKeys());
     }
 
     function isValidImageWorkBackupMetadata(userId, workId) {
@@ -126,21 +419,21 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin();
-      allow create: if isOwner(userId) && isCurrentUserDocument(userId);
-      allow update: if isOwner(userId)
-        && resource.data.uid == userId
-        && isCurrentUserDocument(userId);
+      allow create: if isOwner(userId) && isValidUserWrite(userId);
+      allow update: if isOwner(userId) && isValidUserUpdate(userId);
       allow delete: if false;
 
       match /videos/{videoId} {
         allow read: if isOwner(userId) || isAdmin();
-        allow create, update: if isOwner(userId) && isValidVideoBackupMetadata(userId, videoId);
+        allow create: if isOwner(userId) && isValidVideoBackupMetadata(userId, videoId);
+        allow update: if isOwner(userId) && isValidVideoBackupUpdate(userId, videoId);
         allow delete: if isOwner(userId) || isAdmin();
       }
 
       match /imageWorks/{workId} {
         allow read: if isOwner(userId) || isAdmin();
-        allow create, update: if isOwner(userId) && isValidImageWorkBackupMetadata(userId, workId);
+        allow create: if isOwner(userId) && isValidImageWorkBackupMetadata(userId, workId);
+        allow update: if isOwner(userId) && isValidImageWorkBackupUpdate(userId, workId);
         allow delete: if isOwner(userId) || isAdmin();
       }
 
@@ -156,13 +449,15 @@ service cloud.firestore {
 
       match /backups/{backupId} {
         allow read: if isOwner(userId) || isAdmin();
-        allow create, update: if isOwner(userId) && isValidBackupOverview(userId, backupId);
+        allow create: if isOwner(userId) && isValidBackupOverview(userId, backupId);
+        allow update: if isOwner(userId) && isValidBackupOverviewUpdate(userId, backupId);
         allow delete: if isOwner(userId) || isAdmin();
       }
 
       match /photoBackups/{photoId} {
         allow read: if isOwner(userId) || isAdmin();
-        allow create, update: if isOwner(userId) && isValidPhotoBackupMetadata(userId, photoId);
+        allow create: if isOwner(userId) && isValidPhotoBackupMetadata(userId, photoId);
+        allow update: if isOwner(userId) && isValidPhotoBackupUpdate(userId, photoId);
         allow delete: if isOwner(userId) || isAdmin();
       }
 

@@ -64,3 +64,28 @@ jobs:
 
       - name: Test Firebase Rules
         run: npm run test:firebase-rules
+
+  android-kotlin:
+    name: Android Kotlin Verify
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify Android Kotlin
+        run: npm run android:verify:kotlin

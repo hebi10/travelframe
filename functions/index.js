@@ -2,6 +2,7 @@ const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const {
   assertBackupUploadAllowed,
+  getBackupQuotaLimits,
   getBackupUsageDelta,
   normalizeBackupUsage,
   reserveBackupUsage,
@@ -10,6 +11,15 @@ const {
   completeReservedBackupUsage,
   buildBackupSessionStoragePath
 } = require("./backup-quota");
+const {
+  collectOwnedCloudBackupStoragePaths,
+  isOwnedCloudBackupStoragePath
+} = require("./backup-delete-safety");
+const {
+  reserveWeeklyVideoExportUsage,
+  completeWeeklyVideoExportReservation,
+  releaseWeeklyVideoExportReservation
+} = require("./video-export-quota");
 
 admin.initializeApp();
 
@@ -152,6 +162,25 @@ const getCurrentVideoExportWeek = (date = new Date()) => {
 
 const getWeeklyVideoExportRef = (uid, weekId) =>
   db.doc(`users/${uid}/usage/videoExports/weeks/${weekId}`);
+const getWeeklyVideoExportReservationRef = ({ uid, weekId, reservationId }) =>
+  db.doc(`users/${uid}/usage/videoExports/weeks/${weekId}/reservations/${reservationId}`);
+const createWeeklyVideoExportReservationRef = ({ uid, weekId }) =>
+  getWeeklyVideoExportRef(uid, weekId).collection("reservations").doc(`${weekId}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`);
+const getWeekIdFromReservationId = (reservationId) => {
+  if (typeof reservationId !== "string" || !/^\d{4}-\d{2}-\d{2}-/.test(reservationId)) {
+    throw new HttpsError("invalid-argument", "A valid reservationId is required.");
+  }
+
+  return reservationId.slice(0, 10);
+};
+const buildWeeklyVideoExportResponse = ({ weekId, weekLabel, count, limit, reservationId }) => ({
+  weekId,
+  weekLabel,
+  count: Math.max(0, Number(count ?? 0)),
+  limit,
+  remaining: Math.max(0, limit - Math.max(0, Number(count ?? 0))),
+  ...(reservationId ? { reservationId } : {})
+});
 const ADMIN_PRODUCT_META = {
   ad_remove: {
     productName: "광고 제거",
@@ -235,22 +264,28 @@ exports.reserveWeeklyVideoExport = onCall(async (request) => {
     const limit = getWeeklyVideoExportLimit(subscription);
     const { weekId, weekLabel } = getCurrentVideoExportWeek();
     const usageRef = getWeeklyVideoExportRef(uid, weekId);
+    const reservationRef = createWeeklyVideoExportReservationRef({ uid, weekId });
     let nextCount = 0;
 
     await db.runTransaction(async (transaction) => {
       const snapshot = await transaction.get(usageRef);
-      const currentCount = snapshot.exists
-        ? Math.max(0, Number(snapshot.data().count ?? 0))
-        : 0;
-
-      if (currentCount >= limit) {
+      let reserved;
+      try {
+        reserved = reserveWeeklyVideoExportUsage({
+          usage: snapshot.data() ?? {},
+          limit,
+          reservationId: reservationRef.id,
+          userId: uid,
+          weekId
+        });
+      } catch (error) {
         throw new HttpsError(
           "failed-precondition",
           `이번 주에 MP4 영상을 ${limit}개까지 만들 수 있습니다. 다음 주에 다시 만들거나 플랜을 확인해 주세요.`
         );
       }
 
-      nextCount = currentCount + 1;
+      nextCount = reserved.usage.count;
       transaction.set(
         usageRef,
         {
@@ -266,15 +301,21 @@ exports.reserveWeeklyVideoExport = onCall(async (request) => {
         },
         { merge: true }
       );
+      transaction.set(reservationRef, {
+        ...reserved.reservation,
+        status: "reserved",
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp()
+      });
     });
 
-    return {
+    return buildWeeklyVideoExportResponse({
       weekId,
       weekLabel,
       count: nextCount,
       limit,
-      remaining: Math.max(0, limit - nextCount)
-    };
+      reservationId: reservationRef.id
+    });
   } catch (error) {
     throw toHttpsError(error);
   }
@@ -285,43 +326,111 @@ exports.releaseWeeklyVideoExport = onCall(async (request) => {
     const uid = requireUid(request);
     const subscription = await getBackupSubscription(uid);
     const limit = getWeeklyVideoExportLimit(subscription);
-    const { weekId, weekLabel } = getCurrentVideoExportWeek();
+    const reservationId = request.data?.reservationId;
+    const weekId = typeof reservationId === "string"
+      ? getWeekIdFromReservationId(reservationId)
+      : getCurrentVideoExportWeek().weekId;
+    const { weekLabel } = getCurrentVideoExportWeek(new Date(`${weekId}T00:00:00.000Z`));
     const usageRef = getWeeklyVideoExportRef(uid, weekId);
     let nextCount = 0;
 
-    await db.runTransaction(async (transaction) => {
-      const snapshot = await transaction.get(usageRef);
-      const currentCount = snapshot.exists
+    if (typeof reservationId !== "string" || !reservationId) {
+      const snapshot = await usageRef.get();
+      nextCount = snapshot.exists
         ? Math.max(0, Number(snapshot.data().count ?? 0))
         : 0;
+      return buildWeeklyVideoExportResponse({ weekId, weekLabel, count: nextCount, limit });
+    }
 
-      nextCount = Math.max(0, currentCount - 1);
-      if (!snapshot.exists || currentCount <= 0) {
-        return;
+    await db.runTransaction(async (transaction) => {
+      const reservationRef = getWeeklyVideoExportReservationRef({ uid, weekId, reservationId });
+      const [usageSnapshot, reservationSnapshot] = await Promise.all([
+        transaction.get(usageRef),
+        transaction.get(reservationRef)
+      ]);
+      const reservation = reservationSnapshot.data();
+      if (!reservationSnapshot.exists || reservation.userId !== uid) {
+        throw new HttpsError("not-found", "Weekly video export reservation was not found.");
       }
 
-      transaction.set(
-        usageRef,
-        {
-          userId: uid,
-          weekId,
-          weekLabel,
-          count: nextCount,
-          limit,
-          updatedAt: FieldValue.serverTimestamp(),
-          createdAt: snapshot.data().createdAt ?? FieldValue.serverTimestamp()
-        },
-        { merge: true }
-      );
+      const released = releaseWeeklyVideoExportReservation({
+        usage: usageSnapshot.data() ?? {},
+        reservation
+      });
+      nextCount = released.usage.count;
+
+      if (reservation.status === "reserved") {
+        transaction.set(
+          usageRef,
+          {
+            userId: uid,
+            weekId,
+            weekLabel,
+            count: nextCount,
+            limit,
+            updatedAt: FieldValue.serverTimestamp(),
+            createdAt: usageSnapshot.exists
+              ? usageSnapshot.data().createdAt ?? FieldValue.serverTimestamp()
+              : FieldValue.serverTimestamp()
+          },
+          { merge: true }
+        );
+        transaction.update(reservationRef, {
+          status: "released",
+          releasedAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp()
+        });
+      }
     });
 
-    return {
-      weekId,
-      weekLabel,
-      count: nextCount,
-      limit,
-      remaining: Math.max(0, limit - nextCount)
-    };
+    return buildWeeklyVideoExportResponse({ weekId, weekLabel, count: nextCount, limit });
+  } catch (error) {
+    throw toHttpsError(error);
+  }
+});
+
+exports.completeWeeklyVideoExport = onCall(async (request) => {
+  try {
+    const uid = requireUid(request);
+    const subscription = await getBackupSubscription(uid);
+    const limit = getWeeklyVideoExportLimit(subscription);
+    const { reservationId } = request.data ?? {};
+    if (typeof reservationId !== "string" || !reservationId) {
+      throw new HttpsError("invalid-argument", "reservationId is required.");
+    }
+
+    const weekId = getWeekIdFromReservationId(reservationId);
+    const { weekLabel } = getCurrentVideoExportWeek(new Date(`${weekId}T00:00:00.000Z`));
+    const usageRef = getWeeklyVideoExportRef(uid, weekId);
+    const reservationRef = getWeeklyVideoExportReservationRef({ uid, weekId, reservationId });
+    let nextCount = 0;
+
+    await db.runTransaction(async (transaction) => {
+      const [usageSnapshot, reservationSnapshot] = await Promise.all([
+        transaction.get(usageRef),
+        transaction.get(reservationRef)
+      ]);
+      const reservation = reservationSnapshot.data();
+      if (!reservationSnapshot.exists || reservation.userId !== uid) {
+        throw new HttpsError("not-found", "Weekly video export reservation was not found.");
+      }
+
+      const completed = completeWeeklyVideoExportReservation({
+        usage: usageSnapshot.data() ?? {},
+        reservation
+      });
+      nextCount = completed.usage.count;
+
+      if (reservation.status === "reserved") {
+        transaction.update(reservationRef, {
+          status: "completed",
+          completedAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp()
+        });
+      }
+    });
+
+    return buildWeeklyVideoExportResponse({ weekId, weekLabel, count: nextCount, limit });
   } catch (error) {
     throw toHttpsError(error);
   }
@@ -343,6 +452,14 @@ const deleteStoragePath = async (storagePath) => {
       throw error;
     }
   });
+};
+
+const deleteOwnedCloudBackupStoragePath = async (uid, storagePath) => {
+  if (!isOwnedCloudBackupStoragePath(uid, storagePath)) {
+    return;
+  }
+
+  await deleteStoragePath(storagePath);
 };
 
 const deleteBackupSessionStorageObject = async ({ storagePath, backupSessionId }) => {
@@ -470,6 +587,7 @@ exports.reserveBackupUpload = onCall(async (request) => {
       });
 
       const delta = getBackupUsageDelta({ mediaKind, fileSize });
+      const quotaLimits = getBackupQuotaLimits(subscription);
       const reservedUsage = reserveBackupUsage(usage, delta);
       transaction.set(sessionRef, {
         userId: uid,
@@ -478,6 +596,7 @@ exports.reserveBackupUpload = onCall(async (request) => {
         contentType,
         storagePath: reservedStoragePath,
         usageDelta: delta,
+        quotaLimits,
         status: "reserved",
         createdAt: FieldValue.serverTimestamp(),
         expiresAt: admin.firestore.Timestamp.fromMillis(Date.now() + BACKUP_UPLOAD_SESSION_TTL_MS)
@@ -578,7 +697,11 @@ exports.completeBackupUpload = onCall(async (request) => {
         }
 
         const usageDelta = getBackupSessionUsageDelta(freshSession);
-        const updatedUsage = completeReservedBackupUsage(usageSnapshot.data(), usageDelta);
+        const updatedUsage = completeReservedBackupUsage(
+          usageSnapshot.data(),
+          usageDelta,
+          freshSession.quotaLimits
+        );
 
         transaction.set(
           getUsageRef(uid),
@@ -1327,7 +1450,11 @@ exports.deleteAdminBackupItem = onCall(async (request) => {
       ...(Array.isArray(data.storagePaths) ? data.storagePaths : [])
     ].filter(Boolean);
 
-    await Promise.all(storagePaths.map(deleteStoragePath));
+    await Promise.all(
+      storagePaths.map((storagePath) =>
+        deleteOwnedCloudBackupStoragePath(targetUid, storagePath)
+      )
+    );
     await itemRef.delete();
     const summary = await refreshAdminBackupOverview(targetUid);
 
@@ -1385,36 +1512,40 @@ exports.deleteCloudBackupData = onCall(async (request) => {
   try {
     const uid = requireUid(request);
     const userRef = db.doc(`users/${uid}`);
-    const [photoSnapshot, imageWorkSnapshot, videoSnapshot] = await Promise.all([
+    const [photoSnapshot, imageWorkSnapshot, videoSnapshot, musicSnapshot] = await Promise.all([
       userRef.collection("photoBackups").get(),
       userRef.collection("imageWorks").get(),
-      userRef.collection("videos").get()
+      userRef.collection("videos").get(),
+      userRef.collection("musicTracks").get()
     ]);
 
     let imageBackupBytes = 0;
-    const storageDeletes = [];
     const documentDeletes = [];
+    const storageDeletes = collectOwnedCloudBackupStoragePaths({
+      uid,
+      photoBackups: photoSnapshot.docs.map((item) => item.data()),
+      imageWorks: imageWorkSnapshot.docs.map((item) => item.data()),
+      videos: videoSnapshot.docs.map((item) => item.data()),
+      musicTracks: musicSnapshot.docs.map((item) => item.data())
+    }).map(deleteStoragePath);
 
     for (const item of photoSnapshot.docs) {
       const data = item.data();
       imageBackupBytes += Number(data.imageBackupSize ?? data.optimizedSize ?? data.fileSize ?? 0);
-      storageDeletes.push(deleteStoragePath(data.storagePath));
-      storageDeletes.push(deleteStoragePath(data.previewStoragePath));
       documentDeletes.push(item.ref);
     }
 
     for (const item of imageWorkSnapshot.docs) {
       const data = item.data();
       imageBackupBytes += Number(data.imageBackupSize ?? 0);
-      for (const storagePath of data.storagePaths ?? []) {
-        storageDeletes.push(deleteStoragePath(storagePath));
-      }
       documentDeletes.push(item.ref);
     }
 
     for (const item of videoSnapshot.docs) {
-      const data = item.data();
-      storageDeletes.push(deleteStoragePath(data.storagePath));
+      documentDeletes.push(item.ref);
+    }
+
+    for (const item of musicSnapshot.docs) {
       documentDeletes.push(item.ref);
     }
 
@@ -1429,6 +1560,7 @@ exports.deleteCloudBackupData = onCall(async (request) => {
           photoCount: 0,
           imageBundleCount: 0,
           videoCount: 0,
+          musicCount: 0,
           imageBackupBytes: 0,
           settings: FieldValue.delete(),
           imageBundles: FieldValue.delete(),
@@ -1444,6 +1576,7 @@ exports.deleteCloudBackupData = onCall(async (request) => {
         {
           imageTotalBytes: 0,
           videoCount: 0,
+          videoTotalBytes: 0,
           audioTotalBytes: 0,
           updatedAt: FieldValue.serverTimestamp()
         },
@@ -1455,6 +1588,7 @@ exports.deleteCloudBackupData = onCall(async (request) => {
       photoCount: photoSnapshot.size,
       imageBundleCount: imageWorkSnapshot.size,
       videoCount: videoSnapshot.size,
+      musicCount: musicSnapshot.size,
       imageBackupBytes,
       deleteAfter: null
     };

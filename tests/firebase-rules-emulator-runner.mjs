@@ -51,6 +51,11 @@ const adminHeaders = (extra = {}) => ({
   Authorization: "Bearer owner"
 });
 
+const storageAuthHeaders = (uid, extra = {}) => ({
+  ...extra,
+  ...(uid ? { Authorization: `Bearer ${unsignedToken(uid)}` } : {})
+});
+
 const firestoreValue = (value) => {
   if (typeof value === "string") {
     return { stringValue: value };
@@ -171,26 +176,38 @@ const weeklyVideoUsage = ({ uid = ownerUid, weekId = "2026-05-18", count, limit 
 });
 
 const storageRequest = async (method, name, { uid, contentType, metadata, bytes } = {}) => {
-  const uploadUrl = `${storageBase}?uploadType=media&name=${encodeURIComponent(name)}`;
+  const uploadUrl = `${storageBase}?uploadType=media&name=${encodeURIComponent(name)}${
+    contentType ? `&contentType=${encodeURIComponent(contentType)}` : ""
+  }`;
   const objectUrl = `${storageBase}/${encodeStorageName(name)}?alt=media`;
+  const objectMetadataUrl = `${storageBase}/${encodeStorageName(name)}`;
   const isWrite = method === "POST" || method === "PUT";
+  const isMetadataUpdate = method === "PATCH";
 
-  return fetch(isWrite ? uploadUrl : objectUrl, {
+  return fetch(isWrite ? uploadUrl : isMetadataUpdate ? objectMetadataUrl : objectUrl, {
     method,
-    headers: authHeaders(uid, {
-      ...(contentType ? { "Content-Type": contentType } : {}),
+    headers: storageAuthHeaders(uid, {
+      ...(isMetadataUpdate
+        ? { "Content-Type": "application/json" }
+        : contentType
+          ? { "Content-Type": contentType }
+          : {}),
       ...Object.fromEntries(
         Object.entries(metadata ?? {}).map(([key, value]) => [`x-goog-meta-${key}`, value])
       )
     }),
-    body: isWrite ? bytes ?? new Uint8Array([1, 2, 3]) : undefined
+    body: isWrite
+      ? bytes ?? new Uint8Array([1, 2, 3])
+      : isMetadataUpdate
+        ? JSON.stringify({ metadata: metadata ?? { updatedByTest: "true" } })
+        : undefined
   });
 };
 
 const seedBackupUploadSession = async ({
   uid = ownerUid,
   sessionId = "photo-session",
-  storagePath = `users/${ownerUid}/backups/photos/photo-session.jpg`,
+  storagePath = `users/${ownerUid}/backups/photos/${sessionId}/photo-session.jpg`,
   fileSize = 3,
   contentType = "image/jpeg",
   mediaKind = "image"
@@ -221,6 +238,13 @@ await expectAllowed(
   })
 );
 await expectDenied(
+  "backup overview rejects unexpected client fields",
+  firestoreRequest("PATCH", `users/${ownerUid}/backups/current`, {
+    uid: ownerUid,
+    data: { ...validBackupOverview(), clientInjectedField: true }
+  })
+);
+await expectDenied(
   "users cannot write another user's backup overview path",
   firestoreRequest("PATCH", `users/${otherUid}/backups/current`, {
     uid: ownerUid,
@@ -239,6 +263,37 @@ await expectDenied(
   firestoreRequest("PATCH", `users/${ownerUid}/photoBackups/too-large`, {
     uid: ownerUid,
     data: { ...validPhotoBackup(ownerUid, "too-large"), fileSize: 250 * 1024 * 1024 + 1 }
+  })
+);
+await expectAllowed(
+  "owners can create valid photo backup metadata",
+  firestoreRequest("PATCH", `users/${ownerUid}/photoBackups/photo-1`, {
+    uid: ownerUid,
+    data: validPhotoBackup(ownerUid, "photo-1")
+  })
+);
+await expectDenied(
+  "photo backup metadata rejects unexpected client fields",
+  firestoreRequest("PATCH", `users/${ownerUid}/photoBackups/photo-extra`, {
+    uid: ownerUid,
+    data: { ...validPhotoBackup(ownerUid, "photo-extra"), clientInjectedField: true }
+  })
+);
+await expectAllowed(
+  "owners can update mutable photo backup metadata",
+  firestoreRequest("PATCH", `users/${ownerUid}/photoBackups/photo-1`, {
+    uid: ownerUid,
+    data: { ...validPhotoBackup(ownerUid, "photo-1"), backupStatus: "restored" }
+  })
+);
+await expectDenied(
+  "photo backup metadata rejects immutable storage path updates",
+  firestoreRequest("PATCH", `users/${ownerUid}/photoBackups/photo-1`, {
+    uid: ownerUid,
+    data: {
+      ...validPhotoBackup(ownerUid, "photo-1"),
+      storagePath: `users/${ownerUid}/backups/photos/other-path.jpg`
+    }
   })
 );
 await expectDenied(
@@ -265,6 +320,18 @@ await expectDenied(
   firestoreRequest("PATCH", `users/${ownerUid}/usage/videoExports/weeks/2026-05-18`, {
     uid: ownerUid,
     data: weeklyVideoUsage({ count: 1, limit: 1 })
+  })
+);
+await expectDenied(
+  "clients cannot write weekly video export reservations directly",
+  firestoreRequest("PATCH", `users/${ownerUid}/usage/videoExports/weeks/2026-05-18/reservations/direct`, {
+    uid: ownerUid,
+    data: {
+      userId: ownerUid,
+      weekId: "2026-05-18",
+      reservationId: "direct",
+      status: "reserved"
+    }
   })
 );
 await expectDenied(
@@ -304,7 +371,7 @@ await expectAllowed(
   firestoreRequest("GET", `users/${ownerUid}`, { uid: adminUid })
 );
 
-const validStoragePath = `users/${ownerUid}/backups/photos/photo-session.jpg`;
+const validStoragePath = `users/${ownerUid}/backups/photos/photo-session/photo-session.jpg`;
 await seedBackupUploadSession({ storagePath: validStoragePath });
 await expectDenied(
   "unauthenticated users cannot read backup files",
@@ -312,7 +379,7 @@ await expectDenied(
 );
 await expectDenied(
   "storage uploads without upload sessions are blocked",
-  storageRequest("POST", `users/${ownerUid}/backups/photos/no-session.jpg`, {
+  storageRequest("POST", `users/${ownerUid}/backups/photos/no-session/no-session.jpg`, {
     uid: ownerUid,
     contentType: "image/jpeg",
     bytes: new Uint8Array([1, 2, 3])
@@ -336,12 +403,19 @@ await expectAllowed(
     bytes: new Uint8Array([1, 2, 3])
   })
 );
+await expectDenied(
+  "owners cannot update an existing backup file",
+  storageRequest("PATCH", validStoragePath, {
+    uid: ownerUid,
+    metadata: { updatedByTest: "true" }
+  })
+);
 await expectAllowed(
   "owners can read their own backup files",
   storageRequest("GET", validStoragePath, { uid: ownerUid })
 );
 
-const badTypePath = `users/${ownerUid}/backups/photos/bad-type.jpg`;
+const badTypePath = `users/${ownerUid}/backups/photos/bad-type-session/bad-type.jpg`;
 await seedBackupUploadSession({
   sessionId: "bad-type-session",
   storagePath: badTypePath,
@@ -357,7 +431,7 @@ await expectDenied(
   })
 );
 
-const tooLargePath = `users/${ownerUid}/backups/photos/too-large.jpg`;
+const tooLargePath = `users/${ownerUid}/backups/photos/too-large-session/too-large.jpg`;
 const tooLargeBytes = new Uint8Array(20 * 1024 * 1024 + 1);
 await seedBackupUploadSession({
   sessionId: "too-large-session",

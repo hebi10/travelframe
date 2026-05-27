@@ -8,7 +8,7 @@ for (const snippet of [
   "optimizeImageForBackup",
   "getCurrentImageBackupSize",
   "assertImageBackupCapacity",
-  "CLOUD_BACKUP_STORAGE_LIMIT_BYTES",
+  "getCloudBackupStorageLimitBytes",
   "IMAGE_BACKUP_SIZE_EXCEEDED_MESSAGE",
   "IMAGE_OPTIMIZATION_FAILED_MESSAGE",
   "imageBackupBytes",

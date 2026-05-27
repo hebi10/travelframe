@@ -5,6 +5,7 @@ import { assertLocalLibraryCapacity } from "@/lib/local-library-limit";
 import type { ImageBundleWorkItem } from "@/types/work";
 
 const IMAGE_BUNDLE_STORAGE_KEY = "travel-frame.image-bundles.v1";
+const IMAGE_BUNDLE_DELETION_MARKER_KEY = "travel-frame.image-bundle-deletion-markers.v1";
 const IMAGE_BUNDLE_DIRECTORY = "image-bundles/";
 
 const createWorkId = () =>
@@ -91,6 +92,23 @@ const parseImageBundles = (value: string | null): ImageBundleWorkItem[] => {
   }
 };
 
+const parseDeletedImageWorkIds = (value: string | null) => {
+  if (!value) {
+    return new Set<string>();
+  }
+
+  try {
+    const parsed = JSON.parse(value);
+    return new Set(
+      Array.isArray(parsed)
+        ? parsed.filter((item): item is string => typeof item === "string" && item.length > 0)
+        : []
+    );
+  } catch {
+    return new Set<string>();
+  }
+};
+
 const writeImageBundles = async (items: ImageBundleWorkItem[]) => {
   await localStorageAdapter.setItem(
     IMAGE_BUNDLE_STORAGE_KEY,
@@ -119,6 +137,23 @@ export const getImageBundleWorks = async () => {
   const value = await localStorageAdapter.getItem(IMAGE_BUNDLE_STORAGE_KEY);
   return parseImageBundles(value);
 };
+
+export const getDeletedImageWorkIds = async () => {
+  const value = await localStorageAdapter.getItem(IMAGE_BUNDLE_DELETION_MARKER_KEY);
+  return parseDeletedImageWorkIds(value);
+};
+
+export const recordImageWorkLocalDeletion = async (id: string) => {
+  const deletedImageWorkIds = await getDeletedImageWorkIds();
+  deletedImageWorkIds.add(id);
+  await localStorageAdapter.setItem(
+    IMAGE_BUNDLE_DELETION_MARKER_KEY,
+    JSON.stringify([...deletedImageWorkIds])
+  );
+};
+
+export const wasImageWorkDeletedLocally = async (id: string) =>
+  (await getDeletedImageWorkIds()).has(id);
 
 export const getImageBundleWorkById = async (id: string) => {
   const items = await getImageBundleWorks();
@@ -259,6 +294,7 @@ export const markImageBundleCloudOnly = async (
 };
 
 export const deleteImageBundleWork = async (id: string) => {
+  await recordImageWorkLocalDeletion(id);
   const items = await getImageBundleWorks();
   const work = items.find((item) => item.id === id);
   if (work) {

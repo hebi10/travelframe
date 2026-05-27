@@ -8,6 +8,13 @@ const BACKUP_QUOTA_LIMITS = {
   audioFileBytes: 50 * 1024 * 1024
 };
 
+const EXPERT_BACKUP_QUOTA_LIMITS = {
+  ...BACKUP_QUOTA_LIMITS,
+  totalBytes: 5 * 1024 * 1024 * 1024,
+  imageTotalBytes: 5 * 1024 * 1024 * 1024,
+  videoCount: 100
+};
+
 const VALID_MEDIA_KINDS = new Set(["image", "video", "audio"]);
 
 const normalizeCount = (value) =>
@@ -38,6 +45,14 @@ const isBackupSubscriptionActive = (subscription, now = Date.now()) => {
   }
 
   return new Date(subscription.expiresAt).getTime() > now;
+};
+
+const getBackupQuotaLimits = (subscription) => {
+  if (isBackupSubscriptionActive(subscription) && subscription.productId === "expert_monthly") {
+    return EXPERT_BACKUP_QUOTA_LIMITS;
+  }
+
+  return BACKUP_QUOTA_LIMITS;
 };
 
 const getBackupUsageDelta = ({ mediaKind, fileSize }) => {
@@ -80,17 +95,17 @@ const subtractBackupUsage = (usage, delta) => ({
   )
 });
 
-const assertBackupUsageWithinLimits = (usage) => {
+const assertBackupUsageWithinLimits = (usage, limits = BACKUP_QUOTA_LIMITS) => {
   const normalizedUsage = normalizeBackupUsage(usage);
-  if (normalizedUsage.imageTotalBytes > BACKUP_QUOTA_LIMITS.imageTotalBytes) {
+  if (normalizedUsage.imageTotalBytes > limits.imageTotalBytes) {
     throw new Error("Image backup quota exceeded.");
   }
 
-  if (normalizedUsage.videoCount > BACKUP_QUOTA_LIMITS.videoCount) {
+  if (normalizedUsage.videoCount > limits.videoCount) {
     throw new Error("Video backup quota exceeded.");
   }
 
-  if (normalizedUsage.audioTotalBytes > BACKUP_QUOTA_LIMITS.audioTotalBytes) {
+  if (normalizedUsage.audioTotalBytes > limits.audioTotalBytes) {
     throw new Error("Audio backup quota exceeded.");
   }
 
@@ -99,7 +114,7 @@ const assertBackupUsageWithinLimits = (usage) => {
     normalizedUsage.videoTotalBytes +
     normalizedUsage.audioTotalBytes;
 
-  if (totalBytes > BACKUP_QUOTA_LIMITS.totalBytes) {
+  if (totalBytes > limits.totalBytes) {
     throw new Error("Total backup quota exceeded.");
   }
 };
@@ -122,13 +137,13 @@ const releaseCompletedBackupUsage = (usage, delta) => ({
   pendingUsage: normalizePendingBackupUsage(usage)
 });
 
-const completeReservedBackupUsage = (usage, delta) => {
+const completeReservedBackupUsage = (usage, delta, limits = BACKUP_QUOTA_LIMITS) => {
   const updatedUsage = {
     ...addBackupUsage(normalizeBackupUsage(usage), delta),
     pendingUsage: subtractBackupUsage(normalizePendingBackupUsage(usage), delta)
   };
 
-  assertBackupUsageWithinLimits(updatedUsage);
+  assertBackupUsageWithinLimits(updatedUsage, limits);
   return updatedUsage;
 };
 
@@ -171,7 +186,7 @@ const buildBackupSessionStoragePath = ({ uid, sessionId, storagePath }) => {
         throw new Error("Invalid backup storage path.");
       }
 
-      return `${prefix}${sessionId}-${fileName}`;
+      return `${prefix}${sessionId}/${fileName}`;
     }
   }
 
@@ -183,7 +198,7 @@ const buildBackupSessionStoragePath = ({ uid, sessionId, storagePath }) => {
       throw new Error("Invalid backup storage path.");
     }
 
-    return `${imageWorkPrefix}${workId}/${sessionId}-${fileName}`;
+    return `${imageWorkPrefix}${workId}/${sessionId}/${fileName}`;
   }
 
   throw new Error("Invalid backup storage path.");
@@ -235,18 +250,21 @@ const assertBackupUploadAllowed = ({
   assertValidContentType({ mediaKind, contentType });
   assertValidFileSize({ mediaKind, fileSize });
 
+  const limits = getBackupQuotaLimits(subscription);
   const nextUsage = addBackupUsage(getReservedBackupUsage(usage), getBackupUsageDelta({
     mediaKind,
     fileSize
   }));
 
-  assertBackupUsageWithinLimits(nextUsage);
+  assertBackupUsageWithinLimits(nextUsage, limits);
 };
 
 exports.BACKUP_QUOTA_LIMITS = BACKUP_QUOTA_LIMITS;
+exports.EXPERT_BACKUP_QUOTA_LIMITS = EXPERT_BACKUP_QUOTA_LIMITS;
 exports.normalizeBackupUsage = normalizeBackupUsage;
 exports.normalizePendingBackupUsage = normalizePendingBackupUsage;
 exports.isBackupSubscriptionActive = isBackupSubscriptionActive;
+exports.getBackupQuotaLimits = getBackupQuotaLimits;
 exports.getBackupUsageDelta = getBackupUsageDelta;
 exports.addBackupUsage = addBackupUsage;
 exports.subtractBackupUsage = subtractBackupUsage;

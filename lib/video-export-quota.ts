@@ -19,6 +19,10 @@ export type WeeklyVideoExportUsage = {
   remaining: number;
 };
 
+export type WeeklyVideoExportReservation = WeeklyVideoExportUsage & {
+  reservationId: string;
+};
+
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -73,6 +77,14 @@ const releaseWeeklyVideoExportCallable = () => {
   return httpsCallable(firebaseFunctions, "releaseWeeklyVideoExport");
 };
 
+const completeWeeklyVideoExportCallable = () => {
+  if (!firebaseFunctions) {
+    throw new Error("Firebase 연결 정보가 아직 설정되지 않았습니다.");
+  }
+
+  return httpsCallable(firebaseFunctions, "completeWeeklyVideoExport");
+};
+
 export const buildWeeklyVideoExportUsage = ({
   weekId,
   weekLabel,
@@ -95,6 +107,34 @@ export const buildWeeklyVideoExportUsage = ({
     remaining: Math.max(0, safeLimit - safeCount)
   };
 };
+
+export const buildWeeklyVideoExportReservation = (
+  data: Partial<WeeklyVideoExportReservation>
+): WeeklyVideoExportReservation => {
+  if (typeof data.reservationId !== "string" || !data.reservationId) {
+    throw new Error("MP4 저장 예약 정보를 확인하지 못했습니다.");
+  }
+
+  return {
+    ...buildWeeklyVideoExportUsage({
+      weekId: typeof data.weekId === "string" ? data.weekId : "",
+      weekLabel: typeof data.weekLabel === "string" ? data.weekLabel : "",
+      count: Number(data.count ?? 0),
+      limit: Number(data.limit ?? 0)
+    }),
+    reservationId: data.reservationId
+  };
+};
+
+const buildWeeklyVideoExportUsageFromResponse = (
+  data: Partial<WeeklyVideoExportUsage>
+) =>
+  buildWeeklyVideoExportUsage({
+    weekId: typeof data.weekId === "string" ? data.weekId : "",
+    weekLabel: typeof data.weekLabel === "string" ? data.weekLabel : "",
+    count: Number(data.count ?? 0),
+    limit: Number(data.limit ?? 0)
+  });
 
 export const canReserveWeeklyVideoExport = ({
   count,
@@ -129,18 +169,43 @@ export const getWeeklyVideoExportUsage = async (
 export const reserveWeeklyVideoExport = async (
   user: User,
   limit = FREE_WEEKLY_VIDEO_EXPORT_LIMIT
-) => {
+): Promise<WeeklyVideoExportReservation> => {
   if (!user) {
     throw new Error("로그인 후 MP4 영상을 만들 수 있습니다.");
   }
 
-  await reserveWeeklyVideoExportCallable()({ limit });
+  const result = await reserveWeeklyVideoExportCallable()({ limit });
+  return buildWeeklyVideoExportReservation(
+    result.data as Partial<WeeklyVideoExportReservation>
+  );
 };
 
-export const releaseWeeklyVideoExport = async (user: User) => {
-  if (!user) {
-    return;
+export const completeWeeklyVideoExport = async (
+  user: User,
+  reservationId: string
+) => {
+  if (!user || !reservationId) {
+    return null;
   }
 
-  await releaseWeeklyVideoExportCallable()({});
+  const result = await completeWeeklyVideoExportCallable()({ reservationId });
+  return buildWeeklyVideoExportUsageFromResponse(
+    result.data as Partial<WeeklyVideoExportUsage>
+  );
+};
+
+export const releaseWeeklyVideoExport = async (
+  user: User,
+  reservationId?: string | null
+) => {
+  if (!user) {
+    return null;
+  }
+
+  const result = await releaseWeeklyVideoExportCallable()(
+    reservationId ? { reservationId } : {}
+  );
+  return buildWeeklyVideoExportUsageFromResponse(
+    result.data as Partial<WeeklyVideoExportUsage>
+  );
 };

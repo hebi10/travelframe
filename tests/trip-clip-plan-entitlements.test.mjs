@@ -20,6 +20,18 @@ assert.ok(
   "trip clip should reserve weekly MP4 exports with the plan limit"
 );
 assert.ok(
+  source.includes("weeklyExportReservationId = reservation.reservationId"),
+  "trip clip should keep the reservation id returned by weekly MP4 export reserve"
+);
+assert.ok(
+  source.includes("completeWeeklyVideoExport(user, weeklyExportReservationId)"),
+  "trip clip should complete weekly MP4 export quota only after save succeeds"
+);
+assert.ok(
+  source.includes("releaseWeeklyVideoExport(user, weeklyExportReservationId)"),
+  "trip clip should release weekly MP4 export quota when save fails"
+);
+assert.ok(
   source.includes("showWatermark={planEntitlements.showWatermark}"),
   "recording canvas watermark should follow plan entitlements"
 );

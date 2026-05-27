@@ -113,6 +113,7 @@ const selectJava = () => {
 
 const selectedJava = selectJava();
 const selectedJavaBin = selectedJava.home ? path.join(selectedJava.home, "bin") : undefined;
+const emulatorCommand = `firebase emulators:exec --only firestore,storage --log-verbosity SILENT "node ${runnerPath}"`;
 
 fs.mkdirSync(FIREBASE_CONFIG_DIR, { recursive: true });
 
@@ -145,16 +146,12 @@ if (firebaseVersion.error || firebaseVersion.status !== 0) {
 console.log(`Using Java ${selectedJava.major} for Firebase Rules emulator tests.`);
 console.log(`Running ${firebaseCommandLabel}.`);
 
-const result = spawnSync(
-  "firebase",
-  ["emulators:exec", `node ${runnerPath}`, "--only", "firestore,storage", "--log-verbosity", "SILENT"],
-  {
-    cwd: root,
-    env,
-    stdio: "inherit",
-    shell: process.platform === "win32"
-  }
-);
+const result = spawnSync(emulatorCommand, {
+  cwd: root,
+  env,
+  stdio: "inherit",
+  shell: true
+});
 
 if (result.error) {
   console.error(result.error.message);

@@ -132,12 +132,15 @@ import {
   type CloudBackupOverview
 } from "@/lib/cloud-backup";
 import {
-  CLOUD_BACKUP_VIDEO_LIMIT,
   canBackupMoreVideos,
+  getCloudBackupVideoLimit,
   getRemainingBackupSlots
 } from "@/lib/cloud-backup-limits";
 import { getPlanEntitlements } from "@/lib/plan-entitlements";
+import { isMediaLibraryAccessGranted } from "@/lib/media-library-permissions";
+import { requestMediaLibraryAccess } from "@/lib/request-media-library-access";
 import {
+  completeWeeklyVideoExport,
   getWeeklyVideoExportUsage,
   releaseWeeklyVideoExport,
   reserveWeeklyVideoExport,
@@ -422,16 +425,17 @@ export default function TripClipScreen() {
   );
   const weeklyVideoExportLimit = planEntitlements.weeklyVideoExportLimit;
   const premiumExportActive = planEntitlements.canUseAdvancedOutput;
+  const videoBackupLimit = getCloudBackupVideoLimit(planEntitlements.tier);
   const videoBackupRemaining = getRemainingBackupSlots(
     backupOverview.videoCount,
-    CLOUD_BACKUP_VIDEO_LIMIT
+    videoBackupLimit
   );
   const canBackupVideoExport =
     videoBackupTargetEnabled &&
     cloudBackupEnabled &&
     Boolean(user) &&
     planEntitlements.canBackupToCloud &&
-    canBackupMoreVideos(backupOverview.videoCount);
+    canBackupMoreVideos(backupOverview.videoCount, planEntitlements.tier);
   const player = useAudioPlayer(activeMusicSource);
 
   const selectedPhotos = useMemo(
@@ -688,91 +692,94 @@ export default function TripClipScreen() {
 
   const loadPhotos = useCallback(async () => {
     setIsLoading(true);
-    const [storedPhotos, settings, storedMusicTracks, storedWeeklyUsage] = await Promise.all([
-      getPhotos().then(ensurePhotoPreviews),
-      getAppSettings(),
-      user ? syncUserMusicTracks(user) : Promise.resolve([]),
-      getWeeklyVideoExportUsage(user, weeklyVideoExportLimit)
-    ]);
-    setPhotos(storedPhotos);
-    setUserMusicTracks(storedMusicTracks);
-    setWeeklyVideoExportUsage(storedWeeklyUsage);
-    setSelectedUserMusicId((current) => {
-      if (current && storedMusicTracks.some((track) => track.id === current)) {
-        return current;
+    try {
+      const [storedPhotos, settings, storedMusicTracks, storedWeeklyUsage] = await Promise.all([
+        getPhotos().then(ensurePhotoPreviews),
+        getAppSettings(),
+        user ? syncUserMusicTracks(user) : Promise.resolve([]),
+        getWeeklyVideoExportUsage(user, weeklyVideoExportLimit)
+      ]);
+      setPhotos(storedPhotos);
+      setUserMusicTracks(storedMusicTracks);
+      setWeeklyVideoExportUsage(storedWeeklyUsage);
+      setSelectedUserMusicId((current) => {
+        if (current && storedMusicTracks.some((track) => track.id === current)) {
+          return current;
+        }
+
+        return storedMusicTracks[0]?.id ?? null;
+      });
+      if (storedMusicTracks.length === 0) {
+        setMusicMode("none");
+      }
+      setPreviewGuide(settings.defaultGuide);
+      setPreviewGuideVisible(settings.guideVisible);
+      setPreviewGuideSize(settings.guideSize);
+      setPreviewGuideSizeInput(String(settings.guideSize));
+      setPreviewGuideStrokeWidth(settings.guideStrokeWidth);
+      setPreviewGuideColor(settings.guideColor);
+      setPreviewGuideOffsetX(settings.guideOffsetX);
+      setPreviewGuideOffsetY(settings.guideOffsetY);
+      setPreviewGridGuideLinePositions(settings.gridGuideLinePositions);
+      setPreviewGuideShapePoints(settings.guideShapePoints);
+      previewGuideOffsetXValue.value = settings.guideOffsetX;
+      previewGuideOffsetYValue.value = settings.guideOffsetY;
+      setCloudBackupEnabled(settings.cloudBackupEnabled);
+      setVideoBackupTargetEnabled(isCloudBackupTargetEnabled(settings, "videos"));
+      setImageQuality(settings.imageBackupQuality);
+      setVideoQuality(settings.videoQuality);
+      setExportFormat(settings.tripClipExportFormat);
+      setImageSaveFormat(settings.imageSaveFormat);
+
+      if (videoId && restoredVideoIdRef.current !== videoId) {
+        const storedVideo = await getMadeVideoById(videoId);
+        if (storedVideo) {
+          const availableIds = storedVideo.photoIds.filter((id) =>
+            storedPhotos.some((photo) => photo.id === id)
+          );
+          setSelectedIds(availableIds);
+          setDurations(storedVideo.durations);
+          setRatio(storedVideo.ratio);
+          setTemplate(storedVideo.template);
+          setTransition(storedVideo.transition);
+          setTransitionDuration(storedVideo.transitionDuration);
+          setExportFormat("mp4");
+          setWorkTitle(storedVideo.title);
+          restoredVideoIdRef.current = videoId;
+          return;
+        }
       }
 
-      return storedMusicTracks[0]?.id ?? null;
-    });
-    if (storedMusicTracks.length === 0) {
-      setMusicMode("none");
+      if (bundleId && restoredBundleIdRef.current !== bundleId) {
+        const storedBundle = await getImageBundleWorkById(bundleId);
+        if (storedBundle) {
+          const availableIds = storedBundle.photoIds.filter((id) =>
+            storedPhotos.some((photo) => photo.id === id)
+          );
+          setSelectedIds(availableIds);
+          setRatio(storedBundle.ratio);
+          setExportFormat("images");
+          setWorkTitle(storedBundle.title);
+          restoredBundleIdRef.current = bundleId;
+          return;
+        }
+      }
+
+      setRatio(settings.defaultRatio);
+      setSelectedIds((current) => {
+        if (current.length > 0) {
+          return current.filter((id) => storedPhotos.some((photo) => photo.id === id));
+        }
+
+        return storedPhotos
+          .filter((photo) => photo.addedToVideo)
+          .map((photo) => photo.id);
+      });
+    } catch (error) {
+      setExportMessage(getUserFacingErrorMessage(error, "사진을 불러오지 못했습니다."));
+    } finally {
+      setIsLoading(false);
     }
-    setPreviewGuide(settings.defaultGuide);
-    setPreviewGuideVisible(settings.guideVisible);
-    setPreviewGuideSize(settings.guideSize);
-    setPreviewGuideSizeInput(String(settings.guideSize));
-    setPreviewGuideStrokeWidth(settings.guideStrokeWidth);
-    setPreviewGuideColor(settings.guideColor);
-    setPreviewGuideOffsetX(settings.guideOffsetX);
-    setPreviewGuideOffsetY(settings.guideOffsetY);
-    setPreviewGridGuideLinePositions(settings.gridGuideLinePositions);
-    setPreviewGuideShapePoints(settings.guideShapePoints);
-    previewGuideOffsetXValue.value = settings.guideOffsetX;
-    previewGuideOffsetYValue.value = settings.guideOffsetY;
-    setCloudBackupEnabled(settings.cloudBackupEnabled);
-    setVideoBackupTargetEnabled(isCloudBackupTargetEnabled(settings, "videos"));
-    setImageQuality(settings.imageBackupQuality);
-    setVideoQuality(settings.videoQuality);
-    setExportFormat(settings.tripClipExportFormat);
-    setImageSaveFormat(settings.imageSaveFormat);
-
-    if (videoId && restoredVideoIdRef.current !== videoId) {
-      const storedVideo = await getMadeVideoById(videoId);
-      if (storedVideo) {
-        const availableIds = storedVideo.photoIds.filter((id) =>
-          storedPhotos.some((photo) => photo.id === id)
-        );
-        setSelectedIds(availableIds);
-        setDurations(storedVideo.durations);
-        setRatio(storedVideo.ratio);
-        setTemplate(storedVideo.template);
-        setTransition(storedVideo.transition);
-        setTransitionDuration(storedVideo.transitionDuration);
-        setExportFormat("mp4");
-        setWorkTitle(storedVideo.title);
-        restoredVideoIdRef.current = videoId;
-        setIsLoading(false);
-        return;
-      }
-    }
-
-    if (bundleId && restoredBundleIdRef.current !== bundleId) {
-      const storedBundle = await getImageBundleWorkById(bundleId);
-      if (storedBundle) {
-        const availableIds = storedBundle.photoIds.filter((id) =>
-          storedPhotos.some((photo) => photo.id === id)
-        );
-        setSelectedIds(availableIds);
-        setRatio(storedBundle.ratio);
-        setExportFormat("images");
-        setWorkTitle(storedBundle.title);
-        restoredBundleIdRef.current = bundleId;
-        setIsLoading(false);
-        return;
-      }
-    }
-
-    setRatio(settings.defaultRatio);
-    setSelectedIds((current) => {
-      if (current.length > 0) {
-        return current.filter((id) => storedPhotos.some((photo) => photo.id === id));
-      }
-
-      return storedPhotos
-        .filter((photo) => photo.addedToVideo)
-        .map((photo) => photo.id);
-    });
-    setIsLoading(false);
   }, [
     bundleId,
     previewGuideOffsetXValue,
@@ -1244,10 +1251,11 @@ export default function TripClipScreen() {
 
     try {
       setIsImportingPhotos(true);
-      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync(false);
-
-      if (!permission.granted) {
-        setExportMessage("사진을 선택하려면 앨범 접근 권한이 필요합니다.");
+      const mediaAccessState = await requestMediaLibraryAccess({
+        fallbackMessage: "사진을 선택하려면 앨범 접근 권한이 필요합니다.",
+        onMessage: setExportMessage
+      });
+      if (!isMediaLibraryAccessGranted(mediaAccessState)) {
         return;
       }
 
@@ -1702,7 +1710,8 @@ export default function TripClipScreen() {
       return;
     }
 
-    let reservedWeeklyExport = false;
+    let weeklyExportReservationId: string | null = null;
+    let weeklyExportSaveSucceeded = false;
 
     try {
       setIsExporting(true);
@@ -1714,9 +1723,9 @@ export default function TripClipScreen() {
       });
 
       if (countWeeklyMp4 && exportFormat === "mp4" && user) {
-        await reserveWeeklyVideoExport(user, weeklyVideoExportLimit);
-        reservedWeeklyExport = true;
-        setWeeklyVideoExportUsage(await getWeeklyVideoExportUsage(user, weeklyVideoExportLimit));
+        const reservation = await reserveWeeklyVideoExport(user, weeklyVideoExportLimit);
+        weeklyExportReservationId = reservation.reservationId;
+        setWeeklyVideoExportUsage(reservation);
       }
 
       if (exportFormat === "images") {
@@ -1795,7 +1804,8 @@ export default function TripClipScreen() {
             await backupImageBundleWork({
               user,
               work: savedBundle,
-              enabled: cloudBackupEnabled
+              enabled: cloudBackupEnabled,
+              subscription
             });
           } catch (backupError) {
             await recordBackupFailure({
@@ -1842,6 +1852,11 @@ export default function TripClipScreen() {
         });
       });
       if (!videoUri) {
+        if (weeklyExportReservationId && user) {
+          const releasedUsage = await releaseWeeklyVideoExport(user, weeklyExportReservationId);
+          setWeeklyVideoExportUsage(releasedUsage);
+          weeklyExportReservationId = null;
+        }
         setExportProgress({
           visible: true,
           percent: 100,
@@ -1894,6 +1909,13 @@ export default function TripClipScreen() {
           localVideoLimit: planEntitlements.localVideoLimit
         });
       }
+      weeklyExportSaveSucceeded = true;
+      if (weeklyExportReservationId && user) {
+        const completedUsage = await completeWeeklyVideoExport(user, weeklyExportReservationId);
+        if (completedUsage) {
+          setWeeklyVideoExportUsage(completedUsage);
+        }
+      }
       let backupWarning: string | null = null;
       const wantsVideoBackup =
         shouldBackupVideoExport && videoBackupTargetEnabled &&
@@ -1901,8 +1923,8 @@ export default function TripClipScreen() {
         user &&
         planEntitlements.canBackupToCloud;
 
-      if (wantsVideoBackup && !canBackupMoreVideos(backupOverview.videoCount)) {
-        backupWarning = `영상 백업 한도 ${CLOUD_BACKUP_VIDEO_LIMIT}개를 모두 사용해 클라우드 백업은 건너뛰었습니다.`;
+      if (wantsVideoBackup && !canBackupMoreVideos(backupOverview.videoCount, planEntitlements.tier)) {
+        backupWarning = `영상 백업 한도 ${videoBackupLimit}개를 모두 사용해 클라우드 백업은 건너뛰었습니다.`;
       } else if (wantsVideoBackup) {
         try {
           setExportProgress({
@@ -1914,7 +1936,8 @@ export default function TripClipScreen() {
           await backupMadeVideo({
             user,
             video: savedVideo,
-            enabled: cloudBackupEnabled
+            enabled: cloudBackupEnabled,
+            subscription
           });
         } catch (backupError) {
           await recordBackupFailure({
@@ -1949,7 +1972,7 @@ export default function TripClipScreen() {
       await clearTripClipDraft();
       setAvailableDraft(null);
       setShowDraftPrompt(false);
-      if (reservedWeeklyExport && user) {
+      if (weeklyExportReservationId && user) {
         setWeeklyVideoExportUsage(await getWeeklyVideoExportUsage(user, weeklyVideoExportLimit));
       }
       if (returnToVideoWorks) {
@@ -1960,8 +1983,10 @@ export default function TripClipScreen() {
         setIsPostSaveAdVisible(true);
       }
     } catch (error) {
-      if (reservedWeeklyExport && user) {
-        await releaseWeeklyVideoExport(user).catch(() => undefined);
+      if (weeklyExportReservationId && user && !weeklyExportSaveSucceeded) {
+        await releaseWeeklyVideoExport(user, weeklyExportReservationId).catch(() => null);
+      }
+      if (weeklyExportReservationId && user) {
         setWeeklyVideoExportUsage(
           await getWeeklyVideoExportUsage(user, weeklyVideoExportLimit).catch(() => null)
         );
@@ -2800,7 +2825,7 @@ export default function TripClipScreen() {
                   </Text>
                   <Text selectable style={styles.videoBackupDetail}>
                     {cloudBackupEnabled && planEntitlements.canBackupToCloud && videoBackupTargetEnabled
-                      ? `체크한 영상만 백업합니다. 남은 영상 백업 ${videoBackupRemaining}개 / ${CLOUD_BACKUP_VIDEO_LIMIT}개`
+                      ? `체크한 영상만 백업합니다. 남은 영상 백업 ${videoBackupRemaining}개 / ${videoBackupLimit}개`
                       : "구독과 클라우드 백업 설정이 켜져 있을 때 사용할 수 있습니다."}
                   </Text>
                 </View>

@@ -1,6 +1,8 @@
 node_modules/
 .expo/
 .gradle-local/
+.gradle-workspace/
+.android-workspace/
 .tmp/
 .android-version-code
 android/

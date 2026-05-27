@@ -106,6 +106,7 @@ import {
   type GuideShapePoints
 } from "@/lib/app-settings";
 import { getPlanEntitlements } from "@/lib/plan-entitlements";
+import { isMediaLibraryAccessGranted, requestMediaLibraryAccess } from "@/lib/request-media-library-access";
 import {
   deleteLocalFile,
   getRecentPhoto,
@@ -809,6 +810,10 @@ export default function CameraScreen() {
     }, CAMERA_FOCUS_CONTROLS_DISMISS_MS);
   }, [focusControlsOpacity]);
 
+  const handleCameraFocusError = useCallback((error: unknown) => {
+    if (__DEV__) console.warn("[camera] focus update failed", error);
+    setErrorMessage(getUserFacingErrorMessage(error, "카메라 초점을 맞추지 못했습니다."));
+  }, []);
   const handleCameraTap = useCallback(
     (x: number, y: number) => {
       if (cameraFocusLockedRef.current) {
@@ -830,13 +835,12 @@ export default function CameraScreen() {
         adaptiveness: cameraFocusLockedRef.current ? "locked" : "continuous",
         autoResetAfter: cameraFocusLockedRef.current ? null : 5,
         modes: getCameraFocusMeteringModes(cameraDevice)
-      });
+      }).catch(handleCameraFocusError);
       void triggerFeedback();
       scheduleFocusControlsDismiss();
     },
-    [cameraDevice, cameraFrame, scheduleFocusControlsDismiss, showFocusControls, triggerFeedback]
+    [cameraDevice, cameraFrame, handleCameraFocusError, scheduleFocusControlsDismiss, showFocusControls, triggerFeedback]
   );
-
   const toggleCameraFocusLock = useCallback(() => {
     if (!cameraFocusTap) {
       return;
@@ -854,15 +858,14 @@ export default function CameraScreen() {
         adaptiveness: "locked",
         autoResetAfter: null,
         modes: getCameraFocusMeteringModes(cameraDevice)
-      });
+      }).catch(handleCameraFocusError);
     } else {
-      void cameraRef.current?.resetFocus();
+      void cameraRef.current?.resetFocus().catch(handleCameraFocusError);
       scheduleFocusControlsDismiss();
     }
 
     void triggerFeedback();
-  }, [cameraDevice, cameraFocusTap, cancelFocusControlsDismiss, scheduleFocusControlsDismiss, triggerFeedback]);
-
+  }, [cameraDevice, cameraFocusTap, cancelFocusControlsDismiss, handleCameraFocusError, scheduleFocusControlsDismiss, triggerFeedback]);
   const changeCameraFacing = useCallback((value: CameraFacing) => {
     setCameraFacing(value);
     setIsCameraReady(false);
@@ -877,7 +880,6 @@ export default function CameraScreen() {
 
     void updateAppSettings({ cameraFacing: value });
   }, []);
-
   const updateCameraRatio = (nextRatio: PhotoRatioLabel) => {
     setCameraRatio(nextRatio);
     void updateAppSettings({ cameraRatio: nextRatio });
@@ -930,9 +932,8 @@ export default function CameraScreen() {
     try {
       setErrorMessage(null);
       await triggerFeedback();
-      const mediaPermission = await ImagePicker.requestMediaLibraryPermissionsAsync(false);
-      if (!mediaPermission.granted) {
-        setErrorMessage("사진 가이드를 사용하려면 앨범 접근 권한이 필요합니다.");
+      const mediaAccessState = await requestMediaLibraryAccess({ fallbackMessage: "사진 가이드를 사용하려면 앨범 접근 권한이 필요합니다.", onMessage: setErrorMessage });
+      if (!isMediaLibraryAccessGranted(mediaAccessState)) {
         return;
       }
 

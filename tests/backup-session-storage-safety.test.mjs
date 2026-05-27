@@ -11,7 +11,7 @@ assert.equal(
     sessionId: "session-abc",
     storagePath: "users/user-1/backups/photos/photo-1.jpg"
   }),
-  "users/user-1/backups/photos/session-abc-photo-1.jpg"
+  "users/user-1/backups/photos/session-abc/photo-1.jpg"
 );
 
 assert.equal(
@@ -20,7 +20,7 @@ assert.equal(
     sessionId: "session-abc",
     storagePath: "users/user-1/backups/image-works/work-1/0-image.jpg"
   }),
-  "users/user-1/backups/image-works/work-1/session-abc-0-image.jpg"
+  "users/user-1/backups/image-works/work-1/session-abc/0-image.jpg"
 );
 
 assert.equal(
@@ -29,7 +29,7 @@ assert.equal(
     sessionId: "session-abc",
     storagePath: "users/user-1/backups/videos/video-1.mp4"
   }),
-  "users/user-1/backups/videos/session-abc-video-1.mp4"
+  "users/user-1/backups/videos/session-abc/video-1.mp4"
 );
 
 assert.throws(

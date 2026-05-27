@@ -21,6 +21,8 @@ import { useAppAppearance } from "@/lib/app-appearance";
 import { getAppSettings } from "@/lib/app-settings";
 import { useAuth } from "@/lib/auth-context";
 import { getPlanEntitlements } from "@/lib/plan-entitlements";
+import { isMediaLibraryAccessGranted } from "@/lib/media-library-permissions";
+import { requestMediaLibraryAccess } from "@/lib/request-media-library-access";
 import { recordBackupFailure } from "@/lib/backup-failure-queue";
 import {
   backupPhotoIfEnabled,
@@ -30,7 +32,7 @@ import {
 import {
   CLOUD_BACKUP_IMAGE_WORK_LIMIT,
   CLOUD_BACKUP_PHOTO_LIMIT,
-  CLOUD_BACKUP_VIDEO_LIMIT
+  getCloudBackupVideoLimit
 } from "@/lib/cloud-backup-limits";
 import { deletePhoto, getPhotos, saveCapturedPhoto } from "@/lib/photo-library";
 import { isCreatorSubscriptionActive } from "@/lib/subscription";
@@ -260,10 +262,10 @@ export default function StudioScreen() {
 
     try {
       setIsImportingImage(true);
-      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync(false);
-
-      if (!permission.granted) {
-        Alert.alert("권한 필요", "이미지를 앱에 저장하려면 앨범 접근 권한이 필요합니다.");
+      const mediaAccessState = await requestMediaLibraryAccess({
+        fallbackMessage: "이미지를 앱에 저장하려면 앨범 접근 권한이 필요합니다."
+      });
+      if (!isMediaLibraryAccessGranted(mediaAccessState)) {
         return;
       }
 
@@ -396,6 +398,7 @@ export default function StudioScreen() {
   const videoWorkCount = imageBundleWorks.length + savedVideoWorks.length;
   const shouldShowBackupUsage =
     Boolean(user) && cloudBackupEnabled && isCreatorSubscriptionActive(subscription);
+  const videoBackupLimit = getCloudBackupVideoLimit(planEntitlements.tier);
   const isDark = palette.background !== colors.background;
   const filledButtonStyle = {
     borderColor: palette.text,
@@ -579,7 +582,7 @@ export default function StudioScreen() {
                     shouldShowBackupUsage
                       ? {
                           count: backupOverview.videoCount,
-                          limit: CLOUD_BACKUP_VIDEO_LIMIT
+                          limit: videoBackupLimit
                         }
                       : null
                   }
@@ -659,7 +662,7 @@ export default function StudioScreen() {
                     shouldShowBackupUsage
                       ? {
                           count: backupOverview.videoCount,
-                          limit: CLOUD_BACKUP_VIDEO_LIMIT
+                          limit: videoBackupLimit
                         }
                       : null
                   }
@@ -1125,10 +1128,7 @@ function WorkCard({
         ) : (
           <View style={styles.videoThumbEmpty} />
         )}
-        <Pressable
-          style={({ pressed }) => [styles.videoCopy, pressed && pressedPanelStyle]}
-          onPress={() => router.push(`/video/${video.id}` as Href)}
-        >
+        <View style={styles.videoCopy}>
           <Text selectable={false} style={styles.videoKind}>
             저장한 영상
           </Text>
@@ -1141,7 +1141,7 @@ function WorkCard({
           <Text selectable={false} style={styles.metaText}>
             사진 {video.photoIds.length}장 / {video.musicLabel}
           </Text>
-        </Pressable>
+        </View>
         <View style={styles.workActions}>
           <Pressable
             style={styles.workEditButton}

@@ -30,13 +30,29 @@ service firebase.storage {
         && request.resource.contentType.matches('audio/.*');
     }
 
-    function hasBackupSession() {
-      return request.resource.metadata.backupSessionId is string
-        && request.resource.metadata.backupSessionId.size() > 0;
+    function isValidReservedContentType(mediaKind, contentType) {
+      return (mediaKind == "image" && contentType.matches('image/(jpeg|jpg|png|webp)'))
+        || (mediaKind == "video" && contentType == "video/mp4")
+        || (mediaKind == "audio" && contentType.matches('audio/.*'));
     }
 
-    function backupSession(userId) {
-      return firestore.get(/databases/(default)/documents/users/$(userId)/backupUploadSessions/$(request.resource.metadata.backupSessionId));
+    function isValidReservedSize(mediaKind, fileSize) {
+      return (mediaKind == "image" && fileSize < 20 * 1024 * 1024)
+        || (mediaKind == "video" && fileSize < 250 * 1024 * 1024)
+        || (mediaKind == "audio" && fileSize < 50 * 1024 * 1024);
+    }
+
+    function requestContentTypeMatchesSession(contentType) {
+      return request.resource.contentType == contentType
+        || request.resource.contentType == "application/octet-stream";
+    }
+
+    function hasBackupSession(backupSessionId) {
+      return backupSessionId is string && backupSessionId.size() > 0;
+    }
+
+    function backupSession(userId, backupSessionId) {
+      return firestore.get(/databases/(default)/documents/users/$(userId)/backupUploadSessions/$(backupSessionId));
     }
 
     function hasMusicSession() {
@@ -57,16 +73,23 @@ service firebase.storage {
       return firestore.get(/databases/(default)/documents/users/$(userId)/adminBackupUploadSessions/$(request.resource.metadata.adminBackupSessionId));
     }
 
-    function isReservedBackupUpload(userId, mediaKind) {
+    function isReservedBackupUpload(userId, mediaKind, backupSessionId) {
       return isOwner(userId)
-        && hasBackupSession()
-        && backupSession(userId).data.userId == userId
-        && backupSession(userId).data.status == "reserved"
-        && backupSession(userId).data.mediaKind == mediaKind
-        && backupSession(userId).data.storagePath == request.resource.name
-        && backupSession(userId).data.fileSize == request.resource.size
-        && backupSession(userId).data.contentType == request.resource.contentType
-        && backupSession(userId).data.expiresAt > request.time;
+        && hasBackupSession(backupSessionId)
+        && backupSession(userId, backupSessionId).data.userId == userId
+        && backupSession(userId, backupSessionId).data.status == "reserved"
+        && backupSession(userId, backupSessionId).data.mediaKind == mediaKind
+        && backupSession(userId, backupSessionId).data.storagePath == request.resource.name
+        && backupSession(userId, backupSessionId).data.fileSize == request.resource.size
+        && isValidReservedSize(mediaKind, backupSession(userId, backupSessionId).data.fileSize)
+        && isValidReservedContentType(mediaKind, backupSession(userId, backupSessionId).data.contentType)
+        && requestContentTypeMatchesSession(backupSession(userId, backupSessionId).data.contentType)
+        && backupSession(userId, backupSessionId).data.expiresAt > request.time;
+    }
+
+    function isReservedMetadataBackupUpload(userId, mediaKind) {
+      return request.resource.metadata.backupSessionId is string
+        && isReservedBackupUpload(userId, mediaKind, request.resource.metadata.backupSessionId);
     }
 
     function isReservedMusicUpload(userId) {
@@ -97,27 +120,67 @@ service firebase.storage {
       return isReservedAdminBackupUpload(userId, "audio");
     }
 
+    match /users/{userId}/backups/photos/{backupSessionId}/{fileName} {
+      allow read: if isOwner(userId);
+      allow create: if isReservedBackupUpload(userId, "image", backupSessionId) || (isReservedAdminBackupUpload(userId, "image") && isImageUpload());
+      allow write: if resource == null && (isReservedBackupUpload(userId, "image", backupSessionId) || (isReservedAdminBackupUpload(userId, "image") && isImageUpload()));
+      allow update: if false;
+      allow delete: if false;
+    }
+
     match /users/{userId}/backups/photos/{fileName} {
       allow read: if isOwner(userId);
-      allow create, update: if (isReservedBackupUpload(userId, "image") || isReservedAdminBackupUpload(userId, "image")) && isImageUpload();
+      allow create: if isReservedMetadataBackupUpload(userId, "image") || (isReservedAdminBackupUpload(userId, "image") && isImageUpload());
+      allow write: if resource == null && (isReservedMetadataBackupUpload(userId, "image") || (isReservedAdminBackupUpload(userId, "image") && isImageUpload()));
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    match /users/{userId}/backups/image-works/{workId}/{backupSessionId}/{fileName} {
+      allow read: if isOwner(userId);
+      allow create: if isReservedBackupUpload(userId, "image", backupSessionId) || (isReservedAdminBackupUpload(userId, "image") && isImageUpload());
+      allow write: if resource == null && (isReservedBackupUpload(userId, "image", backupSessionId) || (isReservedAdminBackupUpload(userId, "image") && isImageUpload()));
+      allow update: if false;
       allow delete: if false;
     }
 
     match /users/{userId}/backups/image-works/{workId}/{fileName} {
       allow read: if isOwner(userId);
-      allow create, update: if (isReservedBackupUpload(userId, "image") || isReservedAdminBackupUpload(userId, "image")) && isImageUpload();
+      allow create: if isReservedMetadataBackupUpload(userId, "image") || (isReservedAdminBackupUpload(userId, "image") && isImageUpload());
+      allow write: if resource == null && (isReservedMetadataBackupUpload(userId, "image") || (isReservedAdminBackupUpload(userId, "image") && isImageUpload()));
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    match /users/{userId}/backups/videos/{backupSessionId}/{fileName} {
+      allow read: if isOwner(userId);
+      allow create: if isReservedBackupUpload(userId, "video", backupSessionId) || (isReservedAdminBackupUpload(userId, "video") && isVideoUpload());
+      allow write: if resource == null && (isReservedBackupUpload(userId, "video", backupSessionId) || (isReservedAdminBackupUpload(userId, "video") && isVideoUpload()));
+      allow update: if false;
       allow delete: if false;
     }
 
     match /users/{userId}/backups/videos/{fileName} {
       allow read: if isOwner(userId);
-      allow create, update: if (isReservedBackupUpload(userId, "video") || isReservedAdminBackupUpload(userId, "video")) && isVideoUpload();
+      allow create: if isReservedMetadataBackupUpload(userId, "video") || (isReservedAdminBackupUpload(userId, "video") && isVideoUpload());
+      allow write: if resource == null && (isReservedMetadataBackupUpload(userId, "video") || (isReservedAdminBackupUpload(userId, "video") && isVideoUpload()));
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    match /users/{userId}/backups/audio/{backupSessionId}/{fileName} {
+      allow read: if isOwner(userId);
+      allow create: if isReservedBackupUpload(userId, "audio", backupSessionId) || (isReservedAdminBackupUpload(userId, "audio") && isAudioUpload());
+      allow write: if resource == null && (isReservedBackupUpload(userId, "audio", backupSessionId) || (isReservedAdminBackupUpload(userId, "audio") && isAudioUpload()));
+      allow update: if false;
       allow delete: if false;
     }
 
     match /users/{userId}/backups/audio/{fileName} {
       allow read: if isOwner(userId);
-      allow create, update: if (isReservedBackupUpload(userId, "audio") || isReservedAdminBackupUpload(userId, "audio")) && isAudioUpload();
+      allow create: if isReservedMetadataBackupUpload(userId, "audio") || (isReservedAdminBackupUpload(userId, "audio") && isAudioUpload());
+      allow write: if resource == null && (isReservedMetadataBackupUpload(userId, "audio") || (isReservedAdminBackupUpload(userId, "audio") && isAudioUpload()));
+      allow update: if false;
       allow delete: if false;
     }
 

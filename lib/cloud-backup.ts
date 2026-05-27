@@ -22,9 +22,10 @@ import {
   IMAGE_OPTIMIZATION_FAILED_MESSAGE
 } from "@/constants/image";
 import {
-  CLOUD_BACKUP_STORAGE_LIMIT_BYTES,
-  CLOUD_BACKUP_VIDEO_LIMIT,
-  canBackupMoreVideos
+  canBackupMoreVideos,
+  getCloudBackupStorageLimitBytes,
+  getCloudBackupVideoLimit,
+  type CloudBackupLimitTier
 } from "@/lib/cloud-backup-limits";
 import { firebaseFunctions, firestore, firebaseStorage } from "@/lib/firebase";
 import {
@@ -34,6 +35,7 @@ import {
   type OptimizedBackupImage
 } from "@/lib/image-backup-utils";
 import { localStorageAdapter } from "@/lib/local-storage";
+import { getPlanTier } from "@/lib/plan-entitlements";
 import {
   getDeletedPhotoIds,
   getPhotos,
@@ -43,8 +45,20 @@ import {
 } from "@/lib/photo-library";
 import { isCreatorSubscriptionActive, type UserSubscription } from "@/lib/subscription";
 import { isStorageSaverMode, shouldUseCloudBackupForStorageMode } from "@/lib/storage-mode";
-import { getMadeVideos, markMadeVideoCloudOnly, replaceMadeVideosFromBackup } from "@/lib/video-library";
-import { getImageBundleWorks, markImageBundleCloudOnly, replaceImageBundleWorksFromBackup } from "@/lib/work-library";
+import {
+  getDeletedVideoIds,
+  getMadeVideos,
+  markMadeVideoCloudOnly,
+  replaceMadeVideosFromBackup,
+  wasVideoDeletedLocally
+} from "@/lib/video-library";
+import {
+  getDeletedImageWorkIds,
+  getImageBundleWorks,
+  markImageBundleCloudOnly,
+  replaceImageBundleWorksFromBackup,
+  wasImageWorkDeletedLocally
+} from "@/lib/work-library";
 import type { PhotoItem } from "@/types/photo";
 import type { MadeVideoItem } from "@/types/video";
 import type { ImageBundleWorkItem } from "@/types/work";
@@ -265,6 +279,11 @@ const getSourceDeviceId = async () => {
   return nextDeviceId;
 };
 
+const getBackupLimitTier = (
+  subscription?: UserSubscription | null
+): CloudBackupLimitTier =>
+  getPlanTier({ isLoggedIn: Boolean(subscription), subscription: subscription ?? null });
+
 const uploadLocalFile = async ({
   uri,
   storagePath,
@@ -412,12 +431,14 @@ const assertImageBackupCapacity = async ({
   userId,
   newImages,
   excludePhotoIds,
-  excludeImageWorkIds
+  excludeImageWorkIds,
+  tier = "pro"
 }: {
   userId: string;
   newImages: OptimizedBackupImage[];
   excludePhotoIds?: string[];
   excludeImageWorkIds?: string[];
+  tier?: CloudBackupLimitTier;
 }) => {
   const currentSize = await getCurrentImageBackupSize({
     userId,
@@ -429,7 +450,7 @@ const assertImageBackupCapacity = async ({
     newImages.map((image) => image.size)
   );
 
-  if (isImageBackupSizeExceeded(totalSize, CLOUD_BACKUP_STORAGE_LIMIT_BYTES)) {
+  if (isImageBackupSizeExceeded(totalSize, getCloudBackupStorageLimitBytes(tier))) {
     throw new Error(IMAGE_BACKUP_SIZE_EXCEEDED_MESSAGE);
   }
 
@@ -504,6 +525,82 @@ const removeBackupIfPhotoWasDeleted = async ({
   await deleteDoc(doc(firestore, "users", user.uid, "photoBackups", photo.id));
   if (backupSessionId) {
     await releaseBackupUpload({ backupSessionId });
+  }
+  await refreshBackupOverview(user.uid);
+  return true;
+};
+
+const releaseBackupUploads = async (backupSessionIds: string[]) => {
+  await Promise.all(
+    [...new Set(backupSessionIds)]
+      .filter((backupSessionId) => backupSessionId.length > 0)
+      .map((backupSessionId) =>
+        releaseBackupUpload({ backupSessionId }).catch(() => undefined)
+      )
+  );
+};
+
+const isImageWorkStillBackupEligible = async (workId: string) => {
+  if (await wasImageWorkDeletedLocally(workId)) {
+    return false;
+  }
+
+  const works = await getImageBundleWorks();
+  return works.some((work) => work.id === workId);
+};
+
+const isVideoStillBackupEligible = async (videoId: string) => {
+  if (await wasVideoDeletedLocally(videoId)) {
+    return false;
+  }
+
+  const videos = await getMadeVideos();
+  return videos.some((video) => video.id === videoId);
+};
+
+const removeBackupIfImageWorkWasDeleted = async ({
+  user,
+  work,
+  backupSessionIds
+}: {
+  user: User;
+  work: ImageBundleWorkItem;
+  backupSessionIds: string[];
+}) => {
+  if (!(await wasImageWorkDeletedLocally(work.id))) {
+    return false;
+  }
+
+  if (!firestore) {
+    return false;
+  }
+
+  await deleteDoc(doc(firestore, "users", user.uid, "imageWorks", work.id));
+  await releaseBackupUploads(backupSessionIds);
+  await refreshBackupOverview(user.uid);
+  return true;
+};
+
+const removeBackupIfVideoWasDeleted = async ({
+  user,
+  video,
+  backupSessionId
+}: {
+  user: User;
+  video: MadeVideoItem;
+  backupSessionId?: string | null;
+}) => {
+  if (!(await wasVideoDeletedLocally(video.id))) {
+    return false;
+  }
+
+  if (!firestore) {
+    return false;
+  }
+
+  await deleteDoc(doc(firestore, "users", user.uid, "videos", video.id));
+  if (backupSessionId) {
+    await releaseBackupUploads([backupSessionId]);
   }
   await refreshBackupOverview(user.uid);
   return true;
@@ -600,6 +697,7 @@ export const backupCurrentWorkspace = async ({
   }
 
   ensureBackupAvailable(subscription);
+  const backupLimitTier = getBackupLimitTier(subscription);
   emitBackupProgress(onProgress, 3, "백업할 데이터를 준비하고 있습니다.");
 
   const [settings, photos, imageBundles, videos] = await Promise.all([
@@ -624,12 +722,26 @@ export const backupCurrentWorkspace = async ({
     }
     backupablePhotoBackups.push(photo);
   }
+  const backupableImageBundleBackups: ImageBundleWorkItem[] = [];
+  for (const work of selectedImageBundleBackups) {
+    if (!(await isImageWorkStillBackupEligible(work.id))) {
+      continue;
+    }
+    backupableImageBundleBackups.push(work);
+  }
+  const backupableVideoBackups: MadeVideoItem[] = [];
+  for (const video of selectedVideoBackups) {
+    if (!(await isVideoStillBackupEligible(video.id))) {
+      continue;
+    }
+    backupableVideoBackups.push(video);
+  }
   emitBackupProgress(onProgress, 8, "백업할 데이터를 확인하고 있습니다.");
   const backedUpAt = new Date().toISOString();
   const sourceDeviceId = await getSourceDeviceId();
   const totalOptimizeItems =
     backupablePhotoBackups.length +
-    selectedImageBundleBackups.reduce((sum, work) => sum + work.imageUris.length, 0);
+    backupableImageBundleBackups.reduce((sum, work) => sum + work.imageUris.length, 0);
   let optimizedItemCount = 0;
   const updateOptimizationProgress = () => {
     optimizedItemCount += 1;
@@ -660,11 +772,18 @@ export const backupCurrentWorkspace = async ({
   })).filter((item): item is { photo: PhotoItem; optimized: OptimizedBackupImage } =>
     Boolean(item)
   );
-  const optimizedImageBundles = await Promise.all(
-    selectedImageBundleBackups.map(async (work) => ({
-      work,
-      images: await Promise.all(
+  const optimizedImageBundles = (await Promise.all(
+    backupableImageBundleBackups.map(async (work) => {
+      if (!(await isImageWorkStillBackupEligible(work.id))) {
+        return null;
+      }
+
+      const images = await Promise.all(
         work.imageUris.map(async (imageUri, index) => {
+          if (!(await isImageWorkStillBackupEligible(work.id))) {
+            return null;
+          }
+
           const optimized = await optimizeImageForBackup({
             uri: imageUri,
             width: work.imageWidths?.[index] ?? null,
@@ -675,11 +794,19 @@ export const backupCurrentWorkspace = async ({
           updateOptimizationProgress();
           return optimized;
         })
-      )
-    }))
+      );
+
+      if (images.some((image) => !image)) {
+        return null;
+      }
+
+      return { work, images: images as OptimizedBackupImage[] };
+    })
   ).catch(() => {
     throw new Error(IMAGE_OPTIMIZATION_FAILED_MESSAGE);
-  });
+  })).filter((item): item is { work: ImageBundleWorkItem; images: OptimizedBackupImage[] } =>
+    Boolean(item)
+  );
   if (totalOptimizeItems === 0) {
     emitBackupProgress(onProgress, 45, "백업할 이미지가 있는지 확인하고 있습니다.");
   }
@@ -691,14 +818,15 @@ export const backupCurrentWorkspace = async ({
     userId: user.uid,
     newImages: allOptimizedImages,
     excludePhotoIds: optimizedPhotos.map(({ photo }) => photo.id),
-    excludeImageWorkIds: selectedImageBundleBackups.map((work) => work.id)
+    excludeImageWorkIds: optimizedImageBundles.map(({ work }) => work.id),
+    tier: backupLimitTier
   });
   emitBackupProgress(onProgress, 50, "백업 용량을 확인했습니다.");
 
   const totalUploadItems =
-    selectedPhotoBackups.length +
+    backupablePhotoBackups.length +
     optimizedImageBundles.reduce((sum, item) => sum + item.images.length, 0) +
-    selectedVideoBackups.length;
+    backupableVideoBackups.length;
   let uploadedItemCount = 0;
   const updateUploadProgress = () => {
     uploadedItemCount += 1;
@@ -782,11 +910,21 @@ export const backupCurrentWorkspace = async ({
   }
 
   for (const { work, images } of optimizedImageBundles) {
+    if (!(await isImageWorkStillBackupEligible(work.id))) {
+      continue;
+    }
+
     const backedUpImageUris: string[] = [];
     const storagePaths: string[] = [];
     const backupSessionIds: string[] = [];
     let uploadedFileSize = 0;
+    let cancelled = false;
     for (const [index, optimized] of images.entries()) {
+      if (!(await isImageWorkStillBackupEligible(work.id))) {
+        cancelled = true;
+        break;
+      }
+
       const fileName = fileNameFromUri(work.imageUris[index], `${work.id}-${index}.jpg`);
       const storagePath = `users/${user.uid}/backups/image-works/${work.id}/${index}-${fileName}.jpg`;
       const upload = await uploadLocalFile({
@@ -798,7 +936,16 @@ export const backupCurrentWorkspace = async ({
       backupSessionIds.push(upload.backupSessionId);
       uploadedFileSize += upload.fileSize;
       backedUpImageUris.push(upload.downloadURL);
+      if (!(await isImageWorkStillBackupEligible(work.id))) {
+        cancelled = true;
+        break;
+      }
       updateUploadProgress();
+    }
+
+    if (cancelled || !(await isImageWorkStillBackupEligible(work.id))) {
+      await releaseBackupUploads(backupSessionIds);
+      continue;
     }
 
     await setDoc(
@@ -825,6 +972,15 @@ export const backupCurrentWorkspace = async ({
       },
       { merge: true }
     );
+    if (
+      await removeBackupIfImageWorkWasDeleted({
+        user,
+        work,
+        backupSessionIds
+      })
+    ) {
+      continue;
+    }
     await applyStorageSaverPolicy({
       settings,
       imageBundle: work,
@@ -836,7 +992,11 @@ export const backupCurrentWorkspace = async ({
     });
   }
 
-  for (const video of selectedVideoBackups) {
+  for (const video of backupableVideoBackups) {
+    if (!(await isVideoStillBackupEligible(video.id))) {
+      continue;
+    }
+
     const videoSnapshot = await getDoc(
       doc(firestore, "users", user.uid, "videos", video.id)
     );
@@ -867,6 +1027,11 @@ export const backupCurrentWorkspace = async ({
     });
     const downloadUrl = upload.downloadURL;
 
+    if (!(await isVideoStillBackupEligible(video.id))) {
+      await releaseBackupUploads([upload.backupSessionId]);
+      continue;
+    }
+
     await setDoc(
       doc(firestore, "users", user.uid, "videos", video.id),
       {
@@ -888,6 +1053,15 @@ export const backupCurrentWorkspace = async ({
       },
       { merge: true }
     );
+    if (
+      await removeBackupIfVideoWasDeleted({
+        user,
+        video,
+        backupSessionId: upload.backupSessionId
+      })
+    ) {
+      continue;
+    }
     await applyStorageSaverPolicy({
       settings,
       video,
@@ -934,11 +1108,13 @@ export const backupPhoto = async ({
   user,
   photo,
   enabled,
+  subscription,
   backupEnabledAt
 }: {
   user: User | null;
   photo: PhotoItem;
   enabled: boolean;
+  subscription?: UserSubscription | null;
   backupEnabledAt?: string | null;
 }) => {
   if (!enabled || !user) {
@@ -988,7 +1164,8 @@ export const backupPhoto = async ({
   await assertImageBackupCapacity({
     userId: user.uid,
     newImages: [optimized],
-    excludePhotoIds: [photo.id]
+    excludePhotoIds: [photo.id],
+    tier: getBackupLimitTier(subscription)
   });
 
   const photoFileName = fileNameFromUri(photo.uri, `${photo.id}.jpg`);
@@ -1095,6 +1272,7 @@ export const backupPhotoIfEnabled = async ({
   return backupPhoto({
     user,
     photo,
+    subscription,
     enabled: shouldUseCloudBackupForStorageMode(
       settings.storageMode,
       isCreatorSubscriptionActive(subscription)
@@ -1105,11 +1283,13 @@ export const backupPhotoIfEnabled = async ({
 export const backupImageBundleWork = async ({
   user,
   work,
-  enabled
+  enabled,
+  subscription
 }: {
   user: User | null;
   work: ImageBundleWorkItem;
   enabled: boolean;
+  subscription?: UserSubscription | null;
 }) => {
   if (!enabled || !user) {
     return null;
@@ -1124,25 +1304,43 @@ export const backupImageBundleWork = async ({
     return null;
   }
 
+  if (!(await isImageWorkStillBackupEligible(work.id))) {
+    await removeBackupIfImageWorkWasDeleted({
+      user,
+      work,
+      backupSessionIds: []
+    });
+    return null;
+  }
+
   const sourceDeviceId = await getSourceDeviceId();
   const backedUpAt = new Date().toISOString();
   const optimizedImages = await Promise.all(
-    work.imageUris.map((imageUri, index) =>
-      optimizeImageForBackup({
+    work.imageUris.map(async (imageUri, index) => {
+      if (!(await isImageWorkStillBackupEligible(work.id))) {
+        return null;
+      }
+
+      return optimizeImageForBackup({
         uri: imageUri,
         width: work.imageWidths?.[index] ?? null,
         height: work.imageHeights?.[index] ?? null,
         sourceImageQuality: work.imageQuality ?? null,
         imageQuality: settings.imageBackupQuality
-      })
-    )
+      });
+    })
   ).catch(() => {
     throw new Error(IMAGE_OPTIMIZATION_FAILED_MESSAGE);
   });
+  if (optimizedImages.some((image) => !image)) {
+    return null;
+  }
+  const safeOptimizedImages = optimizedImages as OptimizedBackupImage[];
   await assertImageBackupCapacity({
     userId: user.uid,
-    newImages: optimizedImages,
-    excludeImageWorkIds: [work.id]
+    newImages: safeOptimizedImages,
+    excludeImageWorkIds: [work.id],
+    tier: getBackupLimitTier(subscription)
   });
 
   const backedUpImageUris: string[] = [];
@@ -1150,10 +1348,15 @@ export const backupImageBundleWork = async ({
   const backupSessionIds: string[] = [];
   let uploadedFileSize = 0;
   for (const [index, imageUri] of work.imageUris.entries()) {
+    if (!(await isImageWorkStillBackupEligible(work.id))) {
+      await releaseBackupUploads(backupSessionIds);
+      return null;
+    }
+
     const fileName = fileNameFromUri(imageUri, `${work.id}-${index}.jpg`);
     const storagePath = `users/${user.uid}/backups/image-works/${work.id}/${index}-${fileName}.jpg`;
     const upload = await uploadLocalFile({
-      uri: optimizedImages[index].uri,
+      uri: safeOptimizedImages[index].uri,
       storagePath,
       mediaKind: "image"
     });
@@ -1161,6 +1364,15 @@ export const backupImageBundleWork = async ({
     backupSessionIds.push(upload.backupSessionId);
     uploadedFileSize += upload.fileSize;
     backedUpImageUris.push(upload.downloadURL);
+    if (!(await isImageWorkStillBackupEligible(work.id))) {
+      await releaseBackupUploads(backupSessionIds);
+      return null;
+    }
+  }
+
+  if (!(await isImageWorkStillBackupEligible(work.id))) {
+    await releaseBackupUploads(backupSessionIds);
+    return null;
   }
 
   await setDoc(
@@ -1171,10 +1383,10 @@ export const backupImageBundleWork = async ({
       imageUris: backedUpImageUris,
       storagePaths,
       backupSessionIds,
-      optimizedImages,
-      imageBackupSize: optimizedImages.reduce((sum, image) => sum + image.size, 0),
+      optimizedImages: safeOptimizedImages,
+      imageBackupSize: safeOptimizedImages.reduce((sum, image) => sum + image.size, 0),
       fileSize: uploadedFileSize,
-      originalBackupSize: optimizedImages.reduce(
+      originalBackupSize: safeOptimizedImages.reduce(
         (sum, image) => sum + image.originalSize,
         0
       ),
@@ -1190,6 +1402,15 @@ export const backupImageBundleWork = async ({
     },
     { merge: true }
   );
+  if (
+    await removeBackupIfImageWorkWasDeleted({
+      user,
+      work,
+      backupSessionIds
+    })
+  ) {
+    return null;
+  }
 
   await refreshBackupOverview(user.uid, backedUpAt);
   await applyStorageSaverPolicy({
@@ -1211,11 +1432,13 @@ export const backupImageBundleWork = async ({
 export const backupMadeVideo = async ({
   user,
   video,
-  enabled
+  enabled,
+  subscription
 }: {
   user: User | null;
   video: MadeVideoItem;
   enabled: boolean;
+  subscription?: UserSubscription | null;
 }) => {
   if (!enabled || !user) {
     return null;
@@ -1233,11 +1456,37 @@ export const backupMadeVideo = async ({
     return null;
   }
 
+  if (!(await isVideoStillBackupEligible(video.id))) {
+    await removeBackupIfVideoWasDeleted({ user, video });
+    return null;
+  }
+
   const backedUpAt = new Date().toISOString();
+  const existingSnapshot = await getDoc(
+    doc(firestore, "users", user.uid, "videos", video.id)
+  );
+  const existingVideo = existingSnapshot.data() as
+    | {
+        backupStatus?: string;
+        localId?: string;
+        storagePath?: string;
+      }
+    | undefined;
+  if (
+    existingSnapshot.exists() &&
+    existingVideo?.backupStatus === "backed_up" &&
+    existingVideo.localId === video.id &&
+    existingVideo.storagePath
+  ) {
+    return existingVideo;
+  }
+
   const currentVideoCount = await getCollectionSize(user.uid, "videos");
-  if (!canBackupMoreVideos(currentVideoCount)) {
+  const backupLimitTier = getBackupLimitTier(subscription);
+  const videoLimit = getCloudBackupVideoLimit(backupLimitTier);
+  if (!canBackupMoreVideos(currentVideoCount, backupLimitTier)) {
     throw new Error(
-      `영상 백업 한도 ${CLOUD_BACKUP_VIDEO_LIMIT}개를 모두 사용했습니다. 설정에서 기존 영상 백업을 정리한 뒤 다시 시도해 주세요.`
+      `영상 백업 한도 ${videoLimit}개를 모두 사용했습니다. 설정에서 기존 영상 백업을 정리한 뒤 다시 시도해 주세요.`
     );
   }
 
@@ -1249,6 +1498,11 @@ export const backupMadeVideo = async ({
     mediaKind: "video"
   });
   const downloadUrl = upload.downloadURL;
+
+  if (!(await isVideoStillBackupEligible(video.id))) {
+    await releaseBackupUploads([upload.backupSessionId]);
+    return null;
+  }
 
   await setDoc(
     doc(firestore, "users", user.uid, "videos", video.id),
@@ -1271,6 +1525,15 @@ export const backupMadeVideo = async ({
     },
     { merge: true }
   );
+  if (
+    await removeBackupIfVideoWasDeleted({
+      user,
+      video,
+      backupSessionId: upload.backupSessionId
+    })
+  ) {
+    return null;
+  }
 
   await refreshBackupOverview(user.uid, backedUpAt);
   await applyStorageSaverPolicy({
@@ -1392,12 +1655,18 @@ export const restoreCloudBackupToLocal = async ({ user }: { user: User | null })
   const existingPhotoIds = new Set(localPhotos.map((item) => item.id));
   const deletedPhotoIds = await getDeletedPhotoIds();
   const existingImageWorkIds = new Set(localImageWorks.map((item) => item.id));
+  const deletedImageWorkIds = await getDeletedImageWorkIds();
   const existingVideoIds = new Set(localVideos.map((item) => item.id));
+  const deletedVideoIds = await getDeletedVideoIds();
   const missingPhotos = photos.filter(
     (item) => !existingPhotoIds.has(item.id) && !deletedPhotoIds.has(item.id)
   );
-  const missingImageWorks = imageWorks.filter((item) => !existingImageWorkIds.has(item.id));
-  const missingVideos = videos.filter((item) => !existingVideoIds.has(item.id));
+  const missingImageWorks = imageWorks.filter(
+    (item) => !existingImageWorkIds.has(item.id) && !deletedImageWorkIds.has(item.id)
+  );
+  const missingVideos = videos.filter(
+    (item) => !existingVideoIds.has(item.id) && !deletedVideoIds.has(item.id)
+  );
 
   await Promise.all([
     replacePhotosFromBackup([...localPhotos, ...missingPhotos]),

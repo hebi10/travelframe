@@ -5,6 +5,7 @@ import { assertLocalLibraryCapacity } from "@/lib/local-library-limit";
 import type { MadeVideoItem } from "@/types/video";
 
 const VIDEO_STORAGE_KEY = "travel-frame.videos.v1";
+const VIDEO_DELETION_MARKER_KEY = "travel-frame.video-deletion-markers.v1";
 const VIDEO_DIRECTORY = "made-videos/";
 
 const createVideoId = () =>
@@ -104,6 +105,23 @@ const parseVideos = (value: string | null): MadeVideoItem[] => {
   }
 };
 
+const parseDeletedVideoIds = (value: string | null) => {
+  if (!value) {
+    return new Set<string>();
+  }
+
+  try {
+    const parsed = JSON.parse(value);
+    return new Set(
+      Array.isArray(parsed)
+        ? parsed.filter((item): item is string => typeof item === "string" && item.length > 0)
+        : []
+    );
+  } catch {
+    return new Set<string>();
+  }
+};
+
 const writeVideos = async (videos: MadeVideoItem[]) => {
   await localStorageAdapter.setItem(VIDEO_STORAGE_KEY, JSON.stringify(sortVideos(videos)));
 };
@@ -183,6 +201,23 @@ export const getMadeVideos = async () => {
   const value = await localStorageAdapter.getItem(VIDEO_STORAGE_KEY);
   return parseVideos(value);
 };
+
+export const getDeletedVideoIds = async () => {
+  const value = await localStorageAdapter.getItem(VIDEO_DELETION_MARKER_KEY);
+  return parseDeletedVideoIds(value);
+};
+
+export const recordVideoLocalDeletion = async (id: string) => {
+  const deletedVideoIds = await getDeletedVideoIds();
+  deletedVideoIds.add(id);
+  await localStorageAdapter.setItem(
+    VIDEO_DELETION_MARKER_KEY,
+    JSON.stringify([...deletedVideoIds])
+  );
+};
+
+export const wasVideoDeletedLocally = async (id: string) =>
+  (await getDeletedVideoIds()).has(id);
 
 export const getMadeVideoById = async (id: string) => {
   const videos = await getMadeVideos();
@@ -340,6 +375,7 @@ export const markMadeVideoCloudOnly = async (
 };
 
 export const deleteMadeVideo = async (id: string) => {
+  await recordVideoLocalDeletion(id);
   const videos = await getMadeVideos();
   const video = videos.find((item) => item.id === id);
   if (video?.uri && !isRemoteUri(video.uri)) {

@@ -761,7 +761,8 @@ export default function SettingsScreen() {
             await backupImageBundleWork({
               user,
               work,
-              enabled: settings.cloudBackupEnabled
+              enabled: settings.cloudBackupEnabled,
+              subscription: latestSubscription
             });
           }
 
@@ -775,7 +776,8 @@ export default function SettingsScreen() {
             await backupMadeVideo({
               user,
               video,
-              enabled: settings.cloudBackupEnabled
+              enabled: settings.cloudBackupEnabled,
+              subscription: latestSubscription
             });
           }
 

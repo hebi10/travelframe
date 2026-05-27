@@ -170,7 +170,7 @@ const saveImageToAndroidDownload = async (
     encoding: FileSystem.EncodingType.Base64
   });
 
-  return saveUri;
+  return targetUri;
 };
 
 const saveImageToAndroidAlbum = async (

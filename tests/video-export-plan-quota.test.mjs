@@ -20,6 +20,7 @@ const {
   EXPERT_WEEKLY_VIDEO_EXPORT_LIMIT,
   buildWeeklyVideoExportUsage,
   canReserveWeeklyVideoExport,
+  completeWeeklyVideoExport,
   reserveWeeklyVideoExport,
   releaseWeeklyVideoExport
 } = await import(`data:text/javascript,${encodeURIComponent(transpiled)}`);
@@ -74,6 +75,18 @@ assert.ok(
   source.includes('httpsCallable(firebaseFunctions, "releaseWeeklyVideoExport")'),
   "weekly video export releases should use the server callable"
 );
+assert.ok(
+  source.includes('httpsCallable(firebaseFunctions, "completeWeeklyVideoExport")'),
+  "weekly video export completion should use the server callable"
+);
+assert.ok(
+  source.includes("reservationId"),
+  "weekly video export reservations should carry a reservationId"
+);
+assert.ok(
+  source.includes("buildWeeklyVideoExportReservation"),
+  "weekly video export callable responses should be normalized before use"
+);
 assert.equal(
   source.includes("runTransaction"),
   false,
@@ -86,5 +99,6 @@ assert.equal(
 );
 assert.equal(typeof reserveWeeklyVideoExport, "function");
 assert.equal(typeof releaseWeeklyVideoExport, "function");
+assert.equal(typeof completeWeeklyVideoExport, "function");
 
 console.log("ok - weekly video export quota supports free, pro, and expert limits");

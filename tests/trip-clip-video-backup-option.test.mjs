@@ -9,7 +9,9 @@ for (const snippet of [
   "남은 영상 백업",
   "클라우드 백업",
   "videoBackupRemaining",
-  "canBackupMoreVideos"
+  "canBackupMoreVideos",
+  "getCloudBackupVideoLimit",
+  "videoBackupLimit"
 ]) {
   assert.ok(source.includes(snippet), `trip clip video backup option missing: ${snippet}`);
 }
@@ -21,8 +23,9 @@ assert.ok(
 );
 
 assert.ok(
-  backupSource.includes("CLOUD_BACKUP_VIDEO_LIMIT"),
-  "backupMadeVideo should enforce the 50-video cloud backup limit"
+  backupSource.includes("getCloudBackupVideoLimit") &&
+    backupSource.includes("canBackupMoreVideos(currentVideoCount, backupLimitTier)"),
+  "backupMadeVideo should enforce the plan-specific video cloud backup limit"
 );
 
 console.log("ok - trip clip video backup option is available");
