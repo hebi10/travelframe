@@ -20,3 +20,11 @@ id = "credentials-directory"
 description = "Credential artifacts must not be committed"
 path = '''(?i)(^|[/\\])credentials[/\\].+'''
 tags = ["credentials", "secrets"]
+
+[[allowlists]]
+targetRules = ["gcp-api-key", "generic-api-key"]
+description = "Firebase client web API keys are public identifiers; server-side access is enforced by Firebase Auth, Firestore Rules, and Storage Rules."
+paths = [
+  '''(^|[/\\])admin[/\\]admin\.js$''',
+  '''(^|[/\\])dist-preview[/\\]_expo[/\\]static[/\\]js[/\\]web[/\\]entry-[a-f0-9]+\.js$'''
+]

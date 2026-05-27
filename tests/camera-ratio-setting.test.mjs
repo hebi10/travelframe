@@ -10,7 +10,7 @@ const guideOverlaySource = fs.readFileSync("components/camera-guide-overlay.tsx"
 
 for (const snippet of [
   "cameraRatio: PhotoRatioLabel",
-  'cameraRatio: "Original"',
+  'cameraRatio: "16:9"',
   "const cameraRatios: PhotoRatioLabel[]",
   "cameraRatios.includes(nextSettings.cameraRatio)"
 ]) {
@@ -20,7 +20,7 @@ for (const snippet of [
 for (const snippet of [
   "CAMERA_RATIO_OPTIONS",
   "cameraRatioAspect",
-  'const [cameraRatio, setCameraRatio] = useState<PhotoRatioLabel>("Original")',
+  "const [cameraRatio, setCameraRatio] = useState<PhotoRatioLabel>(defaultAppSettings.cameraRatio)",
   "setCameraRatio(settings.cameraRatio)",
   "const updateCameraRatio = (nextRatio: PhotoRatioLabel)",
   "void updateAppSettings({ cameraRatio: nextRatio })",

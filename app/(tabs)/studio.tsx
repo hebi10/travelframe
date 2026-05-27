@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  FlatList,
   Image as NativeImage,
   Modal,
   Pressable,
@@ -926,16 +927,20 @@ function PaginatedPhotoGrid({
 
   return (
     <View style={styles.paginatedList}>
-      <View style={styles.photoGrid}>
-        {result.items.map((photo) => (
-          <PhotoCard
-            key={photo.id}
-            photo={photo}
-            router={router}
-            onDelete={onDeletePhoto}
-          />
-        ))}
-      </View>
+      <FlatList
+        data={result.items}
+        keyExtractor={(photo) => photo.id}
+        numColumns={2}
+        scrollEnabled={false}
+        contentContainerStyle={styles.photoGrid}
+        columnWrapperStyle={styles.photoGridRow}
+        ItemSeparatorComponent={() => <View style={styles.photoGridRowGap} />}
+        renderItem={({ item: photo }) => (
+          <View style={styles.photoGridItem}>
+            <PhotoCard photo={photo} router={router} onDelete={onDeletePhoto} />
+          </View>
+        )}
+      />
       <PaginationControls
         page={result.page}
         totalPages={result.totalPages}
@@ -1458,15 +1463,19 @@ const styles = StyleSheet.create({
     letterSpacing: 0
   },
   photoGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 14,
     paddingTop: 4
   },
+  photoGridRow: {
+    justifyContent: "space-between"
+  },
+  photoGridRowGap: {
+    height: 14
+  },
+  photoGridItem: {
+    width: "48%",
+    flexShrink: 0
+  },
   photoCard: {
-    flexBasis: "47%",
-    flexGrow: 1,
-    minWidth: 156,
     gap: 10
   },
   thumbnail: {

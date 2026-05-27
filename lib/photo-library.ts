@@ -105,6 +105,7 @@ const getRatioValue = (
   height?: number
 ) => {
   if (label === "Original") {
+    // Original preserves the captured frame instead of applying a preset crop.
     return width && height ? width / height : undefined;
   }
 

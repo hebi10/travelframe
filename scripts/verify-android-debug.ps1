@@ -1,7 +1,9 @@
 param(
-  [ValidateSet("Kotlin", "Assemble")]
+  [ValidateSet("Kotlin", "Assemble", "ManifestDebug", "ManifestRelease")]
   [string]$Mode = "Kotlin",
   [int]$TimeoutSeconds = 300,
+  [string]$NativeArchitectures = "",
+  [int]$LogTailLines = 160,
   [switch]$Offline,
   [switch]$KillStaleProcesses
 )
@@ -62,6 +64,9 @@ function Stop-WithMessage {
 if ($TimeoutSeconds -lt 30) {
   Stop-WithMessage "TimeoutSeconds must be at least 30."
 }
+if ($LogTailLines -lt 20) {
+  Stop-WithMessage "LogTailLines must be at least 20."
+}
 
 $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $androidRoot = Join-Path $projectRoot "android"
@@ -84,7 +89,12 @@ if (-not $env:NODE_ENV) {
 New-Item -ItemType Directory -Force -Path $env:GRADLE_USER_HOME | Out-Null
 New-Item -ItemType Directory -Force -Path $env:ANDROID_USER_HOME | Out-Null
 
-$task = if ($Mode -eq "Assemble") { ":app:assembleDebug" } else { ":app:compileDebugKotlin" }
+$task = switch ($Mode) {
+  "Assemble" { ":app:assembleDebug" }
+  "ManifestDebug" { ":app:processDebugMainManifest" }
+  "ManifestRelease" { ":app:processReleaseMainManifest" }
+  default { ":app:compileDebugKotlin" }
+}
 $arguments = @(
   "--no-daemon",
   "--no-parallel",
@@ -92,12 +102,18 @@ $arguments = @(
   "--console=plain",
   "-Pkotlin.compiler.execution.strategy=in-process"
 )
+if ($NativeArchitectures) {
+  $arguments += "-PreactNativeArchitectures=$NativeArchitectures"
+}
 if ($Offline) {
   $arguments += "--offline"
 }
 $arguments += $task
 
 Write-Host "Running Android $Mode verification with $TimeoutSeconds second timeout..." -ForegroundColor Cyan
+if ($NativeArchitectures) {
+  Write-Host "Using React Native architectures: $NativeArchitectures"
+}
 Write-Host "Using project Gradle cache: $env:GRADLE_USER_HOME"
 Write-Host "Using Android user home: $env:ANDROID_USER_HOME"
 
@@ -119,6 +135,16 @@ if ($stderr) {
 }
 
 if (-not $finished) {
+  if (Test-Path -LiteralPath $stdoutLog) {
+    Write-Host ""
+    Write-Host "Last $LogTailLines stdout lines before timeout:" -ForegroundColor Yellow
+    Get-Content -LiteralPath $stdoutLog -Tail $LogTailLines
+  }
+  if (Test-Path -LiteralPath $stderrLog) {
+    Write-Host ""
+    Write-Host "Last $LogTailLines stderr lines before timeout:" -ForegroundColor Yellow
+    Get-Content -LiteralPath $stderrLog -Tail $LogTailLines
+  }
   Stop-BuildProcesses -Since $startedAt -ProjectRoot $projectRoot
   Stop-WithMessage "Android $Mode verification timed out after $TimeoutSeconds seconds. Stale native build processes were stopped."
 }

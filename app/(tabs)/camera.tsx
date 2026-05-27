@@ -42,10 +42,7 @@ import {
 import { AppGuideOverlay } from "@/components/app-guide-overlay";
 import { CameraGuideOverlay } from "@/components/camera-guide-overlay";
 import { ChevronIcon } from "@/components/chevron-icon";
-import {
-  PhotoReferenceOverlay,
-  type PhotoReferenceOverlayHandle
-} from "@/components/photo-reference-overlay";
+import { PhotoReferenceOverlay, type PhotoReferenceOverlayHandle } from "@/components/photo-reference-overlay";
 import { colors } from "@/constants/app-theme";
 import { GUIDE_LABELS, GUIDE_TYPES, type GuideType } from "@/constants/camera-guides";
 import {
@@ -79,14 +76,8 @@ import {
 import { styles } from "@/features/camera/camera-screen.styles";
 import { useAuth } from "@/lib/auth-context";
 import { recordBackupFailure } from "@/lib/backup-failure-queue";
-import {
-  calculateGuidePositionDragOffset,
-  clampGuidePositionOffset
-} from "@/lib/camera-guide-position";
-import {
-  getNormalizedCameraFocusPoint,
-  getTapExposureControlPosition
-} from "@/lib/camera-focus-controls";
+import { calculateGuidePositionDragOffset, clampGuidePositionOffset } from "@/lib/camera-guide-position";
+import { getNormalizedCameraFocusPoint, getTapExposureControlPosition } from "@/lib/camera-focus-controls";
 import { backupPhotoIfEnabled } from "@/lib/cloud-backup";
 import {
   DEFAULT_GUIDE_COLOR,
@@ -107,12 +98,7 @@ import {
 } from "@/lib/app-settings";
 import { getPlanEntitlements } from "@/lib/plan-entitlements";
 import { isMediaLibraryAccessGranted, requestMediaLibraryAccess } from "@/lib/request-media-library-access";
-import {
-  deleteLocalFile,
-  getRecentPhoto,
-  saveCapturedPhoto,
-  saveCapturedPhotoToDevice
-} from "@/lib/photo-library";
+import { deleteLocalFile, getRecentPhoto, saveCapturedPhoto, saveCapturedPhotoToDevice } from "@/lib/photo-library";
 import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 import type { PhotoItem, PhotoRatioLabel } from "@/types/photo";
 
@@ -178,6 +164,7 @@ const cameraRatioAspect: Record<PhotoRatioLabel, number | null> = {
 
 const CAMERA_ZOOM_MIN = 0;
 const CAMERA_ZOOM_MAX = 100;
+const CAMERA_ULTRA_WIDE_ZOOM_FACTOR = 0.5;
 const CAMERA_LENS_ULTRA_WIDE: PhysicalDeviceType = "ultra-wide-angle";
 const CAMERA_LENS_WIDE: PhysicalDeviceType = "wide-angle";
 const CAMERA_LENS_TELEPHOTO: PhysicalDeviceType = "telephoto";
@@ -187,7 +174,7 @@ const CAMERA_BACK_PHYSICAL_DEVICES: PhysicalDeviceType[] = [
   CAMERA_LENS_TELEPHOTO
 ];
 const CAMERA_BACK_ZOOM_PRESETS_WITH_ULTRA_WIDE = [
-  { label: "0.5x", factor: 0.5 },
+  { label: "0.5x", factor: CAMERA_ULTRA_WIDE_ZOOM_FACTOR },
   { label: "1x", factor: 1 },
   { label: "3x", factor: 3 },
   { label: "5x", factor: 5 },
@@ -282,13 +269,17 @@ function getCameraDeviceLensTypes(cameraDevice: CameraDevice | undefined) {
 
 function getCameraZoomPresets(
   cameraFacing: CameraFacing,
-  availableLenses: PhysicalDeviceType[]
+  availableLenses: PhysicalDeviceType[],
+  cameraDevice: CameraDevice | undefined
 ) {
   if (cameraFacing === "front") {
     return CAMERA_FRONT_ZOOM_PRESETS;
   }
 
-  if (hasCameraLens(availableLenses, CAMERA_LENS_ULTRA_WIDE)) {
+  if (
+    hasCameraLens(availableLenses, CAMERA_LENS_ULTRA_WIDE) &&
+    getCameraSupportsUltraWideZoom(cameraDevice)
+  ) {
     return CAMERA_BACK_ZOOM_PRESETS_WITH_ULTRA_WIDE;
   }
 
@@ -307,6 +298,11 @@ function getCameraZoomBounds(cameraDevice: CameraDevice | undefined) {
     minZoom: Math.max(0.5, minZoom),
     maxZoom: Math.max(Math.max(0.5, minZoom), maxZoom)
   };
+}
+
+function getCameraSupportsUltraWideZoom(cameraDevice: CameraDevice | undefined) {
+  const { minZoom, maxZoom } = getCameraZoomBounds(cameraDevice);
+  return minZoom <= CAMERA_ULTRA_WIDE_ZOOM_FACTOR && maxZoom >= CAMERA_ULTRA_WIDE_ZOOM_FACTOR;
 }
 
 function getCameraZoomFactorFromPercent(
@@ -398,8 +394,8 @@ export default function CameraScreen() {
   const [countdown, setCountdown] = useState<number | null>(null);
   const [hapticEnabled, setHapticEnabled] = useState(true);
   const [photoQuality, setPhotoQuality] = useState<CameraQualityValue>("high");
-  const [cameraRatio, setCameraRatio] = useState<PhotoRatioLabel>("Original");
-  const [cameraSaveScope, setCameraSaveScope] = useState<CameraSaveScope>("app");
+  const [cameraRatio, setCameraRatio] = useState<PhotoRatioLabel>(defaultAppSettings.cameraRatio);
+  const [cameraSaveScope, setCameraSaveScope] = useState<CameraSaveScope>(defaultAppSettings.cameraSaveScope);
   const [cameraShutterSoundMode, setCameraShutterSoundMode] =
     useState<CameraShutterSoundMode>("silent");
   const [cameraControlTabViewportWidth, setCameraControlTabViewportWidth] = useState(0);
@@ -487,8 +483,8 @@ export default function CameraScreen() {
     [cameraDevice]
   );
   const cameraZoomPresets = useMemo(
-    () => getCameraZoomPresets(cameraFacing, availableCameraLenses),
-    [availableCameraLenses, cameraFacing]
+    () => getCameraZoomPresets(cameraFacing, availableCameraLenses, cameraDevice),
+    [availableCameraLenses, cameraDevice, cameraFacing]
   );
   const cameraZoomFactor = useMemo(
     () => getCameraZoomFactorFromPercent(zoomPercent, cameraDevice),
@@ -1521,26 +1517,25 @@ export default function CameraScreen() {
     try {
       setIsCapturing(true);
       setErrorMessage(null);
-      const photo = await photoOutput.capturePhotoToFile(
-        {
-          flashMode: cameraDevice.hasFlash ? flashMode : "off",
-          enableShutterSound: cameraShutterSoundMode === "sound"
-        },
-        {}
-      );
+      const photo = await photoOutput.capturePhotoToFile({
+        flashMode: cameraDevice.hasFlash ? flashMode : "off",
+        enableShutterSound: cameraShutterSoundMode === "sound"
+      }, {});
       photoUri = `file://${photo.filePath}`;
-      const captureInput = {
-        uri: photoUri,
-        ratioLabel: cameraRatio,
-        localImageLimit: planEntitlements.localImageLimit
-      };
+      const captureInput = { uri: photoUri, ratioLabel: cameraRatio, localImageLimit: planEntitlements.localImageLimit };
       let savedPhoto: PhotoItem | null = null;
+      let deviceSaveError: unknown = null;
 
       if (cameraSaveScope !== "device") {
         savedPhoto = await saveCapturedPhoto(captureInput);
       }
       if (cameraSaveScope !== "app") {
-        await saveCapturedPhotoToDevice(captureInput);
+        try {
+          await saveCapturedPhotoToDevice(captureInput);
+        } catch (deviceError) {
+          if (!savedPhoto) throw deviceError;
+          deviceSaveError = deviceError;
+        }
       }
       if (savedPhoto) {
         setRecentPhoto(savedPhoto);
@@ -1557,6 +1552,9 @@ export default function CameraScreen() {
             )
           });
         }
+      }
+      if (deviceSaveError) {
+        setErrorMessage(getUserFacingErrorMessage(deviceSaveError, "기기 앨범 저장에 실패했습니다. 사진은 앱 보관함에 저장되었습니다."));
       }
     } catch (error) {
       setErrorMessage(getUserFacingErrorMessage(error, "사진을 촬영하지 못했습니다."));

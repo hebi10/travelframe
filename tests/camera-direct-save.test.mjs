@@ -8,7 +8,7 @@ const tripClipExportSource = fs.readFileSync("lib/trip-clip-export.ts", "utf8");
 
 for (const snippet of [
   'export type CameraSaveScope = "app" | "device" | "both"',
-  'cameraSaveScope: "app"',
+  'cameraSaveScope: "both"',
   "const cameraSaveScopes: CameraSaveScope[]",
   "cameraSaveScopes.includes(nextSettings.cameraSaveScope)"
 ]) {
@@ -17,7 +17,7 @@ for (const snippet of [
 
 for (const snippet of [
   "CAMERA_SAVE_SCOPE_OPTIONS",
-  'const [cameraSaveScope, setCameraSaveScope] = useState<CameraSaveScope>("app")',
+  "const [cameraSaveScope, setCameraSaveScope] = useState<CameraSaveScope>(defaultAppSettings.cameraSaveScope)",
   "setCameraSaveScope(settings.cameraSaveScope)",
   "const updateCameraSaveScope = (nextScope: CameraSaveScope)",
   "void updateAppSettings({ cameraSaveScope: nextScope })",
@@ -26,6 +26,10 @@ for (const snippet of [
   'cameraSaveScope !== "app"',
   "saveCapturedPhoto(captureInput)",
   "saveCapturedPhotoToDevice(captureInput)",
+  "let deviceSaveError: unknown = null;",
+  "if (!savedPhoto) throw deviceError;",
+  "throw deviceError;",
+  "사진은 앱 보관함에 저장되었습니다.",
   "ratioLabel: cameraRatio",
   "setRecentPhoto(savedPhoto)",
   "backupPhotoIfEnabled({",

@@ -5,6 +5,7 @@ import {
   ActivityIndicator,
   Alert,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View
@@ -65,8 +66,13 @@ type EditableSource = {
 };
 
 type SaveEditMode = "new" | "overwrite";
+type EditPanelTab = "image" | "guide";
 
 const ratios: PhotoRatioLabel[] = ["Original", "1:1", "3:4", "4:5", "9:16", "16:9"];
+const EDIT_PANEL_TABS: { label: string; value: EditPanelTab }[] = [
+  { label: "이미지 편집", value: "image" },
+  { label: "가이드라인 편집", value: "guide" }
+];
 const GUIDE_SIZE_OPTIONS = [
   { label: "작게", value: 34 },
   { label: "기본", value: 44 },
@@ -157,6 +163,7 @@ export default function EditScreen() {
   const [guideShapePoints, setGuideShapePoints] =
     useState<GuideShapePoints>(defaultAppSettings.guideShapePoints);
   const [guidePanelOpen, setGuidePanelOpen] = useState(false);
+  const [activeEditPanelTab, setActiveEditPanelTab] = useState<EditPanelTab>("image");
   const [isCanvasExpanded, setIsCanvasExpanded] = useState(false);
   const [isGuidePositionAdjusting, setIsGuidePositionAdjusting] = useState(false);
   const [guideMoveFrame, setGuideMoveFrame] = useState<CameraGuideFrame>({
@@ -456,6 +463,7 @@ export default function EditScreen() {
       setGuideOffsetY(clampedOffset.y);
       setGuideVisible(true);
       setIsGuidePositionAdjusting(false);
+      setActiveEditPanelTab("guide");
       setGuidePanelOpen(true);
       void updateAppSettings({
         guideOffsetX: clampedOffset.x,
@@ -694,6 +702,43 @@ export default function EditScreen() {
 
       {!isCanvasExpanded ? (
       <View style={[styles.bottomPanel, { paddingBottom: bottomSafePadding }]}>
+        <View style={styles.editPanelTabs}>
+          {EDIT_PANEL_TABS.map((tab) => {
+            const isActive = activeEditPanelTab === tab.value;
+
+            return (
+              <Pressable
+                key={tab.value}
+                style={[
+                  styles.editPanelTab,
+                  isActive && styles.editPanelTabActive
+                ]}
+                onPress={() => {
+                  setActiveEditPanelTab(tab.value);
+                  if (tab.value === "guide") {
+                    setGuidePanelOpen(true);
+                  }
+                }}
+              >
+                <Text
+                  selectable={false}
+                  style={[
+                    styles.editPanelTabText,
+                    isActive && styles.editPanelTabTextActive
+                  ]}
+                >
+                  {tab.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <ScrollView
+          style={styles.editPanelScroll}
+          contentContainerStyle={styles.editPanelScrollContent}
+          showsVerticalScrollIndicator={false}
+        >
         {availableDraft && showDraftPrompt ? (
           <View style={styles.draftPanel}>
             <View style={styles.draftCopy}>
@@ -719,6 +764,8 @@ export default function EditScreen() {
           </View>
         ) : null}
 
+        {activeEditPanelTab === "image" ? (
+          <>
         <View style={styles.sourceRow}>
           <View style={styles.sourceCopy}>
             <Text selectable style={styles.sourceTitle}>
@@ -757,7 +804,10 @@ export default function EditScreen() {
             );
           })}
         </View>
+          </>
+        ) : null}
 
+        {activeEditPanelTab === "guide" ? (
         <View style={styles.guidePanel}>
           <Pressable
             style={styles.guidePanelHeader}
@@ -892,7 +942,9 @@ export default function EditScreen() {
             </View>
           ) : null}
         </View>
+        ) : null}
 
+        {activeEditPanelTab === "image" ? (
         <View style={styles.toolRow}>
           <Pressable
             style={styles.toolButton}
@@ -924,12 +976,14 @@ export default function EditScreen() {
             </Text>
           </Pressable>
         </View>
+        ) : null}
 
         {message ? (
           <Text selectable style={styles.message}>
             {message}
           </Text>
         ) : null}
+        </ScrollView>
       </View>
       ) : null}
     </View>
@@ -1146,12 +1200,49 @@ const styles = StyleSheet.create({
     justifyContent: "center"
   },
   bottomPanel: {
+    maxHeight: "48%",
+    minHeight: 0,
+    flexShrink: 1,
     gap: 12,
     paddingHorizontal: 16,
     paddingTop: 14,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: "rgba(255, 255, 255, 0.16)",
     backgroundColor: colors.background
+  },
+  editPanelTabs: {
+    flexDirection: "row",
+    gap: 8
+  },
+  editPanelTab: {
+    flex: 1,
+    minHeight: controls.compactHeight,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.background
+  },
+  editPanelTabActive: {
+    borderColor: colors.text,
+    backgroundColor: colors.text
+  },
+  editPanelTabText: {
+    color: colors.text,
+    fontSize: typography.button,
+    fontWeight: "800",
+    letterSpacing: 0
+  },
+  editPanelTabTextActive: {
+    color: colors.inverse
+  },
+  editPanelScroll: {
+    flexShrink: 1,
+    minHeight: 0
+  },
+  editPanelScrollContent: {
+    gap: 12
   },
   draftPanel: {
     gap: 12,

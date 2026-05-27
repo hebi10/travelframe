@@ -12,8 +12,10 @@ for (const snippet of [
   "const [studioLoadErrorMessage, setStudioLoadErrorMessage] = useState<string | null>(null);",
   "onRetry={loadStudio}",
   "{singleImageWorks.length > 0 ? (",
-  "flexBasis: \"47%\"",
-  "minWidth: 156"
+  "numColumns={2}",
+  "columnWrapperStyle={styles.photoGridRow}",
+  "styles.photoGridItem",
+  "width: \"48%\""
 ]) {
   assert.ok(source.includes(snippet), `studio follow-up feedback missing: ${snippet}`);
 }
@@ -25,9 +27,9 @@ assert.equal(
 );
 
 assert.equal(
-  source.includes("width: \"47.8%\""),
+  source.includes("flexGrow: 1"),
   false,
-  "photo cards should not use a fragile fixed percentage width"
+  "photo cards should not grow to fill a final odd row"
 );
 
 assert.equal(

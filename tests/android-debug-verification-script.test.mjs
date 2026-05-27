@@ -5,8 +5,8 @@ const script = fs.readFileSync("scripts/verify-android-debug.ps1", "utf8");
 const packageJson = JSON.parse(fs.readFileSync("package.json", "utf8"));
 
 assert.ok(
-  script.includes('[ValidateSet("Kotlin", "Assemble")]'),
-  "Android verification script should support bounded Kotlin and assemble checks"
+  script.includes('[ValidateSet("Kotlin", "Assemble", "ManifestDebug", "ManifestRelease")]'),
+  "Android verification script should support bounded Kotlin, assemble, and manifest checks"
 );
 assert.ok(
   script.includes("-Pkotlin.compiler.execution.strategy=in-process"),
@@ -15,6 +15,15 @@ assert.ok(
 assert.ok(
   script.includes("$process.WaitForExit($TimeoutSeconds * 1000)"),
   "Android verification should enforce a timeout"
+);
+assert.ok(
+  script.includes("-PreactNativeArchitectures=$NativeArchitectures"),
+  "Android debug verification should be able to limit native ABI builds for fast smoke checks"
+);
+assert.ok(
+  script.includes(":app:processDebugMainManifest") &&
+    script.includes(":app:processReleaseMainManifest"),
+  "Android verification should expose merged manifest generation tasks"
 );
 assert.ok(
   script.includes("Stop-BuildProcesses"),
@@ -42,8 +51,23 @@ assert.equal(
 );
 assert.equal(
   packageJson.scripts["android:verify:debug"],
-  "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-android-debug.ps1 -Mode Assemble -TimeoutSeconds 300 -KillStaleProcesses",
-  "package.json should expose a bounded Android debug assemble command"
+  "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-android-debug.ps1 -Mode Assemble -TimeoutSeconds 420 -NativeArchitectures x86_64 -KillStaleProcesses",
+  "package.json should expose a bounded single-ABI Android debug assemble command"
+);
+assert.equal(
+  packageJson.scripts["android:verify:debug:full"],
+  "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-android-debug.ps1 -Mode Assemble -TimeoutSeconds 1200 -KillStaleProcesses",
+  "package.json should expose a deeper full-ABI Android debug assemble command"
+);
+assert.equal(
+  packageJson.scripts["android:manifest:debug"],
+  "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-android-debug.ps1 -Mode ManifestDebug -TimeoutSeconds 180 -KillStaleProcesses",
+  "package.json should expose a bounded debug manifest merge command"
+);
+assert.equal(
+  packageJson.scripts["android:manifest:release"],
+  "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-android-debug.ps1 -Mode ManifestRelease -TimeoutSeconds 240 -KillStaleProcesses",
+  "package.json should expose a bounded release manifest merge command"
 );
 
 console.log("ok - Android debug verification is bounded and cleans stale native build processes");

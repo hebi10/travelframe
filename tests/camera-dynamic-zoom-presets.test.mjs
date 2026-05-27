@@ -5,6 +5,7 @@ const cameraSource = fs.readFileSync("app/(tabs)/camera.tsx", "utf8");
 
 for (const snippet of [
   "getCameraZoomPresets",
+  "getCameraSupportsUltraWideZoom",
   "CAMERA_BACK_ZOOM_PRESETS_WITH_ULTRA_WIDE",
   "CAMERA_BACK_ZOOM_PRESETS_DEFAULT",
   "CAMERA_FRONT_ZOOM_PRESETS",
@@ -17,6 +18,7 @@ for (const snippet of [
   "useCameraDevice(cameraFacing, cameraDeviceFilter)",
   "getCameraDeviceLensTypes(cameraDevice)",
   "availableCameraLenses",
+  "cameraDevice",
   "cameraZoomFactor",
   "getCameraZoomFactorFromPercent",
   "getCameraZoomPresetFactor",
@@ -42,6 +44,27 @@ assert.ok(
 assert.ok(
   cameraSource.includes("hasCameraLens(availableLenses, CAMERA_LENS_ULTRA_WIDE)"),
   "back camera should expose 0.5x only when an ultra-wide lens is available"
+);
+
+assert.ok(
+  cameraSource.includes("getCameraSupportsUltraWideZoom(cameraDevice)"),
+  "back camera should expose 0.5x only when the selected device can actually accept 0.5 zoom"
+);
+
+assert.ok(
+  cameraSource.includes("getCameraZoomPresets(cameraFacing, availableCameraLenses, cameraDevice)"),
+  "dynamic zoom presets should consider the selected VisionCamera device zoom bounds"
+);
+
+assert.equal(
+  cameraSource.includes("getCameraZoomPresets(cameraFacing, availableCameraLenses)"),
+  false,
+  "dynamic zoom presets should not be derived from lens names alone"
+);
+
+assert.ok(
+  /hasCameraLens\(availableLenses,\s*CAMERA_LENS_ULTRA_WIDE\)[\s\S]{0,120}getCameraSupportsUltraWideZoom\(cameraDevice\)/.test(cameraSource),
+  "0.5x preset should require both an ultra-wide lens and a supported 0.5 zoom factor"
 );
 
 for (const removed of [
