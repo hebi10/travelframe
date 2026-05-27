@@ -1515,6 +1515,8 @@ export default function CameraScreen() {
       return;
     }
 
+    let photoUri: string | null = null;
+
     try {
       setIsCapturing(true);
       setErrorMessage(null);
@@ -1525,15 +1527,13 @@ export default function CameraScreen() {
         },
         {}
       );
-      const photoUri = `file://${photo.filePath}`;
+      photoUri = `file://${photo.filePath}`;
       const captureInput = {
         uri: photoUri,
         ratioLabel: cameraRatio,
         localImageLimit: planEntitlements.localImageLimit
       };
       let savedPhoto: PhotoItem | null = null;
-
-      setIsCapturing(false);
 
       if (cameraSaveScope !== "device") {
         savedPhoto = await saveCapturedPhoto(captureInput);
@@ -1557,11 +1557,16 @@ export default function CameraScreen() {
           });
         }
       }
-
-      await deleteLocalFile(photoUri);
     } catch (error) {
       setErrorMessage(getUserFacingErrorMessage(error, "사진을 촬영하지 못했습니다."));
     } finally {
+      if (photoUri) {
+        try {
+          await deleteLocalFile(photoUri);
+        } catch {
+          // 저장 결과와 무관한 임시 파일 정리 실패는 촬영 실패로 표시하지 않습니다.
+        }
+      }
       setIsCapturing(false);
     }
   };
@@ -1598,7 +1603,7 @@ export default function CameraScreen() {
       return;
     }
 
-    router.replace("/");
+    router.replace("/studio");
   }, []);
 
   const openPermissionSettings = useCallback(() => {

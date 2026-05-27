@@ -7,8 +7,8 @@ const tripClipSource = fs.readFileSync("app/(tabs)/trip-clip.tsx", "utf8");
 const functionsSource = fs.readFileSync("functions/index.js", "utf8");
 
 assert.ok(
-  userMusicSource.includes("const MAX_USER_MUSIC_TRACKS = 10;"),
-  "client music hard cap should allow the Pro plan's 10 tracks"
+  userMusicSource.includes("const MAX_USER_MUSIC_TRACKS = 20;"),
+  "client music hard cap should allow the Expert plan's 20 tracks"
 );
 assert.ok(
   userMusicSource.includes("musicTrackLimit = 0"),
@@ -29,8 +29,12 @@ assert.ok(
   "account should pass the active plan music limit"
 );
 assert.ok(
-  functionsSource.includes("const MAX_USER_MUSIC_TRACKS = 10;"),
-  "server music quota should allow the Pro plan's 10 tracks"
+  functionsSource.includes("const MAX_USER_MUSIC_TRACKS = 20;"),
+  "server music hard cap should allow the Expert plan's 20 tracks"
+);
+assert.ok(
+  functionsSource.includes("const getMusicTrackLimit = (subscription)"),
+  "server should derive music track limits from the verified subscription"
 );
 
 console.log("ok - user music uploads are gated by plan music limits");

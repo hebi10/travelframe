@@ -1,14 +1,11 @@
 import { type User } from "firebase/auth";
 import {
   doc,
-  getDoc,
-  increment,
-  runTransaction,
-  serverTimestamp,
-  setDoc
+  getDoc
 } from "firebase/firestore";
+import { httpsCallable } from "firebase/functions";
 
-import { firestore } from "@/lib/firebase";
+import { firebaseFunctions, firestore } from "@/lib/firebase";
 
 export const FREE_WEEKLY_VIDEO_EXPORT_LIMIT = 1;
 export const PRO_WEEKLY_VIDEO_EXPORT_LIMIT = 15;
@@ -58,6 +55,22 @@ const getWeeklyUsageRef = (user: User, weekId: string) => {
   }
 
   return doc(firestore, "users", user.uid, "usage", "videoExports", "weeks", weekId);
+};
+
+const reserveWeeklyVideoExportCallable = () => {
+  if (!firebaseFunctions) {
+    throw new Error("Firebase 연결 정보가 아직 설정되지 않았습니다.");
+  }
+
+  return httpsCallable(firebaseFunctions, "reserveWeeklyVideoExport");
+};
+
+const releaseWeeklyVideoExportCallable = () => {
+  if (!firebaseFunctions) {
+    throw new Error("Firebase 연결 정보가 아직 설정되지 않았습니다.");
+  }
+
+  return httpsCallable(firebaseFunctions, "releaseWeeklyVideoExport");
 };
 
 export const buildWeeklyVideoExportUsage = ({
@@ -117,55 +130,17 @@ export const reserveWeeklyVideoExport = async (
   user: User,
   limit = FREE_WEEKLY_VIDEO_EXPORT_LIMIT
 ) => {
-  const { weekId, weekLabel } = getCurrentVideoExportWeek();
-  const usageRef = getWeeklyUsageRef(user, weekId);
+  if (!user) {
+    throw new Error("로그인 후 MP4 영상을 만들 수 있습니다.");
+  }
 
-  await runTransaction(usageRef.firestore, async (transaction) => {
-    const snapshot = await transaction.get(usageRef);
-    const currentCount = snapshot.exists()
-      ? Math.max(0, Number(snapshot.data().count ?? 0))
-      : 0;
-
-    if (!canReserveWeeklyVideoExport({ count: currentCount, limit })) {
-      throw new Error(
-        `이번 주에 MP4 영상을 ${limit}개까지 만들 수 있습니다. 다음 주에 다시 만들거나 플랜을 확인해 주세요.`
-      );
-    }
-
-    transaction.set(
-      usageRef,
-      {
-        userId: user.uid,
-        weekId,
-        weekLabel,
-        count: currentCount + 1,
-        limit,
-        updatedAt: serverTimestamp(),
-        createdAt: snapshot.exists() ? snapshot.data().createdAt ?? serverTimestamp() : serverTimestamp()
-      },
-      { merge: true }
-    );
-  });
+  await reserveWeeklyVideoExportCallable()({ limit });
 };
 
 export const releaseWeeklyVideoExport = async (user: User) => {
-  const { weekId } = getCurrentVideoExportWeek();
-  const usageRef = getWeeklyUsageRef(user, weekId);
-  const snapshot = await getDoc(usageRef);
-  const currentCount = snapshot.exists()
-    ? Math.max(0, Number(snapshot.data().count ?? 0))
-    : 0;
-
-  if (currentCount <= 0) {
+  if (!user) {
     return;
   }
 
-  await setDoc(
-    usageRef,
-    {
-      count: increment(-1),
-      updatedAt: serverTimestamp()
-    },
-    { merge: true }
-  );
+  await releaseWeeklyVideoExportCallable()({});
 };

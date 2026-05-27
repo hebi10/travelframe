@@ -148,7 +148,11 @@ const isLocalVideoAvailable = async (uri?: string | null) => {
   return fileInfo.exists;
 };
 
-const persistMadeVideoFile = async (uri: string, videoId: string) => {
+const persistMadeVideoFile = async (
+  uri: string,
+  videoId: string,
+  options: { overwrite?: boolean } = {}
+) => {
   if (isRemoteUri(uri) || !isFileUri(uri)) {
     return uri;
   }
@@ -160,7 +164,10 @@ const persistMadeVideoFile = async (uri: string, videoId: string) => {
 
   const destinationUri = `${directory}${videoId}.${getVideoFileExtension(uri)}`;
   const existingDestination = await FileSystem.getInfoAsync(destinationUri);
-  if (!existingDestination.exists) {
+  if (existingDestination.exists && options.overwrite) {
+    await FileSystem.deleteAsync(destinationUri, { idempotent: true });
+  }
+  if (!existingDestination.exists || options.overwrite) {
     await FileSystem.copyAsync({ from: uri, to: destinationUri });
   }
 
@@ -214,6 +221,38 @@ export const saveMadeVideo = async (
 
   await writeVideos([savedVideo, ...videos]);
   return savedVideo;
+};
+
+export const updateMadeVideo = async (
+  id: string,
+  updates: Partial<Omit<MadeVideoItem, "id" | "createdAt">>
+) => {
+  const videos = await getMadeVideos();
+  const video = videos.find((item) => item.id === id);
+
+  if (!video) {
+    return null;
+  }
+
+  const persistedUri = updates.uri
+    ? await persistMadeVideoFile(updates.uri, id, { overwrite: true })
+    : video.uri;
+  const updatedVideo: MadeVideoItem = {
+    ...video,
+    ...updates,
+    id: video.id,
+    uri: persistedUri,
+    localUri: isRemoteUri(persistedUri) ? updates.localUri ?? video.localUri : persistedUri,
+    createdAt: video.createdAt
+  };
+
+  await writeVideos(videos.map((item) => (item.id === id ? updatedVideo : item)));
+
+  if (video.uri && video.uri !== persistedUri && !isRemoteUri(video.uri)) {
+    await FileSystem.deleteAsync(video.uri, { idempotent: true });
+  }
+
+  return updatedVideo;
 };
 
 export const restoreMadeVideoIfNeeded = async (video: MadeVideoItem): Promise<MadeVideoItem> => {

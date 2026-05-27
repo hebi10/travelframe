@@ -98,7 +98,7 @@ import {
 import { resolveImageDimensions } from "@/lib/image-backup-utils";
 import { deselectTripClipPhoto } from "@/lib/trip-clip-selection";
 import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
-import { getMadeVideoById, saveMadeVideo } from "@/lib/video-library";
+import { getMadeVideoById, saveMadeVideo, updateMadeVideo } from "@/lib/video-library";
 import {
   calculateVideoDuration,
   formatVideoDuration,
@@ -191,6 +191,9 @@ type ExportProgress = {
   detail: string;
   completedVideoId?: string;
   error?: string;
+};
+type SaveSelectedExportOptions = {
+  returnToVideoWorks?: boolean;
 };
 type CustomMusic = {
   uri: string;
@@ -297,6 +300,7 @@ export default function TripClipScreen() {
     bundleId?: string;
     videoId?: string;
   }>();
+  const isEditingMadeVideo = Boolean(videoId);
   const recorder = useOptionalViewRecorder();
   const { user, isLoggedIn, subscription } = useAuth();
   const insets = useSafeAreaInsets();
@@ -558,6 +562,15 @@ export default function TripClipScreen() {
     router.replace("/studio?tab=videos" as Href);
   }, []);
 
+  const handleHeaderSavePress = () => {
+    if (isEditingMadeVideo) {
+      void saveSelectedExport({ returnToVideoWorks: true });
+      return;
+    }
+
+    void persistTripClipDraft(true);
+  };
+
   const resumeTripClipDraft = useCallback(() => {
     if (!availableDraft) {
       return;
@@ -725,6 +738,7 @@ export default function TripClipScreen() {
         setTemplate(storedVideo.template);
         setTransition(storedVideo.transition);
         setTransitionDuration(storedVideo.transitionDuration);
+        setExportFormat("mp4");
         setWorkTitle(storedVideo.title);
         restoredVideoIdRef.current = videoId;
         setIsLoading(false);
@@ -1100,7 +1114,29 @@ export default function TripClipScreen() {
 
   useEffect(() => {
     setRenderedVideoUri(null);
-  }, [customMusic?.uri, musicMode, ratio, selectedUserMusicId, videoQuality]);
+  }, [
+    customMusic?.uri,
+    durations,
+    musicMode,
+    photoAdjustments,
+    planEntitlements.showWatermark,
+    previewGridGuideLinePositions,
+    previewGuide,
+    previewGuideColor,
+    previewGuideOffsetX,
+    previewGuideOffsetY,
+    previewGuideShapePoints,
+    previewGuideSize,
+    previewGuideStrokeWidth,
+    previewGuideVisible,
+    ratio,
+    selectedIds,
+    selectedUserMusicId,
+    template,
+    transition,
+    transitionDuration,
+    videoQuality
+  ]);
 
   useEffect(() => {
     if (activeIndex >= selectedPhotos.length) {
@@ -1586,9 +1622,11 @@ export default function TripClipScreen() {
     });
   };
 
-  const saveSelectedExport = async () => {
+  const saveSelectedExport = async ({
+    returnToVideoWorks = false
+  }: SaveSelectedExportOptions = {}) => {
     if (exportFormat !== "mp4") {
-      await executeSelectedExport();
+      await executeSelectedExport({ returnToVideoWorks });
       return;
     }
 
@@ -1625,7 +1663,7 @@ export default function TripClipScreen() {
         return;
       }
 
-      await executeSelectedExport({ countWeeklyMp4: true });
+      await executeSelectedExport({ countWeeklyMp4: true, returnToVideoWorks });
     } catch (error) {
       const message = getUserFacingErrorMessage(
         error,
@@ -1643,9 +1681,11 @@ export default function TripClipScreen() {
   };
 
   const executeSelectedExport = async ({
-    countWeeklyMp4 = false
+    countWeeklyMp4 = false,
+    returnToVideoWorks = false
   }: {
     countWeeklyMp4?: boolean;
+    returnToVideoWorks?: boolean;
   } = {}) => {
     if (exportFormat === "mp4" && Platform.OS === "web") {
       setIsExportComingSoonVisible(true);
@@ -1823,10 +1863,12 @@ export default function TripClipScreen() {
       setExportProgress({
         visible: true,
         percent: 96,
-        title: "목록에 추가 중",
-        detail: "저장한 영상을 작업물 목록에 등록하고 있습니다."
+        title: videoId ? "작업물 저장 중" : "목록에 추가 중",
+        detail: videoId
+          ? "편집한 영상을 작업물에 저장하고 있습니다."
+          : "저장한 영상을 작업물 목록에 등록하고 있습니다."
       });
-      const savedVideo = await saveMadeVideo({
+      const videoPayload: Parameters<typeof saveMadeVideo>[0] = {
         uri: videoUri,
         coverUri: activePhoto?.uri,
         title: normalizedWorkTitle || undefined,
@@ -1842,7 +1884,16 @@ export default function TripClipScreen() {
         }, {}),
         musicId: musicMode === "device" && customMusic ? "custom" : "none",
         musicLabel: activeMusicLabel
-      }, { localVideoLimit: planEntitlements.localVideoLimit });
+      };
+      let savedVideo = null;
+      if (videoId) {
+        savedVideo = await updateMadeVideo(videoId, videoPayload);
+      }
+      if (!savedVideo) {
+        savedVideo = await saveMadeVideo(videoPayload, {
+          localVideoLimit: planEntitlements.localVideoLimit
+        });
+      }
       let backupWarning: string | null = null;
       const wantsVideoBackup =
         shouldBackupVideoExport && videoBackupTargetEnabled &&
@@ -1900,6 +1951,10 @@ export default function TripClipScreen() {
       setShowDraftPrompt(false);
       if (reservedWeeklyExport && user) {
         setWeeklyVideoExportUsage(await getWeeklyVideoExportUsage(user, weeklyVideoExportLimit));
+      }
+      if (returnToVideoWorks) {
+        router.replace("/studio?tab=works" as Href);
+        return;
       }
       if (planEntitlements.showAds) {
         setIsPostSaveAdVisible(true);
@@ -2029,10 +2084,10 @@ export default function TripClipScreen() {
               styles.draftSaveButton,
               (isLoading || isExporting) && styles.disabledButton
             ]}
-            onPress={() => void persistTripClipDraft(true)}
+            onPress={handleHeaderSavePress}
           >
             <Text selectable={false} style={styles.draftSaveButtonText}>
-              임시 저장
+              {isEditingMadeVideo ? "저장" : "임시 저장"}
             </Text>
           </Pressable>
         </View>
@@ -2817,7 +2872,7 @@ export default function TripClipScreen() {
                 (isExporting || selectedPhotos.length === 0 || videoDurationTooLong) &&
                   styles.disabledButton
               ]}
-              onPress={saveSelectedExport}
+              onPress={() => void saveSelectedExport()}
             >
               <Text selectable={false} style={styles.primaryButtonText}>
                 {exportFormat === "mp4" && Platform.OS === "web"
@@ -2945,7 +3000,11 @@ export default function TripClipScreen() {
               exportProgress.error && styles.exportModalPanelError
             ]}
           >
-            <View style={styles.exportModalContent}>
+            <ScrollView
+              style={styles.exportModalScroll}
+              contentContainerStyle={styles.exportModalContent}
+              showsVerticalScrollIndicator={false}
+            >
               <Text style={styles.exportModalTitle}>
                 {exportProgress.title}
               </Text>
@@ -2984,6 +3043,7 @@ export default function TripClipScreen() {
                 </Text>
               </View>
             ) : null}
+            </ScrollView>
             {!isExporting ? (
               <View style={styles.exportModalActions}>
                 {exportProgress.completedVideoId ? (
@@ -3018,7 +3078,6 @@ export default function TripClipScreen() {
                 </Pressable>
               </View>
             ) : null}
-            </View>
           </View>
         </View>
       </Modal>
@@ -3030,12 +3089,14 @@ export default function TripClipScreen() {
       >
         <View style={[styles.exportModalBackdrop, modalSafeStyle]}>
           <View style={[styles.exportModalPanel, styles.comingSoonPanel]}>
-            <Text style={styles.exportModalTitle}>
-              준비중입니다
-            </Text>
-            <Text style={styles.exportModalDetail}>
-              핸드폰에 바로 저장하는 기능은 준비 중입니다. 지금은 미리보기와 편집 흐름을 먼저 사용할 수 있습니다.
-            </Text>
+            <View style={styles.exportModalContent}>
+              <Text style={styles.exportModalTitle}>
+                준비중입니다
+              </Text>
+              <Text style={styles.exportModalDetail}>
+                핸드폰에 바로 저장하는 기능은 준비 중입니다. 지금은 미리보기와 편집 흐름을 먼저 사용할 수 있습니다.
+              </Text>
+            </View>
             <View style={styles.exportModalActions}>
               <Pressable
                 style={[styles.primaryButton, styles.exportModalButton]}

@@ -21,7 +21,9 @@ for (const snippet of [
   'name="chevron-left"',
   "styles.headerSpacer",
   "styles.draftSaveButton",
-  "onPress={() => void persistTripClipDraft(true)}"
+  "const handleHeaderSavePress = () => {",
+  "persistTripClipDraft(true)",
+  "onPress={handleHeaderSavePress}"
 ]) {
   assert.ok(tripClipSource.includes(snippet), `trip clip header action missing: ${snippet}`);
 }

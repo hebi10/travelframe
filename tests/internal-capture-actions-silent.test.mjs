@@ -24,7 +24,7 @@ assert.ok(
 
 assert.ok(
   tripClipSource.includes("android_disableSound") &&
-    tripClipSource.includes("onPress={saveSelectedExport}") &&
+    tripClipSource.includes("onPress={() => void saveSelectedExport()}") &&
     tripClipSource.includes("onPress={shareSelectedExport}"),
   "trip clip export actions should disable Android touch click sound"
 );

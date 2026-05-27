@@ -9,7 +9,6 @@ import {
 } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-auth.js";
 import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-functions.js";
 import {
-  addDoc,
   collection,
   deleteDoc,
   doc,
@@ -93,6 +92,8 @@ const backupUploadAccept = {
 const reserveAdminBackupUpload = httpsCallable(functions, "reserveAdminBackupUpload");
 const completeAdminBackupUpload = httpsCallable(functions, "completeAdminBackupUpload");
 const deleteAdminBackupItem = httpsCallable(functions, "deleteAdminBackupItem");
+const setAdminProductSubscription = httpsCallable(functions, "setAdminProductSubscription");
+const setAdminBackupStatus = httpsCallable(functions, "setAdminBackupStatus");
 
 const productMeta = {
   ad_remove: {
@@ -422,20 +423,6 @@ const getEffectiveSubscription = (subscriptions = currentProductSubscriptions) =
   return null;
 };
 
-const createFreeSubscription = () => ({
-  plan: "free",
-  productId: "free",
-  status: "inactive",
-  provider: "admin",
-  startedAt: null,
-  expiresAt: null,
-  lastPaymentAt: null,
-  priceLabel: "무료",
-  productName: "무료",
-  updatedBy: currentAdmin?.uid ?? null,
-  updatedAt: serverTimestamp()
-});
-
 const renderSubscriptionCards = () => {
   paidProductIds.forEach((productId) => {
     const meta = productMeta[productId];
@@ -465,19 +452,6 @@ const fillSubscriptionForm = (productId = $("productSelect").value) => {
   $("productExpiresInput").value = toDateInput(subscription?.expiresAt);
   $("productExpiresInput").disabled = productId !== "creator_monthly";
   $("adminNoteInput").value = subscription?.adminNote ?? "";
-};
-
-const syncCurrentSubscription = async (uid, nextSubscriptions) => {
-  const effectiveSubscription = getEffectiveSubscription(nextSubscriptions);
-  await setDoc(
-    doc(db, "users", uid, "subscriptions", "current"),
-    {
-      ...(effectiveSubscription ?? createFreeSubscription()),
-      updatedBy: currentAdmin?.uid ?? null,
-      updatedAt: serverTimestamp()
-    },
-    { merge: true }
-  );
 };
 
 const addMonths = (date, months) => {
@@ -1229,50 +1203,16 @@ const saveProductSubscription = async (event) => {
 
   const productId = $("productSelect").value;
   const selectedStatus = $("productStatusSelect").value;
-  const now = new Date();
   const expiresValue = $("productExpiresInput").value;
   const expiresAt = expiresValue ? new Date(`${expiresValue}T23:59:59`).toISOString() : null;
-  const meta = productMeta[productId];
-  const previousSubscription = currentProductSubscriptions[productId];
-
-  const subscription = {
-    plan: "premium",
-    productId,
-    status: selectedStatus,
-    provider: "admin",
-    startedAt: previousSubscription?.startedAt ?? now.toISOString(),
-    expiresAt: productId === "creator_monthly" ? expiresAt : null,
-    lastPaymentAt:
-      selectedStatus === "active" ? now.toISOString() : previousSubscription?.lastPaymentAt ?? null,
-    priceLabel: meta.priceLabel,
-    productName: meta.productName,
-    adminNote: $("adminNoteInput").value.trim() || null,
-    updatedBy: currentAdmin.uid,
-    updatedAt: serverTimestamp()
-  };
 
   try {
-    await setDoc(
-      doc(db, "users", currentUserDoc.id, "subscriptions", productId),
-      subscription,
-      { merge: true }
-    );
-    const nextSubscriptions = {
-      ...currentProductSubscriptions,
-      [productId]: subscription
-    };
-    await syncCurrentSubscription(currentUserDoc.id, nextSubscriptions);
-    await addDoc(collection(db, "users", currentUserDoc.id, "paymentEvents"), {
-      type: "admin_subscription_updated",
+    await setAdminProductSubscription({
+      targetUid: currentUserDoc.id,
       productId,
-      productName: meta.productName,
-      priceLabel: meta.priceLabel,
-      status: subscription.status,
-      provider: "admin",
-      adminUid: currentAdmin.uid,
-      adminEmail: currentAdmin.email ?? null,
-      note: subscription.adminNote,
-      createdAt: serverTimestamp()
+      status: selectedStatus,
+      expiresAt: productId === "creator_monthly" ? expiresAt : null,
+      adminNote: $("adminNoteInput").value.trim() || null
     });
 
     setMessage("subscriptionMessage", "상품 상태를 저장했습니다.");
@@ -1316,15 +1256,11 @@ $("markBackupExpiredButton").addEventListener("click", async () => {
   const deleteAfter = getDeleteAfter(currentSubscription?.expiresAt);
 
   try {
-    await setDoc(
-      doc(db, "users", currentUserDoc.id, "backups", "current"),
-      {
-        status: "expired",
-        deleteAfter,
-        updatedAt: serverTimestamp()
-      },
-      { merge: true }
-    );
+    await setAdminBackupStatus({
+      targetUid: currentUserDoc.id,
+      status: "expired",
+      deleteAfter
+    });
     setMessage("backupMessage", "백업을 만료 상태로 표시했습니다.");
     await loadUserDetail();
   } catch (error) {
@@ -1342,17 +1278,48 @@ $("deleteBackupButton").addEventListener("click", async () => {
   setMessage("backupMessage", "삭제 처리 중입니다.");
 
   try {
-    const photos = await getDocs(collection(db, "users", currentUserDoc.id, "photoBackups"));
-    await Promise.all(photos.docs.map((item) => deleteDoc(item.ref)));
-    await setDoc(
-      doc(db, "users", currentUserDoc.id, "backups", "current"),
-      {
-        status: "deleted",
-        deletedAt: new Date().toISOString(),
-        updatedAt: serverTimestamp()
-      },
-      { merge: true }
-    );
+    const [photos, imageWorks, videos, musicTracks] = await Promise.all([
+      getDocs(collection(db, "users", currentUserDoc.id, "photoBackups")),
+      getDocs(collection(db, "users", currentUserDoc.id, "imageWorks")),
+      getDocs(collection(db, "users", currentUserDoc.id, "videos")),
+      getDocs(collection(db, "users", currentUserDoc.id, "musicTracks"))
+    ]);
+    const deleteTasks = [
+      ...photos.docs.map((item) =>
+        deleteAdminBackupItem({
+          targetUid: currentUserDoc.id,
+          itemType: "photo",
+          itemId: item.id
+        })
+      ),
+      ...imageWorks.docs.map((item) =>
+        deleteAdminBackupItem({
+          targetUid: currentUserDoc.id,
+          itemType: "imageWork",
+          itemId: item.id
+        })
+      ),
+      ...videos.docs.map((item) =>
+        deleteAdminBackupItem({
+          targetUid: currentUserDoc.id,
+          itemType: "video",
+          itemId: item.id
+        })
+      ),
+      ...musicTracks.docs.map((item) =>
+        deleteAdminBackupItem({
+          targetUid: currentUserDoc.id,
+          itemType: "music",
+          itemId: item.id
+        })
+      )
+    ];
+
+    await Promise.all(deleteTasks);
+    await setAdminBackupStatus({
+      targetUid: currentUserDoc.id,
+      status: "deleted"
+    });
     setMessage("backupMessage", "백업 문서를 삭제 처리했습니다.");
     await loadUserDetail();
   } catch (error) {

@@ -11,6 +11,7 @@ const transpiled = ts.transpileModule(source, {
   }
 }).outputText
   .replace(/^import .* from "firebase\/firestore";\n/m, "")
+  .replace(/^import .* from "firebase\/functions";\n/m, "")
   .replace(/^import .* from "@\/lib\/firebase";\n/m, "");
 
 const {
@@ -18,7 +19,9 @@ const {
   PRO_WEEKLY_VIDEO_EXPORT_LIMIT,
   EXPERT_WEEKLY_VIDEO_EXPORT_LIMIT,
   buildWeeklyVideoExportUsage,
-  canReserveWeeklyVideoExport
+  canReserveWeeklyVideoExport,
+  reserveWeeklyVideoExport,
+  releaseWeeklyVideoExport
 } = await import(`data:text/javascript,${encodeURIComponent(transpiled)}`);
 
 assert.equal(FREE_WEEKLY_VIDEO_EXPORT_LIMIT, 1);
@@ -62,5 +65,26 @@ assert.equal(canReserveWeeklyVideoExport({ count: 1, limit: 1 }), false);
 assert.equal(canReserveWeeklyVideoExport({ count: 14, limit: 15 }), true);
 assert.equal(canReserveWeeklyVideoExport({ count: 15, limit: 15 }), false);
 assert.equal(canReserveWeeklyVideoExport({ count: 0, limit: 0 }), false);
+
+assert.ok(
+  source.includes('httpsCallable(firebaseFunctions, "reserveWeeklyVideoExport")'),
+  "weekly video export reservations should use the server callable"
+);
+assert.ok(
+  source.includes('httpsCallable(firebaseFunctions, "releaseWeeklyVideoExport")'),
+  "weekly video export releases should use the server callable"
+);
+assert.equal(
+  source.includes("runTransaction"),
+  false,
+  "weekly video export quota should not be reserved by direct client Firestore transactions"
+);
+assert.equal(
+  source.includes("setDoc"),
+  false,
+  "weekly video export quota should not be released by direct client Firestore writes"
+);
+assert.equal(typeof reserveWeeklyVideoExport, "function");
+assert.equal(typeof releaseWeeklyVideoExport, "function");
 
 console.log("ok - weekly video export quota supports free, pro, and expert limits");

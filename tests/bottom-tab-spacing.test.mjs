@@ -25,8 +25,8 @@ assert.ok(
 );
 
 assert.ok(
-  screenShellSource.includes("const TAB_BAR_CONTENT_RESERVE_HEIGHT = TAB_BAR_BASE_HEIGHT / 2;"),
-  "screen shell should reserve a reduced content gap above the tab bar"
+  screenShellSource.includes("const TAB_BAR_CONTENT_RESERVE_HEIGHT = TAB_BAR_BASE_HEIGHT;"),
+  "screen shell should reserve the full tab bar base height"
 );
 
 assert.ok(

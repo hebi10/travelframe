@@ -6,10 +6,11 @@ const firestoreRules = fs.readFileSync("firestore.rules", "utf8");
 for (const snippet of [
   "function isActiveSubscription(userId, productId)",
   "function weeklyVideoExportLimitForUser(userId)",
-  "request.resource.data.count <= weeklyVideoExportLimitForUser(userId)",
-  "request.resource.data.limit == weeklyVideoExportLimitForUser(userId)"
+  "match /usage/{usageGroup}/weeks/{weekId}",
+  "allow create, update: if false;",
+  "allow delete: if isAdmin();"
 ]) {
-  assert.ok(firestoreRules.includes(snippet), `weekly video export rules missing: ${snippet}`);
+  assert.ok(firestoreRules.includes(snippet), `weekly video export rules should be server-owned: ${snippet}`);
 }
 
-console.log("ok - Firestore rules allow weekly video export usage by active plan limit");
+console.log("ok - Firestore rules keep weekly video export usage server-owned");

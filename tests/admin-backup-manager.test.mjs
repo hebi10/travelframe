@@ -13,7 +13,9 @@ for (const snippet of [
   'const backupPageSize = 10;',
   'const loadBackupItems = async (tab = activeBackupTab)',
   'const uploadAdminBackupFile = async (file)',
-  'const removeBackupItem = async (item)'
+  'const removeBackupItem = async (item)',
+  'const setAdminBackupStatus = httpsCallable(functions, "setAdminBackupStatus");',
+  "await setAdminBackupStatus({"
 ]) {
   assert.ok(adminSource.includes(snippet), `admin backup manager missing: ${snippet}`);
 }
@@ -40,6 +42,28 @@ for (const snippet of [
 ]) {
   assert.ok(functionsSource.includes(snippet), `admin backup functions missing: ${snippet}`);
 }
+
+assert.ok(
+  adminSource.includes('itemType: "photo"') &&
+    adminSource.includes('itemType: "imageWork"') &&
+    adminSource.includes('itemType: "video"') &&
+    adminSource.includes('itemType: "music"'),
+  "admin bulk backup deletion should route every item type through the server callable"
+);
+assert.equal(
+  adminSource.includes("deleteDoc(item.ref)"),
+  false,
+  "admin bulk backup deletion should not delete backup metadata directly"
+);
+assert.equal(
+  adminSource.includes('doc(db, "users", currentUserDoc.id, "backups", "current")'),
+  false,
+  "admin backup status changes should not write backup overview directly"
+);
+assert.ok(
+  functionsSource.includes("exports.setAdminBackupStatus = onCall"),
+  "admin backup status changes should be handled by a server callable"
+);
 
 for (const snippet of [
   "function isAdmin()",

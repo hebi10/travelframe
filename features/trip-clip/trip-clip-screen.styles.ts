@@ -1147,9 +1147,16 @@ export const styles = StyleSheet.create({
     width: "92%",
     maxWidth: 360,
     flexGrow: 0,
+    maxHeight: "86%",
     borderWidth: 1,
     borderColor: colors.text,
-    backgroundColor: colors.background
+    backgroundColor: colors.background,
+    overflow: "hidden"
+  },
+  exportModalScroll: {
+    flexGrow: 0,
+    flexShrink: 1,
+    minHeight: 0
   },
   exportModalContent: {
     gap: 12,
@@ -1227,7 +1234,8 @@ export const styles = StyleSheet.create({
   },
   exportModalActions: {
     gap: 8,
-    paddingTop: 2,
+    paddingHorizontal: 18,
+    paddingBottom: 18,
     width: "100%"
   },
   exportModalButton: {

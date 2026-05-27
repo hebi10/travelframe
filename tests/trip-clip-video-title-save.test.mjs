@@ -7,15 +7,16 @@ for (const snippet of [
   "setWorkTitle(storedVideo.title)",
   "const normalizedWorkTitle = workTitle.trim()",
   "title: normalizedWorkTitle || undefined",
-  "const savedVideo = await saveMadeVideo({"
+  "const videoPayload: Parameters<typeof saveMadeVideo>[0] = {",
+  "savedVideo = await saveMadeVideo(videoPayload,"
 ]) {
   assert.ok(tripClipSource.includes(snippet), `trip clip video title save missing: ${snippet}`);
 }
 
-const saveVideoStart = tripClipSource.indexOf("const savedVideo = await saveMadeVideo({");
-assert.notEqual(saveVideoStart, -1, "saveMadeVideo call should exist");
-const saveVideoEnd = tripClipSource.indexOf("});", saveVideoStart);
-assert.notEqual(saveVideoEnd, -1, "saveMadeVideo call should close");
+const saveVideoStart = tripClipSource.indexOf("const videoPayload: Parameters<typeof saveMadeVideo>[0] = {");
+assert.notEqual(saveVideoStart, -1, "videoPayload should exist");
+const saveVideoEnd = tripClipSource.indexOf("};", saveVideoStart);
+assert.notEqual(saveVideoEnd, -1, "videoPayload should close");
 const saveVideoBlock = tripClipSource.slice(saveVideoStart, saveVideoEnd);
 
 assert.ok(

@@ -1,7 +1,6 @@
 import { Image } from "expo-image";
 import { Stack, router, type Href, useFocusEffect, useLocalSearchParams } from "expo-router";
-import { useVideoPlayer, VideoView } from "expo-video";
-import { useCallback, useState } from "react";
+import { Component, type ReactNode, useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -17,6 +16,18 @@ import { colors, controls, spacing, typography } from "@/constants/app-theme";
 import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 import { getMadeVideoById } from "@/lib/video-library";
 import type { MadeVideoItem } from "@/types/video";
+
+type ExpoVideoModule = typeof import("expo-video");
+
+const getExpoVideoModule = (): ExpoVideoModule | null => {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    return require("expo-video") as ExpoVideoModule;
+  } catch (error) {
+    console.error("영상 재생 모듈을 불러오지 못했습니다.", error);
+    return null;
+  }
+};
 
 const formatDate = (value: string) =>
   new Intl.DateTimeFormat("ko-KR", {
@@ -112,7 +123,9 @@ export default function VideoDetailScreen() {
           style={[styles.videoFrame, { aspectRatio: video.ratio === "16:9" ? 16 / 9 : 9 / 16 }]}
         >
           {hasPlayableVideoSource ? (
-            <VideoPlayerFrame source={videoSource as string} />
+            <VideoPlaybackBoundary>
+              <VideoPlayerFrame source={videoSource as string} />
+            </VideoPlaybackBoundary>
           ) : (
             <View style={styles.videoUnavailable}>
               <Text selectable style={styles.videoUnavailableText}>
@@ -180,6 +193,74 @@ export default function VideoDetailScreen() {
 }
 
 function VideoPlayerFrame({ source }: { source: string }) {
+  const expoVideoModule = getExpoVideoModule();
+
+  if (!expoVideoModule) {
+    return (
+      <View style={styles.videoUnavailable}>
+        <Text selectable style={styles.videoUnavailableText}>
+          영상 재생 기능을 불러오지 못했습니다. 앱을 최신 버전으로 업데이트한 뒤 다시 시도해 주세요.
+        </Text>
+        <Pressable
+          style={styles.lightButton}
+          onPress={() => router.replace("/studio?tab=works" as Href)}
+        >
+          <Text selectable={false} style={styles.lightButtonText}>
+            보관함으로 돌아가기
+          </Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  return <NativeVideoPlayerFrame source={source} videoModule={expoVideoModule} />;
+}
+
+class VideoPlaybackBoundary extends Component<
+  { children: ReactNode },
+  { hasError: boolean }
+> {
+  state = { hasError: false };
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error) {
+    console.error("영상 재생 화면을 열지 못했습니다.", error);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <View style={styles.videoUnavailable}>
+          <Text selectable style={styles.videoUnavailableText}>
+            영상 재생 화면을 열지 못했습니다. 앱을 최신 버전으로 업데이트한 뒤 다시 시도해 주세요.
+          </Text>
+          <Pressable
+            style={styles.lightButton}
+            onPress={() => router.replace("/studio?tab=works" as Href)}
+          >
+            <Text selectable={false} style={styles.lightButtonText}>
+              보관함으로 돌아가기
+            </Text>
+          </Pressable>
+        </View>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
+function NativeVideoPlayerFrame({
+  source,
+  videoModule
+}: {
+  source: string;
+  videoModule: ExpoVideoModule;
+}) {
+  const { useVideoPlayer, VideoView } = videoModule;
   const player = useVideoPlayer(source, (instance) => {
     instance.loop = true;
   });

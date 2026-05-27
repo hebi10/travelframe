@@ -30,7 +30,7 @@ for (const snippet of [
   "setRecentPhoto(savedPhoto)",
   "backupPhotoIfEnabled({",
   "recordBackupFailure({",
-  "const photoUri = `file://${photo.filePath}`",
+  "photoUri = `file://${photo.filePath}`",
   "deleteLocalFile(photoUri)"
 ]) {
   assert.ok(source.includes(snippet), `camera direct save flow missing: ${snippet}`);
@@ -40,7 +40,7 @@ const capturePhotoStart = source.indexOf("  const capturePhoto = async () => {")
 const takePhotoStart = source.indexOf("  const takePhoto = async () => {", capturePhotoStart);
 assert.ok(capturePhotoStart >= 0 && takePhotoStart > capturePhotoStart, "camera capture flow should exist");
 const capturePhotoSource = source.slice(capturePhotoStart, takePhotoStart);
-const nativeCaptureEnd = capturePhotoSource.indexOf("const photoUri = `file://${photo.filePath}`");
+const nativeCaptureEnd = capturePhotoSource.indexOf("photoUri = `file://${photo.filePath}`");
 const unlockAfterNativeCapture = capturePhotoSource.indexOf("setIsCapturing(false)", nativeCaptureEnd);
 const appSaveStart = capturePhotoSource.indexOf("saveCapturedPhoto(captureInput)");
 const deviceSaveStart = capturePhotoSource.indexOf("saveCapturedPhotoToDevice(captureInput)");
@@ -50,8 +50,8 @@ assert.ok(
   "camera should unlock the shutter after native capture completes"
 );
 assert.ok(
-  unlockAfterNativeCapture < appSaveStart && unlockAfterNativeCapture < deviceSaveStart,
-  "camera should not keep the shutter blocked while saving captured photos"
+  unlockAfterNativeCapture > appSaveStart && unlockAfterNativeCapture > deviceSaveStart,
+  "camera should keep the shutter blocked until captured photos finish saving"
 );
 
 for (const snippet of [

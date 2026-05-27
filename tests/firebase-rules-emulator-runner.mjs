@@ -260,38 +260,38 @@ await expectDenied(
   firestoreRequest("GET", `users/${ownerUid}`, { uid: otherUid })
 );
 
-await expectAllowed(
-  "owners can record the free weekly video export limit",
+await expectDenied(
+  "clients cannot write weekly video export usage directly",
   firestoreRequest("PATCH", `users/${ownerUid}/usage/videoExports/weeks/2026-05-18`, {
     uid: ownerUid,
     data: weeklyVideoUsage({ count: 1, limit: 1 })
   })
 );
 await expectDenied(
-  "owners without a creator subscription cannot record the pro weekly video export limit",
+  "clients cannot record the pro weekly video export limit directly",
   firestoreRequest("PATCH", `users/${ownerUid}/usage/videoExports/weeks/2026-05-18`, {
     uid: ownerUid,
     data: weeklyVideoUsage({ count: 1, limit: 15 })
   })
 );
 await seedDoc(`users/${ownerUid}/subscriptions/creator_monthly`, validSubscription("creator_monthly"));
-await expectAllowed(
-  "active creator subscriptions can record the pro weekly video export limit",
+await expectDenied(
+  "active creator subscriptions still cannot write weekly video export usage directly",
   firestoreRequest("PATCH", `users/${ownerUid}/usage/videoExports/weeks/2026-05-18`, {
     uid: ownerUid,
     data: weeklyVideoUsage({ count: 15, limit: 15 })
   })
 );
 await expectDenied(
-  "weekly video export usage cannot exceed the recorded plan limit",
+  "weekly video export usage cannot be written above the recorded plan limit",
   firestoreRequest("PATCH", `users/${ownerUid}/usage/videoExports/weeks/2026-05-18`, {
     uid: ownerUid,
     data: weeklyVideoUsage({ count: 16, limit: 15 })
   })
 );
 await seedDoc(`users/${ownerUid}/subscriptions/expert_monthly`, validSubscription("expert_monthly"));
-await expectAllowed(
-  "active expert subscriptions can record the expert weekly video export limit",
+await expectDenied(
+  "active expert subscriptions still cannot write weekly video export usage directly",
   firestoreRequest("PATCH", `users/${ownerUid}/usage/videoExports/weeks/2026-05-18`, {
     uid: ownerUid,
     data: weeklyVideoUsage({ count: 30, limit: 30 })

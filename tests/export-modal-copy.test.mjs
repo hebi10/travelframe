@@ -1,42 +1,56 @@
 ﻿import assert from "node:assert/strict";
 import fs from "node:fs";
 
-const source = [
-  fs.readFileSync(new URL("../app/(tabs)/trip-clip.tsx", import.meta.url), "utf8"),
-  fs.readFileSync(
-    new URL("../features/trip-clip/trip-clip-screen.styles.ts", import.meta.url),
-    "utf8"
-  )
-].join("\n");
+const tripClipSource = fs.readFileSync(
+  new URL("../app/(tabs)/trip-clip.tsx", import.meta.url),
+  "utf8"
+);
+const styleSource = fs.readFileSync(
+  new URL("../features/trip-clip/trip-clip-screen.styles.ts", import.meta.url),
+  "utf8"
+);
+
+const readStyleBlock = (name) => {
+  const match = new RegExp(`${name}:\\s*\\{([\\s\\S]*?)\\n\\s{2}\\},`).exec(styleSource);
+  assert.ok(match, `${name} style block should exist`);
+  return match[1];
+};
 
 assert.ok(
-  source.includes("저장한 영상은 핸드폰 갤러리에 저장됐습니다."),
+  tripClipSource.includes("저장한 영상은 핸드폰 갤러리에 저장됐습니다."),
   "MP4 save completion should mention phone gallery"
 );
 assert.ok(
-  source.includes("<View\n            style={[\n              styles.exportModalPanel"),
-  "export progress panel should not be a ScrollView panel"
+  tripClipSource.includes("<View\n            style={[\n              styles.exportModalPanel"),
+  "export progress panel should remain a View so actions can stay fixed inside it"
 );
-assert.equal(
-  source.includes("<ScrollView\n            style={[\n              styles.exportModalPanel"),
-  false,
-  "export progress panel should not clip action buttons through ScrollView maxHeight"
+assert.ok(
+  tripClipSource.includes("style={styles.exportModalScroll}") &&
+    tripClipSource.includes("contentContainerStyle={styles.exportModalContent}"),
+  "export progress copy should scroll inside the bounded panel"
+);
+assert.ok(
+  tripClipSource.includes("</ScrollView>\n            {!isExporting ? ("),
+  "completion actions should stay outside the scroll content"
 );
 
-const exportModalPanelMatch = source.match(
-  /exportModalPanel:\s*\{[\s\S]*?\n\s*\},/
-);
+const exportModalPanelStyle = readStyleBlock("exportModalPanel");
+const exportModalScrollStyle = readStyleBlock("exportModalScroll");
+const exportModalActionsStyle = readStyleBlock("exportModalActions");
 
-assert.ok(exportModalPanelMatch, "export modal panel style should exist");
-assert.equal(
-  exportModalPanelMatch[0].includes("maxHeight"),
-  false,
-  "export modal panel should grow to fit completion actions without a max height"
+assert.ok(
+  exportModalPanelStyle.includes('maxHeight: "86%"') &&
+    exportModalPanelStyle.includes('overflow: "hidden"'),
+  "export modal panel should stay within the screen instead of overflowing"
 );
-assert.equal(
-  exportModalPanelMatch[0].includes('overflow: "hidden"'),
-  false,
-  "export modal panel should not clip completion actions"
+assert.ok(
+  exportModalScrollStyle.includes("flexShrink: 1") &&
+    exportModalScrollStyle.includes("minHeight: 0"),
+  "export modal scroll area should shrink within the panel"
+);
+assert.ok(
+  exportModalActionsStyle.includes("paddingBottom: 18"),
+  "export modal actions should keep bottom padding while fixed below scroll content"
 );
 
 console.log("ok - export modal completion copy and layout are stable");

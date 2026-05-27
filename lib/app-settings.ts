@@ -1,4 +1,4 @@
-import type { GuideType } from "@/constants/camera-guides";
+import { GUIDE_TYPES, type GuideType } from "@/constants/camera-guides";
 import {
   DEFAULT_IMAGE_QUALITY,
   IMAGE_QUALITY_OPTIONS,
@@ -350,14 +350,18 @@ const normalizeSettings = (value: Partial<AppSettings> | null): AppSettings => {
   };
   const hasStoredStorageMode =
     value?.storageMode !== undefined && storageModes.includes(value.storageMode);
+  const defaultGuide = GUIDE_TYPES.includes(nextSettings.defaultGuide)
+    ? nextSettings.defaultGuide
+    : defaultAppSettings.defaultGuide;
 
   return {
     ...nextSettings,
+    defaultGuide,
     guideVisible:
       typeof nextSettings.guideVisible === "boolean"
         ? nextSettings.guideVisible
         : defaultAppSettings.guideVisible,
-    guideSize: clampGuideSize(nextSettings.guideSize, nextSettings.defaultGuide),
+    guideSize: clampGuideSize(nextSettings.guideSize, defaultGuide),
     guideStrokeWidth: clampGuideStrokeWidth(nextSettings.guideStrokeWidth),
     guideColor:
       typeof nextSettings.guideColor === "string" && nextSettings.guideColor.trim()

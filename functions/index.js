@@ -56,15 +56,15 @@ const getBackupSubscription = async (uid) => {
   ]);
 
   const current = currentSnapshot.exists ? currentSnapshot.data() : null;
-  if (current?.productId === "creator_monthly" || current?.productId === "expert_monthly") {
-    return current;
-  }
+  const creator = creatorSnapshot.exists ? creatorSnapshot.data() : null;
+  const expert = expertSnapshot.exists ? expertSnapshot.data() : null;
+  const activeExpert = isPremiumSubscriptionActive(expert, ["expert_monthly"]) ? expert : null;
+  const activeCreator = isPremiumSubscriptionActive(creator, ["creator_monthly"]) ? creator : null;
+  const activeCurrent = isPremiumSubscriptionActive(current, ["creator_monthly", "expert_monthly"])
+    ? current
+    : null;
 
-  if (expertSnapshot.exists) {
-    return expertSnapshot.data();
-  }
-
-  return creatorSnapshot.exists ? creatorSnapshot.data() : current;
+  return activeExpert ?? activeCreator ?? activeCurrent ?? expert ?? creator ?? current;
 };
 
 const getUsageRef = (uid) => db.doc(`users/${uid}/backupUsage/current`);
@@ -74,8 +74,128 @@ const getMusicSessionRef = (uid, sessionId) =>
   db.doc(`users/${uid}/musicUploadSessions/${sessionId}`);
 const BACKUP_UPLOAD_SESSION_TTL_MS = 15 * 60 * 1000;
 
-const MAX_USER_MUSIC_TRACKS = 10;
+const MAX_USER_MUSIC_TRACKS = 20;
 const MUSIC_UPLOAD_SESSION_TTL_MS = 15 * 60 * 1000;
+const FREE_WEEKLY_VIDEO_EXPORT_LIMIT = 1;
+const PRO_WEEKLY_VIDEO_EXPORT_LIMIT = 15;
+const EXPERT_WEEKLY_VIDEO_EXPORT_LIMIT = 30;
+const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+const isPremiumSubscriptionActive = (subscription, productIds, now = Date.now()) => {
+  if (
+    !subscription ||
+    subscription.plan !== "premium" ||
+    subscription.status !== "active" ||
+    !productIds.includes(subscription.productId)
+  ) {
+    return false;
+  }
+
+  if (!subscription.expiresAt) {
+    return true;
+  }
+
+  return new Date(subscription.expiresAt).getTime() > now;
+};
+
+const getMusicTrackLimit = (subscription) => {
+  if (isPremiumSubscriptionActive(subscription, ["expert_monthly"])) {
+    return 20;
+  }
+
+  if (isPremiumSubscriptionActive(subscription, ["creator_monthly"])) {
+    return 10;
+  }
+
+  return 0;
+};
+
+const getWeeklyVideoExportLimit = (subscription) => {
+  if (isPremiumSubscriptionActive(subscription, ["expert_monthly"])) {
+    return EXPERT_WEEKLY_VIDEO_EXPORT_LIMIT;
+  }
+
+  if (isPremiumSubscriptionActive(subscription, ["creator_monthly"])) {
+    return PRO_WEEKLY_VIDEO_EXPORT_LIMIT;
+  }
+
+  return FREE_WEEKLY_VIDEO_EXPORT_LIMIT;
+};
+
+const getKstWeekStart = (date = new Date()) => {
+  const kstDate = new Date(date.getTime() + KST_OFFSET_MS);
+  const kstDay = kstDate.getUTCDay();
+  const daysFromMonday = (kstDay + 6) % 7;
+  return new Date(
+    Date.UTC(
+      kstDate.getUTCFullYear(),
+      kstDate.getUTCMonth(),
+      kstDate.getUTCDate() - daysFromMonday
+    )
+  );
+};
+
+const getCurrentVideoExportWeek = (date = new Date()) => {
+  const weekStart = getKstWeekStart(date);
+  const weekEnd = new Date(weekStart.getTime() + 6 * DAY_MS);
+  const format = new Intl.DateTimeFormat("ko-KR", {
+    month: "long",
+    day: "numeric"
+  });
+
+  return {
+    weekId: weekStart.toISOString().slice(0, 10),
+    weekLabel: `${format.format(weekStart)} - ${format.format(weekEnd)}`
+  };
+};
+
+const getWeeklyVideoExportRef = (uid, weekId) =>
+  db.doc(`users/${uid}/usage/videoExports/weeks/${weekId}`);
+const ADMIN_PRODUCT_META = {
+  ad_remove: {
+    productName: "광고 제거",
+    priceLabel: "3,900원"
+  },
+  creator_monthly: {
+    productName: "영상 내보내기",
+    priceLabel: "월 3,900원"
+  },
+  expert_monthly: {
+    productName: "전문가",
+    priceLabel: "월 9,900원"
+  }
+};
+const ADMIN_PRODUCT_IDS = Object.keys(ADMIN_PRODUCT_META);
+const ADMIN_SUBSCRIPTION_STATUSES = new Set(["inactive", "active", "expired"]);
+
+const createAdminFreeSubscription = (adminUid) => ({
+  plan: "free",
+  productId: "free",
+  status: "inactive",
+  provider: "admin",
+  startedAt: null,
+  expiresAt: null,
+  lastPaymentAt: null,
+  priceLabel: "무료",
+  productName: "무료",
+  updatedBy: adminUid,
+  updatedAt: FieldValue.serverTimestamp()
+});
+
+const getEffectiveAdminSubscription = (subscriptions) => {
+  const activeExpert = isPremiumSubscriptionActive(subscriptions.expert_monthly, ["expert_monthly"])
+    ? subscriptions.expert_monthly
+    : null;
+  const activeCreator = isPremiumSubscriptionActive(subscriptions.creator_monthly, ["creator_monthly"])
+    ? subscriptions.creator_monthly
+    : null;
+  const activeAdRemove = isPremiumSubscriptionActive(subscriptions.ad_remove, ["ad_remove"])
+    ? subscriptions.ad_remove
+    : null;
+
+  return activeExpert ?? activeCreator ?? activeAdRemove;
+};
 
 const assertMusicUploadAllowed = ({ uid, trackId, name, fileSize, contentType, storagePath }) => {
   if (typeof trackId !== "string" || !/^music-\d+/.test(trackId)) {
@@ -107,6 +227,105 @@ const getMusicTrackCount = async (transaction, uid) => {
   const snapshot = await transaction.get(db.collection(`users/${uid}/musicTracks`));
   return snapshot.size;
 };
+
+exports.reserveWeeklyVideoExport = onCall(async (request) => {
+  try {
+    const uid = requireUid(request);
+    const subscription = await getBackupSubscription(uid);
+    const limit = getWeeklyVideoExportLimit(subscription);
+    const { weekId, weekLabel } = getCurrentVideoExportWeek();
+    const usageRef = getWeeklyVideoExportRef(uid, weekId);
+    let nextCount = 0;
+
+    await db.runTransaction(async (transaction) => {
+      const snapshot = await transaction.get(usageRef);
+      const currentCount = snapshot.exists
+        ? Math.max(0, Number(snapshot.data().count ?? 0))
+        : 0;
+
+      if (currentCount >= limit) {
+        throw new HttpsError(
+          "failed-precondition",
+          `이번 주에 MP4 영상을 ${limit}개까지 만들 수 있습니다. 다음 주에 다시 만들거나 플랜을 확인해 주세요.`
+        );
+      }
+
+      nextCount = currentCount + 1;
+      transaction.set(
+        usageRef,
+        {
+          userId: uid,
+          weekId,
+          weekLabel,
+          count: nextCount,
+          limit,
+          updatedAt: FieldValue.serverTimestamp(),
+          createdAt: snapshot.exists
+            ? snapshot.data().createdAt ?? FieldValue.serverTimestamp()
+            : FieldValue.serverTimestamp()
+        },
+        { merge: true }
+      );
+    });
+
+    return {
+      weekId,
+      weekLabel,
+      count: nextCount,
+      limit,
+      remaining: Math.max(0, limit - nextCount)
+    };
+  } catch (error) {
+    throw toHttpsError(error);
+  }
+});
+
+exports.releaseWeeklyVideoExport = onCall(async (request) => {
+  try {
+    const uid = requireUid(request);
+    const subscription = await getBackupSubscription(uid);
+    const limit = getWeeklyVideoExportLimit(subscription);
+    const { weekId, weekLabel } = getCurrentVideoExportWeek();
+    const usageRef = getWeeklyVideoExportRef(uid, weekId);
+    let nextCount = 0;
+
+    await db.runTransaction(async (transaction) => {
+      const snapshot = await transaction.get(usageRef);
+      const currentCount = snapshot.exists
+        ? Math.max(0, Number(snapshot.data().count ?? 0))
+        : 0;
+
+      nextCount = Math.max(0, currentCount - 1);
+      if (!snapshot.exists || currentCount <= 0) {
+        return;
+      }
+
+      transaction.set(
+        usageRef,
+        {
+          userId: uid,
+          weekId,
+          weekLabel,
+          count: nextCount,
+          limit,
+          updatedAt: FieldValue.serverTimestamp(),
+          createdAt: snapshot.data().createdAt ?? FieldValue.serverTimestamp()
+        },
+        { merge: true }
+      );
+    });
+
+    return {
+      weekId,
+      weekLabel,
+      count: nextCount,
+      limit,
+      remaining: Math.max(0, limit - nextCount)
+    };
+  } catch (error) {
+    throw toHttpsError(error);
+  }
+});
 
 const getBackupSessionUsageDelta = (session) =>
   session.usageDelta ?? getBackupUsageDelta({
@@ -469,6 +688,12 @@ exports.reserveMusicUpload = onCall(async (request) => {
   try {
     const uid = requireUid(request);
     const { trackId, name, fileSize, contentType, storagePath } = request.data ?? {};
+    const subscription = await getBackupSubscription(uid);
+    const musicTrackLimit = Math.min(MAX_USER_MUSIC_TRACKS, getMusicTrackLimit(subscription));
+
+    if (musicTrackLimit <= 0) {
+      throw new HttpsError("failed-precondition", "Active music subscription is required for music uploads.");
+    }
 
     assertMusicUploadAllowed({
       uid,
@@ -483,7 +708,7 @@ exports.reserveMusicUpload = onCall(async (request) => {
 
     await db.runTransaction(async (transaction) => {
       const trackCount = await getMusicTrackCount(transaction, uid);
-      if (trackCount >= MAX_USER_MUSIC_TRACKS) {
+      if (trackCount >= musicTrackLimit) {
         throw new HttpsError("failed-precondition", "User music track limit exceeded.");
       }
 
@@ -494,6 +719,7 @@ exports.reserveMusicUpload = onCall(async (request) => {
         fileSize,
         contentType,
         storagePath,
+        musicTrackLimit,
         status: "reserved",
         createdAt: FieldValue.serverTimestamp(),
         expiresAt: admin.firestore.Timestamp.fromMillis(Date.now() + MUSIC_UPLOAD_SESSION_TTL_MS)
@@ -564,6 +790,8 @@ exports.completeMusicUpload = onCall(async (request) => {
         ? createdAt
         : new Date().toISOString();
     const trackRef = db.doc(`users/${uid}/musicTracks/${trackId}`);
+    const subscription = await getBackupSubscription(uid);
+    const musicTrackLimit = Math.min(MAX_USER_MUSIC_TRACKS, getMusicTrackLimit(subscription));
 
     await db.runTransaction(async (transaction) => {
       const [freshSessionSnapshot, existingTrackSnapshot] = await Promise.all([
@@ -576,8 +804,12 @@ exports.completeMusicUpload = onCall(async (request) => {
       }
 
       if (!existingTrackSnapshot.exists) {
+        if (musicTrackLimit <= 0) {
+          throw new HttpsError("failed-precondition", "Active music subscription is required for music uploads.");
+        }
+
         const trackCount = await getMusicTrackCount(transaction, uid);
-        if (trackCount >= MAX_USER_MUSIC_TRACKS) {
+        if (trackCount >= musicTrackLimit) {
           throw new HttpsError("failed-precondition", "User music track limit exceeded.");
         }
       }
@@ -659,6 +891,107 @@ const requireAdminUid = async (request) => {
 
   return adminUid;
 };
+
+exports.setAdminProductSubscription = onCall(async (request) => {
+  try {
+    const adminUid = await requireAdminUid(request);
+    const { targetUid, productId, status, expiresAt, adminNote } = request.data ?? {};
+
+    if (typeof targetUid !== "string" || !targetUid) {
+      throw new HttpsError("invalid-argument", "targetUid is required.");
+    }
+
+    if (!ADMIN_PRODUCT_IDS.includes(productId)) {
+      throw new HttpsError("invalid-argument", "Unsupported subscription product.");
+    }
+
+    if (!ADMIN_SUBSCRIPTION_STATUSES.has(status)) {
+      throw new HttpsError("invalid-argument", "Unsupported subscription status.");
+    }
+
+    const targetUserSnapshot = await db.doc(`users/${targetUid}`).get();
+    if (!targetUserSnapshot.exists) {
+      throw new HttpsError("not-found", "Target user was not found.");
+    }
+
+    const safeExpiresAt =
+      (productId === "creator_monthly" || productId === "expert_monthly") &&
+      typeof expiresAt === "string" &&
+      !Number.isNaN(new Date(expiresAt).getTime())
+        ? expiresAt
+        : null;
+    const safeAdminNote = typeof adminNote === "string" && adminNote.trim()
+      ? adminNote.trim()
+      : null;
+    const meta = ADMIN_PRODUCT_META[productId];
+    const productRef = db.doc(`users/${targetUid}/subscriptions/${productId}`);
+    const previousSnapshot = await productRef.get();
+    const previousSubscription = previousSnapshot.exists ? previousSnapshot.data() : null;
+    const nowIso = new Date().toISOString();
+    const subscription = {
+      plan: "premium",
+      productId,
+      status,
+      provider: "admin",
+      startedAt: previousSubscription?.startedAt ?? nowIso,
+      expiresAt: safeExpiresAt,
+      lastPaymentAt:
+        status === "active" ? nowIso : previousSubscription?.lastPaymentAt ?? null,
+      priceLabel: meta.priceLabel,
+      productName: meta.productName,
+      adminNote: safeAdminNote,
+      updatedBy: adminUid,
+      updatedAt: FieldValue.serverTimestamp()
+    };
+
+    const subscriptionRefs = Object.fromEntries(
+      ADMIN_PRODUCT_IDS.map((id) => [id, db.doc(`users/${targetUid}/subscriptions/${id}`)])
+    );
+    const subscriptionSnapshots = await Promise.all(
+      ADMIN_PRODUCT_IDS.map((id) => subscriptionRefs[id].get())
+    );
+    const nextSubscriptions = ADMIN_PRODUCT_IDS.reduce((items, id, index) => {
+      const snapshot = subscriptionSnapshots[index];
+      return {
+        ...items,
+        [id]: id === productId
+          ? subscription
+          : snapshot.exists ? snapshot.data() : null
+      };
+    }, {});
+    const effectiveSubscription = getEffectiveAdminSubscription(nextSubscriptions);
+    const batch = db.batch();
+
+    batch.set(productRef, subscription, { merge: true });
+    batch.set(
+      db.doc(`users/${targetUid}/subscriptions/current`),
+      {
+        ...(effectiveSubscription ?? createAdminFreeSubscription(adminUid)),
+        updatedBy: adminUid,
+        updatedAt: FieldValue.serverTimestamp()
+      },
+      { merge: true }
+    );
+    batch.set(db.collection(`users/${targetUid}/paymentEvents`).doc(), {
+      type: "admin_subscription_updated",
+      productId,
+      productName: meta.productName,
+      priceLabel: meta.priceLabel,
+      status,
+      provider: "admin",
+      adminUid,
+      adminEmail: request.auth?.token?.email ?? null,
+      note: safeAdminNote,
+      createdAt: FieldValue.serverTimestamp()
+    });
+
+    await batch.commit();
+
+    return { saved: true };
+  } catch (error) {
+    throw toHttpsError(error);
+  }
+});
 
 const sanitizeAdminFileName = (fileName) =>
   String(fileName ?? "backup-file")
@@ -999,6 +1332,50 @@ exports.deleteAdminBackupItem = onCall(async (request) => {
     const summary = await refreshAdminBackupOverview(targetUid);
 
     return { deleted: true, summary };
+  } catch (error) {
+    throw toHttpsError(error);
+  }
+});
+
+exports.setAdminBackupStatus = onCall(async (request) => {
+  try {
+    await requireAdminUid(request);
+    const { targetUid, status, deleteAfter } = request.data ?? {};
+
+    if (typeof targetUid !== "string" || !targetUid) {
+      throw new HttpsError("invalid-argument", "targetUid is required.");
+    }
+
+    if (!["expired", "deleted"].includes(status)) {
+      throw new HttpsError("invalid-argument", "Unsupported backup status.");
+    }
+
+    const targetUserSnapshot = await db.doc(`users/${targetUid}`).get();
+    if (!targetUserSnapshot.exists) {
+      throw new HttpsError("not-found", "Target user was not found.");
+    }
+
+    const safeDeleteAfter =
+      status === "expired" &&
+      typeof deleteAfter === "string" &&
+      !Number.isNaN(new Date(deleteAfter).getTime())
+        ? deleteAfter
+        : null;
+    const payload = status === "deleted"
+      ? {
+          status: "deleted",
+          deleteAfter: null,
+          deletedAt: new Date().toISOString(),
+          updatedAt: FieldValue.serverTimestamp()
+        }
+      : {
+          status: "expired",
+          deleteAfter: safeDeleteAfter,
+          updatedAt: FieldValue.serverTimestamp()
+        };
+
+    await db.doc(`users/${targetUid}/backups/current`).set(payload, { merge: true });
+    return { status };
   } catch (error) {
     throw toHttpsError(error);
   }

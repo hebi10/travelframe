@@ -11,9 +11,20 @@ for (const snippet of [
   "completeMusicUpload",
   "releaseMusicUpload",
   "musicUploadSessions",
-  "MAX_USER_MUSIC_TRACKS"
+  "MAX_USER_MUSIC_TRACKS",
+  "getMusicTrackLimit",
+  "Active music subscription is required",
+  "musicTrackLimit"
 ]) {
   assert.ok(functionsSource.includes(snippet), `Functions missing music quota enforcement: ${snippet}`);
+}
+
+for (const snippet of [
+  "const activeExpert = isPremiumSubscriptionActive(expert, [\"expert_monthly\"])",
+  "const activeCreator = isPremiumSubscriptionActive(creator, [\"creator_monthly\"])",
+  "return activeExpert ?? activeCreator ?? activeCurrent ?? expert ?? creator ?? current;"
+]) {
+  assert.ok(functionsSource.includes(snippet), `Functions should prefer active product subscriptions: ${snippet}`);
 }
 
 for (const snippet of [

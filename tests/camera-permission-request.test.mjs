@@ -14,4 +14,14 @@ for (const snippet of [
   assert.ok(cameraSource.includes(snippet), `camera permission auto request missing: ${snippet}`);
 }
 
+assert.ok(
+  cameraSource.includes('router.replace("/studio")'),
+  "camera permission fallback should send users to a usable non-camera screen"
+);
+assert.equal(
+  cameraSource.includes('router.replace("/")'),
+  false,
+  "camera permission fallback should not route back to the root camera redirect"
+);
+
 console.log("ok - camera tab requests permission on first focus");

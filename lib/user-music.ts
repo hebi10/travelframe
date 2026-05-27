@@ -28,7 +28,7 @@ export type UserMusicTrack = {
   createdAt: string;
 };
 
-const MAX_USER_MUSIC_TRACKS = 10;
+const MAX_USER_MUSIC_TRACKS = 20;
 const MUSIC_CACHE_PREFIX = "travel-frame:user-music:v1";
 
 const getMusicCacheKey = (userId: string) => `${MUSIC_CACHE_PREFIX}:${userId}`;
