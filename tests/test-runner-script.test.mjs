@@ -13,6 +13,8 @@ for (const snippet of [
   "testsDirectory",
   "process.argv.slice(2)",
   "firebase-rules-emulator.test.mjs",
+  "!defaultExcludedTests.has(name)",
+  "filters.length === 0 || defaultExcludedTests.has(name)",
   "spawnSync(process.execPath",
   "No tests matched"
 ]) {

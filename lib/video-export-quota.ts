@@ -6,6 +6,7 @@ import {
 import { httpsCallable } from "firebase/functions";
 
 import { firebaseFunctions, firestore } from "@/lib/firebase";
+import { localStorageAdapter } from "@/lib/local-storage";
 
 export const FREE_WEEKLY_VIDEO_EXPORT_LIMIT = 1;
 export const PRO_WEEKLY_VIDEO_EXPORT_LIMIT = 15;
@@ -23,8 +24,18 @@ export type WeeklyVideoExportReservation = WeeklyVideoExportUsage & {
   reservationId: string;
 };
 
+type PendingWeeklyVideoExportCompletion = {
+  userId: string;
+  reservationId: string;
+  limit: number;
+  createdAt: string;
+  lastAttemptAt?: string;
+};
+
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
+const PENDING_WEEKLY_VIDEO_EXPORT_COMPLETIONS_KEY =
+  "pendingWeeklyVideoExportCompletions";
 
 const getKstWeekStart = (date = new Date()) => {
   const kstDate = new Date(date.getTime() + KST_OFFSET_MS);
@@ -136,6 +147,44 @@ const buildWeeklyVideoExportUsageFromResponse = (
     limit: Number(data.limit ?? 0)
   });
 
+const readPendingWeeklyVideoExportCompletions = async () => {
+  const raw = await localStorageAdapter.getItem(PENDING_WEEKLY_VIDEO_EXPORT_COMPLETIONS_KEY);
+  if (!raw) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed.filter(
+      (item): item is PendingWeeklyVideoExportCompletion =>
+        typeof item?.userId === "string" &&
+        typeof item?.reservationId === "string" &&
+        item.userId.length > 0 &&
+        item.reservationId.length > 0
+    );
+  } catch {
+    return [];
+  }
+};
+
+const writePendingWeeklyVideoExportCompletions = async (
+  pending: PendingWeeklyVideoExportCompletion[]
+) => {
+  if (pending.length === 0) {
+    await localStorageAdapter.removeItem(PENDING_WEEKLY_VIDEO_EXPORT_COMPLETIONS_KEY);
+    return;
+  }
+
+  await localStorageAdapter.setItem(
+    PENDING_WEEKLY_VIDEO_EXPORT_COMPLETIONS_KEY,
+    JSON.stringify(pending)
+  );
+};
+
 export const canReserveWeeklyVideoExport = ({
   count,
   limit
@@ -192,6 +241,74 @@ export const completeWeeklyVideoExport = async (
   return buildWeeklyVideoExportUsageFromResponse(
     result.data as Partial<WeeklyVideoExportUsage>
   );
+};
+
+export const recordPendingWeeklyVideoExportCompletion = async ({
+  user,
+  reservationId,
+  limit = FREE_WEEKLY_VIDEO_EXPORT_LIMIT
+}: {
+  user: User | null;
+  reservationId?: string | null;
+  limit?: number;
+}) => {
+  if (!user || !reservationId) {
+    return;
+  }
+
+  const pending = await readPendingWeeklyVideoExportCompletions();
+  const nextItem: PendingWeeklyVideoExportCompletion = {
+    userId: user.uid,
+    reservationId,
+    limit,
+    createdAt: new Date().toISOString()
+  };
+  const nextPending = [
+    ...pending.filter(
+      (item) => item.userId !== user.uid || item.reservationId !== reservationId
+    ),
+    nextItem
+  ];
+
+  await writePendingWeeklyVideoExportCompletions(nextPending);
+};
+
+export const flushPendingWeeklyVideoExportCompletions = async (
+  user: User | null,
+  limit = FREE_WEEKLY_VIDEO_EXPORT_LIMIT
+) => {
+  if (!user) {
+    return null;
+  }
+
+  const pending = await readPendingWeeklyVideoExportCompletions();
+  const userPending = pending.filter((item) => item.userId === user.uid);
+  if (userPending.length === 0) {
+    return null;
+  }
+
+  let latestUsage: WeeklyVideoExportUsage | null = null;
+  const retained: PendingWeeklyVideoExportCompletion[] = pending.filter(
+    (item) => item.userId !== user.uid
+  );
+
+  for (const item of userPending) {
+    try {
+      const completedUsage = await completeWeeklyVideoExport(user, item.reservationId);
+      if (completedUsage) {
+        latestUsage = completedUsage;
+      }
+    } catch {
+      retained.push({
+        ...item,
+        limit: item.limit || limit,
+        lastAttemptAt: new Date().toISOString()
+      });
+    }
+  }
+
+  await writePendingWeeklyVideoExportCompletions(retained);
+  return latestUsage;
 };
 
 export const releaseWeeklyVideoExport = async (

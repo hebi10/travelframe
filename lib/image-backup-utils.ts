@@ -81,7 +81,13 @@ export const resolveImageDimensions = async ({
   });
 };
 
+const isRemoteUri = (uri: string) => /^https?:\/\//i.test(uri);
+
 const getLocalFileSize = async (uri: string) => {
+  if (isRemoteUri(uri)) {
+    throw new Error(IMAGE_OPTIMIZATION_FAILED_MESSAGE);
+  }
+
   const info = await FileSystem.getInfoAsync(uri);
   if (!info.exists || !("size" in info) || typeof info.size !== "number") {
     throw new Error(IMAGE_OPTIMIZATION_FAILED_MESSAGE);

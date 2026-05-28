@@ -153,6 +153,26 @@ const validPhotoBackup = (uid = ownerUid, photoId = "photo-1") => ({
   backupStatus: "backed_up"
 });
 
+const validVideoBackup = (uid = ownerUid, videoId = "video-1") => ({
+  userId: uid,
+  localId: videoId,
+  storagePath: `users/${uid}/backups/videos/${videoId}.mp4`,
+  fileSize: 2048,
+  fileType: "video/mp4",
+  backupSessionId: "video-session",
+  backupStatus: "backed_up"
+});
+
+const validImageWorkBackup = (uid = ownerUid, workId = "work-1") => ({
+  userId: uid,
+  localId: workId,
+  storagePaths: [`users/${uid}/backups/image-works/${workId}/image-1.jpg`],
+  backupSessionIds: ["image-work-session"],
+  fileSize: 1024,
+  imageBackupSize: 1024,
+  backupStatus: "backed_up"
+});
+
 const validSubscription = (productId) => ({
   plan: "premium",
   provider: "admin",
@@ -210,11 +230,12 @@ const seedBackupUploadSession = async ({
   storagePath = `users/${ownerUid}/backups/photos/${sessionId}/photo-session.jpg`,
   fileSize = 3,
   contentType = "image/jpeg",
-  mediaKind = "image"
+  mediaKind = "image",
+  status = "reserved"
 } = {}) => {
   await seedDoc(`users/${uid}/backupUploadSessions/${sessionId}`, {
     userId: uid,
-    status: "reserved",
+    status,
     mediaKind,
     storagePath,
     fileSize,
@@ -265,11 +286,106 @@ await expectDenied(
     data: { ...validPhotoBackup(ownerUid, "too-large"), fileSize: 250 * 1024 * 1024 + 1 }
   })
 );
+await expectDenied(
+  "owners cannot create photo backup metadata with an unreserved upload session",
+  firestoreRequest("PATCH", `users/${ownerUid}/photoBackups/unreserved-photo`, {
+    uid: ownerUid,
+    data: {
+      ...validPhotoBackup(ownerUid, "unreserved-photo"),
+      storagePath: `users/${ownerUid}/backups/photos/attacker-picked.jpg`,
+      backupSessionId: "attacker-picked-session"
+    }
+  })
+);
+await expectDenied(
+  "owners cannot create video backup metadata with an unreserved upload session",
+  firestoreRequest("PATCH", `users/${ownerUid}/videos/unreserved-video`, {
+    uid: ownerUid,
+    data: {
+      ...validVideoBackup(ownerUid, "unreserved-video"),
+      storagePath: `users/${ownerUid}/backups/videos/attacker-picked.mp4`,
+      backupSessionId: "attacker-picked-video-session"
+    }
+  })
+);
+await expectDenied(
+  "owners cannot create image work backup metadata with an unreserved upload session",
+  firestoreRequest("PATCH", `users/${ownerUid}/imageWorks/unreserved-work`, {
+    uid: ownerUid,
+    data: {
+      ...validImageWorkBackup(ownerUid, "unreserved-work"),
+      storagePaths: [`users/${ownerUid}/backups/image-works/unreserved-work/attacker-picked.jpg`],
+      backupSessionIds: ["attacker-picked-work-session"]
+    }
+  })
+);
+await seedBackupUploadSession({
+  sessionId: "photo-session",
+  storagePath: `users/${ownerUid}/backups/photos/photo-1.jpg`,
+  fileSize: 1024,
+  contentType: "image/jpeg",
+  mediaKind: "image",
+  status: "completed"
+});
 await expectAllowed(
   "owners can create valid photo backup metadata",
   firestoreRequest("PATCH", `users/${ownerUid}/photoBackups/photo-1`, {
     uid: ownerUid,
     data: validPhotoBackup(ownerUid, "photo-1")
+  })
+);
+await seedBackupUploadSession({
+  sessionId: "video-session",
+  storagePath: `users/${ownerUid}/backups/videos/video-1.mp4`,
+  fileSize: 2048,
+  contentType: "video/mp4",
+  mediaKind: "video",
+  status: "completed"
+});
+await expectAllowed(
+  "owners can create valid video backup metadata",
+  firestoreRequest("PATCH", `users/${ownerUid}/videos/video-1`, {
+    uid: ownerUid,
+    data: validVideoBackup(ownerUid, "video-1")
+  })
+);
+await seedBackupUploadSession({
+  sessionId: "image-work-session",
+  storagePath: `users/${ownerUid}/backups/image-works/work-1/image-1.jpg`,
+  fileSize: 1024,
+  contentType: "image/jpeg",
+  mediaKind: "image",
+  status: "completed"
+});
+await expectAllowed(
+  "owners can create valid image work backup metadata",
+  firestoreRequest("PATCH", `users/${ownerUid}/imageWorks/work-1`, {
+    uid: ownerUid,
+    data: validImageWorkBackup(ownerUid, "work-1")
+  })
+);
+await seedBackupUploadSession({
+  sessionId: "image-work-multi-session-1",
+  storagePath: `users/${ownerUid}/backups/image-works/work-multi/image-1.jpg`,
+  fileSize: 1024,
+  contentType: "image/jpeg",
+  mediaKind: "image",
+  status: "completed"
+});
+await expectAllowed(
+  "owners can create multi-image work backup metadata with a reserved first upload session",
+  firestoreRequest("PATCH", `users/${ownerUid}/imageWorks/work-multi`, {
+    uid: ownerUid,
+    data: {
+      ...validImageWorkBackup(ownerUid, "work-multi"),
+      storagePaths: [
+        `users/${ownerUid}/backups/image-works/work-multi/image-1.jpg`,
+        `users/${ownerUid}/backups/image-works/work-multi/image-2.jpg`
+      ],
+      backupSessionIds: ["image-work-multi-session-1", "image-work-multi-session-2"],
+      fileSize: 2048,
+      imageBackupSize: 2048
+    }
   })
 );
 await expectDenied(

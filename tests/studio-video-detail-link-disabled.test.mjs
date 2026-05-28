@@ -5,8 +5,8 @@ const source = fs.readFileSync("app/(tabs)/studio.tsx", "utf8");
 
 assert.equal(
   source.includes("router.push(`/video/${video.id}` as Href)"),
-  false,
-  "saved video work cards should not open the unstable video detail screen"
+  true,
+  "saved video work cards should open the video detail playback screen"
 );
 
 assert.ok(
@@ -14,4 +14,4 @@ assert.ok(
   "saved video work cards should still keep the edit action"
 );
 
-console.log("ok - studio saved video cards do not link to video detail");
+console.log("ok - studio saved video cards link to video detail");

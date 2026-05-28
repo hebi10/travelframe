@@ -141,7 +141,9 @@ import { isMediaLibraryAccessGranted } from "@/lib/media-library-permissions";
 import { requestMediaLibraryAccess } from "@/lib/request-media-library-access";
 import {
   completeWeeklyVideoExport,
+  flushPendingWeeklyVideoExportCompletions,
   getWeeklyVideoExportUsage,
+  recordPendingWeeklyVideoExportCompletion,
   releaseWeeklyVideoExport,
   reserveWeeklyVideoExport,
   type WeeklyVideoExportUsage
@@ -697,7 +699,14 @@ export default function TripClipScreen() {
         getPhotos().then(ensurePhotoPreviews),
         getAppSettings(),
         user ? syncUserMusicTracks(user) : Promise.resolve([]),
-        getWeeklyVideoExportUsage(user, weeklyVideoExportLimit)
+        user
+          ? flushPendingWeeklyVideoExportCompletions(user, weeklyVideoExportLimit)
+              .then(
+                (flushedUsage) =>
+                  flushedUsage ?? getWeeklyVideoExportUsage(user, weeklyVideoExportLimit)
+              )
+              .catch(() => getWeeklyVideoExportUsage(user, weeklyVideoExportLimit))
+          : getWeeklyVideoExportUsage(user, weeklyVideoExportLimit)
       ]);
       setPhotos(storedPhotos);
       setUserMusicTracks(storedMusicTracks);
@@ -1911,9 +1920,17 @@ export default function TripClipScreen() {
       }
       weeklyExportSaveSucceeded = true;
       if (weeklyExportReservationId && user) {
-        const completedUsage = await completeWeeklyVideoExport(user, weeklyExportReservationId);
-        if (completedUsage) {
-          setWeeklyVideoExportUsage(completedUsage);
+        try {
+          const completedUsage = await completeWeeklyVideoExport(user, weeklyExportReservationId);
+          if (completedUsage) {
+            setWeeklyVideoExportUsage(completedUsage);
+          }
+        } catch {
+          await recordPendingWeeklyVideoExportCompletion({
+            user,
+            reservationId: weeklyExportReservationId,
+            limit: weeklyVideoExportLimit
+          });
         }
       }
       let backupWarning: string | null = null;

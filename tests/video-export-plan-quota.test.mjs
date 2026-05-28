@@ -12,7 +12,11 @@ const transpiled = ts.transpileModule(source, {
 }).outputText
   .replace(/^import .* from "firebase\/firestore";\n/m, "")
   .replace(/^import .* from "firebase\/functions";\n/m, "")
-  .replace(/^import .* from "@\/lib\/firebase";\n/m, "");
+  .replace(/^import .* from "@\/lib\/firebase";\n/m, "")
+  .replace(
+    /^import \{ localStorageAdapter \} from "@\/lib\/local-storage";\n/m,
+    "const localStorageAdapter = { getItem: async () => null, setItem: async () => {}, removeItem: async () => {} };\n"
+  );
 
 const {
   FREE_WEEKLY_VIDEO_EXPORT_LIMIT,

@@ -12,11 +12,13 @@ const testFiles = fs
   .readdirSync(testsDirectory)
   .filter((name) => name.endsWith(".test.mjs"))
   .sort()
-  .filter((name) =>
-    filters.length === 0
-      ? !defaultExcludedTests.has(name)
-      : filters.some((filter) => name.toLowerCase().includes(filter))
-  );
+  .filter((name) => {
+    if (filters.length === 0 || defaultExcludedTests.has(name)) {
+      return !defaultExcludedTests.has(name);
+    }
+
+    return filters.some((filter) => name.toLowerCase().includes(filter));
+  });
 
 if (filters.length === 0) {
   console.info("info - Firebase Rules emulator checks run via `npm run test:firebase-rules`.");

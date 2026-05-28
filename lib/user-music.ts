@@ -29,6 +29,9 @@ export type UserMusicTrack = {
 };
 
 const MAX_USER_MUSIC_TRACKS = 20;
+const USER_MUSIC_MAX_FILE_BYTES = 50 * 1024 * 1024;
+const SUPPORTED_USER_MUSIC_EXTENSIONS = new Set(["mp3", "m4a", "wav", "aac", "ogg", "flac"]);
+const DANGEROUS_USER_MUSIC_EXTENSIONS = new Set(["apk", "app", "bat", "cmd", "com", "exe", "js", "msi", "ps1", "sh", "vbs"]);
 const MUSIC_CACHE_PREFIX = "travel-frame:user-music:v1";
 
 const getMusicCacheKey = (userId: string) => `${MUSIC_CACHE_PREFIX}:${userId}`;
@@ -54,10 +57,15 @@ const sanitizeFileName = (name: string) =>
     .replace(/\s+/g, "-")
     .slice(0, 80);
 
-const getExtension = (name?: string | null, mimeType?: string | null) => {
+const getFileExtension = (name?: string | null) => {
   const match = name?.split("?")[0]?.match(/\.([a-zA-Z0-9]+)$/);
-  if (match?.[1]) {
-    return match[1].toLowerCase();
+  return match?.[1]?.toLowerCase();
+};
+
+const getExtension = (name?: string | null, mimeType?: string | null) => {
+  const extension = getFileExtension(name);
+  if (extension) {
+    return extension;
   }
 
   if (mimeType?.includes("mpeg")) {
@@ -82,6 +90,26 @@ const normalizeTrackName = (name?: string | null) => {
 
 const getContentType = (mimeType?: string | null) =>
   mimeType && mimeType.startsWith("audio/") ? mimeType : "audio/mpeg";
+
+const validatePickedMusicAsset = (asset: DocumentPicker.DocumentPickerAsset) => {
+  const extension = getFileExtension(asset.name);
+
+  if (typeof asset.size === "number" && asset.size > USER_MUSIC_MAX_FILE_BYTES) {
+    throw new Error("Invalid music file size.");
+  }
+
+  if (!asset.mimeType?.startsWith("audio/")) {
+    throw new Error("Invalid music content type.");
+  }
+
+  if (
+    !extension ||
+    DANGEROUS_USER_MUSIC_EXTENSIONS.has(extension) ||
+    !SUPPORTED_USER_MUSIC_EXTENSIONS.has(extension)
+  ) {
+    throw new Error("Unsupported music file extension.");
+  }
+};
 
 type ReserveMusicUploadResponse = {
   musicSessionId: string;
@@ -339,6 +367,7 @@ export const pickAndUploadUserMusicTrack = async (
   }
 
   const asset = result.assets[0];
+  validatePickedMusicAsset(asset);
   const id = `music-${Date.now()}`;
   const name = normalizeTrackName(asset.name);
   const extension = getExtension(name, asset.mimeType);

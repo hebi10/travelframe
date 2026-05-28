@@ -17,4 +17,16 @@ for (const snippet of [
   assert.ok(checklist.includes(snippet), `manual QA checklist missing: ${snippet}`);
 }
 
+for (const snippet of [
+  "## Android 표시/접근성 QA",
+  "큰 글씨",
+  "작은 화면",
+  "다크 모드",
+  "실제 Android 기기",
+  "텍스트가 겹치지 않으며",
+  "터치 대상에 접근 가능한지"
+]) {
+  assert.ok(checklist.includes(snippet), `manual Android display QA checklist missing: ${snippet}`);
+}
+
 console.log("ok - manual device QA checklist covers native-only service flows");

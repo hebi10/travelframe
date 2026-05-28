@@ -43,6 +43,16 @@ service cloud.firestore {
       return fileType in ["image/jpeg", "image/png", "image/webp", "video/mp4"];
     }
 
+    function isValidReservedBackupContentType(mediaKind, contentType) {
+      return (mediaKind == "image" && contentType.matches('image/(jpeg|jpg|png|webp)'))
+        || (mediaKind == "video" && contentType == "video/mp4");
+    }
+
+    function isValidReservedBackupSize(mediaKind, fileSize) {
+      return (mediaKind == "image" && fileSize < 20 * 1024 * 1024)
+        || (mediaKind == "video" && fileSize < 250 * 1024 * 1024);
+    }
+
     function isValidBackupStatus(status) {
       return status in ["none", "active", "expired", "deleted", "backed_up", "failed", "restored"];
     }
@@ -311,6 +321,29 @@ service cloud.firestore {
       return request.resource.data.userId == userId;
     }
 
+    function backupUploadSession(userId, backupSessionId) {
+      return get(/databases/$(database)/documents/users/$(userId)/backupUploadSessions/$(backupSessionId));
+    }
+
+    function hasReservedBackupUploadSession(userId, mediaKind, backupSessionId, storagePath) {
+      return backupSessionId is string
+        && backupSessionId.size() > 0
+        && exists(/databases/$(database)/documents/users/$(userId)/backupUploadSessions/$(backupSessionId))
+        && backupUploadSession(userId, backupSessionId).data.userId == userId
+        && backupUploadSession(userId, backupSessionId).data.status in ["reserved", "completed"]
+        && backupUploadSession(userId, backupSessionId).data.mediaKind == mediaKind
+        && backupUploadSession(userId, backupSessionId).data.storagePath == storagePath
+        && isValidReservedBackupSize(mediaKind, backupUploadSession(userId, backupSessionId).data.fileSize)
+        && isValidReservedBackupContentType(mediaKind, backupUploadSession(userId, backupSessionId).data.contentType)
+        && backupUploadSession(userId, backupSessionId).data.expiresAt > request.time;
+    }
+
+    function hasReservedTypedBackupUploadSession(userId, mediaKind, backupSessionId, storagePath, fileSize, contentType) {
+      return hasReservedBackupUploadSession(userId, mediaKind, backupSessionId, storagePath)
+        && backupUploadSession(userId, backupSessionId).data.fileSize == fileSize
+        && backupUploadSession(userId, backupSessionId).data.contentType == contentType;
+    }
+
     function isValidUserWrite(userId) {
       return request.resource.data.keys().hasOnly(userDocumentKeys())
         && request.resource.data.uid == userId;
@@ -343,6 +376,14 @@ service cloud.firestore {
         && isValidBackupFileType(request.resource.data.fileType)
         && request.resource.data.fileType.matches('image/.*')
         && hasValidBackupSessionId()
+        && hasReservedTypedBackupUploadSession(
+          userId,
+          "image",
+          request.resource.data.backupSessionId,
+          request.resource.data.storagePath,
+          request.resource.data.fileSize,
+          request.resource.data.fileType
+        )
         && isValidBackupStatus(request.resource.data.backupStatus);
     }
 
@@ -358,6 +399,12 @@ service cloud.firestore {
         && request.resource.data.backupSessionIds.size() == request.resource.data.storagePaths.size()
         && isValidBackupFileSize(request.resource.data.fileSize)
         && isNonNegativeCount(request.resource.data.imageBackupSize)
+        && hasReservedBackupUploadSession(
+          userId,
+          "image",
+          request.resource.data.backupSessionIds[0],
+          request.resource.data.storagePaths[0]
+        )
         && isValidBackupStatus(request.resource.data.backupStatus);
     }
 
@@ -369,6 +416,14 @@ service cloud.firestore {
         && isValidBackupFileSize(request.resource.data.fileSize)
         && request.resource.data.fileType == "video/mp4"
         && hasValidBackupSessionId()
+        && hasReservedTypedBackupUploadSession(
+          userId,
+          "video",
+          request.resource.data.backupSessionId,
+          request.resource.data.storagePath,
+          request.resource.data.fileSize,
+          request.resource.data.fileType
+        )
         && isValidBackupStatus(request.resource.data.backupStatus);
     }
 

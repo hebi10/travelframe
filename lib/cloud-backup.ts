@@ -717,6 +717,9 @@ export const backupCurrentWorkspace = async ({
     : [];
   const backupablePhotoBackups: PhotoItem[] = [];
   for (const photo of selectedPhotoBackups) {
+    if (photo.localFileStatus === "cloud_only") {
+      continue;
+    }
     if (!(await isPhotoStillBackupEligible(photo.id))) {
       continue;
     }
@@ -724,6 +727,9 @@ export const backupCurrentWorkspace = async ({
   }
   const backupableImageBundleBackups: ImageBundleWorkItem[] = [];
   for (const work of selectedImageBundleBackups) {
+    if (work.localFileStatus === "cloud_only") {
+      continue;
+    }
     if (!(await isImageWorkStillBackupEligible(work.id))) {
       continue;
     }
@@ -731,6 +737,9 @@ export const backupCurrentWorkspace = async ({
   }
   const backupableVideoBackups: MadeVideoItem[] = [];
   for (const video of selectedVideoBackups) {
+    if (video.localFileStatus === "cloud_only") {
+      continue;
+    }
     if (!(await isVideoStillBackupEligible(video.id))) {
       continue;
     }
@@ -1146,6 +1155,10 @@ export const backupPhoto = async ({
     return existingData;
   }
 
+  if (photo.localFileStatus === "cloud_only") {
+    return null;
+  }
+
   const [settings, sourceDeviceId] = await Promise.all([
     getAppSettings(),
     getSourceDeviceId()
@@ -1310,6 +1323,10 @@ export const backupImageBundleWork = async ({
       work,
       backupSessionIds: []
     });
+    return null;
+  }
+
+  if (work.localFileStatus === "cloud_only") {
     return null;
   }
 
@@ -1481,6 +1498,10 @@ export const backupMadeVideo = async ({
     return existingVideo;
   }
 
+  if (video.localFileStatus === "cloud_only") {
+    return null;
+  }
+
   const currentVideoCount = await getCollectionSize(user.uid, "videos");
   const backupLimitTier = getBackupLimitTier(subscription);
   const videoLimit = getCloudBackupVideoLimit(backupLimitTier);
@@ -1572,7 +1593,12 @@ const normalizePhotoBackup = (data: Record<string, unknown>, id: string): PhotoI
   kind: data.kind === "edited" ? "edited" : "original",
   edited: Boolean(data.edited),
   addedToVideo: Boolean(data.addedToVideo),
-  backupStatus: "restored"
+  downloadURL:
+    (typeof data.downloadURL === "string" && data.downloadURL) ||
+    (typeof data.uri === "string" && /^https?:\/\//i.test(data.uri) && data.uri) ||
+    undefined,
+  localFileStatus: "cloud_only",
+  backupStatus: "backed_up"
 });
 
 const normalizeImageWorkBackup = (
@@ -1590,7 +1616,8 @@ const normalizeImageWorkBackup = (
       : "9:16",
   photoIds: Array.isArray(data.photoIds) ? (data.photoIds as string[]) : [],
   imageUris: Array.isArray(data.imageUris) ? (data.imageUris as string[]) : [],
-  backupStatus: "restored"
+  localFileStatus: "cloud_only",
+  backupStatus: "backed_up"
 });
 
 const normalizeVideoBackup = (
@@ -1621,7 +1648,12 @@ const normalizeVideoBackup = (
       : {},
   musicId: data.musicId === "custom" || typeof data.musicId === "string" ? (data.musicId as MadeVideoItem["musicId"]) : "none",
   musicLabel: typeof data.musicLabel === "string" ? data.musicLabel : "무음",
-  backupStatus: "restored"
+  downloadURL:
+    (typeof data.downloadURL === "string" && data.downloadURL) ||
+    (typeof data.uri === "string" && /^https?:\/\//i.test(data.uri) && data.uri) ||
+    undefined,
+  localFileStatus: "cloud_only",
+  backupStatus: "backed_up"
 });
 
 export const restoreCloudBackupToLocal = async ({ user }: { user: User | null }) => {
