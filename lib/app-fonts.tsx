@@ -8,6 +8,7 @@ type AppFontOption = {
   label: string;
   detail: string;
   family: string;
+  source: number;
   sourceUri: string;
   license: "SIL Open Font License 1.1";
   licenseUrl: string;
@@ -19,6 +20,7 @@ export const APP_FONT_OPTIONS: AppFontOption[] = [
     label: "Noto Sans KR",
     detail: "기본 UI에 잘 맞는 선명한 고딕체입니다.",
     family: "TravelFrame-NotoSansKR",
+    source: require("../assets/fonts/NotoSansKR.ttf"),
     sourceUri: "https://raw.githubusercontent.com/google/fonts/main/ofl/notosanskr/NotoSansKR%5Bwght%5D.ttf",
     license: "SIL Open Font License 1.1",
     licenseUrl: "https://github.com/google/fonts/blob/main/ofl/notosanskr/OFL.txt"
@@ -28,6 +30,7 @@ export const APP_FONT_OPTIONS: AppFontOption[] = [
     label: "Nanum Gothic",
     detail: "익숙하고 단정한 화면용 고딕체입니다.",
     family: "TravelFrame-NanumGothic",
+    source: require("../assets/fonts/NanumGothic-Regular.ttf"),
     sourceUri: "https://raw.githubusercontent.com/google/fonts/main/ofl/nanumgothic/NanumGothic-Regular.ttf",
     license: "SIL Open Font License 1.1",
     licenseUrl: "https://github.com/google/fonts/blob/main/ofl/nanumgothic/OFL.txt"
@@ -37,6 +40,7 @@ export const APP_FONT_OPTIONS: AppFontOption[] = [
     label: "Gowun Dodum",
     detail: "부드럽고 편안한 인상의 돋움체입니다.",
     family: "TravelFrame-GowunDodum",
+    source: require("../assets/fonts/GowunDodum-Regular.ttf"),
     sourceUri: "https://raw.githubusercontent.com/google/fonts/main/ofl/gowundodum/GowunDodum-Regular.ttf",
     license: "SIL Open Font License 1.1",
     licenseUrl: "https://github.com/google/fonts/blob/main/ofl/gowundodum/OFL.txt"
@@ -46,6 +50,7 @@ export const APP_FONT_OPTIONS: AppFontOption[] = [
     label: "Gugi",
     detail: "각진 인상이 강한 개성형 제목 폰트입니다.",
     family: "TravelFrame-Gugi",
+    source: require("../assets/fonts/Gugi-Regular.ttf"),
     sourceUri: "https://raw.githubusercontent.com/google/fonts/main/ofl/gugi/Gugi-Regular.ttf",
     license: "SIL Open Font License 1.1",
     licenseUrl: "https://github.com/google/fonts/blob/main/ofl/gugi/OFL.txt"
@@ -55,6 +60,7 @@ export const APP_FONT_OPTIONS: AppFontOption[] = [
     label: "Black Han Sans",
     detail: "굵고 강한 제목용 한글 디스플레이 폰트입니다.",
     family: "TravelFrame-BlackHanSans",
+    source: require("../assets/fonts/BlackHanSans-Regular.ttf"),
     sourceUri: "https://raw.githubusercontent.com/google/fonts/main/ofl/blackhansans/BlackHanSans-Regular.ttf",
     license: "SIL Open Font License 1.1",
     licenseUrl: "https://github.com/google/fonts/blob/main/ofl/blackhansans/OFL.txt"
@@ -64,9 +70,9 @@ export const APP_FONT_OPTIONS: AppFontOption[] = [
 export const APP_FONT_SOURCES = APP_FONT_OPTIONS.reduce(
   (sources, option) => ({
     ...sources,
-    [option.family]: { uri: option.sourceUri }
+    [option.family]: option.source
   }),
-  {} as Record<string, { uri: string }>
+  {} as Record<string, number>
 );
 
 const FontLoadContext = createContext(false);

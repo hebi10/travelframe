@@ -30,10 +30,20 @@ for (const snippet of [
   "useFonts(APP_FONT_SOURCES)",
   "FontLoadProvider",
   "useAppFontsReady",
-  "https://raw.githubusercontent.com/google/fonts/main/ofl/"
+  'source: require("../assets/fonts/NotoSansKR.ttf")',
+  'source: require("../assets/fonts/NanumGothic-Regular.ttf")',
+  'source: require("../assets/fonts/GowunDodum-Regular.ttf")',
+  'source: require("../assets/fonts/Gugi-Regular.ttf")',
+  'source: require("../assets/fonts/BlackHanSans-Regular.ttf")',
+  "[option.family]: option.source"
 ]) {
   assert.ok(appFontsSource.includes(snippet), `font loading setup missing: ${snippet}`);
 }
+
+assert.ok(
+  !appFontsSource.includes("[option.family]: { uri: option.sourceUri }"),
+  "runtime font loading should use bundled local assets, not remote URLs"
+);
 
 assert.ok(
   rootLayoutSource.includes("<FontLoadProvider>") &&
