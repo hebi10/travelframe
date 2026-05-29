@@ -239,6 +239,15 @@ const completeBackupUpload = (data: { backupSessionId: string }) =>
     data
   );
 
+const completeImageWorkBackup = (data: {
+  workId: string;
+  imageWork: Record<string, unknown>;
+}) =>
+  callBackupFunction<typeof data, { saved: boolean }>(
+    "completeImageWorkBackup",
+    data
+  );
+
 const releaseBackupUpload = (data: { backupSessionId: string }) =>
   callBackupFunction<typeof data, { released: boolean }>("releaseBackupUpload", data);
 
@@ -957,30 +966,30 @@ export const backupCurrentWorkspace = async ({
       continue;
     }
 
-    await setDoc(
-      doc(firestore, "users", user.uid, "imageWorks", work.id),
-      {
-        ...work,
-        localImageUris: work.imageUris,
-        imageUris: backedUpImageUris,
-        storagePaths,
-        backupSessionIds,
-        optimizedImages: images,
-        imageBackupSize: images.reduce((sum, image) => sum + image.size, 0),
-        fileSize: uploadedFileSize,
-        originalBackupSize: images.reduce((sum, image) => sum + image.originalSize, 0),
-        imageQuality: settings.imageBackupQuality,
-        userId: user.uid,
-        localId: work.id,
-        backupStatus: "backed_up",
-        backupEnabledAt: backedUpAt,
-        lastBackedUpAt: backedUpAt,
-        sourceDeviceId,
-        backedUpAt,
-        updatedAt: serverTimestamp()
-      },
-      { merge: true }
-    );
+    const imageWorkBackup = {
+      ...work,
+      localImageUris: work.imageUris,
+      imageUris: backedUpImageUris,
+      storagePaths,
+      backupSessionIds,
+      optimizedImages: images,
+      imageBackupSize: images.reduce((sum, image) => sum + image.size, 0),
+      fileSize: uploadedFileSize,
+      originalBackupSize: images.reduce((sum, image) => sum + image.originalSize, 0),
+      imageQuality: settings.imageBackupQuality,
+      userId: user.uid,
+      localId: work.id,
+      backupStatus: "backed_up",
+      backupEnabledAt: backedUpAt,
+      lastBackedUpAt: backedUpAt,
+      sourceDeviceId,
+      backedUpAt,
+      updatedAt: backedUpAt
+    };
+    await completeImageWorkBackup({
+      workId: work.id,
+      imageWork: imageWorkBackup
+    });
     if (
       await removeBackupIfImageWorkWasDeleted({
         user,
@@ -1392,33 +1401,33 @@ export const backupImageBundleWork = async ({
     return null;
   }
 
-  await setDoc(
-    doc(firestore, "users", user.uid, "imageWorks", work.id),
-    {
-      ...work,
-      localImageUris: work.imageUris,
-      imageUris: backedUpImageUris,
-      storagePaths,
-      backupSessionIds,
-      optimizedImages: safeOptimizedImages,
-      imageBackupSize: safeOptimizedImages.reduce((sum, image) => sum + image.size, 0),
-      fileSize: uploadedFileSize,
-      originalBackupSize: safeOptimizedImages.reduce(
-        (sum, image) => sum + image.originalSize,
-        0
-      ),
-      imageQuality: settings.imageBackupQuality,
-      userId: user.uid,
-      localId: work.id,
-      backupStatus: "backed_up",
-      backupEnabledAt: backedUpAt,
-      lastBackedUpAt: backedUpAt,
-      sourceDeviceId,
-      backedUpAt,
-      updatedAt: serverTimestamp()
-    },
-    { merge: true }
-  );
+  const imageWorkBackup = {
+    ...work,
+    localImageUris: work.imageUris,
+    imageUris: backedUpImageUris,
+    storagePaths,
+    backupSessionIds,
+    optimizedImages: safeOptimizedImages,
+    imageBackupSize: safeOptimizedImages.reduce((sum, image) => sum + image.size, 0),
+    fileSize: uploadedFileSize,
+    originalBackupSize: safeOptimizedImages.reduce(
+      (sum, image) => sum + image.originalSize,
+      0
+    ),
+    imageQuality: settings.imageBackupQuality,
+    userId: user.uid,
+    localId: work.id,
+    backupStatus: "backed_up",
+    backupEnabledAt: backedUpAt,
+    lastBackedUpAt: backedUpAt,
+    sourceDeviceId,
+    backedUpAt,
+    updatedAt: backedUpAt
+  };
+  await completeImageWorkBackup({
+    workId: work.id,
+    imageWork: imageWorkBackup
+  });
   if (
     await removeBackupIfImageWorkWasDeleted({
       user,

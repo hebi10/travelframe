@@ -21,6 +21,14 @@ assert.ok(
   "option buttons should derive preview font family from the option value"
 );
 assert.ok(
+  settingsSource.includes("const previewFontStyle = fontStylePreview ?? fontFamilyPreview;"),
+  "option buttons should derive preview font weight from the preview font value"
+);
+assert.ok(
+  settingsSource.includes("previewFontStyle ? getFontWeightForStyle(previewFontStyle) : emphasisWeight"),
+  "font style modal should not reuse the currently selected font weight for every option"
+);
+assert.ok(
   settingsSource.includes("fontFamilyPreview={font.value}"),
   "font style modal should pass each option font family into its option button"
 );

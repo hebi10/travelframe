@@ -11,6 +11,11 @@ for (const snippet of [
   "completeBackupUpload",
   "releaseBackupUpload",
   "deleteCloudBackupData",
+  "completeImageWorkBackup",
+  "assertCompletedImageWorkSessions",
+  "storagePaths.length !== backupSessionIds.length",
+  "session.storagePath !== storagePaths[index]",
+  'session.status !== "completed"',
   "backupUsage",
   "pendingUsage",
   "cleanupExpiredBackupUploadSessions",
@@ -39,7 +44,8 @@ for (const snippet of [
   "allow create, update, delete: if false",
   "isValidPhotoBackupMetadata",
   "isValidVideoBackupMetadata",
-  "isValidImageWorkBackupMetadata",
+  "match /imageWorks/{workId}",
+  "allow create, update: if false",
   "storagePath",
   "fileSize"
 ]) {
@@ -50,6 +56,7 @@ for (const snippet of [
   "httpsCallable",
   "reserveBackupUpload",
   "completeBackupUpload",
+  "completeImageWorkBackup",
   "backupSessionId",
   "fileSize",
   "deleteCloudBackupDataCallable"

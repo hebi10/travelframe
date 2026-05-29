@@ -36,7 +36,8 @@ export function OptionButton({
   const fontsReady = useAppFontsReady();
   const themed = useMemo(() => createThemedStyles(palette), [palette]);
   const previewFontSizeScale = fontSizePreview ? getFontSizeScale(fontSizePreview) : fontSizeScale;
-  const previewFontWeight = fontStylePreview ? getFontWeightForStyle(fontStylePreview) : emphasisWeight;
+  const previewFontStyle = fontStylePreview ?? fontFamilyPreview;
+  const previewFontWeight = previewFontStyle ? getFontWeightForStyle(previewFontStyle) : emphasisWeight;
   const previewFontFamily =
     fontFamilyPreview ? getFontFamilyForStyle(fontFamilyPreview, fontsReady) : fontFamily;
 

@@ -80,6 +80,45 @@ const getBackupSubscription = async (uid) => {
 const getUsageRef = (uid) => db.doc(`users/${uid}/backupUsage/current`);
 const getSessionRef = (uid, sessionId) =>
   db.doc(`users/${uid}/backupUploadSessions/${sessionId}`);
+const VALID_BACKUP_STATUSES = new Set([
+  "none",
+  "active",
+  "expired",
+  "deleted",
+  "backed_up",
+  "failed",
+  "restored"
+]);
+const IMAGE_WORK_BACKUP_KEYS = new Set([
+  "id",
+  "kind",
+  "title",
+  "createdAt",
+  "updatedAt",
+  "coverUri",
+  "ratio",
+  "photoIds",
+  "imageUris",
+  "localImageUris",
+  "imageWidths",
+  "imageHeights",
+  "userId",
+  "localId",
+  "storagePath",
+  "storagePaths",
+  "backupSessionIds",
+  "optimizedImages",
+  "imageBackupSize",
+  "originalBackupSize",
+  "imageQuality",
+  "fileSize",
+  "fileType",
+  "backupStatus",
+  "backupEnabledAt",
+  "lastBackedUpAt",
+  "sourceDeviceId",
+  "backedUpAt"
+]);
 const getMusicSessionRef = (uid, sessionId) =>
   db.doc(`users/${uid}/musicUploadSessions/${sessionId}`);
 const BACKUP_UPLOAD_SESSION_TTL_MS = 15 * 60 * 1000;
@@ -802,6 +841,144 @@ exports.releaseBackupUpload = onCall(async (request) => {
     }
 
     return { released: true };
+  } catch (error) {
+    throw toHttpsError(error);
+  }
+});
+
+const getStringList = (value, fieldName) => {
+  if (!Array.isArray(value) || value.length === 0) {
+    throw new HttpsError("invalid-argument", `${fieldName} is required.`);
+  }
+
+  const list = value.filter((item) => typeof item === "string" && item.length > 0);
+  if (list.length !== value.length || new Set(list).size !== list.length) {
+    throw new HttpsError("invalid-argument", `${fieldName} is invalid.`);
+  }
+
+  return list;
+};
+
+const sanitizeImageWorkBackupData = ({ uid, workId, imageWork }) => {
+  if (!imageWork || typeof imageWork !== "object" || Array.isArray(imageWork)) {
+    throw new HttpsError("invalid-argument", "imageWork is required.");
+  }
+
+  const keys = Object.keys(imageWork);
+  const unsupportedKey = keys.find((key) => !IMAGE_WORK_BACKUP_KEYS.has(key));
+  if (unsupportedKey) {
+    throw new HttpsError("invalid-argument", "Unsupported image work backup field.");
+  }
+
+  if (imageWork.id && imageWork.id !== workId) {
+    throw new HttpsError("invalid-argument", "Image work id does not match the path.");
+  }
+
+  if (imageWork.localId && imageWork.localId !== workId) {
+    throw new HttpsError("invalid-argument", "Image work localId does not match the path.");
+  }
+
+  if (imageWork.userId && imageWork.userId !== uid) {
+    throw new HttpsError("permission-denied", "Image work userId does not match the owner.");
+  }
+
+  if (!VALID_BACKUP_STATUSES.has(imageWork.backupStatus)) {
+    throw new HttpsError("invalid-argument", "Invalid image work backup status.");
+  }
+
+  return Object.fromEntries(keys.map((key) => [key, imageWork[key]]));
+};
+
+const assertCompletedImageWorkSessions = async ({ uid, workId, storagePaths, backupSessionIds }) => {
+  if (storagePaths.length !== backupSessionIds.length) {
+    throw new HttpsError("invalid-argument", "Image work backup sessions do not match storage paths.");
+  }
+
+  const expectedPrefix = `users/${uid}/backups/image-works/${workId}/`;
+  if (!storagePaths.every((storagePath) => storagePath.startsWith(expectedPrefix))) {
+    throw new HttpsError("invalid-argument", "Invalid image work backup storage path.");
+  }
+
+  const snapshots = await Promise.all(
+    backupSessionIds.map((sessionId) => getSessionRef(uid, sessionId).get())
+  );
+
+  return snapshots.reduce((totalFileSize, snapshot, index) => {
+    if (!snapshot.exists) {
+      throw new HttpsError("failed-precondition", "Image work backup session was not found.");
+    }
+
+    const session = snapshot.data();
+    if (
+      session.userId !== uid ||
+      session.status !== "completed" ||
+      session.mediaKind !== "image" ||
+      session.storagePath !== storagePaths[index]
+    ) {
+      throw new HttpsError("failed-precondition", "Image work backup session is not completed for this item.");
+    }
+
+    return totalFileSize + Number(session.fileSize ?? 0);
+  }, 0);
+};
+
+exports.completeImageWorkBackup = onCall(async (request) => {
+  try {
+    const uid = requireUid(request);
+    const { workId, imageWork } = request.data ?? {};
+    if (typeof workId !== "string" || !workId) {
+      throw new HttpsError("invalid-argument", "workId is required.");
+    }
+
+    const data = sanitizeImageWorkBackupData({ uid, workId, imageWork });
+    const storagePaths = getStringList(data.storagePaths, "storagePaths");
+    const backupSessionIds = getStringList(data.backupSessionIds, "backupSessionIds");
+    const totalFileSize = await assertCompletedImageWorkSessions({
+      uid,
+      workId,
+      storagePaths,
+      backupSessionIds
+    });
+
+    if (
+      Number(data.fileSize) !== totalFileSize ||
+      Number(data.imageBackupSize) !== totalFileSize
+    ) {
+      throw new HttpsError("failed-precondition", "Image work backup size does not match completed sessions.");
+    }
+
+    const imageWorkRef = db.doc(`users/${uid}/imageWorks/${workId}`);
+    const existingSnapshot = await imageWorkRef.get();
+    if (existingSnapshot.exists) {
+      const existing = existingSnapshot.data();
+      const storagePathsChanged =
+        JSON.stringify(existing.storagePaths ?? []) !== JSON.stringify(storagePaths);
+      const backupSessionIdsChanged =
+        JSON.stringify(existing.backupSessionIds ?? []) !== JSON.stringify(backupSessionIds);
+      if (
+        existing.userId !== uid ||
+        existing.localId !== workId ||
+        storagePathsChanged ||
+        backupSessionIdsChanged
+      ) {
+        throw new HttpsError("failed-precondition", "Image work backup identity fields cannot be changed.");
+      }
+    }
+
+    await imageWorkRef.set({
+      ...data,
+      id: workId,
+      userId: uid,
+      localId: workId,
+      storagePath: storagePaths[0],
+      storagePaths,
+      backupSessionIds,
+      fileSize: totalFileSize,
+      imageBackupSize: totalFileSize,
+      updatedAt: FieldValue.serverTimestamp()
+    });
+
+    return { saved: true };
   } catch (error) {
     throw toHttpsError(error);
   }

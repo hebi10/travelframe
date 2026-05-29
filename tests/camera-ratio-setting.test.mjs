@@ -10,7 +10,7 @@ const guideOverlaySource = fs.readFileSync("components/camera-guide-overlay.tsx"
 
 for (const snippet of [
   "cameraRatio: PhotoRatioLabel",
-  'cameraRatio: "16:9"',
+  'cameraRatio: "9:16"',
   "const cameraRatios: PhotoRatioLabel[]",
   "cameraRatios.includes(nextSettings.cameraRatio)"
 ]) {
@@ -29,6 +29,25 @@ for (const snippet of [
   "aspectRatio={cameraRatioAspect[cameraRatio] ?? undefined}"
 ]) {
   assert.ok(cameraSource.includes(snippet), `camera ratio UI/wiring missing: ${snippet}`);
+}
+
+const cameraRatioOptionsSource = cameraSource.slice(
+  cameraSource.indexOf("const CAMERA_RATIO_OPTIONS"),
+  cameraSource.indexOf("const CAMERA_SAVE_SCOPE_OPTIONS")
+);
+
+for (const forbidden of [
+  'value: "Original"',
+  'const cameraRatioOptions = ["Original",',
+  'const cameraRatios: PhotoRatioLabel[] = ["Original",'
+]) {
+  const sourceToCheck = forbidden === 'value: "Original"'
+    ? cameraRatioOptionsSource
+    : `${cameraSource}\n${settingsSource}`;
+  assert.ok(
+    !sourceToCheck.includes(forbidden),
+    `camera ratio should not expose Original as a camera setting: ${forbidden}`
+  );
 }
 
 for (const snippet of [

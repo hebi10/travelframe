@@ -131,7 +131,6 @@ const CAMERA_QUALITY_OPTIONS = [
   { label: "최대", value: "max", quality: 1 }
 ] as const;
 const CAMERA_RATIO_OPTIONS: { label: string; value: PhotoRatioLabel }[] = [
-  { label: "원본", value: "Original" },
   { label: "1:1", value: "1:1" },
   { label: "3:4", value: "3:4" },
   { label: "4:5", value: "4:5" },
@@ -139,9 +138,9 @@ const CAMERA_RATIO_OPTIONS: { label: string; value: PhotoRatioLabel }[] = [
   { label: "16:9", value: "16:9" }
 ];
 const CAMERA_SAVE_SCOPE_OPTIONS: { label: string; detail: string; value: CameraSaveScope }[] = [
+  { label: "앱, 핸드폰", detail: "앱과 앨범에 함께 저장", value: "both" },
   { label: "앱", detail: "앱 사진 목록에만 저장", value: "app" },
-  { label: "핸드폰", detail: "핸드폰 앨범에만 저장", value: "device" },
-  { label: "앱, 핸드폰", detail: "앱과 앨범에 함께 저장", value: "both" }
+  { label: "핸드폰", detail: "핸드폰 앨범에만 저장", value: "device" }
 ];
 const CAMERA_FACING_OPTIONS: { label: string; value: CameraFacing }[] = [
   { label: "후면", value: "back" },

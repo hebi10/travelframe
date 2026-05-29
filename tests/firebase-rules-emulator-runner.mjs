@@ -231,7 +231,8 @@ const seedBackupUploadSession = async ({
   fileSize = 3,
   contentType = "image/jpeg",
   mediaKind = "image",
-  status = "reserved"
+  status = "reserved",
+  expiresAt = new Date(Date.now() + 60_000)
 } = {}) => {
   await seedDoc(`users/${uid}/backupUploadSessions/${sessionId}`, {
     userId: uid,
@@ -240,7 +241,7 @@ const seedBackupUploadSession = async ({
     storagePath,
     fileSize,
     contentType,
-    expiresAt: new Date(Date.now() + 60_000)
+    expiresAt
   });
 };
 
@@ -309,7 +310,7 @@ await expectDenied(
   })
 );
 await expectDenied(
-  "owners cannot create image work backup metadata with an unreserved upload session",
+  "owners cannot write image work backup metadata directly",
   firestoreRequest("PATCH", `users/${ownerUid}/imageWorks/unreserved-work`, {
     uid: ownerUid,
     data: {
@@ -357,8 +358,8 @@ await seedBackupUploadSession({
   mediaKind: "image",
   status: "completed"
 });
-await expectAllowed(
-  "owners can create valid image work backup metadata",
+await expectDenied(
+  "owners cannot create image work backup metadata directly even with a reserved upload session",
   firestoreRequest("PATCH", `users/${ownerUid}/imageWorks/work-1`, {
     uid: ownerUid,
     data: validImageWorkBackup(ownerUid, "work-1")
@@ -372,8 +373,8 @@ await seedBackupUploadSession({
   mediaKind: "image",
   status: "completed"
 });
-await expectAllowed(
-  "owners can create multi-image work backup metadata with a reserved first upload session",
+await expectDenied(
+  "owners cannot create multi-image work backup metadata when any extra session is unreserved",
   firestoreRequest("PATCH", `users/${ownerUid}/imageWorks/work-multi`, {
     uid: ownerUid,
     data: {
@@ -400,6 +401,22 @@ await expectAllowed(
   firestoreRequest("PATCH", `users/${ownerUid}/photoBackups/photo-1`, {
     uid: ownerUid,
     data: { ...validPhotoBackup(ownerUid, "photo-1"), backupStatus: "restored" }
+  })
+);
+await seedBackupUploadSession({
+  sessionId: "photo-session",
+  storagePath: `users/${ownerUid}/backups/photos/photo-1.jpg`,
+  fileSize: 1024,
+  contentType: "image/jpeg",
+  mediaKind: "image",
+  status: "completed",
+  expiresAt: new Date(Date.now() - 60_000)
+});
+await expectAllowed(
+  "owners can update mutable photo backup metadata after the upload session expires",
+  firestoreRequest("PATCH", `users/${ownerUid}/photoBackups/photo-1`, {
+    uid: ownerUid,
+    data: { ...validPhotoBackup(ownerUid, "photo-1"), backupStatus: "failed" }
   })
 );
 await expectDenied(

@@ -15,6 +15,8 @@ const tripClipSource = fs.readFileSync("app/(tabs)/trip-clip.tsx", "utf8");
 for (const snippet of [
   'export type StorageMode = "local_only" | "local_backup" | "local_saver"',
   'storageMode: "local_only"',
+  'const storageModes: StorageMode[] = ["local_only", "local_backup"]',
+  'nextSettings.storageMode === "local_saver" ? "local_backup"',
   'nextSettings.cloudBackupEnabled ? "local_backup" : "local_only"'
 ]) {
   assert.ok(appSettingsSource.includes(snippet), `app settings storage mode missing: ${snippet}`);
@@ -22,15 +24,30 @@ for (const snippet of [
 
 for (const snippet of [
   "STORAGE_MODE_OPTIONS",
-  "앱에서만 저장",
-  "앱에 저장 + 클라우드 백업",
-  "앱 용량 절약 모드",
+  "백업하지 않기",
+  "사진과 작업물을 이 기기에만 저장합니다.",
+  "앱 + 서버 백업",
+  "이 기기에 저장하고, 계정 서버에도 백업합니다.",
   "isCloudBackupStorageMode",
   "isStorageSaverMode",
   "getEffectiveStorageMode"
 ]) {
   assert.ok(storageModeSource.includes(snippet), `storage mode policy missing: ${snippet}`);
 }
+
+assert.equal(
+  (storageModeSource.match(/value: "local_/g) ?? []).length,
+  2,
+  "storage mode picker should only expose two choices"
+);
+assert.ok(
+  !storageModeSource.includes('value: "local_saver"'),
+  "storage mode picker should not expose local_saver"
+);
+assert.ok(
+  !storageModeSource.includes("앱 용량 절약 모드"),
+  "storage mode copy should not mention app capacity saver mode"
+);
 
 for (const snippet of [
   "applyStorageSaverPolicy",
@@ -48,7 +65,7 @@ for (const [name, source, restoreSnippet, markSnippet] of [
   ["work library", workLibrarySource, "restoreImageBundleWorkIfNeeded", "markImageBundleCloudOnly"]
 ]) {
   assert.ok(source.includes(restoreSnippet), `${name} should restore cloud-only originals on open`);
-  assert.ok(source.includes(markSnippet), `${name} should mark originals as cloud-only after backup`);
+  assert.ok(source.includes(markSnippet), `${name} should keep cloud-only compatibility helpers`);
 }
 
 for (const snippet of [
@@ -75,13 +92,23 @@ assert.ok(
 
 for (const snippet of [
   "저장 방식",
-  "앱에서만 저장",
-  "앱에 저장 + 클라우드 백업",
-  "앱 용량 절약 모드",
+  "백업하지 않기 / 앱 + 서버 백업",
+  "getStorageModeLabel(effectiveStorageMode)",
   "getEffectiveStorageMode",
   "STORAGE_MODE_OPTIONS"
 ]) {
   assert.ok(settingsSource.includes(snippet), `settings storage mode UI missing: ${snippet}`);
+}
+
+for (const forbidden of [
+  "storageSaverUpgradeMessage",
+  'option.value === "local_saver"',
+  "앱 용량 절약 모드"
+]) {
+  assert.ok(
+    !settingsSource.includes(forbidden),
+    `settings storage mode UI should not include saver mode: ${forbidden}`
+  );
 }
 
 for (const snippet of [
@@ -92,4 +119,4 @@ for (const snippet of [
   assert.ok(accountSource.includes(snippet), `account storage mode UI missing: ${snippet}`);
 }
 
-console.log("ok - storage mode policy is wired through settings, backup, restore, and local cleanup");
+console.log("ok - storage mode policy exposes two clear backup choices");

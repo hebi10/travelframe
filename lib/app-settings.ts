@@ -133,7 +133,7 @@ export const defaultAppSettings: AppSettings = {
   cameraZoomPercent: 0,
   cameraTorchEnabled: false,
   cameraFacing: "back",
-  cameraRatio: "16:9",
+  cameraRatio: "9:16",
   cameraSaveScope: "both",
   cameraShutterSoundMode: "silent",
   defaultRatio: "9:16",
@@ -166,9 +166,9 @@ const exportQualities: ExportQuality[] = ["standard", "high", "max"];
 const videoQualities = VIDEO_QUALITY_OPTIONS.map((option) => option.id);
 const tripClipExportFormats: TripClipExportFormat[] = ["mp4", "images"];
 const imageSaveFormats: AppImageSaveFormat[] = ["original", "png", "jpeg"];
-const storageModes: StorageMode[] = ["local_only", "local_backup", "local_saver"];
+const storageModes: StorageMode[] = ["local_only", "local_backup"];
 const imageBackupQualities = IMAGE_QUALITY_OPTIONS.map((option) => option.value);
-const cameraRatios: PhotoRatioLabel[] = ["Original", "1:1", "3:4", "4:5", "9:16", "16:9"];
+const cameraRatios: PhotoRatioLabel[] = ["1:1", "3:4", "4:5", "9:16", "16:9"];
 const cameraSaveScopes: CameraSaveScope[] = ["app", "device", "both"];
 const cameraFacings: CameraFacing[] = ["back", "front"];
 const cameraShutterSoundModes: CameraShutterSoundMode[] = ["silent", "sound"];
@@ -348,8 +348,10 @@ const normalizeSettings = (value: Partial<AppSettings> | null): AppSettings => {
     ...defaultAppSettings,
     ...(value ?? {})
   };
+  const normalizedStorageMode =
+    nextSettings.storageMode === "local_saver" ? "local_backup" : nextSettings.storageMode;
   const hasStoredStorageMode =
-    value?.storageMode !== undefined && storageModes.includes(value.storageMode);
+    value?.storageMode !== undefined && storageModes.includes(normalizedStorageMode);
   const defaultGuide = GUIDE_TYPES.includes(nextSettings.defaultGuide)
     ? nextSettings.defaultGuide
     : defaultAppSettings.defaultGuide;
@@ -418,7 +420,7 @@ const normalizeSettings = (value: Partial<AppSettings> | null): AppSettings => {
       ? nextSettings.screenLayout
       : defaultAppSettings.screenLayout,
     storageMode: hasStoredStorageMode
-      ? nextSettings.storageMode
+      ? normalizedStorageMode
       : nextSettings.cloudBackupEnabled ? "local_backup" : "local_only",
     cloudBackupEnabled: hasStoredStorageMode
       ? nextSettings.storageMode !== "local_only"

@@ -129,13 +129,11 @@ type SettingKey =
   | "imageBackupQuality";
 
 const opacityOptions = [0.2, 0.3, 0.4, 0.5, 0.6, 0.7];
-const cameraRatioOptions = ["Original", "1:1", "3:4", "4:5", "9:16", "16:9"] as const;
+const cameraRatioOptions = ["1:1", "3:4", "4:5", "9:16", "16:9"] as const;
 
 
 const storageModeLegend =
-  "앱에서만 저장 / 앱에 저장 + 클라우드 백업 / 앱 용량 절약 모드";
-const storageSaverUpgradeMessage =
-  "앱 용량 절약 모드는 Pro 이상에서만 사용 가능합니다.";
+  "백업하지 않기 / 앱 + 서버 백업";
 const backupTargetOptions: {
   value: CloudBackupTarget;
   label: string;
@@ -160,9 +158,9 @@ const getBackupTargetsSummary = (targets: AppSettings["cloudBackupTargets"]) => 
 };
 
 const cameraSaveScopeOptions: { value: CameraSaveScope; label: string; detail: string }[] = [
+  { value: "both", label: "앱, 핸드폰", detail: "앱과 핸드폰 앨범에 함께 저장합니다." },
   { value: "app", label: "앱", detail: "앱 사진 목록에만 저장합니다." },
-  { value: "device", label: "핸드폰", detail: "핸드폰 앨범에만 저장합니다." },
-  { value: "both", label: "앱, 핸드폰", detail: "앱과 핸드폰 앨범에 함께 저장합니다." }
+  { value: "device", label: "핸드폰", detail: "핸드폰 앨범에만 저장합니다." }
 ];
 const tripClipExportFormatOptions: {
   value: TripClipExportFormat;
@@ -1925,14 +1923,8 @@ export default function SettingsScreen() {
                     ) : null}
                   </View>
                   {STORAGE_MODE_OPTIONS.map((option) => {
-                    const isSaverOption = option.value === "local_saver";
-                    const isDisabled =
-                      isBackupSubmitting ||
-                      (isSaverOption && !planEntitlements.canBackupToCloud);
-                    const detail =
-                      isSaverOption && !planEntitlements.canBackupToCloud
-                        ? storageSaverUpgradeMessage
-                        : option.detail;
+                    const isDisabled = isBackupSubmitting;
+                    const detail = option.detail;
                     const onPress = () => {
                       if (option.value === "local_only") {
                         void updateSetting({
