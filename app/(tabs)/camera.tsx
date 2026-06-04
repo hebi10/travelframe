@@ -41,7 +41,6 @@ import {
 
 import { AppGuideOverlay } from "@/components/app-guide-overlay";
 import { CameraGuideOverlay } from "@/components/camera-guide-overlay";
-import { ChevronIcon } from "@/components/chevron-icon";
 import { PhotoReferenceOverlay, type PhotoReferenceOverlayHandle } from "@/components/photo-reference-overlay";
 import { colors } from "@/constants/app-theme";
 import { GUIDE_LABELS, GUIDE_TYPES, type GuideType } from "@/constants/camera-guides";
@@ -191,9 +190,7 @@ const CAMERA_FRONT_ZOOM_PRESETS = [
 ] as const;
 const CAMERA_CONTROL_TABS = [
   { id: "photo", label: "사진" },
-  { id: "zoom", label: "확대" },
-  { id: "guide", label: "가이드" },
-  { id: "light", label: "라이트" }
+  { id: "zoom", label: "확대" }
 ] as const;
 const CAMERA_EXPOSURE_BIAS_MIN = -1;
 const CAMERA_EXPOSURE_BIAS_MAX = 1;
@@ -384,7 +381,6 @@ export default function CameraScreen() {
     useState<GridGuideLineKey | null>(null);
   const [selectedGuideShapePointIndex, setSelectedGuideShapePointIndex] =
     useState<number | null>(null);
-  const [guideChoiceOpen, setGuideChoiceOpen] = useState(false);
   const [guideSettingsOpen, setGuideSettingsOpen] = useState(false);
   const [cameraSettingsOpen, setCameraSettingsOpen] = useState(false);
   const [activeCameraControlTab, setActiveCameraControlTab] =
@@ -454,7 +450,7 @@ export default function CameraScreen() {
     }),
     [insets.bottom, insets.top]
   );
-  const isCameraModalOpen = guideChoiceOpen || guideSettingsOpen || cameraSettingsOpen;
+  const isCameraModalOpen = guideSettingsOpen || cameraSettingsOpen;
   const controlsStyle = overlaySetupActive
     ? [styles.controls, { paddingBottom: bottomSafePadding }]
     : styles.controls;
@@ -516,6 +512,12 @@ export default function CameraScreen() {
     isCameraScreenFocused &&
     appState === "active" &&
     !cameraRecoveryPending;
+  const cameraNativeControlsReady = isCameraSessionActive && isCameraReady;
+  const cameraTorchMode = cameraNativeControlsReady && cameraDevice?.hasTorch
+    ? torchEnabled ? "on" : "off"
+    : undefined;
+  const cameraNativeZoom = cameraNativeControlsReady ? cameraZoomFactor : undefined;
+  const cameraNativeExposure = cameraNativeControlsReady ? cameraExposureBias : undefined;
 
   const focusIndicatorAnimatedStyle = useAnimatedStyle(() => ({
     opacity: focusControlsOpacity.value,
@@ -583,6 +585,13 @@ export default function CameraScreen() {
       };
     }, [guideOffsetXValue, guideOffsetYValue])
   );
+
+  useEffect(() => {
+    if (cameraDevice && !cameraDevice.hasTorch && torchEnabled) {
+      setTorchEnabled(false);
+      void updateAppSettings({ cameraTorchEnabled: false });
+    }
+  }, [cameraDevice, torchEnabled]);
 
   useEffect(() => {
     if (cameraControlTabViewportWidth <= 0) {
@@ -734,12 +743,12 @@ export default function CameraScreen() {
 
   const setLightEnabled = useCallback(
     (enabled: boolean) => {
-      const nextEnabled = cameraFacing === "back" && enabled;
+      const nextEnabled = cameraFacing === "back" && Boolean(cameraDevice?.hasTorch) && enabled;
       setTorchEnabled(nextEnabled);
       void updateAppSettings({ cameraTorchEnabled: nextEnabled });
       void triggerFeedback();
     },
-    [cameraFacing, triggerFeedback]
+    [cameraDevice, cameraFacing, triggerFeedback]
   );
 
   const applyCameraExposureBias = useCallback(
@@ -978,12 +987,10 @@ export default function CameraScreen() {
   };
 
   const openLineGuideSettings = () => {
-    setGuideChoiceOpen(false);
     setGuideSettingsOpen(true);
   };
 
   const openPhotoGuideSettings = () => {
-    setGuideChoiceOpen(false);
     reopenOverlaySetup();
   };
 
@@ -1645,9 +1652,9 @@ export default function CameraScreen() {
           device={cameraDevice}
           isActive={isCameraSessionActive}
           outputs={cameraOutputs}
-          torchMode={torchEnabled && cameraDevice.hasTorch ? "on" : "off"}
-          zoom={cameraZoomFactor}
-          exposure={cameraExposureBias}
+          torchMode={cameraTorchMode}
+          zoom={cameraNativeZoom}
+          exposure={cameraNativeExposure}
           getInitialZoom={() => cameraZoomFactor}
           getInitialExposureBias={() => cameraExposureBias}
           onStarted={() => {
@@ -1820,61 +1827,55 @@ export default function CameraScreen() {
           <Text selectable={false} style={styles.brand}>
             트래블프레임
           </Text>
-          <Pressable
-            style={styles.cameraSettingsIconButton}
-            onPress={openCameraSettingsMenu}
-            accessibilityRole="button"
-            accessibilityLabel="카메라 설정 열기"
-          >
-            <Feather name="settings" size={22} color={colors.inverse} />
-          </Pressable>
-        </View>
-      ) : null}
-
-      <Modal
-        visible={guideChoiceOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setGuideChoiceOpen(false)}
-      >
-        <View style={[styles.navModalBackdrop, modalSafeStyle]}>
-          <View style={[styles.navModal, { paddingBottom: bottomModalPadding }]}>
-            <View style={styles.modalHeader}>
-              <View style={styles.modalTitleGroup}>
-                <Text selectable={false} style={styles.modalEyebrow}>GUIDE</Text>
-                <Text selectable={false} style={styles.modalTitle}>가이드 띄우기</Text>
-              </View>
-              <Pressable style={styles.modalCloseButton} onPress={() => setGuideChoiceOpen(false)}>
-                <Text selectable={false} style={styles.modalCloseText}>닫기</Text>
-              </Pressable>
-            </View>
-            <View style={styles.navList}>
-              <Pressable style={styles.navItem} onPress={openLineGuideSettings}>
-                <View style={styles.navItemCopy}>
-                  <Text selectable={false} style={styles.navItemTitle}>라인 가이드</Text>
-                  <Text selectable={false} style={styles.navItemDetail}>
-                    중앙점, 원, 십자선, 3분할, 수평선 가이드를 설정합니다.
-                  </Text>
-                </View>
-                <View style={styles.navItemArrow}>
-                  <ChevronIcon color={colors.text} size={10} />
-                </View>
-              </Pressable>
-              <Pressable style={styles.navItem} onPress={openPhotoGuideSettings}>
-                <View style={styles.navItemCopy}>
-                  <Text selectable={false} style={styles.navItemTitle}>사진 가이드</Text>
-                  <Text selectable={false} style={styles.navItemDetail}>
-                    이전 사진을 카메라 위에 띄워 같은 구도로 맞춥니다.
-                  </Text>
-                </View>
-                <View style={styles.navItemArrow}>
-                  <ChevronIcon color={colors.text} size={10} />
-                </View>
-              </Pressable>
-            </View>
+          <View style={styles.cameraInstantControlRow}>
+            <Pressable
+              style={[
+                styles.cameraInstantControlButton,
+                isLineGuideActive && styles.cameraInstantControlButtonActive
+              ]}
+              onPress={openLineGuideSettings}
+              accessibilityRole="button"
+              accessibilityLabel="라인 가이드 설정 열기"
+            >
+              <Feather name="crosshair" size={15} color={colors.inverse} />
+              <Text selectable={false} style={styles.cameraInstantControlText}>라인</Text>
+            </Pressable>
+            <Pressable
+              style={[
+                styles.cameraInstantControlButton,
+                isPhotoGuideActive && styles.cameraInstantControlButtonActive
+              ]}
+              onPress={openPhotoGuideSettings}
+              accessibilityRole="button"
+              accessibilityLabel="사진 오버레이 열기"
+            >
+              <Feather name="image" size={15} color={colors.inverse} />
+              <Text selectable={false} style={styles.cameraInstantControlText}>오버레이</Text>
+            </Pressable>
+            <Pressable
+              style={[
+                styles.cameraInstantControlButton,
+                torchEnabled && styles.cameraInstantControlButtonActive
+              ]}
+              onPress={() => setLightEnabled(!torchEnabled)}
+              accessibilityRole="button"
+              accessibilityLabel="라이트 켜기 끄기"
+            >
+              <Feather name="zap" size={15} color={colors.inverse} />
+              <Text selectable={false} style={styles.cameraInstantControlText}>라이트</Text>
+            </Pressable>
+            <Pressable
+              style={styles.cameraInstantControlButton}
+              onPress={openCameraSettingsMenu}
+              accessibilityRole="button"
+              accessibilityLabel="카메라 설정 열기"
+            >
+              <Feather name="settings" size={15} color={colors.inverse} />
+              <Text selectable={false} style={styles.cameraInstantControlText}>설정</Text>
+            </Pressable>
           </View>
         </View>
-      </Modal>
+      ) : null}
 
       <Modal
         visible={cameraSettingsOpen}
@@ -2362,82 +2363,6 @@ export default function CameraScreen() {
                               </Pressable>
                             );
                           })}
-                        </View>
-                      ) : null}
-                      {activeCameraControlTab === "guide" ? (
-                        <View style={styles.quickButtonRow}>
-                          <Pressable
-                            style={[
-                              styles.quickPillButton,
-                              isLineGuideActive && styles.quickPillButtonActive
-                            ]}
-                            onPress={openLineGuideSettings}
-                          >
-                            <Text
-                              selectable={false}
-                              style={[
-                                styles.quickPillText,
-                                isLineGuideActive && styles.quickPillTextActive
-                              ]}
-                            >
-                              라인
-                            </Text>
-                          </Pressable>
-                          <Pressable
-                            style={[
-                              styles.quickPillButton,
-                              isPhotoGuideActive && styles.quickPillButtonActive
-                            ]}
-                            onPress={openPhotoGuideSettings}
-                          >
-                            <Text
-                              selectable={false}
-                              style={[
-                                styles.quickPillText,
-                                isPhotoGuideActive && styles.quickPillTextActive
-                              ]}
-                            >
-                              이미지
-                            </Text>
-                          </Pressable>
-                        </View>
-                      ) : null}
-                      {activeCameraControlTab === "light" ? (
-                        <View style={styles.quickButtonRow}>
-                          <Pressable
-                            style={[
-                              styles.quickPillButton,
-                              torchEnabled && styles.quickPillButtonActive
-                            ]}
-                            onPress={() => setLightEnabled(true)}
-                          >
-                            <Text
-                              selectable={false}
-                              style={[
-                                styles.quickPillText,
-                                torchEnabled && styles.quickPillTextActive
-                              ]}
-                            >
-                              on
-                            </Text>
-                          </Pressable>
-                          <Pressable
-                            style={[
-                              styles.quickPillButton,
-                              !torchEnabled && styles.quickPillButtonActive
-                            ]}
-                            onPress={() => setLightEnabled(false)}
-                          >
-                            <Text
-                              selectable={false}
-                              style={[
-                                styles.quickPillText,
-                                !torchEnabled && styles.quickPillTextActive
-                              ]}
-                            >
-                              off
-                            </Text>
-                          </Pressable>
                         </View>
                       ) : null}
                     </Animated.View>

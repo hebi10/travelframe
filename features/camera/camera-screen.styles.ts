@@ -141,14 +141,33 @@ export const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center"
   },
-  cameraSettingsIconButton: {
-    width: 42,
+  cameraInstantControlRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: 6,
+    flexShrink: 1
+  },
+  cameraInstantControlButton: {
+    width: 48,
     height: 36,
     alignItems: "center",
     justifyContent: "center",
+    gap: 2,
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.55)",
     backgroundColor: "rgba(0, 0, 0, 0.28)"
+  },
+  cameraInstantControlButtonActive: {
+    borderColor: colors.inverse,
+    backgroundColor: "rgba(255, 255, 255, 0.22)"
+  },
+  cameraInstantControlText: {
+    color: colors.inverse,
+    fontSize: 9,
+    fontWeight: "900",
+    lineHeight: 11,
+    letterSpacing: 0
   },
   countdownOverlay: {
     position: "absolute",

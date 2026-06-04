@@ -4,27 +4,28 @@ import fs from "node:fs";
 const cameraSource = fs.readFileSync("app/(tabs)/camera.tsx", "utf8");
 
 for (const snippet of [
-  "guideChoiceOpen",
-  "setGuideChoiceOpen",
   "openLineGuideSettings",
   "openPhotoGuideSettings",
-  "visible={guideChoiceOpen}",
-  'activeCameraControlTab === "guide"',
   "onPress={openLineGuideSettings}",
   "onPress={openPhotoGuideSettings}",
-  "가이드",
+  "라인",
+  "오버레이",
   "setGuideSettingsOpen(true)",
   "reopenOverlaySetup();"
 ]) {
-  assert.ok(cameraSource.includes(snippet), `camera guide entry modal missing: ${snippet}`);
+  assert.ok(cameraSource.includes(snippet), `camera instant guide entry missing: ${snippet}`);
 }
 
 assert.ok(
-  cameraSource.includes("const isCameraModalOpen = guideChoiceOpen ||"),
-  "guide choice modal should block camera controls like other camera modals"
+  cameraSource.includes("const isCameraModalOpen = guideSettingsOpen || cameraSettingsOpen"),
+  "camera controls should still be blocked by camera modals"
 );
 
 for (const removed of [
+  "guideChoiceOpen",
+  "setGuideChoiceOpen",
+  "visible={guideChoiceOpen}",
+  'activeCameraControlTab === "guide"',
   "hiddenCameraDropdownItem",
   "guideLaunchLabel",
   "hiddenGuideSettingsLabel",

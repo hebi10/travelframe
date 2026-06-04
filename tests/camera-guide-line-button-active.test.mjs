@@ -9,13 +9,13 @@ assert.ok(
 );
 
 assert.ok(
-  cameraSource.includes("isLineGuideActive && styles.quickPillButtonActive"),
-  "line guide quick button should use the active pill style while the line guide is visible"
+  cameraSource.includes("isLineGuideActive && styles.cameraInstantControlButtonActive"),
+  "line guide instant button should use the active style while the line guide is visible"
 );
 
 assert.ok(
-  cameraSource.includes("isLineGuideActive && styles.quickPillTextActive"),
-  "line guide quick button text should use the active text style while the line guide is visible"
+  cameraSource.includes("<Text selectable={false} style={styles.cameraInstantControlText}>라인</Text>"),
+  "line guide instant button should keep a visible line label"
 );
 
-console.log("ok - camera line guide quick button reflects visible guide state");
+console.log("ok - camera line guide instant button reflects visible guide state");

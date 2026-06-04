@@ -12,8 +12,6 @@ for (const snippet of [
   "CAMERA_CONTROL_TABS",
   '"photo"',
   '"zoom"',
-  '"guide"',
-  '"light"',
   'useState<CameraControlTab>("photo")',
   "cameraControlTabGesture",
   "cameraControlTabPanGesture",
@@ -55,7 +53,6 @@ for (const snippet of [
   "5x",
   "10x",
   "setZoomPreset",
-  "setLightEnabled",
   "toggleCameraFacing",
   'name="refresh-cw"',
   "size={26}"
@@ -66,6 +63,10 @@ for (const snippet of [
 for (const removed of [
   "captureZoomControl",
   'label="줌"',
+  'id: "guide"',
+  'id: "light"',
+  'activeCameraControlTab === "guide"',
+  'activeCameraControlTab === "light"',
   "cameraFlipText",
   "CAMERA_CONTROL_RESET_BUTTON_WIDTH",
   "CAMERA_CONTROL_ROW_GAP",
