@@ -7,12 +7,25 @@ for (const snippet of [
   "useCameraPermission()",
   "hasCameraPermission",
   "canRequestCameraPermission",
-  "requestCameraPermission",
-  "if (!hasCameraPermission && canRequestCameraPermission)",
-  "await requestCameraPermission();"
+  "requestCameraPermission"
 ]) {
-  assert.ok(cameraSource.includes(snippet), `camera permission auto request missing: ${snippet}`);
+  assert.ok(cameraSource.includes(snippet), `camera permission flow missing: ${snippet}`);
 }
+
+assert.equal(
+  cameraSource.includes("requestCameraPermissionOnFocus"),
+  false,
+  "camera permission should not be requested automatically on first focus"
+);
+assert.equal(
+  cameraSource.includes("await requestCameraPermission();"),
+  false,
+  "camera permission should only be requested from the explicit permission button"
+);
+assert.ok(
+  cameraSource.includes("onPress={canRequestCameraPermission ? requestCameraPermission : openPermissionSettings}"),
+  "camera permission screen should keep an explicit permission request button"
+);
 
 assert.ok(
   cameraSource.includes('router.replace("/studio")'),
@@ -24,4 +37,4 @@ assert.equal(
   "camera permission fallback should not route back to the root camera redirect"
 );
 
-console.log("ok - camera tab requests permission on first focus");
+console.log("ok - camera tab waits for explicit permission request");

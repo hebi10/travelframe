@@ -532,19 +532,11 @@ export default function CameraScreen() {
     useCallback(() => {
       setIsCameraScreenFocused(true);
 
-      const requestCameraPermissionOnFocus = async () => {
-        if (!hasCameraPermission && canRequestCameraPermission) {
-          await requestCameraPermission();
-        }
-      };
-
-      void requestCameraPermissionOnFocus();
-
       return () => {
         setIsCameraScreenFocused(false);
         setIsCameraReady(false);
       };
-    }, [canRequestCameraPermission, hasCameraPermission, requestCameraPermission])
+    }, [])
   );
 
   useFocusEffect(

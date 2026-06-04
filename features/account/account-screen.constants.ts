@@ -66,7 +66,7 @@ export const paymentPlans: PaymentPlan[] = [
   {
     id: "creator",
     title: "Pro",
-    price: "월 3,900원",
+    price: "월 2,900원",
     billing: "월 결제",
     summary: "Pro는 주 15회 영상 출력, 워터마크 제거, 클라우드 백업, 광고 제거를 함께 제공합니다.",
     benefits: [

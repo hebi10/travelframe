@@ -227,7 +227,7 @@ const ADMIN_PRODUCT_META = {
   },
   creator_monthly: {
     productName: "영상 내보내기",
-    priceLabel: "월 3,900원"
+    priceLabel: "월 2,900원"
   },
   expert_monthly: {
     productName: "전문가",

@@ -33,6 +33,7 @@
     "android": {
       "package": "com.haebi.photoguide",
       "versionCode": 31,
+      "allowBackup": false,
       "blockedPermissions": [
         "android.permission.RECORD_AUDIO"
       ],
