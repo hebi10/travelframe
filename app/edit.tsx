@@ -68,7 +68,7 @@ type EditableSource = {
 type SaveEditMode = "new" | "overwrite";
 type EditPanelTab = "image" | "guide";
 
-const ratios: PhotoRatioLabel[] = ["Original", "1:1", "3:4", "4:5", "9:16", "16:9"];
+const ratios: PhotoRatioLabel[] = ["Original", "1:1", "3:4", "4:3", "4:5", "9:16", "16:9"];
 const EDIT_PANEL_TABS: { label: string; value: EditPanelTab }[] = [
   { label: "이미지 편집", value: "image" },
   { label: "가이드라인 편집", value: "guide" }

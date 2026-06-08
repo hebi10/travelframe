@@ -12,6 +12,10 @@ for (const snippet of [
   "releaseMusicUpload",
   "musicUploadSessions",
   "MAX_USER_MUSIC_TRACKS",
+  "MAX_PENDING_MUSIC_UPLOAD_SESSIONS",
+  "MAX_PENDING_MUSIC_UPLOAD_BYTES",
+  "cleanupExpiredMusicUploadSessions",
+  "getReservedMusicUploadSummary",
   "getMusicTrackLimit",
   "Active music subscription is required",
   "musicTrackLimit"
@@ -29,8 +33,8 @@ for (const snippet of [
 
 for (const snippet of [
   "match /musicTracks/{trackId}",
-  "allow read, delete: if isOwner(userId) || isAdmin();",
-  "allow create, update: if false;",
+  "allow read: if isOwner(userId) || isAdmin();",
+  "allow create, update, delete: if false;",
   "match /musicUploadSessions/{sessionId}",
   "allow create, update, delete: if false;"
 ]) {
@@ -51,9 +55,29 @@ for (const snippet of [
   "reserveMusicUpload",
   "completeMusicUpload",
   "releaseMusicUpload",
+  "deleteUserBackupItem",
   "musicSessionId"
 ]) {
   assert.ok(userMusicSource.includes(snippet), `client music upload flow missing server function call: ${snippet}`);
 }
+
+assert.equal(
+  functionsSource.includes('downloadUrl.startsWith("https://firebasestorage.googleapis.com/")'),
+  false,
+  "music/admin completion must not trust a client-provided Firebase Storage URL prefix"
+);
+assert.ok(
+  functionsSource.includes("getDownloadUrlFromStorageMetadata"),
+  "completion should derive download URLs from Storage metadata when a URL is stored"
+);
+assert.ok(
+  functionsSource.includes('deleteUserBackupItem = secureOnCall'),
+  "user backup/music deletion should route through a callable that can remove Storage objects"
+);
+assert.ok(
+  functionsSource.includes("CALLABLE_RUNTIME_OPTIONS") &&
+    functionsSource.includes("enforceAppCheck"),
+  "callable App Check enforcement should be centrally optioned for production without breaking local tests"
+);
 
 console.log("ok - user music uploads are anchored on server quota checks");

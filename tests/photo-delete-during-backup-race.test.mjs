@@ -25,7 +25,7 @@ for (const snippet of [
   "await removeBackupIfPhotoWasDeleted({",
   "backupSessionId: photoUpload.backupSessionId",
   "await releaseBackupUpload({",
-  "await deleteDoc(doc(firestore, \"users\", user.uid, \"photoBackups\", photo.id));"
+  "await deleteUserBackupItem({ itemType: \"photo\", itemId: photo.id });"
 ]) {
   assert.ok(
     backupSource.includes(snippet),

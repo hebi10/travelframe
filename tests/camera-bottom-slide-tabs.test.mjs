@@ -9,44 +9,11 @@ const cameraSource = [
 const settingsSource = fs.readFileSync("lib/app-settings.ts", "utf8");
 
 for (const snippet of [
-  "CAMERA_CONTROL_TABS",
-  '"photo"',
-  '"zoom"',
-  'useState<CameraControlTab>("photo")',
-  "cameraControlTabGesture",
-  "cameraControlTabPanGesture",
-  "cameraControlTabTapGesture",
-  "selectCameraControlTabByIndex",
-  "getNearestCameraControlTabIndex",
-  "getCameraControlTabOffset",
-  "Gesture.Pan()",
-  "Gesture.Tap()",
-  "Gesture.Exclusive",
-  "FadeIn",
-  "entering={FadeIn.duration(140)}",
-  "cameraControlTabTrackAnimatedStyle",
-  "cameraControlTabViewport",
-  "cameraControlTabTrack",
-  "cameraControlTabCenterSpacer",
-  "getCameraControlTabCenterPadding",
-  "cameraControlTabCenterPadding",
-  "cameraControlTabViewportWidth",
-  "setCameraControlTabViewportWidth",
-  "event.nativeEvent.layout.width",
-  "CAMERA_CONTROL_HORIZONTAL_PADDING",
-  "CAMERA_CONTROL_TRAY_HORIZONTAL_PADDING",
-  "CAMERA_CONTROL_TAB_WIDTH",
-  "CAMERA_CONTROL_TAB_GAP",
-  "cameraControlShutterCenterX",
-  "setCameraControlShutterCenterX",
-  "x + width / 2",
-  "selectCameraControlTab",
-  "onPress={() => selectCameraControlTab(tab.id)}",
-  "styles.cameraFloatingPanelWrap",
-  "styles.cameraFloatingPanelRaised",
-  "styles.cameraControlBottomTray",
-  "gap: 30",
-  "styles.cameraControlPage",
+  "const openZoomControls = () =>",
+  'activeCameraControlPanel === "zoom"',
+  'setActiveCameraControlPanel((current) => (current === "zoom" ? null : "zoom"))',
+  'accessibilityLabel="확대 설정 열기"',
+  '<Text selectable={false} style={styles.cameraInstantControlText}>확대</Text>',
   "cameraZoomPresets",
   "1x",
   "3x",
@@ -55,18 +22,45 @@ for (const snippet of [
   "setZoomPreset",
   "toggleCameraFacing",
   'name="refresh-cw"',
-  "size={26}"
+  "size={26}",
+  "styles.cameraFloatingPanelWrap",
+  "styles.cameraFloatingPanelRaised",
+  "styles.cameraControlBottomTray",
+  "styles.cameraControlPage",
+  "FadeIn",
+  "entering={FadeIn.duration(140)}"
 ]) {
-  assert.ok(cameraSource.includes(snippet), `camera bottom slide tabs missing: ${snippet}`);
+  assert.ok(cameraSource.includes(snippet), `camera top zoom control missing: ${snippet}`);
 }
 
 for (const removed of [
+  "CAMERA_CONTROL_TABS",
+  "CameraControlTab",
+  "cameraControlTabGesture",
+  "cameraControlTabPanGesture",
+  "cameraControlTabTapGesture",
+  "selectCameraControlTabByIndex",
+  "getNearestCameraControlTabIndex",
+  "getCameraControlTabOffset",
+  "cameraControlTabTrackAnimatedStyle",
+  "cameraControlTabViewport",
+  "cameraControlTabTrack",
+  "cameraControlTabCenterSpacer",
+  "cameraControlTabRow",
+  "cameraControlTabCenterPadding",
+  "cameraControlTabViewportWidth",
+  "setCameraControlTabViewportWidth",
+  "cameraControlTabSlideX",
+  "cameraControlTabStartX",
+  "styles.cameraControlTab",
+  "styles.cameraControlTabActive",
+  "styles.cameraControlTabText",
+  "styles.cameraControlTabTextActive",
+  "<Text selectable={false} style={styles.cameraInstantControlText}>사진</Text>",
   "captureZoomControl",
   'label="줌"',
   'id: "guide"',
   'id: "light"',
-  'activeCameraControlTab === "guide"',
-  'activeCameraControlTab === "light"',
   "cameraFlipText",
   "CAMERA_CONTROL_RESET_BUTTON_WIDTH",
   "CAMERA_CONTROL_ROW_GAP",
@@ -88,48 +82,8 @@ for (const removed of [
 }
 
 assert.ok(
-  !cameraSource.includes("lastOffset"),
-  "camera control tabs should not clamp the first or last item away from the center slot"
-);
-
-assert.ok(
-  !cameraSource.includes("activeCameraControlTabIndex + direction"),
-  "camera control tab drag should not move only one item by direction"
-);
-
-assert.ok(
-  cameraSource.includes("cameraControlTabStartX.value + event.translationX"),
-  "camera control tab drag should choose the selected item from the full drag distance"
-);
-
-assert.ok(
-  cameraSource.includes("cameraControlTabSlideX"),
-  "camera control tabs should still slide while the quick action buttons fade"
-);
-
-assert.ok(
-  cameraSource.includes("setCameraControlTabViewportWidth(event.nativeEvent.layout.width)"),
-  "camera control tab center padding should be derived from the actual rendered tab viewport width"
-);
-
-assert.ok(
-  cameraSource.includes("CAMERA_CONTROL_TAB_GAP +"),
-  "camera control tab centering should account for the track gap before the first tab"
-);
-
-assert.ok(
-  cameraSource.includes("targetCenterX - CAMERA_CONTROL_TAB_WIDTH / 2 - CAMERA_CONTROL_TAB_GAP"),
-  "camera control tab center should be derived from the measured shutter center instead of a fixed pixel nudge"
-);
-
-assert.ok(
-  !cameraSource.includes("CAMERA_CONTROL_TAB_CENTER_NUDGE_X"),
-  "camera control tab centering should not rely on a fixed pixel nudge"
-);
-
-assert.ok(
   !cameraSource.includes("bottomSafePadding + 96"),
-  "camera quick action buttons should not use a fixed absolute bottom offset that can overlap the tab row"
+  "camera quick action buttons should not use a fixed absolute bottom offset"
 );
 
 assert.ok(
@@ -148,6 +102,15 @@ assert.ok(
 );
 
 for (const snippet of [
+  "const [cameraControlsHeight, setCameraControlsHeight] = useState(0)",
+  "cameraControlsHeight + CAMERA_PREVIEW_CONTROL_GAP",
+  "setCameraControlsHeight((currentHeight) =>",
+  "const latestTopWithoutBottomOverlap = height - cameraPreviewBottomOffset - boundedFrameHeight;"
+]) {
+  assert.ok(cameraSource.includes(snippet), `camera preview should reserve measured controls height: ${snippet}`);
+}
+
+for (const snippet of [
   "cameraZoomPercent: number;",
   "cameraTorchEnabled: boolean;",
   "cameraFacing: CameraFacing;",
@@ -158,4 +121,4 @@ for (const snippet of [
   assert.ok(settingsSource.includes(snippet), `camera quick setting persistence missing: ${snippet}`);
 }
 
-console.log("ok - camera bottom controls use centered slide tabs with persisted quick settings");
+console.log("ok - camera bottom controls keep only capture actions while top controls open zoom");

@@ -24,6 +24,7 @@ const previewRatioAspect: Record<PhotoRatioLabel, number | null> = {
   Original: null,
   "1:1": 1,
   "3:4": 3 / 4,
+  "4:3": 4 / 3,
   "4:5": 4 / 5,
   "9:16": 9 / 16,
   "16:9": 16 / 9
@@ -33,6 +34,7 @@ const isPhotoRatioLabel = (value: unknown): value is PhotoRatioLabel =>
   value === "Original" ||
   value === "1:1" ||
   value === "3:4" ||
+  value === "4:3" ||
   value === "4:5" ||
   value === "9:16" ||
   value === "16:9";

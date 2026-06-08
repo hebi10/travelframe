@@ -51,6 +51,7 @@ const ratioValue: Record<PhotoRatioLabel, number | null> = {
   Original: null,
   "1:1": 1,
   "3:4": 3 / 4,
+  "4:3": 4 / 3,
   "4:5": 4 / 5,
   "9:16": 9 / 16,
   "16:9": 16 / 9

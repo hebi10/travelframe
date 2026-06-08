@@ -89,8 +89,8 @@ assert.ok(
 );
 
 assert.ok(
-  useAppGuideSource.includes('tabKey !== "camera"'),
-  "first-run app guide should follow the new camera landing tab"
+  !useAppGuideSource.includes('tabKey !== "camera"'),
+  "first-run app guide should not be limited to the camera tab"
 );
 assert.ok(
   !useAppGuideSource.includes('tabKey !== "home"'),

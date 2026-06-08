@@ -2,16 +2,21 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const accountSource = fs.readFileSync("app/(tabs)/account.tsx", "utf8");
+const helperSource = fs.readFileSync("lib/google-auth.ts", "utf8");
 const routeSource = fs.readFileSync("app/oauthredirect.tsx", "utf8");
 const layoutSource = fs.readFileSync("app/_layout.tsx", "utf8");
 
 for (const snippet of [
   "com.haebi.photoguide:/oauthredirect",
-  "path: \"oauthredirect\"",
   "AuthRequest"
 ]) {
-  assert.ok(accountSource.includes(snippet), `google auth request missing: ${snippet}`);
+  assert.ok(helperSource.includes(snippet), `google auth helper missing: ${snippet}`);
 }
+
+assert.ok(
+  accountSource.includes("signInWithGoogleAuthSession"),
+  "account should delegate Google auth request handling to the shared helper"
+);
 
 for (const snippet of [
   "OAuthRedirectScreen",

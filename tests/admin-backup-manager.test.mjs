@@ -34,9 +34,9 @@ for (const snippet of [
 
 for (const snippet of [
   "const requireAdminUid = async (request) =>",
-  "exports.reserveAdminBackupUpload = onCall",
-  "exports.completeAdminBackupUpload = onCall",
-  "exports.deleteAdminBackupItem = onCall",
+  "exports.reserveAdminBackupUpload = secureOnCall",
+  "exports.completeAdminBackupUpload = secureOnCall",
+  "exports.deleteAdminBackupItem = secureOnCall",
   "adminBackupUploadSessions",
   "refreshAdminBackupOverview"
 ]) {
@@ -61,7 +61,7 @@ assert.equal(
   "admin backup status changes should not write backup overview directly"
 );
 assert.ok(
-  functionsSource.includes("exports.setAdminBackupStatus = onCall"),
+  functionsSource.includes("exports.setAdminBackupStatus = secureOnCall"),
   "admin backup status changes should be handled by a server callable"
 );
 

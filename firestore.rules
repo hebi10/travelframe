@@ -54,7 +54,12 @@ service cloud.firestore {
     }
 
     function isValidBackupStatus(status) {
-      return status in ["none", "active", "expired", "deleted", "backed_up", "failed", "restored"];
+      return status in ["none", "empty", "active", "expired", "deleted", "backed_up", "failed", "restored"];
+    }
+
+    function hasOptionalNonNegativeCount(fieldName) {
+      return !request.resource.data.keys().hasAny([fieldName])
+        || isNonNegativeCount(request.resource.data[fieldName]);
     }
 
     function userDocumentKeys() {
@@ -87,6 +92,7 @@ service cloud.firestore {
         "photoCount",
         "imageBundleCount",
         "videoCount",
+        "musicCount",
         "imageBackupBytes",
         "status",
         "deleteAfter",
@@ -104,6 +110,7 @@ service cloud.firestore {
         "photoCount",
         "imageBundleCount",
         "videoCount",
+        "musicCount",
         "imageBackupBytes",
         "status",
         "deleteAfter",
@@ -362,6 +369,7 @@ service cloud.firestore {
         && isNonNegativeCount(request.resource.data.photoCount)
         && isNonNegativeCount(request.resource.data.imageBundleCount)
         && isNonNegativeCount(request.resource.data.videoCount)
+        && hasOptionalNonNegativeCount("musicCount")
         && isNonNegativeCount(request.resource.data.imageBackupBytes)
         && isValidBackupStatus(request.resource.data.status);
     }
@@ -498,18 +506,18 @@ service cloud.firestore {
         allow read: if isOwner(userId) || isAdmin();
         allow create: if isOwner(userId) && isValidVideoBackupMetadata(userId, videoId);
         allow update: if isOwner(userId) && isValidVideoBackupUpdate(userId, videoId);
-        allow delete: if isOwner(userId) || isAdmin();
+        allow delete: if false;
       }
 
       match /imageWorks/{workId} {
         allow read: if isOwner(userId) || isAdmin();
         allow create, update: if false;
-        allow delete: if isOwner(userId) || isAdmin();
+        allow delete: if false;
       }
 
       match /musicTracks/{trackId} {
-        allow read, delete: if isOwner(userId) || isAdmin();
-        allow create, update: if false;
+        allow read: if isOwner(userId) || isAdmin();
+        allow create, update, delete: if false;
       }
 
       match /musicUploadSessions/{sessionId} {
@@ -521,14 +529,14 @@ service cloud.firestore {
         allow read: if isOwner(userId) || isAdmin();
         allow create: if isOwner(userId) && isValidBackupOverview(userId, backupId);
         allow update: if isOwner(userId) && isValidBackupOverviewUpdate(userId, backupId);
-        allow delete: if isOwner(userId) || isAdmin();
+        allow delete: if false;
       }
 
       match /photoBackups/{photoId} {
         allow read: if isOwner(userId) || isAdmin();
         allow create: if isOwner(userId) && isValidPhotoBackupMetadata(userId, photoId);
         allow update: if isOwner(userId) && isValidPhotoBackupUpdate(userId, photoId);
-        allow delete: if isOwner(userId) || isAdmin();
+        allow delete: if false;
       }
 
       match /backupUsage/{usageId} {

@@ -14,7 +14,8 @@ assert.ok(
 );
 
 assert.ok(
-  cameraSource.includes("<View style={controlsStyle}>"),
+  cameraSource.includes("style={controlsStyle}") &&
+    cameraSource.includes("onLayout={(event) => {"),
   "camera controls should render through the computed safe-area-aware style"
 );
 

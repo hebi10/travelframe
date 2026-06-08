@@ -22,6 +22,23 @@ for (const snippet of [
   "cameraRatioAspect",
   "const [cameraRatio, setCameraRatio] = useState<PhotoRatioLabel>(defaultAppSettings.cameraRatio)",
   "setCameraRatio(settings.cameraRatio)",
+  "const selectedCameraRatioAspect = cameraRatioAspect[cameraRatio] ?? undefined",
+  "const cameraPreviewViewportStyle = useMemo(",
+  "const [cameraControlsHeight, setCameraControlsHeight] = useState(0)",
+  "const cameraPreviewBottomReserved = overlaySetupActive",
+  "const cameraPreviewBottomOffset =",
+  "cameraControlsHeight + CAMERA_PREVIEW_CONTROL_GAP",
+  "bottom: 0",
+  "const cameraPreviewFrameStyle = useMemo(",
+  "const frameHeight = Math.round(width / selectedCameraRatioAspect);",
+  "const boundedFrameHeight = Math.min(frameHeight, height);",
+  "const latestTopWithoutBottomOverlap = height - cameraPreviewBottomOffset - boundedFrameHeight;",
+  "width: \"100%\"",
+  "top: Math.max(0, Math.min(cameraPreviewTopReserved, latestTopWithoutBottomOverlap))",
+  "setCameraPreviewViewport({ width, height });",
+  "styles.cameraPreviewViewport",
+  "styles.cameraPreviewFrame",
+  "styles.cameraPreviewFrameFill",
   "const updateCameraRatio = (nextRatio: PhotoRatioLabel)",
   "void updateAppSettings({ cameraRatio: nextRatio })",
   "카메라 비율",
@@ -30,6 +47,49 @@ for (const snippet of [
 ]) {
   assert.ok(cameraSource.includes(snippet), `camera ratio UI/wiring missing: ${snippet}`);
 }
+
+for (const snippet of [
+  '{ label: "4:3", value: "4:3" }',
+  '"4:3": 4 / 3'
+]) {
+  assert.ok(cameraSource.includes(snippet), `camera ratio should expose 4:3: ${snippet}`);
+}
+
+assert.ok(
+  settingsSource.includes('const cameraRatios: PhotoRatioLabel[] = ["1:1", "3:4", "4:3", "4:5", "9:16", "16:9"]'),
+  "app settings should accept 4:3 as a camera ratio"
+);
+
+assert.ok(
+  photoTypesSource.includes('"4:3"'),
+  "photo ratio type should include 4:3"
+);
+
+const cameraPreviewSection = cameraSource.slice(
+  cameraSource.indexOf("style={[styles.cameraPreviewViewport, cameraPreviewViewportStyle]}"),
+  cameraSource.indexOf("{countdown ? (")
+);
+assert.ok(
+  cameraPreviewSection.includes("<Camera") &&
+    cameraPreviewSection.includes("<CameraGuideOverlay") &&
+    cameraPreviewSection.includes("style={[styles.cameraPreviewFrame, cameraPreviewFrameStyle]}"),
+  "camera preview and guide overlay should share the selected ratio frame"
+);
+assert.ok(
+  cameraPreviewSection.includes("onLayout={(event) => {") &&
+    cameraPreviewSection.includes("setCameraPreviewViewport({ width, height });"),
+  "camera preview should measure the screen before placing the full-width ratio frame"
+);
+assert.ok(
+  !cameraSource.includes("Math.round(height * selectedCameraRatioAspect)") &&
+    !cameraSource.includes("viewportAspect > selectedCameraRatioAspect"),
+  "camera preview should keep the selected-ratio frame full width instead of shrinking width to fit height"
+);
+assert.ok(
+  cameraSource.includes("height: boundedFrameHeight") &&
+    !cameraSource.includes("height: frameHeight,"),
+  "camera preview should not create a frame taller than the visible phone screen"
+);
 
 const cameraRatioOptionsSource = cameraSource.slice(
   cameraSource.indexOf("const CAMERA_RATIO_OPTIONS"),
@@ -91,7 +151,6 @@ for (const forbidden of ["아래로 스크롤"]) {
 
 for (const forbidden of [
   "cameraRatioMask",
-  "selectedCameraRatioAspect",
   "styles.cameraRatioMask"
 ]) {
   assert.ok(
@@ -104,6 +163,8 @@ for (const snippet of [
   "ratio?: string;",
   "const selectedRatio: PhotoRatioLabel",
   "previewRatioAspect",
+  '"4:3": 4 / 3',
+  'value === "4:3"',
   "ratioLabel: selectedRatio",
   'resizeMode={selectedRatioAspect ? "cover" : "contain"}'
 ]) {
@@ -116,6 +177,7 @@ assert.ok(
 );
 
 for (const snippet of [
+  '{ label: "4:3", value: 4 / 3 }',
   "resolveImageDimensions",
   "const capturedDimensions = await resolveImageDimensions({ uri, width, height });",
   'ratioLabel = "Original"',

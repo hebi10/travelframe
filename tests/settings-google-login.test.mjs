@@ -5,16 +5,28 @@ const settingsSource = fs.readFileSync(
   new URL("../app/(tabs)/settings.tsx", import.meta.url),
   "utf8"
 );
+const helperSource = fs.readFileSync(
+  new URL("../lib/google-auth.ts", import.meta.url),
+  "utf8"
+);
 
 for (const snippet of [
-  "signInWithGoogleIdToken",
+  "signInWithGoogleAuthSession",
   "const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false);",
   "const handleGoogleSignIn = () => {",
+  "Google로 계속하기",
+  "Google 로그인 중",
+  "disabled={isAuthLoading || isAuthSubmitting || isGoogleSubmitting}",
+  "onPress={handleGoogleSignIn}"
+]) {
+  assert.ok(settingsSource.includes(snippet), `settings google login missing: ${snippet}`);
+}
+
+for (const snippet of [
   'await import("expo-auth-session")',
   'scopes: ["openid", "profile", "email"]',
   'prompt: "select_account"',
   "await signInWithGoogleIdToken(idToken);",
-  "Google로 계속하기",
   "Google 로그인 설정값을 확인해 주세요.",
   "Google 로그인 승인 코드를 받지 못했습니다.",
   "Google 로그인 토큰을 받지 못했습니다.",
@@ -23,7 +35,7 @@ for (const snippet of [
   "Google 로그인 중 문제가 발생했습니다.",
   "Google 로그인을 사용할 수 없습니다. 앱을 최신 버전으로 업데이트한 뒤 다시 시도해 주세요."
 ]) {
-  assert.ok(settingsSource.includes(snippet), `settings google login missing: ${snippet}`);
+  assert.ok(helperSource.includes(snippet), `shared google login helper missing: ${snippet}`);
 }
 
 assert.ok(

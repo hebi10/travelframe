@@ -111,10 +111,18 @@ const productMeta = {
     productName: "영상 내보내기",
     priceLabel: "월 2,900원",
     description: "월결제 상품입니다. 활성 상태면 영상 내보내기와 백업 혜택이 적용됩니다."
+  },
+  expert_monthly: {
+    cardId: "expertMonthlyCard",
+    statusId: "expertMonthlyStatusLabel",
+    detailId: "expertMonthlyDetail",
+    productName: "Expert",
+    priceLabel: "월 9,900원",
+    description: "월결제 상품입니다. 활성 상태면 주 30개 영상 출력, 5GiB 백업, 음악 20개 혜택이 적용됩니다."
   }
 };
 
-const paidProductIds = ["ad_remove", "creator_monthly"];
+const paidProductIds = ["ad_remove", "creator_monthly", "expert_monthly"];
 
 const statusLabels = {
   inactive: "비활성",
@@ -163,6 +171,7 @@ const setupSubscriptionPanel = () => {
         <select id="productSelect">
           <option value="ad_remove">광고 제거 1회 결제</option>
           <option value="creator_monthly">영상 내보내기 월결제</option>
+          <option value="expert_monthly">Expert 월결제</option>
         </select>
       </label>
       <label>
@@ -412,6 +421,10 @@ const getActiveProductIds = (subscriptions = currentProductSubscriptions) =>
   paidProductIds.filter((productId) => isSubscriptionActive(subscriptions[productId]));
 
 const getEffectiveSubscription = (subscriptions = currentProductSubscriptions) => {
+  if (isSubscriptionActive(subscriptions.expert_monthly)) {
+    return subscriptions.expert_monthly;
+  }
+
   if (isSubscriptionActive(subscriptions.creator_monthly)) {
     return subscriptions.creator_monthly;
   }
@@ -432,7 +445,7 @@ const renderSubscriptionCards = () => {
     const status = subscription?.status ?? "inactive";
     const statusLabel = isActive ? "활성" : statusLabels[status] ?? status;
     const expiresText =
-      productId === "creator_monthly" && subscription?.expiresAt
+      productId !== "ad_remove" && subscription?.expiresAt
         ? `만료 ${formatDate(subscription.expiresAt)}`
         : productId === "ad_remove" && isActive
           ? "1회 결제 완료"
@@ -450,7 +463,7 @@ const fillSubscriptionForm = (productId = $("productSelect").value) => {
   $("productSelect").value = productId;
   $("productStatusSelect").value = subscription?.status ?? "inactive";
   $("productExpiresInput").value = toDateInput(subscription?.expiresAt);
-  $("productExpiresInput").disabled = productId !== "creator_monthly";
+  $("productExpiresInput").disabled = productId === "ad_remove";
   $("adminNoteInput").value = subscription?.adminNote ?? "";
 };
 
@@ -1211,7 +1224,7 @@ const saveProductSubscription = async (event) => {
       targetUid: currentUserDoc.id,
       productId,
       status: selectedStatus,
-      expiresAt: productId === "creator_monthly" ? expiresAt : null,
+      expiresAt: productId === "ad_remove" ? null : expiresAt,
       adminNote: $("adminNoteInput").value.trim() || null
     });
 

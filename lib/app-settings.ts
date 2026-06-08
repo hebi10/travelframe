@@ -168,7 +168,7 @@ const tripClipExportFormats: TripClipExportFormat[] = ["mp4", "images"];
 const imageSaveFormats: AppImageSaveFormat[] = ["original", "png", "jpeg"];
 const storageModes: StorageMode[] = ["local_only", "local_backup"];
 const imageBackupQualities = IMAGE_QUALITY_OPTIONS.map((option) => option.value);
-const cameraRatios: PhotoRatioLabel[] = ["1:1", "3:4", "4:5", "9:16", "16:9"];
+const cameraRatios: PhotoRatioLabel[] = ["1:1", "3:4", "4:3", "4:5", "9:16", "16:9"];
 const cameraSaveScopes: CameraSaveScope[] = ["app", "device", "both"];
 const cameraFacings: CameraFacing[] = ["back", "front"];
 const cameraShutterSoundModes: CameraShutterSoundMode[] = ["silent", "sound"];

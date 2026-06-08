@@ -21,6 +21,8 @@ for (const snippet of [
   "cleanupExpiredBackupUploadSessions",
   "buildBackupSessionStoragePath",
   "deleteBackupSessionStorageObject",
+  "deleteUserBackupItem",
+  "deleteBackupItemForUser",
   "metadata.metadata?.backupSessionId !== backupSessionId",
   "getBackupSubscription",
   "subscriptions/expert_monthly"
@@ -46,6 +48,7 @@ for (const snippet of [
   "isValidVideoBackupMetadata",
   "match /imageWorks/{workId}",
   "allow create, update: if false",
+  "allow delete: if false",
   "storagePath",
   "fileSize"
 ]) {
@@ -59,7 +62,8 @@ for (const snippet of [
   "completeImageWorkBackup",
   "backupSessionId",
   "fileSize",
-  "deleteCloudBackupDataCallable"
+  "deleteCloudBackupDataCallable",
+  "deleteUserBackupItem"
 ]) {
   assert.ok(backupSource.includes(snippet), `client backup flow missing server function call: ${snippet}`);
 }

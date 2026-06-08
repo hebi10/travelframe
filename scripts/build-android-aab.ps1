@@ -67,6 +67,85 @@ function Set-GradleProperty {
   Write-Utf8NoBom -Path $Path -Value $content
 }
 
+# Local AAB versionCode source of truth:
+# - explicit -VersionCode wins when provided
+# - otherwise .android-version-code is advanced monotonically from yyMMddHH
+# - app.json expo.android.versionCode is ignored by local AAB builds
+# - EAS remote appVersionSource remains separate for `npm run android:build-prod`
+function Get-NextAndroidVersionCode {
+  param([string]$ProjectRoot)
+
+  $versionCodeStatePath = Join-Path $ProjectRoot ".android-version-code"
+  $baseVersionCode = [int](Get-Date -Format "yyMMddHH")
+  $lastVersionCode = 0
+
+  if (Test-Path -LiteralPath $versionCodeStatePath) {
+    $lastVersionCodeText = (Get-Content -LiteralPath $versionCodeStatePath -Raw).Trim()
+    if ($lastVersionCodeText -match "^\d+$") {
+      $lastVersionCode = [int]$lastVersionCodeText
+    }
+  }
+
+  if ($lastVersionCode -gt 0) {
+    return [Math]::Max($baseVersionCode, $lastVersionCode + 1)
+  }
+
+  return $baseVersionCode + 1
+}
+
+function Write-LocalVersionCodePolicyNotice {
+  param([string]$ProjectRoot)
+
+  $appJsonPath = Join-Path $ProjectRoot "app.json"
+  if (-not (Test-Path -LiteralPath $appJsonPath)) {
+    return
+  }
+
+  $appJson = Get-Content -LiteralPath $appJsonPath -Raw
+  if ($appJson -match '"versionCode"\s*:') {
+    Write-Warning "app.json expo.android.versionCode is ignored by local AAB builds; use -VersionCode or .android-version-code for scripts/build-android-aab.ps1. EAS remote appVersionSource remains separate for npm run android:build-prod."
+  }
+}
+
+function Set-RequiredBuildGradleReplacement {
+  param(
+    [string]$Text,
+    [string]$Pattern,
+    [string]$Replacement,
+    [string]$Description
+  )
+
+  $matches = [regex]::Matches($Text, $Pattern)
+  if ($matches.Count -ne 1) {
+    Stop-WithMessage "Expected exactly one build.gradle match for $Description, found $($matches.Count). Refusing to continue after prebuild."
+  }
+
+  return [regex]::Replace($Text, $Pattern, $Replacement, 1)
+}
+
+function Assert-AndroidAabBuildGradle {
+  param(
+    [string]$BuildGradle,
+    [int]$VersionCode
+  )
+
+  $versionMatches = [regex]::Matches($BuildGradle, "versionCode\s+$VersionCode\b")
+  if ($versionMatches.Count -ne 1) {
+    Stop-WithMessage "Generated build.gradle does not contain exactly one local AAB versionCode $VersionCode."
+  }
+
+  foreach ($requiredSnippet in @(
+    "TRAVELFRAME_UPLOAD_STORE_FILE",
+    "signingConfig signingConfigs.release",
+    "minifyEnabled enableMinifyInReleaseBuilds",
+    "proguardFiles getDefaultProguardFile"
+  )) {
+    if (-not $BuildGradle.Contains($requiredSnippet)) {
+      Stop-WithMessage "Generated build.gradle is missing required release setting: $requiredSnippet"
+    }
+  }
+}
+
 function Remove-DuplicateLauncherPngResources {
   param([string]$ProjectRoot)
 
@@ -263,22 +342,7 @@ if ($missingEnv.Count -gt 0) {
 }
 
 if ($VersionCode -le 0) {
-  $versionCodeStatePath = Join-Path $projectRoot ".android-version-code"
-  $baseVersionCode = [int](Get-Date -Format "yyMMddHH")
-  $lastVersionCode = 0
-
-  if (Test-Path -LiteralPath $versionCodeStatePath) {
-    $lastVersionCodeText = (Get-Content -LiteralPath $versionCodeStatePath -Raw).Trim()
-    if ($lastVersionCodeText -match "^\d+$") {
-      $lastVersionCode = [int]$lastVersionCodeText
-    }
-  }
-
-  if ($lastVersionCode -gt 0) {
-    $VersionCode = [Math]::Max($baseVersionCode, $lastVersionCode + 1)
-  } else {
-    $VersionCode = $baseVersionCode + 1
-  }
+  $VersionCode = Get-NextAndroidVersionCode -ProjectRoot $projectRoot
 }
 
 if ($VersionCode -gt 2100000000) {
@@ -286,6 +350,7 @@ if ($VersionCode -gt 2100000000) {
 }
 
 Set-Content -LiteralPath (Join-Path $projectRoot ".android-version-code") -Value $VersionCode -Encoding ASCII
+Write-LocalVersionCodePolicyNotice -ProjectRoot $projectRoot
 
 Write-Host "Preparing Android project..." -ForegroundColor Cyan
 Invoke-External "npx" @("expo", "prebuild", "--platform", "android", "--no-install")
@@ -333,16 +398,13 @@ signingConfigs {
             }
         }
 "@
-  $buildGradle = $buildGradle -replace "signingConfigs\s*\{", $releaseSigning
+  $buildGradle = Set-RequiredBuildGradleReplacement -Text $buildGradle -Pattern "signingConfigs\s*\{" -Replacement $releaseSigning -Description "release signing config insertion"
 }
 
-$buildGradle = [regex]::Replace($buildGradle, "versionCode\s+\d+", "versionCode $VersionCode", 1)
-$buildGradle = [regex]::Replace(
-  $buildGradle,
-  "(buildTypes\s*\{[\s\S]*?release\s*\{[\s\S]*?signingConfig\s+)signingConfigs\.debug",
-  '${1}signingConfigs.release',
-  1
-)
+$buildGradle = Set-RequiredBuildGradleReplacement -Text $buildGradle -Pattern "versionCode\s+\d+" -Replacement "versionCode $VersionCode" -Description "local versionCode"
+$buildGradle = Set-RequiredBuildGradleReplacement -Text $buildGradle -Pattern "(buildTypes\s*\{[\s\S]*?release\s*\{[\s\S]*?signingConfig\s+)signingConfigs\.debug" -Replacement '${1}signingConfigs.release' -Description "release signingConfig"
+
+Assert-AndroidAabBuildGradle -BuildGradle $buildGradle -VersionCode $VersionCode
 
 Write-Utf8NoBom -Path $buildGradlePath -Value $buildGradle
 

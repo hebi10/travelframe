@@ -303,6 +303,11 @@
                   <strong id="creatorMonthlyStatusLabel">-</strong>
                   <span id="creatorMonthlyDetail" class="meta">-</span>
                 </div>
+                <div id="expertMonthlyCard" class="subscription-product-card">
+                  <span class="meta">Expert</span>
+                  <strong id="expertMonthlyStatusLabel">-</strong>
+                  <span id="expertMonthlyDetail" class="meta">-</span>
+                </div>
               </div>
             </section>
             </div>
@@ -335,15 +340,15 @@
               <form id="subscriptionForm" class="form form-grid">
                 <label>
                   플랜
-                  <select id="planSelect">
-                    <option value="free">무료</option>
+                  <select id="productSelect">
                     <option value="ad_remove">광고 제거 1회 결제</option>
                     <option value="creator_monthly">영상 내보내기 월결제</option>
+                    <option value="expert_monthly">Expert 월결제</option>
                   </select>
                 </label>
                 <label>
                   상태
-                  <select id="statusSelect">
+                  <select id="productStatusSelect">
                     <option value="inactive">비활성</option>
                     <option value="active">활성</option>
                     <option value="expired">만료</option>
@@ -351,7 +356,7 @@
                 </label>
                 <label>
                   만료일
-                  <input id="expiresInput" type="date" />
+                  <input id="productExpiresInput" type="date" />
                 </label>
                 <label class="full">
                   관리자 메모

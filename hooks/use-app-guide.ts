@@ -12,7 +12,7 @@ import {
 } from "@/lib/guide-progress";
 
 export function useAppGuide(tabKey: AppGuideTabKey, replaySignal = 0) {
-  const steps = useMemo(() => APP_GUIDE_STEPS[tabKey], [tabKey]);
+  const steps = useMemo(() => APP_GUIDE_STEPS[tabKey] ?? [], [tabKey]);
   const [visible, setVisible] = useState(false);
   const [stepIndex, setStepIndex] = useState(0);
 
@@ -21,7 +21,7 @@ export function useAppGuide(tabKey: AppGuideTabKey, replaySignal = 0) {
       let isActive = true;
 
       const loadGuide = async () => {
-        if (tabKey !== "camera") {
+        if (steps.length <= 0) {
           return;
         }
 

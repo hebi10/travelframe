@@ -52,8 +52,6 @@ import {
   SmoothValueSlider
 } from "@/features/camera/camera-screen.components";
 import {
-  CAMERA_CONTROL_TAB_GAP,
-  CAMERA_CONTROL_TAB_WIDTH,
   CAMERA_FOCUS_CONTROLS_DISMISS_MS,
   CAMERA_FOCUS_CONTROLS_FADE_MS,
   CAMERA_FOCUS_INDICATOR_RADIUS,
@@ -132,6 +130,7 @@ const CAMERA_QUALITY_OPTIONS = [
 const CAMERA_RATIO_OPTIONS: { label: string; value: PhotoRatioLabel }[] = [
   { label: "1:1", value: "1:1" },
   { label: "3:4", value: "3:4" },
+  { label: "4:3", value: "4:3" },
   { label: "4:5", value: "4:5" },
   { label: "9:16", value: "9:16" },
   { label: "16:9", value: "16:9" }
@@ -155,10 +154,16 @@ const cameraRatioAspect: Record<PhotoRatioLabel, number | null> = {
   Original: null,
   "1:1": 1,
   "3:4": 3 / 4,
+  "4:3": 4 / 3,
   "4:5": 4 / 5,
   "9:16": 9 / 16,
   "16:9": 16 / 9
 };
+const CAMERA_PREVIEW_TOP_RESERVED = 88;
+const CAMERA_PREVIEW_BOTTOM_RESERVED = 158;
+const CAMERA_PREVIEW_FLOATING_BOTTOM_RESERVED = 218;
+const CAMERA_PREVIEW_OVERLAY_SETUP_BOTTOM_RESERVED = 238;
+const CAMERA_PREVIEW_CONTROL_GAP = 12;
 
 const CAMERA_ZOOM_MIN = 0;
 const CAMERA_ZOOM_MAX = 100;
@@ -188,10 +193,6 @@ const CAMERA_FRONT_ZOOM_PRESETS = [
   { label: "1x", factor: 1 },
   { label: "3x", factor: 3 }
 ] as const;
-const CAMERA_CONTROL_TABS = [
-  { id: "photo", label: "사진" },
-  { id: "zoom", label: "확대" }
-] as const;
 const CAMERA_EXPOSURE_BIAS_MIN = -1;
 const CAMERA_EXPOSURE_BIAS_MAX = 1;
 const CAMERA_FLIP_SWIPE_THRESHOLD = 70;
@@ -201,7 +202,7 @@ const CAMERA_SESSION_RECOVERY_DELAY_MS = 700;
 
 type CameraTimerValue = (typeof CAMERA_TIMER_OPTIONS)[number]["value"];
 type CameraQualityValue = (typeof CAMERA_QUALITY_OPTIONS)[number]["value"];
-type CameraControlTab = (typeof CAMERA_CONTROL_TABS)[number]["id"];
+type CameraControlPanel = "zoom";
 type CameraZoomPreset =
   | (typeof CAMERA_BACK_ZOOM_PRESETS_WITH_ULTRA_WIDE)[number]
   | (typeof CAMERA_BACK_ZOOM_PRESETS_DEFAULT)[number]
@@ -211,27 +212,6 @@ const sleep = (milliseconds: number) =>
   new Promise((resolve) => {
     setTimeout(resolve, milliseconds);
   });
-
-function getCameraControlTabOffset(index: number) {
-  "worklet";
-
-  return -index * (CAMERA_CONTROL_TAB_WIDTH + CAMERA_CONTROL_TAB_GAP);
-}
-
-function getNearestCameraControlTabIndex(offsetX: number) {
-  "worklet";
-
-  const tabStride = CAMERA_CONTROL_TAB_WIDTH + CAMERA_CONTROL_TAB_GAP;
-  const nearestIndex = Math.round(-offsetX / tabStride);
-  return Math.max(0, Math.min(CAMERA_CONTROL_TABS.length - 1, nearestIndex));
-}
-
-function getCameraControlTabCenterPadding(viewportWidth: number, measuredCenterX = 0) {
-  "worklet";
-
-  const targetCenterX = measuredCenterX > 0 ? measuredCenterX : viewportWidth / 2;
-  return Math.max(0, targetCenterX - CAMERA_CONTROL_TAB_WIDTH / 2 - CAMERA_CONTROL_TAB_GAP);
-}
 
 function hasCameraLens(availableLenses: PhysicalDeviceType[], lens: PhysicalDeviceType) {
   return availableLenses.includes(lens);
@@ -383,8 +363,8 @@ export default function CameraScreen() {
     useState<number | null>(null);
   const [guideSettingsOpen, setGuideSettingsOpen] = useState(false);
   const [cameraSettingsOpen, setCameraSettingsOpen] = useState(false);
-  const [activeCameraControlTab, setActiveCameraControlTab] =
-    useState<CameraControlTab>("photo");
+  const [activeCameraControlPanel, setActiveCameraControlPanel] =
+    useState<CameraControlPanel | null>(null);
   const [shutterTimer, setShutterTimer] = useState<CameraTimerValue>(0);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [hapticEnabled, setHapticEnabled] = useState(true);
@@ -393,8 +373,6 @@ export default function CameraScreen() {
   const [cameraSaveScope, setCameraSaveScope] = useState<CameraSaveScope>(defaultAppSettings.cameraSaveScope);
   const [cameraShutterSoundMode, setCameraShutterSoundMode] =
     useState<CameraShutterSoundMode>("silent");
-  const [cameraControlTabViewportWidth, setCameraControlTabViewportWidth] = useState(0);
-  const [cameraControlShutterCenterX, setCameraControlShutterCenterX] = useState(0);
   const [cameraFacing, setCameraFacing] = useState<CameraFacing>("back");
   const [flashMode, setFlashMode] = useState<FlashMode>("off");
   const [torchEnabled, setTorchEnabled] = useState(false);
@@ -418,14 +396,14 @@ export default function CameraScreen() {
   const [overlayResetKey, setOverlayResetKey] = useState(0);
   const [recentPhoto, setRecentPhoto] = useState<PhotoItem | null>(null);
   const [cameraFrame, setCameraFrame] = useState({ width: 0, height: 0 });
+  const [cameraPreviewViewport, setCameraPreviewViewport] = useState({ width: 0, height: 0 });
+  const [cameraControlsHeight, setCameraControlsHeight] = useState(0);
   const guideOffsetXValue = useSharedValue(0);
   const guideOffsetYValue = useSharedValue(0);
   const guideDragStartX = useSharedValue(0);
   const guideDragStartY = useSharedValue(0);
   const guidePinchStartSize = useSharedValue(44);
   const cameraPinchStartZoomPercent = useSharedValue(0);
-  const cameraControlTabSlideX = useSharedValue(0);
-  const cameraControlTabStartX = useSharedValue(0);
   const focusControlsOpacity = useSharedValue(0);
   const focusIndicatorScale = useSharedValue(1);
   const guideSizeRef = useRef(44);
@@ -489,14 +467,6 @@ export default function CameraScreen() {
     CAMERA_QUALITY_OPTIONS.find((option) => option.value === photoQuality)?.quality ?? 0.92;
   const photoOutput = usePhotoOutput({ quality: photoOutputQuality });
   const cameraOutputs = useMemo(() => [photoOutput], [photoOutput]);
-  const activeCameraControlTabIndex = Math.max(
-    0,
-    CAMERA_CONTROL_TABS.findIndex((tab) => tab.id === activeCameraControlTab)
-  );
-  const cameraControlTabCenterPadding = getCameraControlTabCenterPadding(
-    cameraControlTabViewportWidth,
-    cameraControlShutterCenterX
-  );
   const cameraSupportsExposureBias = cameraDevice ? cameraDevice.supportsExposureBias : false;
   const cameraExposureMin =
     cameraDevice && cameraDevice.supportsExposureBias
@@ -518,6 +488,50 @@ export default function CameraScreen() {
     : undefined;
   const cameraNativeZoom = cameraNativeControlsReady ? cameraZoomFactor : undefined;
   const cameraNativeExposure = cameraNativeControlsReady ? cameraExposureBias : undefined;
+  const selectedCameraRatioAspect = cameraRatioAspect[cameraRatio] ?? undefined;
+  const cameraPreviewTopReserved = Math.max(insets.top + 56, CAMERA_PREVIEW_TOP_RESERVED);
+  const cameraPreviewBottomReserved = overlaySetupActive
+    ? CAMERA_PREVIEW_OVERLAY_SETUP_BOTTOM_RESERVED
+    : activeCameraControlPanel === "zoom"
+      ? CAMERA_PREVIEW_FLOATING_BOTTOM_RESERVED
+      : CAMERA_PREVIEW_BOTTOM_RESERVED;
+  const cameraPreviewBottomOffset =
+    cameraControlsHeight > 0
+      ? cameraControlsHeight + CAMERA_PREVIEW_CONTROL_GAP
+      : bottomSafePadding + cameraPreviewBottomReserved;
+  const cameraPreviewViewportStyle = useMemo(
+    () => ({
+      top: 0,
+      bottom: 0
+    }),
+    []
+  );
+  const cameraPreviewFrameStyle = useMemo(() => {
+    const { width, height } = cameraPreviewViewport;
+
+    if (!selectedCameraRatioAspect || width <= 0 || height <= 0) {
+      return styles.cameraPreviewFrameFill;
+    }
+
+    const frameHeight = Math.round(width / selectedCameraRatioAspect);
+    if (!Number.isFinite(frameHeight) || frameHeight <= 0) {
+      return styles.cameraPreviewFrameFill;
+    }
+
+    const boundedFrameHeight = Math.min(frameHeight, height);
+    const latestTopWithoutBottomOverlap = height - cameraPreviewBottomOffset - boundedFrameHeight;
+
+    return {
+      width: "100%" as const,
+      height: boundedFrameHeight,
+      top: Math.max(0, Math.min(cameraPreviewTopReserved, latestTopWithoutBottomOverlap))
+    };
+  }, [
+    cameraPreviewBottomOffset,
+    cameraPreviewTopReserved,
+    cameraPreviewViewport,
+    selectedCameraRatioAspect
+  ]);
 
   const focusIndicatorAnimatedStyle = useAnimatedStyle(() => ({
     opacity: focusControlsOpacity.value,
@@ -525,9 +539,6 @@ export default function CameraScreen() {
   }));
   const focusControlsAnimatedStyle = useAnimatedStyle(() => ({
     opacity: focusControlsOpacity.value
-  }));
-  const cameraControlTabTrackAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: cameraControlTabSlideX.value }]
   }));
 
   useFocusEffect(
@@ -592,17 +603,6 @@ export default function CameraScreen() {
       void updateAppSettings({ cameraTorchEnabled: false });
     }
   }, [cameraDevice, torchEnabled]);
-
-  useEffect(() => {
-    if (cameraControlTabViewportWidth <= 0) {
-      return;
-    }
-
-    cameraControlTabSlideX.value = withTiming(
-      getCameraControlTabOffset(activeCameraControlTabIndex),
-      { duration: 180 }
-    );
-  }, [activeCameraControlTabIndex, cameraControlTabSlideX, cameraControlTabViewportWidth]);
 
   useEffect(
     () => () => {
@@ -1221,103 +1221,10 @@ export default function CameraScreen() {
     router.push("/studio");
   };
 
-  const selectCameraControlTab = useCallback(
-    (nextTab: CameraControlTab) => {
-      setActiveCameraControlTab(nextTab);
-      void triggerFeedback();
-    },
-    [triggerFeedback]
-  );
-
-  const selectCameraControlTabByIndex = useCallback(
-    (nextIndex: number) => {
-      const nextTab = CAMERA_CONTROL_TABS[nextIndex]?.id;
-      if (nextTab) {
-        selectCameraControlTab(nextTab);
-      }
-    },
-    [selectCameraControlTab]
-  );
-
-  const cameraControlTabPanGesture = useMemo(
-    () =>
-      Gesture.Pan()
-        .activeOffsetX([-10, 10])
-        .failOffsetY([-12, 12])
-        .onBegin(() => {
-          cameraControlTabStartX.value = cameraControlTabSlideX.value;
-        })
-        .onUpdate((event) => {
-          if (cameraControlTabViewportWidth <= 0) {
-            return;
-          }
-
-          const minOffset = getCameraControlTabOffset(CAMERA_CONTROL_TABS.length - 1);
-          const nextOffset = cameraControlTabStartX.value + event.translationX;
-          cameraControlTabSlideX.value = Math.max(minOffset, Math.min(0, nextOffset));
-        })
-        .onEnd((event) => {
-          if (cameraControlTabViewportWidth <= 0) {
-            return;
-          }
-
-          const minOffset = getCameraControlTabOffset(CAMERA_CONTROL_TABS.length - 1);
-          const dragEndOffset = Math.max(
-            minOffset,
-            Math.min(0, cameraControlTabStartX.value + event.translationX)
-          );
-          const nextIndex = getNearestCameraControlTabIndex(dragEndOffset);
-          cameraControlTabSlideX.value = withTiming(getCameraControlTabOffset(nextIndex), {
-            duration: 160
-          });
-          if (nextIndex !== activeCameraControlTabIndex) {
-            runOnJS(selectCameraControlTabByIndex)(nextIndex);
-          }
-        }),
-    [
-      activeCameraControlTabIndex,
-      cameraControlTabSlideX,
-      cameraControlTabStartX,
-      cameraControlTabViewportWidth,
-      selectCameraControlTabByIndex
-    ]
-  );
-
-  const cameraControlTabTapGesture = useMemo(
-    () =>
-      Gesture.Tap()
-        .maxDuration(220)
-        .onEnd((event) => {
-          if (cameraControlTabViewportWidth <= 0) {
-            return;
-          }
-
-          const tabStride = CAMERA_CONTROL_TAB_WIDTH + CAMERA_CONTROL_TAB_GAP;
-          const firstTabCenter =
-            getCameraControlTabCenterPadding(
-              cameraControlTabViewportWidth,
-              cameraControlShutterCenterX
-            ) +
-            CAMERA_CONTROL_TAB_GAP +
-            CAMERA_CONTROL_TAB_WIDTH / 2;
-          const tappedIndex = Math.round(
-            (event.x - firstTabCenter - cameraControlTabSlideX.value) / tabStride
-          );
-          const nextIndex = Math.max(0, Math.min(CAMERA_CONTROL_TABS.length - 1, tappedIndex));
-          runOnJS(selectCameraControlTabByIndex)(nextIndex);
-        }),
-    [
-      cameraControlShutterCenterX,
-      cameraControlTabSlideX,
-      cameraControlTabViewportWidth,
-      selectCameraControlTabByIndex
-    ]
-  );
-
-  const cameraControlTabGesture = useMemo(
-    () => Gesture.Exclusive(cameraControlTabPanGesture, cameraControlTabTapGesture),
-    [cameraControlTabPanGesture, cameraControlTabTapGesture]
-  );
+  const openZoomControls = () => {
+    setActiveCameraControlPanel((current) => (current === "zoom" ? null : "zoom"));
+    void triggerFeedback();
+  };
 
   const cameraSwipeGesture = useMemo(
     () =>
@@ -1637,13 +1544,21 @@ export default function CameraScreen() {
   }
 
   return (
-    <View
-      style={styles.screen}
-      onLayout={(event) => {
-        const { width, height } = event.nativeEvent.layout;
-        setCameraFrame({ width, height });
-      }}
-    >
+    <View style={styles.screen}>
+      <View
+        style={[styles.cameraPreviewViewport, cameraPreviewViewportStyle]}
+        onLayout={(event) => {
+          const { width, height } = event.nativeEvent.layout;
+          setCameraPreviewViewport({ width, height });
+        }}
+      >
+        <View
+          style={[styles.cameraPreviewFrame, cameraPreviewFrameStyle]}
+          onLayout={(event) => {
+            const { width, height } = event.nativeEvent.layout;
+            setCameraFrame({ width, height });
+          }}
+        >
       {cameraDevice ? (
         <Camera
           key={`${cameraDevice.id}-${cameraSessionRestartKey}`}
@@ -1806,6 +1721,9 @@ export default function CameraScreen() {
         </Animated.View>
       ) : null}
 
+        </View>
+      </View>
+
       {countdown ? (
         <View style={styles.countdownOverlay}>
           <Text selectable={false} style={styles.countdownText}>
@@ -1851,6 +1769,18 @@ export default function CameraScreen() {
             >
               <Feather name="image" size={15} color={colors.inverse} />
               <Text selectable={false} style={styles.cameraInstantControlText}>오버레이</Text>
+            </Pressable>
+            <Pressable
+              style={[
+                styles.cameraInstantControlButton,
+                activeCameraControlPanel === "zoom" && styles.cameraInstantControlButtonActive
+              ]}
+              onPress={openZoomControls}
+              accessibilityRole="button"
+              accessibilityLabel="확대 설정 열기"
+            >
+              <Feather name="zoom-in" size={15} color={colors.inverse} />
+              <Text selectable={false} style={styles.cameraInstantControlText}>확대</Text>
             </Pressable>
             <Pressable
               style={[
@@ -2272,7 +2202,15 @@ export default function CameraScreen() {
       </Modal>
 
       {!isCameraModalOpen && !isGuidePositionAdjusting && !isGridLineControlAdjusting ? (
-        <View style={controlsStyle}>
+        <View
+          style={controlsStyle}
+          onLayout={(event) => {
+            const nextHeight = Math.ceil(event.nativeEvent.layout.height);
+            setCameraControlsHeight((currentHeight) =>
+              currentHeight === nextHeight ? currentHeight : nextHeight
+            );
+          }}
+        >
           {errorMessage ? <Text selectable style={styles.errorText}>{errorMessage}</Text> : null}
 
           {overlaySetupActive && referenceUri ? (
@@ -2325,104 +2263,50 @@ export default function CameraScreen() {
             </View>
           ) : (
             <View collapsable={false} style={styles.cameraControlDeck}>
-              {activeCameraControlTab !== "photo" ? (
+              {activeCameraControlPanel === "zoom" ? (
                 <View
                   pointerEvents="box-none"
                   style={[styles.cameraFloatingPanelWrap, styles.cameraFloatingPanelRaised]}
                 >
                   <View style={styles.cameraControlPanelViewport}>
                     <Animated.View
-                      key={activeCameraControlTab}
+                      key={activeCameraControlPanel}
                       entering={FadeIn.duration(140)}
                       style={styles.cameraControlPage}
                     >
-                      {activeCameraControlTab === "zoom" ? (
-                        <View style={styles.quickButtonRow}>
-                          {cameraZoomPresets.map((preset) => {
-                            const presetFactor = getCameraZoomPresetFactor(preset, cameraDevice);
-                            const isActive =
-                              Math.abs(cameraZoomFactor - presetFactor) < 0.08;
-                            return (
-                              <Pressable
-                                key={preset.label}
+                      <View style={styles.quickButtonRow}>
+                        {cameraZoomPresets.map((preset) => {
+                          const presetFactor = getCameraZoomPresetFactor(preset, cameraDevice);
+                          const isActive =
+                            Math.abs(cameraZoomFactor - presetFactor) < 0.08;
+                          return (
+                            <Pressable
+                              key={preset.label}
+                              style={[
+                                styles.quickPillButton,
+                                isActive && styles.quickPillButtonActive
+                              ]}
+                              onPress={() => setZoomPreset(preset)}
+                            >
+                              <Text
+                                selectable={false}
                                 style={[
-                                  styles.quickPillButton,
-                                  isActive && styles.quickPillButtonActive
+                                  styles.quickPillText,
+                                  isActive && styles.quickPillTextActive
                                 ]}
-                                onPress={() => setZoomPreset(preset)}
                               >
-                                <Text
-                                  selectable={false}
-                                  style={[
-                                    styles.quickPillText,
-                                    isActive && styles.quickPillTextActive
-                                  ]}
-                                >
-                                  {preset.label}
-                                </Text>
-                              </Pressable>
-                            );
-                          })}
-                        </View>
-                      ) : null}
+                                {preset.label}
+                              </Text>
+                            </Pressable>
+                          );
+                        })}
+                      </View>
                     </Animated.View>
                   </View>
                 </View>
               ) : null}
 
               <View style={[styles.cameraControlBottomTray, { paddingBottom: bottomSafePadding }]}>
-                <View style={styles.cameraControlTabRow}>
-                  <GestureDetector gesture={cameraControlTabGesture}>
-                    <Animated.View
-                      collapsable={false}
-                      style={styles.cameraControlTabViewport}
-                      onLayout={(event) =>
-                        setCameraControlTabViewportWidth(event.nativeEvent.layout.width)
-                      }
-                    >
-                      <Animated.View
-                        style={[styles.cameraControlTabTrack, cameraControlTabTrackAnimatedStyle]}
-                      >
-                        <View
-                          style={[
-                            styles.cameraControlTabCenterSpacer,
-                            { width: cameraControlTabCenterPadding }
-                          ]}
-                        />
-                        {CAMERA_CONTROL_TABS.map((tab) => {
-                          const isActive = activeCameraControlTab === tab.id;
-                          return (
-                            <Pressable
-                              key={tab.id}
-                              style={[
-                                styles.cameraControlTab,
-                                isActive && styles.cameraControlTabActive
-                              ]}
-                              onPress={() => selectCameraControlTab(tab.id)}
-                            >
-                              <Text
-                                selectable={false}
-                                style={[
-                                  styles.cameraControlTabText,
-                                  isActive && styles.cameraControlTabTextActive
-                                ]}
-                              >
-                                {tab.label}
-                              </Text>
-                            </Pressable>
-                          );
-                        })}
-                        <View
-                          style={[
-                            styles.cameraControlTabCenterSpacer,
-                            { width: cameraControlTabCenterPadding }
-                          ]}
-                        />
-                      </Animated.View>
-                    </Animated.View>
-                  </GestureDetector>
-                </View>
-
                 <View style={styles.captureRow}>
                   <Pressable
                     style={styles.galleryButton}
@@ -2442,10 +2326,6 @@ export default function CameraScreen() {
                   <Pressable
                     android_disableSound
                     disabled={!isCameraReady || isCapturing || !cameraDevice}
-                    onLayout={(event) => {
-                      const { x, width } = event.nativeEvent.layout;
-                      setCameraControlShutterCenterX(x + width / 2);
-                    }}
                     style={[
                       styles.shutterOuter,
                       (!isCameraReady || isCapturing || !cameraDevice) && styles.shutterDisabled

@@ -86,6 +86,30 @@ assertIncludes(
   'fileType in ["image/jpeg", "image/png", "image/webp", "video/mp4"]',
   "backup metadata fileType allow-list missing"
 );
+assertIncludes(
+  firestoreRules,
+  '"musicCount"',
+  "backup overview schema must allow server-written musicCount"
+);
+assertIncludes(
+  firestoreRules,
+  '"empty"',
+  "backup overview schema must allow server-written empty status"
+);
+
+for (const snippet of [
+  "match /videos/{videoId} {\n        allow read: if isOwner(userId) || isAdmin();\n        allow create: if isOwner(userId) && isValidVideoBackupMetadata(userId, videoId);\n        allow update: if isOwner(userId) && isValidVideoBackupUpdate(userId, videoId);\n        allow delete: if false;",
+  "match /imageWorks/{workId} {\n        allow read: if isOwner(userId) || isAdmin();\n        allow create, update: if false;\n        allow delete: if false;",
+  "match /musicTracks/{trackId} {\n        allow read: if isOwner(userId) || isAdmin();\n        allow create, update, delete: if false;",
+  "match /backups/{backupId} {\n        allow read: if isOwner(userId) || isAdmin();\n        allow create: if isOwner(userId) && isValidBackupOverview(userId, backupId);\n        allow update: if isOwner(userId) && isValidBackupOverviewUpdate(userId, backupId);\n        allow delete: if false;",
+  "match /photoBackups/{photoId} {\n        allow read: if isOwner(userId) || isAdmin();\n        allow create: if isOwner(userId) && isValidPhotoBackupMetadata(userId, photoId);\n        allow update: if isOwner(userId) && isValidPhotoBackupUpdate(userId, photoId);\n        allow delete: if false;"
+]) {
+  assertIncludes(
+    firestoreRules,
+    snippet,
+    "backup metadata deletes must go through server callables"
+  );
+}
 
 for (const snippet of [
   "request.resource.size < 20 * 1024 * 1024",

@@ -42,7 +42,7 @@ assert.equal(
 
 const functionsSource = fs.readFileSync(new URL("../functions/index.js", import.meta.url), "utf8");
 assert.ok(
-  functionsSource.includes("exports.setAdminProductSubscription = onCall"),
+  functionsSource.includes("exports.setAdminProductSubscription = secureOnCall"),
   "server should expose admin product subscription management"
 );
 

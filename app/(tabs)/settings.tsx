@@ -5,7 +5,6 @@ import {
   Alert,
   Linking,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   Text,
@@ -52,6 +51,12 @@ import {
 import {
   useAppAppearance
 } from "@/lib/app-appearance";
+import {
+  GOOGLE_SIGN_IN_MESSAGES,
+  getGoogleSignInErrorMessage,
+  isGoogleSignInConfigured,
+  signInWithGoogleAuthSession
+} from "@/lib/google-auth";
 import { APP_FONT_OPTIONS, getFontOptionLabel } from "@/lib/app-fonts";
 import { useAuth } from "@/lib/auth-context";
 import { getPlanEntitlements } from "@/lib/plan-entitlements";
@@ -129,7 +134,7 @@ type SettingKey =
   | "imageBackupQuality";
 
 const opacityOptions = [0.2, 0.3, 0.4, 0.5, 0.6, 0.7];
-const cameraRatioOptions = ["1:1", "3:4", "4:5", "9:16", "16:9"] as const;
+  const cameraRatioOptions = ["1:1", "3:4", "4:3", "4:5", "9:16", "16:9"] as const;
 
 
 const storageModeLegend =
@@ -318,7 +323,10 @@ export default function SettingsScreen() {
     useState<WeeklyVideoExportUsage | null>(null);
   const googleWebClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
   const googleAndroidClientId = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;
-  const isGoogleReady = Boolean(googleWebClientId && googleAndroidClientId);
+  const isGoogleReady = isGoogleSignInConfigured({
+    webClientId: googleWebClientId,
+    androidClientId: googleAndroidClientId
+  });
   const planEntitlements = useMemo(
     () => getPlanEntitlements({ isLoggedIn, subscription }),
     [isLoggedIn, subscription]
@@ -897,88 +905,30 @@ export default function SettingsScreen() {
 
   const handleGoogleSignIn = () => {
     if (!isGoogleReady) {
-      setAuthMessage("Google 로그인 설정값을 확인해 주세요.");
+      setAuthMessage(GOOGLE_SIGN_IN_MESSAGES.missingConfig);
       return;
     }
 
     const runGoogleLogin = async () => {
       setIsGoogleSubmitting(true);
       setAuthMessage(null);
-
-      const AuthSession = await import("expo-auth-session");
-      const clientId = Platform.OS === "android" ? googleAndroidClientId! : googleWebClientId!;
-      const redirectUri =
-        Platform.OS === "android"
-          ? "com.haebi.photoguide:/oauthredirect"
-          : AuthSession.makeRedirectUri({
-              scheme: "photoguide",
-              path: "oauthredirect"
-            });
-      const discovery = {
-        authorizationEndpoint: "https://accounts.google.com/o/oauth2/v2/auth",
-        tokenEndpoint: "https://oauth2.googleapis.com/token"
-      };
-      const request = new AuthSession.AuthRequest({
-        clientId,
-        responseType: AuthSession.ResponseType.Code,
-        redirectUri,
-        scopes: ["openid", "profile", "email"],
-        usePKCE: true,
-        extraParams: {
-          prompt: "select_account"
-        }
+      const result = await signInWithGoogleAuthSession({
+        webClientId: googleWebClientId,
+        androidClientId: googleAndroidClientId,
+        signInWithGoogleIdToken
       });
-      const result = await request.promptAsync(discovery);
-
-      if (result.type === "success") {
-        if (result.params.error) {
-          throw new Error(result.params.error_description ?? result.params.error);
-        }
-
-        const code = result.params.code;
-        if (!code) {
-          throw new Error("Google 로그인 승인 코드를 받지 못했습니다.");
-        }
-
-        const token = await AuthSession.exchangeCodeAsync(
-          {
-            clientId,
-            code,
-            redirectUri,
-            scopes: ["openid", "profile", "email"],
-            extraParams: {
-              code_verifier: request.codeVerifier ?? ""
-            }
-          },
-          discovery
-        );
-        const idToken = token.idToken;
-        if (!idToken) {
-          throw new Error("Google 로그인 토큰을 받지 못했습니다.");
-        }
-
-        await signInWithGoogleIdToken(idToken);
-        setAuthMessage("Google 계정으로 로그인했습니다.");
-        return;
-      }
-
-      if (result.type === "cancel" || result.type === "dismiss") {
-        setAuthMessage("Google 로그인을 취소했습니다.");
-        return;
-      }
-
-      throw new Error("Google 로그인 중 문제가 발생했습니다.");
+      setAuthMessage(
+        result === "success"
+          ? GOOGLE_SIGN_IN_MESSAGES.success
+          : GOOGLE_SIGN_IN_MESSAGES.cancelled
+      );
     };
 
     runGoogleLogin().catch((error) => {
-      setIsGoogleSubmitting(false);
-      const message = error instanceof Error ? error.message : String(error);
       setAuthMessage(
-          message.includes("ExpoWebBrowser") ||
-          message.includes("native module") ||
-          message.includes("Cannot find native module")
-          ? "Google 로그인을 사용할 수 없습니다. 앱을 최신 버전으로 업데이트한 뒤 다시 시도해 주세요."
-          : message
+        getGoogleSignInErrorMessage(error, (fallbackError) =>
+          fallbackError instanceof Error ? fallbackError.message : String(fallbackError)
+        )
       );
     }).finally(() => {
       setIsGoogleSubmitting(false);

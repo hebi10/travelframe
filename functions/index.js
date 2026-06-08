@@ -26,6 +26,10 @@ admin.initializeApp();
 const db = admin.firestore();
 const bucket = admin.storage().bucket();
 const FieldValue = admin.firestore.FieldValue;
+const CALLABLE_RUNTIME_OPTIONS = process.env.FUNCTIONS_ENFORCE_APP_CHECK === "true"
+  ? { enforceAppCheck: true }
+  : {};
+const secureOnCall = (handler) => onCall(CALLABLE_RUNTIME_OPTIONS, handler);
 
 const toHttpsError = (error) => {
   if (error instanceof HttpsError) {
@@ -124,6 +128,8 @@ const getMusicSessionRef = (uid, sessionId) =>
 const BACKUP_UPLOAD_SESSION_TTL_MS = 15 * 60 * 1000;
 
 const MAX_USER_MUSIC_TRACKS = 20;
+const MAX_PENDING_MUSIC_UPLOAD_SESSIONS = 3;
+const MAX_PENDING_MUSIC_UPLOAD_BYTES = 150 * 1024 * 1024;
 const MUSIC_UPLOAD_SESSION_TTL_MS = 15 * 60 * 1000;
 const FREE_WEEKLY_VIDEO_EXPORT_LIMIT = 1;
 const PRO_WEEKLY_VIDEO_EXPORT_LIMIT = 15;
@@ -296,7 +302,105 @@ const getMusicTrackCount = async (transaction, uid) => {
   return snapshot.size;
 };
 
-exports.reserveWeeklyVideoExport = onCall(async (request) => {
+const getReservedMusicUploadSummary = async (transaction, uid) => {
+  const snapshot = await transaction.get(
+    db.collection(`users/${uid}/musicUploadSessions`).where("status", "==", "reserved")
+  );
+
+  return snapshot.docs.reduce(
+    (summary, docSnapshot) => {
+      const session = docSnapshot.data();
+      return {
+        count: summary.count + 1,
+        bytes: summary.bytes + Math.max(0, Number(session.fileSize ?? 0))
+      };
+    },
+    { count: 0, bytes: 0 }
+  );
+};
+
+const deleteMusicSessionStorageObject = async ({ storagePath, musicSessionId }) => {
+  if (typeof storagePath !== "string" || !storagePath || typeof musicSessionId !== "string") {
+    return;
+  }
+
+  const file = bucket.file(storagePath);
+  let metadata;
+  try {
+    [metadata] = await file.getMetadata();
+  } catch (error) {
+    if (error?.code === 404) {
+      return;
+    }
+
+    throw error;
+  }
+
+  if (metadata.metadata?.musicSessionId !== musicSessionId) {
+    return;
+  }
+
+  await file.delete().catch((error) => {
+    if (error?.code !== 404) {
+      throw error;
+    }
+  });
+};
+
+const failMusicUploadSession = async ({ uid, sessionRef, reason, objectGeneration = null }) => {
+  let sessionToDelete = null;
+
+  await db.runTransaction(async (transaction) => {
+    const sessionSnapshot = await transaction.get(sessionRef);
+    if (!sessionSnapshot.exists) {
+      return;
+    }
+
+    const session = sessionSnapshot.data();
+    if (session.status !== "reserved") {
+      return;
+    }
+
+    transaction.update(sessionRef, {
+      status: "failed",
+      failureReason: reason,
+      failedAt: FieldValue.serverTimestamp(),
+      objectGeneration
+    });
+    sessionToDelete = { ...session, musicSessionId: sessionSnapshot.id };
+  });
+
+  if (sessionToDelete) {
+    await deleteMusicSessionStorageObject({
+      storagePath: sessionToDelete.storagePath,
+      musicSessionId: sessionToDelete.musicSessionId
+    });
+  }
+};
+
+const cleanupExpiredMusicUploadSessions = async (uid, limit = 25) => {
+  const snapshot = await db
+    .collection(`users/${uid}/musicUploadSessions`)
+    .where("status", "==", "reserved")
+    .limit(limit)
+    .get();
+  const now = Date.now();
+
+  for (const docSnapshot of snapshot.docs) {
+    const session = docSnapshot.data();
+    if (!session.expiresAt?.toMillis || session.expiresAt.toMillis() >= now) {
+      continue;
+    }
+
+    await failMusicUploadSession({
+      uid,
+      sessionRef: docSnapshot.ref,
+      reason: "Music upload session expired before completion."
+    });
+  }
+};
+
+exports.reserveWeeklyVideoExport = secureOnCall(async (request) => {
   try {
     const uid = requireUid(request);
     const subscription = await getBackupSubscription(uid);
@@ -360,7 +464,7 @@ exports.reserveWeeklyVideoExport = onCall(async (request) => {
   }
 });
 
-exports.releaseWeeklyVideoExport = onCall(async (request) => {
+exports.releaseWeeklyVideoExport = secureOnCall(async (request) => {
   try {
     const uid = requireUid(request);
     const subscription = await getBackupSubscription(uid);
@@ -428,7 +532,7 @@ exports.releaseWeeklyVideoExport = onCall(async (request) => {
   }
 });
 
-exports.completeWeeklyVideoExport = onCall(async (request) => {
+exports.completeWeeklyVideoExport = secureOnCall(async (request) => {
   try {
     const uid = requireUid(request);
     const subscription = await getBackupSubscription(uid);
@@ -491,6 +595,19 @@ const deleteStoragePath = async (storagePath) => {
       throw error;
     }
   });
+};
+
+const getDownloadUrlFromStorageMetadata = ({ storagePath, metadata }) => {
+  const tokens = metadata?.metadata?.firebaseStorageDownloadTokens;
+  const token = typeof tokens === "string"
+    ? tokens.split(",").map((value) => value.trim()).find(Boolean)
+    : null;
+
+  if (!token || typeof storagePath !== "string" || !storagePath) {
+    return null;
+  }
+
+  return `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(storagePath)}?alt=media&token=${encodeURIComponent(token)}`;
 };
 
 const deleteOwnedCloudBackupStoragePath = async (uid, storagePath) => {
@@ -597,7 +714,7 @@ const cleanupExpiredBackupUploadSessions = async (uid, limit = 25) => {
   }
 };
 
-exports.reserveBackupUpload = onCall(async (request) => {
+exports.reserveBackupUpload = secureOnCall(async (request) => {
   try {
     const uid = requireUid(request);
     const { mediaKind, fileSize, contentType, storagePath } = request.data ?? {};
@@ -661,7 +778,7 @@ exports.reserveBackupUpload = onCall(async (request) => {
   }
 });
 
-exports.completeBackupUpload = onCall(async (request) => {
+exports.completeBackupUpload = secureOnCall(async (request) => {
   try {
     const uid = requireUid(request);
     const { backupSessionId } = request.data ?? {};
@@ -778,7 +895,7 @@ exports.completeBackupUpload = onCall(async (request) => {
   }
 });
 
-exports.releaseBackupUpload = onCall(async (request) => {
+exports.releaseBackupUpload = secureOnCall(async (request) => {
   try {
     const uid = requireUid(request);
     const { backupSessionId } = request.data ?? {};
@@ -922,7 +1039,7 @@ const assertCompletedImageWorkSessions = async ({ uid, workId, storagePaths, bac
   }, 0);
 };
 
-exports.completeImageWorkBackup = onCall(async (request) => {
+exports.completeImageWorkBackup = secureOnCall(async (request) => {
   try {
     const uid = requireUid(request);
     const { workId, imageWork } = request.data ?? {};
@@ -984,7 +1101,7 @@ exports.completeImageWorkBackup = onCall(async (request) => {
   }
 });
 
-exports.reserveMusicUpload = onCall(async (request) => {
+exports.reserveMusicUpload = secureOnCall(async (request) => {
   try {
     const uid = requireUid(request);
     const { trackId, name, fileSize, contentType, storagePath } = request.data ?? {};
@@ -994,6 +1111,8 @@ exports.reserveMusicUpload = onCall(async (request) => {
     if (musicTrackLimit <= 0) {
       throw new HttpsError("failed-precondition", "Active music subscription is required for music uploads.");
     }
+
+    await cleanupExpiredMusicUploadSessions(uid);
 
     assertMusicUploadAllowed({
       uid,
@@ -1007,9 +1126,21 @@ exports.reserveMusicUpload = onCall(async (request) => {
     const sessionRef = db.collection(`users/${uid}/musicUploadSessions`).doc();
 
     await db.runTransaction(async (transaction) => {
-      const trackCount = await getMusicTrackCount(transaction, uid);
+      const [trackCount, pendingSummary] = await Promise.all([
+        getMusicTrackCount(transaction, uid),
+        getReservedMusicUploadSummary(transaction, uid)
+      ]);
       if (trackCount >= musicTrackLimit) {
         throw new HttpsError("failed-precondition", "User music track limit exceeded.");
+      }
+      if (trackCount + pendingSummary.count >= musicTrackLimit) {
+        throw new HttpsError("failed-precondition", "Pending music upload session limit exceeded.");
+      }
+      if (
+        pendingSummary.count >= MAX_PENDING_MUSIC_UPLOAD_SESSIONS ||
+        pendingSummary.bytes + fileSize > MAX_PENDING_MUSIC_UPLOAD_BYTES
+      ) {
+        throw new HttpsError("failed-precondition", "Too many pending music uploads.");
       }
 
       transaction.set(sessionRef, {
@@ -1036,10 +1167,10 @@ exports.reserveMusicUpload = onCall(async (request) => {
   }
 });
 
-exports.completeMusicUpload = onCall(async (request) => {
+exports.completeMusicUpload = secureOnCall(async (request) => {
   try {
     const uid = requireUid(request);
-    const { musicSessionId, trackId, name, downloadUrl, createdAt } = request.data ?? {};
+    const { musicSessionId, trackId, name, createdAt } = request.data ?? {};
     if (typeof musicSessionId !== "string" || !musicSessionId) {
       throw new HttpsError("invalid-argument", "musicSessionId is required.");
     }
@@ -1060,6 +1191,11 @@ exports.completeMusicUpload = onCall(async (request) => {
     }
 
     if (session.expiresAt?.toMillis && session.expiresAt.toMillis() < Date.now()) {
+      await failMusicUploadSession({
+        uid,
+        sessionRef,
+        reason: "Music upload session expired before completion."
+      });
       throw new HttpsError("deadline-exceeded", "Music upload session expired.");
     }
 
@@ -1067,7 +1203,17 @@ exports.completeMusicUpload = onCall(async (request) => {
       throw new HttpsError("failed-precondition", "Music upload session metadata does not match.");
     }
 
-    const [metadata] = await bucket.file(session.storagePath).getMetadata();
+    let metadata;
+    try {
+      [metadata] = await bucket.file(session.storagePath).getMetadata();
+    } catch (error) {
+      await failMusicUploadSession({
+        uid,
+        sessionRef,
+        reason: "Reserved music object was not found in Storage."
+      });
+      throw new HttpsError("failed-precondition", "Uploaded music object does not match the reserved session.");
+    }
     const objectSize = Number(metadata.size);
     const objectContentType = metadata.contentType;
     const objectSessionId = metadata.metadata?.musicSessionId;
@@ -1077,14 +1223,19 @@ exports.completeMusicUpload = onCall(async (request) => {
       objectContentType !== session.contentType ||
       objectSessionId !== musicSessionId
     ) {
+      await failMusicUploadSession({
+        uid,
+        sessionRef,
+        reason: "Uploaded music object does not match the reserved session.",
+        objectGeneration: metadata.generation ?? null
+      });
       throw new HttpsError("failed-precondition", "Uploaded music object does not match the reserved session.");
     }
 
-    const safeDownloadUrl =
-      typeof downloadUrl === "string" &&
-      downloadUrl.startsWith("https://firebasestorage.googleapis.com/")
-        ? downloadUrl
-        : null;
+    const safeDownloadUrl = getDownloadUrlFromStorageMetadata({
+      storagePath: session.storagePath,
+      metadata
+    });
     const safeCreatedAt =
       typeof createdAt === "string" && !Number.isNaN(new Date(createdAt).getTime())
         ? createdAt
@@ -1138,7 +1289,7 @@ exports.completeMusicUpload = onCall(async (request) => {
   }
 });
 
-exports.releaseMusicUpload = onCall(async (request) => {
+exports.releaseMusicUpload = secureOnCall(async (request) => {
   try {
     const uid = requireUid(request);
     const { musicSessionId } = request.data ?? {};
@@ -1147,6 +1298,7 @@ exports.releaseMusicUpload = onCall(async (request) => {
     }
 
     const sessionRef = getMusicSessionRef(uid, musicSessionId);
+    let sessionToDelete = null;
     await db.runTransaction(async (transaction) => {
       const sessionSnapshot = await transaction.get(sessionRef);
       if (!sessionSnapshot.exists) {
@@ -1159,8 +1311,16 @@ exports.releaseMusicUpload = onCall(async (request) => {
           status: "released",
           releasedAt: FieldValue.serverTimestamp()
         });
+        sessionToDelete = { ...session, musicSessionId };
       }
     });
+
+    if (sessionToDelete) {
+      await deleteMusicSessionStorageObject({
+        storagePath: sessionToDelete.storagePath,
+        musicSessionId
+      });
+    }
 
     return { released: true };
   } catch (error) {
@@ -1192,7 +1352,7 @@ const requireAdminUid = async (request) => {
   return adminUid;
 };
 
-exports.setAdminProductSubscription = onCall(async (request) => {
+exports.setAdminProductSubscription = secureOnCall(async (request) => {
   try {
     const adminUid = await requireAdminUid(request);
     const { targetUid, productId, status, expiresAt, adminNote } = request.data ?? {};
@@ -1409,7 +1569,7 @@ const refreshAdminBackupOverview = async (uid) => {
     userRef.collection("backups").doc("current").set(
       {
         userId: uid,
-        status: photoSnapshot.size || imageWorkSnapshot.size || videoSnapshot.size ? "active" : "empty",
+        status: photoSnapshot.size || imageWorkSnapshot.size || videoSnapshot.size || musicSnapshot.size ? "active" : "empty",
         photoCount: photoSnapshot.size,
         imageBundleCount: imageWorkSnapshot.size,
         videoCount: videoSnapshot.size,
@@ -1441,7 +1601,7 @@ const refreshAdminBackupOverview = async (uid) => {
   };
 };
 
-exports.reserveAdminBackupUpload = onCall(async (request) => {
+exports.reserveAdminBackupUpload = secureOnCall(async (request) => {
   try {
     const adminUid = await requireAdminUid(request);
     const { targetUid, itemKind, fileName, fileSize, contentType } = request.data ?? {};
@@ -1484,10 +1644,10 @@ exports.reserveAdminBackupUpload = onCall(async (request) => {
   }
 });
 
-exports.completeAdminBackupUpload = onCall(async (request) => {
+exports.completeAdminBackupUpload = secureOnCall(async (request) => {
   try {
     const adminUid = await requireAdminUid(request);
-    const { targetUid, uploadSessionId, downloadUrl } = request.data ?? {};
+    const { targetUid, uploadSessionId } = request.data ?? {};
     if (typeof targetUid !== "string" || !targetUid || typeof uploadSessionId !== "string") {
       throw new HttpsError("invalid-argument", "targetUid and uploadSessionId are required.");
     }
@@ -1522,11 +1682,10 @@ exports.completeAdminBackupUpload = onCall(async (request) => {
 
     const now = new Date().toISOString();
     const itemId = `${session.itemType}-${Date.now()}`;
-    const safeDownloadUrl =
-      typeof downloadUrl === "string" &&
-      downloadUrl.startsWith("https://firebasestorage.googleapis.com/")
-        ? downloadUrl
-        : null;
+    const safeDownloadUrl = getDownloadUrlFromStorageMetadata({
+      storagePath: session.storagePath,
+      metadata
+    });
 
     if (session.itemType === "photo") {
       await db.doc(`users/${targetUid}/photoBackups/${itemId}`).set({
@@ -1596,52 +1755,75 @@ exports.completeAdminBackupUpload = onCall(async (request) => {
   }
 });
 
-exports.deleteAdminBackupItem = onCall(async (request) => {
+const getBackupItemRef = ({ uid, itemType, itemId }) => {
+  const refByType = {
+    photo: db.doc(`users/${uid}/photoBackups/${itemId}`),
+    imageWork: db.doc(`users/${uid}/imageWorks/${itemId}`),
+    video: db.doc(`users/${uid}/videos/${itemId}`),
+    music: db.doc(`users/${uid}/musicTracks/${itemId}`)
+  };
+  const itemRef = refByType[itemType];
+  if (!itemRef) {
+    throw new HttpsError("invalid-argument", "Unsupported backup item type.");
+  }
+
+  return itemRef;
+};
+
+const deleteBackupItemForUser = async ({ uid, itemType, itemId }) => {
+  if (typeof itemId !== "string" || !itemId) {
+    throw new HttpsError("invalid-argument", "itemId is required.");
+  }
+
+  const itemRef = getBackupItemRef({ uid, itemType, itemId });
+  const snapshot = await itemRef.get();
+  if (!snapshot.exists) {
+    throw new HttpsError("not-found", "Backup item was not found.");
+  }
+
+  const data = snapshot.data();
+  const storagePaths = [
+    data.storagePath,
+    data.previewStoragePath,
+    ...(Array.isArray(data.storagePaths) ? data.storagePaths : [])
+  ].filter(Boolean);
+
+  await Promise.all(
+    storagePaths.map((storagePath) =>
+      deleteOwnedCloudBackupStoragePath(uid, storagePath)
+    )
+  );
+  await itemRef.delete();
+  const summary = await refreshAdminBackupOverview(uid);
+
+  return { deleted: true, summary };
+};
+
+exports.deleteUserBackupItem = secureOnCall(async (request) => {
   try {
-    await requireAdminUid(request);
-    const { targetUid, itemType, itemId } = request.data ?? {};
-    if (typeof targetUid !== "string" || !targetUid || typeof itemId !== "string" || !itemId) {
-      throw new HttpsError("invalid-argument", "targetUid and itemId are required.");
-    }
-
-    const refByType = {
-      photo: db.doc(`users/${targetUid}/photoBackups/${itemId}`),
-      imageWork: db.doc(`users/${targetUid}/imageWorks/${itemId}`),
-      video: db.doc(`users/${targetUid}/videos/${itemId}`),
-      music: db.doc(`users/${targetUid}/musicTracks/${itemId}`)
-    };
-    const itemRef = refByType[itemType];
-    if (!itemRef) {
-      throw new HttpsError("invalid-argument", "Unsupported backup item type.");
-    }
-
-    const snapshot = await itemRef.get();
-    if (!snapshot.exists) {
-      throw new HttpsError("not-found", "Backup item was not found.");
-    }
-
-    const data = snapshot.data();
-    const storagePaths = [
-      data.storagePath,
-      data.previewStoragePath,
-      ...(Array.isArray(data.storagePaths) ? data.storagePaths : [])
-    ].filter(Boolean);
-
-    await Promise.all(
-      storagePaths.map((storagePath) =>
-        deleteOwnedCloudBackupStoragePath(targetUid, storagePath)
-      )
-    );
-    await itemRef.delete();
-    const summary = await refreshAdminBackupOverview(targetUid);
-
-    return { deleted: true, summary };
+    const uid = requireUid(request);
+    const { itemType, itemId } = request.data ?? {};
+    return await deleteBackupItemForUser({ uid, itemType, itemId });
   } catch (error) {
     throw toHttpsError(error);
   }
 });
 
-exports.setAdminBackupStatus = onCall(async (request) => {
+exports.deleteAdminBackupItem = secureOnCall(async (request) => {
+  try {
+    await requireAdminUid(request);
+    const { targetUid, itemType, itemId } = request.data ?? {};
+    if (typeof targetUid !== "string" || !targetUid) {
+      throw new HttpsError("invalid-argument", "targetUid is required.");
+    }
+
+    return await deleteBackupItemForUser({ uid: targetUid, itemType, itemId });
+  } catch (error) {
+    throw toHttpsError(error);
+  }
+});
+
+exports.setAdminBackupStatus = secureOnCall(async (request) => {
   try {
     await requireAdminUid(request);
     const { targetUid, status, deleteAfter } = request.data ?? {};
@@ -1685,7 +1867,7 @@ exports.setAdminBackupStatus = onCall(async (request) => {
   }
 });
 
-exports.deleteCloudBackupData = onCall(async (request) => {
+exports.deleteCloudBackupData = secureOnCall(async (request) => {
   try {
     const uid = requireUid(request);
     const userRef = db.doc(`users/${uid}`);

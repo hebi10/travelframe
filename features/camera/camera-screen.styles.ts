@@ -2,10 +2,6 @@ import { StyleSheet } from "react-native";
 
 import { colors, controls, typography } from "@/constants/app-theme";
 import {
-  CAMERA_CONTROL_HORIZONTAL_PADDING,
-  CAMERA_CONTROL_TAB_GAP,
-  CAMERA_CONTROL_TAB_WIDTH,
-  CAMERA_CONTROL_TRAY_HORIZONTAL_PADDING,
   CAMERA_FOCUS_INDICATOR_RADIUS,
   CAMERA_FOCUS_INDICATOR_SIZE,
   CAMERA_FOCUS_LOCK_BUTTON_SIZE,
@@ -15,10 +11,30 @@ import {
   EXPOSURE_TRACK_WIDTH
 } from "@/features/camera/camera-screen.constants";
 
+const CAMERA_CONTROL_HORIZONTAL_PADDING = 0;
+
 export const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: colors.ink
+  },
+  cameraPreviewViewport: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden"
+  },
+  cameraPreviewFrame: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    width: "100%",
+    overflow: "hidden",
+    backgroundColor: colors.ink
+  },
+  cameraPreviewFrameFill: {
+    top: 0,
+    bottom: 0
   },
   camera: {
     ...StyleSheet.absoluteFillObject
@@ -119,14 +135,14 @@ export const styles = StyleSheet.create({
   },
   topBar: {
     position: "absolute",
-    left: 18,
-    right: 18,
+    left: 12,
+    right: 12,
     top: 0,
     zIndex: 20,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: 12
+    gap: 8
   },
   brand: {
     display: "none",
@@ -136,7 +152,7 @@ export const styles = StyleSheet.create({
     letterSpacing: 0
   },
   accountIconButton: {
-    width: 42,
+    width: 38,
     height: 36,
     alignItems: "center",
     justifyContent: "center"
@@ -145,11 +161,11 @@ export const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "flex-end",
-    gap: 6,
+    gap: 4,
     flexShrink: 1
   },
   cameraInstantControlButton: {
-    width: 48,
+    width: 40,
     height: 36,
     alignItems: "center",
     justifyContent: "center",
@@ -164,7 +180,7 @@ export const styles = StyleSheet.create({
   },
   cameraInstantControlText: {
     color: colors.inverse,
-    fontSize: 9,
+    fontSize: 8,
     fontWeight: "900",
     lineHeight: 11,
     letterSpacing: 0
@@ -853,51 +869,8 @@ export const styles = StyleSheet.create({
     width: "100%",
     gap: 30,
     paddingTop: 10,
-    paddingHorizontal: CAMERA_CONTROL_TRAY_HORIZONTAL_PADDING,
+    paddingHorizontal: CAMERA_CONTROL_HORIZONTAL_PADDING,
     backgroundColor: "rgba(0, 0, 0, 0.52)"
-  },
-  cameraControlTabRow: {
-    width: "100%",
-    minHeight: 38,
-    flexDirection: "row",
-    alignItems: "center"
-  },
-  cameraControlTabViewport: {
-    flex: 1,
-    minHeight: 38,
-    overflow: "hidden"
-  },
-  cameraControlTabTrack: {
-    minHeight: 38,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: CAMERA_CONTROL_TAB_GAP
-  },
-  cameraControlTabCenterSpacer: {
-    height: 1
-  },
-  cameraControlTab: {
-    width: CAMERA_CONTROL_TAB_WIDTH,
-    minHeight: 36,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 8,
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.24)",
-    backgroundColor: "rgba(0, 0, 0, 0.18)"
-  },
-  cameraControlTabActive: {
-    borderColor: colors.inverse,
-    backgroundColor: "rgba(255, 255, 255, 0.18)"
-  },
-  cameraControlTabText: {
-    color: "rgba(255, 255, 255, 0.72)",
-    fontSize: 11,
-    fontWeight: "900",
-    letterSpacing: 0
-  },
-  cameraControlTabTextActive: {
-    color: colors.inverse
   },
   captureRow: {
     width: "100%",

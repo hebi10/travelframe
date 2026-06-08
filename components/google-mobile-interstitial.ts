@@ -1,14 +1,49 @@
-import { AdEventType, InterstitialAd } from "react-native-google-mobile-ads";
-
 type ShowGoogleMobileInterstitialAdInput = {
   adUnitId: string;
   onComplete: () => void;
+};
+
+type InterstitialAdInstance = {
+  addAdEventListener: (eventType: string, listener: () => void) => () => void;
+  load: () => void;
+  show: () => Promise<void> | void;
+};
+
+type GoogleMobileAdsInterstitialModule = {
+  AdEventType: {
+    LOADED: string;
+    CLOSED: string;
+    ERROR: string;
+  };
+  InterstitialAd: {
+    createForAdRequest: (
+      adUnitId: string,
+      options: { requestNonPersonalizedAdsOnly: boolean }
+    ) => InterstitialAdInstance;
+  };
+};
+
+const loadGoogleMobileAds = (): GoogleMobileAdsInterstitialModule | null => {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    return require("react-native-google-mobile-ads") as GoogleMobileAdsInterstitialModule;
+  } catch {
+    return null;
+  }
 };
 
 export const showGoogleMobileInterstitialAd = ({
   adUnitId,
   onComplete
 }: ShowGoogleMobileInterstitialAdInput) => {
+  const googleMobileAds = loadGoogleMobileAds();
+
+  if (!googleMobileAds) {
+    onComplete();
+    return () => {};
+  }
+
+  const { AdEventType, InterstitialAd } = googleMobileAds;
   let completed = false;
   const interstitial = InterstitialAd.createForAdRequest(adUnitId, {
     requestNonPersonalizedAdsOnly: true

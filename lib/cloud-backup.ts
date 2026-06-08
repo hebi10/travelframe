@@ -1,7 +1,6 @@
 import { type User } from "firebase/auth";
 import {
   collection,
-  deleteDoc,
   doc,
   getDoc,
   getDocs,
@@ -255,6 +254,15 @@ const deleteCloudBackupDataCallable = () =>
   callBackupFunction<Record<string, never>, BackupSummary>(
     "deleteCloudBackupData",
     {}
+  );
+
+const deleteUserBackupItem = (data: {
+  itemType: "photo" | "imageWork" | "video" | "music";
+  itemId: string;
+}) =>
+  callBackupFunction<typeof data, { deleted: boolean; summary: BackupSummary }>(
+    "deleteUserBackupItem",
+    data
   );
 
 const normalizeDateValue = (value: unknown) => {
@@ -527,15 +535,14 @@ const removeBackupIfPhotoWasDeleted = async ({
     return false;
   }
 
-  if (!firestore) {
+  if (!firebaseFunctions) {
     return false;
   }
 
-  await deleteDoc(doc(firestore, "users", user.uid, "photoBackups", photo.id));
+  await deleteUserBackupItem({ itemType: "photo", itemId: photo.id });
   if (backupSessionId) {
     await releaseBackupUpload({ backupSessionId });
   }
-  await refreshBackupOverview(user.uid);
   return true;
 };
 
@@ -580,13 +587,12 @@ const removeBackupIfImageWorkWasDeleted = async ({
     return false;
   }
 
-  if (!firestore) {
+  if (!firebaseFunctions) {
     return false;
   }
 
-  await deleteDoc(doc(firestore, "users", user.uid, "imageWorks", work.id));
+  await deleteUserBackupItem({ itemType: "imageWork", itemId: work.id });
   await releaseBackupUploads(backupSessionIds);
-  await refreshBackupOverview(user.uid);
   return true;
 };
 
@@ -603,15 +609,14 @@ const removeBackupIfVideoWasDeleted = async ({
     return false;
   }
 
-  if (!firestore) {
+  if (!firebaseFunctions) {
     return false;
   }
 
-  await deleteDoc(doc(firestore, "users", user.uid, "videos", video.id));
+  await deleteUserBackupItem({ itemType: "video", itemId: video.id });
   if (backupSessionId) {
     await releaseBackupUploads([backupSessionId]);
   }
-  await refreshBackupOverview(user.uid);
   return true;
 };
 

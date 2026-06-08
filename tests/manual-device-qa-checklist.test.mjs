@@ -2,6 +2,17 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const checklist = fs.readFileSync("docs/manual-device-qa.md", "utf8");
+const readme = fs.readFileSync("README.md", "utf8");
+const packageJson = JSON.parse(fs.readFileSync("package.json", "utf8"));
+
+assert.ok(readme.includes("Android 전용"), "README should state the current Android-only scope");
+assert.ok(readme.includes("npm run quality"), "README should document the local quality command");
+assert.ok(
+  readme.includes("npm run quality:firebase-rules"),
+  "README should document Firebase Rules checks as a separate command"
+);
+assert.equal(packageJson.scripts.ios, undefined, "package scripts should not expose iOS commands");
+assert.equal(packageJson.scripts.web, undefined, "package scripts should not expose web commands");
 
 for (const snippet of [
   "Android 실기기",

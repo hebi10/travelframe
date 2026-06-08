@@ -139,6 +139,7 @@ const validBackupOverview = (uid = ownerUid) => ({
   photoCount: 0,
   imageBundleCount: 0,
   videoCount: 0,
+  musicCount: 0,
   imageBackupBytes: 0,
   status: "active"
 });
@@ -257,6 +258,13 @@ await expectAllowed(
   firestoreRequest("PATCH", `users/${ownerUid}/backups/current`, {
     uid: ownerUid,
     data: validBackupOverview()
+  })
+);
+await expectAllowed(
+  "owners can write the server-compatible empty backup overview shape",
+  firestoreRequest("PATCH", `users/${ownerUid}/backups/current`, {
+    uid: ownerUid,
+    data: { ...validBackupOverview(), status: "empty", musicCount: 2 }
   })
 );
 await expectDenied(
@@ -428,6 +436,22 @@ await expectDenied(
       storagePath: `users/${ownerUid}/backups/photos/other-path.jpg`
     }
   })
+);
+await expectDenied(
+  "owners cannot delete backup overview metadata directly",
+  firestoreRequest("DELETE", `users/${ownerUid}/backups/current`, { uid: ownerUid })
+);
+await expectDenied(
+  "owners cannot delete photo backup metadata directly",
+  firestoreRequest("DELETE", `users/${ownerUid}/photoBackups/photo-1`, { uid: ownerUid })
+);
+await expectDenied(
+  "owners cannot delete video backup metadata directly",
+  firestoreRequest("DELETE", `users/${ownerUid}/videos/video-1`, { uid: ownerUid })
+);
+await expectDenied(
+  "owners cannot delete user music metadata directly",
+  firestoreRequest("DELETE", `users/${ownerUid}/musicTracks/music-1`, { uid: ownerUid })
 );
 await expectDenied(
   "clients cannot create subscription documents",

@@ -16,6 +16,11 @@ for (const snippet of [
   "!defaultExcludedTests.has(name)",
   "filters.length === 0 || defaultExcludedTests.has(name)",
   "spawnSync(process.execPath",
+  "TEST_TIMEOUT_MS",
+  "300_000",
+  "timeout: TEST_TIMEOUT_MS",
+  "result.signal === \"SIGTERM\"",
+  "timed out after",
   "No tests matched"
 ]) {
   assert.ok(runnerSource.includes(snippet), `test runner missing: ${snippet}`);

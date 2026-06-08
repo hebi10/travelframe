@@ -41,6 +41,10 @@ const getPhotoAspectRatio = (photo: PhotoItem) => {
     return 3 / 4;
   }
 
+  if (photo.ratioLabel === "4:3") {
+    return 4 / 3;
+  }
+
   if (photo.ratioLabel === "4:5") {
     return 4 / 5;
   }

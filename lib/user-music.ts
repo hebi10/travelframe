@@ -3,8 +3,6 @@ import * as FileSystem from "expo-file-system/legacy";
 import { type User } from "firebase/auth";
 import {
   collection,
-  deleteDoc,
-  doc,
   getDocs
 } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
@@ -146,12 +144,14 @@ const completeMusicUpload = (data: {
   musicSessionId: string;
   trackId: string;
   name: string;
-  downloadUrl: string;
   createdAt: string;
 }) => callMusicFunction<typeof data, { trackId: string }>("completeMusicUpload", data);
 
 const releaseMusicUpload = (data: { musicSessionId: string }) =>
   callMusicFunction<typeof data, { released: boolean }>("releaseMusicUpload", data);
+
+const deleteUserBackupItem = (data: { itemType: "music"; itemId: string }) =>
+  callMusicFunction<typeof data, { deleted: boolean }>("deleteUserBackupItem", data);
 
 const saveTracksToCache = async (userId: string, tracks: UserMusicTrack[]) => {
   await localStorageAdapter.setItem(getMusicCacheKey(userId), JSON.stringify(tracks));
@@ -216,7 +216,6 @@ const uploadLocalAudioFile = async ({
       musicSessionId: reservation.musicSessionId,
       trackId,
       name,
-      downloadUrl,
       createdAt
     });
     return downloadUrl;
@@ -253,6 +252,11 @@ export const syncUserMusicTracks = async (user: User | null) => {
     };
     const cachedTrack = cachedTracks.find((track) => track.id === item.id);
     let localUri = cachedTrack?.uri ?? data.localUri;
+    const remoteDownloadUrl =
+      data.downloadUrl ??
+      (data.storagePath && firebaseStorage
+        ? await getDownloadURL(ref(firebaseStorage, data.storagePath)).catch(() => undefined)
+        : undefined);
 
     if (localUri) {
       const info = await FileSystem.getInfoAsync(localUri);
@@ -261,15 +265,15 @@ export const syncUserMusicTracks = async (user: User | null) => {
       }
     }
 
-    if (!localUri && data.downloadUrl && !isStorageSaverMode(settings.storageMode, true)) {
+    if (!localUri && remoteDownloadUrl && !isStorageSaverMode(settings.storageMode, true)) {
       const extension = getExtension(data.name, data.mimeType);
       const fileName = `${item.id}-${sanitizeFileName(data.name)}.${extension}`;
       const destination = `${directory}${fileName}`;
       try {
-        const result = await FileSystem.downloadAsync(data.downloadUrl, destination);
+        const result = await FileSystem.downloadAsync(remoteDownloadUrl, destination);
         localUri = result.uri;
       } catch {
-        localUri = data.downloadUrl;
+        localUri = remoteDownloadUrl;
       }
     }
 
@@ -277,11 +281,11 @@ export const syncUserMusicTracks = async (user: User | null) => {
       id: item.id,
       userId: user.uid,
       name: data.name,
-      uri: localUri ?? data.downloadUrl ?? "",
+      uri: localUri ?? remoteDownloadUrl ?? "",
       mimeType: data.mimeType,
       size: data.size,
       storagePath: data.storagePath,
-      downloadUrl: data.downloadUrl,
+      downloadUrl: remoteDownloadUrl,
       backupStatus: data.backupStatus ?? "backed_up",
       createdAt: data.createdAt
     });
@@ -448,12 +452,8 @@ export const deleteUserMusicTrack = async ({
     throw new Error("로그인 후 내 음악을 삭제할 수 있습니다.");
   }
 
-  if (firestore) {
-    await deleteDoc(doc(firestore, "users", user.uid, "musicTracks", track.id));
-  }
-
-  if (firebaseStorage && track.storagePath) {
-    await deleteObject(ref(firebaseStorage, track.storagePath)).catch(() => undefined);
+  if (track.storagePath) {
+    await deleteUserBackupItem({ itemType: "music", itemId: track.id });
   }
 
   await deleteLocalMusicFile(track);
