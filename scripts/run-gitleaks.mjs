@@ -14,6 +14,9 @@ const CACHE_ROOT = path.join(PROJECT_ROOT, ".tmp", "tools", "gitleaks", `v${GITL
 const SCAN_ROOT = path.join(PROJECT_ROOT, ".tmp", "gitleaks-scan-tree");
 const CONFIG_PATH = path.join(PROJECT_ROOT, ".gitleaks.toml");
 const SCAN_HISTORY = process.argv.includes("--history");
+const COMMAND_TIMEOUT_MS = 30_000;
+const DOWNLOAD_TIMEOUT_MS = 120_000;
+const GITLEAKS_RUN_TIMEOUT_MS = 300_000;
 
 const ASSETS = {
   "darwin-arm64": {
@@ -54,6 +57,7 @@ function fail(message) {
 function commandExists(command, args) {
   const result = childProcess.spawnSync(command, args, {
     encoding: "utf8",
+    timeout: COMMAND_TIMEOUT_MS,
     windowsHide: true,
   });
   if (result.status !== 0 || !result.stdout) {
@@ -100,7 +104,7 @@ function download(url, destination) {
   return new Promise((resolve, reject) => {
     fs.mkdirSync(path.dirname(destination), { recursive: true });
     const request = (targetUrl, redirectsLeft = 5) => {
-      https
+      const requestHandle = https
         .get(
           targetUrl,
           {
@@ -135,6 +139,9 @@ function download(url, destination) {
           }
         )
         .on("error", reject);
+      requestHandle.setTimeout(DOWNLOAD_TIMEOUT_MS, () => {
+        requestHandle.destroy(new Error(`gitleaks download timed out after ${DOWNLOAD_TIMEOUT_MS / 1000} seconds.`));
+      });
     };
     request(url);
   });
@@ -157,11 +164,16 @@ function extractArchive(archivePath, destination) {
             archivePath,
             destination,
           ],
-          { stdio: "inherit", windowsHide: true }
+          { stdio: "inherit", timeout: COMMAND_TIMEOUT_MS, windowsHide: true }
         )
       : childProcess.spawnSync("tar", ["-xzf", archivePath, "-C", destination], {
           stdio: "inherit",
+          timeout: COMMAND_TIMEOUT_MS,
         });
+
+  if (result.error?.code === "ETIMEDOUT" || result.signal === "SIGTERM") {
+    fail(`Failed to extract ${path.basename(archivePath)} before timeout.`);
+  }
 
   if (result.status !== 0) {
     fail(`Failed to extract ${path.basename(archivePath)}.`);
@@ -227,11 +239,18 @@ function runGitleaks(binary) {
   const result = childProcess.spawnSync(binary, args, {
     cwd: PROJECT_ROOT,
     stdio: "inherit",
+    timeout: GITLEAKS_RUN_TIMEOUT_MS,
     windowsHide: true,
   });
 
   if (result.error) {
+    if (result.error.code === "ETIMEDOUT") {
+      fail(`gitleaks timed out after ${GITLEAKS_RUN_TIMEOUT_MS / 1000} seconds.`);
+    }
     fail(`Failed to run gitleaks: ${result.error.message}`);
+  }
+  if (result.signal === "SIGTERM") {
+    fail(`gitleaks timed out after ${GITLEAKS_RUN_TIMEOUT_MS / 1000} seconds.`);
   }
   process.exit(result.status ?? 1);
 }

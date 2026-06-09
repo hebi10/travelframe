@@ -25,6 +25,8 @@ for (const snippet of [
   "const selectedCameraRatioAspect = cameraRatioAspect[cameraRatio] ?? undefined",
   "const cameraPreviewViewportStyle = useMemo(",
   "const [cameraControlsHeight, setCameraControlsHeight] = useState(0)",
+  "const [cameraTopBarHeight, setCameraTopBarHeight] = useState(0)",
+  "const cameraPreviewTopOffset =",
   "const cameraPreviewBottomReserved = overlaySetupActive",
   "const cameraPreviewBottomOffset =",
   "cameraControlsHeight + CAMERA_PREVIEW_CONTROL_GAP",
@@ -32,15 +34,20 @@ for (const snippet of [
   "const cameraPreviewFrameStyle = useMemo(",
   "const frameHeight = Math.round(width / selectedCameraRatioAspect);",
   "const boundedFrameHeight = Math.min(frameHeight, height);",
-  "const latestTopWithoutBottomOverlap = height - cameraPreviewBottomOffset - boundedFrameHeight;",
+  "const availablePreviewHeight = Math.max(0, height - cameraPreviewTopOffset - cameraPreviewBottomOffset);",
+  "const frameFitsAboveControls = boundedFrameHeight <= availablePreviewHeight;",
+  "const frameTop = Math.max(",
+  "Math.max(cameraPreviewTopOffset,",
+  "cameraPreviewTopOffset + Math.round((availablePreviewHeight - boundedFrameHeight) / 2)",
+  "Math.round((height - boundedFrameHeight) / 2)",
   "width: \"100%\"",
-  "top: Math.max(0, Math.min(cameraPreviewTopReserved, latestTopWithoutBottomOverlap))",
+  "top: frameTop",
   "setCameraPreviewViewport({ width, height });",
   "styles.cameraPreviewViewport",
   "styles.cameraPreviewFrame",
   "styles.cameraPreviewFrameFill",
   "const updateCameraRatio = (nextRatio: PhotoRatioLabel)",
-  "void updateAppSettings({ cameraRatio: nextRatio })",
+  "queueAppSettingsUpdate({ cameraRatio: nextRatio })",
   "카메라 비율",
   "ratioLabel: cameraRatio",
   "aspectRatio={cameraRatioAspect[cameraRatio] ?? undefined}"
@@ -89,6 +96,11 @@ assert.ok(
   cameraSource.includes("height: boundedFrameHeight") &&
     !cameraSource.includes("height: frameHeight,"),
   "camera preview should not create a frame taller than the visible phone screen"
+);
+assert.ok(
+  !cameraSource.includes("latestTopWithoutBottomOverlap") &&
+    !cameraSource.includes("Math.min(cameraPreviewTopReserved"),
+  "camera preview should center in the non-capture area instead of pinning near the top"
 );
 
 const cameraRatioOptionsSource = cameraSource.slice(

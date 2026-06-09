@@ -10,8 +10,10 @@ const cameraRenderSource = cameraSource.slice(
 for (const snippet of [
   "const cameraNativeControlsReady = isCameraSessionActive && isCameraReady;",
   "if (cameraDevice && !cameraDevice.hasTorch && torchEnabled)",
-  "cameraFacing === \"back\" && Boolean(cameraDevice?.hasTorch) && enabled",
-  "const cameraTorchMode = cameraNativeControlsReady && cameraDevice?.hasTorch",
+  "const cameraLightAvailable = cameraFacing === \"back\" && cameraDevice?.hasTorch === true;",
+  "const visibleTorchEnabled = cameraLightAvailable && torchEnabled;",
+  "const nextEnabled = cameraLightAvailable && enabled;",
+  "const cameraTorchMode = cameraNativeControlsReady && cameraLightAvailable",
   "const cameraNativeZoom = cameraNativeControlsReady ? cameraZoomFactor : undefined;",
   "const cameraNativeExposure = cameraNativeControlsReady ? cameraExposureBias : undefined;",
   "torchMode={cameraTorchMode}",
@@ -23,6 +25,7 @@ for (const snippet of [
 
 for (const unsafeSnippet of [
   'torchMode={torchEnabled && cameraDevice.hasTorch ? "on" : "off"}',
+  "const nextEnabled = cameraFacing === \"back\" && enabled;",
   "zoom={cameraZoomFactor}",
   "exposure={cameraExposureBias}"
 ]) {

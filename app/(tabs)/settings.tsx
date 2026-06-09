@@ -904,6 +904,10 @@ export default function SettingsScreen() {
   };
 
   const handleGoogleSignIn = () => {
+    if (isGoogleSubmitting) {
+      return;
+    }
+
     if (!isGoogleReady) {
       setAuthMessage(GOOGLE_SIGN_IN_MESSAGES.missingConfig);
       return;

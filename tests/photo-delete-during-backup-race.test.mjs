@@ -24,7 +24,6 @@ for (const snippet of [
   "if (!(await isPhotoStillBackupEligible(photo.id)))",
   "await removeBackupIfPhotoWasDeleted({",
   "backupSessionId: photoUpload.backupSessionId",
-  "await releaseBackupUpload({",
   "await deleteUserBackupItem({ itemType: \"photo\", itemId: photo.id });"
 ]) {
   assert.ok(
@@ -32,6 +31,19 @@ for (const snippet of [
     `cloud backup should skip or remove photos deleted while backup is in flight: ${snippet}`
   );
 }
+
+const removeDeletedPhotoStart = backupSource.indexOf("const removeBackupIfPhotoWasDeleted");
+const removeDeletedPhotoEnd = backupSource.indexOf("const releaseBackupUploads", removeDeletedPhotoStart);
+assert.ok(
+  removeDeletedPhotoStart >= 0 && removeDeletedPhotoEnd > removeDeletedPhotoStart,
+  "removeBackupIfPhotoWasDeleted should exist"
+);
+const removeDeletedPhotoSource = backupSource.slice(removeDeletedPhotoStart, removeDeletedPhotoEnd);
+assert.equal(
+  removeDeletedPhotoSource.includes("releaseBackupUpload"),
+  false,
+  "photo deletion cleanup should not call releaseBackupUpload after deleteUserBackupItem"
+);
 
 for (const snippet of [
   "const releaseCompletedBackupUsage",
@@ -44,15 +56,23 @@ for (const snippet of [
 }
 
 for (const snippet of [
-  "releaseCompletedBackupUsage",
-  'session.status === "completed"',
-  'status: "released"'
+  'session.status !== "reserved"',
+  "deleteBackupItemForUser"
 ]) {
   assert.ok(
     functionsSource.includes(snippet),
-    `releaseBackupUpload should clean up completed in-flight uploads: ${snippet}`
+    `completed upload cleanup should be owned by deleteUserBackupItem, not releaseBackupUpload: ${snippet}`
   );
 }
+
+const releaseBackupUploadStart = functionsSource.indexOf("exports.releaseBackupUpload");
+const releaseBackupUploadEnd = functionsSource.indexOf("const getStringList", releaseBackupUploadStart);
+const releaseBackupUploadSource = functionsSource.slice(releaseBackupUploadStart, releaseBackupUploadEnd);
+assert.equal(
+  releaseBackupUploadSource.includes('session.status === "completed"'),
+  false,
+  "releaseBackupUpload must not subtract completed usage after a backup item was already deleted"
+);
 
 const backupPhotoStart = backupSource.indexOf("export const backupPhoto = async");
 const backupPhotoEnd = backupSource.indexOf("export const backupPhotoIfEnabled", backupPhotoStart);

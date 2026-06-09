@@ -49,4 +49,10 @@ assert.match(
   "settings Google login button must use the Google handler and shared auth disabled state"
 );
 
+assert.match(
+  settingsSource,
+  /const handleGoogleSignIn = \(\) => \{\s*if \(isGoogleSubmitting\) \{\s*return;\s*\}/,
+  "settings Google login handler must guard against rapid repeated presses before disabled state is applied"
+);
+
 console.log("ok - settings page includes Google login");

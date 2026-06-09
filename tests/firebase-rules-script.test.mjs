@@ -12,6 +12,9 @@ for (const snippet of [
   "tests/firebase-rules-emulator-runner.mjs",
   "FIREBASE_CONFIG_DIR",
   "Java 21 or newer",
+  "FIREBASE_EMULATOR_TIMEOUT_MS",
+  "timeout: FIREBASE_EMULATOR_TIMEOUT_MS",
+  "timed out after",
   "process.exit(result.status ?? 1)"
 ]) {
   assert.ok(scriptSource.includes(snippet), `Firebase Rules runner missing: ${snippet}`);

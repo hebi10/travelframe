@@ -23,10 +23,9 @@ type SignInWithGoogleAuthSessionInput = {
 type GoogleSignInResult = "success" | "cancelled";
 
 export const isGoogleSignInConfigured = ({
-  webClientId,
   androidClientId
 }: Pick<SignInWithGoogleAuthSessionInput, "webClientId" | "androidClientId">) =>
-  Boolean(webClientId && androidClientId);
+  Boolean(androidClientId);
 
 export const isGoogleAuthNativeModuleError = (error: unknown) => {
   const message = error instanceof Error ? error.message : String(error);

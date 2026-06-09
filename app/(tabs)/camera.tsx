@@ -1,4 +1,4 @@
-import { Feather } from "@expo/vector-icons";
+﻿import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 import { router, useFocusEffect } from "expo-router";
@@ -86,6 +86,7 @@ import {
   getAppSettings,
   getGuideSizeBounds,
   updateAppSettings,
+  type AppSettings,
   type CameraFacing,
   type CameraShutterSoundMode,
   type CameraSaveScope,
@@ -203,6 +204,7 @@ const CAMERA_SESSION_RECOVERY_DELAY_MS = 700;
 type CameraTimerValue = (typeof CAMERA_TIMER_OPTIONS)[number]["value"];
 type CameraQualityValue = (typeof CAMERA_QUALITY_OPTIONS)[number]["value"];
 type CameraControlPanel = "zoom";
+type CameraSettingsPatch = Partial<AppSettings>;
 type CameraZoomPreset =
   | (typeof CAMERA_BACK_ZOOM_PRESETS_WITH_ULTRA_WIDE)[number]
   | (typeof CAMERA_BACK_ZOOM_PRESETS_DEFAULT)[number]
@@ -337,6 +339,8 @@ export default function CameraScreen() {
   );
   const cameraRef = useRef<CameraRef>(null);
   const referenceOverlayRef = useRef<PhotoReferenceOverlayHandle>(null);
+  const pendingSettingsPatchRef = useRef<CameraSettingsPatch | null>(null);
+  const settingsSaveChainRef = useRef<Promise<void>>(Promise.resolve());
   const {
     hasPermission: hasCameraPermission,
     canRequestPermission: canRequestCameraPermission,
@@ -397,6 +401,7 @@ export default function CameraScreen() {
   const [recentPhoto, setRecentPhoto] = useState<PhotoItem | null>(null);
   const [cameraFrame, setCameraFrame] = useState({ width: 0, height: 0 });
   const [cameraPreviewViewport, setCameraPreviewViewport] = useState({ width: 0, height: 0 });
+  const [cameraTopBarHeight, setCameraTopBarHeight] = useState(0);
   const [cameraControlsHeight, setCameraControlsHeight] = useState(0);
   const guideOffsetXValue = useSharedValue(0);
   const guideOffsetYValue = useSharedValue(0);
@@ -449,6 +454,29 @@ export default function CameraScreen() {
     setGuideShapePoints(nextShapePoints);
     return nextShapePoints;
   }, []);
+  const flushQueuedAppSettingsUpdates = useCallback(async () => {
+    const nextPatch = pendingSettingsPatchRef.current;
+    if (!nextPatch) {
+      return;
+    }
+
+    pendingSettingsPatchRef.current = null;
+    await updateAppSettings(nextPatch);
+  }, []);
+  const queueAppSettingsUpdate = useCallback(
+    (updates: CameraSettingsPatch) => {
+      pendingSettingsPatchRef.current = {
+        ...pendingSettingsPatchRef.current,
+        ...updates
+      };
+      settingsSaveChainRef.current = settingsSaveChainRef.current.then(
+        flushQueuedAppSettingsUpdates,
+        flushQueuedAppSettingsUpdates
+      );
+      void settingsSaveChainRef.current;
+    },
+    [flushQueuedAppSettingsUpdates]
+  );
   const cameraDeviceFilter = useMemo(() => getCameraDeviceFilter(cameraFacing), [cameraFacing]);
   const cameraDevice = useCameraDevice(cameraFacing, cameraDeviceFilter);
   const availableCameraLenses = useMemo(
@@ -483,13 +511,18 @@ export default function CameraScreen() {
     appState === "active" &&
     !cameraRecoveryPending;
   const cameraNativeControlsReady = isCameraSessionActive && isCameraReady;
-  const cameraTorchMode = cameraNativeControlsReady && cameraDevice?.hasTorch
+  const cameraLightAvailable = cameraFacing === "back" && cameraDevice?.hasTorch === true;
+  const visibleTorchEnabled = cameraLightAvailable && torchEnabled;
+  const cameraTorchMode = cameraNativeControlsReady && cameraLightAvailable
     ? torchEnabled ? "on" : "off"
     : undefined;
   const cameraNativeZoom = cameraNativeControlsReady ? cameraZoomFactor : undefined;
   const cameraNativeExposure = cameraNativeControlsReady ? cameraExposureBias : undefined;
   const selectedCameraRatioAspect = cameraRatioAspect[cameraRatio] ?? undefined;
-  const cameraPreviewTopReserved = Math.max(insets.top + 56, CAMERA_PREVIEW_TOP_RESERVED);
+  const cameraPreviewTopOffset =
+    cameraTopBarHeight > 0
+      ? cameraTopBarHeight + CAMERA_PREVIEW_CONTROL_GAP
+      : Math.max(insets.top + 56, CAMERA_PREVIEW_TOP_RESERVED);
   const cameraPreviewBottomReserved = overlaySetupActive
     ? CAMERA_PREVIEW_OVERLAY_SETUP_BOTTOM_RESERVED
     : activeCameraControlPanel === "zoom"
@@ -519,16 +552,21 @@ export default function CameraScreen() {
     }
 
     const boundedFrameHeight = Math.min(frameHeight, height);
-    const latestTopWithoutBottomOverlap = height - cameraPreviewBottomOffset - boundedFrameHeight;
+    const availablePreviewHeight = Math.max(0, height - cameraPreviewTopOffset - cameraPreviewBottomOffset);
+    const frameFitsAboveControls = boundedFrameHeight <= availablePreviewHeight;
+    const preferredFrameTop = frameFitsAboveControls
+      ? cameraPreviewTopOffset + Math.round((availablePreviewHeight - boundedFrameHeight) / 2)
+      : Math.round((height - boundedFrameHeight) / 2);
+    const frameTop = Math.max(cameraPreviewTopOffset, preferredFrameTop);
 
     return {
       width: "100%" as const,
       height: boundedFrameHeight,
-      top: Math.max(0, Math.min(cameraPreviewTopReserved, latestTopWithoutBottomOverlap))
+      top: frameTop
     };
   }, [
     cameraPreviewBottomOffset,
-    cameraPreviewTopReserved,
+    cameraPreviewTopOffset,
     cameraPreviewViewport,
     selectedCameraRatioAspect
   ]);
@@ -600,9 +638,9 @@ export default function CameraScreen() {
   useEffect(() => {
     if (cameraDevice && !cameraDevice.hasTorch && torchEnabled) {
       setTorchEnabled(false);
-      void updateAppSettings({ cameraTorchEnabled: false });
+      queueAppSettingsUpdate({ cameraTorchEnabled: false });
     }
-  }, [cameraDevice, torchEnabled]);
+  }, [cameraDevice, queueAppSettingsUpdate, torchEnabled]);
 
   useEffect(
     () => () => {
@@ -650,13 +688,13 @@ export default function CameraScreen() {
       if (guide === "grid") {
         applyGridGuideLinePositionsState(nextGridGuideLinePositions);
       }
-      void updateAppSettings({
+      queueAppSettingsUpdate({
         guideSize: nextSize,
         guideVisible: true,
         ...(guide === "grid" ? { gridGuideLinePositions: nextGridGuideLinePositions } : {})
       });
     },
-    [applyGridGuideLinePositionsState, guide, guideSizeBounds.max, guideSizeBounds.min]
+    [applyGridGuideLinePositionsState, guide, guideSizeBounds.max, guideSizeBounds.min, queueAppSettingsUpdate]
   );
 
   const previewGuideSize = useCallback(
@@ -687,12 +725,12 @@ export default function CameraScreen() {
       setIsGuideShapePointAdjusting(false);
       setSelectedGuideShapePointIndex(null); selectedGuideShapePointIndexRef.current = null;
     }
-    void updateAppSettings({ defaultGuide: nextGuide, guideSize: nextGuideSize, guideVisible: true });
+    queueAppSettingsUpdate({ defaultGuide: nextGuide, guideSize: nextGuideSize, guideVisible: true });
   };
 
   const updateGuideVisibility = (nextVisible: boolean) => {
     setGuideVisible(nextVisible);
-    void updateAppSettings({ guideVisible: nextVisible });
+    queueAppSettingsUpdate({ guideVisible: nextVisible });
   };
 
   const updateGuideStrokeWidth = (nextStrokeWidth: number) => {
@@ -701,13 +739,13 @@ export default function CameraScreen() {
     );
     setGuideStrokeWidth(clampedStrokeWidth);
     setGuideVisible(true);
-    void updateAppSettings({ guideStrokeWidth: clampedStrokeWidth, guideVisible: true });
+    queueAppSettingsUpdate({ guideStrokeWidth: clampedStrokeWidth, guideVisible: true });
   };
 
   const updateGuideColor = (nextColor: string) => {
     setGuideColor(nextColor);
     setGuideVisible(true);
-    void updateAppSettings({ guideColor: nextColor, guideVisible: true });
+    queueAppSettingsUpdate({ guideColor: nextColor, guideVisible: true });
   };
 
   const commitGuideSizeInput = () => {
@@ -735,7 +773,7 @@ export default function CameraScreen() {
       const nextFactor = getCameraZoomPresetFactor(preset, cameraDevice);
       const nextZoom = getCameraZoomPercentFromFactor(nextFactor, cameraDevice);
       setZoomPercent(nextZoom);
-      void updateAppSettings({ cameraZoomPercent: nextZoom });
+      queueAppSettingsUpdate({ cameraZoomPercent: nextZoom });
       void triggerFeedback();
     },
     [cameraDevice, triggerFeedback]
@@ -743,12 +781,12 @@ export default function CameraScreen() {
 
   const setLightEnabled = useCallback(
     (enabled: boolean) => {
-      const nextEnabled = cameraFacing === "back" && Boolean(cameraDevice?.hasTorch) && enabled;
+      const nextEnabled = cameraLightAvailable && enabled;
       setTorchEnabled(nextEnabled);
-      void updateAppSettings({ cameraTorchEnabled: nextEnabled });
+      queueAppSettingsUpdate({ cameraTorchEnabled: nextEnabled });
       void triggerFeedback();
     },
-    [cameraDevice, cameraFacing, triggerFeedback]
+    [cameraLightAvailable, queueAppSettingsUpdate, triggerFeedback]
   );
 
   const applyCameraExposureBias = useCallback(
@@ -809,7 +847,7 @@ export default function CameraScreen() {
   const handleCameraFocusError = useCallback((error: unknown) => {
     if (__DEV__) console.warn("[camera] focus update failed", error);
     setErrorMessage(getUserFacingErrorMessage(error, "카메라 초점을 맞추지 못했습니다."));
-  }, []);
+  }, [queueAppSettingsUpdate]);
   const handleCameraTap = useCallback(
     (x: number, y: number) => {
       if (cameraFocusLockedRef.current) {
@@ -870,27 +908,27 @@ export default function CameraScreen() {
     setCameraFocusLocked(false);
     if (value === "front") {
       setTorchEnabled(false);
-      void updateAppSettings({ cameraFacing: value, cameraTorchEnabled: false });
+      queueAppSettingsUpdate({ cameraFacing: value, cameraTorchEnabled: false });
       return;
     }
 
-    void updateAppSettings({ cameraFacing: value });
+    queueAppSettingsUpdate({ cameraFacing: value });
   }, []);
   const updateCameraRatio = (nextRatio: PhotoRatioLabel) => {
     setCameraRatio(nextRatio);
-    void updateAppSettings({ cameraRatio: nextRatio });
+    queueAppSettingsUpdate({ cameraRatio: nextRatio });
     void triggerFeedback();
   };
 
   const updateCameraSaveScope = (nextScope: CameraSaveScope) => {
     setCameraSaveScope(nextScope);
-    void updateAppSettings({ cameraSaveScope: nextScope });
+    queueAppSettingsUpdate({ cameraSaveScope: nextScope });
     void triggerFeedback();
   };
 
   const updateCameraShutterSoundMode = (nextMode: CameraShutterSoundMode) => {
     setCameraShutterSoundMode(nextMode);
-    void updateAppSettings({ cameraShutterSoundMode: nextMode });
+    queueAppSettingsUpdate({ cameraShutterSoundMode: nextMode });
     void triggerFeedback();
   };
 
@@ -1034,7 +1072,7 @@ export default function CameraScreen() {
     setSelectedGuideShapePointIndex(null);
     selectedGuideShapePointIndexRef.current = null;
     setGuideSettingsOpen(true);
-    void updateAppSettings({
+    queueAppSettingsUpdate({
       guideOffsetX: clampedOffset.x,
       guideOffsetY: clampedOffset.y,
       guideSize: guideSizeRef.current,
@@ -1075,7 +1113,7 @@ export default function CameraScreen() {
     selectedGridGuideLineRef.current = null;
     setSelectedGridGuideLine(null);
     setGuideSettingsOpen(true);
-    void updateAppSettings({
+    queueAppSettingsUpdate({
       defaultGuide: "grid",
       guideVisible: true,
       guideSize: guideSizeRef.current,
@@ -1115,7 +1153,7 @@ export default function CameraScreen() {
     setIsGuideShapePointAdjusting(false);
     selectedGuideShapePointIndexRef.current = null;
     setSelectedGuideShapePointIndex(null);
-    void updateAppSettings({
+    queueAppSettingsUpdate({
       guideShapePoints: guideShapePointsRef.current,
       guideVisible: true
     });
@@ -2391,3 +2429,4 @@ export default function CameraScreen() {
     </View>
   );
 }
+

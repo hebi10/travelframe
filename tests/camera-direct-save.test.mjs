@@ -20,7 +20,7 @@ for (const snippet of [
   "const [cameraSaveScope, setCameraSaveScope] = useState<CameraSaveScope>(defaultAppSettings.cameraSaveScope)",
   "setCameraSaveScope(settings.cameraSaveScope)",
   "const updateCameraSaveScope = (nextScope: CameraSaveScope)",
-  "void updateAppSettings({ cameraSaveScope: nextScope })",
+  "queueAppSettingsUpdate({ cameraSaveScope: nextScope })",
   "저장 범위",
   'cameraSaveScope !== "device"',
   'cameraSaveScope !== "app"',

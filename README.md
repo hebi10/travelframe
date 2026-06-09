@@ -12,10 +12,10 @@ TravelFrame은 같은 구도로 사진을 촬영하고, 사진 편집과 여행 
 
 ```bash
 npm install
-npm run start
+npm run android:dev
 ```
 
-Android 개발 빌드 실행과 설치는 아래 명령을 사용합니다.
+Android 개발 빌드 생성과 설치는 아래 명령을 사용합니다.
 
 ```bash
 npm run android:build-dev

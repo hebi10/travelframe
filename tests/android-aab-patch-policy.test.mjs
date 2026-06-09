@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const patchScript = fs.readFileSync("scripts/apply-patches.mjs", "utf8");
+const aabScript = fs.readFileSync("scripts/build-android-aab.ps1", "utf8");
 const proguardRules = fs.readFileSync("android/app/proguard-rules.pro", "utf8");
 
 assert.equal(
@@ -35,6 +36,16 @@ assert.ok(
 assert.ok(
   patchScript.includes("VisionCamera Android shutter sound override"),
   "VisionCamera shutter sound patch should be labeled as a required patch"
+);
+
+assert.ok(
+  aabScript.includes('Invoke-External "node" @("scripts/apply-patches.mjs")'),
+  "local AAB build should apply required package patches before prebuild"
+);
+
+assert.ok(
+  aabScript.includes("Assert-VisionCameraAndroidShutterSoundPatch"),
+  "local AAB build should verify the required VisionCamera Android patch before building"
 );
 
 for (const snippet of [

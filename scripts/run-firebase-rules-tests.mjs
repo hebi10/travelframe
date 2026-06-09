@@ -9,6 +9,7 @@ const firebaseCommandLabel = "firebase emulators:exec";
 const javaExecutableName = process.platform === "win32" ? "java.exe" : "java";
 const pathDelimiter = path.delimiter;
 const FIREBASE_CONFIG_DIR = path.join(root, ".tmp", "firebase-config");
+const FIREBASE_EMULATOR_TIMEOUT_MS = 300_000;
 
 const unique = (values) => [...new Set(values.filter(Boolean))];
 
@@ -150,11 +151,21 @@ const result = spawnSync(emulatorCommand, {
   cwd: root,
   env,
   stdio: "inherit",
-  shell: true
+  shell: true,
+  timeout: FIREBASE_EMULATOR_TIMEOUT_MS
 });
 
 if (result.error) {
+  if (result.error.code === "ETIMEDOUT") {
+    console.error(`${firebaseCommandLabel} timed out after ${FIREBASE_EMULATOR_TIMEOUT_MS / 1000} seconds.`);
+    process.exit(1);
+  }
   console.error(result.error.message);
+  process.exit(1);
+}
+
+if (result.signal === "SIGTERM") {
+  console.error(`${firebaseCommandLabel} timed out after ${FIREBASE_EMULATOR_TIMEOUT_MS / 1000} seconds.`);
   process.exit(1);
 }
 

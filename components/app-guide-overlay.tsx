@@ -50,6 +50,11 @@ export function AppGuideOverlay({
     skip
   } = useAppGuide(tabKey, replaySignal);
   const activeVisualIndex = Math.min(stepIndex, guideVisualSlides.length - 1);
+  const visualPageIndexes = Array.from({ length: totalSteps });
+  const visualPages = visualPageIndexes.map((_, index) => ({
+    index,
+    source: guideVisualSlides[Math.min(index, guideVisualSlides.length - 1)]
+  }));
 
   useEffect(() => {
     requestAnimationFrame(() => {
@@ -66,7 +71,7 @@ export function AppGuideOverlay({
 
   const handleVisualScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const nextIndex = Math.round(event.nativeEvent.contentOffset.x / visualWidth);
-    goToStep(Math.max(0, Math.min(guideVisualSlides.length - 1, nextIndex)));
+    goToStep(Math.max(0, Math.min(totalSteps - 1, nextIndex)));
   };
 
   return (
@@ -103,13 +108,13 @@ export function AppGuideOverlay({
                 style={styles.visualScroller}
                 contentContainerStyle={styles.visualTrack}
               >
-                {guideVisualSlides.map((visualSource, index) => (
+                {visualPages.map(({ index, source }) => (
                   <View
                     key={index}
                     style={[styles.visualSlide, { width: visualWidth }]}
                   >
                     <Image
-                      source={visualSource}
+                      source={source}
                       style={styles.stageImage}
                       contentFit="contain"
                     />
@@ -117,7 +122,7 @@ export function AppGuideOverlay({
                 ))}
               </ScrollView>
               <View pointerEvents="none" style={styles.visualDots}>
-                {guideVisualSlides.map((_, index) => (
+                {visualPages.map(({ index }) => (
                   <View
                     key={index}
                     style={[

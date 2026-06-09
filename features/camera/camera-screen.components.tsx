@@ -77,6 +77,7 @@ export type CameraSettingToggleRowProps = {
   detail: string;
   valueLabel: string;
   disabled?: boolean;
+  selected?: boolean;
   onPress: () => void;
 };
 
@@ -85,6 +86,7 @@ export function CameraSettingToggleRow({
   detail,
   valueLabel,
   disabled = false,
+  selected = false,
   onPress
 }: CameraSettingToggleRowProps) {
   return (
@@ -92,6 +94,8 @@ export function CameraSettingToggleRow({
       disabled={disabled}
       style={[styles.settingToggleRow, disabled && styles.settingToggleRowDisabled]}
       onPress={onPress}
+      accessibilityRole="switch"
+      accessibilityState={{ disabled, checked: selected }}
     >
       <View style={styles.settingToggleCopy}>
         <Text selectable={false} style={styles.settingToggleTitle}>{title}</Text>
@@ -128,6 +132,7 @@ export function CameraShutterSoundChoice({
         <Pressable
           style={[styles.optionButton, mode === "silent" ? styles.optionButtonActive : null]}
           onPress={() => onChange("silent")}
+          accessibilityState={{ selected: mode === "silent" }}
         >
           <Text
             selectable={false}
@@ -139,6 +144,7 @@ export function CameraShutterSoundChoice({
         <Pressable
           style={[styles.optionButton, mode === "sound" && styles.optionButtonActive]}
           onPress={() => onChange("sound")}
+          accessibilityState={{ selected: mode === "sound" }}
         >
           <Text
             selectable={false}

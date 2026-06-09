@@ -7,6 +7,12 @@ const packageJson = JSON.parse(fs.readFileSync("package.json", "utf8"));
 
 assert.ok(readme.includes("Android 전용"), "README should state the current Android-only scope");
 assert.ok(readme.includes("npm run quality"), "README should document the local quality command");
+assert.ok(readme.includes("npm run android:dev"), "README should document Android dev client startup");
+assert.equal(
+  readme.includes("npm run start"),
+  false,
+  "README basic execution should not point to the generic Expo start command"
+);
 assert.ok(
   readme.includes("npm run quality:firebase-rules"),
   "README should document Firebase Rules checks as a separate command"

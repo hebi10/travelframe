@@ -285,6 +285,10 @@ export default function AccountScreen() {
   };
 
   const handleGoogleSignIn = () => {
+    if (isGoogleSubmitting) {
+      return;
+    }
+
     if (!isGoogleReady) {
       setMessage(GOOGLE_SIGN_IN_MESSAGES.missingConfig);
       return;

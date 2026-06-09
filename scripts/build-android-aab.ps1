@@ -67,30 +67,49 @@ function Set-GradleProperty {
   Write-Utf8NoBom -Path $Path -Value $content
 }
 
+function Get-LastAndroidVersionCode {
+  param([string]$ProjectRoot)
+
+  $versionCodeStatePath = Join-Path $ProjectRoot ".android-version-code"
+
+  if (Test-Path -LiteralPath $versionCodeStatePath) {
+    $lastVersionCodeText = (Get-Content -LiteralPath $versionCodeStatePath -Raw).Trim()
+    if ($lastVersionCodeText -match "^\d+$") {
+      return [int]$lastVersionCodeText
+    }
+  }
+
+  return 0
+}
+
 # Local AAB versionCode source of truth:
-# - explicit -VersionCode wins when provided
+# - explicit -VersionCode wins when provided, but must increase .android-version-code
 # - otherwise .android-version-code is advanced monotonically from yyMMddHH
 # - app.json expo.android.versionCode is ignored by local AAB builds
 # - EAS remote appVersionSource remains separate for `npm run android:build-prod`
 function Get-NextAndroidVersionCode {
   param([string]$ProjectRoot)
 
-  $versionCodeStatePath = Join-Path $ProjectRoot ".android-version-code"
   $baseVersionCode = [int](Get-Date -Format "yyMMddHH")
-  $lastVersionCode = 0
-
-  if (Test-Path -LiteralPath $versionCodeStatePath) {
-    $lastVersionCodeText = (Get-Content -LiteralPath $versionCodeStatePath -Raw).Trim()
-    if ($lastVersionCodeText -match "^\d+$") {
-      $lastVersionCode = [int]$lastVersionCodeText
-    }
-  }
+  $lastVersionCode = Get-LastAndroidVersionCode -ProjectRoot $ProjectRoot
 
   if ($lastVersionCode -gt 0) {
     return [Math]::Max($baseVersionCode, $lastVersionCode + 1)
   }
 
   return $baseVersionCode + 1
+}
+
+function Assert-ManualAndroidVersionCode {
+  param(
+    [string]$ProjectRoot,
+    [int]$VersionCode
+  )
+
+  $lastVersionCode = Get-LastAndroidVersionCode -ProjectRoot $ProjectRoot
+  if ($lastVersionCode -gt 0 -and $VersionCode -le $lastVersionCode) {
+    Stop-WithMessage "Manual -VersionCode $VersionCode must be greater than the previous local AAB versionCode $lastVersionCode from .android-version-code."
+  }
 }
 
 function Write-LocalVersionCodePolicyNotice {
@@ -123,6 +142,25 @@ function Set-RequiredBuildGradleReplacement {
   return [regex]::Replace($Text, $Pattern, $Replacement, 1)
 }
 
+function Set-ReleaseBuildSigningConfig {
+  param([string]$BuildGradle)
+
+  $releasePattern = "(buildTypes\s*\{[\s\S]*?release\s*\{[\s\S]*?signingConfig\s+)signingConfigs\.release"
+  $releaseSigningConfigMatches = [regex]::Matches($BuildGradle, $releasePattern)
+  if ($releaseSigningConfigMatches.Count -eq 1) {
+    return $BuildGradle
+  }
+  if ($releaseSigningConfigMatches.Count -gt 1) {
+    Stop-WithMessage "Expected at most one build.gradle match for existing release signingConfig, found $($releaseSigningConfigMatches.Count). Refusing to continue after prebuild."
+  }
+
+  return Set-RequiredBuildGradleReplacement `
+    -Text $BuildGradle `
+    -Pattern "(buildTypes\s*\{[\s\S]*?release\s*\{[\s\S]*?signingConfig\s+)signingConfigs\.debug" `
+    -Replacement '${1}signingConfigs.release' `
+    -Description "release signingConfig"
+}
+
 function Assert-AndroidAabBuildGradle {
   param(
     [string]$BuildGradle,
@@ -144,6 +182,50 @@ function Assert-AndroidAabBuildGradle {
       Stop-WithMessage "Generated build.gradle is missing required release setting: $requiredSnippet"
     }
   }
+}
+
+function Assert-VisionCameraAndroidShutterSoundPatch {
+  param([string]$ProjectRoot)
+
+  $packageJsonPath = Join-Path $ProjectRoot "package.json"
+  if (-not (Test-Path -LiteralPath $packageJsonPath)) {
+    Stop-WithMessage "package.json was not found; cannot verify required VisionCamera Android patch."
+  }
+
+  $packageJson = Get-Content -LiteralPath $packageJsonPath -Raw | ConvertFrom-Json
+  $declaresVisionCamera = $false
+  if ($packageJson.dependencies) {
+    $declaresVisionCamera = $packageJson.dependencies.PSObject.Properties.Name -contains "react-native-vision-camera"
+  }
+  if (-not $declaresVisionCamera) {
+    return
+  }
+
+  $visionCameraOutputPath = Join-Path $ProjectRoot "node_modules\react-native-vision-camera\android\src\main\java\com\margelo\nitro\camera\hybrids\outputs\HybridPhotoOutput.kt"
+  if (-not (Test-Path -LiteralPath $visionCameraOutputPath)) {
+    Stop-WithMessage "react-native-vision-camera is declared but its Android output source was not found. Run npm install before building the local AAB."
+  }
+
+  $source = Get-Content -LiteralPath $visionCameraOutputPath -Raw
+  if (-not $source.Contains("val enableShutterSound = settings.enableShutterSound ?: true")) {
+    Stop-WithMessage "Required VisionCamera Android shutter sound patch was not applied."
+  }
+  if ($source.Contains("CameraInfo.mustPlayShutterSound()")) {
+    Stop-WithMessage "Required VisionCamera Android shutter sound patch is incomplete; CameraInfo.mustPlayShutterSound() is still present."
+  }
+}
+
+function Assert-AndroidR8MappingFile {
+  param([string]$ProjectRoot)
+
+  $mappingPath = Join-Path $ProjectRoot "android\app\build\outputs\mapping\release\mapping.txt"
+  if (-not (Test-Path -LiteralPath $mappingPath)) {
+    Stop-WithMessage "R8 mapping file was not found. Release candidate AAB builds must produce android\app\build\outputs\mapping\release\mapping.txt before uploading to Google Play."
+  }
+
+  Write-Host ""
+  Write-Host "R8 mapping file created for Google Play:" -ForegroundColor Green
+  Write-Host $mappingPath
 }
 
 function Remove-DuplicateLauncherPngResources {
@@ -341,8 +423,11 @@ if ($missingEnv.Count -gt 0) {
   Stop-WithMessage "Missing signing environment variables: $($missingEnv -join ', ')"
 }
 
+$manualVersionCodeProvided = $PSBoundParameters.ContainsKey("VersionCode") -and $VersionCode -gt 0
 if ($VersionCode -le 0) {
   $VersionCode = Get-NextAndroidVersionCode -ProjectRoot $projectRoot
+} elseif ($manualVersionCodeProvided) {
+  Assert-ManualAndroidVersionCode -ProjectRoot $projectRoot -VersionCode $VersionCode
 }
 
 if ($VersionCode -gt 2100000000) {
@@ -353,6 +438,8 @@ Set-Content -LiteralPath (Join-Path $projectRoot ".android-version-code") -Value
 Write-LocalVersionCodePolicyNotice -ProjectRoot $projectRoot
 
 Write-Host "Preparing Android project..." -ForegroundColor Cyan
+Invoke-External "node" @("scripts/apply-patches.mjs")
+Assert-VisionCameraAndroidShutterSoundPatch -ProjectRoot $projectRoot
 Invoke-External "npx" @("expo", "prebuild", "--platform", "android", "--no-install")
 Remove-DuplicateLauncherPngResources -ProjectRoot $projectRoot
 
@@ -402,7 +489,7 @@ signingConfigs {
 }
 
 $buildGradle = Set-RequiredBuildGradleReplacement -Text $buildGradle -Pattern "versionCode\s+\d+" -Replacement "versionCode $VersionCode" -Description "local versionCode"
-$buildGradle = Set-RequiredBuildGradleReplacement -Text $buildGradle -Pattern "(buildTypes\s*\{[\s\S]*?release\s*\{[\s\S]*?signingConfig\s+)signingConfigs\.debug" -Replacement '${1}signingConfigs.release' -Description "release signingConfig"
+$buildGradle = Set-ReleaseBuildSigningConfig -BuildGradle $buildGradle
 
 Assert-AndroidAabBuildGradle -BuildGradle $buildGradle -VersionCode $VersionCode
 
@@ -425,12 +512,4 @@ Write-Host ""
 Write-Host "AAB created:" -ForegroundColor Green
 Write-Host $aabPath
 
-$mappingPath = Join-Path $projectRoot "android\app\build\outputs\mapping\release\mapping.txt"
-if (Test-Path -LiteralPath $mappingPath) {
-  Write-Host ""
-  Write-Host "R8 mapping file created for Google Play:" -ForegroundColor Green
-  Write-Host $mappingPath
-} else {
-  Write-Host ""
-  Write-Host "R8 mapping file was not found. Check the release minify settings before uploading to Google Play." -ForegroundColor Yellow
-}
+Assert-AndroidR8MappingFile -ProjectRoot $projectRoot

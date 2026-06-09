@@ -37,6 +37,9 @@ jobs:
       - name: Test
         run: npm test
 
+      - name: Secret Scan
+        run: npm run security:secrets
+
   firebase-rules:
     name: Firebase Rules
     runs-on: ubuntu-latest

@@ -7,7 +7,6 @@ const {
   normalizeBackupUsage,
   reserveBackupUsage,
   releaseReservedBackupUsage,
-  releaseCompletedBackupUsage,
   completeReservedBackupUsage,
   buildBackupSessionStoragePath
 } = require("./backup-quota");
@@ -26,6 +25,7 @@ admin.initializeApp();
 const db = admin.firestore();
 const bucket = admin.storage().bucket();
 const FieldValue = admin.firestore.FieldValue;
+// Enable only after the Android client initializes Firebase App Check.
 const CALLABLE_RUNTIME_OPTIONS = process.env.FUNCTIONS_ENFORCE_APP_CHECK === "true"
   ? { enforceAppCheck: true }
   : {};
@@ -904,60 +904,47 @@ exports.releaseBackupUpload = secureOnCall(async (request) => {
     }
 
     const sessionRef = getSessionRef(uid, backupSessionId);
+    let sessionToDelete = null;
     await db.runTransaction(async (transaction) => {
-      const sessionSnapshot = await transaction.get(sessionRef);
+      const [sessionSnapshot, usageSnapshot] = await Promise.all([
+        transaction.get(sessionRef),
+        transaction.get(getUsageRef(uid))
+      ]);
       if (!sessionSnapshot.exists) {
         return;
       }
 
       const session = sessionSnapshot.data();
-      if (session.status === "reserved") {
-        const usageSnapshot = await transaction.get(getUsageRef(uid));
-        const usageDelta = getBackupSessionUsageDelta(session);
-        const releasedUsage = releaseReservedBackupUsage(usageSnapshot.data(), usageDelta);
-        transaction.set(
-          getUsageRef(uid),
-          {
-            ...releasedUsage,
-            pendingUsage: releasedUsage.pendingUsage,
-            updatedAt: FieldValue.serverTimestamp()
-          },
-          { merge: true }
-        );
-        transaction.update(sessionRef, {
-          status: "released",
-          releasedAt: FieldValue.serverTimestamp()
-        });
-      } else if (session.status === "completed") {
-        const usageSnapshot = await transaction.get(getUsageRef(uid));
-        const usageDelta = getBackupSessionUsageDelta(session);
-        const releasedUsage = releaseCompletedBackupUsage(usageSnapshot.data(), usageDelta);
-        transaction.set(
-          getUsageRef(uid),
-          {
-            ...releasedUsage,
-            pendingUsage: releasedUsage.pendingUsage,
-            updatedAt: FieldValue.serverTimestamp()
-          },
-          { merge: true }
-        );
-        transaction.update(sessionRef, {
-          status: "released",
-          releasedAt: FieldValue.serverTimestamp()
-        });
+      if (session.status !== "reserved") {
+        return;
       }
+
+      const usageDelta = getBackupSessionUsageDelta(session);
+      const releasedUsage = releaseReservedBackupUsage(usageSnapshot.data(), usageDelta);
+      transaction.set(
+        getUsageRef(uid),
+        {
+          ...releasedUsage,
+          pendingUsage: releasedUsage.pendingUsage,
+          updatedAt: FieldValue.serverTimestamp()
+        },
+        { merge: true }
+      );
+      transaction.update(sessionRef, {
+        status: "released",
+        releasedAt: FieldValue.serverTimestamp()
+      });
+      sessionToDelete = { ...session, backupSessionId };
     });
 
-    const sessionSnapshot = await sessionRef.get();
-    const session = sessionSnapshot.data();
-    if (session?.status === "released" || session?.status === "failed") {
+    if (sessionToDelete) {
       await deleteBackupSessionStorageObject({
-        storagePath: session.storagePath,
+        storagePath: sessionToDelete.storagePath,
         backupSessionId
       });
     }
 
-    return { released: true };
+    return { released: Boolean(sessionToDelete) };
   } catch (error) {
     throw toHttpsError(error);
   }
@@ -1020,7 +1007,7 @@ const assertCompletedImageWorkSessions = async ({ uid, workId, storagePaths, bac
     backupSessionIds.map((sessionId) => getSessionRef(uid, sessionId).get())
   );
 
-  return snapshots.reduce((totalFileSize, snapshot, index) => {
+  const totalFileSize = snapshots.reduce((size, snapshot, index) => {
     if (!snapshot.exists) {
       throw new HttpsError("failed-precondition", "Image work backup session was not found.");
     }
@@ -1035,8 +1022,32 @@ const assertCompletedImageWorkSessions = async ({ uid, workId, storagePaths, bac
       throw new HttpsError("failed-precondition", "Image work backup session is not completed for this item.");
     }
 
-    return totalFileSize + Number(session.fileSize ?? 0);
+    return size + Number(session.fileSize ?? 0);
   }, 0);
+
+  const safeImageUris = await Promise.all(
+    storagePaths.map(async (storagePath, index) => {
+      let metadata;
+      try {
+        [metadata] = await bucket.file(storagePath).getMetadata();
+      } catch (error) {
+        throw new HttpsError("failed-precondition", "Image work backup object was not found in Storage.");
+      }
+
+      if (metadata.metadata?.backupSessionId !== backupSessionIds[index]) {
+        throw new HttpsError("failed-precondition", "Image work backup object does not match the completed session.");
+      }
+
+      const downloadUrl = getDownloadUrlFromStorageMetadata({ storagePath, metadata });
+      if (!downloadUrl) {
+        throw new HttpsError("failed-precondition", "Image work backup object is missing a Storage download token.");
+      }
+
+      return downloadUrl;
+    })
+  );
+
+  return { totalFileSize, safeImageUris };
 };
 
 exports.completeImageWorkBackup = secureOnCall(async (request) => {
@@ -1050,7 +1061,7 @@ exports.completeImageWorkBackup = secureOnCall(async (request) => {
     const data = sanitizeImageWorkBackupData({ uid, workId, imageWork });
     const storagePaths = getStringList(data.storagePaths, "storagePaths");
     const backupSessionIds = getStringList(data.backupSessionIds, "backupSessionIds");
-    const totalFileSize = await assertCompletedImageWorkSessions({
+    const { totalFileSize, safeImageUris } = await assertCompletedImageWorkSessions({
       uid,
       workId,
       storagePaths,
@@ -1087,6 +1098,7 @@ exports.completeImageWorkBackup = secureOnCall(async (request) => {
       id: workId,
       userId: uid,
       localId: workId,
+      imageUris: safeImageUris,
       storagePath: storagePaths[0],
       storagePaths,
       backupSessionIds,

@@ -32,65 +32,69 @@ const loadGoogleMobileAds = (): GoogleMobileAdsInterstitialModule | null => {
   }
 };
 
-export const showGoogleMobileInterstitialAd = ({
-  adUnitId,
-  onComplete
-}: ShowGoogleMobileInterstitialAdInput) => {
-  const googleMobileAds = loadGoogleMobileAds();
+export const createGoogleMobileInterstitialAdPresenter =
+  (
+    loadAds: () => GoogleMobileAdsInterstitialModule | null = loadGoogleMobileAds
+  ) =>
+  ({ adUnitId, onComplete }: ShowGoogleMobileInterstitialAdInput) => {
+    const googleMobileAds = loadAds();
 
-  if (!googleMobileAds) {
-    onComplete();
-    return () => {};
-  }
-
-  const { AdEventType, InterstitialAd } = googleMobileAds;
-  let completed = false;
-  const interstitial = InterstitialAd.createForAdRequest(adUnitId, {
-    requestNonPersonalizedAdsOnly: true
-  });
-  const unsubscribers: (() => void)[] = [];
-
-  const cleanup = () => {
-    while (unsubscribers.length > 0) {
-      unsubscribers.pop()?.();
-    }
-  };
-
-  const complete = () => {
-    if (completed) {
-      return;
+    if (!googleMobileAds) {
+      onComplete();
+      return () => {};
     }
 
-    completed = true;
-    cleanup();
-    onComplete();
-  };
+    const { AdEventType, InterstitialAd } = googleMobileAds;
+    let completed = false;
+    const interstitial = InterstitialAd.createForAdRequest(adUnitId, {
+      requestNonPersonalizedAdsOnly: true
+    });
+    const unsubscribers: (() => void)[] = [];
 
-  unsubscribers.push(
-    interstitial.addAdEventListener(AdEventType.LOADED, () => {
-      try {
-        const result = interstitial.show();
-        void Promise.resolve(result).catch(complete);
-      } catch {
-        complete();
+    const cleanup = () => {
+      while (unsubscribers.length > 0) {
+        unsubscribers.pop()?.();
       }
-    }),
-    interstitial.addAdEventListener(AdEventType.CLOSED, complete),
-    interstitial.addAdEventListener(AdEventType.ERROR, complete)
-  );
+    };
 
-  try {
-    interstitial.load();
-  } catch {
-    complete();
-  }
+    const complete = () => {
+      if (completed) {
+        return;
+      }
 
-  return () => {
-    if (completed) {
-      return;
+      completed = true;
+      cleanup();
+      onComplete();
+    };
+
+    unsubscribers.push(
+      interstitial.addAdEventListener(AdEventType.LOADED, () => {
+        try {
+          const result = interstitial.show();
+          void Promise.resolve(result).catch(complete);
+        } catch {
+          complete();
+        }
+      }),
+      interstitial.addAdEventListener(AdEventType.CLOSED, complete),
+      interstitial.addAdEventListener(AdEventType.ERROR, complete)
+    );
+
+    try {
+      interstitial.load();
+    } catch {
+      complete();
     }
 
-    completed = true;
-    cleanup();
+    return () => {
+      if (completed) {
+        return;
+      }
+
+      completed = true;
+      cleanup();
+    };
   };
-};
+
+export const showGoogleMobileInterstitialAd =
+  createGoogleMobileInterstitialAdPresenter();

@@ -17,12 +17,15 @@ const loadMobileAds = (): MobileAdsFactory | null => {
   }
 };
 
-export const initializeNativeAdMob = async () => {
-  const mobileAds = loadMobileAds();
+export const createNativeAdMobInitializer =
+  (loadAds: () => MobileAdsFactory | null = loadMobileAds) => async () => {
+    const mobileAds = loadAds();
 
-  if (!mobileAds) {
-    return;
-  }
+    if (!mobileAds) {
+      return;
+    }
 
-  await mobileAds().initialize();
-};
+    await mobileAds().initialize();
+  };
+
+export const initializeNativeAdMob = createNativeAdMobInitializer();

@@ -540,9 +540,6 @@ const removeBackupIfPhotoWasDeleted = async ({
   }
 
   await deleteUserBackupItem({ itemType: "photo", itemId: photo.id });
-  if (backupSessionId) {
-    await releaseBackupUpload({ backupSessionId });
-  }
   return true;
 };
 
@@ -592,7 +589,6 @@ const removeBackupIfImageWorkWasDeleted = async ({
   }
 
   await deleteUserBackupItem({ itemType: "imageWork", itemId: work.id });
-  await releaseBackupUploads(backupSessionIds);
   return true;
 };
 
@@ -614,9 +610,6 @@ const removeBackupIfVideoWasDeleted = async ({
   }
 
   await deleteUserBackupItem({ itemType: "video", itemId: video.id });
-  if (backupSessionId) {
-    await releaseBackupUploads([backupSessionId]);
-  }
   return true;
 };
 

@@ -8,10 +8,18 @@ For local AAB builds, the Local AAB versionCode source of truth is:
 - `-VersionCode` passed to `scripts/build-android-aab.ps1`
 - otherwise `.android-version-code`, advanced monotonically from `yyMMddHH`
 
+Manual `-VersionCode` values must be greater than the value already recorded in
+`.android-version-code`. Reusing or lowering the local version code is rejected
+before the AAB build starts.
+
 `app.json` may still contain Expo metadata, but local AAB builds rewrite the generated
 `android/app/build.gradle` versionCode after `expo prebuild`. EAS remote
 `appVersionSource` is separate and applies to `npm run android:build-prod`.
 EAS remote appVersionSource must not be treated as the local AAB source.
+
+Local release candidate AAB builds must also produce
+`android/app/build/outputs/mapping/release/mapping.txt`. A missing R8 mapping file
+is treated as a failed release candidate build, not a warning.
 
 ## Android permissions and Play Console declarations
 

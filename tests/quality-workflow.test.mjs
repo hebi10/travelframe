@@ -13,6 +13,7 @@ for (const snippet of [
   "npm run typecheck",
   "npm run lint",
   "npm test",
+  "npm run security:secrets",
   "name: Firebase Rules",
   "actions/setup-java@v4",
   "distribution: temurin",
@@ -29,6 +30,17 @@ assert.equal(
   packageJson.scripts.quality,
   "npm run typecheck && npm run lint && npm test && npm run security:secrets",
   "package.json should expose one bounded local app quality command"
+);
+
+const qualityJobStart = source.indexOf("jobs:\n  quality:");
+const firebaseRulesJobStart = source.indexOf("\n  firebase-rules:");
+assert.ok(qualityJobStart >= 0, "quality workflow should define the quality job");
+assert.ok(firebaseRulesJobStart > qualityJobStart, "quality workflow should define Firebase Rules after app quality");
+
+const qualityJobSource = source.slice(qualityJobStart, firebaseRulesJobStart);
+assert.ok(
+  qualityJobSource.includes("npm run security:secrets"),
+  "CI app quality job should include the same secrets scan as npm run quality"
 );
 assert.equal(
   packageJson.scripts["quality:firebase-rules"],

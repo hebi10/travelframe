@@ -23,14 +23,10 @@ const createEmptySeenTabs = () =>
     {} as Record<AppGuideTabKey, boolean>
   );
 
-const createCompletedSeenTabs = () =>
-  Object.keys(APP_GUIDE_STEPS).reduce(
-    (seenTabs, tabKey) => ({
-      ...seenTabs,
-      [tabKey]: true
-    }),
-    {} as Record<AppGuideTabKey, boolean>
-  );
+const createExistingUserSeenTabs = () => ({
+  ...createEmptySeenTabs(),
+  camera: true
+});
 
 const normalizeGuideProgress = (value: Partial<GuideProgress> | null): GuideProgress => ({
   seenGuideVersion:
@@ -73,7 +69,7 @@ export const getGuideProgress = async () => {
     return saveGuideProgress({
       seenGuideVersion: APP_GUIDE_VERSION,
       seenIntro: true,
-      seenTabs: createCompletedSeenTabs()
+      seenTabs: createExistingUserSeenTabs()
     });
   }
 

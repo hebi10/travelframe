@@ -99,7 +99,7 @@ service firebase.storage {
         && musicUploadSession(userId).data.status == "reserved"
         && musicUploadSession(userId).data.storagePath == request.resource.name
         && musicUploadSession(userId).data.fileSize == request.resource.size
-        && musicUploadSession(userId).data.contentType == request.resource.contentType
+        && requestContentTypeMatchesSession(musicUploadSession(userId).data.contentType)
         && musicUploadSession(userId).data.expiresAt > request.time;
     }
 
@@ -186,8 +186,9 @@ service firebase.storage {
 
     match /users/{userId}/music/{allPaths=**} {
       allow read: if isOwner(userId);
-      allow create, update: if (isReservedMusicUpload(userId) || isReservedAdminMusicUpload(userId)) && isAudioUpload();
-      allow delete: if isOwner(userId);
+      allow create: if resource == null && (isReservedMusicUpload(userId) || isReservedAdminMusicUpload(userId));
+      allow update: if false;
+      allow delete: if false;
     }
 
     match /{allPaths=**} {

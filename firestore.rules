@@ -43,6 +43,28 @@ service cloud.firestore {
       return fileType in ["image/jpeg", "image/png", "image/webp", "video/mp4"];
     }
 
+    function isValidBackupDownloadUrl(userId, value) {
+      return value is string
+        && value.matches('https://firebasestorage.googleapis.com/v0/b/[^/]+/o/users%2F' + userId + '%2Fbackups%2F.*');
+    }
+
+    function isOptionalValidBackupDownloadUrl(userId, fieldName) {
+      return !request.resource.data.keys().hasAny([fieldName])
+        || request.resource.data[fieldName] == null
+        || isValidBackupDownloadUrl(userId, request.resource.data[fieldName]);
+    }
+
+    function isValidPhotoBackupUrls(userId) {
+      return isOptionalValidBackupDownloadUrl(userId, "uri")
+        && isOptionalValidBackupDownloadUrl(userId, "downloadURL")
+        && isOptionalValidBackupDownloadUrl(userId, "previewUri");
+    }
+
+    function isValidVideoBackupUrls(userId) {
+      return isOptionalValidBackupDownloadUrl(userId, "uri")
+        && isOptionalValidBackupDownloadUrl(userId, "downloadURL");
+    }
+
     function isValidReservedBackupContentType(mediaKind, contentType) {
       return (mediaKind == "image" && contentType.matches('image/(jpeg|jpg|png|webp)'))
         || (mediaKind == "video" && contentType == "video/mp4");
@@ -166,14 +188,9 @@ service cloud.firestore {
 
     function photoBackupMutableKeys() {
       return [
-        "uri",
         "localUri",
-        "previewUri",
         "localPreviewUri",
         "localFileStatus",
-        "downloadURL",
-        "fileSize",
-        "fileType",
         "backupStatus",
         "backupEnabledAt",
         "lastBackedUpAt",
@@ -283,7 +300,6 @@ service cloud.firestore {
 
     function videoBackupMutableKeys() {
       return [
-        "uri",
         "localUri",
         "coverUri",
         "updatedAt",
@@ -297,9 +313,6 @@ service cloud.firestore {
         "durations",
         "musicId",
         "musicLabel",
-        "downloadURL",
-        "fileSize",
-        "fileType",
         "backupStatus",
         "backupEnabledAt",
         "lastBackedUpAt",
@@ -383,6 +396,7 @@ service cloud.firestore {
         && isValidBackupFileSize(request.resource.data.fileSize)
         && isValidBackupFileType(request.resource.data.fileType)
         && request.resource.data.fileType.matches('image/.*')
+        && isValidPhotoBackupUrls(userId)
         && hasValidBackupSessionId()
         && hasReservedTypedBackupUploadSession(
           userId,
@@ -423,6 +437,7 @@ service cloud.firestore {
         && isValidBackupStoragePath(userId, request.resource.data.storagePath)
         && isValidBackupFileSize(request.resource.data.fileSize)
         && request.resource.data.fileType == "video/mp4"
+        && isValidVideoBackupUrls(userId)
         && hasValidBackupSessionId()
         && hasReservedTypedBackupUploadSession(
           userId,
@@ -454,12 +469,15 @@ service cloud.firestore {
         && isValidBackupFileSize(request.resource.data.fileSize)
         && isValidBackupFileType(request.resource.data.fileType)
         && request.resource.data.fileType.matches('image/.*')
+        && isValidPhotoBackupUrls(userId)
         && hasValidBackupSessionId()
         && isValidBackupStatus(request.resource.data.backupStatus)
         && request.resource.data.userId == resource.data.userId
         && request.resource.data.localId == resource.data.localId
         && request.resource.data.storagePath == resource.data.storagePath
         && request.resource.data.backupSessionId == resource.data.backupSessionId
+        && request.resource.data.fileSize == resource.data.fileSize
+        && request.resource.data.fileType == resource.data.fileType
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(photoBackupMutableKeys());
     }
 
@@ -483,12 +501,15 @@ service cloud.firestore {
         && isValidBackupStoragePath(userId, request.resource.data.storagePath)
         && isValidBackupFileSize(request.resource.data.fileSize)
         && request.resource.data.fileType == "video/mp4"
+        && isValidVideoBackupUrls(userId)
         && hasValidBackupSessionId()
         && isValidBackupStatus(request.resource.data.backupStatus)
         && request.resource.data.userId == resource.data.userId
         && request.resource.data.localId == resource.data.localId
         && request.resource.data.storagePath == resource.data.storagePath
         && request.resource.data.backupSessionId == resource.data.backupSessionId
+        && request.resource.data.fileSize == resource.data.fileSize
+        && request.resource.data.fileType == resource.data.fileType
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(videoBackupMutableKeys());
     }
 

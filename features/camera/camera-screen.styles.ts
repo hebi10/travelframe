@@ -870,7 +870,7 @@ export const styles = StyleSheet.create({
     gap: 30,
     paddingTop: 10,
     paddingHorizontal: CAMERA_CONTROL_HORIZONTAL_PADDING,
-    backgroundColor: "rgba(0, 0, 0, 0.52)"
+    backgroundColor: "rgba(0, 0, 0, 0.4)"
   },
   captureRow: {
     width: "100%",

@@ -47,4 +47,26 @@ for (const [label, source] of [
   );
 }
 
+for (const [label, source] of [
+  ["account", accountSource],
+  ["settings", settingsSource]
+]) {
+  assert.match(
+    source,
+    /const handleGoogleSignIn = \(\) => \{\s*if \(isGoogleSubmitting\) \{\s*return;\s*\}/,
+    `${label} Google login handler should ignore re-entry while a Google login is in progress`
+  );
+}
+
+assert.match(
+  helperSource,
+  /Boolean\(androidClientId\)/,
+  "Android Google AuthSession should be configured by the Android client id actually used for the request"
+);
+assert.doesNotMatch(
+  helperSource,
+  /Boolean\(webClientId && androidClientId\)/,
+  "Android Google AuthSession should not require an unused web client id"
+);
+
 console.log("ok - Google login flow is shared by account and settings");

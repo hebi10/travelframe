@@ -49,8 +49,8 @@ for (const snippet of [
 }
 
 for (const snippet of [
-  "void updateAppSettings({ cameraRatio: nextRatio })",
-  "void updateAppSettings({ cameraSaveScope: nextScope })"
+  "queueAppSettingsUpdate({ cameraRatio: nextRatio })",
+  "queueAppSettingsUpdate({ cameraSaveScope: nextScope })"
 ]) {
   assert.ok(cameraSource.includes(snippet), `camera settings should persist: ${snippet}`);
 }

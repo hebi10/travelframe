@@ -52,13 +52,41 @@ assert.ok(
 );
 
 assert.ok(
+  source.includes("Get-LastAndroidVersionCode"),
+  "AAB script should read the last local versionCode state in a named helper"
+);
+
+assert.ok(
+  source.includes('$PSBoundParameters.ContainsKey("VersionCode")') &&
+    source.includes("must be greater than the previous local AAB versionCode"),
+  "AAB script should reject manual -VersionCode values that do not increase .android-version-code"
+);
+
+assert.ok(
   source.includes("Set-RequiredBuildGradleReplacement"),
   "AAB script should fail when required build.gradle replacements do not match exactly once"
 );
 
 assert.ok(
+  source.includes("function Set-ReleaseBuildSigningConfig"),
+  "AAB script should handle release signingConfig mutation in a named helper"
+);
+
+assert.ok(
+  source.includes("if ($releaseSigningConfigMatches.Count -eq 1) {") &&
+    source.includes("return $BuildGradle"),
+  "AAB script should accept a prebuild file that already uses signingConfigs.release"
+);
+
+assert.ok(
   source.includes("Assert-AndroidAabBuildGradle"),
   "AAB script should validate generated build.gradle after prebuild mutation"
+);
+
+assert.ok(
+  source.includes("Assert-AndroidR8MappingFile") &&
+    source.includes("R8 mapping file was not found"),
+  "AAB script should fail release candidate builds when R8 mapping.txt is missing"
 );
 
 assert.ok(

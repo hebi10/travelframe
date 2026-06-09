@@ -105,7 +105,8 @@ for (const snippet of [
   "const [cameraControlsHeight, setCameraControlsHeight] = useState(0)",
   "cameraControlsHeight + CAMERA_PREVIEW_CONTROL_GAP",
   "setCameraControlsHeight((currentHeight) =>",
-  "const latestTopWithoutBottomOverlap = height - cameraPreviewBottomOffset - boundedFrameHeight;"
+  "const availablePreviewHeight = Math.max(0, height - cameraPreviewTopOffset - cameraPreviewBottomOffset);",
+  "const frameFitsAboveControls = boundedFrameHeight <= availablePreviewHeight;"
 ]) {
   assert.ok(cameraSource.includes(snippet), `camera preview should reserve measured controls height: ${snippet}`);
 }
