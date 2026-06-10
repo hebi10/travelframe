@@ -36,8 +36,9 @@ for (const snippet of [
   "const boundedFrameHeight = Math.min(frameHeight, height);",
   "const availablePreviewHeight = Math.max(0, height - cameraPreviewTopOffset - cameraPreviewBottomOffset);",
   "const frameFitsAboveControls = boundedFrameHeight <= availablePreviewHeight;",
-  "const frameTop = Math.max(",
-  "Math.max(cameraPreviewTopOffset,",
+  "const preferredFrameTop = frameFitsAboveControls",
+  "const latestFrameTop = height - boundedFrameHeight;",
+  "Math.min(latestFrameTop,",
   "cameraPreviewTopOffset + Math.round((availablePreviewHeight - boundedFrameHeight) / 2)",
   "Math.round((height - boundedFrameHeight) / 2)",
   "width: \"100%\"",
@@ -99,7 +100,8 @@ assert.ok(
 );
 assert.ok(
   !cameraSource.includes("latestTopWithoutBottomOverlap") &&
-    !cameraSource.includes("Math.min(cameraPreviewTopReserved"),
+    !cameraSource.includes("Math.min(cameraPreviewTopReserved") &&
+    !cameraSource.includes("Math.max(cameraPreviewTopOffset, preferredFrameTop)"),
   "camera preview should center in the non-capture area instead of pinning near the top"
 );
 

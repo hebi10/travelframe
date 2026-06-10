@@ -12,7 +12,8 @@ for (const snippet of [
   "cameraTopBarHeight + CAMERA_PREVIEW_CONTROL_GAP",
   "Math.max(insets.top + 56, CAMERA_PREVIEW_TOP_RESERVED)",
   "const availablePreviewHeight = Math.max(0, height - cameraPreviewTopOffset - cameraPreviewBottomOffset);",
-  "Math.max(cameraPreviewTopOffset,",
+  "const latestFrameTop = height - boundedFrameHeight;",
+  "Math.min(latestFrameTop, preferredFrameTop)",
   "top: frameTop",
   "setCameraTopBarHeight((currentHeight) =>"
 ]) {
@@ -28,7 +29,8 @@ for (const snippet of [
   "...pendingSettingsPatchRef.current",
   "...updates",
   "await updateAppSettings(nextPatch);",
-  "const queueAppSettingsUpdate = useCallback((updates: CameraSettingsPatch) =>",
+  "const queueAppSettingsUpdate = useCallback(",
+  "(updates: CameraSettingsPatch) =>",
   "settingsSaveChainRef.current = settingsSaveChainRef.current.then(",
   "queueAppSettingsUpdate({ cameraZoomPercent: nextZoom })",
   "queueAppSettingsUpdate({ cameraTorchEnabled: nextEnabled })",
@@ -40,10 +42,11 @@ for (const snippet of [
 
 for (const snippet of [
   "const cameraLightAvailable = cameraFacing === \"back\" && cameraDevice?.hasTorch === true;",
+  "const cameraLightReady = cameraNativeControlsReady && cameraLightAvailable;",
   "const visibleTorchEnabled = cameraLightAvailable && torchEnabled;",
-  "const cameraTorchMode = cameraNativeControlsReady && cameraLightAvailable",
-  "const nextEnabled = cameraLightAvailable && enabled;",
-  "disabled={!cameraLightAvailable}",
+  "const cameraTorchMode = cameraLightReady",
+  "const nextEnabled = cameraLightReady && enabled;",
+  "disabled={!cameraLightReady}",
   "visibleTorchEnabled && styles.cameraInstantControlButtonActive",
   "valueLabel={visibleTorchEnabled ?"
 ]) {

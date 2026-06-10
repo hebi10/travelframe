@@ -9,6 +9,7 @@ import {
   type AppStateStatus,
   Image as NativeImage,
   Linking,
+  type LayoutChangeEvent,
   Modal,
   Pressable,
   ScrollView,
@@ -162,7 +163,6 @@ const cameraRatioAspect: Record<PhotoRatioLabel, number | null> = {
 };
 const CAMERA_PREVIEW_TOP_RESERVED = 88;
 const CAMERA_PREVIEW_BOTTOM_RESERVED = 158;
-const CAMERA_PREVIEW_FLOATING_BOTTOM_RESERVED = 218;
 const CAMERA_PREVIEW_OVERLAY_SETUP_BOTTOM_RESERVED = 238;
 const CAMERA_PREVIEW_CONTROL_GAP = 12;
 
@@ -512,8 +512,9 @@ export default function CameraScreen() {
     !cameraRecoveryPending;
   const cameraNativeControlsReady = isCameraSessionActive && isCameraReady;
   const cameraLightAvailable = cameraFacing === "back" && cameraDevice?.hasTorch === true;
+  const cameraLightReady = cameraNativeControlsReady && cameraLightAvailable;
   const visibleTorchEnabled = cameraLightAvailable && torchEnabled;
-  const cameraTorchMode = cameraNativeControlsReady && cameraLightAvailable
+  const cameraTorchMode = cameraLightReady
     ? torchEnabled ? "on" : "off"
     : undefined;
   const cameraNativeZoom = cameraNativeControlsReady ? cameraZoomFactor : undefined;
@@ -525,11 +526,10 @@ export default function CameraScreen() {
       : Math.max(insets.top + 56, CAMERA_PREVIEW_TOP_RESERVED);
   const cameraPreviewBottomReserved = overlaySetupActive
     ? CAMERA_PREVIEW_OVERLAY_SETUP_BOTTOM_RESERVED
-    : activeCameraControlPanel === "zoom"
-      ? CAMERA_PREVIEW_FLOATING_BOTTOM_RESERVED
-      : CAMERA_PREVIEW_BOTTOM_RESERVED;
-  const cameraPreviewBottomOffset =
-    cameraControlsHeight > 0
+    : CAMERA_PREVIEW_BOTTOM_RESERVED;
+  const cameraPreviewBottomOffset = overlaySetupActive
+    ? bottomSafePadding + cameraPreviewBottomReserved
+    : cameraControlsHeight > 0
       ? cameraControlsHeight + CAMERA_PREVIEW_CONTROL_GAP
       : bottomSafePadding + cameraPreviewBottomReserved;
   const cameraPreviewViewportStyle = useMemo(
@@ -557,7 +557,11 @@ export default function CameraScreen() {
     const preferredFrameTop = frameFitsAboveControls
       ? cameraPreviewTopOffset + Math.round((availablePreviewHeight - boundedFrameHeight) / 2)
       : Math.round((height - boundedFrameHeight) / 2);
-    const frameTop = Math.max(cameraPreviewTopOffset, preferredFrameTop);
+    const latestFrameTop = height - boundedFrameHeight;
+    const frameTop = Math.max(
+      0,
+      Math.min(latestFrameTop, preferredFrameTop)
+    );
 
     return {
       width: "100%" as const,
@@ -776,17 +780,17 @@ export default function CameraScreen() {
       queueAppSettingsUpdate({ cameraZoomPercent: nextZoom });
       void triggerFeedback();
     },
-    [cameraDevice, triggerFeedback]
+    [cameraDevice, queueAppSettingsUpdate, triggerFeedback]
   );
 
   const setLightEnabled = useCallback(
     (enabled: boolean) => {
-      const nextEnabled = cameraLightAvailable && enabled;
+      const nextEnabled = cameraLightReady && enabled;
       setTorchEnabled(nextEnabled);
       queueAppSettingsUpdate({ cameraTorchEnabled: nextEnabled });
       void triggerFeedback();
     },
-    [cameraLightAvailable, queueAppSettingsUpdate, triggerFeedback]
+    [cameraLightReady, queueAppSettingsUpdate, triggerFeedback]
   );
 
   const applyCameraExposureBias = useCallback(
@@ -847,10 +851,10 @@ export default function CameraScreen() {
   const handleCameraFocusError = useCallback((error: unknown) => {
     if (__DEV__) console.warn("[camera] focus update failed", error);
     setErrorMessage(getUserFacingErrorMessage(error, "카메라 초점을 맞추지 못했습니다."));
-  }, [queueAppSettingsUpdate]);
+  }, []);
   const handleCameraTap = useCallback(
     (x: number, y: number) => {
-      if (cameraFocusLockedRef.current) {
+      if (!isCameraReady || !cameraDevice || !cameraRef.current || cameraFocusLockedRef.current) {
         return;
       }
 
@@ -873,10 +877,10 @@ export default function CameraScreen() {
       void triggerFeedback();
       scheduleFocusControlsDismiss();
     },
-    [cameraDevice, cameraFrame, handleCameraFocusError, scheduleFocusControlsDismiss, showFocusControls, triggerFeedback]
+    [cameraDevice, cameraFrame, handleCameraFocusError, isCameraReady, scheduleFocusControlsDismiss, showFocusControls, triggerFeedback]
   );
   const toggleCameraFocusLock = useCallback(() => {
-    if (!cameraFocusTap) {
+    if (!isCameraReady || !cameraDevice || !cameraRef.current || !cameraFocusTap) {
       return;
     }
 
@@ -899,7 +903,7 @@ export default function CameraScreen() {
     }
 
     void triggerFeedback();
-  }, [cameraDevice, cameraFocusTap, cancelFocusControlsDismiss, handleCameraFocusError, scheduleFocusControlsDismiss, triggerFeedback]);
+  }, [cameraDevice, cameraFocusTap, cancelFocusControlsDismiss, handleCameraFocusError, isCameraReady, scheduleFocusControlsDismiss, triggerFeedback]);
   const changeCameraFacing = useCallback((value: CameraFacing) => {
     setCameraFacing(value);
     setIsCameraReady(false);
@@ -913,7 +917,7 @@ export default function CameraScreen() {
     }
 
     queueAppSettingsUpdate({ cameraFacing: value });
-  }, []);
+  }, [queueAppSettingsUpdate]);
   const updateCameraRatio = (nextRatio: PhotoRatioLabel) => {
     setCameraRatio(nextRatio);
     queueAppSettingsUpdate({ cameraRatio: nextRatio });
@@ -1263,6 +1267,20 @@ export default function CameraScreen() {
     setActiveCameraControlPanel((current) => (current === "zoom" ? null : "zoom"));
     void triggerFeedback();
   };
+
+  const handleCameraTopBarLayout = useCallback((event: LayoutChangeEvent) => {
+    const nextHeight = Math.ceil(event.nativeEvent.layout.height);
+    setCameraTopBarHeight((currentHeight) =>
+      currentHeight === nextHeight ? currentHeight : nextHeight
+    );
+  }, []);
+
+  const handleCameraBottomTrayLayout = useCallback((event: LayoutChangeEvent) => {
+    const nextHeight = Math.ceil(event.nativeEvent.layout.height);
+    setCameraControlsHeight((currentHeight) =>
+      currentHeight === nextHeight ? currentHeight : nextHeight
+    );
+  }, []);
 
   const cameraSwipeGesture = useMemo(
     () =>
@@ -1771,7 +1789,10 @@ export default function CameraScreen() {
       ) : null}
 
       {!isGuidePositionAdjusting && !isGridLineControlAdjusting ? (
-        <View style={[styles.topBar, { paddingTop: insets.top + 12 }]}>
+        <View
+          style={[styles.topBar, { paddingTop: insets.top + 12 }]}
+          onLayout={handleCameraTopBarLayout}
+        >
           <Pressable
             style={styles.accountIconButton}
             onPress={() => router.push("/account")}
@@ -1823,8 +1844,9 @@ export default function CameraScreen() {
             <Pressable
               style={[
                 styles.cameraInstantControlButton,
-                torchEnabled && styles.cameraInstantControlButtonActive
+                visibleTorchEnabled && styles.cameraInstantControlButtonActive
               ]}
+              disabled={!cameraLightReady}
               onPress={() => setLightEnabled(!torchEnabled)}
               accessibilityRole="button"
               accessibilityLabel="라이트 켜기 끄기"
@@ -1886,6 +1908,7 @@ export default function CameraScreen() {
                           cameraFacing === option.value && styles.optionButtonActive
                         ]}
                         onPress={() => changeCameraFacing(option.value)}
+                        accessibilityState={{ selected: cameraFacing === option.value }}
                       >
                         <Text
                           selectable={false}
@@ -1912,6 +1935,7 @@ export default function CameraScreen() {
                           shutterTimer === option.value && styles.optionButtonActive
                         ]}
                         onPress={() => setShutterTimer(option.value)}
+                        accessibilityState={{ selected: shutterTimer === option.value }}
                       >
                         <Text
                           selectable={false}
@@ -1938,6 +1962,7 @@ export default function CameraScreen() {
                           flashMode === option.value && styles.optionButtonActive
                         ]}
                         onPress={() => setFlashMode(option.value)}
+                        accessibilityState={{ selected: flashMode === option.value }}
                       >
                         <Text
                           selectable={false}
@@ -1954,8 +1979,9 @@ export default function CameraScreen() {
                   <CameraSettingToggleRow
                     title="손전등"
                     detail="어두운 곳에서 계속 켜지는 보조 조명입니다."
-                    valueLabel={torchEnabled && cameraFacing === "back" ? "켜짐" : "꺼짐"}
-                    disabled={cameraFacing === "front"}
+                    valueLabel={visibleTorchEnabled ? "켜짐" : "꺼짐"}
+                    disabled={!cameraLightReady}
+                    selected={visibleTorchEnabled}
                     onPress={() => setLightEnabled(!torchEnabled)}
                   />
                 </View>
@@ -1971,6 +1997,7 @@ export default function CameraScreen() {
                           photoQuality === option.value && styles.optionButtonActive
                         ]}
                         onPress={() => setPhotoQuality(option.value)}
+                        accessibilityState={{ selected: photoQuality === option.value }}
                       >
                         <Text
                           selectable={false}
@@ -1997,6 +2024,7 @@ export default function CameraScreen() {
                           cameraRatio === option.value && styles.optionButtonActive
                         ]}
                         onPress={() => updateCameraRatio(option.value)}
+                        accessibilityState={{ selected: cameraRatio === option.value }}
                       >
                         <Text
                           selectable={false}
@@ -2023,6 +2051,7 @@ export default function CameraScreen() {
                           cameraSaveScope === option.value && styles.optionButtonActive
                         ]}
                         onPress={() => updateCameraSaveScope(option.value)}
+                        accessibilityState={{ selected: cameraSaveScope === option.value }}
                       >
                         <Text
                           selectable={false}
@@ -2051,12 +2080,14 @@ export default function CameraScreen() {
                     title="가이드 표시"
                     detail="현재 선택한 구도 가이드를 카메라 위에 표시합니다."
                     valueLabel={guideVisible ? "켜짐" : "꺼짐"}
+                    selected={guideVisible}
                     onPress={() => updateGuideVisibility(!guideVisible)}
                   />
                   <CameraSettingToggleRow
                     title="햅틱 피드백"
                     detail="촬영과 주요 조작 시 짧은 진동 피드백을 사용합니다."
                     valueLabel={hapticEnabled ? "켜짐" : "꺼짐"}
+                    selected={hapticEnabled}
                     onPress={() => setHapticEnabled((value) => !value)}
                   />
                 </View>
@@ -2100,6 +2131,7 @@ export default function CameraScreen() {
                         onPress={() => {
                           updateGuideType(type);
                         }}
+                        accessibilityState={{ selected: guide === type }}
                       >
                         <Text
                           selectable={false}
@@ -2126,6 +2158,7 @@ export default function CameraScreen() {
                           guideSize === option.value && styles.optionButtonActive
                         ]}
                         onPress={() => applyGuideSize(option.value)}
+                        accessibilityState={{ selected: guideSize === option.value }}
                       >
                         <Text
                           selectable={false}
@@ -2187,6 +2220,7 @@ export default function CameraScreen() {
                           key={strokeWidth}
                           style={[styles.optionButton, isActive && styles.optionButtonActive]}
                           onPress={() => updateGuideStrokeWidth(strokeWidth)}
+                          accessibilityState={{ selected: isActive }}
                         >
                           <Text
                             selectable={false}
@@ -2211,6 +2245,7 @@ export default function CameraScreen() {
                           guideColor === option.value && styles.colorOptionActive
                         ]}
                         onPress={() => updateGuideColor(option.value)}
+                        accessibilityState={{ selected: guideColor === option.value }}
                       >
                         <View style={[styles.colorSwatch, { backgroundColor: option.value }]} />
                         <Text selectable={false} style={styles.colorLabel}>{option.label}</Text>
@@ -2222,6 +2257,7 @@ export default function CameraScreen() {
                 <Pressable
                   style={[styles.visibilityButton, guideVisible && styles.visibilityButtonActive]}
                   onPress={() => updateGuideVisibility(!guideVisible)}
+                  accessibilityState={{ selected: guideVisible }}
                 >
                   <Text
                     selectable={false}
@@ -2240,15 +2276,7 @@ export default function CameraScreen() {
       </Modal>
 
       {!isCameraModalOpen && !isGuidePositionAdjusting && !isGridLineControlAdjusting ? (
-        <View
-          style={controlsStyle}
-          onLayout={(event) => {
-            const nextHeight = Math.ceil(event.nativeEvent.layout.height);
-            setCameraControlsHeight((currentHeight) =>
-              currentHeight === nextHeight ? currentHeight : nextHeight
-            );
-          }}
-        >
+        <View style={controlsStyle}>
           {errorMessage ? <Text selectable style={styles.errorText}>{errorMessage}</Text> : null}
 
           {overlaySetupActive && referenceUri ? (
@@ -2344,7 +2372,10 @@ export default function CameraScreen() {
                 </View>
               ) : null}
 
-              <View style={[styles.cameraControlBottomTray, { paddingBottom: bottomSafePadding }]}>
+              <View
+                style={[styles.cameraControlBottomTray, { paddingBottom: bottomSafePadding }]}
+                onLayout={handleCameraBottomTrayLayout}
+              >
                 <View style={styles.captureRow}>
                   <Pressable
                     style={styles.galleryButton}
@@ -2369,6 +2400,12 @@ export default function CameraScreen() {
                       (!isCameraReady || isCapturing || !cameraDevice) && styles.shutterDisabled
                     ]}
                     onPress={takePhoto}
+                    accessibilityRole="button"
+                    accessibilityLabel="사진 촬영"
+                    accessibilityState={{
+                      disabled: !isCameraReady || isCapturing || !cameraDevice,
+                      busy: isCapturing
+                    }}
                   >
                     <View style={styles.shutterInner} />
                   </Pressable>

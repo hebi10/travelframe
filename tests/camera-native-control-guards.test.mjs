@@ -11,11 +11,14 @@ for (const snippet of [
   "const cameraNativeControlsReady = isCameraSessionActive && isCameraReady;",
   "if (cameraDevice && !cameraDevice.hasTorch && torchEnabled)",
   "const cameraLightAvailable = cameraFacing === \"back\" && cameraDevice?.hasTorch === true;",
+  "const cameraLightReady = cameraNativeControlsReady && cameraLightAvailable;",
   "const visibleTorchEnabled = cameraLightAvailable && torchEnabled;",
-  "const nextEnabled = cameraLightAvailable && enabled;",
-  "const cameraTorchMode = cameraNativeControlsReady && cameraLightAvailable",
+  "const nextEnabled = cameraLightReady && enabled;",
+  "const cameraTorchMode = cameraLightReady",
   "const cameraNativeZoom = cameraNativeControlsReady ? cameraZoomFactor : undefined;",
   "const cameraNativeExposure = cameraNativeControlsReady ? cameraExposureBias : undefined;",
+  "if (!isCameraReady || !cameraDevice || !cameraRef.current || cameraFocusLockedRef.current)",
+  "disabled={!cameraLightReady}",
   "torchMode={cameraTorchMode}",
   "zoom={cameraNativeZoom}",
   "exposure={cameraNativeExposure}"
@@ -25,6 +28,7 @@ for (const snippet of [
 
 for (const unsafeSnippet of [
   'torchMode={torchEnabled && cameraDevice.hasTorch ? "on" : "off"}',
+  "const nextEnabled = cameraLightAvailable && enabled;",
   "const nextEnabled = cameraFacing === \"back\" && enabled;",
   "zoom={cameraZoomFactor}",
   "exposure={cameraExposureBias}"

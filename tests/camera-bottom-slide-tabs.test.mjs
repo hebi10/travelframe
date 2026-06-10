@@ -26,6 +26,8 @@ for (const snippet of [
   "styles.cameraFloatingPanelWrap",
   "styles.cameraFloatingPanelRaised",
   "styles.cameraControlBottomTray",
+  "const handleCameraBottomTrayLayout = useCallback(",
+  "onLayout={handleCameraBottomTrayLayout}",
   "styles.cameraControlPage",
   "FadeIn",
   "entering={FadeIn.duration(140)}"
@@ -73,6 +75,7 @@ for (const removed of [
   "styles.cameraControlPager",
   "FadeOut",
   "exiting={",
+  "CAMERA_PREVIEW_FLOATING_BOTTOM_RESERVED",
   "const CAMERA_ZOOM_PRESETS = [",
   "guideVisible && !referenceUri && styles.quickPillButtonActive",
   "guideVisible && !referenceUri && styles.quickPillTextActive",
@@ -104,12 +107,17 @@ assert.ok(
 for (const snippet of [
   "const [cameraControlsHeight, setCameraControlsHeight] = useState(0)",
   "cameraControlsHeight + CAMERA_PREVIEW_CONTROL_GAP",
-  "setCameraControlsHeight((currentHeight) =>",
+  "const nextHeight = Math.ceil(event.nativeEvent.layout.height);",
   "const availablePreviewHeight = Math.max(0, height - cameraPreviewTopOffset - cameraPreviewBottomOffset);",
   "const frameFitsAboveControls = boundedFrameHeight <= availablePreviewHeight;"
 ]) {
   assert.ok(cameraSource.includes(snippet), `camera preview should reserve measured controls height: ${snippet}`);
 }
+
+assert.ok(
+  !cameraSource.includes('activeCameraControlPanel === "zoom"\n      ? CAMERA_PREVIEW_FLOATING_BOTTOM_RESERVED'),
+  "zoom overlay should not change the camera preview bottom reservation"
+);
 
 for (const snippet of [
   "cameraZoomPercent: number;",
