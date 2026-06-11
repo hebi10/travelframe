@@ -9,12 +9,12 @@ const cameraRenderSource = cameraSource.slice(
 
 for (const snippet of [
   "const cameraNativeControlsReady = isCameraSessionActive && isCameraReady;",
-  "function getCameraDeviceFilter(cameraFacing: CameraPosition, preferTorch = false)",
-  "return { physicalDevices: preferTorch ? [CAMERA_LENS_WIDE] : CAMERA_BACK_PHYSICAL_DEVICES };",
+  "function getCameraDeviceFilter(cameraFacing: CameraPosition)",
+  "return { physicalDevices: CAMERA_BACK_PHYSICAL_DEVICES };",
   "function getPreferredCameraDevice(",
   "cameraDevices.filter((device) => device.position === \"back\" && device.hasTorch)",
   "torchDevices.find((device) => cameraDeviceHasLens(device, CAMERA_LENS_WIDE))",
-  "getPreferredCameraDevice(cameraDevices, cameraFacing, torchEnabled)",
+  "getPreferredCameraDevice(cameraDevices, cameraFacing)",
   "const cameraLightAvailable = cameraFacing === \"back\" && Boolean(cameraDevice);",
   "const visibleTorchEnabled = cameraLightAvailable && torchEnabled;",
   "const nextEnabled = cameraLightAvailable && enabled;",
@@ -42,6 +42,7 @@ for (const unsafeSnippet of [
   "torchMode={cameraTorchMode}",
   "if (cameraDevice && !cameraDevice.hasTorch && torchEnabled)",
   "useCameraDevice(cameraFacing, cameraDeviceFilter)",
+  "cameraTorchDevicePinned",
   "const nextEnabled = cameraFacing === \"back\" && enabled;",
   ".focusTo(tap, {",
   ".resetFocus().catch(handleCameraFocusError)",

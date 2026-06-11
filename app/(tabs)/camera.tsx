@@ -228,20 +228,19 @@ function cameraDeviceHasLens(cameraDevice: CameraDevice, lens: PhysicalDeviceTyp
   return cameraDevice.physicalDevices?.some((physicalDevice) => physicalDevice.type === lens) === true;
 }
 
-function getCameraDeviceFilter(cameraFacing: CameraPosition, preferTorch = false): DeviceFilter | undefined {
+function getCameraDeviceFilter(cameraFacing: CameraPosition): DeviceFilter | undefined {
   if (cameraFacing === "front") {
     return undefined;
   }
 
-  return { physicalDevices: preferTorch ? [CAMERA_LENS_WIDE] : CAMERA_BACK_PHYSICAL_DEVICES };
+  return { physicalDevices: CAMERA_BACK_PHYSICAL_DEVICES };
 }
 
 function getPreferredCameraDevice(
   cameraDevices: CameraDevice[],
-  cameraFacing: CameraPosition,
-  preferTorch = false
+  cameraFacing: CameraPosition
 ) {
-  if (cameraFacing === "back" && preferTorch) {
+  if (cameraFacing === "back") {
     const torchDevices = cameraDevices.filter((device) => device.position === "back" && device.hasTorch);
     const wideTorchDevice =
       torchDevices.find((device) => cameraDeviceHasLens(device, CAMERA_LENS_WIDE)) ?? torchDevices[0];
@@ -520,8 +519,8 @@ export default function CameraScreen() {
   );
   const cameraDevices = useCameraDevices();
   const cameraDevice = useMemo(
-    () => getPreferredCameraDevice(cameraDevices, cameraFacing, torchEnabled),
-    [cameraDevices, cameraFacing, torchEnabled]
+    () => getPreferredCameraDevice(cameraDevices, cameraFacing),
+    [cameraDevices, cameraFacing]
   );
   const availableCameraLenses = useMemo(
     () => getCameraDeviceLensTypes(cameraDevice),
@@ -683,7 +682,8 @@ export default function CameraScreen() {
         guideOffsetYValue.value = settings.guideOffsetY;
         setOverlayOpacity(settings.overlayOpacity);
         setZoomPercent(settings.cameraZoomPercent);
-        setTorchEnabled(settings.cameraTorchEnabled && settings.cameraFacing === "back");
+        const restoredTorchEnabled = settings.cameraTorchEnabled && settings.cameraFacing === "back";
+        setTorchEnabled(restoredTorchEnabled);
         setCameraFacing(settings.cameraFacing);
         setCameraRatio(settings.cameraRatio);
         setCameraSaveScope(settings.cameraSaveScope);

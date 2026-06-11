@@ -14,7 +14,7 @@ for (const snippet of [
   '"wide-angle"',
   '"telephoto"',
   "CAMERA_BACK_PHYSICAL_DEVICES",
-  "getPreferredCameraDevice(cameraDevices, cameraFacing, torchEnabled)",
+  "getPreferredCameraDevice(cameraDevices, cameraFacing)",
   "useCameraDevices()",
   "getCameraDeviceLensTypes(cameraDevice)",
   "availableCameraLenses",
