@@ -13,12 +13,15 @@ for (const snippet of [
   "const cameraLightAvailable = cameraFacing === \"back\" && cameraDevice?.hasTorch === true;",
   "const cameraLightReady = cameraNativeControlsReady && cameraLightAvailable;",
   "const visibleTorchEnabled = cameraLightAvailable && torchEnabled;",
-  "const nextEnabled = cameraLightReady && enabled;",
+  "const nextEnabled = cameraLightAvailable && enabled;",
   "const cameraTorchMode = cameraLightReady",
   "const cameraNativeZoom = cameraNativeControlsReady ? cameraZoomFactor : undefined;",
   "const cameraNativeExposure = cameraNativeControlsReady ? cameraExposureBias : undefined;",
-  "if (!isCameraReady || !cameraDevice || !cameraRef.current || cameraFocusLockedRef.current)",
-  "disabled={!cameraLightReady}",
+  "const runCameraFocusAction = useCallback(",
+  "try {",
+  "result.catch(handleCameraFocusError);",
+  "handleCameraFocusError(error);",
+  "disabled={!cameraLightAvailable}",
   "torchMode={cameraTorchMode}",
   "zoom={cameraNativeZoom}",
   "exposure={cameraNativeExposure}"
@@ -28,8 +31,9 @@ for (const snippet of [
 
 for (const unsafeSnippet of [
   'torchMode={torchEnabled && cameraDevice.hasTorch ? "on" : "off"}',
-  "const nextEnabled = cameraLightAvailable && enabled;",
   "const nextEnabled = cameraFacing === \"back\" && enabled;",
+  ".focusTo(tap, {",
+  ".resetFocus().catch(handleCameraFocusError)",
   "zoom={cameraZoomFactor}",
   "exposure={cameraExposureBias}"
 ]) {

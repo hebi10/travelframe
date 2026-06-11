@@ -45,8 +45,8 @@ for (const snippet of [
   "const cameraLightReady = cameraNativeControlsReady && cameraLightAvailable;",
   "const visibleTorchEnabled = cameraLightAvailable && torchEnabled;",
   "const cameraTorchMode = cameraLightReady",
-  "const nextEnabled = cameraLightReady && enabled;",
-  "disabled={!cameraLightReady}",
+  "const nextEnabled = cameraLightAvailable && enabled;",
+  "disabled={!cameraLightAvailable}",
   "visibleTorchEnabled && styles.cameraInstantControlButtonActive",
   "valueLabel={visibleTorchEnabled ?"
 ]) {

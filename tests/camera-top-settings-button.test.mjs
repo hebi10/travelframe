@@ -48,6 +48,20 @@ assert.ok(
   "camera settings should no longer be a standalone top-right-only button"
 );
 
+const topLightButtonSource = cameraSource.slice(
+  cameraSource.indexOf('accessibilityLabel="라이트 켜기 끄기"') - 280,
+  cameraSource.indexOf('accessibilityLabel="카메라 설정 열기"')
+);
+assert.ok(
+  topLightButtonSource.includes("onPress={() => setLightEnabled(!torchEnabled)}"),
+  "top light button should toggle the light setting directly"
+);
+assert.ok(
+  !topLightButtonSource.includes("disabled={!cameraLightReady}") &&
+    !topLightButtonSource.includes("disabled={!cameraLightAvailable}"),
+  "top light button should stay clickable even before native torch controls are ready"
+);
+
 for (const requiredStyleSnippet of [
   "left: 12",
   "right: 12",

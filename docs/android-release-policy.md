@@ -28,11 +28,13 @@ features:
 
 - `CAMERA`: camera capture.
 - `READ_EXTERNAL_STORAGE` and `WRITE_EXTERNAL_STORAGE`: legacy media access on Android 12 and lower.
-- `READ_MEDIA_IMAGES`, `READ_MEDIA_VIDEO`, and `READ_MEDIA_VISUAL_USER_SELECTED`: media picker and library access on Android 13+.
+- `READ_MEDIA_IMAGES` and `READ_MEDIA_VISUAL_USER_SELECTED`: image picker and library access on Android 13+.
 - `AD_ID`: Google Mobile Ads. Keep the Play Console advertising ID declaration aligned with this permission.
 
 `RECORD_AUDIO` is blocked because the app does not record microphone audio.
 `MODIFY_AUDIO_SETTINGS` is not requested unless a native audio-routing feature is added.
+The app does not request `READ_MEDIA_VIDEO` because current flows create videos
+inside the app but do not import videos from the user's external video library.
 
 Before Play Console upload, verify the merged release manifest with
 `npm run android:manifest:release` and confirm the Play Console permission and data

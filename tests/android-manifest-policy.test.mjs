@@ -34,6 +34,11 @@ assert.equal(
   "app config should not request MODIFY_AUDIO_SETTINGS unless a native audio-routing feature needs it"
 );
 assert.equal(
+  appConfig.expo?.android?.permissions?.includes("android.permission.READ_MEDIA_VIDEO"),
+  false,
+  "app config should not request READ_MEDIA_VIDEO unless users import videos from their library"
+);
+assert.equal(
   mainManifest.includes("android.permission.SYSTEM_ALERT_WINDOW"),
   false,
   "release manifest should not request SYSTEM_ALERT_WINDOW"
@@ -62,12 +67,16 @@ for (const snippet of [
   "EAS remote appVersionSource",
   "CAMERA",
   "READ_MEDIA_IMAGES",
-  "READ_MEDIA_VIDEO",
   "READ_MEDIA_VISUAL_USER_SELECTED",
   "AD_ID",
   "Play Console"
 ]) {
   assert.ok(releasePolicyDoc.includes(snippet), `Android release policy doc missing: ${snippet}`);
 }
+
+assert.ok(
+  releasePolicyDoc.includes("does not request `READ_MEDIA_VIDEO`"),
+  "Android release policy should document why video read access is not requested"
+);
 
 console.log("ok - Android release manifest avoids risky backup, permissions, and overlay settings");

@@ -151,6 +151,8 @@ export const defaultAppSettings: AppSettings = {
   imageBackupQuality: DEFAULT_IMAGE_QUALITY
 };
 
+let appSettingsUpdateChain: Promise<AppSettings> = Promise.resolve(defaultAppSettings);
+
 const themeModes: ThemeMode[] = ["light", "dark", "system"];
 const fontStyles: FontStyle[] = [
   "noto_sans_kr",
@@ -467,11 +469,16 @@ export const saveAppSettings = async (settings: AppSettings) => {
 };
 
 export const updateAppSettings = async (updates: Partial<AppSettings>) => {
-  const current = await getAppSettings();
-  return saveAppSettings({
-    ...current,
-    ...updates
-  });
+  const runUpdate = async () => {
+    const current = await getAppSettings();
+    return saveAppSettings({
+      ...current,
+      ...updates
+    });
+  };
+  const nextUpdate = appSettingsUpdateChain.then(runUpdate, runUpdate);
+  appSettingsUpdateChain = nextUpdate.catch(async () => getAppSettings());
+  return nextUpdate;
 };
 
 export const subscribeAppSettings = (listener: (settings: AppSettings) => void) => {

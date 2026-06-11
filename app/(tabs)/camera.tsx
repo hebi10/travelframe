@@ -1,4 +1,4 @@
-﻿import { Feather } from "@expo/vector-icons";
+import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 import { router, useFocusEffect } from "expo-router";
@@ -423,6 +423,10 @@ export default function CameraScreen() {
   const cameraExposureBiasRef = useRef(0);
   const focusIndicatorTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cameraRecoveryTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const timedCaptureTokenRef = useRef(0);
+  const isTimedCapturePendingRef = useRef(false);
+  const isCameraReadyRef = useRef(false);
+  const isCameraSessionActiveRef = useRef(false);
   const insets = useSafeAreaInsets();
   const bottomSafePadding = Math.max(insets.bottom + 10, 24);
   const bottomModalPadding = Math.max(insets.bottom + 18, 28);
@@ -461,7 +465,16 @@ export default function CameraScreen() {
     }
 
     pendingSettingsPatchRef.current = null;
-    await updateAppSettings(nextPatch);
+    try {
+      await updateAppSettings(nextPatch);
+    } catch (error) {
+      const pendingPatch = pendingSettingsPatchRef.current ?? {};
+      pendingSettingsPatchRef.current = {
+        ...nextPatch,
+        ...pendingPatch
+      };
+      throw error;
+    }
   }, []);
   const queueAppSettingsUpdate = useCallback(
     (updates: CameraSettingsPatch) => {
@@ -519,6 +532,22 @@ export default function CameraScreen() {
     : undefined;
   const cameraNativeZoom = cameraNativeControlsReady ? cameraZoomFactor : undefined;
   const cameraNativeExposure = cameraNativeControlsReady ? cameraExposureBias : undefined;
+  const cancelPendingTimedCapture = useCallback(() => {
+    if (!isTimedCapturePendingRef.current) {
+      return;
+    }
+
+    timedCaptureTokenRef.current += 1;
+    isTimedCapturePendingRef.current = false;
+    setCountdown(null);
+    setIsCapturing(false);
+  }, []);
+  const canCaptureWithCurrentSession = useCallback(
+    () =>
+      isCameraReadyRef.current &&
+      isCameraSessionActiveRef.current,
+    []
+  );
   const selectedCameraRatioAspect = cameraRatioAspect[cameraRatio] ?? undefined;
   const cameraPreviewTopOffset =
     cameraTopBarHeight > 0
@@ -585,13 +614,17 @@ export default function CameraScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      isCameraSessionActiveRef.current = true;
       setIsCameraScreenFocused(true);
 
       return () => {
+        isCameraSessionActiveRef.current = false;
+        isCameraReadyRef.current = false;
+        cancelPendingTimedCapture();
         setIsCameraScreenFocused(false);
         setIsCameraReady(false);
       };
-    }, [])
+    }, [cancelPendingTimedCapture])
   );
 
   useFocusEffect(
@@ -659,15 +692,32 @@ export default function CameraScreen() {
   );
 
   useEffect(() => {
+    isCameraReadyRef.current = isCameraReady;
+    if (!isCameraReady) {
+      cancelPendingTimedCapture();
+    }
+  }, [cancelPendingTimedCapture, isCameraReady]);
+
+  useEffect(() => {
+    isCameraSessionActiveRef.current = isCameraSessionActive;
+    if (!isCameraSessionActive) {
+      cancelPendingTimedCapture();
+    }
+  }, [cancelPendingTimedCapture, isCameraSessionActive]);
+
+  useEffect(() => {
     const subscription = AppState.addEventListener("change", (nextState) => {
       setAppState(nextState);
       if (nextState !== "active") {
+        isCameraSessionActiveRef.current = false;
+        isCameraReadyRef.current = false;
+        cancelPendingTimedCapture();
         setIsCameraReady(false);
       }
     });
 
     return () => subscription.remove();
-  }, []);
+  }, [cancelPendingTimedCapture]);
 
   const triggerFeedback = useCallback(async () => {
     if (!hapticEnabled) {
@@ -785,12 +835,12 @@ export default function CameraScreen() {
 
   const setLightEnabled = useCallback(
     (enabled: boolean) => {
-      const nextEnabled = cameraLightReady && enabled;
+      const nextEnabled = cameraLightAvailable && enabled;
       setTorchEnabled(nextEnabled);
       queueAppSettingsUpdate({ cameraTorchEnabled: nextEnabled });
       void triggerFeedback();
     },
-    [cameraLightReady, queueAppSettingsUpdate, triggerFeedback]
+    [cameraLightAvailable, queueAppSettingsUpdate, triggerFeedback]
   );
 
   const applyCameraExposureBias = useCallback(
@@ -852,9 +902,22 @@ export default function CameraScreen() {
     if (__DEV__) console.warn("[camera] focus update failed", error);
     setErrorMessage(getUserFacingErrorMessage(error, "카메라 초점을 맞추지 못했습니다."));
   }, []);
+  const runCameraFocusAction = useCallback(
+    (action: () => Promise<void> | void) => {
+      try {
+        const result = action();
+        if (result) {
+          void result.catch(handleCameraFocusError);
+        }
+      } catch (error) {
+        handleCameraFocusError(error);
+      }
+    },
+    [handleCameraFocusError]
+  );
   const handleCameraTap = useCallback(
     (x: number, y: number) => {
-      if (!isCameraReady || !cameraDevice || !cameraRef.current || cameraFocusLockedRef.current) {
+      if (!cameraDevice || !cameraRef.current || cameraFocusLockedRef.current) {
         return;
       }
 
@@ -868,19 +931,19 @@ export default function CameraScreen() {
       setCameraFocusLocked(false);
       setCameraFocusTap(tap);
       showFocusControls();
-      void cameraRef.current?.focusTo(tap, {
+      runCameraFocusAction(() => cameraRef.current?.focusTo(tap, {
         responsiveness: "snappy",
         adaptiveness: cameraFocusLockedRef.current ? "locked" : "continuous",
         autoResetAfter: cameraFocusLockedRef.current ? null : 5,
         modes: getCameraFocusMeteringModes(cameraDevice)
-      }).catch(handleCameraFocusError);
+      }));
       void triggerFeedback();
       scheduleFocusControlsDismiss();
     },
-    [cameraDevice, cameraFrame, handleCameraFocusError, isCameraReady, scheduleFocusControlsDismiss, showFocusControls, triggerFeedback]
+    [cameraDevice, cameraFrame, runCameraFocusAction, scheduleFocusControlsDismiss, showFocusControls, triggerFeedback]
   );
   const toggleCameraFocusLock = useCallback(() => {
-    if (!isCameraReady || !cameraDevice || !cameraRef.current || !cameraFocusTap) {
+    if (!cameraDevice || !cameraRef.current || !cameraFocusTap) {
       return;
     }
 
@@ -891,19 +954,19 @@ export default function CameraScreen() {
 
     if (nextLocked) {
       cancelFocusControlsDismiss();
-      void cameraRef.current?.focusTo(cameraFocusTap, {
+      runCameraFocusAction(() => cameraRef.current?.focusTo(cameraFocusTap, {
         responsiveness: "snappy",
         adaptiveness: "locked",
         autoResetAfter: null,
         modes: getCameraFocusMeteringModes(cameraDevice)
-      }).catch(handleCameraFocusError);
+      }));
     } else {
-      void cameraRef.current?.resetFocus().catch(handleCameraFocusError);
+      runCameraFocusAction(() => cameraRef.current?.resetFocus());
       scheduleFocusControlsDismiss();
     }
 
     void triggerFeedback();
-  }, [cameraDevice, cameraFocusTap, cancelFocusControlsDismiss, handleCameraFocusError, isCameraReady, scheduleFocusControlsDismiss, triggerFeedback]);
+  }, [cameraDevice, cameraFocusTap, cancelFocusControlsDismiss, runCameraFocusAction, scheduleFocusControlsDismiss, triggerFeedback]);
   const changeCameraFacing = useCallback((value: CameraFacing) => {
     setCameraFacing(value);
     setIsCameraReady(false);
@@ -1469,7 +1532,7 @@ export default function CameraScreen() {
   );
 
   const capturePhoto = async () => {
-    if (!cameraDevice || !isCameraReady || isCapturing) {
+    if (!cameraDevice || !canCaptureWithCurrentSession() || isCapturing) {
       return;
     }
 
@@ -1532,7 +1595,7 @@ export default function CameraScreen() {
   };
 
   const takePhoto = async () => {
-    if (!cameraDevice || !isCameraReady || isCapturing) {
+    if (!cameraDevice || !canCaptureWithCurrentSession() || isCapturing) {
       return;
     }
 
@@ -1541,17 +1604,34 @@ export default function CameraScreen() {
       return;
     }
 
+    const captureToken = timedCaptureTokenRef.current + 1;
+    timedCaptureTokenRef.current = captureToken;
+    isTimedCapturePendingRef.current = true;
+
     try {
       setIsCapturing(true);
       setErrorMessage(null);
       for (let remaining = shutterTimer; remaining > 0; remaining -= 1) {
+        if (timedCaptureTokenRef.current !== captureToken || !canCaptureWithCurrentSession()) {
+          return;
+        }
         setCountdown(remaining);
         await triggerFeedback();
         await sleep(1000);
+        if (timedCaptureTokenRef.current !== captureToken || !canCaptureWithCurrentSession()) {
+          return;
+        }
       }
     } finally {
+      if (timedCaptureTokenRef.current === captureToken) {
+        isTimedCapturePendingRef.current = false;
+      }
       setCountdown(null);
       setIsCapturing(false);
+    }
+
+    if (timedCaptureTokenRef.current !== captureToken || !canCaptureWithCurrentSession()) {
+      return;
     }
 
     await capturePhoto();
@@ -1629,12 +1709,17 @@ export default function CameraScreen() {
           getInitialZoom={() => cameraZoomFactor}
           getInitialExposureBias={() => cameraExposureBias}
           onStarted={() => {
+            isCameraReadyRef.current = true;
             setIsCameraReady(true);
             if (errorMessage === "카메라 연결이 불안정해 다시 시작합니다.") {
               setErrorMessage(null);
             }
           }}
-          onStopped={() => setIsCameraReady(false)}
+          onStopped={() => {
+            isCameraReadyRef.current = false;
+            cancelPendingTimedCapture();
+            setIsCameraReady(false);
+          }}
           onError={handleCameraSessionError}
         />
       ) : (
@@ -1846,7 +1931,6 @@ export default function CameraScreen() {
                 styles.cameraInstantControlButton,
                 visibleTorchEnabled && styles.cameraInstantControlButtonActive
               ]}
-              disabled={!cameraLightReady}
               onPress={() => setLightEnabled(!torchEnabled)}
               accessibilityRole="button"
               accessibilityLabel="라이트 켜기 끄기"
@@ -1980,7 +2064,7 @@ export default function CameraScreen() {
                     title="손전등"
                     detail="어두운 곳에서 계속 켜지는 보조 조명입니다."
                     valueLabel={visibleTorchEnabled ? "켜짐" : "꺼짐"}
-                    disabled={!cameraLightReady}
+                    disabled={!cameraLightAvailable}
                     selected={visibleTorchEnabled}
                     onPress={() => setLightEnabled(!torchEnabled)}
                   />
