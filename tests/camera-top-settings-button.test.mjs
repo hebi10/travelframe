@@ -26,7 +26,7 @@ for (const requiredSnippet of [
   "openLineGuideSettings",
   "openPhotoGuideSettings",
   "openZoomControls",
-  "setLightEnabled(!torchEnabled)",
+  "openLightControls",
   "onPress={openCameraSettingsMenu}",
   'accessibilityLabel="라인 가이드 설정 열기"',
   'accessibilityLabel="사진 오버레이 열기"',
@@ -53,13 +53,27 @@ const topLightButtonSource = cameraSource.slice(
   cameraSource.indexOf('accessibilityLabel="카메라 설정 열기"')
 );
 assert.ok(
-  topLightButtonSource.includes("onPress={() => setLightEnabled(!torchEnabled)}"),
-  "top light button should toggle the light setting directly"
+  topLightButtonSource.includes("onPress={openLightControls}"),
+  "top light button should open the bottom light controls"
 );
 assert.ok(
   !topLightButtonSource.includes("disabled={!cameraLightReady}") &&
     !topLightButtonSource.includes("disabled={!cameraLightAvailable}"),
   "top light button should stay clickable even before native torch controls are ready"
+);
+assert.ok(
+  cameraSource.includes('type CameraControlPanel = "zoom" | "light"'),
+  "camera controls should include a light panel"
+);
+assert.ok(
+  cameraSource.includes('activeCameraControlPanel === "light"') &&
+    cameraSource.includes('setActiveCameraControlPanel((current) => (current === "light" ? null : "light"))'),
+  "top light button should toggle the bottom light panel"
+);
+assert.ok(
+  cameraSource.includes("onPress={() => setLightEnabled(false)}") &&
+    cameraSource.includes("onPress={() => setLightEnabled(true)}"),
+  "bottom light panel should expose explicit off and on buttons"
 );
 
 for (const requiredStyleSnippet of [

@@ -9,12 +9,21 @@ const cameraRenderSource = cameraSource.slice(
 
 for (const snippet of [
   "const cameraNativeControlsReady = isCameraSessionActive && isCameraReady;",
-  "if (cameraDevice && !cameraDevice.hasTorch && torchEnabled)",
-  "const cameraLightAvailable = cameraFacing === \"back\" && cameraDevice?.hasTorch === true;",
-  "const cameraLightReady = cameraNativeControlsReady && cameraLightAvailable;",
+  "function getCameraDeviceFilter(cameraFacing: CameraPosition, preferTorch = false)",
+  "return { physicalDevices: preferTorch ? [CAMERA_LENS_WIDE] : CAMERA_BACK_PHYSICAL_DEVICES };",
+  "function getPreferredCameraDevice(",
+  "cameraDevices.filter((device) => device.position === \"back\" && device.hasTorch)",
+  "torchDevices.find((device) => cameraDeviceHasLens(device, CAMERA_LENS_WIDE))",
+  "getPreferredCameraDevice(cameraDevices, cameraFacing, torchEnabled)",
+  "const cameraLightAvailable = cameraFacing === \"back\" && Boolean(cameraDevice);",
   "const visibleTorchEnabled = cameraLightAvailable && torchEnabled;",
   "const nextEnabled = cameraLightAvailable && enabled;",
-  "const cameraTorchMode = cameraLightReady",
+  "const handleCameraTorchError = useCallback((error: unknown) =>",
+  "cameraRef.current?.controller?.setTorchMode(enabled ? \"on\" : \"off\")",
+  "void result.catch(handleCameraTorchError);",
+  "const cameraTorchAppliedRef = useRef(false);",
+  "if (!enabled && !cameraTorchAppliedRef.current) {",
+  "cameraTorchAppliedRef.current = true;",
   "const cameraNativeZoom = cameraNativeControlsReady ? cameraZoomFactor : undefined;",
   "const cameraNativeExposure = cameraNativeControlsReady ? cameraExposureBias : undefined;",
   "const runCameraFocusAction = useCallback(",
@@ -22,7 +31,6 @@ for (const snippet of [
   "result.catch(handleCameraFocusError);",
   "handleCameraFocusError(error);",
   "disabled={!cameraLightAvailable}",
-  "torchMode={cameraTorchMode}",
   "zoom={cameraNativeZoom}",
   "exposure={cameraNativeExposure}"
 ]) {
@@ -31,6 +39,9 @@ for (const snippet of [
 
 for (const unsafeSnippet of [
   'torchMode={torchEnabled && cameraDevice.hasTorch ? "on" : "off"}',
+  "torchMode={cameraTorchMode}",
+  "if (cameraDevice && !cameraDevice.hasTorch && torchEnabled)",
+  "useCameraDevice(cameraFacing, cameraDeviceFilter)",
   "const nextEnabled = cameraFacing === \"back\" && enabled;",
   ".focusTo(tap, {",
   ".resetFocus().catch(handleCameraFocusError)",

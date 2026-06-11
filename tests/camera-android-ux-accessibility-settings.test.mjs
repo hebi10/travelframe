@@ -41,13 +41,12 @@ for (const snippet of [
 }
 
 for (const snippet of [
-  "const cameraLightAvailable = cameraFacing === \"back\" && cameraDevice?.hasTorch === true;",
-  "const cameraLightReady = cameraNativeControlsReady && cameraLightAvailable;",
+  "const cameraLightAvailable = cameraFacing === \"back\" && Boolean(cameraDevice);",
   "const visibleTorchEnabled = cameraLightAvailable && torchEnabled;",
-  "const cameraTorchMode = cameraLightReady",
   "const nextEnabled = cameraLightAvailable && enabled;",
+  "cameraRef.current?.controller?.setTorchMode(enabled ? \"on\" : \"off\")",
   "disabled={!cameraLightAvailable}",
-  "visibleTorchEnabled && styles.cameraInstantControlButtonActive",
+  "activeCameraControlPanel === \"light\" || visibleTorchEnabled",
   "valueLabel={visibleTorchEnabled ?"
 ]) {
   assert.ok(cameraSource.includes(snippet), `torch UI should respect rear camera torch support: ${snippet}`);

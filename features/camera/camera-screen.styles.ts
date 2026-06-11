@@ -2,6 +2,7 @@ import { StyleSheet } from "react-native";
 
 import { colors, controls, typography } from "@/constants/app-theme";
 import {
+  CAMERA_CONTROL_TRAY_HORIZONTAL_PADDING,
   CAMERA_FOCUS_INDICATOR_RADIUS,
   CAMERA_FOCUS_INDICATOR_SIZE,
   CAMERA_FOCUS_LOCK_BUTTON_SIZE,
@@ -881,7 +882,7 @@ export const styles = StyleSheet.create({
   },
   galleryButton: {
     position: "absolute",
-    left: 0,
+    left: CAMERA_CONTROL_TRAY_HORIZONTAL_PADDING,
     width: 54,
     height: 54,
     alignItems: "center",
@@ -893,7 +894,7 @@ export const styles = StyleSheet.create({
   },
   cameraFlipButton: {
     position: "absolute",
-    right: 0,
+    right: CAMERA_CONTROL_TRAY_HORIZONTAL_PADDING,
     width: 54,
     height: 54,
     alignItems: "center",

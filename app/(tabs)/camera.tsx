@@ -28,7 +28,8 @@ import Animated, {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   Camera,
-  useCameraDevice,
+  getCameraDevice,
+  useCameraDevices,
   useCameraPermission,
   usePhotoOutput,
   type CameraDevice,
@@ -203,7 +204,7 @@ const CAMERA_SESSION_RECOVERY_DELAY_MS = 700;
 
 type CameraTimerValue = (typeof CAMERA_TIMER_OPTIONS)[number]["value"];
 type CameraQualityValue = (typeof CAMERA_QUALITY_OPTIONS)[number]["value"];
-type CameraControlPanel = "zoom";
+type CameraControlPanel = "zoom" | "light";
 type CameraSettingsPatch = Partial<AppSettings>;
 type CameraZoomPreset =
   | (typeof CAMERA_BACK_ZOOM_PRESETS_WITH_ULTRA_WIDE)[number]
@@ -219,12 +220,38 @@ function hasCameraLens(availableLenses: PhysicalDeviceType[], lens: PhysicalDevi
   return availableLenses.includes(lens);
 }
 
-function getCameraDeviceFilter(cameraFacing: CameraPosition): DeviceFilter | undefined {
+function cameraDeviceHasLens(cameraDevice: CameraDevice, lens: PhysicalDeviceType) {
+  if (cameraDevice.type === lens) {
+    return true;
+  }
+
+  return cameraDevice.physicalDevices?.some((physicalDevice) => physicalDevice.type === lens) === true;
+}
+
+function getCameraDeviceFilter(cameraFacing: CameraPosition, preferTorch = false): DeviceFilter | undefined {
   if (cameraFacing === "front") {
     return undefined;
   }
 
-  return { physicalDevices: CAMERA_BACK_PHYSICAL_DEVICES };
+  return { physicalDevices: preferTorch ? [CAMERA_LENS_WIDE] : CAMERA_BACK_PHYSICAL_DEVICES };
+}
+
+function getPreferredCameraDevice(
+  cameraDevices: CameraDevice[],
+  cameraFacing: CameraPosition,
+  preferTorch = false
+) {
+  if (cameraFacing === "back" && preferTorch) {
+    const torchDevices = cameraDevices.filter((device) => device.position === "back" && device.hasTorch);
+    const wideTorchDevice =
+      torchDevices.find((device) => cameraDeviceHasLens(device, CAMERA_LENS_WIDE)) ?? torchDevices[0];
+
+    if (wideTorchDevice) {
+      return wideTorchDevice;
+    }
+  }
+
+  return getCameraDevice(cameraDevices, cameraFacing, getCameraDeviceFilter(cameraFacing));
 }
 
 function getCameraDeviceLensTypes(cameraDevice: CameraDevice | undefined) {
@@ -421,6 +448,7 @@ export default function CameraScreen() {
   const selectedGuideShapePointIndexRef = useRef<number | null>(null);
   const cameraFocusLockedRef = useRef(false);
   const cameraExposureBiasRef = useRef(0);
+  const cameraTorchAppliedRef = useRef(false);
   const focusIndicatorTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cameraRecoveryTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const timedCaptureTokenRef = useRef(0);
@@ -490,8 +518,11 @@ export default function CameraScreen() {
     },
     [flushQueuedAppSettingsUpdates]
   );
-  const cameraDeviceFilter = useMemo(() => getCameraDeviceFilter(cameraFacing), [cameraFacing]);
-  const cameraDevice = useCameraDevice(cameraFacing, cameraDeviceFilter);
+  const cameraDevices = useCameraDevices();
+  const cameraDevice = useMemo(
+    () => getPreferredCameraDevice(cameraDevices, cameraFacing, torchEnabled),
+    [cameraDevices, cameraFacing, torchEnabled]
+  );
   const availableCameraLenses = useMemo(
     () => getCameraDeviceLensTypes(cameraDevice),
     [cameraDevice]
@@ -524,12 +555,8 @@ export default function CameraScreen() {
     appState === "active" &&
     !cameraRecoveryPending;
   const cameraNativeControlsReady = isCameraSessionActive && isCameraReady;
-  const cameraLightAvailable = cameraFacing === "back" && cameraDevice?.hasTorch === true;
-  const cameraLightReady = cameraNativeControlsReady && cameraLightAvailable;
+  const cameraLightAvailable = cameraFacing === "back" && Boolean(cameraDevice);
   const visibleTorchEnabled = cameraLightAvailable && torchEnabled;
-  const cameraTorchMode = cameraLightReady
-    ? torchEnabled ? "on" : "off"
-    : undefined;
   const cameraNativeZoom = cameraNativeControlsReady ? cameraZoomFactor : undefined;
   const cameraNativeExposure = cameraNativeControlsReady ? cameraExposureBias : undefined;
   const cancelPendingTimedCapture = useCallback(() => {
@@ -671,13 +698,6 @@ export default function CameraScreen() {
       };
     }, [guideOffsetXValue, guideOffsetYValue])
   );
-
-  useEffect(() => {
-    if (cameraDevice && !cameraDevice.hasTorch && torchEnabled) {
-      setTorchEnabled(false);
-      queueAppSettingsUpdate({ cameraTorchEnabled: false });
-    }
-  }, [cameraDevice, queueAppSettingsUpdate, torchEnabled]);
 
   useEffect(
     () => () => {
@@ -842,6 +862,47 @@ export default function CameraScreen() {
     },
     [cameraLightAvailable, queueAppSettingsUpdate, triggerFeedback]
   );
+
+  const handleCameraTorchError = useCallback((error: unknown) => {
+    if (__DEV__) console.warn("[camera] torch update failed", error);
+    cameraTorchAppliedRef.current = false;
+    setTorchEnabled(false);
+    queueAppSettingsUpdate({ cameraTorchEnabled: false });
+    setErrorMessage(getUserFacingErrorMessage(error, "라이트를 켜지 못했습니다."));
+  }, [queueAppSettingsUpdate]);
+
+  const applyCameraTorchMode = useCallback(
+    (enabled: boolean) => {
+      if (!enabled && !cameraTorchAppliedRef.current) {
+        return;
+      }
+
+      try {
+        const result = cameraRef.current?.controller?.setTorchMode(enabled ? "on" : "off");
+        cameraTorchAppliedRef.current = true;
+        if (result) {
+          void result.catch(handleCameraTorchError);
+        }
+      } catch (error) {
+        handleCameraTorchError(error);
+      }
+    },
+    [handleCameraTorchError]
+  );
+
+  useEffect(() => {
+    isCameraReadyRef.current = false;
+    setIsCameraReady(false);
+    cameraTorchAppliedRef.current = false;
+  }, [cameraDevice?.id]);
+
+  useEffect(() => {
+    if (!cameraNativeControlsReady || cameraFacing !== "back") {
+      return;
+    }
+
+    applyCameraTorchMode(torchEnabled);
+  }, [applyCameraTorchMode, cameraDevice?.id, cameraFacing, cameraNativeControlsReady, torchEnabled]);
 
   const applyCameraExposureBias = useCallback(
     (value: number) => {
@@ -1331,6 +1392,11 @@ export default function CameraScreen() {
     void triggerFeedback();
   };
 
+  const openLightControls = () => {
+    setActiveCameraControlPanel((current) => (current === "light" ? null : "light"));
+    void triggerFeedback();
+  };
+
   const handleCameraTopBarLayout = useCallback((event: LayoutChangeEvent) => {
     const nextHeight = Math.ceil(event.nativeEvent.layout.height);
     setCameraTopBarHeight((currentHeight) =>
@@ -1703,7 +1769,6 @@ export default function CameraScreen() {
           device={cameraDevice}
           isActive={isCameraSessionActive}
           outputs={cameraOutputs}
-          torchMode={cameraTorchMode}
           zoom={cameraNativeZoom}
           exposure={cameraNativeExposure}
           getInitialZoom={() => cameraZoomFactor}
@@ -1929,9 +1994,10 @@ export default function CameraScreen() {
             <Pressable
               style={[
                 styles.cameraInstantControlButton,
-                visibleTorchEnabled && styles.cameraInstantControlButtonActive
+                (activeCameraControlPanel === "light" || visibleTorchEnabled) &&
+                  styles.cameraInstantControlButtonActive
               ]}
-              onPress={() => setLightEnabled(!torchEnabled)}
+              onPress={openLightControls}
               accessibilityRole="button"
               accessibilityLabel="라이트 켜기 끄기"
             >
@@ -2450,6 +2516,62 @@ export default function CameraScreen() {
                             </Pressable>
                           );
                         })}
+                      </View>
+                    </Animated.View>
+                  </View>
+                </View>
+              ) : null}
+
+              {activeCameraControlPanel === "light" ? (
+                <View
+                  pointerEvents="box-none"
+                  style={[styles.cameraFloatingPanelWrap, styles.cameraFloatingPanelRaised]}
+                >
+                  <View style={styles.cameraControlPanelViewport}>
+                    <Animated.View
+                      key={activeCameraControlPanel}
+                      entering={FadeIn.duration(140)}
+                      style={styles.cameraControlPage}
+                    >
+                      <View style={styles.quickButtonRow}>
+                        <Pressable
+                          disabled={!cameraLightAvailable}
+                          style={[
+                            styles.quickPillButton,
+                            !visibleTorchEnabled && styles.quickPillButtonActive,
+                            !cameraLightAvailable && styles.shutterDisabled
+                          ]}
+                          onPress={() => setLightEnabled(false)}
+                        >
+                          <Text
+                            selectable={false}
+                            style={[
+                              styles.quickPillText,
+                              !visibleTorchEnabled && styles.quickPillTextActive
+                            ]}
+                          >
+                            끄기
+                          </Text>
+                        </Pressable>
+                        <Pressable
+                          disabled={!cameraLightAvailable}
+                          style={[
+                            styles.quickPillButton,
+                            visibleTorchEnabled && styles.quickPillButtonActive,
+                            !cameraLightAvailable && styles.shutterDisabled
+                          ]}
+                          onPress={() => setLightEnabled(true)}
+                        >
+                          <Text
+                            selectable={false}
+                            style={[
+                              styles.quickPillText,
+                              visibleTorchEnabled && styles.quickPillTextActive
+                            ]}
+                          >
+                            켜기
+                          </Text>
+                        </Pressable>
                       </View>
                     </Animated.View>
                   </View>
