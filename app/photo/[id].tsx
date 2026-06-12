@@ -13,6 +13,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { colors, controls, spacing, typography } from "@/constants/app-theme";
+import { useAuth } from "@/lib/auth-context";
 import { deletePhoto, getPhotoById } from "@/lib/photo-library";
 import { saveImageToLibrary } from "@/lib/trip-clip-export";
 import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
@@ -62,6 +63,7 @@ const getPhotoAspectRatio = (photo: PhotoItem) => {
 
 export default function PhotoDetailScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
+  const { user } = useAuth();
   const insets = useSafeAreaInsets();
   const bottomSafePadding = Math.max(insets.bottom + spacing.screen, spacing.screen);
   const [photo, setPhoto] = useState<PhotoItem | null>(null);
@@ -103,6 +105,17 @@ export default function PhotoDetailScreen() {
     } finally {
       setIsSavingToDevice(false);
     }
+  };
+
+  const showLoginRequiredForEditing = () => {
+    Alert.alert(
+      "로그인이 필요합니다",
+      "사진 편집은 무료 로그인부터 사용할 수 있습니다.",
+      [
+        { text: "닫기", style: "cancel" },
+        { text: "로그인하기", onPress: () => router.push("/account" as Href) }
+      ]
+    );
   };
 
   const removePhoto = async () => {
@@ -199,7 +212,14 @@ export default function PhotoDetailScreen() {
         </Pressable>
         <Pressable
           style={styles.lightButton}
-          onPress={() => router.push(`/edit?photoId=${photo.id}` as Href)}
+          onPress={() => {
+            if (!user) {
+              showLoginRequiredForEditing();
+              return;
+            }
+
+            router.push(`/edit?photoId=${photo.id}` as Href);
+          }}
         >
           <Text selectable={false} style={styles.lightButtonText}>
             사진 편집

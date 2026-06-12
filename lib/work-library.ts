@@ -2,6 +2,7 @@ import * as FileSystem from "expo-file-system/legacy";
 
 import { localStorageAdapter } from "@/lib/local-storage";
 import { assertLocalLibraryCapacity } from "@/lib/local-library-limit";
+import { getNextTripClipTitle, TRIP_CLIP_TITLE_PREFIX } from "@/lib/trip-clip-title";
 import type { ImageBundleWorkItem } from "@/types/work";
 
 const IMAGE_BUNDLE_STORAGE_KEY = "travel-frame.image-bundles.v1";
@@ -48,7 +49,7 @@ const normalizeImageBundleWorkItem = (
   ...work,
   id: normalizeText(work.id, `stored-image-bundle-${index + 1}`),
   kind: "image-bundle",
-  title: normalizeText(work.title, `영상 만들기 작업 ${index + 1}`),
+  title: normalizeText(work.title, `${TRIP_CLIP_TITLE_PREFIX} ${index + 1}`),
   createdAt: normalizeDate(work.createdAt),
   coverUri:
     typeof work.coverUri === "string" && work.coverUri.length > 0
@@ -183,7 +184,7 @@ export const saveImageBundleWork = async (
     id: createWorkId(),
     kind: "image-bundle",
     createdAt: new Date().toISOString(),
-    title: item.title ?? `영상 만들기 ${items.length + 1}`
+    title: item.title ?? getNextTripClipTitle(items.map((work) => work.title))
   };
 
   await writeImageBundles([savedItem, ...items]);

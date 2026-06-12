@@ -22,7 +22,16 @@ export type ThemeMode = "light" | "dark" | "system";
 export type FontStyle = "noto_sans_kr" | "nanum_gothic" | "gowun_dodum" | "gugi" | "black_han_sans";
 export type FontSize = "small" | "medium" | "large";
 export type ScreenLayout = "compact" | "balanced" | "comfortable";
-export type CameraSaveScope = "app" | "device" | "both";
+export type CameraSaveTarget = "app" | "device" | "cloud";
+export type CameraSaveTargets = Record<CameraSaveTarget, boolean>;
+export type CameraSaveScope =
+  | "app"
+  | "device"
+  | "cloud"
+  | "app_device"
+  | "app_cloud"
+  | "device_cloud"
+  | "all";
 export type CameraFacing = "back" | "front";
 export type CameraShutterSoundMode = "silent" | "sound";
 export type TripClipExportFormat = "mp4" | "images";
@@ -93,6 +102,7 @@ export type AppSettings = {
   guideOffsetFrameHeight: number;
   gridGuideLinePositions: GridGuideLinePositions;
   guideShapePoints: GuideShapePoints;
+  guideLineOpacity: number;
   overlayOpacity: number;
   cameraZoomPercent: number;
   cameraTorchEnabled: boolean;
@@ -122,6 +132,51 @@ export const defaultCloudBackupTargets: CloudBackupTargets = {
   music: true
 };
 
+const cameraSaveScopeTargets: Record<CameraSaveScope, CameraSaveTargets> = {
+  app: { app: true, device: false, cloud: false },
+  device: { app: false, device: true, cloud: false },
+  cloud: { app: false, device: false, cloud: true },
+  app_device: { app: true, device: true, cloud: false },
+  app_cloud: { app: true, device: false, cloud: true },
+  device_cloud: { app: false, device: true, cloud: true },
+  all: { app: true, device: true, cloud: true }
+};
+
+export const getCameraSaveScopeTargets = (scope: CameraSaveScope): CameraSaveTargets => ({
+  ...cameraSaveScopeTargets[scope]
+});
+
+export const createCameraSaveScope = (targets: CameraSaveTargets): CameraSaveScope => {
+  if (targets.app && targets.device && targets.cloud) {
+    return "all";
+  }
+  if (targets.app && targets.device) {
+    return "app_device";
+  }
+  if (targets.app && targets.cloud) {
+    return "app_cloud";
+  }
+  if (targets.device && targets.cloud) {
+    return "device_cloud";
+  }
+  if (targets.cloud) {
+    return "cloud";
+  }
+  if (targets.device) {
+    return "device";
+  }
+  return "app";
+};
+
+const normalizeCameraSaveScope = (value: unknown): CameraSaveScope => {
+  if (value === "both") {
+    return "app_device";
+  }
+  return typeof value === "string" && cameraSaveScopes.includes(value as CameraSaveScope)
+    ? (value as CameraSaveScope)
+    : defaultAppSettings.cameraSaveScope;
+};
+
 export const defaultAppSettings: AppSettings = {
   defaultGuide: "circle",
   guideVisible: true,
@@ -134,12 +189,13 @@ export const defaultAppSettings: AppSettings = {
   guideOffsetFrameHeight: 0,
   gridGuideLinePositions: defaultGridGuideLinePositions,
   guideShapePoints: defaultGuideShapePoints,
+  guideLineOpacity: 0.7,
   overlayOpacity: 0.4,
   cameraZoomPercent: 0,
   cameraTorchEnabled: false,
   cameraFacing: "back",
   cameraRatio: "9:16",
-  cameraSaveScope: "both",
+  cameraSaveScope: "app_device",
   cameraShutterSoundMode: "silent",
   defaultRatio: "9:16",
   exportQuality: "high",
@@ -176,7 +232,15 @@ const imageSaveFormats: AppImageSaveFormat[] = ["original", "png", "jpeg"];
 const storageModes: StorageMode[] = ["local_only", "local_backup"];
 const imageBackupQualities = IMAGE_QUALITY_OPTIONS.map((option) => option.value);
 const cameraRatios: PhotoRatioLabel[] = ["1:1", "3:4", "4:3", "4:5", "9:16", "16:9"];
-const cameraSaveScopes: CameraSaveScope[] = ["app", "device", "both"];
+const cameraSaveScopes: CameraSaveScope[] = [
+  "app",
+  "device",
+  "cloud",
+  "app_device",
+  "app_cloud",
+  "device_cloud",
+  "all"
+];
 const cameraFacings: CameraFacing[] = ["back", "front"];
 const cameraShutterSoundModes: CameraShutterSoundMode[] = ["silent", "sound"];
 const tripClipRatios: TripClipRatio[] = ["9:16", "4:5", "1:1", "16:9", "3:4"];
@@ -327,6 +391,15 @@ const normalizeCameraZoomPercent = (value: unknown) => {
   return Math.round(Math.max(0, Math.min(100, parsedValue)));
 };
 
+const normalizeGuideLineOpacity = (value: unknown) => {
+  const parsedValue = Number(value);
+  if (!Number.isFinite(parsedValue)) {
+    return defaultAppSettings.guideLineOpacity;
+  }
+
+  return Math.round(Math.max(0.2, Math.min(1, parsedValue)) * 100) / 100;
+};
+
 export const normalizeCloudBackupTargets = (value: unknown): CloudBackupTargets => {
   const storedTargets =
     value && typeof value === "object" && !Array.isArray(value)
@@ -382,6 +455,7 @@ const normalizeSettings = (value: Partial<AppSettings> | null): AppSettings => {
     guideOffsetFrameHeight: normalizeGuideOffsetFrameSize(nextSettings.guideOffsetFrameHeight),
     gridGuideLinePositions: normalizeGridGuideLinePositions(nextSettings.gridGuideLinePositions),
     guideShapePoints: normalizeGuideShapePoints(nextSettings.guideShapePoints),
+    guideLineOpacity: normalizeGuideLineOpacity(nextSettings.guideLineOpacity),
     cameraZoomPercent: normalizeCameraZoomPercent(nextSettings.cameraZoomPercent),
     cameraTorchEnabled:
       typeof nextSettings.cameraTorchEnabled === "boolean"
@@ -393,9 +467,7 @@ const normalizeSettings = (value: Partial<AppSettings> | null): AppSettings => {
     cameraRatio: cameraRatios.includes(nextSettings.cameraRatio)
       ? nextSettings.cameraRatio
       : defaultAppSettings.cameraRatio,
-    cameraSaveScope: cameraSaveScopes.includes(nextSettings.cameraSaveScope)
-      ? nextSettings.cameraSaveScope
-      : defaultAppSettings.cameraSaveScope,
+    cameraSaveScope: normalizeCameraSaveScope(nextSettings.cameraSaveScope),
     cameraShutterSoundMode: cameraShutterSoundModes.includes(nextSettings.cameraShutterSoundMode)
       ? nextSettings.cameraShutterSoundMode
       : defaultAppSettings.cameraShutterSoundMode,

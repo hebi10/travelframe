@@ -109,6 +109,7 @@ export default function StudioScreen() {
     () => getPlanEntitlements({ isLoggedIn: Boolean(user), subscription }),
     [subscription, user]
   );
+  const canUseVideoCreation = planEntitlements.canExportVideo;
   const { tab } = useLocalSearchParams<{ tab?: string }>();
   const [activeTab, setActiveTab] = useState<StudioTab>("photos");
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
@@ -124,6 +125,28 @@ export default function StudioScreen() {
   const [cloudBackupEnabled, setCloudBackupEnabled] = useState(false);
   const [backupOverview, setBackupOverview] =
     useState<CloudBackupOverview>(initialBackupOverview);
+
+  const showLoginRequiredForEditing = useCallback(() => {
+    Alert.alert(
+      "로그인이 필요합니다",
+      "사진 편집은 무료 로그인부터 사용할 수 있습니다.",
+      [
+        { text: "닫기", style: "cancel" },
+        { text: "로그인하기", onPress: () => router.push("/account" as Href) }
+      ]
+    );
+  }, [router]);
+
+  const showLoginRequiredForVideoCreation = useCallback(() => {
+    Alert.alert(
+      "로그인이 필요합니다",
+      "동영상 만들기는 로그인 후 주 1회 무료로 사용할 수 있습니다.",
+      [
+        { text: "닫기", style: "cancel" },
+        { text: "로그인하기", onPress: () => router.push("/account" as Href) }
+      ]
+    );
+  }, [router]);
 
   const loadStudio = useCallback(async () => {
     try {
@@ -400,6 +423,19 @@ export default function StudioScreen() {
   const shouldShowBackupUsage =
     Boolean(user) && cloudBackupEnabled && isCreatorSubscriptionActive(subscription);
   const videoBackupLimit = getCloudBackupVideoLimit(planEntitlements.tier);
+  const photoUsage = shouldShowBackupUsage
+    ? { label: "클라우드 백업", count: backupOverview.photoCount, limit: CLOUD_BACKUP_PHOTO_LIMIT }
+    : { label: "이미지 보관함", count: photoLibraryItems.length, limit: planEntitlements.localImageLimit };
+  const imageBundleUsage = shouldShowBackupUsage
+    ? {
+        label: "클라우드 백업",
+        count: backupOverview.imageBundleCount,
+        limit: CLOUD_BACKUP_IMAGE_WORK_LIMIT
+      }
+    : { label: "이미지 보관함", count: imageBundles.length, limit: planEntitlements.localImageLimit };
+  const videoUsage = shouldShowBackupUsage
+    ? { label: "클라우드 백업", count: backupOverview.videoCount, limit: videoBackupLimit }
+    : { label: "영상 보관함", count: videos.length, limit: planEntitlements.localVideoLimit };
   const isDark = palette.background !== colors.background;
   const filledButtonStyle = {
     borderColor: palette.text,
@@ -493,12 +529,7 @@ export default function StudioScreen() {
           </SectionBlock>
 
           <SectionBlock title="사진">
-          {shouldShowBackupUsage ? (
-            <BackupUsageBadge
-              count={backupOverview.photoCount}
-              limit={CLOUD_BACKUP_PHOTO_LIMIT}
-            />
-          ) : null}
+          <UsageBadge label={photoUsage.label} count={photoUsage.count} limit={photoUsage.limit} />
           {isLoading ? (
             <LoadingState />
           ) : studioLoadErrorMessage ? null : photoLibraryItems.length > 0 ? (
@@ -507,7 +538,9 @@ export default function StudioScreen() {
               page={pages.photos ?? 0}
               pageSize={pageSize}
               router={router}
+              canEditLibraryItems={Boolean(user)}
               onDeletePhoto={confirmDeletePhoto}
+              onRequireLoginForEdit={showLoginRequiredForEditing}
               onPageChange={(page) => setSectionPage("photos", page)}
             />
           ) : (
@@ -525,12 +558,17 @@ export default function StudioScreen() {
           <SectionBlock title="영상 만들기">
             <Pressable
               style={({ pressed }) => [styles.clipCta, panelStyle, pressed && pressedPanelStyle]}
-              onPress={() =>
+              onPress={() => {
+                if (!canUseVideoCreation) {
+                  showLoginRequiredForVideoCreation();
+                  return;
+                }
+
                 router.push({
                   pathname: "/trip-clip",
-                  params: { returnTo: "/studio?tab=videos" }
-                } as Href)
-              }
+                  params: { returnTo: "/studio?tab=videos", start: "new" }
+                } as Href);
+              }}
             >
               <View style={styles.clipCopy}>
                 <Text selectable={false} style={styles.clipTitle}>
@@ -563,15 +601,12 @@ export default function StudioScreen() {
                   pageSize={pageSize}
                   router={router}
                   onDeleteWork={confirmDeleteWork}
+                  canEditLibraryItems={Boolean(user)}
+                  canUseVideoCreation={canUseVideoCreation}
+                  onRequireLoginForEdit={showLoginRequiredForEditing}
+                  onRequireLoginForVideo={showLoginRequiredForVideoCreation}
                   onPageChange={(page) => setSectionPage("videoImageBundles", page)}
-                  backupUsage={
-                    shouldShowBackupUsage
-                      ? {
-                          count: backupOverview.imageBundleCount,
-                          limit: CLOUD_BACKUP_IMAGE_WORK_LIMIT
-                        }
-                      : null
-                  }
+                  usage={imageBundleUsage}
                 />
               ) : null}
               {savedVideoWorks.length > 0 ? (
@@ -583,15 +618,12 @@ export default function StudioScreen() {
                   pageSize={pageSize}
                   router={router}
                   onDeleteWork={confirmDeleteWork}
+                  canEditLibraryItems={Boolean(user)}
+                  canUseVideoCreation={canUseVideoCreation}
+                  onRequireLoginForEdit={showLoginRequiredForEditing}
+                  onRequireLoginForVideo={showLoginRequiredForVideoCreation}
                   onPageChange={(page) => setSectionPage("videoWorks", page)}
-                  backupUsage={
-                    shouldShowBackupUsage
-                      ? {
-                          count: backupOverview.videoCount,
-                          limit: videoBackupLimit
-                        }
-                      : null
-                  }
+                  usage={videoUsage}
                 />
               ) : null}
             </>
@@ -623,15 +655,12 @@ export default function StudioScreen() {
                   pageSize={pageSize}
                   router={router}
                   onDeleteWork={confirmDeleteWork}
+                  canEditLibraryItems={Boolean(user)}
+                  canUseVideoCreation={canUseVideoCreation}
+                  onRequireLoginForEdit={showLoginRequiredForEditing}
+                  onRequireLoginForVideo={showLoginRequiredForVideoCreation}
                   onPageChange={(page) => setSectionPage("singleImages", page)}
-                  backupUsage={
-                    shouldShowBackupUsage
-                      ? {
-                          count: backupOverview.photoCount,
-                          limit: CLOUD_BACKUP_PHOTO_LIMIT
-                        }
-                      : null
-                  }
+                  usage={photoUsage}
                 />
               ) : null}
               {imageBundleWorks.length > 0 ? (
@@ -643,15 +672,12 @@ export default function StudioScreen() {
                   pageSize={pageSize}
                   router={router}
                   onDeleteWork={confirmDeleteWork}
+                  canEditLibraryItems={Boolean(user)}
+                  canUseVideoCreation={canUseVideoCreation}
+                  onRequireLoginForEdit={showLoginRequiredForEditing}
+                  onRequireLoginForVideo={showLoginRequiredForVideoCreation}
                   onPageChange={(page) => setSectionPage("imageBundles", page)}
-                  backupUsage={
-                    shouldShowBackupUsage
-                      ? {
-                          count: backupOverview.imageBundleCount,
-                          limit: CLOUD_BACKUP_IMAGE_WORK_LIMIT
-                        }
-                      : null
-                  }
+                  usage={imageBundleUsage}
                 />
               ) : null}
               {videoWorks.length > 0 ? (
@@ -663,15 +689,12 @@ export default function StudioScreen() {
                   pageSize={pageSize}
                   router={router}
                   onDeleteWork={confirmDeleteWork}
+                  canEditLibraryItems={Boolean(user)}
+                  canUseVideoCreation={canUseVideoCreation}
+                  onRequireLoginForEdit={showLoginRequiredForEditing}
+                  onRequireLoginForVideo={showLoginRequiredForVideoCreation}
                   onPageChange={(page) => setSectionPage("videos", page)}
-                  backupUsage={
-                    shouldShowBackupUsage
-                      ? {
-                          count: backupOverview.videoCount,
-                          limit: videoBackupLimit
-                        }
-                      : null
-                  }
+                  usage={videoUsage}
                 />
               ) : null}
             </>
@@ -758,11 +781,15 @@ export default function StudioScreen() {
 function PhotoCard({
   photo,
   router,
-  onDelete
+  canEditLibraryItems,
+  onDelete,
+  onRequireLoginForEdit
 }: {
   photo: PhotoItem;
   router: ReturnType<typeof useRouter>;
+  canEditLibraryItems: boolean;
   onDelete: (photo: PhotoItem) => void;
+  onRequireLoginForEdit: () => void;
 }) {
   const { palette } = useAppAppearance();
   const isDark = palette.background !== colors.background;
@@ -815,7 +842,14 @@ function PhotoCard({
       <View style={styles.cardActions}>
         <Pressable
           style={[styles.cardButton, filledButtonStyle]}
-          onPress={() => router.push(`/edit?photoId=${photo.id}` as Href)}
+          onPress={() => {
+            if (!canEditLibraryItems) {
+              onRequireLoginForEdit();
+              return;
+            }
+
+            router.push(`/edit?photoId=${photo.id}` as Href);
+          }}
         >
           <Text selectable={false} style={[styles.cardButtonText, filledButtonTextStyle]}>
             편집
@@ -918,14 +952,18 @@ function PaginatedPhotoGrid({
   page,
   pageSize,
   router,
+  canEditLibraryItems,
   onDeletePhoto,
+  onRequireLoginForEdit,
   onPageChange
 }: {
   items: PhotoItem[];
   page: number;
   pageSize: PageSize;
   router: ReturnType<typeof useRouter>;
+  canEditLibraryItems: boolean;
   onDeletePhoto: (photo: PhotoItem) => void;
+  onRequireLoginForEdit: () => void;
   onPageChange: (page: number) => void;
 }) {
   const result = getPaginatedItems(items, page, pageSize);
@@ -942,7 +980,13 @@ function PaginatedPhotoGrid({
         ItemSeparatorComponent={() => <View style={styles.photoGridRowGap} />}
         renderItem={({ item: photo }) => (
           <View style={styles.photoGridItem}>
-            <PhotoCard photo={photo} router={router} onDelete={onDeletePhoto} />
+            <PhotoCard
+              photo={photo}
+              router={router}
+              canEditLibraryItems={canEditLibraryItems}
+              onDelete={onDeletePhoto}
+              onRequireLoginForEdit={onRequireLoginForEdit}
+            />
           </View>
         )}
       />
@@ -956,11 +1000,11 @@ function PaginatedPhotoGrid({
   );
 }
 
-function BackupUsageBadge({ count, limit }: { count: number; limit: number }) {
+function UsageBadge({ label, count, limit }: { label: string; count: number; limit: number }) {
   return (
     <View style={styles.backupUsageBadge}>
       <Text selectable={false} style={styles.backupUsageText}>
-        클라우드 백업 {count}/{limit}
+        {label} {count}/{limit}
       </Text>
     </View>
   );
@@ -974,8 +1018,12 @@ function WorkSection({
   pageSize,
   router,
   onDeleteWork,
+  canEditLibraryItems,
+  canUseVideoCreation,
+  onRequireLoginForEdit,
+  onRequireLoginForVideo,
   onPageChange,
-  backupUsage
+  usage
 }: {
   title: string;
   emptyDetail: string;
@@ -984,15 +1032,19 @@ function WorkSection({
   pageSize: PageSize;
   router: ReturnType<typeof useRouter>;
   onDeleteWork: (work: StudioWorkItem) => void;
+  canEditLibraryItems: boolean;
+  canUseVideoCreation: boolean;
+  onRequireLoginForEdit: () => void;
+  onRequireLoginForVideo: () => void;
   onPageChange: (page: number) => void;
-  backupUsage?: { count: number; limit: number } | null;
+  usage?: { label: string; count: number; limit: number } | null;
 }) {
   const result = getPaginatedItems(items, page, pageSize);
 
   return (
     <SectionBlock title={title}>
-      {backupUsage ? (
-        <BackupUsageBadge count={backupUsage.count} limit={backupUsage.limit} />
+      {usage ? (
+        <UsageBadge label={usage.label} count={usage.count} limit={usage.limit} />
       ) : null}
       {items.length > 0 ? (
         <View style={styles.paginatedList}>
@@ -1002,7 +1054,11 @@ function WorkSection({
                 key={`${work.kind}-${work.item.id}`}
                 work={work}
                 router={router}
+                canEditLibraryItems={canEditLibraryItems}
+                canUseVideoCreation={canUseVideoCreation}
                 onDelete={onDeleteWork}
+                onRequireLoginForEdit={onRequireLoginForEdit}
+                onRequireLoginForVideo={onRequireLoginForVideo}
               />
             ))}
           </View>
@@ -1072,11 +1128,19 @@ function PaginationControls({
 function WorkCard({
   work,
   router,
-  onDelete
+  canEditLibraryItems,
+  canUseVideoCreation,
+  onDelete,
+  onRequireLoginForEdit,
+  onRequireLoginForVideo
 }: {
   work: StudioWorkItem;
   router: ReturnType<typeof useRouter>;
+  canEditLibraryItems: boolean;
+  canUseVideoCreation: boolean;
   onDelete: (work: StudioWorkItem) => void;
+  onRequireLoginForEdit: () => void;
+  onRequireLoginForVideo: () => void;
 }) {
   const { palette } = useAppAppearance();
   const pressedPanelStyle = {
@@ -1109,7 +1173,14 @@ function WorkCard({
         <View style={styles.workActions}>
           <Pressable
             style={styles.workEditButton}
-            onPress={() => router.push(`/edit?photoId=${photo.id}` as Href)}
+            onPress={() => {
+              if (!canEditLibraryItems) {
+                onRequireLoginForEdit();
+                return;
+              }
+
+              router.push(`/edit?photoId=${photo.id}` as Href);
+            }}
           >
             <Text selectable={false} style={styles.workEditButtonText}>
               다시 편집
@@ -1158,12 +1229,17 @@ function WorkCard({
         <View style={styles.workActions}>
           <Pressable
             style={styles.workEditButton}
-            onPress={() =>
+            onPress={() => {
+              if (!canUseVideoCreation) {
+                onRequireLoginForVideo();
+                return;
+              }
+
               router.push({
                 pathname: "/trip-clip",
                 params: { videoId: video.id, returnTo: "/studio?tab=works" }
-              } as Href)
-            }
+              } as Href);
+            }}
           >
             <Text selectable={false} style={styles.workEditButtonText}>
               다시 편집
@@ -1191,15 +1267,20 @@ function WorkCard({
       ) : (
         <View style={styles.videoThumbEmpty} />
       )}
-      <Pressable
-        style={({ pressed }) => [styles.videoCopy, pressed && pressedPanelStyle]}
-        onPress={() =>
-          router.push({
-            pathname: "/trip-clip",
-            params: { bundleId: bundle.id, returnTo: "/studio?tab=works" }
-          } as Href)
-        }
-      >
+        <Pressable
+          style={({ pressed }) => [styles.videoCopy, pressed && pressedPanelStyle]}
+          onPress={() => {
+            if (!canUseVideoCreation) {
+              onRequireLoginForVideo();
+              return;
+            }
+
+            router.push({
+              pathname: "/trip-clip",
+              params: { bundleId: bundle.id, returnTo: "/studio?tab=works" }
+            } as Href);
+          }}
+        >
         <Text selectable={false} style={styles.videoKind}>
           영상 만들기 작업
         </Text>
@@ -1216,12 +1297,17 @@ function WorkCard({
     <View style={styles.workActions}>
       <Pressable
         style={styles.workEditButton}
-        onPress={() =>
+        onPress={() => {
+          if (!canUseVideoCreation) {
+            onRequireLoginForVideo();
+            return;
+          }
+
           router.push({
             pathname: "/trip-clip",
             params: { bundleId: bundle.id, returnTo: "/studio?tab=works" }
-          } as Href)
-        }
+          } as Href);
+        }}
       >
         <Text selectable={false} style={styles.workEditButtonText}>
           다시 편집

@@ -50,6 +50,7 @@ export const createThemedStyles = (palette: AppPalette, fontFamily?: string) => 
     },
     mutedText: {
       color: palette.muted,
+      fontWeight: "700",
       ...fontTextStyle
     },
     inverseText: {

@@ -2,6 +2,7 @@ import * as FileSystem from "expo-file-system/legacy";
 
 import { localStorageAdapter } from "@/lib/local-storage";
 import { assertLocalLibraryCapacity } from "@/lib/local-library-limit";
+import { getNextTripClipTitle, TRIP_CLIP_TITLE_PREFIX } from "@/lib/trip-clip-title";
 import type { MadeVideoItem } from "@/types/video";
 
 const VIDEO_STORAGE_KEY = "travel-frame.videos.v1";
@@ -66,7 +67,7 @@ const normalizeMadeVideoItem = (
       ? video.coverUri
       : undefined,
   createdAt: normalizeDate(video.createdAt),
-  title: normalizeText(video.title, `여행 클립 ${index + 1}`),
+  title: normalizeText(video.title, `${TRIP_CLIP_TITLE_PREFIX} ${index + 1}`),
   ratio: validRatios.has(video.ratio ?? "") ? video.ratio! : "9:16",
   template: validTemplates.has(video.template ?? "") ? video.template! : "minimal",
   transition: validTransitions.has(video.transition ?? "") ? video.transition! : "fade",
@@ -251,7 +252,7 @@ export const saveMadeVideo = async (
     uri: persistedUri,
     localUri: isRemoteUri(persistedUri) ? video.localUri : persistedUri,
     createdAt,
-    title: video.title ?? `여행 클립 ${videos.length + 1}`
+    title: video.title ?? getNextTripClipTitle(videos.map((item) => item.title))
   };
 
   await writeVideos([savedVideo, ...videos]);

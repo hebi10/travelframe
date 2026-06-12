@@ -15,7 +15,7 @@ const backupUsageBadgeStyle = source.slice(backupUsageBadgeStart, backupUsageBad
 
 for (const snippet of [
   "subscribeCloudBackupOverview",
-  "BackupUsageBadge",
+  "UsageBadge",
   "CLOUD_BACKUP_PHOTO_LIMIT",
   "CLOUD_BACKUP_IMAGE_WORK_LIMIT",
   "getCloudBackupVideoLimit",
@@ -23,14 +23,17 @@ for (const snippet of [
   "클라우드 백업",
   "backupOverview.photoCount",
   "backupOverview.imageBundleCount",
-  "backupOverview.videoCount"
+  "backupOverview.videoCount",
+  "photoUsage",
+  "imageBundleUsage",
+  "videoUsage"
 ]) {
   assert.ok(source.includes(snippet), `studio backup usage missing: ${snippet}`);
 }
 
 assert.ok(
   source.includes("cloudBackupEnabled && isCreatorSubscriptionActive(subscription)"),
-  "backup usage counters should only show for subscribed users with backup enabled"
+  "backup usage counters should switch to cloud counts only for subscribed users with backup enabled"
 );
 
 assert.ok(

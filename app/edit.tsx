@@ -129,7 +129,7 @@ const getDraftSourceKey = (draft: Pick<PhotoEditDraft, "sourceUri" | "sourcePhot
   draft.sourcePhotoId ?? draft.sourceUri;
 
 export default function EditScreen() {
-  const { user, subscription } = useAuth();
+  const { user, subscription, isAuthLoading } = useAuth();
   const planEntitlements = useMemo(
     () => getPlanEntitlements({ isLoggedIn: Boolean(user), subscription }),
     [subscription, user]
@@ -156,6 +156,7 @@ export default function EditScreen() {
     defaultAppSettings.guideStrokeWidth
   );
   const [guideColor, setGuideColor] = useState(defaultAppSettings.guideColor);
+  const [guideLineOpacity, setGuideLineOpacity] = useState(defaultAppSettings.guideLineOpacity);
   const [guideOffsetX, setGuideOffsetX] = useState(defaultAppSettings.guideOffsetX);
   const [guideOffsetY, setGuideOffsetY] = useState(defaultAppSettings.guideOffsetY);
   const [guideOffsetFrameWidth, setGuideOffsetFrameWidth] = useState(
@@ -180,9 +181,26 @@ export default function EditScreen() {
   const guideOffsetYValue = useSharedValue(defaultAppSettings.guideOffsetY);
   const guideDragStartX = useSharedValue(0);
   const guideDragStartY = useSharedValue(0);
+  const loginRequiredAlertShownRef = useRef(false);
   const originalAspectRatio =
     source?.width && source?.height ? source.width / source.height : undefined;
   const canOverwriteSource = Boolean(sourcePhoto?.edited);
+
+  useEffect(() => {
+    if (isAuthLoading || user || loginRequiredAlertShownRef.current) {
+      return;
+    }
+
+    if (!user) {
+      loginRequiredAlertShownRef.current = true;
+      Alert.alert(
+        "로그인이 필요합니다",
+        "사진 편집은 무료 로그인부터 사용할 수 있습니다.",
+        [{ text: "확인", onPress: () => router.replace("/account" as Href) }]
+      );
+      router.replace("/account" as Href);
+    }
+  }, [isAuthLoading, user]);
 
   useEffect(() => {
     let isMounted = true;
@@ -231,6 +249,7 @@ export default function EditScreen() {
         setGuideSize(settings.guideSize);
         setGuideStrokeWidth(settings.guideStrokeWidth);
         setGuideColor(settings.guideColor);
+        setGuideLineOpacity(settings.guideLineOpacity);
         setGuideOffsetX(settings.guideOffsetX);
         setGuideOffsetY(settings.guideOffsetY);
         setGuideOffsetFrameWidth(settings.guideOffsetFrameWidth);
@@ -666,6 +685,7 @@ export default function EditScreen() {
             guideSize={guideSize}
             guideStrokeWidth={guideStrokeWidth}
             guideColor={guideColor}
+            guideLineOpacity={guideLineOpacity}
             guideOffsetX={guideOffsetX}
             guideOffsetY={guideOffsetY}
             guideOffsetFrameWidth={guideOffsetFrameWidth}

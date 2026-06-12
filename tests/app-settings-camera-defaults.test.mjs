@@ -8,10 +8,10 @@ const photoLibrarySource = fs.readFileSync("lib/photo-library.ts", "utf8");
 
 for (const snippet of [
   'cameraRatio: "9:16"',
-  'cameraSaveScope: "both"',
+  'cameraSaveScope: "app_device"',
   'const cameraRatios: PhotoRatioLabel[] = ["1:1", "3:4", "4:3", "4:5", "9:16", "16:9"]',
   "cameraRatios.includes(nextSettings.cameraRatio)",
-  "cameraSaveScopes.includes(nextSettings.cameraSaveScope)",
+  "normalizeCameraSaveScope(nextSettings.cameraSaveScope)",
   ": defaultAppSettings.cameraRatio",
   ": defaultAppSettings.cameraSaveScope",
   "return defaultAppSettings;"
@@ -25,8 +25,10 @@ for (const snippet of [
   "setCameraRatio(settings.cameraRatio)",
   "setCameraSaveScope(settings.cameraSaveScope)",
   "ratioLabel: cameraRatio",
-  'saveScope !== "device"',
-  'saveScope !== "app"'
+  "getCameraSaveScopeTargets(saveScope)",
+  "targets.app || targets.cloud",
+  "targets.device",
+  "targets.cloud"
 ]) {
   assert.ok(cameraSource.includes(snippet), `camera should use normalized setting: ${snippet}`);
 }
@@ -34,9 +36,9 @@ for (const snippet of [
 for (const snippet of [
   "useState<AppSettings>(defaultAppSettings)",
   "mark={settings.cameraRatio}",
-  "mark={cameraSaveScopeLabel[settings.cameraSaveScope]}",
+  "mark={getCameraSaveScopeLabel(settings.cameraSaveScope)}",
   "active={settings.cameraRatio === ratio}",
-  "active={settings.cameraSaveScope === scope.value}"
+  "active={getCameraSaveScopeTargets(settings.cameraSaveScope)[scope.value] && !isCloudSaveTargetDisabled}"
 ]) {
   assert.ok(settingsSource.includes(snippet), `settings screen should display normalized setting: ${snippet}`);
 }
@@ -72,8 +74,10 @@ const cameraSaveScopeOptionsSource = cameraSource.slice(
   cameraSource.indexOf("const CAMERA_FACING_OPTIONS")
 );
 assert.ok(
-  cameraSaveScopeOptionsSource.indexOf('value: "both"') < cameraSaveScopeOptionsSource.indexOf('value: "app"'),
-  "camera save scope controls should show the default app and device option first"
+  cameraSaveScopeOptionsSource.includes('value: "app"') &&
+    cameraSaveScopeOptionsSource.includes('value: "device"') &&
+    cameraSaveScopeOptionsSource.includes('value: "cloud"'),
+  "camera save scope controls should show app, phone album, and cloud toggles"
 );
 
 const settingsCameraSaveScopeOptionsSource = settingsSource.slice(
@@ -81,9 +85,10 @@ const settingsCameraSaveScopeOptionsSource = settingsSource.slice(
   settingsSource.indexOf("const tripClipExportFormatOptions")
 );
 assert.ok(
-  settingsCameraSaveScopeOptionsSource.indexOf('value: "both"') <
-    settingsCameraSaveScopeOptionsSource.indexOf('value: "app"'),
-  "settings camera save scope controls should show the default app and device option first"
+  settingsCameraSaveScopeOptionsSource.includes('value: "app"') &&
+    settingsCameraSaveScopeOptionsSource.includes('value: "device"') &&
+    settingsCameraSaveScopeOptionsSource.includes('value: "cloud"'),
+  "settings camera save scope controls should show app, phone album, and cloud toggles"
 );
 
-console.log("ok - camera defaults use 9:16 and both while preserving valid settings");
+console.log("ok - camera defaults use 9:16 and app plus phone album while preserving valid settings");

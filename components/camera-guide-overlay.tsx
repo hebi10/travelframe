@@ -108,6 +108,7 @@ type CameraGuideOverlayProps = {
   shapePoints?: GuideShapePoints;
   showShapeControlPoints?: boolean;
   selectedShapePointIndex?: number | null;
+  opacity?: number;
 };
 
 export function CameraGuideOverlay({
@@ -125,7 +126,8 @@ export function CameraGuideOverlay({
   selectedGridLine = null,
   shapePoints,
   showShapeControlPoints = false,
-  selectedShapePointIndex = null
+  selectedShapePointIndex = null,
+  opacity = 1
 }: CameraGuideOverlayProps) {
   const [guideFrame, setGuideFrame] = useState({ width: 0, height: 0 });
   const handleGuideFrameLayout = useCallback((event: LayoutChangeEvent) => {
@@ -147,6 +149,7 @@ export function CameraGuideOverlay({
   }
 
   const safeStrokeWidth = Math.max(1, Math.min(5, Math.round(strokeWidth)));
+  const safeOpacity = Math.max(0.2, Math.min(1, opacity));
   const safeAspectRatio = Number.isFinite(aspectRatio) && Number(aspectRatio) > 0
     ? Number(aspectRatio)
     : null;
@@ -194,7 +197,7 @@ export function CameraGuideOverlay({
   if (guide === "grid") {
     return (
       <View style={styles.overlayViewport}>
-        <View style={[styles.constrainedFrame, constrainedFrameStyle]}>
+        <View style={[styles.constrainedFrame, constrainedFrameStyle, { opacity: safeOpacity }]}>
           <View style={styles.gridOverlay}>
             <View
               style={[
@@ -262,7 +265,12 @@ export function CameraGuideOverlay({
   return (
     <View style={styles.overlayViewport}>
       <View
-        style={[styles.constrainedFrame, constrainedFrameStyle, offsetStyle]}
+        style={[
+          styles.constrainedFrame,
+          constrainedFrameStyle,
+          offsetStyle,
+          { opacity: safeOpacity }
+        ]}
         onLayout={handleGuideFrameLayout}
       >
         <View style={styles.overlay}>

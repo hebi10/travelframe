@@ -68,7 +68,7 @@ for (const snippet of [
   "accessibilityState={{ selected: flashMode === option.value }}",
   "accessibilityState={{ selected: photoQuality === option.value }}",
   "accessibilityState={{ selected: cameraRatio === option.value }}",
-  "accessibilityState={{ selected: cameraSaveScope === option.value }}",
+  "accessibilityState={{ disabled: isCloudSaveTargetDisabled, selected: isSelected }}",
   "accessibilityState={{ selected: guide === type }}",
   "accessibilityState={{ selected: guideSize === option.value }}",
   "accessibilityState={{ selected: isActive }}",

@@ -35,13 +35,16 @@ import {
   GUIDE_STROKE_WIDTH_MAX,
   GUIDE_STROKE_WIDTH_MIN,
   defaultAppSettings,
+  createCameraSaveScope,
   getAppSettings,
+  getCameraSaveScopeTargets,
   getGuideSizeBounds,
   saveAppSettings,
   subscribeAppSettings,
   type AppImageSaveFormat,
   type AppSettings,
   type CameraSaveScope,
+  type CameraSaveTarget,
   type CloudBackupTarget,
   type FontSize,
   type StorageMode,
@@ -102,7 +105,8 @@ import {
   type UserMusicTrack
 } from "@/lib/user-music";
 import { getImageBundleWorks } from "@/lib/work-library";
-import { OptionButton, SettingsGuideSizeSlider } from "@/features/settings/settings-screen.components";
+import { GuideSizeSlider } from "@/features/camera/camera-screen.components";
+import { OptionButton } from "@/features/settings/settings-screen.components";
 import { emptyBackupOverview, emptyUsageStats, type UsageStats } from "@/features/settings/settings-screen.constants";
 import {
   clampSettingsGuideSizeInRange,
@@ -118,7 +122,7 @@ type SettingKey =
   | "guideSize"
   | "guideStrokeWidth"
   | "guideColor"
-  | "overlayOpacity"
+  | "guideLineOpacity"
   | "cameraRatio"
   | "cameraSaveScope"
   | "defaultRatio"
@@ -133,12 +137,12 @@ type SettingKey =
   | "cloudBackupTargets"
   | "imageBackupQuality";
 
-const opacityOptions = [0.2, 0.3, 0.4, 0.5, 0.6, 0.7];
+const guideLineOpacityOptions = [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.85, 1];
   const cameraRatioOptions = ["1:1", "3:4", "4:3", "4:5", "9:16", "16:9"] as const;
 
 
 const storageModeLegend =
-  "앱 보관함에만 저장 / 클라우드 백업";
+  "앱 보관함 / 핸드폰 앨범 / 클라우드";
 const backupTargetOptions: {
   value: CloudBackupTarget;
   label: string;
@@ -162,10 +166,10 @@ const getBackupTargetsSummary = (targets: AppSettings["cloudBackupTargets"]) => 
   return selectedLabels.length > 0 ? selectedLabels.join(", ") : "선택 없음";
 };
 
-const cameraSaveScopeOptions: { value: CameraSaveScope; label: string; detail: string }[] = [
-  { value: "both", label: "클라우드 백업 + 핸드폰 앨범", detail: "앱 보관함에 저장하고 클라우드 백업과 핸드폰 앨범 저장을 함께 시도합니다." },
-  { value: "app", label: "클라우드 백업", detail: "앱 보관함에 저장하고 클라우드 백업 설정이 켜져 있으면 계정에도 백업합니다." },
-  { value: "device", label: "핸드폰 앨범", detail: "핸드폰 앨범에만 저장합니다." }
+const cameraSaveScopeOptions: { value: CameraSaveTarget; label: string; detail: string }[] = [
+  { value: "app", label: "앱 보관함", detail: "보관함 탭에서 다시 열 수 있도록 앱에 저장합니다." },
+  { value: "device", label: "핸드폰 앨범", detail: "기기 갤러리 앱에서도 볼 수 있도록 저장합니다." },
+  { value: "cloud", label: "클라우드", detail: "로그인 및 백업 설정이 가능한 경우 계정에 백업합니다." }
 ];
 const tripClipExportFormatOptions: {
   value: TripClipExportFormat;
@@ -209,13 +213,13 @@ const imageQualityLabel = IMAGE_QUALITY_OPTIONS.reduce(
   }),
   {} as Record<(typeof IMAGE_QUALITY_OPTIONS)[number]["value"], string>
 );
-const cameraSaveScopeLabel = cameraSaveScopeOptions.reduce(
-  (labels, option) => ({
-    ...labels,
-    [option.value]: option.label
-  }),
-  {} as Record<CameraSaveScope, string>
-);
+const getCameraSaveScopeLabel = (scope: CameraSaveScope) => {
+  const targets = getCameraSaveScopeTargets(scope);
+  return cameraSaveScopeOptions
+    .filter((option) => targets[option.value])
+    .map((option) => option.label)
+    .join(" + ");
+};
 const tripClipExportFormatLabel = tripClipExportFormatOptions.reduce(
   (labels, option) => ({
     ...labels,
@@ -334,6 +338,7 @@ export default function SettingsScreen() {
     () => getPlanEntitlements({ isLoggedIn, subscription }),
     [isLoggedIn, subscription]
   );
+  const canSelectCloudSaveTarget = planEntitlements.canBackupToCloud;
   const localImageUsage = usageStats.photos + usageStats.imageBundles;
   const effectiveStorageMode = getEffectiveStorageMode(
     settings.storageMode,
@@ -424,8 +429,8 @@ export default function SettingsScreen() {
       return "가이드 색상";
     }
 
-    if (activeSetting === "overlayOpacity") {
-      return "오버레이 투명도";
+    if (activeSetting === "guideLineOpacity") {
+      return "가이드 라인 투명도";
     }
 
     if (activeSetting === "defaultRatio") {
@@ -491,6 +496,31 @@ export default function SettingsScreen() {
     setSettings(nextSettings);
     await saveAppSettings(nextSettings);
     setActiveSetting(null);
+  };
+
+  const toggleCameraSaveTarget = async (target: CameraSaveTarget) => {
+    if (target === "cloud" && !canSelectCloudSaveTarget) {
+      return;
+    }
+
+    const targets = getCameraSaveScopeTargets(settings.cameraSaveScope);
+    const nextTargets = {
+      ...targets,
+      [target]: !targets[target]
+    };
+    if (!nextTargets.app && !nextTargets.device && !nextTargets.cloud) {
+      return;
+    }
+
+    const nextSettings = {
+      ...settings,
+      cameraSaveScope: createCameraSaveScope(nextTargets),
+      ...(target === "cloud" && nextTargets.cloud
+        ? { storageMode: "local_backup" as const, cloudBackupEnabled: true }
+        : {})
+    };
+    setSettings(nextSettings);
+    await saveAppSettings(nextSettings);
   };
 
   const previewGuideSize = (value: number) => {
@@ -959,8 +989,10 @@ export default function SettingsScreen() {
                 </Text>
                 <Text selectable style={[styles.accountDetail, themed.mutedText]}>
                   {isLoggedIn
-                    ? `${user?.email ?? "계정"}으로 전체 기능을 사용할 수 있습니다.`
-                    : "비로그인 상태에서는 무료 기능과 워터마크가 적용됩니다."}
+                    ? planEntitlements.canBackupToCloud
+                      ? `${user?.email ?? "계정"}으로 Pro 기능과 클라우드 백업을 사용할 수 있습니다.`
+                      : `${user?.email ?? "계정"}으로 로그인하면 사진 편집과 MP4 영상 주 1회 기능을 사용할 수 있습니다.`
+                    : "비로그인 상태에서는 촬영과 앱 보관함 저장만 사용할 수 있습니다."}
                 </Text>
               </View>
               <View
@@ -1230,34 +1262,36 @@ export default function SettingsScreen() {
                   카메라, 사진 편집, 영상 만들기에 같은 가이드가 적용됩니다.
                 </Text>
               </View>
-              <Pressable
-                style={[
-                  styles.guideVisibleButton,
-                  themed.secondaryButton,
-                  settings.guideVisible && styles.guideVisibleButtonActive,
-                  settings.guideVisible && themed.activeFill
-                ]}
-                onPress={() => updateSetting({ guideVisible: !settings.guideVisible })}
-              >
-                <Text
-                  selectable={false}
-                  style={[
-                    styles.guideVisibleButtonText,
-                    themed.text,
-                    settings.guideVisible && styles.guideVisibleButtonTextActive,
-                    settings.guideVisible && themed.inverseText
-                  ]}
-                >
-                  {settings.guideVisible ? "켜짐" : "꺼짐"}
-                </Text>
-              </Pressable>
             </View>
 
             <View style={styles.guideCollapsedRow}>
               <Text selectable style={[styles.guideSummary, themed.mutedText]}>
                 {GUIDE_LABELS[settings.defaultGuide]} / {settings.guideSize} / {settings.guideStrokeWidth}px /{" "}
-                {Math.round(settings.overlayOpacity * 100)}%
+                {Math.round(settings.guideLineOpacity * 100)}%
               </Text>
+              {guideExpanded ? (
+                <Pressable
+                  style={[
+                    styles.guideVisibleButton,
+                    themed.secondaryButton,
+                    settings.guideVisible && styles.guideVisibleButtonActive,
+                    settings.guideVisible && themed.activeFill
+                  ]}
+                  onPress={() => updateSetting({ guideVisible: !settings.guideVisible })}
+                >
+                  <Text
+                    selectable={false}
+                    style={[
+                      styles.guideVisibleButtonText,
+                      themed.text,
+                      settings.guideVisible && styles.guideVisibleButtonTextActive,
+                      settings.guideVisible && themed.inverseText
+                    ]}
+                  >
+                    {settings.guideVisible ? "켜짐" : "꺼짐"}
+                  </Text>
+                </Pressable>
+              ) : null}
               <Pressable
                 style={[styles.guideExpandButton, themed.secondaryButton]}
                 onPress={() => setGuideExpanded((value) => !value)}
@@ -1290,6 +1324,7 @@ export default function SettingsScreen() {
                   offsetFrameHeight={settings.guideOffsetFrameHeight}
                   gridLinePositions={settings.gridGuideLinePositions}
                   shapePoints={settings.guideShapePoints}
+                  opacity={settings.guideLineOpacity}
                 />
                 {!settings.guideVisible ? (
                   <View style={styles.guidePreviewDisabled}>
@@ -1415,7 +1450,8 @@ export default function SettingsScreen() {
                   </Pressable>
                 ))}
               </View>
-              <SettingsGuideSizeSlider
+              <GuideSizeSlider
+                compact
                 value={settings.guideSize}
                 min={guideSizeBounds.min}
                 max={guideSizeBounds.max}
@@ -1463,27 +1499,27 @@ export default function SettingsScreen() {
 
             <View style={styles.compactGroup}>
               <Text selectable style={[styles.compactGroupTitle, themed.text]}>
-                오버레이 투명도
+                가이드 라인 투명도
               </Text>
               <View style={styles.compactOptionRow}>
-                {opacityOptions.map((opacity) => (
+                {guideLineOpacityOptions.map((opacity) => (
                   <Pressable
                     key={opacity}
                     style={[
                       styles.compactOption,
                       themed.secondaryButton,
-                      settings.overlayOpacity === opacity && styles.compactOptionActive,
-                      settings.overlayOpacity === opacity && themed.activeFill
+                      settings.guideLineOpacity === opacity && styles.compactOptionActive,
+                      settings.guideLineOpacity === opacity && themed.activeFill
                     ]}
-                    onPress={() => updateSetting({ overlayOpacity: opacity })}
+                    onPress={() => updateSetting({ guideLineOpacity: opacity })}
                   >
                     <Text
                       selectable={false}
                       style={[
                         styles.compactOptionText,
                         themed.text,
-                        settings.overlayOpacity === opacity && styles.compactOptionTextActive,
-                        settings.overlayOpacity === opacity && themed.inverseText
+                        settings.guideLineOpacity === opacity && styles.compactOptionTextActive,
+                        settings.guideLineOpacity === opacity && themed.inverseText
                       ]}
                     >
                       {Math.round(opacity * 100)}%
@@ -1506,8 +1542,8 @@ export default function SettingsScreen() {
           />
           <ActionRow
             label="저장 범위"
-            detail="카메라 촬영 사진을 클라우드 백업과 핸드폰 앨범 중 어디에 저장할지 선택"
-            mark={cameraSaveScopeLabel[settings.cameraSaveScope]}
+            detail="카메라 촬영 사진을 앱 보관함, 핸드폰 앨범, 클라우드 중 어디에 저장할지 선택"
+            mark={getCameraSaveScopeLabel(settings.cameraSaveScope)}
             onPress={() => setActiveSetting("cameraSaveScope")}
           />
           <ActionRow
@@ -1691,14 +1727,14 @@ export default function SettingsScreen() {
                   ))
                 : null}
 
-              {activeSetting === "overlayOpacity"
-                ? opacityOptions.map((opacity) => (
+              {activeSetting === "guideLineOpacity"
+                ? guideLineOpacityOptions.map((opacity) => (
                     <OptionButton
                       key={opacity}
                       label={`${Math.round(opacity * 100)}%`}
-                      detail="이전 사진 오버레이 기본 투명도"
-                      active={settings.overlayOpacity === opacity}
-                      onPress={() => updateSetting({ overlayOpacity: opacity })}
+                      detail="카메라, 사진 편집, 영상 만들기에 적용되는 가이드 라인 투명도"
+                      active={settings.guideLineOpacity === opacity}
+                      onPress={() => updateSetting({ guideLineOpacity: opacity })}
                     />
                   ))
                 : null}
@@ -1716,15 +1752,20 @@ export default function SettingsScreen() {
                 : null}
 
               {activeSetting === "cameraSaveScope"
-                ? cameraSaveScopeOptions.map((scope) => (
-                    <OptionButton
-                      key={scope.value}
-                      label={scope.label}
-                      detail={scope.detail}
-                      active={settings.cameraSaveScope === scope.value}
-                      onPress={() => updateSetting({ cameraSaveScope: scope.value })}
-                    />
-                  ))
+                ? cameraSaveScopeOptions.map((scope) => {
+                    const isCloudSaveTargetDisabled = scope.value === "cloud" && !canSelectCloudSaveTarget;
+
+                    return (
+                      <OptionButton
+                        key={scope.value}
+                        label={scope.label}
+                        detail={scope.detail}
+                        active={getCameraSaveScopeTargets(settings.cameraSaveScope)[scope.value] && !isCloudSaveTargetDisabled}
+                        disabled={isCloudSaveTargetDisabled}
+                        onPress={() => toggleCameraSaveTarget(scope.value)}
+                      />
+                    );
+                  })
                 : null}
 
               {activeSetting === "defaultRatio"

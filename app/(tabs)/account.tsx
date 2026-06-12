@@ -404,7 +404,7 @@ export default function AccountScreen() {
         description={
           isLoggedIn
             ? "이메일 인증, 구독 상태, 저장한 작업 기록을 한곳에서 확인합니다."
-            : "이메일 인증 후 프리미엄을 활성화하면 워터마크 없이 저장하고 작업 백업을 사용할 수 있습니다."
+            : "무료 로그인하면 사진 편집과 MP4 영상 주 1회 저장을 사용할 수 있습니다. Pro부터 워터마크 제거와 클라우드 백업이 제공됩니다."
         }
         safeTop
       >
@@ -547,7 +547,7 @@ export default function AccountScreen() {
               {!hasFullAccess ? (
                 <View style={styles.verifyPanel}>
                   <Text selectable style={[styles.helpText, themed.mutedText]}>
-                    이메일 인증과 프리미엄 활성화가 완료되어야 운영 환경에서 전체 기능과 워터마크 제거를 안정적으로 사용할 수 있습니다.
+                    이메일 인증과 Pro 활성화가 완료되면 워터마크 제거, 클라우드 백업, 고급 출력 기능을 사용할 수 있습니다.
                   </Text>
                   <View style={styles.inlineActions}>
                     <Pressable

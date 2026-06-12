@@ -126,7 +126,7 @@ for (const snippet of [
 }
 
 assert.ok(
-  overlaySource.includes("style={[styles.constrainedFrame, constrainedFrameStyle, offsetStyle]}"),
+  /style=\{\[\s*styles\.constrainedFrame,\s*constrainedFrameStyle,\s*offsetStyle,/.test(overlaySource),
   "guide overlay should apply the stored position offset"
 );
 

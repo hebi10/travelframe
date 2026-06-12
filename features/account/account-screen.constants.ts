@@ -45,9 +45,10 @@ export const initialSubscriptionProducts: UserSubscriptionProducts = {
 };
 
 export const signedInBenefits = [
-  "주 1회 영상 출력과 기본 출력 제공",
+  "사진 편집과 MP4 영상 주 1회",
   "앱 내 보관함 이미지 100개, 영상 30개",
-  "워터마크 포함, 광고 표시"
+  "워터마크 포함, 광고 표시",
+  "클라우드 백업은 Pro부터 사용 가능"
 ];
 
 export const paymentPlans: PaymentPlan[] = [

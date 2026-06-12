@@ -22,7 +22,7 @@ for (const [name, source] of [
   assert.ok(source.includes("이미지 보관함"), `${name} should show image library quota`);
   assert.ok(source.includes("영상 보관함"), `${name} should show video library quota`);
   assert.ok(source.includes("음악 보관함"), `${name} should show music library quota`);
-  assert.ok(source.includes("서버 백업"), `${name} should show server backup storage quota`);
+  assert.ok(source.includes("클라우드 백업"), `${name} should show cloud backup storage quota`);
   assert.ok(source.includes("getWeeklyVideoExportUsage"), `${name} should load weekly video usage`);
   assert.ok(source.includes("planEntitlements.backupStorageBytes"), `${name} should use the plan backup storage limit`);
   assert.ok(source.includes("formatQuotaValue"), `${name} should format used and remaining quotas`);

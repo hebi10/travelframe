@@ -92,7 +92,7 @@ assert.ok(
 
 for (const snippet of [
   "저장 방식",
-  "앱 보관함에만 저장 / 클라우드 백업",
+  "앱 보관함 / 핸드폰 앨범 / 클라우드",
   "getStorageModeLabel(effectiveStorageMode)",
   "getEffectiveStorageMode",
   "STORAGE_MODE_OPTIONS"

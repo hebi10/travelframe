@@ -30,6 +30,7 @@ type EditablePhotoCanvasProps = {
   guideSize: number;
   guideStrokeWidth: number;
   guideColor: string;
+  guideLineOpacity?: number;
   guideOffsetX?: number;
   guideOffsetY?: number;
   guideOffsetFrameWidth?: number;
@@ -205,6 +206,7 @@ export const EditablePhotoCanvas = forwardRef<
   guideSize,
   guideStrokeWidth,
   guideColor,
+  guideLineOpacity = 1,
   guideOffsetX = 0,
   guideOffsetY = 0,
   guideOffsetFrameWidth = 0,
@@ -486,6 +488,7 @@ export const EditablePhotoCanvas = forwardRef<
                 size={guideSize}
                 strokeWidth={guideStrokeWidth}
                 color={guideColor}
+                opacity={guideLineOpacity}
                 aspectRatio={frameAspectRatio}
                 offsetX={guideOffsetX}
                 offsetY={guideOffsetY}

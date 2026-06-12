@@ -1,14 +1,10 @@
-import { useMemo, useState } from "react";
-import { Pressable, Text, View, type GestureResponderEvent } from "react-native";
+import { useMemo } from "react";
+import { Pressable, Text, View } from "react-native";
 
 import { typography } from "@/constants/app-theme";
-import { GUIDE_SIZE_MAX, GUIDE_SIZE_MIN, getFontSizeScale, type FontSize, type FontStyle } from "@/lib/app-settings";
+import { getFontSizeScale, type FontSize, type FontStyle } from "@/lib/app-settings";
 import { getFontWeightForStyle, useAppAppearance } from "@/lib/app-appearance";
 import { getFontFamilyForStyle, useAppFontsReady } from "@/lib/app-fonts";
-import {
-  clampSettingsGuideSizeInRange,
-  getGuideSizeFromTrackX
-} from "@/features/settings/settings-screen.helpers";
 import { createThemedStyles, styles } from "@/features/settings/settings-screen.styles";
 
 export function OptionButton({
@@ -105,83 +101,5 @@ export function OptionButton({
         ]}
       />
     </Pressable>
-  );
-}
-
-export function SettingsGuideSizeSlider({
-  value,
-  min = GUIDE_SIZE_MIN,
-  max = GUIDE_SIZE_MAX,
-  onChange,
-  onCommit
-}: {
-  value: number;
-  min?: number;
-  max?: number;
-  onChange: (value: number) => void;
-  onCommit: (value: number) => void;
-}) {
-  const { palette, fontFamily, emphasisWeight } = useAppAppearance();
-  const [trackWidth, setTrackWidth] = useState(1);
-  const progress =
-    ((clampSettingsGuideSizeInRange(value, min, max) - min) /
-      (max - min)) *
-    100;
-  const getEventValue = (event: GestureResponderEvent) =>
-    getGuideSizeFromTrackX(event.nativeEvent.locationX, trackWidth, min, max);
-
-  const handlePreview = (event: GestureResponderEvent) => {
-    onChange(getEventValue(event));
-  };
-
-  const handleCommit = (event: GestureResponderEvent) => {
-    onCommit(getEventValue(event));
-  };
-
-  return (
-    <View style={styles.settingsGuideSizeSlider}>
-      <View style={styles.settingsGuideSizeSliderHeader}>
-        <Text selectable={false} style={[styles.settingsGuideSizeSliderLabel, { color: palette.muted, fontFamily, fontWeight: emphasisWeight }]}>
-          드래그로 크기 조절
-        </Text>
-        <Text selectable={false} style={[styles.settingsGuideSizeSliderValue, { color: palette.text, fontFamily, fontWeight: emphasisWeight }]}>
-          {Math.round(value)}
-        </Text>
-      </View>
-      <View
-        style={styles.settingsGuideSizeTrack}
-        onLayout={(event) => setTrackWidth(Math.max(1, event.nativeEvent.layout.width))}
-        onStartShouldSetResponder={() => true}
-        onResponderGrant={handlePreview}
-        onResponderMove={handlePreview}
-        onResponderRelease={handleCommit}
-      >
-        <View style={[styles.settingsGuideSizeTrackBase, { backgroundColor: palette.line }]} />
-        <View
-          style={[
-            styles.settingsGuideSizeTrackFill,
-            { backgroundColor: palette.text, width: `${progress}%` }
-          ]}
-        />
-        <View
-          style={[
-            styles.settingsGuideSizeThumb,
-            {
-              borderColor: palette.text,
-              backgroundColor: palette.background,
-              left: `${progress}%`
-            }
-          ]}
-        />
-      </View>
-      <View style={styles.settingsGuideSizeSliderRange}>
-        <Text selectable={false} style={[styles.settingsGuideSizeSliderRangeText, { color: palette.muted, fontFamily, fontWeight: emphasisWeight }]}>
-          {min}
-        </Text>
-        <Text selectable={false} style={[styles.settingsGuideSizeSliderRangeText, { color: palette.muted, fontFamily, fontWeight: emphasisWeight }]}>
-          {max}
-        </Text>
-      </View>
-    </View>
   );
 }

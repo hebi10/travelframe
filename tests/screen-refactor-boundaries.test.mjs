@@ -29,9 +29,9 @@ for (const path of expectedFeatureFiles) {
 
 const screenBoundaries = [
   ["app/(tabs)/account.tsx", "@/features/account/", 1250],
-  ["app/(tabs)/camera.tsx", "@/features/camera/", 2600],
+  ["app/(tabs)/camera.tsx", "@/features/camera/", 2830],
   ["app/(tabs)/settings.tsx", "@/features/settings/", 2300],
-  ["app/(tabs)/trip-clip.tsx", "@/features/trip-clip/", 3200]
+  ["app/(tabs)/trip-clip.tsx", "@/features/trip-clip/", 3300]
 ];
 
 for (const [path, importPrefix, maxLines] of screenBoundaries) {

@@ -37,6 +37,7 @@ type TripClipPreviewPlayerProps = {
   guideSize: number;
   guideStrokeWidth: number;
   guideColor: string;
+  guideLineOpacity?: number;
   guideOffsetX?: number;
   guideOffsetY?: number;
   guideOffsetFrameWidth?: number;
@@ -110,6 +111,7 @@ export function TripClipPreviewPlayer({
   guideSize,
   guideStrokeWidth,
   guideColor,
+  guideLineOpacity = 1,
   guideOffsetX = 0,
   guideOffsetY = 0,
   guideOffsetFrameWidth = 0,
@@ -368,6 +370,7 @@ export function TripClipPreviewPlayer({
         size={guideSize}
         strokeWidth={guideStrokeWidth}
         color={guideColor}
+        opacity={guideLineOpacity}
         offsetX={guideOffsetX}
         offsetY={guideOffsetY}
         offsetFrameWidth={guideOffsetFrameWidth}

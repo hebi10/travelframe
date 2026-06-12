@@ -15,6 +15,10 @@ import {
   assertCanSaveToMediaLibrary,
   MEDIA_LIBRARY_SAVE_UNAVAILABLE_MESSAGE
 } from "./media-library-availability";
+import {
+  getMediaLibraryAccessState,
+  getMediaLibraryPermissionMessage
+} from "@/lib/media-library-permissions";
 
 type MediaLibraryModule = typeof import("expo-media-library");
 type MediaPermissionKind = "photo" | "video";
@@ -53,11 +57,17 @@ const requestSavePermission = async (kind: MediaPermissionKind) => {
   const MediaLibrary = await getMediaLibrary();
   const permission =
     Platform.OS === "android"
-      ? await MediaLibrary.requestPermissionsAsync(true, [kind])
-      : await MediaLibrary.requestPermissionsAsync(true);
+      ? await MediaLibrary.requestPermissionsAsync(false, [kind])
+      : await MediaLibrary.requestPermissionsAsync(false);
+  const state = getMediaLibraryAccessState(permission);
 
-  if (!permission.granted) {
-    throw new Error("핸드폰 앨범 저장 권한이 필요합니다.");
+  const permissionMessage = getMediaLibraryPermissionMessage(
+    state,
+    "핸드폰 앨범 저장 권한이 필요합니다."
+  );
+
+  if (state !== "full") {
+    throw new Error(permissionMessage);
   }
 
   return MediaLibrary;
@@ -119,18 +129,6 @@ const getImageSaveMimeType = (uri: string, format: ImageSaveFormat) => {
   return getMimeType(uri);
 };
 
-const getImageSaveExtension = (mimeType: string) => {
-  if (mimeType === "image/png") {
-    return "png";
-  }
-
-  if (mimeType === "image/webp") {
-    return "webp";
-  }
-
-  return "jpg";
-};
-
 const getImageSaveFormat = (uri: string, format: ImageSaveFormat) => {
   const mimeType = getImageSaveMimeType(uri, format);
 
@@ -152,7 +150,6 @@ const saveImageToAndroidDownload = async (
 ) => {
   const saveUri = await prepareImageForLibrarySave(uri, format, options);
   const mimeType = getImageSaveMimeType(saveUri, format);
-  const extension = getImageSaveExtension(mimeType);
   const directoryUri = await getAndroidDownloadDirectoryUri();
   const fileName = `travel-frame-${Date.now()}-${Math.random()
     .toString(36)

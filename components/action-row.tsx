@@ -56,7 +56,8 @@ export function ActionRow({ href, label, detail, mark = ">", onPress }: ActionRo
                 color: palette.muted,
                 fontSize: Math.round(typography.small * fontSizeScale),
                 lineHeight: Math.round(18 * fontSizeScale),
-                fontFamily
+                fontFamily,
+                fontWeight: "700"
               }
             ]}
           >

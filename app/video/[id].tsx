@@ -3,6 +3,7 @@ import { Stack, router, type Href, useFocusEffect, useLocalSearchParams } from "
 import { Component, type ReactNode, useCallback, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -13,6 +14,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AdBanner } from "@/components/ad-banner";
 import { colors, controls, spacing, typography } from "@/constants/app-theme";
+import { useAuth } from "@/lib/auth-context";
 import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 import { getMadeVideoById } from "@/lib/video-library";
 import type { MadeVideoItem } from "@/types/video";
@@ -48,6 +50,7 @@ const formatDuration = (seconds: number) => {
 
 export default function VideoDetailScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
+  const { user } = useAuth();
   const insets = useSafeAreaInsets();
   const bottomSafePadding = Math.max(insets.bottom + spacing.screen, spacing.screen);
   const [video, setVideo] = useState<MadeVideoItem | null>(null);
@@ -79,6 +82,17 @@ export default function VideoDetailScreen() {
       loadVideo();
     }, [loadVideo])
   );
+
+  const showLoginRequiredForVideoCreation = () => {
+    Alert.alert(
+      "로그인이 필요합니다",
+      "동영상 만들기는 로그인 후 주 1회 무료로 사용할 수 있습니다.",
+      [
+        { text: "닫기", style: "cancel" },
+        { text: "로그인하기", onPress: () => router.push("/account" as Href) }
+      ]
+    );
+  };
 
   const headerTitle = video?.title ?? "만든 영상";
 
@@ -169,12 +183,17 @@ export default function VideoDetailScreen() {
         <View style={styles.actions}>
           <Pressable
             style={styles.darkButton}
-            onPress={() =>
+            onPress={() => {
+              if (!user) {
+                showLoginRequiredForVideoCreation();
+                return;
+              }
+
               router.push({
                 pathname: "/trip-clip",
                 params: { videoId: video.id, returnTo: `/video/${video.id}` }
-              } as Href)
-            }
+              } as Href);
+            }}
           >
             <Text selectable={false} style={styles.darkButtonText}>
               다시 편집하기

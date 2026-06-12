@@ -13,6 +13,7 @@ import {
 } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Modal,
   Platform,
   Pressable,
@@ -77,10 +78,12 @@ import {
   saveTripClipDraft,
   type TripClipDraft
 } from "@/lib/trip-clip-draft";
+import { getNextTripClipTitle } from "@/lib/trip-clip-title";
 import {
   DEFAULT_GUIDE_COLOR,
   GUIDE_STROKE_WIDTH_MAX,
   GUIDE_STROKE_WIDTH_MIN,
+  defaultAppSettings,
   defaultGridGuideLinePositions,
   defaultGuideShapePoints,
   getAppSettings,
@@ -98,7 +101,12 @@ import {
 import { resolveImageDimensions } from "@/lib/image-backup-utils";
 import { deselectTripClipPhoto } from "@/lib/trip-clip-selection";
 import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
-import { getMadeVideoById, saveMadeVideo, updateMadeVideo } from "@/lib/video-library";
+import {
+  getMadeVideoById,
+  getMadeVideos,
+  saveMadeVideo,
+  updateMadeVideo
+} from "@/lib/video-library";
 import {
   calculateVideoDuration,
   formatVideoDuration,
@@ -114,6 +122,7 @@ import {
 } from "@/lib/trip-clip-photo-adjustment";
 import {
   getImageBundleWorkById,
+  getImageBundleWorks,
   saveImageBundleWork,
   updateImageBundleWork
 } from "@/lib/work-library";
@@ -301,16 +310,19 @@ const formatDraftTime = (value: string) =>
   }).format(new Date(value));
 
 export default function TripClipScreen() {
-  const { bundleId, videoId, returnTo } = useLocalSearchParams<{
+  const { bundleId, videoId, returnTo, start } = useLocalSearchParams<{
     bundleId?: string;
     videoId?: string;
     returnTo?: string | string[];
+    start?: string | string[];
   }>();
   const returnToParam = Array.isArray(returnTo) ? returnTo[0] : returnTo;
+  const startParam = Array.isArray(start) ? start[0] : start;
   const backTarget = returnToParam ?? "/studio?tab=videos";
+  const shouldStartFreshProject = startParam === "new";
   const isEditingMadeVideo = Boolean(videoId);
   const recorder = useOptionalViewRecorder();
-  const { user, isLoggedIn, subscription } = useAuth();
+  const { user, isLoggedIn, isAuthLoading, subscription } = useAuth();
   const insets = useSafeAreaInsets();
   const bottomSafePadding = Math.max(insets.bottom + 12, 28);
   const modalSafeStyle = useMemo(
@@ -346,6 +358,9 @@ export default function TripClipScreen() {
   const [previewGuideStrokeWidth, setPreviewGuideStrokeWidth] = useState(1);
   const [previewGuideColor, setPreviewGuideColor] = useState<string>(
     GUIDE_COLOR_OPTIONS[0].value
+  );
+  const [previewGuideLineOpacity, setPreviewGuideLineOpacity] = useState(
+    defaultAppSettings.guideLineOpacity
   );
   const [previewGuideOffsetX, setPreviewGuideOffsetX] = useState(0);
   const [previewGuideOffsetY, setPreviewGuideOffsetY] = useState(0);
@@ -432,6 +447,7 @@ export default function TripClipScreen() {
     [isLoggedIn, subscription]
   );
   const weeklyVideoExportLimit = planEntitlements.weeklyVideoExportLimit;
+  const canUseVideoCreation = planEntitlements.canExportVideo;
   const premiumExportActive = planEntitlements.canUseAdvancedOutput;
   const videoBackupLimit = getCloudBackupVideoLimit(planEntitlements.tier);
   const videoBackupRemaining = getRemainingBackupSlots(
@@ -445,6 +461,7 @@ export default function TripClipScreen() {
     planEntitlements.canBackupToCloud &&
     canBackupMoreVideos(backupOverview.videoCount, planEntitlements.tier);
   const player = useAudioPlayer(activeMusicSource);
+  const loginRequiredVideoAlertShownRef = useRef(false);
 
   const selectedPhotos = useMemo(
     () =>
@@ -509,6 +526,7 @@ export default function TripClipScreen() {
       previewGuideSize,
       previewGuideStrokeWidth,
       previewGuideColor,
+      previewGuideLineOpacity,
       previewGuideOffsetX,
       previewGuideOffsetY,
       activeEditorTab,
@@ -528,6 +546,7 @@ export default function TripClipScreen() {
       previewAdjustEnabled,
       previewGuide,
       previewGuideColor,
+      previewGuideLineOpacity,
       previewGuideOffsetX,
       previewGuideOffsetY,
       previewGuideSize,
@@ -589,6 +608,31 @@ export default function TripClipScreen() {
     router.replace(backTarget as Href);
   }, [backTarget]);
 
+  const showLoginRequiredForVideoCreation = useCallback(() => {
+    setExportMessage("동영상 만들기는 로그인 후 주 1회 무료로 사용할 수 있습니다.");
+    setExportProgress({
+      visible: true,
+      percent: 100,
+      title: "로그인이 필요합니다",
+      detail: "무료 로그인 사용자는 MP4 영상을 주 1회 만들 수 있습니다.",
+      error: "마이페이지에서 로그인한 뒤 다시 시도해 주세요."
+    });
+  }, []);
+
+  useEffect(() => {
+    if (isAuthLoading || canUseVideoCreation || loginRequiredVideoAlertShownRef.current) {
+      return;
+    }
+
+    loginRequiredVideoAlertShownRef.current = true;
+    Alert.alert(
+      "로그인이 필요합니다",
+      "동영상 만들기는 로그인 후 주 1회 무료로 사용할 수 있습니다.",
+      [{ text: "확인", onPress: () => router.replace("/account" as Href) }]
+    );
+    router.replace("/account" as Href);
+  }, [canUseVideoCreation, isAuthLoading]);
+
   const handleHeaderSavePress = () => {
     if (isEditingMadeVideo) {
       void saveSelectedExport({ returnToVideoWorks: true });
@@ -627,6 +671,7 @@ export default function TripClipScreen() {
     setPreviewGuideSizeInput(String(availableDraft.previewGuideSize));
     setPreviewGuideStrokeWidth(availableDraft.previewGuideStrokeWidth);
     setPreviewGuideColor(availableDraft.previewGuideColor);
+    setPreviewGuideLineOpacity(availableDraft.previewGuideLineOpacity);
     setPreviewGuideOffsetX(availableDraft.previewGuideOffsetX);
     setPreviewGuideOffsetY(availableDraft.previewGuideOffsetY);
     previewGuideOffsetXValue.value = availableDraft.previewGuideOffsetX;
@@ -716,7 +761,14 @@ export default function TripClipScreen() {
   const loadPhotos = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [storedPhotos, settings, storedMusicTracks, storedWeeklyUsage] = await Promise.all([
+      const [
+        storedPhotos,
+        settings,
+        storedMusicTracks,
+        storedWeeklyUsage,
+        storedVideos,
+        storedImageBundles
+      ] = await Promise.all([
         getPhotos().then(ensurePhotoPreviews),
         getAppSettings(),
         user ? syncUserMusicTracks(user) : Promise.resolve([]),
@@ -727,7 +779,9 @@ export default function TripClipScreen() {
                   flushedUsage ?? getWeeklyVideoExportUsage(user, weeklyVideoExportLimit)
               )
               .catch(() => getWeeklyVideoExportUsage(user, weeklyVideoExportLimit))
-          : getWeeklyVideoExportUsage(user, weeklyVideoExportLimit)
+          : getWeeklyVideoExportUsage(user, weeklyVideoExportLimit),
+        getMadeVideos(),
+        getImageBundleWorks()
       ]);
       setPhotos(storedPhotos);
       setUserMusicTracks(storedMusicTracks);
@@ -748,6 +802,7 @@ export default function TripClipScreen() {
       setPreviewGuideSizeInput(String(settings.guideSize));
       setPreviewGuideStrokeWidth(settings.guideStrokeWidth);
       setPreviewGuideColor(settings.guideColor);
+      setPreviewGuideLineOpacity(settings.guideLineOpacity);
       setPreviewGuideOffsetX(settings.guideOffsetX);
       setPreviewGuideOffsetY(settings.guideOffsetY);
       setPreviewGuideOffsetFrameWidth(settings.guideOffsetFrameWidth);
@@ -797,6 +852,11 @@ export default function TripClipScreen() {
         }
       }
 
+      const nextWorkTitle = getNextTripClipTitle([
+        ...storedVideos.map((video) => video.title),
+        ...storedImageBundles.map((bundle) => bundle.title)
+      ]);
+      setWorkTitle((current) => current.trim() ? current : nextWorkTitle);
       setRatio(settings.defaultRatio);
       const shouldSuppressAutoVideoSelection = suppressAutoVideoSelectionRef.current;
       suppressAutoVideoSelectionRef.current = false;
@@ -1068,6 +1128,13 @@ export default function TripClipScreen() {
     let isMounted = true;
 
     const loadTripClipDraft = async () => {
+      if (shouldStartFreshProject) {
+        resetNewTripClipProject();
+        setAvailableDraft(null);
+        setShowDraftPrompt(false);
+        return;
+      }
+
       const draft = await getTripClipDraft();
       if (!isMounted) {
         return;
@@ -1087,7 +1154,13 @@ export default function TripClipScreen() {
     return () => {
       isMounted = false;
     };
-  }, [bundleId, isLoading, videoId]);
+  }, [
+    bundleId,
+    isLoading,
+    resetNewTripClipProject,
+    shouldStartFreshProject,
+    videoId
+  ]);
 
   useEffect(() => {
     if (isLoading || bundleId || videoId) {
@@ -1685,6 +1758,11 @@ export default function TripClipScreen() {
   const saveSelectedExport = async ({
     returnToVideoWorks = false
   }: SaveSelectedExportOptions = {}) => {
+    if (!canUseVideoCreation) {
+      showLoginRequiredForVideoCreation();
+      return;
+    }
+
     if (exportFormat !== "mp4") {
       await executeSelectedExport({ returnToVideoWorks });
       return;
@@ -2068,6 +2146,11 @@ export default function TripClipScreen() {
   };
 
   const shareSelectedExport = async () => {
+    if (!canUseVideoCreation) {
+      showLoginRequiredForVideoCreation();
+      return;
+    }
+
     if (exportFormat === "mp4" && videoDurationTooLong) {
       showVideoDurationBlocked();
       return;
@@ -2247,6 +2330,7 @@ export default function TripClipScreen() {
                 guideSize={previewGuideSize}
                 guideStrokeWidth={previewGuideStrokeWidth}
                 guideColor={previewGuideColor}
+                guideLineOpacity={previewGuideLineOpacity}
                 guideOffsetX={previewGuideOffsetX}
                 guideOffsetY={previewGuideOffsetY}
                 guideOffsetFrameWidth={previewGuideOffsetFrameWidth}
@@ -3027,6 +3111,7 @@ export default function TripClipScreen() {
               guideSize={previewGuideSize}
               guideStrokeWidth={previewGuideStrokeWidth}
               guideColor={previewGuideColor}
+              guideLineOpacity={previewGuideLineOpacity}
               guideOffsetX={previewGuideOffsetX}
               guideOffsetY={previewGuideOffsetY}
               guideOffsetFrameWidth={previewGuideOffsetFrameWidth}

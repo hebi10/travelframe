@@ -46,18 +46,23 @@ assert.equal(
 );
 
 assert.equal(PLAN_ENTITLEMENTS.guest.canExportVideo, false);
+assert.equal(PLAN_ENTITLEMENTS.guest.localImageLimit, 100);
+assert.equal(PLAN_ENTITLEMENTS.guest.localVideoLimit, 30);
+assert.equal(PLAN_ENTITLEMENTS.free.canExportVideo, true);
 assert.equal(PLAN_ENTITLEMENTS.free.weeklyVideoExportLimit, 1);
 assert.equal(PLAN_ENTITLEMENTS.free.showWatermark, true);
 assert.equal(PLAN_ENTITLEMENTS.free.showAds, true);
 assert.equal(PLAN_ENTITLEMENTS.free.localImageLimit, 100);
 assert.equal(PLAN_ENTITLEMENTS.free.localVideoLimit, 30);
 
+assert.equal(PLAN_ENTITLEMENTS.ad_remove.canExportVideo, true);
 assert.equal(PLAN_ENTITLEMENTS.ad_remove.weeklyVideoExportLimit, 1);
 assert.equal(PLAN_ENTITLEMENTS.ad_remove.showAds, false);
 assert.equal(PLAN_ENTITLEMENTS.ad_remove.showWatermark, true);
 assert.equal(PLAN_ENTITLEMENTS.ad_remove.canBackupToCloud, false);
 
 assert.equal(PLAN_ENTITLEMENTS.pro.weeklyVideoExportLimit, 15);
+assert.equal(PLAN_ENTITLEMENTS.pro.canExportVideo, true);
 assert.equal(PLAN_ENTITLEMENTS.pro.showAds, false);
 assert.equal(PLAN_ENTITLEMENTS.pro.showWatermark, false);
 assert.equal(PLAN_ENTITLEMENTS.pro.localImageLimit, 200);
@@ -66,6 +71,7 @@ assert.equal(PLAN_ENTITLEMENTS.pro.musicTrackLimit, 10);
 assert.equal(PLAN_ENTITLEMENTS.pro.backupStorageBytes, 2 * 1024 * 1024 * 1024);
 
 assert.equal(PLAN_ENTITLEMENTS.expert.weeklyVideoExportLimit, 30);
+assert.equal(PLAN_ENTITLEMENTS.expert.canExportVideo, true);
 assert.equal(PLAN_ENTITLEMENTS.expert.localImageLimit, 300);
 assert.equal(PLAN_ENTITLEMENTS.expert.localVideoLimit, 100);
 assert.equal(PLAN_ENTITLEMENTS.expert.musicTrackLimit, 20);

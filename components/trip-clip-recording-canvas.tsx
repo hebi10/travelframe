@@ -66,6 +66,7 @@ export function TripClipRecordingCanvas({
   guideSize,
   guideStrokeWidth,
   guideColor,
+  guideLineOpacity = 1,
   guideOffsetX,
   guideOffsetY,
   guideOffsetFrameWidth,
@@ -84,6 +85,7 @@ export function TripClipRecordingCanvas({
   guideSize: number;
   guideStrokeWidth: number;
   guideColor: string;
+  guideLineOpacity?: number;
   guideOffsetX: number;
   guideOffsetY: number;
   guideOffsetFrameWidth: number;
@@ -160,6 +162,7 @@ export function TripClipRecordingCanvas({
         size={guideSize}
         strokeWidth={guideStrokeWidth}
         color={guideColor}
+        opacity={guideLineOpacity}
         offsetX={guideOffsetX}
         offsetY={guideOffsetY}
         offsetFrameWidth={guideOffsetFrameWidth}

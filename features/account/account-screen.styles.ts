@@ -36,6 +36,7 @@ export const createAccountThemedStyles = (palette: AppPalette, fontFamily?: stri
     },
     mutedText: {
       color: palette.muted,
+      fontWeight: "700",
       ...fontTextStyle
     },
     inverseText: {

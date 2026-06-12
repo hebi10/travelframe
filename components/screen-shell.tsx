@@ -72,7 +72,8 @@ export function ScreenShell({
                 color: palette.muted,
                 fontSize: Math.round(typography.body * fontSizeScale),
                 lineHeight: Math.round(21 * fontSizeScale),
-                fontFamily
+                fontFamily,
+                fontWeight: "700"
               }
             ]}
           >

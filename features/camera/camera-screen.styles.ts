@@ -918,18 +918,6 @@ export const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: "rgba(255, 255, 255, 0.08)"
   },
-  galleryEmptyLine: {
-    width: 24,
-    height: 2,
-    backgroundColor: colors.inverse
-  },
-  galleryEmptyDot: {
-    width: 8,
-    height: 8,
-    marginTop: 5,
-    borderRadius: 999,
-    backgroundColor: colors.inverse
-  },
   opacityStepButton: {
     width: 34,
     height: controls.height,

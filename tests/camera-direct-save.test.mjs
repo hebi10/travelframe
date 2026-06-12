@@ -7,10 +7,15 @@ const photoLibrarySource = fs.readFileSync("lib/photo-library.ts", "utf8");
 const tripClipExportSource = fs.readFileSync("lib/trip-clip-export.ts", "utf8");
 
 for (const snippet of [
-  'export type CameraSaveScope = "app" | "device" | "both"',
-  'cameraSaveScope: "both"',
+  'export type CameraSaveTarget = "app" | "device" | "cloud"',
+  "export type CameraSaveScope =",
+  '"app_device"',
+  '"app_cloud"',
+  '"device_cloud"',
+  '"all"',
+  'cameraSaveScope: "app_device"',
   "const cameraSaveScopes: CameraSaveScope[]",
-  "cameraSaveScopes.includes(nextSettings.cameraSaveScope)"
+  "normalizeCameraSaveScope(nextSettings.cameraSaveScope)"
 ]) {
   assert.ok(settingsSource.includes(snippet), `camera save scope setting missing: ${snippet}`);
 }
@@ -18,12 +23,12 @@ for (const snippet of [
 for (const snippet of [
   "Alert,",
   "CAMERA_SAVE_SCOPE_OPTIONS",
-  'label: "클라우드 백업 + 핸드폰 앨범"',
-  'label: "클라우드 백업"',
+  'label: "앱 보관함"',
   'label: "핸드폰 앨범"',
+  'label: "클라우드"',
   "const [cameraSaveScope, setCameraSaveScope] = useState<CameraSaveScope>(defaultAppSettings.cameraSaveScope)",
   "setCameraSaveScope(settings.cameraSaveScope)",
-  "const updateCameraSaveScope = (nextScope: CameraSaveScope)",
+  "const toggleCameraSaveTarget = (target: CameraSaveTarget)",
   "queueAppSettingsUpdate({ cameraSaveScope: nextScope })",
   "저장 범위",
   "const cameraNativeCaptureInProgressRef = useRef(false)",
@@ -33,8 +38,10 @@ for (const snippet of [
   "captureSaveQueueTailRef.current = queuedSave.catch(() => undefined);",
   "void queuedSave.catch",
   "queueCapturedPhotoSave({",
-  'saveScope !== "device"',
-  'saveScope !== "app"',
+  "getCameraSaveScopeTargets(saveScope)",
+  "targets.app || targets.cloud",
+  "targets.device",
+  "targets.cloud",
   "saveCapturedPhoto(captureInput)",
   "saveCapturedPhotoToDevice(captureInput)",
   "let deviceSaveError: unknown = null;",

@@ -56,8 +56,8 @@ assert.ok(
 );
 assert.ok(
   settingsComponentsSource.includes("fontFamily, emphasisWeight") &&
-    settingsComponentsSource.includes("fontFamily,") &&
-    settingsComponentsSource.includes("fontWeight: emphasisWeight"),
+    settingsComponentsSource.includes("fontFamily: previewFontFamily") &&
+    settingsComponentsSource.includes("fontWeight: previewFontWeight"),
   "settings custom controls should apply the selected font family directly"
 );
 

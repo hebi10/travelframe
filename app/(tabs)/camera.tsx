@@ -86,11 +86,14 @@ import {
   defaultAppSettings,
   defaultGridGuideLinePositions,
   defaultGuideShapePoints,
+  createCameraSaveScope,
   getAppSettings,
+  getCameraSaveScopeTargets,
   getGuideSizeBounds,
   updateAppSettings,
   type AppSettings,
   type CameraFacing,
+  type CameraSaveTarget,
   type CameraShutterSoundMode,
   type CameraSaveScope,
   type GridGuideLineKey,
@@ -102,7 +105,6 @@ import { isMediaLibraryAccessGranted, requestMediaLibraryAccess } from "@/lib/re
 import { deleteLocalFile, getRecentPhoto, saveCapturedPhoto, saveCapturedPhotoToDevice } from "@/lib/photo-library";
 import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 import type { PhotoItem, PhotoRatioLabel, SaveCapturedPhotoInput } from "@/types/photo";
-
 const GUIDE_SIZE_OPTIONS = [
   { label: "작게", value: 34 },
   { label: "기본", value: 44 },
@@ -111,7 +113,6 @@ const GUIDE_SIZE_OPTIONS = [
 const GUIDE_STROKE_WIDTH_OPTIONS = [1, 2, 3, 4, 5] as const;
 const OVERLAY_OPACITY_MIN = 10;
 const OVERLAY_OPACITY_MAX = 85;
-
 const GUIDE_COLOR_OPTIONS = [
   { label: "흰색", value: DEFAULT_GUIDE_COLOR },
   { label: "노랑", value: "#F5D76E" },
@@ -139,10 +140,10 @@ const CAMERA_RATIO_OPTIONS: { label: string; value: PhotoRatioLabel }[] = [
   { label: "9:16", value: "9:16" },
   { label: "16:9", value: "16:9" }
 ];
-const CAMERA_SAVE_SCOPE_OPTIONS: { label: string; detail: string; value: CameraSaveScope }[] = [
-  { label: "클라우드 백업 + 핸드폰 앨범", detail: "앱 보관함에 저장하고 클라우드 백업과 핸드폰 앨범 저장을 함께 시도", value: "both" },
-  { label: "클라우드 백업", detail: "앱 보관함에 저장하고 클라우드 백업 설정이 켜져 있으면 계정에도 백업", value: "app" },
-  { label: "핸드폰 앨범", detail: "핸드폰 앨범에만 저장", value: "device" }
+const CAMERA_SAVE_SCOPE_OPTIONS: { label: string; detail: string; value: CameraSaveTarget }[] = [
+  { label: "앱 보관함", detail: "보관함 탭에서 다시 열 수 있도록 앱에 저장", value: "app" },
+  { label: "핸드폰 앨범", detail: "기기 갤러리 앱에서도 볼 수 있도록 저장", value: "device" },
+  { label: "클라우드", detail: "로그인 및 백업 설정이 가능한 경우 계정에 백업", value: "cloud" }
 ];
 const CAMERA_FACING_OPTIONS: { label: string; value: CameraFacing }[] = [
   { label: "후면", value: "back" },
@@ -364,6 +365,7 @@ export default function CameraScreen() {
     () => getPlanEntitlements({ isLoggedIn: Boolean(user), subscription }),
     [subscription, user]
   );
+  const canSelectCloudSaveTarget = planEntitlements.canBackupToCloud;
   const cameraRef = useRef<CameraRef>(null);
   const referenceOverlayRef = useRef<PhotoReferenceOverlayHandle>(null);
   const pendingSettingsPatchRef = useRef<CameraSettingsPatch | null>(null);
@@ -379,6 +381,7 @@ export default function CameraScreen() {
   const [guideSizeInput, setGuideSizeInput] = useState("44");
   const [guideStrokeWidth, setGuideStrokeWidth] = useState(1);
   const [guideColor, setGuideColor] = useState<string>(GUIDE_COLOR_OPTIONS[0].value);
+  const [guideLineOpacity, setGuideLineOpacity] = useState(defaultAppSettings.guideLineOpacity);
   const [guideOffsetX, setGuideOffsetX] = useState(0);
   const [guideOffsetY, setGuideOffsetY] = useState(0);
   const [guideOffsetFrameWidth, setGuideOffsetFrameWidth] = useState(0);
@@ -676,6 +679,7 @@ export default function CameraScreen() {
         setGuideSizeInput(String(settings.guideSize));
         setGuideStrokeWidth(settings.guideStrokeWidth);
         setGuideColor(settings.guideColor);
+        setGuideLineOpacity(settings.guideLineOpacity);
         setGuideOffsetX(settings.guideOffsetX);
         setGuideOffsetY(settings.guideOffsetY);
         setGuideOffsetFrameWidth(settings.guideOffsetFrameWidth);
@@ -1052,6 +1056,31 @@ export default function CameraScreen() {
   const updateCameraSaveScope = (nextScope: CameraSaveScope) => {
     setCameraSaveScope(nextScope);
     queueAppSettingsUpdate({ cameraSaveScope: nextScope });
+    void triggerFeedback();
+  };
+
+  const toggleCameraSaveTarget = (target: CameraSaveTarget) => {
+    if (target === "cloud" && !canSelectCloudSaveTarget) {
+      return;
+    }
+
+    const targets = getCameraSaveScopeTargets(cameraSaveScope);
+    const nextTargets = {
+      ...targets,
+      [target]: !targets[target]
+    };
+    if (!nextTargets.app && !nextTargets.device && !nextTargets.cloud) {
+      return;
+    }
+
+    const nextScope = createCameraSaveScope(nextTargets);
+    setCameraSaveScope(nextScope);
+    queueAppSettingsUpdate({
+      cameraSaveScope: nextScope,
+      ...(target === "cloud" && nextTargets.cloud
+        ? { storageMode: "local_backup" as const, cloudBackupEnabled: true }
+        : {})
+    });
     void triggerFeedback();
   };
 
@@ -1650,12 +1679,13 @@ export default function CameraScreen() {
       const runSaveJob = async () => {
         let savedPhoto: PhotoItem | null = null;
         let deviceSaveError: unknown = null;
+        const targets = getCameraSaveScopeTargets(saveScope);
 
         try {
-          if (saveScope !== "device") {
+          if (targets.app || targets.cloud) {
             savedPhoto = await saveCapturedPhoto(captureInput);
           }
-          if (saveScope !== "app") {
+          if (targets.device) {
             try {
               await saveCapturedPhotoToDevice(captureInput);
             } catch (deviceError) {
@@ -1665,22 +1695,24 @@ export default function CameraScreen() {
           }
           if (savedPhoto) {
             setRecentPhoto(savedPhoto);
-            try {
-              await backupPhotoIfEnabled({
-                user: backupUser,
-                subscription: backupSubscription,
-                photo: savedPhoto
-              });
-            } catch (backupError) {
-              await recordBackupFailure({
-                id: savedPhoto.id,
-                kind: "photo",
-                label: "촬영 사진",
-                message: getUserFacingErrorMessage(
-                  backupError,
-                  "클라우드 백업을 완료하지 못했습니다."
-                )
-              });
+            if (targets.cloud) {
+              try {
+                await backupPhotoIfEnabled({
+                  user: backupUser,
+                  subscription: backupSubscription,
+                  photo: savedPhoto
+                });
+              } catch (backupError) {
+                await recordBackupFailure({
+                  id: savedPhoto.id,
+                  kind: "photo",
+                  label: "촬영 사진",
+                  message: getUserFacingErrorMessage(
+                    backupError,
+                    "클라우드 백업을 완료하지 못했습니다."
+                  )
+                });
+              }
             }
           }
           if (deviceSaveError) {
@@ -1741,9 +1773,15 @@ export default function CameraScreen() {
       const captureInput = { uri: photoUri, ratioLabel: cameraRatio, localImageLimit: planEntitlements.localImageLimit };
       setIsCapturing(false);
       cameraNativeCaptureInProgressRef.current = false;
+      const captureSaveScope = canSelectCloudSaveTarget
+        ? cameraSaveScope
+        : createCameraSaveScope({
+            ...getCameraSaveScopeTargets(cameraSaveScope),
+            cloud: false
+          });
       queueCapturedPhotoSave({
         captureInput,
-        saveScope: cameraSaveScope,
+        saveScope: captureSaveScope,
         backupUser: user,
         backupSubscription: subscription
       });
@@ -1919,6 +1957,7 @@ export default function CameraScreen() {
           showShapeControlPoints={isGuideShapePointAdjusting}
           selectedShapePointIndex={selectedGuideShapePointIndex}
           aspectRatio={cameraRatioAspect[cameraRatio] ?? undefined}
+          opacity={guideLineOpacity}
         />
       </Animated.View>
       <PhotoReferenceOverlay
@@ -2290,30 +2329,40 @@ export default function CameraScreen() {
                 <View style={styles.cameraSettingBlock}>
                   <Text selectable={false} style={styles.modalSectionTitle}>저장 범위</Text>
                   <View style={styles.optionGrid}>
-                    {CAMERA_SAVE_SCOPE_OPTIONS.map((option) => (
-                      <Pressable
-                        key={option.value}
-                        style={[
-                          styles.optionButton,
-                          cameraSaveScope === option.value && styles.optionButtonActive
-                        ]}
-                        onPress={() => updateCameraSaveScope(option.value)}
-                        accessibilityState={{ selected: cameraSaveScope === option.value }}
-                      >
-                        <Text
-                          selectable={false}
+                    {CAMERA_SAVE_SCOPE_OPTIONS.map((option) => {
+                      const isCloudSaveTargetDisabled =
+                        option.value === "cloud" && !canSelectCloudSaveTarget;
+                      const isSelected =
+                        getCameraSaveScopeTargets(cameraSaveScope)[option.value] &&
+                        !isCloudSaveTargetDisabled;
+
+                      return (
+                        <Pressable
+                          key={option.value}
+                          disabled={isCloudSaveTargetDisabled}
                           style={[
-                            styles.optionButtonText,
-                            cameraSaveScope === option.value && styles.optionButtonTextActive
+                            styles.optionButton,
+                            isSelected && styles.optionButtonActive,
+                            isCloudSaveTargetDisabled && { opacity: 0.38 }
                           ]}
+                          onPress={() => toggleCameraSaveTarget(option.value)}
+                          accessibilityState={{ disabled: isCloudSaveTargetDisabled, selected: isSelected }}
                         >
-                          {option.label}
-                        </Text>
-                      </Pressable>
-                    ))}
+                          <Text
+                            selectable={false}
+                            style={[
+                              styles.optionButtonText,
+                              isSelected && styles.optionButtonTextActive
+                            ]}
+                          >
+                            {option.label}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
                   </View>
                   <Text selectable={false} style={styles.modalSectionDetail}>
-                    {CAMERA_SAVE_SCOPE_OPTIONS.find((option) => option.value === cameraSaveScope)?.detail}
+                    선택한 위치에 각각 저장합니다. 클라우드는 로그인 및 백업 설정이 가능한 경우에만 사용됩니다.
                   </Text>
                 </View>
 
@@ -2690,8 +2739,7 @@ export default function CameraScreen() {
                       <NativeImage source={{ uri: recentPhoto.uri }} style={styles.galleryThumb} resizeMode="cover" />
                     ) : (
                       <View style={styles.galleryEmptyThumb}>
-                        <View style={styles.galleryEmptyLine} />
-                        <View style={styles.galleryEmptyDot} />
+                        <Feather name="image" size={28} color={colors.inverse} />
                       </View>
                     )}
                   </Pressable>

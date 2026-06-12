@@ -12,6 +12,10 @@ assert.ok(
   "trip clip should use the current plan weekly video export limit"
 );
 assert.ok(
+  source.includes("planEntitlements.canExportVideo"),
+  "trip clip should use the plan video export entitlement"
+);
+assert.ok(
   source.includes("getWeeklyVideoExportUsage(user, weeklyVideoExportLimit)"),
   "trip clip should load weekly usage with the plan limit"
 );

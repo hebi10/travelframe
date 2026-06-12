@@ -29,8 +29,8 @@ export const PLAN_ENTITLEMENTS: Record<PlanTier, PlanEntitlements> = {
     showWatermark: true,
     canUseAdvancedOutput: false,
     canBackupToCloud: false,
-    localImageLimit: 0,
-    localVideoLimit: 0,
+    localImageLimit: 100,
+    localVideoLimit: 30,
     musicTrackLimit: 0,
     backupStorageBytes: 0
   },

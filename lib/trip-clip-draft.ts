@@ -7,6 +7,7 @@ import type {
 import type { ImageQuality } from "@/constants/image";
 import type { VideoQualityId } from "@/constants/video";
 import { localStorageAdapter } from "@/lib/local-storage";
+import { defaultAppSettings } from "@/lib/app-settings";
 import type { ImageSaveFormat } from "@/lib/trip-clip-export";
 import type { TripClipPhotoAdjustmentMap } from "@/lib/trip-clip-photo-adjustment";
 
@@ -30,6 +31,7 @@ export type TripClipDraft = {
   previewGuideSize: number;
   previewGuideStrokeWidth: number;
   previewGuideColor: string;
+  previewGuideLineOpacity: number;
   previewGuideOffsetX: number;
   previewGuideOffsetY: number;
   activeEditorTab: "photos" | "timeline" | "video" | "guide" | "music" | "export";
@@ -47,7 +49,15 @@ const parseTripClipDraft = (value: string | null): TripClipDraft | null => {
 
   try {
     const parsed = JSON.parse(value) as TripClipDraft;
-    return Array.isArray(parsed?.selectedIds) && parsed?.ratio ? parsed : null;
+    return Array.isArray(parsed?.selectedIds) && parsed?.ratio
+      ? {
+          ...parsed,
+          previewGuideLineOpacity:
+            typeof parsed.previewGuideLineOpacity === "number"
+              ? parsed.previewGuideLineOpacity
+              : defaultAppSettings.guideLineOpacity
+        }
+      : null;
   } catch {
     return null;
   }
