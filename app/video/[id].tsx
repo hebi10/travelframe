@@ -169,7 +169,12 @@ export default function VideoDetailScreen() {
         <View style={styles.actions}>
           <Pressable
             style={styles.darkButton}
-            onPress={() => router.push(`/trip-clip?videoId=${video.id}` as Href)}
+            onPress={() =>
+              router.push({
+                pathname: "/trip-clip",
+                params: { videoId: video.id, returnTo: `/video/${video.id}` }
+              } as Href)
+            }
           >
             <Text selectable={false} style={styles.darkButtonText}>
               다시 편집하기

@@ -1,4 +1,4 @@
-﻿import assert from "node:assert/strict";
+import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const tripClipSource = fs.readFileSync(
@@ -22,7 +22,7 @@ assert.ok(
 );
 assert.ok(
   tripClipSource.includes("<View\n            style={[\n              styles.exportModalPanel"),
-  "export progress panel should remain a View so actions can stay fixed inside it"
+  "export progress panel should remain a View around the completion content"
 );
 assert.ok(
   tripClipSource.includes("style={styles.exportModalScroll}") &&
@@ -39,9 +39,9 @@ const exportModalScrollStyle = readStyleBlock("exportModalScroll");
 const exportModalActionsStyle = readStyleBlock("exportModalActions");
 
 assert.ok(
-  exportModalPanelStyle.includes('maxHeight: "86%"') &&
-    exportModalPanelStyle.includes('overflow: "hidden"'),
-  "export modal panel should stay within the screen instead of overflowing"
+  !exportModalPanelStyle.includes("maxHeight") &&
+    !exportModalPanelStyle.includes('overflow: "hidden"'),
+  "export modal panel should not clip completion actions with a fixed height limit"
 );
 assert.ok(
   exportModalScrollStyle.includes("flexShrink: 1") &&

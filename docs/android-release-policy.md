@@ -35,6 +35,9 @@ features:
 `MODIFY_AUDIO_SETTINGS` is not requested unless a native audio-routing feature is added.
 The app does not request `READ_MEDIA_VIDEO` because current flows create videos
 inside the app but do not import videos from the user's external video library.
+`android.hardware.camera` and `android.hardware.microphone` are declared with
+`android:required="false"` so Google Play does not exclude otherwise compatible
+devices based only on hardware feature filters.
 
 Before Play Console upload, verify the merged release manifest with
 `npm run android:manifest:release` and confirm the Play Console permission and data

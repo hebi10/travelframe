@@ -10,14 +10,14 @@ export type StorageModeOption = {
 export const STORAGE_MODE_OPTIONS: StorageModeOption[] = [
   {
     value: "local_only",
-    label: "백업하지 않기",
-    detail: "사진과 작업물을 이 기기에만 저장합니다.",
+    label: "앱 보관함에만 저장",
+    detail: "사진과 작업물을 이 핸드폰의 앱 보관함에만 저장합니다.",
     requiresBackupPlan: false
   },
   {
     value: "local_backup",
-    label: "앱 + 서버 백업",
-    detail: "이 기기에 저장하고, 계정 서버에도 백업합니다.",
+    label: "클라우드 백업",
+    detail: "앱 보관함에 저장하고 클라우드 백업 설정이 켜져 있으면 계정에도 백업합니다.",
     requiresBackupPlan: false
   }
 ];

@@ -5,8 +5,11 @@ import { useAppAppearance } from "@/lib/app-appearance";
 import { createAccountThemedStyles, styles } from "@/features/account/account-screen.styles";
 
 export function StatusBadge({ label, active }: { label: string; active?: boolean }) {
-  const { palette } = useAppAppearance();
-  const themed = useMemo(() => createAccountThemedStyles(palette), [palette]);
+  const { palette, fontFamily } = useAppAppearance();
+  const themed = useMemo(
+    () => createAccountThemedStyles(palette, fontFamily),
+    [palette, fontFamily]
+  );
 
   return (
     <View
@@ -33,8 +36,11 @@ export function StatusBadge({ label, active }: { label: string; active?: boolean
 }
 
 export function InfoRow({ label, value }: { label: string; value: string }) {
-  const { palette } = useAppAppearance();
-  const themed = useMemo(() => createAccountThemedStyles(palette), [palette]);
+  const { palette, fontFamily } = useAppAppearance();
+  const themed = useMemo(
+    () => createAccountThemedStyles(palette, fontFamily),
+    [palette, fontFamily]
+  );
 
   return (
     <View style={[styles.infoRow, themed.bottomBorder]}>
@@ -49,8 +55,11 @@ export function InfoRow({ label, value }: { label: string; value: string }) {
 }
 
 export function StatCard({ label, value }: { label: string; value: number }) {
-  const { palette } = useAppAppearance();
-  const themed = useMemo(() => createAccountThemedStyles(palette), [palette]);
+  const { palette, fontFamily } = useAppAppearance();
+  const themed = useMemo(
+    () => createAccountThemedStyles(palette, fontFamily),
+    [palette, fontFamily]
+  );
 
   return (
     <View style={[styles.statCard, themed.panel]}>

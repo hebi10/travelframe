@@ -24,10 +24,10 @@ for (const snippet of [
 
 for (const snippet of [
   "STORAGE_MODE_OPTIONS",
-  "백업하지 않기",
-  "사진과 작업물을 이 기기에만 저장합니다.",
-  "앱 + 서버 백업",
-  "이 기기에 저장하고, 계정 서버에도 백업합니다.",
+  "앱 보관함에만 저장",
+  "사진과 작업물을 이 핸드폰의 앱 보관함에만 저장합니다.",
+  "클라우드 백업",
+  "앱 보관함에 저장하고 클라우드 백업 설정이 켜져 있으면 계정에도 백업합니다.",
   "isCloudBackupStorageMode",
   "isStorageSaverMode",
   "getEffectiveStorageMode"
@@ -92,7 +92,7 @@ assert.ok(
 
 for (const snippet of [
   "저장 방식",
-  "백업하지 않기 / 앱 + 서버 백업",
+  "앱 보관함에만 저장 / 클라우드 백업",
   "getStorageModeLabel(effectiveStorageMode)",
   "getEffectiveStorageMode",
   "STORAGE_MODE_OPTIONS"
@@ -114,9 +114,14 @@ for (const forbidden of [
 for (const snippet of [
   "저장 방식",
   "getStorageModeLabel(effectiveStorageMode)",
-  "getEffectiveStorageMode"
+  "getEffectiveStorageMode",
+  "클라우드 백업"
 ]) {
   assert.ok(accountSource.includes(snippet), `account storage mode UI missing: ${snippet}`);
+}
+
+for (const source of [storageModeSource, settingsSource, accountSource]) {
+  assert.ok(!source.includes("서버 백업"), "storage mode copy should say cloud backup, not server backup");
 }
 
 console.log("ok - storage mode policy exposes two clear backup choices");

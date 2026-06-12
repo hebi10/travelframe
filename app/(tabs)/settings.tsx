@@ -138,7 +138,7 @@ const opacityOptions = [0.2, 0.3, 0.4, 0.5, 0.6, 0.7];
 
 
 const storageModeLegend =
-  "백업하지 않기 / 앱 + 서버 백업";
+  "앱 보관함에만 저장 / 클라우드 백업";
 const backupTargetOptions: {
   value: CloudBackupTarget;
   label: string;
@@ -163,9 +163,9 @@ const getBackupTargetsSummary = (targets: AppSettings["cloudBackupTargets"]) => 
 };
 
 const cameraSaveScopeOptions: { value: CameraSaveScope; label: string; detail: string }[] = [
-  { value: "both", label: "앱, 핸드폰", detail: "앱과 핸드폰 앨범에 함께 저장합니다." },
-  { value: "app", label: "앱", detail: "앱 사진 목록에만 저장합니다." },
-  { value: "device", label: "핸드폰", detail: "핸드폰 앨범에만 저장합니다." }
+  { value: "both", label: "클라우드 백업 + 핸드폰 앨범", detail: "앱 보관함에 저장하고 클라우드 백업과 핸드폰 앨범 저장을 함께 시도합니다." },
+  { value: "app", label: "클라우드 백업", detail: "앱 보관함에 저장하고 클라우드 백업 설정이 켜져 있으면 계정에도 백업합니다." },
+  { value: "device", label: "핸드폰 앨범", detail: "핸드폰 앨범에만 저장합니다." }
 ];
 const tripClipExportFormatOptions: {
   value: TripClipExportFormat;
@@ -272,8 +272,11 @@ const fontSizeLabel: Record<FontSize, string> = {
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
-  const { palette } = useAppAppearance();
-  const themed = useMemo(() => createThemedStyles(palette), [palette]);
+  const { palette, fontFamily } = useAppAppearance();
+  const themed = useMemo(
+    () => createThemedStyles(palette, fontFamily),
+    [palette, fontFamily]
+  );
   const modalSafeStyle = useMemo(
     () => ({
       paddingTop: Math.max(insets.top + 14, 24),
@@ -563,7 +566,7 @@ export default function SettingsScreen() {
             cloudBackupEnabled: true
           });
           setAuthMessage(
-            "저장 방식은 앱에 저장 + 클라우드 백업으로 설정했습니다. 서버 업로드는 Pro 이상에서 자동으로 실행됩니다."
+            "저장 방식은 클라우드 백업으로 설정했습니다. 클라우드 업로드는 Pro 이상에서 자동으로 실행됩니다."
           );
           return;
         }
@@ -1156,7 +1159,7 @@ export default function SettingsScreen() {
               {formatQuotaValue(musicTracks.length, planEntitlements.musicTrackLimit)}
             </Text>
             <Text selectable style={[styles.backupStatusDetail, themed.mutedText]}>
-              서버 백업:{" "}
+              클라우드 백업:{" "}
               {formatStorageQuotaValue(
                 backupOverview.imageBackupBytes,
                 planEntitlements.backupStorageBytes
@@ -1283,6 +1286,8 @@ export default function SettingsScreen() {
                   strokeWidth={settings.guideStrokeWidth}
                   offsetX={settings.guideOffsetX}
                   offsetY={settings.guideOffsetY}
+                  offsetFrameWidth={settings.guideOffsetFrameWidth}
+                  offsetFrameHeight={settings.guideOffsetFrameHeight}
                   gridLinePositions={settings.gridGuideLinePositions}
                   shapePoints={settings.guideShapePoints}
                 />
@@ -1501,7 +1506,7 @@ export default function SettingsScreen() {
           />
           <ActionRow
             label="저장 범위"
-            detail="카메라 촬영 사진을 앱과 핸드폰 중 어디에 저장할지 선택"
+            detail="카메라 촬영 사진을 클라우드 백업과 핸드폰 앨범 중 어디에 저장할지 선택"
             mark={cameraSaveScopeLabel[settings.cameraSaveScope]}
             onPress={() => setActiveSetting("cameraSaveScope")}
           />

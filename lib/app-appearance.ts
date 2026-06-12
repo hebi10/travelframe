@@ -15,13 +15,13 @@ import { getFontFamilyForStyle, useAppFontsReady } from "@/lib/app-fonts";
 
 export type AppPalette = Record<keyof typeof colors, string>;
 export type EffectiveThemeMode = "light" | "dark";
-export type AppFontWeight = "700" | "800" | "900";
+export type AppFontWeight = "400" | "700" | "800" | "900";
 
 let cachedAppSettings: AppSettings = defaultAppSettings;
 let appSettingsCacheVersion = 0;
 
 const darkPalette: AppPalette = {
-  background: "#0f0f0f",
+  background: "#000000",
   chrome: "#000000",
   surface: "#171717",
   surfaceStrong: "#202020",
@@ -30,7 +30,7 @@ const darkPalette: AppPalette = {
   faint: "#a8a8a8",
   line: "#2d2d2d",
   darkLine: "#777777",
-  inverse: "#0f0f0f",
+  inverse: "#000000",
   ink: "#f2f2f2"
 };
 
@@ -54,15 +54,11 @@ export const getAppPalette = (
 };
 
 export const getFontWeightForStyle = (fontStyle: FontStyle): AppFontWeight => {
-  if (fontStyle === "black_han_sans") {
-    return "900";
+  if (fontStyle === "noto_sans_kr") {
+    return "800";
   }
 
-  if (fontStyle === "gowun_dodum") {
-    return "700";
-  }
-
-  return "800";
+  return "400";
 };
 
 export function useAppAppearance() {

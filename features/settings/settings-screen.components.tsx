@@ -32,9 +32,12 @@ export function OptionButton({
   fontSizePreview?: FontSize;
   onPress: () => void;
 }) {
-  const { palette, fontSizeScale, layoutScale, emphasisWeight, fontFamily } = useAppAppearance();
+  const { palette, fontSizeScale, layoutScale, fontFamily, emphasisWeight } = useAppAppearance();
   const fontsReady = useAppFontsReady();
-  const themed = useMemo(() => createThemedStyles(palette), [palette]);
+  const themed = useMemo(
+    () => createThemedStyles(palette, fontFamily),
+    [palette, fontFamily]
+  );
   const previewFontSizeScale = fontSizePreview ? getFontSizeScale(fontSizePreview) : fontSizeScale;
   const previewFontStyle = fontStylePreview ?? fontFamilyPreview;
   const previewFontWeight = previewFontStyle ? getFontWeightForStyle(previewFontStyle) : emphasisWeight;
@@ -118,7 +121,7 @@ export function SettingsGuideSizeSlider({
   onChange: (value: number) => void;
   onCommit: (value: number) => void;
 }) {
-  const { palette } = useAppAppearance();
+  const { palette, fontFamily, emphasisWeight } = useAppAppearance();
   const [trackWidth, setTrackWidth] = useState(1);
   const progress =
     ((clampSettingsGuideSizeInRange(value, min, max) - min) /
@@ -138,10 +141,10 @@ export function SettingsGuideSizeSlider({
   return (
     <View style={styles.settingsGuideSizeSlider}>
       <View style={styles.settingsGuideSizeSliderHeader}>
-        <Text selectable={false} style={[styles.settingsGuideSizeSliderLabel, { color: palette.muted }]}>
+        <Text selectable={false} style={[styles.settingsGuideSizeSliderLabel, { color: palette.muted, fontFamily, fontWeight: emphasisWeight }]}>
           드래그로 크기 조절
         </Text>
-        <Text selectable={false} style={[styles.settingsGuideSizeSliderValue, { color: palette.text }]}>
+        <Text selectable={false} style={[styles.settingsGuideSizeSliderValue, { color: palette.text, fontFamily, fontWeight: emphasisWeight }]}>
           {Math.round(value)}
         </Text>
       </View>
@@ -172,10 +175,10 @@ export function SettingsGuideSizeSlider({
         />
       </View>
       <View style={styles.settingsGuideSizeSliderRange}>
-        <Text selectable={false} style={[styles.settingsGuideSizeSliderRangeText, { color: palette.muted }]}>
+        <Text selectable={false} style={[styles.settingsGuideSizeSliderRangeText, { color: palette.muted, fontFamily, fontWeight: emphasisWeight }]}>
           {min}
         </Text>
-        <Text selectable={false} style={[styles.settingsGuideSizeSliderRangeText, { color: palette.muted }]}>
+        <Text selectable={false} style={[styles.settingsGuideSizeSliderRangeText, { color: palette.muted, fontFamily, fontWeight: emphasisWeight }]}>
           {max}
         </Text>
       </View>

@@ -2,22 +2,30 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const studioSource = fs.readFileSync("app/(tabs)/studio.tsx", "utf8");
+const videoDetailSource = fs.readFileSync("app/video/[id].tsx", "utf8");
 const tripClipSource = fs.readFileSync("app/(tabs)/trip-clip.tsx", "utf8");
 
 assert.ok(
-  studioSource.includes('onPress={() => router.push("/trip-clip")}') &&
-    studioSource.includes("생성 시작"),
-  "studio video creation CTA should open trip clip"
+  studioSource.includes('pathname: "/trip-clip"') &&
+    studioSource.includes('returnTo: "/studio?tab=videos"') &&
+    studioSource.includes('returnTo: "/studio?tab=works"'),
+  "studio trip clip entry points should pass the screen to return to"
+);
+
+assert.ok(
+  videoDetailSource.includes('pathname: "/trip-clip"') &&
+    videoDetailSource.includes("returnTo: `/video/${video.id}`"),
+  "video detail edit entry should return to the video detail screen"
 );
 
 for (const snippet of [
   'import { Feather } from "@expo/vector-icons";',
+  "returnTo?: string | string[];",
+  "const returnToParam = Array.isArray(returnTo) ? returnTo[0] : returnTo;",
+  'const backTarget = returnToParam ?? "/studio?tab=videos";',
   "const handleBackPress = useCallback(() => {",
-  "router.canGoBack()",
-  "router.back()",
-  'router.replace("/studio?tab=videos" as Href)',
+  "router.replace(backTarget as Href)",
   "styles.headerBackButton",
-  'accessibilityLabel="보관함으로 돌아가기"',
   'name="chevron-left"',
   "styles.headerSpacer",
   "styles.draftSaveButton",
@@ -27,6 +35,12 @@ for (const snippet of [
 ]) {
   assert.ok(tripClipSource.includes(snippet), `trip clip header action missing: ${snippet}`);
 }
+
+assert.ok(
+  !tripClipSource.includes("router.canGoBack()") &&
+    !tripClipSource.includes("router.back()"),
+  "trip clip header back should not fall through to the camera tab history"
+);
 
 const headerActionStart = tripClipSource.indexOf("<View style={styles.headerActionRow}>");
 const headerActionEnd = tripClipSource.indexOf("</View>", headerActionStart);
@@ -38,4 +52,4 @@ assert.ok(
   "trip clip header should place back on the left and draft save on the right"
 );
 
-console.log("ok - trip clip header has back and draft actions");
+console.log("ok - trip clip header has deterministic return navigation");

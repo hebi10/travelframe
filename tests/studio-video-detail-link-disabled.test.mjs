@@ -10,7 +10,9 @@ assert.equal(
 );
 
 assert.ok(
-  source.includes("router.push(`/trip-clip?videoId=${video.id}` as Href)"),
+  source.includes('pathname: "/trip-clip"') &&
+    source.includes("videoId: video.id") &&
+    source.includes('returnTo: "/studio?tab=works"'),
   "saved video work cards should still keep the edit action"
 );
 

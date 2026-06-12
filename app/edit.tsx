@@ -158,6 +158,12 @@ export default function EditScreen() {
   const [guideColor, setGuideColor] = useState(defaultAppSettings.guideColor);
   const [guideOffsetX, setGuideOffsetX] = useState(defaultAppSettings.guideOffsetX);
   const [guideOffsetY, setGuideOffsetY] = useState(defaultAppSettings.guideOffsetY);
+  const [guideOffsetFrameWidth, setGuideOffsetFrameWidth] = useState(
+    defaultAppSettings.guideOffsetFrameWidth
+  );
+  const [guideOffsetFrameHeight, setGuideOffsetFrameHeight] = useState(
+    defaultAppSettings.guideOffsetFrameHeight
+  );
   const [gridGuideLinePositions, setGridGuideLinePositions] =
     useState<GridGuideLinePositions>(defaultAppSettings.gridGuideLinePositions);
   const [guideShapePoints, setGuideShapePoints] =
@@ -227,6 +233,8 @@ export default function EditScreen() {
         setGuideColor(settings.guideColor);
         setGuideOffsetX(settings.guideOffsetX);
         setGuideOffsetY(settings.guideOffsetY);
+        setGuideOffsetFrameWidth(settings.guideOffsetFrameWidth);
+        setGuideOffsetFrameHeight(settings.guideOffsetFrameHeight);
         setGridGuideLinePositions(settings.gridGuideLinePositions);
         setGuideShapePoints(settings.guideShapePoints);
         guideOffsetXValue.value = settings.guideOffsetX;
@@ -461,6 +469,8 @@ export default function EditScreen() {
       guideOffsetYValue.value = clampedOffset.y;
       setGuideOffsetX(clampedOffset.x);
       setGuideOffsetY(clampedOffset.y);
+      setGuideOffsetFrameWidth(guideMoveFrame.width);
+      setGuideOffsetFrameHeight(guideMoveFrame.height);
       setGuideVisible(true);
       setIsGuidePositionAdjusting(false);
       setActiveEditPanelTab("guide");
@@ -468,10 +478,18 @@ export default function EditScreen() {
       void updateAppSettings({
         guideOffsetX: clampedOffset.x,
         guideOffsetY: clampedOffset.y,
+        guideOffsetFrameWidth: guideMoveFrame.width,
+        guideOffsetFrameHeight: guideMoveFrame.height,
         guideVisible: true
       });
     },
-    [getClampedGuideOffset, guideOffsetXValue, guideOffsetYValue]
+    [
+      getClampedGuideOffset,
+      guideMoveFrame.height,
+      guideMoveFrame.width,
+      guideOffsetXValue,
+      guideOffsetYValue
+    ]
   );
 
   const startGuidePositionAdjustment = () => {
@@ -650,8 +668,11 @@ export default function EditScreen() {
             guideColor={guideColor}
             guideOffsetX={guideOffsetX}
             guideOffsetY={guideOffsetY}
+            guideOffsetFrameWidth={guideOffsetFrameWidth}
+            guideOffsetFrameHeight={guideOffsetFrameHeight}
             gridGuideLinePositions={gridGuideLinePositions}
             guideShapePoints={guideShapePoints}
+            onGuideFrameLayout={setGuideMoveFrame}
           />
         )}
         {isCanvasExpanded && isGuidePositionAdjusting ? (

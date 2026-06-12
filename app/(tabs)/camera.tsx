@@ -5,6 +5,7 @@ import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   AppState,
   type AppStateStatus,
   Image as NativeImage,
@@ -100,7 +101,7 @@ import { getPlanEntitlements } from "@/lib/plan-entitlements";
 import { isMediaLibraryAccessGranted, requestMediaLibraryAccess } from "@/lib/request-media-library-access";
 import { deleteLocalFile, getRecentPhoto, saveCapturedPhoto, saveCapturedPhotoToDevice } from "@/lib/photo-library";
 import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
-import type { PhotoItem, PhotoRatioLabel } from "@/types/photo";
+import type { PhotoItem, PhotoRatioLabel, SaveCapturedPhotoInput } from "@/types/photo";
 
 const GUIDE_SIZE_OPTIONS = [
   { label: "작게", value: 34 },
@@ -139,9 +140,9 @@ const CAMERA_RATIO_OPTIONS: { label: string; value: PhotoRatioLabel }[] = [
   { label: "16:9", value: "16:9" }
 ];
 const CAMERA_SAVE_SCOPE_OPTIONS: { label: string; detail: string; value: CameraSaveScope }[] = [
-  { label: "앱, 핸드폰", detail: "앱과 앨범에 함께 저장", value: "both" },
-  { label: "앱", detail: "앱 사진 목록에만 저장", value: "app" },
-  { label: "핸드폰", detail: "핸드폰 앨범에만 저장", value: "device" }
+  { label: "클라우드 백업 + 핸드폰 앨범", detail: "앱 보관함에 저장하고 클라우드 백업과 핸드폰 앨범 저장을 함께 시도", value: "both" },
+  { label: "클라우드 백업", detail: "앱 보관함에 저장하고 클라우드 백업 설정이 켜져 있으면 계정에도 백업", value: "app" },
+  { label: "핸드폰 앨범", detail: "핸드폰 앨범에만 저장", value: "device" }
 ];
 const CAMERA_FACING_OPTIONS: { label: string; value: CameraFacing }[] = [
   { label: "후면", value: "back" },
@@ -380,6 +381,8 @@ export default function CameraScreen() {
   const [guideColor, setGuideColor] = useState<string>(GUIDE_COLOR_OPTIONS[0].value);
   const [guideOffsetX, setGuideOffsetX] = useState(0);
   const [guideOffsetY, setGuideOffsetY] = useState(0);
+  const [guideOffsetFrameWidth, setGuideOffsetFrameWidth] = useState(0);
+  const [guideOffsetFrameHeight, setGuideOffsetFrameHeight] = useState(0);
   const [gridGuideLinePositions, setGridGuideLinePositions] =
     useState<GridGuideLinePositions>(defaultGridGuideLinePositions);
   const [guideShapePoints, setGuideShapePoints] =
@@ -454,6 +457,8 @@ export default function CameraScreen() {
   const isTimedCapturePendingRef = useRef(false);
   const isCameraReadyRef = useRef(false);
   const isCameraSessionActiveRef = useRef(false);
+  const cameraNativeCaptureInProgressRef = useRef(false);
+  const captureSaveQueueTailRef = useRef<Promise<void>>(Promise.resolve());
   const insets = useSafeAreaInsets();
   const bottomSafePadding = Math.max(insets.bottom + 10, 24);
   const bottomModalPadding = Math.max(insets.bottom + 18, 28);
@@ -673,6 +678,8 @@ export default function CameraScreen() {
         setGuideColor(settings.guideColor);
         setGuideOffsetX(settings.guideOffsetX);
         setGuideOffsetY(settings.guideOffsetY);
+        setGuideOffsetFrameWidth(settings.guideOffsetFrameWidth);
+        setGuideOffsetFrameHeight(settings.guideOffsetFrameHeight);
         guideOffsetRef.current = { x: settings.guideOffsetX, y: settings.guideOffsetY };
         setGridGuideLinePositions(settings.gridGuideLinePositions);
         gridGuideLinePositionsRef.current = settings.gridGuideLinePositions;
@@ -889,12 +896,6 @@ export default function CameraScreen() {
     },
     [handleCameraTorchError]
   );
-
-  useEffect(() => {
-    isCameraReadyRef.current = false;
-    setIsCameraReady(false);
-    cameraTorchAppliedRef.current = false;
-  }, [cameraDevice?.id]);
 
   useEffect(() => {
     if (!cameraNativeControlsReady || cameraFacing !== "back") {
@@ -1195,6 +1196,8 @@ export default function CameraScreen() {
     guideOffsetRef.current = clampedOffset;
     setGuideOffsetX(clampedOffset.x);
     setGuideOffsetY(clampedOffset.y);
+    setGuideOffsetFrameWidth(cameraFrame.width);
+    setGuideOffsetFrameHeight(cameraFrame.height);
     setIsGuidePositionAdjusting(false);
     setIsGuideShapePointAdjusting(false);
     setSelectedGuideShapePointIndex(null);
@@ -1203,6 +1206,8 @@ export default function CameraScreen() {
     queueAppSettingsUpdate({
       guideOffsetX: clampedOffset.x,
       guideOffsetY: clampedOffset.y,
+      guideOffsetFrameWidth: cameraFrame.width,
+      guideOffsetFrameHeight: cameraFrame.height,
       guideSize: guideSizeRef.current,
       guideShapePoints: guideShapePointsRef.current,
       guideVisible: true
@@ -1215,6 +1220,8 @@ export default function CameraScreen() {
     guideOffsetRef.current = { x: 0, y: 0 };
     setGuideOffsetX(0);
     setGuideOffsetY(0);
+    setGuideOffsetFrameWidth(cameraFrame.width);
+    setGuideOffsetFrameHeight(cameraFrame.height);
   };
 
   const resetGuideSizeToDefault = () => {
@@ -1597,14 +1604,133 @@ export default function CameraScreen() {
     [cameraFocusTap, cameraFrame]
   );
 
+  const isDeviceAlbumPermissionError = useCallback((error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error ?? "");
+    return message.includes("핸드폰 앨범 저장 권한") || message.includes("앨범 저장 권한");
+  }, []);
+
+  const showDeviceAlbumPermissionPrompt = useCallback(
+    (message: string) => {
+      setErrorMessage(message);
+      Alert.alert(
+        "핸드폰 앨범 저장 권한이 필요합니다.",
+        `${message}\n\n설정에서 사진 및 동영상 권한을 허용하거나 클라우드로만 저장하도록 바꿀 수 있습니다.`,
+        [
+          { text: "나중에", style: "cancel" },
+          {
+            text: "클라우드로 저장",
+            onPress: () => {
+              setCameraSaveScope("app");
+              queueAppSettingsUpdate({
+                cameraSaveScope: "app",
+                storageMode: "local_backup",
+                cloudBackupEnabled: true
+              });
+            }
+          },
+          { text: "설정 열기", onPress: () => void Linking.openSettings() }
+        ]
+      );
+    },
+    [queueAppSettingsUpdate]
+  );
+
+  const queueCapturedPhotoSave = useCallback(
+    ({
+      captureInput,
+      saveScope,
+      backupUser,
+      backupSubscription
+    }: {
+      captureInput: SaveCapturedPhotoInput;
+      saveScope: CameraSaveScope;
+      backupUser: typeof user;
+      backupSubscription: typeof subscription;
+    }) => {
+      const runSaveJob = async () => {
+        let savedPhoto: PhotoItem | null = null;
+        let deviceSaveError: unknown = null;
+
+        try {
+          if (saveScope !== "device") {
+            savedPhoto = await saveCapturedPhoto(captureInput);
+          }
+          if (saveScope !== "app") {
+            try {
+              await saveCapturedPhotoToDevice(captureInput);
+            } catch (deviceError) {
+              if (!savedPhoto) throw deviceError;
+              deviceSaveError = deviceError;
+            }
+          }
+          if (savedPhoto) {
+            setRecentPhoto(savedPhoto);
+            try {
+              await backupPhotoIfEnabled({
+                user: backupUser,
+                subscription: backupSubscription,
+                photo: savedPhoto
+              });
+            } catch (backupError) {
+              await recordBackupFailure({
+                id: savedPhoto.id,
+                kind: "photo",
+                label: "촬영 사진",
+                message: getUserFacingErrorMessage(
+                  backupError,
+                  "클라우드 백업을 완료하지 못했습니다."
+                )
+              });
+            }
+          }
+          if (deviceSaveError) {
+            const message = getUserFacingErrorMessage(
+              deviceSaveError,
+              "기기 앨범 저장에 실패했습니다. 사진은 앱 보관함에 저장되었습니다."
+            );
+            if (isDeviceAlbumPermissionError(deviceSaveError)) {
+              showDeviceAlbumPermissionPrompt(message);
+            } else {
+              setErrorMessage(message);
+            }
+          }
+        } finally {
+          try {
+            await deleteLocalFile(captureInput.uri);
+          } catch {
+            // 저장 결과와 무관한 임시 파일 정리 실패는 촬영 실패로 표시하지 않습니다.
+          }
+        }
+      };
+
+      const queuedSave = captureSaveQueueTailRef.current.then(runSaveJob, runSaveJob);
+      captureSaveQueueTailRef.current = queuedSave.catch(() => undefined);
+      void queuedSave.catch((error) => {
+        const message = getUserFacingErrorMessage(error, "사진 저장에 실패했습니다.");
+        if (isDeviceAlbumPermissionError(error)) {
+          showDeviceAlbumPermissionPrompt(message);
+        } else {
+          setErrorMessage(message);
+        }
+      });
+    },
+    [isDeviceAlbumPermissionError, showDeviceAlbumPermissionPrompt]
+  );
+
   const capturePhoto = async () => {
-    if (!cameraDevice || !canCaptureWithCurrentSession() || isCapturing) {
+    if (
+      !cameraDevice ||
+      !canCaptureWithCurrentSession() ||
+      isCapturing ||
+      cameraNativeCaptureInProgressRef.current
+    ) {
       return;
     }
 
     let photoUri: string | null = null;
 
     try {
+      cameraNativeCaptureInProgressRef.current = true;
       setIsCapturing(true);
       setErrorMessage(null);
       const photo = await photoOutput.capturePhotoToFile({
@@ -1613,42 +1739,19 @@ export default function CameraScreen() {
       }, {});
       photoUri = `file://${photo.filePath}`;
       const captureInput = { uri: photoUri, ratioLabel: cameraRatio, localImageLimit: planEntitlements.localImageLimit };
-      let savedPhoto: PhotoItem | null = null;
-      let deviceSaveError: unknown = null;
-
-      if (cameraSaveScope !== "device") {
-        savedPhoto = await saveCapturedPhoto(captureInput);
-      }
-      if (cameraSaveScope !== "app") {
-        try {
-          await saveCapturedPhotoToDevice(captureInput);
-        } catch (deviceError) {
-          if (!savedPhoto) throw deviceError;
-          deviceSaveError = deviceError;
-        }
-      }
-      if (savedPhoto) {
-        setRecentPhoto(savedPhoto);
-        try {
-          await backupPhotoIfEnabled({ user, subscription, photo: savedPhoto });
-        } catch (backupError) {
-          await recordBackupFailure({
-            id: savedPhoto.id,
-            kind: "photo",
-            label: "촬영 사진",
-            message: getUserFacingErrorMessage(
-              backupError,
-              "클라우드 백업을 완료하지 못했습니다."
-            )
-          });
-        }
-      }
-      if (deviceSaveError) {
-        setErrorMessage(getUserFacingErrorMessage(deviceSaveError, "기기 앨범 저장에 실패했습니다. 사진은 앱 보관함에 저장되었습니다."));
-      }
+      setIsCapturing(false);
+      cameraNativeCaptureInProgressRef.current = false;
+      queueCapturedPhotoSave({
+        captureInput,
+        saveScope: cameraSaveScope,
+        backupUser: user,
+        backupSubscription: subscription
+      });
+      photoUri = null;
     } catch (error) {
       setErrorMessage(getUserFacingErrorMessage(error, "사진을 촬영하지 못했습니다."));
     } finally {
+      cameraNativeCaptureInProgressRef.current = false;
       if (photoUri) {
         try {
           await deleteLocalFile(photoUri);
@@ -1798,17 +1901,7 @@ export default function CameraScreen() {
 
       <Animated.View
         pointerEvents="none"
-        style={[
-          styles.guidePositionLayer,
-          guide !== "grid"
-            ? {
-                transform: [
-                  { translateX: guideOffsetXValue },
-                  { translateY: guideOffsetYValue }
-                ]
-              }
-            : null
-        ]}
+        style={styles.guidePositionLayer}
       >
         <CameraGuideOverlay
           guide={guide}
@@ -1816,6 +1909,10 @@ export default function CameraScreen() {
           size={guideSize}
           strokeWidth={guideStrokeWidth}
           color={guideColor}
+          offsetX={guide !== "grid" ? guideOffsetX : 0}
+          offsetY={guide !== "grid" ? guideOffsetY : 0}
+          offsetFrameWidth={guideOffsetFrameWidth}
+          offsetFrameHeight={guideOffsetFrameHeight}
           gridLinePositions={gridGuideLinePositions}
           selectedGridLine={selectedGridGuideLine}
           shapePoints={guideShapePoints}

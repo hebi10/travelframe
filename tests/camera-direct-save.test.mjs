@@ -16,20 +16,37 @@ for (const snippet of [
 }
 
 for (const snippet of [
+  "Alert,",
   "CAMERA_SAVE_SCOPE_OPTIONS",
+  'label: "클라우드 백업 + 핸드폰 앨범"',
+  'label: "클라우드 백업"',
+  'label: "핸드폰 앨범"',
   "const [cameraSaveScope, setCameraSaveScope] = useState<CameraSaveScope>(defaultAppSettings.cameraSaveScope)",
   "setCameraSaveScope(settings.cameraSaveScope)",
   "const updateCameraSaveScope = (nextScope: CameraSaveScope)",
   "queueAppSettingsUpdate({ cameraSaveScope: nextScope })",
   "저장 범위",
-  'cameraSaveScope !== "device"',
-  'cameraSaveScope !== "app"',
+  "const cameraNativeCaptureInProgressRef = useRef(false)",
+  "const captureSaveQueueTailRef = useRef<Promise<void>>(Promise.resolve())",
+  "const queueCapturedPhotoSave = useCallback(",
+  "captureSaveQueueTailRef.current.then(runSaveJob, runSaveJob)",
+  "captureSaveQueueTailRef.current = queuedSave.catch(() => undefined);",
+  "void queuedSave.catch",
+  "queueCapturedPhotoSave({",
+  'saveScope !== "device"',
+  'saveScope !== "app"',
   "saveCapturedPhoto(captureInput)",
   "saveCapturedPhotoToDevice(captureInput)",
   "let deviceSaveError: unknown = null;",
   "if (!savedPhoto) throw deviceError;",
   "throw deviceError;",
   "사진은 앱 보관함에 저장되었습니다.",
+  "핸드폰 앨범 저장 권한이 필요합니다.",
+  "클라우드로 저장",
+  "void Linking.openSettings()",
+  'cameraSaveScope: "app"',
+  'storageMode: "local_backup"',
+  "cloudBackupEnabled: true",
   "ratioLabel: cameraRatio",
   "setRecentPhoto(savedPhoto)",
   "backupPhotoIfEnabled({",
@@ -43,19 +60,27 @@ for (const snippet of [
 const capturePhotoStart = source.indexOf("  const capturePhoto = async () => {");
 const takePhotoStart = source.indexOf("  const takePhoto = async () => {", capturePhotoStart);
 assert.ok(capturePhotoStart >= 0 && takePhotoStart > capturePhotoStart, "camera capture flow should exist");
+const queueSaveStart = source.indexOf("  const queueCapturedPhotoSave = useCallback(");
+assert.ok(queueSaveStart >= 0 && queueSaveStart < capturePhotoStart, "camera save queue should be defined before capture");
+const queueSaveSource = source.slice(queueSaveStart, capturePhotoStart);
 const capturePhotoSource = source.slice(capturePhotoStart, takePhotoStart);
 const nativeCaptureEnd = capturePhotoSource.indexOf("photoUri = `file://${photo.filePath}`");
 const unlockAfterNativeCapture = capturePhotoSource.indexOf("setIsCapturing(false)", nativeCaptureEnd);
-const appSaveStart = capturePhotoSource.indexOf("saveCapturedPhoto(captureInput)");
-const deviceSaveStart = capturePhotoSource.indexOf("saveCapturedPhotoToDevice(captureInput)");
+const queueCallStart = capturePhotoSource.indexOf("queueCapturedPhotoSave({", nativeCaptureEnd);
+const appSaveStart = queueSaveSource.indexOf("saveCapturedPhoto(captureInput)");
+const deviceSaveStart = queueSaveSource.indexOf("saveCapturedPhotoToDevice(captureInput)");
 assert.ok(nativeCaptureEnd >= 0, "camera should derive a photo URI after native capture");
 assert.ok(
   unlockAfterNativeCapture > nativeCaptureEnd,
   "camera should unlock the shutter after native capture completes"
 );
 assert.ok(
-  unlockAfterNativeCapture > appSaveStart && unlockAfterNativeCapture > deviceSaveStart,
-  "camera should keep the shutter blocked until captured photos finish saving"
+  queueCallStart > unlockAfterNativeCapture,
+  "camera should queue photo saving only after the shutter is unlocked for the next capture"
+);
+assert.ok(
+  appSaveStart >= 0 && deviceSaveStart >= 0,
+  "camera should keep app and device saves in the background queue"
 );
 
 for (const snippet of [

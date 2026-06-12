@@ -55,4 +55,9 @@ for (const unsafeSnippet of [
   );
 }
 
+assert.ok(
+  !cameraSource.includes("setIsCameraReady(false);\n    cameraTorchAppliedRef.current = false;\n  }, [cameraDevice?.id]);"),
+  "camera should not force ready=false from a device-id effect because VisionCamera owns lifecycle start/stop events"
+);
+
 console.log("ok - camera native zoom exposure and torch props are guarded until active");

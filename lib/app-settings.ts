@@ -11,6 +11,7 @@ import {
   type VideoQualityId
 } from "@/constants/video";
 import type { PhotoRatioLabel } from "@/types/photo";
+import { normalizeGuideOffsetFrameSize } from "@/lib/guide-offset";
 import { localStorageAdapter } from "@/lib/local-storage";
 
 const APP_SETTINGS_KEY = "travel-frame.settings.v1";
@@ -88,6 +89,8 @@ export type AppSettings = {
   guideColor: string;
   guideOffsetX: number;
   guideOffsetY: number;
+  guideOffsetFrameWidth: number;
+  guideOffsetFrameHeight: number;
   gridGuideLinePositions: GridGuideLinePositions;
   guideShapePoints: GuideShapePoints;
   overlayOpacity: number;
@@ -127,6 +130,8 @@ export const defaultAppSettings: AppSettings = {
   guideColor: DEFAULT_GUIDE_COLOR,
   guideOffsetX: 0,
   guideOffsetY: 0,
+  guideOffsetFrameWidth: 0,
+  guideOffsetFrameHeight: 0,
   gridGuideLinePositions: defaultGridGuideLinePositions,
   guideShapePoints: defaultGuideShapePoints,
   overlayOpacity: 0.4,
@@ -373,6 +378,8 @@ const normalizeSettings = (value: Partial<AppSettings> | null): AppSettings => {
         : defaultAppSettings.guideColor,
     guideOffsetX: normalizeGuideOffset(nextSettings.guideOffsetX),
     guideOffsetY: normalizeGuideOffset(nextSettings.guideOffsetY),
+    guideOffsetFrameWidth: normalizeGuideOffsetFrameSize(nextSettings.guideOffsetFrameWidth),
+    guideOffsetFrameHeight: normalizeGuideOffsetFrameSize(nextSettings.guideOffsetFrameHeight),
     gridGuideLinePositions: normalizeGridGuideLinePositions(nextSettings.gridGuideLinePositions),
     guideShapePoints: normalizeGuideShapePoints(nextSettings.guideShapePoints),
     cameraZoomPercent: normalizeCameraZoomPercent(nextSettings.cameraZoomPercent),

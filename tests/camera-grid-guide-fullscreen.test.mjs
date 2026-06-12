@@ -21,9 +21,10 @@ assert.ok(
 );
 
 assert.ok(
-  cameraSource.includes('guide !== "grid"') &&
-    cameraSource.includes("{ translateX: guideOffsetXValue }") &&
-    cameraSource.includes("{ translateY: guideOffsetYValue }"),
+  cameraSource.includes('offsetX={guide !== "grid" ? guideOffsetX : 0}') &&
+    cameraSource.includes('offsetY={guide !== "grid" ? guideOffsetY : 0}') &&
+    cameraSource.includes("offsetFrameWidth={guideOffsetFrameWidth}") &&
+    cameraSource.includes("offsetFrameHeight={guideOffsetFrameHeight}"),
   "camera grid guide should not be shifted by saved guide offsets"
 );
 

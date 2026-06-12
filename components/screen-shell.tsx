@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { spacing, typography } from "@/constants/app-theme";
 import { type FontStyle } from "@/lib/app-settings";
-import { useAppAppearance } from "@/lib/app-appearance";
+import { getFontWeightForStyle, useAppAppearance } from "@/lib/app-appearance";
 
 const TAB_BAR_BASE_HEIGHT = 58;
 const TAB_BAR_CONTENT_RESERVE_HEIGHT = TAB_BAR_BASE_HEIGHT;
@@ -150,6 +150,6 @@ const getTitleStyle = (
     fontSize: Math.round(style.fontSize * scale),
     lineHeight: Math.round(style.lineHeight * scale),
     fontFamily,
-    fontWeight: fontStyle === "black_han_sans" ? "900" : "800"
+    fontWeight: getFontWeightForStyle(fontStyle)
   };
 };

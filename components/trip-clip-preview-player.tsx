@@ -39,6 +39,8 @@ type TripClipPreviewPlayerProps = {
   guideColor: string;
   guideOffsetX?: number;
   guideOffsetY?: number;
+  guideOffsetFrameWidth?: number;
+  guideOffsetFrameHeight?: number;
   gridGuideLinePositions: GridGuideLinePositions;
   guideShapePoints: GuideShapePoints;
   photoAdjustments: TripClipPhotoAdjustmentMap;
@@ -110,6 +112,8 @@ export function TripClipPreviewPlayer({
   guideColor,
   guideOffsetX = 0,
   guideOffsetY = 0,
+  guideOffsetFrameWidth = 0,
+  guideOffsetFrameHeight = 0,
   gridGuideLinePositions,
   guideShapePoints,
   photoAdjustments,
@@ -366,6 +370,8 @@ export function TripClipPreviewPlayer({
         color={guideColor}
         offsetX={guideOffsetX}
         offsetY={guideOffsetY}
+        offsetFrameWidth={guideOffsetFrameWidth}
+        offsetFrameHeight={guideOffsetFrameHeight}
         gridLinePositions={gridGuideLinePositions}
         shapePoints={guideShapePoints}
       />

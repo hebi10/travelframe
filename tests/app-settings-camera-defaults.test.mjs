@@ -25,8 +25,8 @@ for (const snippet of [
   "setCameraRatio(settings.cameraRatio)",
   "setCameraSaveScope(settings.cameraSaveScope)",
   "ratioLabel: cameraRatio",
-  'cameraSaveScope !== "device"',
-  'cameraSaveScope !== "app"'
+  'saveScope !== "device"',
+  'saveScope !== "app"'
 ]) {
   assert.ok(cameraSource.includes(snippet), `camera should use normalized setting: ${snippet}`);
 }

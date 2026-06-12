@@ -85,6 +85,19 @@ export const shouldShowGuideForTab = async (tabKey: AppGuideTabKey) => {
   return !progress.seenTabs[tabKey];
 };
 
+export const shouldShowInitialAppGuide = async () => {
+  const progress = await getGuideProgress();
+  return !progress.seenIntro;
+};
+
+export const markAppGuideIntroSeen = async () => {
+  const progress = await getGuideProgress();
+  return saveGuideProgress({
+    ...progress,
+    seenIntro: true
+  });
+};
+
 export const markGuideTabSeen = async (tabKey: AppGuideTabKey) => {
   const progress = await getGuideProgress();
   return saveGuideProgress({

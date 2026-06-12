@@ -62,6 +62,7 @@
     },
     "plugins": [
       "expo-router",
+      "./plugins/with-android-release-manifest",
       [
         "expo-image-picker",
         {

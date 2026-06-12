@@ -20,8 +20,17 @@ assert.ok(
   "useAppGuide should skip undefined or empty guide step lists"
 );
 assert.ok(
+  hookSource.includes("shouldShowInitialAppGuide()"),
+  "useAppGuide should consult the global first-visit guide progress"
+);
+assert.ok(
+  hookSource.includes("isAuthLoading || isLoggedIn"),
+  "useAppGuide should only auto-open for logged-out users after auth loading"
+);
+assert.equal(
   hookSource.includes("shouldShowGuideForTab(tabKey)"),
-  "useAppGuide should consult guide progress for the active tab"
+  false,
+  "useAppGuide should not auto-open once per tab"
 );
 
 assert.equal(

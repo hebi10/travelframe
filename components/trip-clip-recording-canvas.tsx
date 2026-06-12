@@ -68,6 +68,8 @@ export function TripClipRecordingCanvas({
   guideColor,
   guideOffsetX,
   guideOffsetY,
+  guideOffsetFrameWidth,
+  guideOffsetFrameHeight,
   gridGuideLinePositions,
   guideShapePoints,
   photoAdjustments
@@ -84,6 +86,8 @@ export function TripClipRecordingCanvas({
   guideColor: string;
   guideOffsetX: number;
   guideOffsetY: number;
+  guideOffsetFrameWidth: number;
+  guideOffsetFrameHeight: number;
   gridGuideLinePositions: GridGuideLinePositions;
   guideShapePoints: GuideShapePoints;
   photoAdjustments: TripClipPhotoAdjustmentMap;
@@ -158,6 +162,8 @@ export function TripClipRecordingCanvas({
         color={guideColor}
         offsetX={guideOffsetX}
         offsetY={guideOffsetY}
+        offsetFrameWidth={guideOffsetFrameWidth}
+        offsetFrameHeight={guideOffsetFrameHeight}
         gridLinePositions={gridGuideLinePositions}
         shapePoints={guideShapePoints}
       />

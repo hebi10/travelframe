@@ -1,4 +1,5 @@
-import { type DimensionValue, StyleSheet, View } from "react-native";
+import { useCallback, useState } from "react";
+import { type DimensionValue, StyleSheet, View, type LayoutChangeEvent } from "react-native";
 
 import type { GuideType } from "@/constants/camera-guides";
 import type {
@@ -7,6 +8,7 @@ import type {
   GuideShapePoints
 } from "@/lib/app-settings";
 import { defaultGuideShapePoints, getGuideSizeBounds } from "@/lib/app-settings";
+import { scaleGuideOffsetForFrame } from "@/lib/guide-offset";
 
 type GuideShapePoint = {
   x: number;
@@ -99,6 +101,8 @@ type CameraGuideOverlayProps = {
   aspectRatio?: number;
   offsetX?: number;
   offsetY?: number;
+  offsetFrameWidth?: number;
+  offsetFrameHeight?: number;
   gridLinePositions?: GridGuideLinePositions;
   selectedGridLine?: GridGuideLineKey | null;
   shapePoints?: GuideShapePoints;
@@ -115,12 +119,29 @@ export function CameraGuideOverlay({
   aspectRatio,
   offsetX = 0,
   offsetY = 0,
+  offsetFrameWidth = 0,
+  offsetFrameHeight = 0,
   gridLinePositions,
   selectedGridLine = null,
   shapePoints,
   showShapeControlPoints = false,
   selectedShapePointIndex = null
 }: CameraGuideOverlayProps) {
+  const [guideFrame, setGuideFrame] = useState({ width: 0, height: 0 });
+  const handleGuideFrameLayout = useCallback((event: LayoutChangeEvent) => {
+    const { width, height } = event.nativeEvent.layout;
+    const nextFrame = {
+      width: Number(width.toFixed(2)),
+      height: Number(height.toFixed(2))
+    };
+
+    setGuideFrame((currentFrame) =>
+      currentFrame.width === nextFrame.width && currentFrame.height === nextFrame.height
+        ? currentFrame
+        : nextFrame
+    );
+  }, []);
+
   if (!visible) {
     return null;
   }
@@ -226,16 +247,24 @@ export function CameraGuideOverlay({
     backgroundColor: color,
     height: safeStrokeWidth
   };
+  const scaledOffset = scaleGuideOffsetForFrame({
+    offset: { x: offsetX, y: offsetY },
+    sourceFrame: { width: offsetFrameWidth, height: offsetFrameHeight },
+    targetFrame: guideFrame
+  });
   const offsetStyle = {
     transform: [
-      { translateX: Number.isFinite(offsetX) ? offsetX : 0 },
-      { translateY: Number.isFinite(offsetY) ? offsetY : 0 }
+      { translateX: scaledOffset.x },
+      { translateY: scaledOffset.y }
     ]
   };
 
   return (
     <View style={styles.overlayViewport}>
-      <View style={[styles.constrainedFrame, constrainedFrameStyle, offsetStyle]}>
+      <View
+        style={[styles.constrainedFrame, constrainedFrameStyle, offsetStyle]}
+        onLayout={handleGuideFrameLayout}
+      >
         <View style={styles.overlay}>
           {guide === "dot" ? (
             <View

@@ -32,8 +32,11 @@ type EditablePhotoCanvasProps = {
   guideColor: string;
   guideOffsetX?: number;
   guideOffsetY?: number;
+  guideOffsetFrameWidth?: number;
+  guideOffsetFrameHeight?: number;
   gridGuideLinePositions: GridGuideLinePositions;
   guideShapePoints: GuideShapePoints;
+  onGuideFrameLayout?: (frame: { width: number; height: number }) => void;
 };
 
 export type EditablePhotoCanvasHandle = {
@@ -204,8 +207,11 @@ export const EditablePhotoCanvas = forwardRef<
   guideColor,
   guideOffsetX = 0,
   guideOffsetY = 0,
+  guideOffsetFrameWidth = 0,
+  guideOffsetFrameHeight = 0,
   gridGuideLinePositions,
-  guideShapePoints
+  guideShapePoints,
+  onGuideFrameLayout
 }, ref) {
   const recorder = useOptionalViewRecorder();
   const [frameSize, setFrameSize] = useState({ width: 0, height: 0 });
@@ -442,10 +448,12 @@ export const EditablePhotoCanvas = forwardRef<
     nativeEvent: { layout: { width: number; height: number } };
   }) => {
     const { width, height } = event.nativeEvent.layout;
-    setFrameSize({
+    const nextFrame = {
       width: Number(width.toFixed(2)),
       height: Number(height.toFixed(2))
-    });
+    };
+    setFrameSize(nextFrame);
+    onGuideFrameLayout?.(nextFrame);
   };
 
   if (!isCapturingSnapshot) {
@@ -481,6 +489,8 @@ export const EditablePhotoCanvas = forwardRef<
                 aspectRatio={frameAspectRatio}
                 offsetX={guideOffsetX}
                 offsetY={guideOffsetY}
+                offsetFrameWidth={guideOffsetFrameWidth}
+                offsetFrameHeight={guideOffsetFrameHeight}
                 gridLinePositions={gridGuideLinePositions}
                 shapePoints={guideShapePoints}
               />

@@ -82,8 +82,11 @@ import { createAccountThemedStyles, styles } from "@/features/account/account-sc
 
 export default function AccountScreen() {
   const insets = useSafeAreaInsets();
-  const { palette } = useAppAppearance();
-  const themed = useMemo(() => createAccountThemedStyles(palette), [palette]);
+  const { palette, fontFamily } = useAppAppearance();
+  const themed = useMemo(
+    () => createAccountThemedStyles(palette, fontFamily),
+    [palette, fontFamily]
+  );
   const modalSafeStyle = useMemo(
     () => ({
       paddingTop: Math.max(insets.top + 14, 24),
@@ -689,7 +692,7 @@ export default function AccountScreen() {
                 )}
               />
               <InfoRow
-                label="서버 백업"
+                label="클라우드 백업"
                 value={formatStorageQuotaValue(
                   backupOverview.imageBackupBytes,
                   planEntitlements.backupStorageBytes

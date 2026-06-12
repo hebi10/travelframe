@@ -3,8 +3,9 @@ import { StyleSheet } from "react-native";
 import { colors, controls, spacing, typography } from "@/constants/app-theme";
 import type { AppPalette } from "@/lib/app-appearance";
 
-export const createThemedStyles = (palette: AppPalette) => {
+export const createThemedStyles = (palette: AppPalette, fontFamily?: string) => {
   const isDark = palette.background !== colors.background;
+  const fontTextStyle = fontFamily ? { fontFamily } : {};
 
   return StyleSheet.create({
     panel: {
@@ -27,11 +28,11 @@ export const createThemedStyles = (palette: AppPalette) => {
     },
     activeFill: {
       borderColor: palette.text,
-      backgroundColor: isDark ? palette.ink : palette.text
+      backgroundColor: isDark ? palette.surfaceStrong : palette.text
     },
     secondaryButton: {
       borderColor: palette.line,
-      backgroundColor: palette.background
+      backgroundColor: isDark ? palette.surface : palette.background
     },
     colorButton: {
       borderColor: palette.line,
@@ -40,19 +41,24 @@ export const createThemedStyles = (palette: AppPalette) => {
     input: {
       borderColor: palette.line,
       color: palette.text,
-      backgroundColor: palette.surfaceStrong
+      backgroundColor: palette.surfaceStrong,
+      ...fontTextStyle
     },
     text: {
-      color: palette.text
+      color: palette.text,
+      ...fontTextStyle
     },
     mutedText: {
-      color: palette.muted
+      color: palette.muted,
+      ...fontTextStyle
     },
     inverseText: {
-      color: palette.inverse
+      color: isDark ? palette.text : palette.inverse,
+      ...fontTextStyle
     },
     inverseMutedText: {
-      color: palette.inverse
+      color: palette.inverse,
+      ...fontTextStyle
     },
     optionMark: {
       borderColor: palette.faint,

@@ -3,8 +3,9 @@ import { StyleSheet } from "react-native";
 import { colors, controls, spacing, typography } from "@/constants/app-theme";
 import type { AppPalette } from "@/lib/app-appearance";
 
-export const createAccountThemedStyles = (palette: AppPalette) => {
+export const createAccountThemedStyles = (palette: AppPalette, fontFamily?: string) => {
   const isDark = palette.background !== colors.background;
+  const fontTextStyle = fontFamily ? { fontFamily } : {};
 
   return StyleSheet.create({
     panel: {
@@ -18,7 +19,8 @@ export const createAccountThemedStyles = (palette: AppPalette) => {
     input: {
       borderColor: palette.line,
       color: palette.text,
-      backgroundColor: palette.surfaceStrong
+      backgroundColor: palette.surfaceStrong,
+      ...fontTextStyle
     },
     secondaryButton: {
       borderColor: palette.line,
@@ -29,13 +31,16 @@ export const createAccountThemedStyles = (palette: AppPalette) => {
       backgroundColor: isDark ? palette.surfaceStrong : palette.text
     },
     text: {
-      color: palette.text
+      color: palette.text,
+      ...fontTextStyle
     },
     mutedText: {
-      color: palette.muted
+      color: palette.muted,
+      ...fontTextStyle
     },
     inverseText: {
-      color: isDark ? palette.text : palette.inverse
+      color: isDark ? palette.text : palette.inverse,
+      ...fontTextStyle
     },
     bottomBorder: {
       borderBottomColor: palette.line

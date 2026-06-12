@@ -28,7 +28,7 @@ assert.ok(
   "appearance hook should expose font style weight"
 );
 for (const darkColor of [
-  'background: "#0f0f0f"',
+  'background: "#000000"',
   'chrome: "#000000"',
   'surface: "#171717"',
   'surfaceStrong: "#202020"',
@@ -36,6 +36,7 @@ for (const darkColor of [
   'muted: "#d6d6d6"',
   'faint: "#a8a8a8"',
   'line: "#2d2d2d"',
+  'inverse: "#000000"',
   'ink: "#f2f2f2"'
 ]) {
   assert.ok(appAppearance.includes(darkColor), `dark palette should include ${darkColor}`);

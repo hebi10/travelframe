@@ -525,7 +525,12 @@ export default function StudioScreen() {
           <SectionBlock title="영상 만들기">
             <Pressable
               style={({ pressed }) => [styles.clipCta, panelStyle, pressed && pressedPanelStyle]}
-              onPress={() => router.push("/trip-clip")}
+              onPress={() =>
+                router.push({
+                  pathname: "/trip-clip",
+                  params: { returnTo: "/studio?tab=videos" }
+                } as Href)
+              }
             >
               <View style={styles.clipCopy}>
                 <Text selectable={false} style={styles.clipTitle}>
@@ -1153,7 +1158,12 @@ function WorkCard({
         <View style={styles.workActions}>
           <Pressable
             style={styles.workEditButton}
-            onPress={() => router.push(`/trip-clip?videoId=${video.id}` as Href)}
+            onPress={() =>
+              router.push({
+                pathname: "/trip-clip",
+                params: { videoId: video.id, returnTo: "/studio?tab=works" }
+              } as Href)
+            }
           >
             <Text selectable={false} style={styles.workEditButtonText}>
               다시 편집
@@ -1183,7 +1193,12 @@ function WorkCard({
       )}
       <Pressable
         style={({ pressed }) => [styles.videoCopy, pressed && pressedPanelStyle]}
-        onPress={() => router.push(`/trip-clip?bundleId=${bundle.id}` as Href)}
+        onPress={() =>
+          router.push({
+            pathname: "/trip-clip",
+            params: { bundleId: bundle.id, returnTo: "/studio?tab=works" }
+          } as Href)
+        }
       >
         <Text selectable={false} style={styles.videoKind}>
           영상 만들기 작업
@@ -1201,7 +1216,12 @@ function WorkCard({
     <View style={styles.workActions}>
       <Pressable
         style={styles.workEditButton}
-        onPress={() => router.push(`/trip-clip?bundleId=${bundle.id}` as Href)}
+        onPress={() =>
+          router.push({
+            pathname: "/trip-clip",
+            params: { bundleId: bundle.id, returnTo: "/studio?tab=works" }
+          } as Href)
+        }
       >
         <Text selectable={false} style={styles.workEditButtonText}>
           다시 편집
