@@ -104,6 +104,8 @@ export function TripClipRecordingCanvas({
   const nextAdjustmentStyle = getRecordingPhotoAdjustmentStyle(
     getTripClipPhotoAdjustment(photoAdjustments, frame.nextPhoto?.id)
   );
+  const currentLayerStyle =
+    transition === "fade" && frame.nextPhoto ? { opacity: 1 - progress } : { opacity: 1 };
   const nextLayerStyle =
     transition === "slide"
       ? { opacity: progress > 0 ? 1 : 0, transform: [{ translateX: (1 - progress) * 44 }] }
@@ -114,7 +116,7 @@ export function TripClipRecordingCanvas({
   return (
     <View style={[styles.recordingCanvasInner, isFilm && styles.recordingCanvasFilm]}>
       {frame.currentPhoto ? (
-        <View style={styles.recordingLayer}>
+        <View style={[styles.recordingLayer, currentLayerStyle]}>
           <View style={[styles.recordingImageMotionLayer, currentAdjustmentStyle]}>
             <Image
               source={{ uri: getPreviewUri(frame.currentPhoto) }}

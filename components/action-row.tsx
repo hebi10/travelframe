@@ -18,7 +18,7 @@ export function ActionRow({ href, label, detail, mark = ">", onPress }: ActionRo
   const isDark = palette.background !== colors.background;
   const content = (
     <Pressable
-      style={({ pressed }) => [
+      style={[
         styles.row,
         {
           minHeight: Math.round(96 * layoutScale),
@@ -26,8 +26,7 @@ export function ActionRow({ href, label, detail, mark = ">", onPress }: ActionRo
           paddingHorizontal: Math.round(14 * layoutScale),
           borderColor: palette.line,
           backgroundColor: palette.background
-        },
-        pressed && styles.pressed
+        }
       ]}
       onPress={onPress}
     >
@@ -113,9 +112,6 @@ const styles = StyleSheet.create({
   row: {
     gap: 12,
     borderWidth: 1
-  },
-  pressed: {
-    opacity: 0.55
   },
   copy: {
     gap: 4

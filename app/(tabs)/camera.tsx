@@ -423,6 +423,7 @@ export default function CameraScreen() {
   const [cameraRecoveryPending, setCameraRecoveryPending] = useState(false);
   const [cameraSessionRestartKey, setCameraSessionRestartKey] = useState(0);
   const [isCapturing, setIsCapturing] = useState(false);
+  const [pendingPhotoSaveCount, setPendingPhotoSaveCount] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [referenceUri, setReferenceUri] = useState<string | null>(null);
   const [overlayOpacity, setOverlayOpacity] = useState(0.42);
@@ -478,6 +479,7 @@ export default function CameraScreen() {
     : styles.controls;
   const isLineGuideActive = guideVisible;
   const isPhotoGuideActive = Boolean(referenceUri);
+  const isPhotoSavePending = pendingPhotoSaveCount > 0;
   const guideSizeBounds = useMemo(() => getGuideSizeBounds(guide), [guide]);
   const applyGridGuideLinePositionsState = useCallback(
     (nextPositions: GridGuideLinePositions) => {
@@ -1676,6 +1678,7 @@ export default function CameraScreen() {
       backupUser: typeof user;
       backupSubscription: typeof subscription;
     }) => {
+      setPendingPhotoSaveCount((count) => count + 1);
       const runSaveJob = async () => {
         let savedPhoto: PhotoItem | null = null;
         let deviceSaveError: unknown = null;
@@ -1732,6 +1735,7 @@ export default function CameraScreen() {
           } catch {
             // 저장 결과와 무관한 임시 파일 정리 실패는 촬영 실패로 표시하지 않습니다.
           }
+          setPendingPhotoSaveCount((count) => Math.max(0, count - 1));
         }
       };
 
@@ -2734,14 +2738,19 @@ export default function CameraScreen() {
                     onPress={openPersonalGallery}
                     accessibilityRole="button"
                     accessibilityLabel="개인 갤러리 열기"
-                  >
-                    {recentPhoto ? (
+                  >{recentPhoto ? (
                       <NativeImage source={{ uri: recentPhoto.uri }} style={styles.galleryThumb} resizeMode="cover" />
                     ) : (
                       <View style={styles.galleryEmptyThumb}>
                         <Feather name="image" size={28} color={colors.inverse} />
                       </View>
                     )}
+                    {isPhotoSavePending ? (
+                      <View pointerEvents="none" style={styles.gallerySavingOverlay}>
+                        <ActivityIndicator color={colors.inverse} size="small" />
+                        <Text selectable={false} style={styles.gallerySavingText}>저장중</Text>
+                      </View>
+                    ) : null}
                   </Pressable>
                   <Pressable
                     android_disableSound

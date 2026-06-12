@@ -3219,7 +3219,6 @@ export default function TripClipScreen() {
                 </Text>
               </View>
             ) : null}
-            </ScrollView>
             {!isExporting ? (
               <View style={styles.exportModalActions}>
                 {exportProgress.completedVideoId ? (
@@ -3254,6 +3253,7 @@ export default function TripClipScreen() {
                 </Pressable>
               </View>
             ) : null}
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -3273,7 +3273,7 @@ export default function TripClipScreen() {
                 핸드폰에 바로 저장하는 기능은 준비 중입니다. 지금은 미리보기와 편집 흐름을 먼저 사용할 수 있습니다.
               </Text>
             </View>
-            <View style={styles.exportModalActions}>
+            <View style={[styles.exportModalActions, styles.exportModalExternalActions]}>
               <Pressable
                 style={[styles.primaryButton, styles.exportModalButton]}
                 onPress={() => setIsExportComingSoonVisible(false)}

@@ -292,6 +292,8 @@ export function TripClipPreviewPlayer({
       ? 0
       : isIncoming && transition === "fade"
         ? progress
+        : isActive && incomingLayer && transition === "fade"
+          ? 1 - progress
         : 1;
     const translate = isIncoming && transition === "slide" ? (1 - progress) * 34 : 0;
     const imageScale = isIncoming && transition === "zoom" ? 1.08 - progress * 0.08 : 1;
@@ -312,6 +314,8 @@ export function TripClipPreviewPlayer({
       ? 0
       : isIncoming && transition === "fade"
         ? progress
+        : isActive && incomingLayer && transition === "fade"
+          ? 1 - progress
         : 1;
     const translate = isIncoming && transition === "slide" ? (1 - progress) * 34 : 0;
     const imageScale = isIncoming && transition === "zoom" ? 1.08 - progress * 0.08 : 1;

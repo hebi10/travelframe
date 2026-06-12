@@ -1232,9 +1232,13 @@ export const styles = StyleSheet.create({
   },
   exportModalActions: {
     gap: 8,
+    width: "100%",
+    paddingTop: 2,
+    paddingBottom: 0
+  },
+  exportModalExternalActions: {
     paddingHorizontal: 18,
-    paddingBottom: 18,
-    width: "100%"
+    paddingBottom: 18
   },
   exportModalButton: {
     flex: 0,

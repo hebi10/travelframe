@@ -66,6 +66,10 @@ const requestSavePermission = async (kind: MediaPermissionKind) => {
     "핸드폰 앨범 저장 권한이 필요합니다."
   );
 
+  if (!permission.granted) {
+    throw new Error(permissionMessage);
+  }
+
   if (state !== "full") {
     throw new Error(permissionMessage);
   }
@@ -179,13 +183,12 @@ const saveImageToAndroidAlbum = async (
   assertCanSaveToMediaLibrary(MediaLibrary);
 
   const saveUri = await prepareImageForLibrarySave(uri, format, options);
-  const asset = await MediaLibrary.createAssetAsync(saveUri);
   const album = await MediaLibrary.getAlbumAsync(TRIP_CLIP_MEDIA_ALBUM);
 
   if (album) {
-    await MediaLibrary.addAssetsToAlbumAsync([asset], album, false);
+    await MediaLibrary.createAssetAsync(saveUri, album);
   } else {
-    await MediaLibrary.createAlbumAsync(TRIP_CLIP_MEDIA_ALBUM, asset, false);
+    await MediaLibrary.createAlbumAsync(TRIP_CLIP_MEDIA_ALBUM, undefined, true, saveUri);
   }
 
   return saveUri;

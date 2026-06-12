@@ -5,6 +5,7 @@ const source = fs.readFileSync("app/(tabs)/camera.tsx", "utf8");
 const settingsSource = fs.readFileSync("lib/app-settings.ts", "utf8");
 const photoLibrarySource = fs.readFileSync("lib/photo-library.ts", "utf8");
 const tripClipExportSource = fs.readFileSync("lib/trip-clip-export.ts", "utf8");
+const cameraStyleSource = fs.readFileSync("features/camera/camera-screen.styles.ts", "utf8");
 
 for (const snippet of [
   'export type CameraSaveTarget = "app" | "device" | "cloud"',
@@ -33,10 +34,18 @@ for (const snippet of [
   "저장 범위",
   "const cameraNativeCaptureInProgressRef = useRef(false)",
   "const captureSaveQueueTailRef = useRef<Promise<void>>(Promise.resolve())",
+  "const [pendingPhotoSaveCount, setPendingPhotoSaveCount] = useState(0)",
+  "const isPhotoSavePending = pendingPhotoSaveCount > 0",
   "const queueCapturedPhotoSave = useCallback(",
+  "setPendingPhotoSaveCount((count) => count + 1)",
+  "setPendingPhotoSaveCount((count) => Math.max(0, count - 1))",
   "captureSaveQueueTailRef.current.then(runSaveJob, runSaveJob)",
   "captureSaveQueueTailRef.current = queuedSave.catch(() => undefined);",
   "void queuedSave.catch",
+  "{isPhotoSavePending ? (",
+  "styles.gallerySavingOverlay",
+  "styles.gallerySavingText",
+  "저장중",
   "queueCapturedPhotoSave({",
   "getCameraSaveScopeTargets(saveScope)",
   "targets.app || targets.cloud",
@@ -105,6 +114,16 @@ for (const snippet of [
   "핸드폰 앨범 저장 권한이 필요합니다."
 ]) {
   assert.ok(tripClipExportSource.includes(snippet), `media save permission request missing: ${snippet}`);
+}
+
+for (const snippet of [
+  "gallerySavingOverlay",
+  "gallerySavingText",
+  "position: \"absolute\"",
+  "fontSize: 11",
+  "fontWeight: \"900\""
+]) {
+  assert.ok(cameraStyleSource.includes(snippet), `camera saving indicator style missing: ${snippet}`);
 }
 
 for (const forbidden of [

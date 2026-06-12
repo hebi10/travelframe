@@ -918,6 +918,23 @@ export const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: "rgba(255, 255, 255, 0.08)"
   },
+  gallerySavingOverlay: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 3,
+    backgroundColor: "rgba(0, 0, 0, 0.68)"
+  },
+  gallerySavingText: {
+    color: colors.inverse,
+    fontSize: 11,
+    fontWeight: "900",
+    letterSpacing: 0
+  },
   opacityStepButton: {
     width: 34,
     height: controls.height,

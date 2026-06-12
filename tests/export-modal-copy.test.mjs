@@ -30,8 +30,14 @@ assert.ok(
   "export progress copy should scroll inside the bounded panel"
 );
 assert.ok(
-  tripClipSource.includes("</ScrollView>\n            {!isExporting ? ("),
-  "completion actions should stay outside the scroll content"
+  (() => {
+    const modalStart = tripClipSource.indexOf("visible={exportProgress.visible}");
+    const scrollStart = tripClipSource.indexOf("<ScrollView", modalStart);
+    const actionsStart = tripClipSource.indexOf("styles.exportModalActions", scrollStart);
+    const scrollEnd = tripClipSource.indexOf("</ScrollView>", actionsStart);
+    return modalStart >= 0 && scrollStart > modalStart && actionsStart > scrollStart && scrollEnd > actionsStart;
+  })(),
+  "completion actions should stay inside the scroll content so Android measures the full modal height"
 );
 
 const exportModalPanelStyle = readStyleBlock("exportModalPanel");
@@ -49,8 +55,9 @@ assert.ok(
   "export modal scroll area should shrink within the panel"
 );
 assert.ok(
-  exportModalActionsStyle.includes("paddingBottom: 18"),
-  "export modal actions should keep bottom padding while fixed below scroll content"
+  exportModalActionsStyle.includes("paddingTop: 2") &&
+    exportModalActionsStyle.includes("paddingBottom: 0"),
+  "export modal actions should rely on scroll content padding instead of overflowing below the panel"
 );
 
 console.log("ok - export modal completion copy and layout are stable");
