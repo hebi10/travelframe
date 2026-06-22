@@ -1913,7 +1913,7 @@ export default function CameraScreen() {
           style={styles.camera}
           device={cameraDevice}
           isActive={isCameraSessionActive}
-          outputs={cameraOutputs}
+          outputs={cameraOutputs} orientationSource="interface"
           zoom={cameraNativeZoom}
           exposure={cameraNativeExposure}
           getInitialZoom={() => cameraZoomFactor}

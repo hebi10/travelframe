@@ -414,26 +414,23 @@ const normalizeCapturedPhotoForRatio = async ({
   width?: number;
   height?: number;
 }) => {
-  const dimensions = await resolveImageDimensions({ uri, width, height });
-
-  if (dimensions?.width && dimensions.height) {
-    return {
-      uri,
-      width: dimensions.width,
-      height: dimensions.height,
-      temporaryUris: [] as string[]
-    };
-  }
-
   const normalized = await manipulateAsync(uri, [], {
     compress: 1,
     format: SaveFormat.JPEG
   });
+  const dimensions =
+    normalized.width && normalized.height
+      ? { width: normalized.width, height: normalized.height }
+      : await resolveImageDimensions({
+          uri: normalized.uri,
+          width,
+          height
+        });
 
   return {
     uri: normalized.uri,
-    width: normalized.width ?? width ?? 0,
-    height: normalized.height ?? height ?? 0,
+    width: dimensions?.width ?? width ?? 0,
+    height: dimensions?.height ?? height ?? 0,
     temporaryUris: normalized.uri !== uri ? [normalized.uri] : []
   };
 };
@@ -446,13 +443,13 @@ const renderCapturedPhotoForSave = async ({
 }: SaveCapturedPhotoInput) => {
   const shouldApplyRatio = ratioLabel !== "Original";
   const capturedDimensions = await resolveImageDimensions({ uri, width, height });
+  const normalizedSource = await normalizeCapturedPhotoForRatio({
+    uri,
+    width: capturedDimensions?.width ?? width,
+    height: capturedDimensions?.height ?? height
+  });
 
   if (shouldApplyRatio) {
-    const normalizedSource = await normalizeCapturedPhotoForRatio({
-      uri,
-      width: capturedDimensions?.width ?? width,
-      height: capturedDimensions?.height ?? height
-    });
     const rendered = await renderEditedPhotoFromTransform({
       sourceUri: normalizedSource.uri,
       width: normalizedSource.width,
@@ -475,10 +472,10 @@ const renderCapturedPhotoForSave = async ({
   }
 
   return {
-    uri,
-    width: capturedDimensions?.width ?? width ?? 0,
-    height: capturedDimensions?.height ?? height ?? 0,
-    temporaryUris: [] as string[]
+    uri: normalizedSource.uri,
+    width: normalizedSource.width,
+    height: normalizedSource.height,
+    temporaryUris: normalizedSource.temporaryUris
   };
 };
 
