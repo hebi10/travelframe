@@ -21,9 +21,11 @@
     "android:manifest:debug": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-android-debug.ps1 -Mode ManifestDebug -TimeoutSeconds 180 -KillStaleProcesses",
     "android:manifest:release": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-android-debug.ps1 -Mode ManifestRelease -TimeoutSeconds 240 -KillStaleProcesses",
     "lint": "expo lint",
+    "format:check": "npm run lint",
     "test": "node scripts/run-tests.mjs",
     "test:firebase-rules": "node scripts/run-firebase-rules-tests.mjs",
-    "quality": "npm run typecheck && npm run lint && npm test && npm run security:secrets",
+    "quality": "npm run typecheck && npm run format:check && npm test && npm run security:secrets",
+    "quality:functions": "npm --prefix functions run quality",
     "quality:firebase-rules": "npm run test:firebase-rules",
     "security:secrets": "node scripts/run-gitleaks.mjs",
     "security:secrets:history": "node scripts/run-gitleaks.mjs --history",
@@ -80,5 +82,11 @@
     "eslint": "^9.0.0",
     "eslint-config-expo": "^55.0.0",
     "typescript": "^5.9.0"
+  },
+  "overrides": {
+    "@react-native/virtualized-lists": "0.83.6",
+    "js-yaml": "^4.2.0",
+    "react-native": "0.83.6",
+    "uuid": "^11.1.1"
   }
 }

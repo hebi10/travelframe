@@ -22,6 +22,17 @@ const PHOTO_PREVIEW_DIRECTORY = "photo-previews/";
 const CAPTURE_DRAFT_DIRECTORY = "capture-drafts/";
 const PREVIEW_MAX_EDGE = 1080;
 
+let photoLibraryMutationChain = Promise.resolve();
+
+const runPhotoLibraryMutation = async <T>(operation: () => Promise<T>) => {
+  const run = photoLibraryMutationChain.then(operation, operation);
+  photoLibraryMutationChain = run.then(
+    () => undefined,
+    () => undefined
+  );
+  return run;
+};
+
 const ratioPresets = [
   { label: "9:16", value: 9 / 16 },
   { label: "4:5", value: 4 / 5 },
@@ -546,6 +557,7 @@ export const saveCapturedPhoto = async ({
   ratioLabel = "Original",
   localImageLimit
 }: SaveCapturedPhotoInput) => {
+  return runPhotoLibraryMutation(async () => {
   const photos = await getPhotos();
   assertLocalLibraryCapacity({
     currentCount: photos.length,
@@ -601,6 +613,7 @@ export const saveCapturedPhoto = async ({
   } finally {
     await deleteTemporaryFiles(prepared.temporaryUris);
   }
+  });
 };
 
 export const saveEditedPhoto = async ({

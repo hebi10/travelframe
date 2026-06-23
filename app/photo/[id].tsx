@@ -79,9 +79,16 @@ export default function PhotoDetailScreen() {
     }
 
     setIsLoading(true);
-    const storedPhoto = await getPhotoById(id);
-    setPhoto(storedPhoto);
-    setIsLoading(false);
+    setMessage(null);
+    try {
+      const storedPhoto = await getPhotoById(id);
+      setPhoto(storedPhoto);
+    } catch (error) {
+      setPhoto(null);
+      setMessage(getUserFacingErrorMessage(error, "사진을 불러오지 못했습니다."));
+    } finally {
+      setIsLoading(false);
+    }
   }, [id]);
 
   useFocusEffect(

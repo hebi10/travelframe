@@ -5,8 +5,18 @@
     "node": "20"
   },
   "main": "index.js",
+  "scripts": {
+    "syntax": "node --check backup-delete-safety.js && node --check backup-quota.js && node --check index.js && node --check video-export-quota.js",
+    "quality": "npm run syntax"
+  },
   "dependencies": {
-    "firebase-admin": "^12.7.0",
+    "firebase-admin": "^13.10.0",
     "firebase-functions": "^6.2.0"
+  },
+  "overrides": {
+    "gaxios": "^7.1.5",
+    "google-gax": "^5.0.7",
+    "retry-request": "^8.0.3",
+    "teeny-request": "^10.1.3"
   }
 }

@@ -13,6 +13,17 @@ export type BackupFailureRecord = {
 
 const BACKUP_FAILURE_QUEUE_KEY = "travel-frame.backup-failure-queue.v1";
 
+let backupFailureMutationChain = Promise.resolve();
+
+const runBackupFailureMutation = async <T>(operation: () => Promise<T>) => {
+  const run = backupFailureMutationChain.then(operation, operation);
+  backupFailureMutationChain = run.then(
+    () => undefined,
+    () => undefined
+  );
+  return run;
+};
+
 const parseBackupFailures = (value: string | null): BackupFailureRecord[] => {
   if (!value) {
     return [];
@@ -49,30 +60,36 @@ export const recordBackupFailure = async ({
   label: string;
   message?: string;
 }) => {
-  const records = await getBackupFailures();
-  const now = new Date().toISOString();
-  const existing = records.find((record) => record.id === id);
-  const nextRecord: BackupFailureRecord = {
-    id,
-    kind,
-    label,
-    message,
-    createdAt: existing?.createdAt ?? now,
-    updatedAt: now
-  };
+  return runBackupFailureMutation(async () => {
+    const records = await getBackupFailures();
+    const now = new Date().toISOString();
+    const existing = records.find((record) => record.id === id);
+    const nextRecord: BackupFailureRecord = {
+      id,
+      kind,
+      label,
+      message,
+      createdAt: existing?.createdAt ?? now,
+      updatedAt: now
+    };
 
-  await writeBackupFailures([
-    nextRecord,
-    ...records.filter((record) => record.id !== id)
-  ]);
-  return nextRecord;
+    await writeBackupFailures([
+      nextRecord,
+      ...records.filter((record) => record.id !== id)
+    ]);
+    return nextRecord;
+  });
 };
 
 export const clearBackupFailure = async (id: string) => {
-  const records = await getBackupFailures();
-  await writeBackupFailures(records.filter((record) => record.id !== id));
+  return runBackupFailureMutation(async () => {
+    const records = await getBackupFailures();
+    await writeBackupFailures(records.filter((record) => record.id !== id));
+  });
 };
 
 export const clearBackupFailures = async () => {
-  await writeBackupFailures([]);
+  return runBackupFailureMutation(async () => {
+    await writeBackupFailures([]);
+  });
 };

@@ -1403,16 +1403,16 @@ export default function TripClipScreen() {
         return;
       }
 
-      const savedPhotos = await Promise.all(
-        result.assets.map((asset) =>
-          saveCapturedPhoto({
-            uri: asset.uri,
-            width: asset.width,
-            height: asset.height,
-            localImageLimit: planEntitlements.localImageLimit
-          })
-        )
-      );
+      const savedPhotos: PhotoItem[] = [];
+      for (const asset of result.assets) {
+        const savedPhoto = await saveCapturedPhoto({
+          uri: asset.uri,
+          width: asset.width,
+          height: asset.height,
+          localImageLimit: planEntitlements.localImageLimit
+        });
+        savedPhotos.push(savedPhoto);
+      }
       let backupFailureCount = 0;
 
       for (const savedPhoto of savedPhotos) {

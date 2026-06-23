@@ -1,3 +1,4 @@
+import * as FileSystem from "expo-file-system/legacy";
 import { type User } from "firebase/auth";
 import {
   collection,
@@ -61,6 +62,50 @@ import {
 import type { PhotoItem } from "@/types/photo";
 import type { MadeVideoItem } from "@/types/video";
 import type { ImageBundleWorkItem } from "@/types/work";
+
+const BACKUP_IMAGE_OPTIMIZATION_CONCURRENCY = 2;
+
+type OptimizedBackupImageCleanup = {
+  optimized: OptimizedBackupImage;
+  sourceUri: string;
+};
+
+const mapWithConcurrencyLimit = async <T, R>(
+  items: T[],
+  concurrency: number,
+  mapper: (item: T, index: number) => Promise<R>
+) => {
+  const results = new Array<R>(items.length);
+  let nextIndex = 0;
+  const workerCount = Math.min(Math.max(1, concurrency), items.length);
+
+  await Promise.all(
+    Array.from({ length: workerCount }, async () => {
+      while (nextIndex < items.length) {
+        const currentIndex = nextIndex;
+        nextIndex += 1;
+        results[currentIndex] = await mapper(items[currentIndex], currentIndex);
+      }
+    })
+  );
+
+  return results;
+};
+
+const cleanupOptimizedBackupImage = async ({
+  optimized,
+  sourceUri
+}: OptimizedBackupImageCleanup) => {
+  if (optimized.uri === sourceUri || !optimized.uri.startsWith("file:")) {
+    return;
+  }
+
+  await FileSystem.deleteAsync(optimized.uri, { idempotent: true }).catch(() => undefined);
+};
+
+const cleanupOptimizedBackupImages = async (items: OptimizedBackupImageCleanup[]) => {
+  await Promise.all(items.map((item) => cleanupOptimizedBackupImage(item)));
+};
 
 export type BackupSummary = {
   photoCount: number;
@@ -767,8 +812,12 @@ export const backupCurrentWorkspace = async ({
       "이미지를 최적화하고 있습니다."
     );
   };
-  const optimizedPhotos = (await Promise.all(
-    backupablePhotoBackups.map(async (photo) => {
+  const optimizedImagesForCleanup: OptimizedBackupImageCleanup[] = [];
+  try {
+  const optimizedPhotos = (await mapWithConcurrencyLimit(
+    backupablePhotoBackups,
+    BACKUP_IMAGE_OPTIMIZATION_CONCURRENCY,
+    async (photo) => {
       if (!(await isPhotoStillBackupEligible(photo.id))) {
         return null;
       }
@@ -780,22 +829,27 @@ export const backupCurrentWorkspace = async ({
         sourceImageQuality: photo.imageQuality ?? null,
         imageQuality: settings.imageBackupQuality
       });
+      optimizedImagesForCleanup.push({ optimized, sourceUri: photo.uri });
       updateOptimizationProgress();
       return { photo, optimized };
-    })
+    }
   ).catch(() => {
     throw new Error(IMAGE_OPTIMIZATION_FAILED_MESSAGE);
   })).filter((item): item is { photo: PhotoItem; optimized: OptimizedBackupImage } =>
     Boolean(item)
   );
-  const optimizedImageBundles = (await Promise.all(
-    backupableImageBundleBackups.map(async (work) => {
+  const optimizedImageBundles = (await mapWithConcurrencyLimit(
+    backupableImageBundleBackups,
+    BACKUP_IMAGE_OPTIMIZATION_CONCURRENCY,
+    async (work) => {
       if (!(await isImageWorkStillBackupEligible(work.id))) {
         return null;
       }
 
-      const images = await Promise.all(
-        work.imageUris.map(async (imageUri, index) => {
+      const images = await mapWithConcurrencyLimit(
+        work.imageUris,
+        BACKUP_IMAGE_OPTIMIZATION_CONCURRENCY,
+        async (imageUri, index) => {
           if (!(await isImageWorkStillBackupEligible(work.id))) {
             return null;
           }
@@ -807,9 +861,10 @@ export const backupCurrentWorkspace = async ({
             sourceImageQuality: work.imageQuality ?? null,
             imageQuality: settings.imageBackupQuality
           });
+          optimizedImagesForCleanup.push({ optimized, sourceUri: imageUri });
           updateOptimizationProgress();
           return optimized;
-        })
+        }
       );
 
       if (images.some((image) => !image)) {
@@ -817,7 +872,7 @@ export const backupCurrentWorkspace = async ({
       }
 
       return { work, images: images as OptimizedBackupImage[] };
-    })
+    }
   ).catch(() => {
     throw new Error(IMAGE_OPTIMIZATION_FAILED_MESSAGE);
   })).filter((item): item is { work: ImageBundleWorkItem; images: OptimizedBackupImage[] } =>
@@ -1118,6 +1173,9 @@ export const backupCurrentWorkspace = async ({
     imageBackupBytes: overview.imageBackupBytes,
     deleteAfter: null
   };
+  } finally {
+    await cleanupOptimizedBackupImages(optimizedImagesForCleanup);
+  }
 };
 
 export const backupPhoto = async ({
@@ -1181,6 +1239,7 @@ export const backupPhoto = async ({
     throw new Error(IMAGE_OPTIMIZATION_FAILED_MESSAGE);
   });
 
+  try {
   await assertImageBackupCapacity({
     userId: user.uid,
     newImages: [optimized],
@@ -1267,6 +1326,9 @@ export const backupPhoto = async ({
     downloadURL,
     backupStatus: "backed_up" as const
   };
+  } finally {
+    await cleanupOptimizedBackupImage({ optimized, sourceUri: photo.uri });
+  }
 };
 
 export const backupPhotoIfEnabled = async ({
@@ -1339,20 +1401,26 @@ export const backupImageBundleWork = async ({
 
   const sourceDeviceId = await getSourceDeviceId();
   const backedUpAt = new Date().toISOString();
-  const optimizedImages = await Promise.all(
-    work.imageUris.map(async (imageUri, index) => {
+  const optimizedImagesForCleanup: OptimizedBackupImageCleanup[] = [];
+  try {
+  const optimizedImages = await mapWithConcurrencyLimit(
+    work.imageUris,
+    BACKUP_IMAGE_OPTIMIZATION_CONCURRENCY,
+    async (imageUri, index) => {
       if (!(await isImageWorkStillBackupEligible(work.id))) {
         return null;
       }
 
-      return optimizeImageForBackup({
+      const optimized = await optimizeImageForBackup({
         uri: imageUri,
         width: work.imageWidths?.[index] ?? null,
         height: work.imageHeights?.[index] ?? null,
         sourceImageQuality: work.imageQuality ?? null,
         imageQuality: settings.imageBackupQuality
       });
-    })
+      optimizedImagesForCleanup.push({ optimized, sourceUri: imageUri });
+      return optimized;
+    }
   ).catch(() => {
     throw new Error(IMAGE_OPTIMIZATION_FAILED_MESSAGE);
   });
@@ -1451,6 +1519,9 @@ export const backupImageBundleWork = async ({
     ...work,
     imageUris: backedUpImageUris
   };
+  } finally {
+    await cleanupOptimizedBackupImages(optimizedImagesForCleanup);
+  }
 };
 
 export const backupMadeVideo = async ({
