@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 
-const source = readFileSync("app/(tabs)/studio.tsx", "utf8");
-const paginatedGridStart = source.indexOf("function PaginatedPhotoGrid");
-const paginatedGridEnd = source.indexOf("function UsageBadge", paginatedGridStart);
-const stylesStart = source.indexOf("const styles = StyleSheet.create({");
+import { readStudioSource } from "./studio-test-source.mjs";
+
+const source = readStudioSource();
+const paginatedGridStart = source.indexOf("export function PaginatedPhotoGrid");
+const paginatedGridEnd = source.indexOf("export function UsageBadge", paginatedGridStart);
+const stylesStart = source.indexOf("export const styles = StyleSheet.create({");
 
 assert.ok(
   paginatedGridStart >= 0 && paginatedGridEnd > paginatedGridStart,

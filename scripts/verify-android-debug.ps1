@@ -61,6 +61,49 @@ function Stop-WithMessage {
   exit 1
 }
 
+function Get-ShortGradleUserHome {
+  if ($env:TRAVEL_FRAME_GRADLE_USER_HOME) {
+    return $env:TRAVEL_FRAME_GRADLE_USER_HOME
+  }
+
+  return "C:\g"
+}
+
+function Get-AndroidCxxCachePaths {
+  param([string]$ProjectRoot)
+
+  $paths = @()
+  $appCxxPath = Join-Path $ProjectRoot "android\app\.cxx"
+  if (Test-Path -LiteralPath $appCxxPath) {
+    $paths += $appCxxPath
+  }
+
+  $nodeModulesPath = Join-Path $ProjectRoot "node_modules"
+  if (Test-Path -LiteralPath $nodeModulesPath) {
+    $paths += Get-ChildItem -LiteralPath $nodeModulesPath -Directory -Recurse -Filter ".cxx" -ErrorAction SilentlyContinue |
+      Where-Object { $_.FullName.EndsWith("\android\.cxx", [System.StringComparison]::OrdinalIgnoreCase) } |
+      ForEach-Object { $_.FullName }
+  }
+
+  $paths | Sort-Object -Unique
+}
+
+function Clear-StaleAndroidCxxCache {
+  param([string]$ProjectRoot)
+
+  foreach ($cxxPath in Get-AndroidCxxCachePaths -ProjectRoot $ProjectRoot) {
+    $staleFiles = Get-ChildItem -LiteralPath $cxxPath -Recurse -File -Include "build.ninja", "compile_commands.json", "CMakeCache.txt" -ErrorAction SilentlyContinue |
+      Select-String -SimpleMatch ".gradle-local" -List -ErrorAction SilentlyContinue |
+      Select-Object -First 1
+    if (-not $staleFiles) {
+      continue
+    }
+
+    Write-Host "Clearing stale Android CMake cache: $cxxPath"
+    Remove-Item -LiteralPath $cxxPath -Recurse -Force
+  }
+}
+
 if ($TimeoutSeconds -lt 30) {
   Stop-WithMessage "TimeoutSeconds must be at least 30."
 }
@@ -80,7 +123,7 @@ if ($KillStaleProcesses) {
   Stop-BuildProcesses -Since (Get-Date) -ProjectRoot $projectRoot -IncludeExisting
 }
 
-$env:GRADLE_USER_HOME = Join-Path $projectRoot ".gradle-local"
+$env:GRADLE_USER_HOME = Get-ShortGradleUserHome
 $env:ANDROID_USER_HOME = Join-Path $projectRoot ".tmp\android-home"
 if (-not $env:NODE_ENV) {
   $env:NODE_ENV = "development"
@@ -88,6 +131,7 @@ if (-not $env:NODE_ENV) {
 
 New-Item -ItemType Directory -Force -Path $env:GRADLE_USER_HOME | Out-Null
 New-Item -ItemType Directory -Force -Path $env:ANDROID_USER_HOME | Out-Null
+Clear-StaleAndroidCxxCache -ProjectRoot $projectRoot
 
 $task = switch ($Mode) {
   "Assemble" { ":app:assembleDebug" }
@@ -114,7 +158,7 @@ Write-Host "Running Android $Mode verification with $TimeoutSeconds second timeo
 if ($NativeArchitectures) {
   Write-Host "Using React Native architectures: $NativeArchitectures"
 }
-Write-Host "Using project Gradle cache: $env:GRADLE_USER_HOME"
+Write-Host "Using short Gradle cache: $env:GRADLE_USER_HOME"
 Write-Host "Using Android user home: $env:ANDROID_USER_HOME"
 
 $startedAt = Get-Date

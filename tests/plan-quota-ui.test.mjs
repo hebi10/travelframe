@@ -1,14 +1,10 @@
 import assert from "node:assert/strict";
-import fs from "node:fs";
 
-const accountSource = [
-  fs.readFileSync("app/(tabs)/account.tsx", "utf8"),
-  fs.readFileSync("features/account/account-screen.helpers.ts", "utf8")
-].join("\n");
-const settingsSource = [
-  fs.readFileSync("app/(tabs)/settings.tsx", "utf8"),
-  fs.readFileSync("features/settings/settings-screen.helpers.ts", "utf8")
-].join("\n");
+import { readAccountSource } from "./account-test-source.mjs";
+import { readSettingsSource } from "./settings-test-source.mjs";
+
+const accountSource = readAccountSource();
+const settingsSource = readSettingsSource();
 
 for (const [name, source] of [
   ["account", accountSource],

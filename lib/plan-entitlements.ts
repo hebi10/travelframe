@@ -96,11 +96,22 @@ const isActivePremiumProduct = (
   subscription: UserSubscription | null,
   productId: string
 ) => {
+  const rawProductId = subscription?.productId as string | undefined;
+  const normalizedProductId =
+    rawProductId === "ad_remove" ||
+    rawProductId === "creator_monthly" ||
+    rawProductId === "expert_monthly"
+      ? rawProductId
+      : rawProductId === "premium" ||
+          (!rawProductId && subscription?.plan === "premium")
+        ? "creator_monthly"
+        : "free";
+
   if (
     !subscription ||
     subscription.plan !== "premium" ||
     subscription.status !== "active" ||
-    subscription.productId !== productId
+    normalizedProductId !== productId
   ) {
     return false;
   }

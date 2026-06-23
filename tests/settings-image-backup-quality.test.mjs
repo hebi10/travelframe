@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-const settingsSource = readFileSync("app/(tabs)/settings.tsx", "utf8");
+const settingsSource = readFileSync("features/settings/SettingsScreen.tsx", "utf8");
 const appSettingsSource = readFileSync("lib/app-settings.ts", "utf8");
-const accountSource = readFileSync("app/(tabs)/account.tsx", "utf8");
+const accountSource = readFileSync("features/account/AccountScreen.tsx", "utf8");
 const constantsSource = readFileSync("constants/image.ts", "utf8");
 
 for (const snippet of [

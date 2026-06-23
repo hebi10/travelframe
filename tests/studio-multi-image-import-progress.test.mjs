@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
-import fs from "node:fs";
 
-const studioSource = fs.readFileSync("app/(tabs)/studio.tsx", "utf8");
+import { readStudioSource } from "./studio-test-source.mjs";
+
+const studioSource = readStudioSource();
 
 for (const snippet of [
   "allowsMultipleSelection: true",

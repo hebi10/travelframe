@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 
+import { readSettingsSource } from "./settings-test-source.mjs";
+import { readTripClipSource } from "./trip-clip-test-source.mjs";
+
 const appSettingsSource = fs.readFileSync("lib/app-settings.ts", "utf8");
 const storageModeSource = fs.readFileSync("lib/storage-mode.ts", "utf8");
 const cloudBackupSource = fs.readFileSync("lib/cloud-backup.ts", "utf8");
@@ -8,9 +11,9 @@ const photoLibrarySource = fs.readFileSync("lib/photo-library.ts", "utf8");
 const videoLibrarySource = fs.readFileSync("lib/video-library.ts", "utf8");
 const workLibrarySource = fs.readFileSync("lib/work-library.ts", "utf8");
 const userMusicSource = fs.readFileSync("lib/user-music.ts", "utf8");
-const settingsSource = fs.readFileSync("app/(tabs)/settings.tsx", "utf8");
-const accountSource = fs.readFileSync("app/(tabs)/account.tsx", "utf8");
-const tripClipSource = fs.readFileSync("app/(tabs)/trip-clip.tsx", "utf8");
+const settingsSource = readSettingsSource();
+const accountSource = fs.readFileSync("features/account/AccountScreen.tsx", "utf8");
+const tripClipSource = readTripClipSource();
 
 for (const snippet of [
   'export type StorageMode = "local_only" | "local_backup" | "local_saver"',

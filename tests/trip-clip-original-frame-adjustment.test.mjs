@@ -1,8 +1,9 @@
-﻿import assert from "node:assert/strict";
+import { readTripClipSource } from "./trip-clip-test-source.mjs";
+import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const previewSource = fs.readFileSync("components/trip-clip-preview-player.tsx", "utf8");
-const tripClipSource = fs.readFileSync("app/(tabs)/trip-clip.tsx", "utf8");
+const tripClipSource = readTripClipSource();
 const recordingSource = fs.readFileSync("components/trip-clip-recording-canvas.tsx", "utf8");
 
 for (const snippet of [

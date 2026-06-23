@@ -1,13 +1,14 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { readTripClipSource } from "./trip-clip-test-source.mjs";
 
-const settingsSource = readFileSync("app/(tabs)/settings.tsx", "utf8");
+const settingsSource = readFileSync("features/settings/SettingsScreen.tsx", "utf8");
 const settingsComponentsSource = readFileSync("features/settings/settings-screen.components.tsx", "utf8");
 const appSettingsSource = readFileSync("lib/app-settings.ts", "utf8");
 const guideOverlaySource = readFileSync("components/camera-guide-overlay.tsx", "utf8");
-const cameraSource = readFileSync("app/(tabs)/camera.tsx", "utf8");
+const cameraSource = readFileSync("features/camera/CameraScreen.tsx", "utf8");
 const editSource = readFileSync("app/edit.tsx", "utf8");
-const tripClipSource = readFileSync("app/(tabs)/trip-clip.tsx", "utf8");
+const tripClipSource = readTripClipSource();
 const editableCanvasSource = readFileSync("components/editable-photo-canvas.tsx", "utf8");
 const tripClipPreviewSource = readFileSync("components/trip-clip-preview-player.tsx", "utf8");
 const tripClipRecordingSource = readFileSync("components/trip-clip-recording-canvas.tsx", "utf8");

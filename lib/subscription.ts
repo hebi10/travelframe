@@ -41,6 +41,25 @@ export type UserSubscriptionState = {
 const createSubscriptionStorageKey = (uid: string) =>
   `travel-frame.subscription.${uid}.v1`;
 
+const normalizeSubscriptionProductId = (
+  productId: unknown,
+  plan: unknown
+): SubscriptionProductId => {
+  if (
+    productId === "ad_remove" ||
+    productId === "creator_monthly" ||
+    productId === "expert_monthly"
+  ) {
+    return productId;
+  }
+
+  if (productId === "premium" || (!productId && plan === "premium")) {
+    return "creator_monthly";
+  }
+
+  return "free";
+};
+
 export const freeSubscription: UserSubscription = {
   plan: "free",
   status: "inactive",
@@ -70,9 +89,14 @@ export const isCreatorSubscriptionActive = (subscription: UserSubscription | nul
     return false;
   }
 
+  const productId = normalizeSubscriptionProductId(
+    subscription?.productId,
+    subscription?.plan
+  );
+
   return (
-    subscription?.productId === "creator_monthly" ||
-    subscription?.productId === "expert_monthly"
+    productId === "creator_monthly" ||
+    productId === "expert_monthly"
   );
 };
 
@@ -81,17 +105,24 @@ export const isAdFreeSubscription = (subscription: UserSubscription | null) => {
     return false;
   }
 
+  const productId = normalizeSubscriptionProductId(
+    subscription?.productId,
+    subscription?.plan
+  );
+
   return (
-    subscription?.productId === "ad_remove" ||
-    subscription?.productId === "creator_monthly" ||
-    subscription?.productId === "expert_monthly"
+    productId === "ad_remove" ||
+    productId === "creator_monthly" ||
+    productId === "expert_monthly"
   );
 };
 
 export const isSubscriptionProductActive = (
   subscription: UserSubscription | null,
   productId: Exclude<SubscriptionProductId, "free">
-) => isPremiumSubscription(subscription) && subscription?.productId === productId;
+) =>
+  isPremiumSubscription(subscription) &&
+  normalizeSubscriptionProductId(subscription?.productId, subscription?.plan) === productId;
 
 const parseSubscription = (value: string | null): UserSubscription => {
   if (!value) {
@@ -102,7 +133,8 @@ const parseSubscription = (value: string | null): UserSubscription => {
     const parsed = JSON.parse(value) as Partial<UserSubscription>;
     return {
       ...freeSubscription,
-      ...parsed
+      ...parsed,
+      productId: normalizeSubscriptionProductId(parsed.productId, parsed.plan)
     };
   } catch {
     return freeSubscription;

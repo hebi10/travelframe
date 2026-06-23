@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import { readTripClipSource } from "./trip-clip-test-source.mjs";
 
 const functionsSource = fs.readFileSync("functions/index.js", "utf8");
 const releaseSection = functionsSource.slice(
   functionsSource.indexOf("exports.releaseWeeklyVideoExport"),
   functionsSource.indexOf("const getBackupSessionUsageDelta")
 );
-const tripClipSource = fs.readFileSync("app/(tabs)/trip-clip.tsx", "utf8");
+const tripClipSource = readTripClipSource();
 
 assert.ok(
   releaseSection.includes("releaseWeeklyVideoExport"),

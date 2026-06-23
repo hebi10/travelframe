@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 
-const settingsSource = fs.readFileSync("app/(tabs)/settings.tsx", "utf8");
+const settingsSource = fs.readFileSync("features/settings/SettingsScreen.tsx", "utf8");
 const modalTitleTexts = settingsSource.match(
   /<Text[^>]*style=\{\[styles\.modalTitle,\s*themed\.text\]\}[^>]*>/g
 ) ?? [];

@@ -1,9 +1,12 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 
-const studioSource = fs.readFileSync("app/(tabs)/studio.tsx", "utf8");
+import { readStudioSource } from "./studio-test-source.mjs";
+import { readTripClipSource } from "./trip-clip-test-source.mjs";
+
+const studioSource = readStudioSource();
 const editSource = fs.readFileSync("app/edit.tsx", "utf8");
-const tripClipSource = fs.readFileSync("app/(tabs)/trip-clip.tsx", "utf8");
+const tripClipSource = readTripClipSource();
 const photoDetailSource = fs.readFileSync("app/photo/[id].tsx", "utf8");
 const videoDetailSource = fs.readFileSync("app/video/[id].tsx", "utf8");
 

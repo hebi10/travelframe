@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 
-const cameraSource = fs.readFileSync("app/(tabs)/camera.tsx", "utf8");
+import { readCameraSource } from "./camera-test-source.mjs";
+
+const cameraSource = readCameraSource();
 const componentsSource = fs.readFileSync("features/camera/camera-screen.components.tsx", "utf8");
 
 for (const snippet of [
@@ -21,7 +23,7 @@ for (const snippet of [
 }
 
 for (const snippet of [
-  "type CameraSettingsPatch = Partial<AppSettings>;",
+  "export type CameraSettingsPatch = Partial<AppSettings>;",
   "const pendingSettingsPatchRef = useRef<CameraSettingsPatch | null>(null)",
   "const settingsSaveChainRef = useRef<Promise<void>>(Promise.resolve())",
   "const flushQueuedAppSettingsUpdates = useCallback(async () =>",

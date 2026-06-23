@@ -2,9 +2,9 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 const files = [
-  "app/(tabs)/studio.tsx",
-  "app/(tabs)/trip-clip.tsx",
-  "app/(tabs)/camera.tsx",
+  "features/studio/StudioScreen.tsx",
+  "features/trip-clip/TripClipScreen.tsx",
+  "features/camera/CameraScreen.tsx",
   "app/edit.tsx"
 ];
 

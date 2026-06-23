@@ -1,10 +1,8 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import { readTripClipSource } from "./trip-clip-test-source.mjs";
 
-const tripClipSource = fs.readFileSync(
-  new URL("../app/(tabs)/trip-clip.tsx", import.meta.url),
-  "utf8"
-);
+const tripClipSource = readTripClipSource();
 const styleSource = fs.readFileSync(
   new URL("../features/trip-clip/trip-clip-screen.styles.ts", import.meta.url),
   "utf8"

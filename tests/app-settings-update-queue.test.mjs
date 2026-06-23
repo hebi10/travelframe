@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const appSettingsSource = fs.readFileSync("lib/app-settings.ts", "utf8");
-const cameraSource = fs.readFileSync("app/(tabs)/camera.tsx", "utf8");
+const cameraSource = fs.readFileSync("features/camera/CameraScreen.tsx", "utf8");
 
 for (const snippet of [
   "let appSettingsUpdateChain: Promise<AppSettings> = Promise.resolve(defaultAppSettings);",

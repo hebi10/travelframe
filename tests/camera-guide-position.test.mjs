@@ -3,7 +3,7 @@ import fs from "node:fs";
 import ts from "typescript";
 
 const cameraSource = [
-  fs.readFileSync("app/(tabs)/camera.tsx", "utf8"),
+  fs.readFileSync("features/camera/CameraScreen.tsx", "utf8"),
   fs.readFileSync("features/camera/camera-screen.styles.ts", "utf8")
 ].join("\n");
 const guidePositionSource = fs.readFileSync("lib/camera-guide-position.ts", "utf8");

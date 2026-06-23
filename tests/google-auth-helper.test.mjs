@@ -5,8 +5,8 @@ const helperPath = "lib/google-auth.ts";
 assert.ok(fs.existsSync(helperPath), "Google auth flow should live in a shared helper");
 
 const helperSource = fs.readFileSync(helperPath, "utf8");
-const accountSource = fs.readFileSync("app/(tabs)/account.tsx", "utf8");
-const settingsSource = fs.readFileSync("app/(tabs)/settings.tsx", "utf8");
+const accountSource = fs.readFileSync("features/account/AccountScreen.tsx", "utf8");
+const settingsSource = fs.readFileSync("features/settings/SettingsScreen.tsx", "utf8");
 
 for (const snippet of [
   "signInWithGoogleAuthSession",

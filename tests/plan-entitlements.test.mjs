@@ -41,6 +41,16 @@ assert.equal(
   "pro"
 );
 assert.equal(
+  getPlanTier({ isLoggedIn: true, subscription: activeSubscription("premium") }),
+  "pro"
+);
+const legacyPremiumWithoutProductId = activeSubscription(undefined);
+delete legacyPremiumWithoutProductId.productId;
+assert.equal(
+  getPlanTier({ isLoggedIn: true, subscription: legacyPremiumWithoutProductId }),
+  "pro"
+);
+assert.equal(
   getPlanTier({ isLoggedIn: true, subscription: activeSubscription("expert_monthly") }),
   "expert"
 );

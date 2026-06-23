@@ -6,7 +6,7 @@ const appSettingsSource = readFileSync("lib/app-settings.ts", "utf8");
 const appAppearanceSource = readFileSync("lib/app-appearance.ts", "utf8");
 const rootLayoutSource = readFileSync("app/_layout.tsx", "utf8");
 const settingsSource = [
-  readFileSync("app/(tabs)/settings.tsx", "utf8"),
+  readFileSync("features/settings/SettingsScreen.tsx", "utf8"),
   readFileSync("features/settings/settings-screen.components.tsx", "utf8")
 ].join("\n");
 

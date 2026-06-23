@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 
-const studioSource = readFileSync("app/(tabs)/studio.tsx", "utf8");
-const tripClipSource = readFileSync("app/(tabs)/trip-clip.tsx", "utf8");
+import { readStudioSource } from "./studio-test-source.mjs";
+import { readTripClipSource } from "./trip-clip-test-source.mjs";
+
+const studioSource = readStudioSource();
+const tripClipSource = readTripClipSource();
 
 assert.ok(
   studioSource.includes('params: { returnTo: "/studio?tab=videos", start: "new" }'),

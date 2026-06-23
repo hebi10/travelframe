@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import { readTripClipSource } from "./trip-clip-test-source.mjs";
 
-const source = fs.readFileSync("app/(tabs)/trip-clip.tsx", "utf8");
+const source = readTripClipSource();
 
 const effectStart = source.indexOf("  useEffect(() => {\n    setRenderedVideoUri(null);");
 const effectEnd = source.indexOf("\n\n  useEffect(() => {", effectStart + 1);

@@ -2,10 +2,10 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const accountSource = [
-  fs.readFileSync("app/(tabs)/account.tsx", "utf8"),
+  fs.readFileSync("features/account/AccountScreen.tsx", "utf8"),
   fs.readFileSync("features/account/account-screen.constants.ts", "utf8")
 ].join("\n");
-const settingsSource = fs.readFileSync("app/(tabs)/settings.tsx", "utf8");
+const settingsSource = fs.readFileSync("features/settings/SettingsScreen.tsx", "utf8");
 
 for (const snippet of [
   "무료 로그인하면 사진 편집과 MP4 영상 주 1회 저장을 사용할 수 있습니다.",

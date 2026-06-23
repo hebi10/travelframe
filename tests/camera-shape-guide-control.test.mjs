@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const constantsSource = fs.readFileSync("constants/camera-guides.ts", "utf8");
-const cameraSource = fs.readFileSync("app/(tabs)/camera.tsx", "utf8");
+const cameraSource = fs.readFileSync("features/camera/CameraScreen.tsx", "utf8");
 const overlaySource = fs.readFileSync("components/camera-guide-overlay.tsx", "utf8");
 const settingsSource = fs.readFileSync("lib/app-settings.ts", "utf8");
 

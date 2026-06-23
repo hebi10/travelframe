@@ -10,7 +10,7 @@ const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 const firestoreRules = read("firestore.rules");
 const subscriptionSource = read("lib/subscription.ts");
 const authContextSource = read("lib/auth-context.tsx");
-const accountSource = read("app/(tabs)/account.tsx");
+const accountSource = read("features/account/AccountScreen.tsx");
 
 assert.equal(
   firestoreRules.includes("isOwner(userId) && isMockSubscription"),
@@ -36,7 +36,7 @@ assert.ok(
 for (const [file, source] of [
   ["lib/subscription.ts", subscriptionSource],
   ["lib/auth-context.tsx", authContextSource],
-  ["app/(tabs)/account.tsx", accountSource]
+  ["features/account/AccountScreen.tsx", accountSource]
 ]) {
   assert.equal(source.includes("activateMockSubscription"), false, `${file} must not expose mock subscription activation`);
   assert.equal(source.includes("startMockSubscription"), false, `${file} must not expose mock subscription activation`);

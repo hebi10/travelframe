@@ -4,7 +4,7 @@ import fs from "node:fs";
 const indexSource = fs.readFileSync("app/index.tsx", "utf8");
 const rootLayoutSource = fs.readFileSync("app/_layout.tsx", "utf8");
 const tabsLayoutSource = fs.readFileSync("app/(tabs)/_layout.tsx", "utf8");
-const cameraSource = fs.readFileSync("app/(tabs)/camera.tsx", "utf8");
+const cameraSource = fs.readFileSync("features/camera/CameraScreen.tsx", "utf8");
 const tabGlyphSource = fs.readFileSync("components/tab-glyph.tsx", "utf8");
 const appGuideOverlaySource = fs.readFileSync("components/app-guide-overlay.tsx", "utf8");
 const useAppGuideSource = fs.readFileSync("hooks/use-app-guide.ts", "utf8");

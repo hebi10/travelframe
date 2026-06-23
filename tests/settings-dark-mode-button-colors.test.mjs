@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 
 const appAppearanceSource = readFileSync("lib/app-appearance.ts", "utf8");
 const settingsStylesSource = readFileSync("features/settings/settings-screen.styles.ts", "utf8");
-const settingsSource = readFileSync("app/(tabs)/settings.tsx", "utf8");
+const settingsSource = readFileSync("features/settings/SettingsScreen.tsx", "utf8");
 
 for (const snippet of [
   'background: "#000000"',

@@ -1,7 +1,8 @@
-﻿import assert from "node:assert/strict";
+import { readTripClipSource } from "./trip-clip-test-source.mjs";
+import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-const source = readFileSync("app/(tabs)/trip-clip.tsx", "utf8");
+const source = readTripClipSource();
 const backupSource = readFileSync("lib/cloud-backup.ts", "utf8");
 
 for (const snippet of [

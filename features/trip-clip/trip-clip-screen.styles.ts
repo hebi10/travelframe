@@ -275,6 +275,38 @@ export const styles = StyleSheet.create({
   previewAdjustButtonTextActive: {
     color: colors.inverse
   },
+  frameFitInlineActions: {
+    position: "absolute",
+    left: 10,
+    right: 10,
+    bottom: 10,
+    zIndex: 10,
+    flexDirection: "row",
+    gap: 8
+  },
+  frameFitInlineButton: {
+    minHeight: 34,
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 8,
+    borderWidth: 1,
+    borderColor: "rgba(17, 17, 17, 0.18)",
+    backgroundColor: "rgba(255, 255, 255, 0.9)"
+  },
+  frameFitInlinePrimaryButton: {
+    borderColor: colors.text,
+    backgroundColor: colors.text
+  },
+  frameFitInlineButtonText: {
+    color: colors.text,
+    fontSize: typography.button,
+    fontWeight: "900",
+    letterSpacing: 0
+  },
+  frameFitInlinePrimaryButtonText: {
+    color: colors.inverse
+  },
   previewInner: {
     flex: 1,
     backgroundColor: colors.ink,
@@ -346,6 +378,86 @@ export const styles = StyleSheet.create({
   previewActions: {
     flexDirection: "row",
     gap: 10
+  },
+  frameFitModalBackdrop: {
+    flex: 1,
+    justifyContent: "center",
+    padding: 14,
+    backgroundColor: "rgba(17, 17, 17, 0.72)"
+  },
+  frameFitModalPanel: {
+    gap: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.background
+  },
+  frameFitModalHeader: {
+    minHeight: 40,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 12
+  },
+  frameFitModalCopy: {
+    flex: 1,
+    gap: 4
+  },
+  frameFitModalTitle: {
+    color: colors.text,
+    fontSize: typography.body,
+    fontWeight: "900",
+    letterSpacing: 0
+  },
+  frameFitModalDetail: {
+    color: colors.muted,
+    fontSize: typography.small,
+    lineHeight: 18,
+    letterSpacing: 0
+  },
+  frameFitModalCloseButton: {
+    width: 36,
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.surface
+  },
+  frameFitModalFrame: {
+    width: "100%",
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: colors.text,
+    backgroundColor: colors.ink
+  },
+  frameFitModalActions: {
+    minHeight: 40,
+    flexDirection: "row",
+    gap: 10
+  },
+  frameFitModalButton: {
+    flex: 1,
+    minHeight: 40,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.background
+  },
+  frameFitModalPrimaryButton: {
+    borderColor: colors.text,
+    backgroundColor: colors.text
+  },
+  frameFitModalButtonText: {
+    color: colors.text,
+    fontSize: typography.button,
+    fontWeight: "900",
+    letterSpacing: 0
+  },
+  frameFitModalPrimaryButtonText: {
+    color: colors.inverse
   },
   playbackPanel: {
     gap: 10,
@@ -615,6 +727,84 @@ export const styles = StyleSheet.create({
     fontSize: typography.small,
     letterSpacing: 0,
     fontVariant: ["tabular-nums"]
+  },
+  timelineDurationDetailEditing: {
+    color: colors.text,
+    fontWeight: "900"
+  },
+  timelineDurationInput: {
+    width: 64,
+    minHeight: 30,
+    paddingHorizontal: 8,
+    borderWidth: 1,
+    borderColor: colors.text,
+    color: colors.text,
+    backgroundColor: colors.background,
+    fontSize: typography.small,
+    fontWeight: "800",
+    letterSpacing: 0,
+    textAlign: "center",
+    fontVariant: ["tabular-nums"]
+  },
+  timelineDurationKeyboardPanel: {
+    position: "absolute",
+    left: 12,
+    right: 12,
+    zIndex: 40,
+    elevation: 8,
+    minHeight: 58,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.background
+  },
+  timelineDurationKeyboardCopy: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2
+  },
+  timelineDurationKeyboardTitle: {
+    color: colors.text,
+    fontSize: typography.button,
+    fontWeight: "900",
+    letterSpacing: 0
+  },
+  timelineDurationKeyboardDetail: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 0
+  },
+  timelineDurationKeyboardInput: {
+    width: 76,
+    minHeight: 38,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: colors.text,
+    color: colors.text,
+    backgroundColor: colors.background,
+    fontSize: typography.body,
+    fontWeight: "900",
+    letterSpacing: 0,
+    textAlign: "center",
+    fontVariant: ["tabular-nums"]
+  },
+  timelineDurationKeyboardDoneButton: {
+    minWidth: 58,
+    minHeight: 38,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 12,
+    backgroundColor: colors.text
+  },
+  timelineDurationKeyboardDoneText: {
+    color: colors.inverse,
+    fontSize: typography.button,
+    fontWeight: "900",
+    letterSpacing: 0
   },
   smallControls: {
     gap: 6,

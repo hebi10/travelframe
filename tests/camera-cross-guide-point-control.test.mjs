@@ -4,7 +4,7 @@ import fs from "node:fs";
 const helpersSource = fs.readFileSync("features/camera/camera-screen.helpers.ts", "utf8");
 const overlaySource = fs.readFileSync("components/camera-guide-overlay.tsx", "utf8");
 const settingsSource = fs.readFileSync("lib/app-settings.ts", "utf8");
-const cameraSource = fs.readFileSync("app/(tabs)/camera.tsx", "utf8");
+const cameraSource = fs.readFileSync("features/camera/CameraScreen.tsx", "utf8");
 
 for (const snippet of [
   'export type GuideShapeKey = "cross" | "triangle" | "square";',

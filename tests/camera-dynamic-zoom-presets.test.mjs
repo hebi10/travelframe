@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
-import fs from "node:fs";
 
-const cameraSource = fs.readFileSync("app/(tabs)/camera.tsx", "utf8");
+import { readCameraSource } from "./camera-test-source.mjs";
+
+const cameraSource = readCameraSource();
 
 for (const snippet of [
   "getCameraZoomPresets",

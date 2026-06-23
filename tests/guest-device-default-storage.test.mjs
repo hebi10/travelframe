@@ -2,11 +2,15 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import ts from "typescript";
 
+import { readCameraSource } from "./camera-test-source.mjs";
+import { readSettingsSource } from "./settings-test-source.mjs";
+import { readStudioSource } from "./studio-test-source.mjs";
+
 const appSettingsSource = fs.readFileSync("lib/app-settings.ts", "utf8");
 const planSource = fs.readFileSync("lib/plan-entitlements.ts", "utf8");
-const cameraSource = fs.readFileSync("app/(tabs)/camera.tsx", "utf8");
-const settingsSource = fs.readFileSync("app/(tabs)/settings.tsx", "utf8");
-const studioSource = fs.readFileSync("app/(tabs)/studio.tsx", "utf8");
+const cameraSource = readCameraSource();
+const settingsSource = readSettingsSource();
+const studioSource = readStudioSource();
 const cloudBackupSource = fs.readFileSync("lib/cloud-backup.ts", "utf8");
 
 const transpiledPlan = ts.transpileModule(planSource, {

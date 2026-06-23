@@ -3,6 +3,10 @@ import fs from "node:fs";
 import ts from "typescript";
 
 const sourceUrl = new URL("../lib/subscription-products.ts", import.meta.url);
+const accountSource = fs.readFileSync(
+  new URL("../features/account/AccountScreen.tsx", import.meta.url),
+  "utf8"
+);
 const source = fs.readFileSync(sourceUrl, "utf8");
 const transpiled = ts.transpileModule(source, {
   compilerOptions: {
@@ -44,6 +48,28 @@ assert.equal(creatorProducts.adRemove, null);
 assert.equal(creatorProducts.creatorMonthly?.productId, "creator_monthly");
 assert.equal(creatorProducts.expertMonthly, null);
 
+const legacyCreatorProducts = getSubscriptionProductsFromSubscription({
+  ...baseSubscription,
+  productId: "premium",
+  expiresAt: "2999-01-01T00:00:00.000Z",
+  productName: "Pro"
+});
+assert.equal(legacyCreatorProducts.adRemove, null);
+assert.equal(legacyCreatorProducts.creatorMonthly?.productId, "premium");
+assert.equal(legacyCreatorProducts.expertMonthly, null);
+
+const missingProductCreator = {
+  ...baseSubscription,
+  expiresAt: "2999-01-01T00:00:00.000Z",
+  productName: "Pro"
+};
+delete missingProductCreator.productId;
+const missingProductCreatorProducts =
+  getSubscriptionProductsFromSubscription(missingProductCreator);
+assert.equal(missingProductCreatorProducts.adRemove, null);
+assert.equal(missingProductCreatorProducts.creatorMonthly?.productName, "Pro");
+assert.equal(missingProductCreatorProducts.expertMonthly, null);
+
 const expertProducts = getSubscriptionProductsFromSubscription({
   ...baseSubscription,
   productId: "expert_monthly",
@@ -64,5 +90,11 @@ const expiredCreatorProducts = getSubscriptionProductsFromSubscription({
 assert.equal(expiredCreatorProducts.adRemove, null);
 assert.equal(expiredCreatorProducts.creatorMonthly, null);
 assert.equal(expiredCreatorProducts.expertMonthly, null);
+
+assert.ok(
+  accountSource.includes("getSubscriptionProductsFromSubscription(subscription)") &&
+    accountSource.includes("effectiveSubscriptionProducts"),
+  "account page should derive product status from the verified subscription when product docs are unavailable"
+);
 
 console.log("ok - subscription products can be derived from active subscription");

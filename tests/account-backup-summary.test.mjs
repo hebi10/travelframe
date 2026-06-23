@@ -1,10 +1,8 @@
 import assert from "node:assert/strict";
-import fs from "node:fs";
 
-const accountSource = fs.readFileSync(
-  new URL("../app/(tabs)/account.tsx", import.meta.url),
-  "utf8"
-);
+import { readAccountSource } from "./account-test-source.mjs";
+
+const accountSource = readAccountSource();
 
 for (const snippet of [
   "subscribeCloudBackupOverview",
@@ -15,6 +13,8 @@ for (const snippet of [
   'label="마지막 백업"',
   'label="삭제 방식"',
   'value="설정에서 직접 요청"',
+  "restoreCloudBackupToLocal",
+  "백업 데이터 불러오기",
   "기존 백업 데이터 삭제는 설정에서 직접 요청할 수 있습니다."
 ]) {
   assert.ok(accountSource.includes(snippet), `account backup summary missing: ${snippet}`);

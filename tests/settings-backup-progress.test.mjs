@@ -3,7 +3,7 @@ import fs from "node:fs";
 
 const backupSource = fs.readFileSync("lib/cloud-backup.ts", "utf8");
 const settingsSource = [
-  fs.readFileSync("app/(tabs)/settings.tsx", "utf8"),
+  fs.readFileSync("features/settings/SettingsScreen.tsx", "utf8"),
   fs.readFileSync("features/settings/settings-screen.components.tsx", "utf8"),
   fs.readFileSync("features/settings/settings-screen.styles.ts", "utf8")
 ].join("\n");

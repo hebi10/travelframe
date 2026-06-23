@@ -51,6 +51,15 @@ export type GuideShapePoint = {
   y: number;
 };
 export type GuideShapePoints = Record<GuideShapeKey, GuideShapePoint[]>;
+export type CameraColorValues = {
+  exposureBias: number;
+  temperature: number;
+  tint: number;
+  brightness: number;
+  contrast: number;
+  saturation: number;
+};
+export type CameraColorSlot = CameraColorValues | null;
 
 export const GUIDE_SIZE_MIN = 24;
 export const GUIDE_SIZE_MAX = 86;
@@ -58,6 +67,7 @@ export const SHAPE_GUIDE_SIZE_MIN = 4;
 export const SHAPE_GUIDE_SIZE_MAX = 160;
 export const GUIDE_STROKE_WIDTH_MIN = 1;
 export const GUIDE_STROKE_WIDTH_MAX = 5;
+export const CAMERA_COLOR_SLOT_COUNT = 5;
 export const DEFAULT_GUIDE_COLOR = "rgba(255, 255, 255, 0.78)";
 
 export const getGuideSizeBounds = (guide: GuideType) =>
@@ -90,6 +100,9 @@ export const defaultGuideShapePoints: GuideShapePoints = {
   ]
 };
 
+export const createEmptyCameraColorSlots = (): CameraColorSlot[] =>
+  Array.from({ length: CAMERA_COLOR_SLOT_COUNT }, () => null);
+
 export type AppSettings = {
   defaultGuide: GuideType;
   guideVisible: boolean;
@@ -110,6 +123,14 @@ export type AppSettings = {
   cameraRatio: PhotoRatioLabel;
   cameraSaveScope: CameraSaveScope;
   cameraShutterSoundMode: CameraShutterSoundMode;
+  cameraExposureBias: number;
+  cameraColorTemperature: number;
+  cameraColorTint: number;
+  cameraBrightness: number;
+  cameraContrast: number;
+  cameraSaturation: number;
+  cameraColorSlots: CameraColorSlot[];
+  selectedCameraColorSlot: number;
   defaultRatio: TripClipRatio;
   exportQuality: ExportQuality;
   videoQuality: VideoQualityId;
@@ -197,6 +218,14 @@ export const defaultAppSettings: AppSettings = {
   cameraRatio: "9:16",
   cameraSaveScope: "app_device",
   cameraShutterSoundMode: "silent",
+  cameraExposureBias: 0,
+  cameraColorTemperature: 0,
+  cameraColorTint: 0,
+  cameraBrightness: 0,
+  cameraContrast: 0,
+  cameraSaturation: 0,
+  cameraColorSlots: createEmptyCameraColorSlots(),
+  selectedCameraColorSlot: 0,
   defaultRatio: "9:16",
   exportQuality: "high",
   videoQuality: DEFAULT_VIDEO_QUALITY,
@@ -400,6 +429,92 @@ const normalizeGuideLineOpacity = (value: unknown) => {
   return Math.round(Math.max(0.2, Math.min(1, parsedValue)) * 100) / 100;
 };
 
+const normalizeCameraExposureBias = (value: unknown) => {
+  const parsedValue = Number(value);
+  if (!Number.isFinite(parsedValue)) {
+    return defaultAppSettings.cameraExposureBias;
+  }
+
+  return Math.round(Math.max(-1, Math.min(1, parsedValue)) * 100) / 100;
+};
+
+const normalizeCameraColorTemperature = (value: unknown) => {
+  const parsedValue = Number(value);
+  if (!Number.isFinite(parsedValue)) {
+    return defaultAppSettings.cameraColorTemperature;
+  }
+
+  return Math.round(Math.max(-100, Math.min(100, parsedValue)));
+};
+
+const normalizeCameraColorTint = (value: unknown) => {
+  const parsedValue = Number(value);
+  if (!Number.isFinite(parsedValue)) {
+    return defaultAppSettings.cameraColorTint;
+  }
+
+  return Math.round(Math.max(-100, Math.min(100, parsedValue)));
+};
+
+const normalizeCameraBrightness = (value: unknown) => {
+  const parsedValue = Number(value);
+  if (!Number.isFinite(parsedValue)) {
+    return defaultAppSettings.cameraBrightness;
+  }
+
+  return Math.round(Math.max(-100, Math.min(100, parsedValue)));
+};
+
+const normalizeCameraContrast = (value: unknown) => {
+  const parsedValue = Number(value);
+  if (!Number.isFinite(parsedValue)) {
+    return defaultAppSettings.cameraContrast;
+  }
+
+  return Math.round(Math.max(-100, Math.min(100, parsedValue)));
+};
+
+const normalizeCameraSaturation = (value: unknown) => {
+  const parsedValue = Number(value);
+  if (!Number.isFinite(parsedValue)) {
+    return defaultAppSettings.cameraSaturation;
+  }
+
+  return Math.round(Math.max(-100, Math.min(100, parsedValue)));
+};
+
+const normalizeCameraColorValues = (value: unknown): CameraColorSlot => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  const storedValues = value as Partial<CameraColorValues>;
+  return {
+    exposureBias: normalizeCameraExposureBias(storedValues.exposureBias),
+    temperature: normalizeCameraColorTemperature(storedValues.temperature),
+    tint: normalizeCameraColorTint(storedValues.tint),
+    brightness: normalizeCameraBrightness(storedValues.brightness),
+    contrast: normalizeCameraContrast(storedValues.contrast),
+    saturation: normalizeCameraSaturation(storedValues.saturation)
+  };
+};
+
+const normalizeCameraColorSlots = (value: unknown): CameraColorSlot[] => {
+  const storedSlots = Array.isArray(value) ? value : [];
+  return createEmptyCameraColorSlots().map((slot, index) =>
+    normalizeCameraColorValues(storedSlots[index]) ?? slot
+  );
+};
+
+const normalizeSelectedCameraColorSlot = (value: unknown) => {
+  const parsedValue = Number(value);
+  if (!Number.isFinite(parsedValue)) {
+    return defaultAppSettings.selectedCameraColorSlot;
+  }
+
+  return Math.round(Math.max(0, Math.min(CAMERA_COLOR_SLOT_COUNT - 1, parsedValue)));
+};
+
 export const normalizeCloudBackupTargets = (value: unknown): CloudBackupTargets => {
   const storedTargets =
     value && typeof value === "object" && !Array.isArray(value)
@@ -471,6 +586,14 @@ const normalizeSettings = (value: Partial<AppSettings> | null): AppSettings => {
     cameraShutterSoundMode: cameraShutterSoundModes.includes(nextSettings.cameraShutterSoundMode)
       ? nextSettings.cameraShutterSoundMode
       : defaultAppSettings.cameraShutterSoundMode,
+    cameraExposureBias: normalizeCameraExposureBias(nextSettings.cameraExposureBias),
+    cameraColorTemperature: normalizeCameraColorTemperature(nextSettings.cameraColorTemperature),
+    cameraColorTint: normalizeCameraColorTint(nextSettings.cameraColorTint),
+    cameraBrightness: normalizeCameraBrightness(nextSettings.cameraBrightness),
+    cameraContrast: normalizeCameraContrast(nextSettings.cameraContrast),
+    cameraSaturation: normalizeCameraSaturation(nextSettings.cameraSaturation),
+    cameraColorSlots: normalizeCameraColorSlots(nextSettings.cameraColorSlots),
+    selectedCameraColorSlot: normalizeSelectedCameraColorSlot(nextSettings.selectedCameraColorSlot),
     defaultRatio: tripClipRatios.includes(nextSettings.defaultRatio)
       ? nextSettings.defaultRatio
       : defaultAppSettings.defaultRatio,

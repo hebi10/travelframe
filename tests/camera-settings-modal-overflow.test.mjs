@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const cameraSource = [
-  fs.readFileSync("app/(tabs)/camera.tsx", "utf8"),
+  fs.readFileSync("features/camera/CameraScreen.tsx", "utf8"),
   fs.readFileSync("features/camera/camera-screen.styles.ts", "utf8")
 ].join("\n");
 

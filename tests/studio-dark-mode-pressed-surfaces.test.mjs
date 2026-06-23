@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 
-const source = readFileSync("app/(tabs)/studio.tsx", "utf8");
+import { readStudioSource } from "./studio-test-source.mjs";
+
+const source = readStudioSource();
 
 assert.ok(
   source.includes("backgroundColor: palette.surfaceStrong"),

@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
-import fs from "node:fs";
 
-const source = fs.readFileSync("app/(tabs)/studio.tsx", "utf8");
+import { readStudioSource } from "./studio-test-source.mjs";
+
+const source = readStudioSource();
 
 assert.equal(
   source.includes("router.push(`/video/${video.id}` as Href)"),

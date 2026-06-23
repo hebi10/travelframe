@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 
 const settingsSource = [
   readFileSync("lib/app-settings.ts", "utf8"),
-  readFileSync("app/(tabs)/settings.tsx", "utf8"),
+  readFileSync("features/settings/SettingsScreen.tsx", "utf8"),
   readFileSync("features/settings/settings-screen.components.tsx", "utf8")
 ].join("\n");
 

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 const source = [
-  readFileSync("app/(tabs)/account.tsx", "utf8"),
+  readFileSync("features/account/AccountScreen.tsx", "utf8"),
   readFileSync("features/account/account-screen.styles.ts", "utf8")
 ].join("\n");
 

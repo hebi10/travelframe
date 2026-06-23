@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
-import fs from "node:fs";
 
-const cameraSource = fs.readFileSync("app/(tabs)/camera.tsx", "utf8");
+import { readCameraSource } from "./camera-test-source.mjs";
+
+const cameraSource = readCameraSource();
 const cameraRenderSource = cameraSource.slice(
   cameraSource.indexOf("{cameraDevice ? ("),
   cameraSource.indexOf("onError={handleCameraSessionError}")
@@ -9,9 +10,9 @@ const cameraRenderSource = cameraSource.slice(
 
 for (const snippet of [
   "const cameraNativeControlsReady = isCameraSessionActive && isCameraReady;",
-  "function getCameraDeviceFilter(cameraFacing: CameraPosition)",
+  "export function getCameraDeviceFilter(cameraFacing: CameraPosition)",
   "return { physicalDevices: CAMERA_BACK_PHYSICAL_DEVICES };",
-  "function getPreferredCameraDevice(",
+  "export function getPreferredCameraDevice(",
   "cameraDevices.filter((device) => device.position === \"back\" && device.hasTorch)",
   "torchDevices.find((device) => cameraDeviceHasLens(device, CAMERA_LENS_WIDE))",
   "getPreferredCameraDevice(cameraDevices, cameraFacing)",

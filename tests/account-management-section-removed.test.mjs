@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-const accountSource = readFileSync("app/(tabs)/account.tsx", "utf8");
+const accountSource = readFileSync("features/account/AccountScreen.tsx", "utf8");
 const authSource = readFileSync("lib/auth-context.tsx", "utf8");
 
 assert.equal(

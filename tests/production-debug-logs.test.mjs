@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const appSources = [
-  "app/(tabs)/account.tsx",
-  "app/(tabs)/settings.tsx",
+  "features/account/AccountScreen.tsx",
+  "features/settings/SettingsScreen.tsx",
   "lib/photo-library.ts"
 ];
 

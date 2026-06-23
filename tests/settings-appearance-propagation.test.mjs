@@ -2,9 +2,9 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 const appAppearance = readFileSync("lib/app-appearance.ts", "utf8");
-const settingsScreen = readFileSync("app/(tabs)/settings.tsx", "utf8");
+const settingsScreen = readFileSync("features/settings/SettingsScreen.tsx", "utf8");
 const accountScreen = [
-  readFileSync("app/(tabs)/account.tsx", "utf8"),
+  readFileSync("features/account/AccountScreen.tsx", "utf8"),
   readFileSync("features/account/account-screen.styles.ts", "utf8")
 ].join("\n");
 const tabsLayout = readFileSync("app/(tabs)/_layout.tsx", "utf8");

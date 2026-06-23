@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 const source = [
-  readFileSync("app/(tabs)/settings.tsx", "utf8"),
+  readFileSync("features/settings/SettingsScreen.tsx", "utf8"),
   readFileSync("features/settings/settings-screen.components.tsx", "utf8"),
   readFileSync("features/camera/camera-screen.components.tsx", "utf8")
 ].join("\n");

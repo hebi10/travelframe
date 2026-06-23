@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import { readTripClipSource } from "./trip-clip-test-source.mjs";
 
-const tripClipSource = fs.readFileSync("app/(tabs)/trip-clip.tsx", "utf8");
+const tripClipSource = readTripClipSource();
 const recordingStart = tripClipSource.indexOf("<TripClipRecordingCanvas");
 const recordingEnd = tripClipSource.indexOf("/>", recordingStart);
 const recordingBlock = tripClipSource.slice(recordingStart, recordingEnd);

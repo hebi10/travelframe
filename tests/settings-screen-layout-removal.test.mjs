@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-const settingsSource = readFileSync("app/(tabs)/settings.tsx", "utf8");
+const settingsSource = readFileSync("features/settings/SettingsScreen.tsx", "utf8");
 
 for (const removedSnippet of [
   'label="화면 구성"',

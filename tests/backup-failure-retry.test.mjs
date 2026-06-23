@@ -1,9 +1,10 @@
-﻿import assert from "node:assert/strict";
+import { readTripClipSource } from "./trip-clip-test-source.mjs";
+import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const retryQueueSource = fs.readFileSync("lib/backup-failure-queue.ts", "utf8");
-const settingsSource = fs.readFileSync("app/(tabs)/settings.tsx", "utf8");
-const tripClipSource = fs.readFileSync("app/(tabs)/trip-clip.tsx", "utf8");
+const settingsSource = fs.readFileSync("features/settings/SettingsScreen.tsx", "utf8");
+const tripClipSource = readTripClipSource();
 
 for (const snippet of [
   "recordBackupFailure",

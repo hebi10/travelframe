@@ -1,7 +1,8 @@
-﻿import assert from "node:assert/strict";
+import { readTripClipSource } from "./trip-clip-test-source.mjs";
+import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-const source = readFileSync("app/(tabs)/trip-clip.tsx", "utf8");
+const source = readTripClipSource();
 const constantsSource = readFileSync("constants/video.ts", "utf8");
 
 for (const snippet of [
@@ -27,7 +28,7 @@ for (const snippet of [
 }
 
 assert.ok(
-  source.includes("disabled={isExporting || selectedPhotos.length === 0 || videoDurationTooLong}"),
+  source.includes("disabled={isExporting || selectedPhotoCount === 0 || videoDurationTooLong}"),
   "export button should be disabled when no photos or duration is too long"
 );
 

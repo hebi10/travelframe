@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import { readTripClipSource } from "./trip-clip-test-source.mjs";
 
 const quotaSource = fs.readFileSync("lib/video-export-quota.ts", "utf8");
-const tripClipSource = fs.readFileSync("app/(tabs)/trip-clip.tsx", "utf8");
+const tripClipSource = readTripClipSource();
 
 assert.ok(
   quotaSource.includes("pendingWeeklyVideoExportCompletions"),

@@ -1,15 +1,19 @@
-﻿import assert from "node:assert/strict";
+import { readTripClipSource } from "./trip-clip-test-source.mjs";
+import assert from "node:assert/strict";
 import fs from "node:fs";
+
+import { readCameraSource } from "./camera-test-source.mjs";
+import { readStudioSource } from "./studio-test-source.mjs";
 
 const photoLibrarySource = fs.readFileSync("lib/photo-library.ts", "utf8");
 const photoTypesSource = fs.readFileSync("types/photo.ts", "utf8");
 const videoLibrarySource = fs.readFileSync("lib/video-library.ts", "utf8");
 const workLibrarySource = fs.readFileSync("lib/work-library.ts", "utf8");
-const cameraSource = fs.readFileSync("app/(tabs)/camera.tsx", "utf8");
+const cameraSource = readCameraSource();
 const capturePreviewSource = fs.readFileSync("app/capture-preview.tsx", "utf8");
 const editSource = fs.readFileSync("app/edit.tsx", "utf8");
-const studioSource = fs.readFileSync("app/(tabs)/studio.tsx", "utf8");
-const tripClipSource = fs.readFileSync("app/(tabs)/trip-clip.tsx", "utf8");
+const studioSource = readStudioSource();
+const tripClipSource = readTripClipSource();
 
 for (const [name, source] of [
   ["photo library", photoLibrarySource],

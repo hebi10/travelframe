@@ -4,6 +4,7 @@ import { manipulateAsync, SaveFormat, type Action } from "expo-image-manipulator
 import { localStorageAdapter } from "@/lib/local-storage";
 import { assertLocalLibraryCapacity } from "@/lib/local-library-limit";
 import { optimizeImageForStorage, resolveImageDimensions } from "@/lib/image-backup-utils";
+import { applyAndroidImageAdjustment, hasCameraColorAdjustment } from "@/lib/android-image-adjustment";
 import type {
   PhotoEditTransform,
   PhotoItem,
@@ -485,28 +486,50 @@ const deleteTemporaryFiles = async (uris: string[]) => {
 
 const prepareCapturedPhotoForStorage = async (input: SaveCapturedPhotoInput) => {
   const rendered = await renderCapturedPhotoForSave(input);
-  const settings = await getAppSettings();
-  const optimized = await optimizeImageForStorage({
+  const temporaryUris = [...rendered.temporaryUris];
+  let adjusted: { uri: string; width?: number; height?: number } = {
     uri: rendered.uri,
     width: rendered.width,
-    height: rendered.height,
+    height: rendered.height
+  };
+  if (hasCameraColorAdjustment(input.colorAdjustment)) {
+    adjusted = await applyAndroidImageAdjustment({
+        uri: rendered.uri,
+        adjustment: input.colorAdjustment
+      });
+  }
+  if (adjusted.uri !== rendered.uri && adjusted.uri !== input.uri) {
+    temporaryUris.push(adjusted.uri);
+  }
+  const settings = await getAppSettings();
+  const optimized = await optimizeImageForStorage({
+    uri: adjusted.uri,
+    width: adjusted.width ?? rendered.width,
+    height: adjusted.height ?? rendered.height,
     imageQuality: settings.imageBackupQuality
   });
-  const temporaryUris = [
-    ...rendered.temporaryUris,
+  const allTemporaryUris = [
+    ...temporaryUris,
     rendered.uri !== input.uri ? rendered.uri : null,
-    optimized.uri !== rendered.uri && optimized.uri !== input.uri ? optimized.uri : null
+    optimized.uri !== adjusted.uri && optimized.uri !== input.uri ? optimized.uri : null
   ].filter((uri): uri is string => Boolean(uri));
 
   return {
     ...optimized,
-    width: optimized.width ?? rendered.width,
-    height: optimized.height ?? rendered.height,
-    temporaryUris
+    width: optimized.width ?? adjusted.width ?? rendered.width,
+    height: optimized.height ?? adjusted.height ?? rendered.height,
+    temporaryUris: allTemporaryUris
   };
 };
 
-export const saveCapturedPhotoToDevice = async (input: SaveCapturedPhotoInput) => {
+export const saveCapturedPhotoToDevice = async (
+  input: SaveCapturedPhotoInput,
+  preparedUri?: string
+) => {
+  if (preparedUri) {
+    return await saveImageToLibrary(preparedUri);
+  }
+
   const prepared = await prepareCapturedPhotoForStorage(input);
 
   try {

@@ -9,7 +9,7 @@ const checkedExtensions = new Set([".ts", ".tsx"]);
 const forbiddenProductName = "영상 내보내기";
 const requiredCopy = [
   {
-    file: "app/(tabs)/account.tsx",
+    file: "features/account/AccountScreen.tsx",
     snippets: [
       'title: "Pro"',
       "Pro는 주 15회 영상 출력, 워터마크 제거, 클라우드 백업, 광고 제거를 함께 제공합니다.",
@@ -60,7 +60,7 @@ for (const directory of checkedDirs) {
 for (const requirement of requiredCopy) {
   const source = [
     fs.readFileSync(path.join(root, requirement.file), "utf8"),
-    requirement.file === "app/(tabs)/account.tsx"
+    requirement.file === "features/account/AccountScreen.tsx"
       ? fs.readFileSync(path.join(root, "features/account/account-screen.constants.ts"), "utf8")
       : ""
   ].join("\n");

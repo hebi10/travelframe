@@ -2,17 +2,13 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import ts from "typescript";
 
+import { readCameraSource } from "./camera-test-source.mjs";
+
 const focusControlsPath = "lib/camera-focus-controls.ts";
 assert.ok(fs.existsSync(focusControlsPath), "camera focus control helpers should exist");
 
 const focusControlsSource = fs.readFileSync(focusControlsPath, "utf8");
-const cameraSource = [
-  fs.readFileSync("app/(tabs)/camera.tsx", "utf8"),
-  fs.readFileSync("features/camera/camera-screen.components.tsx", "utf8"),
-  fs.readFileSync("features/camera/camera-screen.constants.ts", "utf8"),
-  fs.readFileSync("features/camera/camera-screen.helpers.ts", "utf8"),
-  fs.readFileSync("features/camera/camera-screen.styles.ts", "utf8")
-].join("\n");
+const cameraSource = readCameraSource();
 const packageJson = JSON.parse(fs.readFileSync("package.json", "utf8"));
 
 const { outputText } = ts.transpileModule(focusControlsSource, {

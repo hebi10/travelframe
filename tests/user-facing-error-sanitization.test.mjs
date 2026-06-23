@@ -1,26 +1,24 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import { readTripClipSource } from "./trip-clip-test-source.mjs";
 
 const errorSource = fs.readFileSync(
   new URL("../lib/user-facing-error.ts", import.meta.url),
   "utf8"
 );
 const settingsSource = fs.readFileSync(
-  new URL("../app/(tabs)/settings.tsx", import.meta.url),
+  new URL("../features/settings/SettingsScreen.tsx", import.meta.url),
   "utf8"
 );
 const accountSource = fs.readFileSync(
-  new URL("../app/(tabs)/account.tsx", import.meta.url),
+  new URL("../features/account/AccountScreen.tsx", import.meta.url),
   "utf8"
 );
 const backupSource = fs.readFileSync(
   new URL("../lib/cloud-backup.ts", import.meta.url),
   "utf8"
 );
-const tripClipSource = fs.readFileSync(
-  new URL("../app/(tabs)/trip-clip.tsx", import.meta.url),
-  "utf8"
-);
+const tripClipSource = readTripClipSource();
 const editableCanvasSource = fs.readFileSync(
   new URL("../components/editable-photo-canvas.tsx", import.meta.url),
   "utf8"

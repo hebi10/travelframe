@@ -1,14 +1,19 @@
-﻿import assert from "node:assert/strict";
+import { readTripClipSource } from "./trip-clip-test-source.mjs";
+import assert from "node:assert/strict";
 import fs from "node:fs";
+
+import { readCameraSource } from "./camera-test-source.mjs";
+import { readSettingsSource } from "./settings-test-source.mjs";
+import { readStudioSource } from "./studio-test-source.mjs";
 
 const authSource = fs.readFileSync("lib/auth-context.tsx", "utf8");
 const backupSource = fs.readFileSync("lib/cloud-backup.ts", "utf8");
-const settingsSource = fs.readFileSync("app/(tabs)/settings.tsx", "utf8");
-const cameraSource = fs.readFileSync("app/(tabs)/camera.tsx", "utf8");
+const settingsSource = readSettingsSource();
+const cameraSource = readCameraSource();
 const capturePreviewSource = fs.readFileSync("app/capture-preview.tsx", "utf8");
 const editSource = fs.readFileSync("app/edit.tsx", "utf8");
-const studioSource = fs.readFileSync("app/(tabs)/studio.tsx", "utf8");
-const tripClipSource = fs.readFileSync("app/(tabs)/trip-clip.tsx", "utf8");
+const studioSource = readStudioSource();
+const tripClipSource = readTripClipSource();
 const userMusicSource = fs.readFileSync("lib/user-music.ts", "utf8");
 
 for (const snippet of [
@@ -50,6 +55,7 @@ for (const snippet of [
   "나중에 선택",
   "현재 기기의 데이터로 백업을 시작합니다. 기존 클라우드 백업과 중복될 수 있습니다. 계속하시겠습니까?",
   "클라우드 백업 데이터 중 현재 앱에 없는 사진, 작업물, 영상만 불러옵니다. 이미 저장된 항목은 그대로 둡니다. 계속하시겠습니까?",
+  "백업 데이터 불러오기",
   "실패한 백업 다시 시도",
   "getCloudBackupOverview",
   "restoreCloudBackupToLocal"

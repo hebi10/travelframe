@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 
-const accountSource = fs.readFileSync("app/(tabs)/account.tsx", "utf8");
+const accountSource = fs.readFileSync("features/account/AccountScreen.tsx", "utf8");
 const helperSource = fs.readFileSync("lib/google-auth.ts", "utf8");
 const routeSource = fs.readFileSync("app/oauthredirect.tsx", "utf8");
 const layoutSource = fs.readFileSync("app/_layout.tsx", "utf8");

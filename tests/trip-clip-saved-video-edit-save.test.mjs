@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import { readTripClipSource } from "./trip-clip-test-source.mjs";
 
-const tripClipSource = fs.readFileSync("app/(tabs)/trip-clip.tsx", "utf8");
+const tripClipSource = readTripClipSource();
 const videoLibrarySource = fs.readFileSync("lib/video-library.ts", "utf8");
 
 for (const snippet of [

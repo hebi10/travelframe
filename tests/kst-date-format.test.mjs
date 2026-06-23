@@ -1,29 +1,29 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 
-const files = [
-  "app/(tabs)/studio.tsx",
-  "app/photo/[id].tsx",
-  "app/video/[id].tsx",
-  "app/edit.tsx",
-  "components/trip-clip-preview-player.tsx"
+import { readAccountSource } from "./account-test-source.mjs";
+import { readSettingsSource } from "./settings-test-source.mjs";
+import { readStudioSource } from "./studio-test-source.mjs";
+
+const sources = [
+  ["features/studio", readStudioSource()],
+  ["app/photo/[id].tsx", fs.readFileSync("app/photo/[id].tsx", "utf8")],
+  ["app/video/[id].tsx", fs.readFileSync("app/video/[id].tsx", "utf8")],
+  ["app/edit.tsx", fs.readFileSync("app/edit.tsx", "utf8")],
+  ["components/trip-clip-preview-player.tsx", fs.readFileSync("components/trip-clip-preview-player.tsx", "utf8")]
 ];
 
-for (const file of files) {
-  const source = fs.readFileSync(file, "utf8");
+for (const [file, source] of sources) {
   assert.ok(
     source.includes('timeZone: "Asia/Seoul"'),
     `${file} should format visible app dates in Korean time`
   );
 }
 
-for (const [screenFile, helperFile] of [
-  ["app/(tabs)/account.tsx", "features/account/account-screen.helpers.ts"],
-  ["app/(tabs)/settings.tsx", "features/settings/settings-screen.helpers.ts"]
+for (const [screenFile, source] of [
+  ["features/account", readAccountSource()],
+  ["features/settings", readSettingsSource()]
 ]) {
-  const source = [screenFile, helperFile]
-    .map((file) => fs.readFileSync(file, "utf8"))
-    .join("\n");
   assert.ok(
     source.includes('timeZone: "Asia/Seoul"'),
     `${screenFile} should format visible app dates in Korean time`

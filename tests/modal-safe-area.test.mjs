@@ -1,20 +1,18 @@
-﻿import assert from "node:assert/strict";
+import { readTripClipSource } from "./trip-clip-test-source.mjs";
+import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const settingsSource = fs.readFileSync(
-  new URL("../app/(tabs)/settings.tsx", import.meta.url),
+  new URL("../features/settings/SettingsScreen.tsx", import.meta.url),
   "utf8"
 );
 const accountSource = fs.readFileSync(
-  new URL("../app/(tabs)/account.tsx", import.meta.url),
+  new URL("../features/account/AccountScreen.tsx", import.meta.url),
   "utf8"
 );
-const tripClipSource = fs.readFileSync(
-  new URL("../app/(tabs)/trip-clip.tsx", import.meta.url),
-  "utf8"
-);
+const tripClipSource = readTripClipSource();
 const cameraSource = fs.readFileSync(
-  new URL("../app/(tabs)/camera.tsx", import.meta.url),
+  new URL("../features/camera/CameraScreen.tsx", import.meta.url),
   "utf8"
 );
 

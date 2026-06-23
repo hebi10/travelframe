@@ -1,9 +1,12 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 
-const studioSource = fs.readFileSync("app/(tabs)/studio.tsx", "utf8");
+import { readStudioSource } from "./studio-test-source.mjs";
+import { readTripClipSource } from "./trip-clip-test-source.mjs";
+
+const studioSource = readStudioSource();
 const videoDetailSource = fs.readFileSync("app/video/[id].tsx", "utf8");
-const tripClipSource = fs.readFileSync("app/(tabs)/trip-clip.tsx", "utf8");
+const tripClipSource = readTripClipSource();
 
 assert.ok(
   studioSource.includes('pathname: "/trip-clip"') &&

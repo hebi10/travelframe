@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-const cameraSource = readFileSync("app/(tabs)/camera.tsx", "utf8");
+const cameraSource = readFileSync("features/camera/CameraScreen.tsx", "utf8");
 
 assert.ok(
   cameraSource.includes('<Feather name="image" size={28} color={colors.inverse} />'),

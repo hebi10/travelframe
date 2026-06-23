@@ -5,10 +5,10 @@ const appAppearanceSource = readFileSync("lib/app-appearance.ts", "utf8");
 const screenShellSource = readFileSync("components/screen-shell.tsx", "utf8");
 const settingsStylesSource = readFileSync("features/settings/settings-screen.styles.ts", "utf8");
 const settingsComponentsSource = readFileSync("features/settings/settings-screen.components.tsx", "utf8");
-const settingsScreenSource = readFileSync("app/(tabs)/settings.tsx", "utf8");
+const settingsScreenSource = readFileSync("features/settings/SettingsScreen.tsx", "utf8");
 const accountStylesSource = readFileSync("features/account/account-screen.styles.ts", "utf8");
 const accountComponentsSource = readFileSync("features/account/account-screen.components.tsx", "utf8");
-const accountScreenSource = readFileSync("app/(tabs)/account.tsx", "utf8");
+const accountScreenSource = readFileSync("features/account/AccountScreen.tsx", "utf8");
 
 assert.ok(
   appAppearanceSource.includes('export type AppFontWeight = "400" | "700" | "800" | "900"'),

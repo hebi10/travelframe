@@ -1,8 +1,9 @@
-﻿import assert from "node:assert/strict";
+import { readTripClipSource } from "./trip-clip-test-source.mjs";
+import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 const source = [
-  readFileSync("app/(tabs)/trip-clip.tsx", "utf8"),
+  readTripClipSource(),
   readFileSync("features/trip-clip/trip-clip-screen.constants.ts", "utf8")
 ].join("\n");
 
@@ -28,7 +29,8 @@ assert.ok(
   "MP4 export option should be displayed before image export"
 );
 
-assert.ok(
-  source.includes("\uC5EC\uD589\uD074\uB9BD \uB9CC\uB4E4\uAE30"),
-  "trip clip screen title should say 여행클립 만들기"
+assert.match(
+  source,
+  /<Text selectable style=\{styles\.eyebrow\}>\s*영상 만들기\s*<\/Text>/,
+  "trip clip screen eyebrow should say 영상 만들기"
 );

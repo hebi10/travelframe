@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const settingsSource = fs.readFileSync(
-  new URL("../app/(tabs)/settings.tsx", import.meta.url),
+  new URL("../features/settings/SettingsScreen.tsx", import.meta.url),
   "utf8"
 );
 const helperSource = fs.readFileSync(

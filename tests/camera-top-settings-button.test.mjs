@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 
-const cameraSource = fs.readFileSync("app/(tabs)/camera.tsx", "utf8");
+import { readCameraSource } from "./camera-test-source.mjs";
+
+const cameraSource = readCameraSource();
 const stylesSource = fs.readFileSync("features/camera/camera-screen.styles.ts", "utf8");
 
 for (const removedSnippet of [
@@ -62,7 +64,7 @@ assert.ok(
   "top light button should stay clickable even before native torch controls are ready"
 );
 assert.ok(
-  cameraSource.includes('type CameraControlPanel = "zoom" | "light"'),
+  cameraSource.includes('export type CameraControlPanel = "color" | "zoom" | "light"'),
   "camera controls should include a light panel"
 );
 assert.ok(

@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 
-const cameraSource = fs.readFileSync("app/(tabs)/camera.tsx", "utf8");
-const settingsSource = fs.readFileSync("app/(tabs)/settings.tsx", "utf8");
+const cameraSource = fs.readFileSync("features/camera/CameraScreen.tsx", "utf8");
+const settingsSource = fs.readFileSync("features/settings/SettingsScreen.tsx", "utf8");
 
 for (const snippet of [
   "const canSelectCloudSaveTarget = planEntitlements.canBackupToCloud",

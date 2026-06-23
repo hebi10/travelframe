@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 
-const cameraSource = fs.readFileSync("app/(tabs)/camera.tsx", "utf8");
+const cameraSource = fs.readFileSync("features/camera/CameraScreen.tsx", "utf8");
 const focusEffectSource = cameraSource.slice(
   cameraSource.indexOf("useFocusEffect("),
   cameraSource.indexOf("useFocusEffect(", cameraSource.indexOf("useFocusEffect(") + 1)

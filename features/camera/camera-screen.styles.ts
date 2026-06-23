@@ -40,6 +40,10 @@ export const styles = StyleSheet.create({
   camera: {
     ...StyleSheet.absoluteFillObject
   },
+  cameraColorOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 2
+  },
   guidePositionLayer: {
     ...StyleSheet.absoluteFillObject,
     zIndex: 3
@@ -835,6 +839,86 @@ export const styles = StyleSheet.create({
     minHeight: 42,
     alignItems: "center",
     justifyContent: "center"
+  },
+  cameraColorPanel: {
+    width: "100%",
+    gap: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.background
+  },
+  cameraColorHeaderRow: {
+    minHeight: 42,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 10
+  },
+  cameraColorHeader: {
+    flex: 1,
+    gap: 3
+  },
+  cameraColorTitle: {
+    color: colors.text,
+    fontSize: typography.body,
+    fontWeight: "900",
+    letterSpacing: 0
+  },
+  cameraColorHint: {
+    color: colors.muted,
+    fontSize: 11,
+    lineHeight: 16,
+    letterSpacing: 0
+  },
+  cameraColorCloseButton: {
+    width: 34,
+    height: 34,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.surface
+  },
+  cameraColorSlotRow: {
+    minHeight: 38,
+    flexDirection: "row",
+    gap: 7
+  },
+  cameraColorSlotButton: {
+    flex: 1,
+    minWidth: 0,
+    height: 38,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.surface
+  },
+  cameraColorSlotButtonActive: {
+    borderColor: colors.text,
+    backgroundColor: colors.background
+  },
+  cameraColorSlotButtonSaved: {
+    borderColor: colors.text
+  },
+  cameraColorSlotText: {
+    color: colors.text,
+    fontSize: typography.button,
+    fontWeight: "900",
+    letterSpacing: 0,
+    fontVariant: ["tabular-nums"]
+  },
+  cameraColorSlotTextMuted: {
+    color: colors.muted
+  },
+  cameraColorSliderList: {
+    gap: 10
+  },
+  cameraColorActions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 8
   },
   quickButtonRow: {
     minHeight: 42,

@@ -57,6 +57,7 @@ export type SmoothValueSliderProps = {
   min: number;
   max: number;
   label: string;
+  formatValue?: (value: number) => string;
   compact?: boolean;
   onChange?: (value: number) => void;
   onCommit: (value: number) => void;
@@ -308,6 +309,7 @@ export function SmoothValueSlider({
   min,
   max,
   label,
+  formatValue,
   compact = false,
   onChange,
   onCommit
@@ -318,6 +320,7 @@ export function SmoothValueSlider({
   const isDragging = useSharedValue(false);
   const thumbTranslateX = useDerivedValue(() => thumbX.value - 9);
   const previewValue = onChange ?? onCommit;
+  const valueLabel = formatValue ? formatValue(value) : `${Math.round(value)}%`;
 
   useEffect(() => {
     if (trackWidth <= 0) {
@@ -389,7 +392,7 @@ export function SmoothValueSlider({
             </Animated.View>
           </GestureDetector>
           <Text selectable={false} style={styles.compactSliderValue}>
-            {Math.round(value)}%
+            {valueLabel}
           </Text>
         </View>
       </View>
@@ -403,7 +406,7 @@ export function SmoothValueSlider({
           {label}
         </Text>
         <Text selectable={false} style={styles.sizeSliderMetaText}>
-          {Math.round(value)}%
+          {valueLabel}
         </Text>
       </View>
       <GestureDetector gesture={sliderGesture}>

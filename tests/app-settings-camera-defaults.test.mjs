@@ -1,9 +1,12 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 
+import { readCameraSource } from "./camera-test-source.mjs";
+import { readSettingsSource } from "./settings-test-source.mjs";
+
 const source = fs.readFileSync("lib/app-settings.ts", "utf8");
-const cameraSource = fs.readFileSync("app/(tabs)/camera.tsx", "utf8");
-const settingsSource = fs.readFileSync("app/(tabs)/settings.tsx", "utf8");
+const cameraSource = readCameraSource();
+const settingsSource = readSettingsSource();
 const photoLibrarySource = fs.readFileSync("lib/photo-library.ts", "utf8");
 
 for (const snippet of [

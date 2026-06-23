@@ -125,3 +125,29 @@ export function SmallButton({ label, onPress }: { label: string; onPress: () => 
     </Pressable>
   );
 }
+
+export function TimelineDurationControl({
+  duration,
+  editing,
+  onBeginEditing
+}: {
+  duration: number;
+  editing: boolean;
+  onBeginEditing: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="노출 시간 숫자로 수정"
+      hitSlop={8}
+      onPress={onBeginEditing}
+    >
+      <Text
+        selectable={false}
+        style={[styles.timelineDetail, editing && styles.timelineDurationDetailEditing]}
+      >
+        {duration.toFixed(1)}초
+      </Text>
+    </Pressable>
+  );
+}

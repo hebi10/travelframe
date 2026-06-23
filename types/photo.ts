@@ -14,6 +14,14 @@ export type PhotoEditTransform = {
   frameHeight?: number;
 };
 
+export type CameraColorAdjustment = {
+  brightness: number;
+  contrast: number;
+  saturation: number;
+  temperature: number;
+  tint: number;
+};
+
 export type BackupMetadata = {
   userId?: string;
   localId?: string;
@@ -56,6 +64,7 @@ export type SaveCapturedPhotoInput = {
   width?: number;
   height?: number;
   ratioLabel?: PhotoRatioLabel;
+  colorAdjustment?: CameraColorAdjustment;
   localImageLimit?: number;
 };
 

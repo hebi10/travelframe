@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
-import fs from "node:fs";
 
-const source = fs.readFileSync("app/(tabs)/studio.tsx", "utf8");
+import { readStudioSource } from "./studio-test-source.mjs";
+
+const source = readStudioSource();
 
 for (const snippet of [
   "type DeleteProgress",

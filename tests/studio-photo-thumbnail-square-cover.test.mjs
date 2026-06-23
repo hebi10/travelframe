@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 
-const source = readFileSync("app/(tabs)/studio.tsx", "utf8");
+import { readStudioSource } from "./studio-test-source.mjs";
+
+const source = readStudioSource();
 const photoCardStart = source.indexOf("function PhotoCard");
-const photoCardEnd = source.indexOf("function PageSizeSelector", photoCardStart);
+const photoCardEnd = source.indexOf("export function PageSizeSelector", photoCardStart);
 const thumbnailStyleStart = source.indexOf("thumbnail: {");
 const thumbnailStyleEnd = source.indexOf("photoMeta:", thumbnailStyleStart);
 

@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
+import { readTripClipSource } from "./trip-clip-test-source.mjs";
 
 const helperPath = "lib/trip-clip-title.ts";
 const helperSource = existsSync(helperPath) ? readFileSync(helperPath, "utf8") : "";
-const tripClipSource = readFileSync("app/(tabs)/trip-clip.tsx", "utf8");
+const tripClipSource = readTripClipSource();
 
 assert.ok(helperSource.includes("TRIP_CLIP_TITLE_PREFIX = \"여행 클립\""), "title helper should use the visible Korean prefix");
 assert.ok(

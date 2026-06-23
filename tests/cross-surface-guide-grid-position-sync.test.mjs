@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import { readTripClipSource } from "./trip-clip-test-source.mjs";
 
 const editSource = fs.readFileSync("app/edit.tsx", "utf8");
 const editableCanvasSource = fs.readFileSync("components/editable-photo-canvas.tsx", "utf8");
-const tripClipSource = fs.readFileSync("app/(tabs)/trip-clip.tsx", "utf8");
+const tripClipSource = readTripClipSource();
 const previewPlayerSource = fs.readFileSync("components/trip-clip-preview-player.tsx", "utf8");
 const recordingCanvasSource = fs.readFileSync("components/trip-clip-recording-canvas.tsx", "utf8");
-const settingsSource = fs.readFileSync("app/(tabs)/settings.tsx", "utf8");
+const settingsSource = fs.readFileSync("features/settings/SettingsScreen.tsx", "utf8");
 
 for (const [label, source] of [
   ["edit screen", editSource],

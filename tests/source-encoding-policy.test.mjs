@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const sourceFiles = [
-  "app/(tabs)/camera.tsx",
+  "features/camera/CameraScreen.tsx",
   "lib/app-settings.ts",
   "app.json",
   "README.md",
