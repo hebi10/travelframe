@@ -4,7 +4,7 @@ import { readTripClipSource } from "./trip-clip-test-source.mjs";
 
 const source = [
   readTripClipSource(),
-  readFileSync("features/trip-clip/trip-clip-screen.components.tsx", "utf8"),
+  readFileSync("trip-clip-screen.components.tsx", "utf8"),
   readFileSync("features/trip-clip/trip-clip-screen.helpers.ts", "utf8")
 ].join("\n");
 const stylesSource = readFileSync(
@@ -21,6 +21,8 @@ for (const snippet of [
   "Keyboard.addListener(\"keyboardDidShow\"",
   "Keyboard.addListener(\"keyboardDidHide\"",
   "ANDROID_DURATION_KEYBOARD_FALLBACK_HEIGHT",
+  "ANDROID_DURATION_KEYBOARD_EXTRA_GAP",
+  "ANDROID_DURATION_KEYBOARD_RECHECK_DELAYS",
   "durationKeyboardPanelBottom",
   "timelineDurationKeyboardPanel",
   "timelineDurationKeyboardInput",
@@ -50,6 +52,41 @@ assert.ok(
   ),
   "timeline duration input should not trust an undersized Android keyboard height"
 );
+
+assert.ok(
+  source.includes("ANDROID_DURATION_KEYBOARD_EXTRA_GAP") &&
+    source.includes("DURATION_KEYBOARD_PANEL_GAP +\n      ANDROID_DURATION_KEYBOARD_EXTRA_GAP"),
+  "timeline duration input should keep an Android-only gap above the numeric keyboard"
+);
+
+assert.ok(
+  source.includes("const ANDROID_DURATION_KEYBOARD_RECHECK_DELAYS = [80, 180, 320] as const;"),
+  "timeline duration input should recheck keyboard metrics three times after Android keyboard show"
+);
+
+for (const snippet of [
+  "durationKeyboardRecheckTimersRef",
+  "clearDurationKeyboardHeightRechecks",
+  "scheduleDurationKeyboardHeightRechecks",
+  "Keyboard.metrics()",
+  "ANDROID_DURATION_KEYBOARD_RECHECK_DELAYS.map",
+  "setTimeout(updateDurationKeyboardHeightFromMetrics, delay)",
+  "setDurationKeyboardHeight((current) => Math.max(current, metricsHeight))",
+  "clearTimeout(timer)"
+]) {
+  assert.ok(source.includes(snippet), `timeline duration limited keyboard recheck missing: ${snippet}`);
+}
+
+for (const snippet of [
+  "import { Feather } from \"@expo/vector-icons\";",
+  "alignSelf: \"flex-start\"",
+  "paddingRight: 8",
+  "style={{ marginTop: 1 }}",
+  "Feather",
+  "name=\"edit-2\""
+]) {
+  assert.ok(source.includes(snippet), `timeline duration edit icon missing: ${snippet}`);
+}
 
 assert.match(
   source,

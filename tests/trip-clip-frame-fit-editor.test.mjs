@@ -17,6 +17,8 @@ for (const snippet of [
   "adjustEnabled={previewAdjustEnabled}",
   "{...frameFitPreviewProps}",
   "visible={isFrameFitModalVisible}",
+  "GestureHandlerRootView",
+  "style={styles.frameFitModalGestureRoot}",
   "adjustEnabled={isFrameFitModalVisible}",
   "onRequestClose={() => setIsFrameFitModalVisible(false)}",
   "styles.frameFitModalBackdrop",
@@ -30,6 +32,7 @@ for (const snippet of [
   "frameFitInlineActions",
   "frameFitInlineButton",
   "frameFitInlinePrimaryButton",
+  "frameFitModalGestureRoot",
   "frameFitModalBackdrop",
   "frameFitModalPanel",
   "frameFitModalFrame",
@@ -43,10 +46,11 @@ const modalBlock = tripClipSource.slice(
   tripClipSource.indexOf("</Modal>", tripClipSource.indexOf("visible={isFrameFitModalVisible}"))
 );
 assert.ok(
-  modalBlock.includes("TripClipPreviewPlayer") &&
+  modalBlock.includes("GestureHandlerRootView") &&
+    modalBlock.includes("TripClipPreviewPlayer") &&
     modalBlock.includes("{...frameFitPreviewProps}") &&
     tripClipSource.includes("onPhotoAdjustmentChange: updatePhotoAdjustment"),
-  "frame fit modal should reuse the preview player and shared photo adjustment state"
+  "frame fit modal should reuse the preview player inside a gesture root with shared photo adjustment state"
 );
 
 console.log("ok - trip clip frame fit editor supports inline and large modal editing");

@@ -1,7 +1,7 @@
 import fs from "node:fs";
 
 const tripClipSourceFiles = [
-  "features/trip-clip/TripClipScreen.tsx",
+  "TripClipScreen.tsx",
   "features/trip-clip/components/TripClipHeader.tsx",
   "features/trip-clip/components/TripClipPreview.tsx",
   "features/trip-clip/components/TripClipPhotoTab.tsx",
@@ -16,7 +16,7 @@ const tripClipSourceFiles = [
   "features/trip-clip/hooks/useTripClipGuide.ts",
   "features/trip-clip/hooks/useTripClipExport.ts",
   "features/trip-clip/hooks/useTripClipMusic.ts",
-  "features/trip-clip/trip-clip-screen.components.tsx",
+  "trip-clip-screen.components.tsx",
   "features/trip-clip/trip-clip-screen.constants.ts",
   "features/trip-clip/trip-clip-screen.helpers.ts"
 ];

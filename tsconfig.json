@@ -3,6 +3,12 @@
   "compilerOptions": {
     "strict": true,
     "paths": {
+      "@/features/trip-clip/TripClipScreen": [
+        "./TripClipScreen"
+      ],
+      "@/features/trip-clip/trip-clip-screen.components": [
+        "./trip-clip-screen.components"
+      ],
       "@/*": [
         "./*"
       ]

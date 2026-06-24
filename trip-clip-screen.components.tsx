@@ -1,8 +1,15 @@
+import { Feather } from "@expo/vector-icons";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Pressable, Text, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import Reanimated, { runOnJS, type SharedValue, useAnimatedStyle, useSharedValue } from "react-native-reanimated";
+import Reanimated, {
+  runOnJS,
+  type SharedValue,
+  useAnimatedStyle,
+  useSharedValue
+} from "react-native-reanimated";
 
+import { colors } from "@/constants/app-theme";
 import { styles } from "@/features/trip-clip/trip-clip-screen.styles";
 
 export function Section({ title, children }: { title: string; children: ReactNode }) {
@@ -140,6 +147,15 @@ export function TimelineDurationControl({
       accessibilityRole="button"
       accessibilityLabel="노출 시간 숫자로 수정"
       hitSlop={8}
+      style={{
+        alignSelf: "flex-start",
+        minHeight: 30,
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 5,
+        paddingVertical: 4,
+        paddingRight: 8
+      }}
       onPress={onBeginEditing}
     >
       <Text
@@ -148,6 +164,12 @@ export function TimelineDurationControl({
       >
         {duration.toFixed(1)}초
       </Text>
+      <Feather
+        name="edit-2"
+        size={13}
+        color={editing ? colors.text : colors.muted}
+        style={{ marginTop: 1 }}
+      />
     </Pressable>
   );
 }

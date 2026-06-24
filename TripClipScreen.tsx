@@ -251,6 +251,8 @@ const VIEW_RECORDER_FPS = 24;
 const TRIP_CLIP_DRAFT_AUTOSAVE_MS = 60000;
 const ANDROID_DURATION_KEYBOARD_FALLBACK_HEIGHT = 320;
 const DURATION_KEYBOARD_PANEL_GAP = 8;
+const ANDROID_DURATION_KEYBOARD_EXTRA_GAP = 56;
+const ANDROID_DURATION_KEYBOARD_RECHECK_DELAYS = [80, 180, 320] as const;
 
 const ratioAspect: Record<TripClipRatio, number> = {
   "9:16": 9 / 16,
@@ -401,6 +403,7 @@ export default function TripClipScreen() {
   const suppressAutoVideoSelectionRef = useRef(false);
   const autoDurationIdsRef = useRef<Set<string>>(new Set());
   const playbackOffsetRef = useRef(0);
+  const durationKeyboardRecheckTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const playbackProgress = useSharedValue(0);
   const previewGuideOffsetXValue = useSharedValue(0);
   const previewGuideOffsetYValue = useSharedValue(0);
@@ -451,26 +454,61 @@ export default function TripClipScreen() {
         : 0;
     const androidKeyboardOffset =
       Math.max(durationKeyboardHeight, ANDROID_DURATION_KEYBOARD_FALLBACK_HEIGHT) +
-      DURATION_KEYBOARD_PANEL_GAP;
+      DURATION_KEYBOARD_PANEL_GAP +
+      ANDROID_DURATION_KEYBOARD_EXTRA_GAP;
     const keyboardOffset =
       Platform.OS === "android" ? androidKeyboardOffset : measuredKeyboardOffset;
 
     return Math.max(bottomSafePadding, keyboardOffset);
   }, [bottomSafePadding, durationKeyboardHeight]);
 
+  const clearDurationKeyboardHeightRechecks = useCallback(() => {
+    durationKeyboardRecheckTimersRef.current.forEach((timer) => {
+      clearTimeout(timer);
+    });
+    durationKeyboardRecheckTimersRef.current = [];
+  }, []);
+
+  const updateDurationKeyboardHeightFromMetrics = useCallback(() => {
+    const metrics = Keyboard.metrics();
+    const metricsHeight = metrics?.height;
+
+    if (typeof metricsHeight !== "number" || metricsHeight <= 0) {
+      return;
+    }
+
+    setDurationKeyboardHeight((current) => Math.max(current, metricsHeight));
+  }, []);
+
+  const scheduleDurationKeyboardHeightRechecks = useCallback(() => {
+    clearDurationKeyboardHeightRechecks();
+
+    if (Platform.OS !== "android") {
+      return;
+    }
+
+    durationKeyboardRecheckTimersRef.current =
+      ANDROID_DURATION_KEYBOARD_RECHECK_DELAYS.map((delay) =>
+        setTimeout(updateDurationKeyboardHeightFromMetrics, delay)
+      );
+  }, [clearDurationKeyboardHeightRechecks, updateDurationKeyboardHeightFromMetrics]);
+
   useEffect(() => {
     const showSubscription = Keyboard.addListener("keyboardDidShow", (event) => {
       setDurationKeyboardHeight(event.endCoordinates.height);
+      scheduleDurationKeyboardHeightRechecks();
     });
     const hideSubscription = Keyboard.addListener("keyboardDidHide", () => {
+      clearDurationKeyboardHeightRechecks();
       setDurationKeyboardHeight(0);
     });
 
     return () => {
+      clearDurationKeyboardHeightRechecks();
       showSubscription.remove();
       hideSubscription.remove();
     };
-  }, []);
+  }, [clearDurationKeyboardHeightRechecks, scheduleDurationKeyboardHeightRechecks]);
 
   const updatePhotoAdjustment = useCallback(
     (photoId: string, adjustment: TripClipPhotoAdjustment) => {

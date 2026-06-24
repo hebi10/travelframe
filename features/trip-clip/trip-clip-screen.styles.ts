@@ -379,6 +379,9 @@ export const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 10
   },
+  frameFitModalGestureRoot: {
+    flex: 1
+  },
   frameFitModalBackdrop: {
     flex: 1,
     justifyContent: "center",

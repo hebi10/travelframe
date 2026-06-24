@@ -17,7 +17,7 @@ const expectedFeatureFiles = [
   "features/settings/settings-screen.constants.ts",
   "features/settings/settings-screen.helpers.ts",
   "features/settings/settings-screen.styles.ts",
-  "features/trip-clip/trip-clip-screen.components.tsx",
+  "trip-clip-screen.components.tsx",
   "features/trip-clip/trip-clip-screen.constants.ts",
   "features/trip-clip/trip-clip-screen.helpers.ts",
   "features/trip-clip/trip-clip-screen.styles.ts"
