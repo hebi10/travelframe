@@ -14,6 +14,7 @@ import {
 import {
   ActivityIndicator,
   Alert,
+  BackHandler,
   Keyboard,
   Modal,
   Platform,
@@ -719,6 +720,19 @@ export default function TripClipScreen() {
   const handleBackPress = useCallback(() => {
     router.replace(backTarget as Href);
   }, [backTarget]);
+
+  useFocusEffect(
+    useCallback(() => {
+      const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
+        handleBackPress();
+        return true;
+      });
+
+      return () => {
+        subscription.remove();
+      };
+    }, [handleBackPress])
+  );
 
   const showLoginRequiredForVideoCreation = useCallback(() => {
     setExportMessage("동영상 만들기는 로그인 후 주 1회 무료로 사용할 수 있습니다.");

@@ -881,9 +881,15 @@ export default function CameraScreen() {
     setSelectedCameraColorSlot(slotIndex);
 
     if (!slot) {
-      queueAppSettingsUpdate({
-        selectedCameraColorSlot: slotIndex
+      const nextValues = applyCameraColorValues({
+        exposureBias: defaultAppSettings.cameraExposureBias,
+        temperature: defaultAppSettings.cameraColorTemperature,
+        tint: defaultAppSettings.cameraColorTint,
+        brightness: defaultAppSettings.cameraBrightness,
+        contrast: defaultAppSettings.cameraContrast,
+        saturation: defaultAppSettings.cameraSaturation
       });
+      persistCameraColorValues(nextValues, slotIndex);
       void triggerFeedback();
       return;
     }
@@ -894,7 +900,6 @@ export default function CameraScreen() {
   }, [
     applyCameraColorValues,
     persistCameraColorValues,
-    queueAppSettingsUpdate,
     triggerFeedback
   ]);
 
@@ -2718,6 +2723,7 @@ export default function CameraScreen() {
                               >
                                 {index + 1}
                               </Text>
+                              {slot ? <View pointerEvents="none" style={styles.cameraColorSlotSavedDot} /> : null}
                             </Pressable>
                           ))}
                         </View>

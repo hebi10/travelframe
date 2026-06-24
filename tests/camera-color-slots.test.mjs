@@ -31,6 +31,7 @@ for (const snippet of [
   "cameraColorSlots.map((slot, index) =>",
   "cameraColorSlots: nextSlots",
   "cameraColorSlots.map((slot, index) => (",
+  "slot ? <View pointerEvents=\"none\" style={styles.cameraColorSlotSavedDot} /> : null",
   "accessibilityLabel={`",
   "${index + 1}`}",
   "styles.cameraColorCloseButton"
@@ -48,6 +49,22 @@ assert.ok(
 );
 assert.ok(!resetSource.includes("cameraColorSlots"), "reset should not clear or overwrite saved color slots");
 
+const applySlotSource = cameraSource.slice(
+  cameraSource.indexOf("const applyCameraColorSlot = useCallback("),
+  cameraSource.indexOf("const saveCameraColorSlot = useCallback(")
+);
+for (const snippet of [
+  "exposureBias: defaultAppSettings.cameraExposureBias",
+  "temperature: defaultAppSettings.cameraColorTemperature",
+  "tint: defaultAppSettings.cameraColorTint",
+  "brightness: defaultAppSettings.cameraBrightness",
+  "contrast: defaultAppSettings.cameraContrast",
+  "saturation: defaultAppSettings.cameraSaturation",
+  "persistCameraColorValues(nextValues, slotIndex);"
+]) {
+  assert.ok(applySlotSource.includes(snippet), `empty color slot should reset to defaults: ${snippet}`);
+}
+
 for (const snippet of [
   "cameraColorHeaderRow",
   "cameraColorCloseButton",
@@ -55,6 +72,7 @@ for (const snippet of [
   "cameraColorSlotButton",
   "cameraColorSlotButtonActive",
   "cameraColorSlotButtonSaved",
+  "cameraColorSlotSavedDot",
   "cameraColorSlotText",
   "cameraColorSlotTextMuted"
 ]) {

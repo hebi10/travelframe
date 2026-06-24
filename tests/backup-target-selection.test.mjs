@@ -37,7 +37,7 @@ for (const snippet of [
   "backupTargetOptions",
   "toggleCloudBackupTarget",
   'activeSetting === "cloudBackupTargets"',
-  'onPress={() => setActiveSetting("cloudBackupTargets")}',
+  'onPress={planEntitlements.canBackupToCloud ? () => setActiveSetting("cloudBackupTargets") : undefined}',
   "getBackupTargetsSummary(settings.cloudBackupTargets)"
 ]) {
   assert.ok(settingsSource.includes(snippet), `settings backup target UI missing: ${snippet}`);

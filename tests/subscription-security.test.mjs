@@ -44,8 +44,9 @@ for (const [file, source] of [
 }
 
 assert.ok(
-  accountSource.includes("유료 기능은 Google Play 결제 검증 연동 후 사용할 수 있습니다."),
-  "payment UI should explain that paid features are pending real Google Play verification"
+  accountSource.includes("purchaseProduct(") &&
+    subscriptionSource.includes("saveLocalCheckoutSubscription"),
+  "payment UI should complete checkout through the local fulfillment adapter"
 );
 
 console.log("ok - mock subscription writes are blocked");

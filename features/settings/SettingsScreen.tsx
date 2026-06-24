@@ -426,15 +426,18 @@ export default function SettingsScreen() {
       await refreshUser().catch(() => undefined);
       const latestSubscription = await getUserSubscription(user);
 
+      if (targetStorageMode !== "local_only" && !canSelectCloudSaveTarget) {
+        setAuthMessage("Pro 결제 후 클라우드 백업을 사용할 수 있습니다. 현재는 앱 보관함에만 저장됩니다.");
+        setActiveSetting(null);
+        return;
+      }
+
       if (!isCreatorSubscriptionActive(latestSubscription)) {
         if (targetStorageMode === "local_backup") {
-          await updateSetting({
-            storageMode: "local_backup",
-            cloudBackupEnabled: true
-          });
           setAuthMessage(
             "저장 방식은 클라우드 백업으로 설정했습니다. 클라우드 업로드는 Pro 이상에서 자동으로 실행됩니다."
           );
+          setActiveSetting(null);
           return;
         }
 
@@ -965,7 +968,7 @@ export default function SettingsScreen() {
                   label="백업 대상"
                   detail="클라우드 백업에 포함할 데이터를 선택합니다."
                   mark={getBackupTargetsSummary(settings.cloudBackupTargets)}
-                  onPress={() => setActiveSetting("cloudBackupTargets")}
+                  onPress={planEntitlements.canBackupToCloud ? () => setActiveSetting("cloudBackupTargets") : undefined}
                 />
                 <View style={[styles.backupStatusPanel, themed.border]}>
                   <Text selectable style={[styles.backupStatusTitle, themed.text]}>
@@ -994,13 +997,13 @@ export default function SettingsScreen() {
                     </Pressable>
                   ) : null}
                   <Pressable
-                    disabled={isBackupSubmitting}
+                    disabled={isBackupSubmitting || !planEntitlements.canBackupToCloud}
                     style={[
                       styles.authSecondaryButton,
                       themed.secondaryButton,
-                      isBackupSubmitting && styles.disabledButton
+                      (isBackupSubmitting || !planEntitlements.canBackupToCloud) && styles.disabledButton
                     ]}
-                    onPress={handleRestoreBackupPress}
+                    onPress={planEntitlements.canBackupToCloud ? handleRestoreBackupPress : undefined}
                   >
                     <Text selectable={false} style={[styles.authSecondaryButtonText, themed.text]}>
                       백업 데이터 불러오기
@@ -1760,6 +1763,7 @@ export default function SettingsScreen() {
                       label={option.label}
                       detail={option.detail}
                       active={settings.cloudBackupTargets[option.value] !== false}
+                      disabled={!canSelectCloudSaveTarget}
                       onPress={() => toggleCloudBackupTarget(option.value)}
                     />
                   ))
@@ -1800,13 +1804,13 @@ export default function SettingsScreen() {
                       </Pressable>
                     ) : null}
                     <Pressable
-                      disabled={isBackupSubmitting}
+                      disabled={isBackupSubmitting || !planEntitlements.canBackupToCloud}
                       style={[
                         styles.authSecondaryButton,
                         themed.secondaryButton,
-                        isBackupSubmitting && styles.disabledButton
+                        (isBackupSubmitting || !planEntitlements.canBackupToCloud) && styles.disabledButton
                       ]}
-                      onPress={handleRestoreBackupPress}
+                      onPress={planEntitlements.canBackupToCloud ? handleRestoreBackupPress : undefined}
                     >
                       <Text selectable={false} style={[styles.authSecondaryButtonText, themed.text]}>
                         백업 데이터 불러오기
@@ -1814,7 +1818,9 @@ export default function SettingsScreen() {
                     </Pressable>
                   </View>
                   {STORAGE_MODE_OPTIONS.map((option) => {
-                    const isDisabled = isBackupSubmitting;
+                    const isCloudBackupOptionDisabled =
+                      option.value !== "local_only" && !canSelectCloudSaveTarget;
+                    const isDisabled = isBackupSubmitting || isCloudBackupOptionDisabled;
                     const detail = option.detail;
                     const onPress = () => {
                       if (option.value === "local_only") {

@@ -154,8 +154,19 @@ const saveImageToAndroidDownload = async (
 ) => {
   const saveUri = await prepareImageForLibrarySave(uri, format, options);
   const mimeType = getImageSaveMimeType(saveUri, format);
+  return saveFileToAndroidDownload(saveUri, mimeType, "travel-frame");
+};
+
+const saveVideoToAndroidDownload = async (uri: string) =>
+  saveFileToAndroidDownload(uri, "video/mp4", "travel-frame-video");
+
+const saveFileToAndroidDownload = async (
+  uri: string,
+  mimeType: string,
+  fileNamePrefix: string
+) => {
   const directoryUri = await getAndroidDownloadDirectoryUri();
-  const fileName = `travel-frame-${Date.now()}-${Math.random()
+  const fileName = `${fileNamePrefix}-${Date.now()}-${Math.random()
     .toString(36)
     .slice(2, 7)}`;
   const targetUri = await FileSystem.StorageAccessFramework.createFileAsync(
@@ -163,7 +174,7 @@ const saveImageToAndroidDownload = async (
     fileName,
     mimeType
   );
-  const base64 = await FileSystem.readAsStringAsync(saveUri, {
+  const base64 = await FileSystem.readAsStringAsync(uri, {
     encoding: FileSystem.EncodingType.Base64
   });
 
@@ -241,8 +252,12 @@ export const prepareImageForLibrarySave = async (
 };
 
 export const saveVideoToLibrary = async (uri: string) => {
-  const MediaLibrary = await requestSavePermission("video");
   try {
+    if (Platform.OS === "android") {
+      return await saveVideoToAndroidDownload(uri);
+    }
+
+    const MediaLibrary = await requestSavePermission("video");
     assertCanSaveToMediaLibrary(MediaLibrary);
     await MediaLibrary.saveToLibraryAsync(uri);
   } catch (error) {

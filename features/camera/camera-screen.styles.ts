@@ -889,6 +889,7 @@ export const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
     height: 38,
+    position: "relative",
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
@@ -901,6 +902,15 @@ export const styles = StyleSheet.create({
   },
   cameraColorSlotButtonSaved: {
     borderColor: colors.text
+  },
+  cameraColorSlotSavedDot: {
+    position: "absolute",
+    top: 6,
+    right: 6,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.text
   },
   cameraColorSlotText: {
     color: colors.text,

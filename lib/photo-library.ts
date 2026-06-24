@@ -555,6 +555,7 @@ export const saveCapturedPhoto = async ({
   width,
   height,
   ratioLabel = "Original",
+  colorAdjustment,
   localImageLimit
 }: SaveCapturedPhotoInput) => {
   return runPhotoLibraryMutation(async () => {
@@ -573,7 +574,8 @@ export const saveCapturedPhoto = async ({
     uri,
     width,
     height,
-    ratioLabel
+    ratioLabel,
+    colorAdjustment
   });
 
   try {

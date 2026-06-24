@@ -22,6 +22,7 @@ import { useAuth } from "@/lib/auth-context";
 import {
   getUserSubscriptionProducts,
   isPremiumSubscription,
+  type SubscriptionProductId,
   type UserSubscriptionProducts
 } from "@/lib/subscription";
 import { getSubscriptionProductsFromSubscription } from "@/lib/subscription-products";
@@ -90,6 +91,7 @@ export default function AccountScreen() {
     logOut,
     sendVerificationEmail,
     resetPassword,
+    purchaseProduct,
     refreshUser
   } = useAuth();
   const [mode, setMode] = useState<AuthMode>("signIn");
@@ -298,9 +300,34 @@ export default function AccountScreen() {
     );
   };
 
-  const handlePaymentUnavailable = () => {
-    setSelectedPaymentPlan(null);
-    setMessage("유료 기능은 Google Play 결제 검증 연동 후 사용할 수 있습니다.");
+  const getPaymentProductId = (
+    plan: PaymentPlan
+  ): Exclude<SubscriptionProductId, "free"> =>
+    plan.id === "adRemove" ? "ad_remove" : "creator_monthly";
+
+  const getPaymentActionLabel = (plan: PaymentPlan) =>
+    getPaymentPlanStatus(plan).active
+      ? "사용 중"
+      : plan.id === "adRemove"
+        ? "구매하기"
+        : "구독하기";
+
+  const handlePaymentPurchase = async () => {
+    if (isSubmitting || !selectedPaymentPlan) {
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      setMessage(null);
+      await purchaseProduct(getPaymentProductId(selectedPaymentPlan));
+      setMessage(`${selectedPaymentPlan.title} 결제가 완료되었습니다.`);
+      setSelectedPaymentPlan(null);
+    } catch (error) {
+      setMessage(getUserFacingErrorMessage(error, "결제를 완료하지 못했습니다."));
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const getPaymentPlanStatus = (plan: PaymentPlan) => {
@@ -322,7 +349,7 @@ export default function AccountScreen() {
           ? "구매 완료"
           : effectiveSubscriptionProducts.creatorMonthly || effectiveSubscriptionProducts.expertMonthly
             ? "구독 포함"
-            : "준비 중"
+            : "미구매"
       };
     }
 
@@ -333,7 +360,7 @@ export default function AccountScreen() {
       label:
         effectiveSubscriptionProducts.creatorMonthly || effectiveSubscriptionProducts.expertMonthly
           ? "구독 중"
-          : "준비 중"
+          : "미구독"
     };
   };
 
@@ -656,12 +683,11 @@ export default function AccountScreen() {
                   value={getStorageModeLabel(effectiveStorageMode)}
                 />
                 <InfoRow
-                  label="백업 권한"
-                  value={
-                    isSubscriptionCheckFailed
-                      ? "확인 불가"
-                    : effectiveSubscriptionProducts.creatorMonthly ||
-                      effectiveSubscriptionProducts.expertMonthly
+                label="백업 권한"
+                value={
+                  isSubscriptionCheckFailed
+                    ? "확인 불가"
+                    : planEntitlements.canBackupToCloud
                       ? "사용 가능"
                       : isLoggedIn
                         ? "구독 후 사용 가능"
@@ -938,12 +964,22 @@ export default function AccountScreen() {
             </View>
 
             <Pressable
-              disabled={isSubmitting || !selectedPaymentPlan}
-              style={[styles.primaryButton, themed.activeFill, isSubmitting && styles.disabledButton]}
-              onPress={handlePaymentUnavailable}
+              disabled={
+                isSubmitting ||
+                !selectedPaymentPlan ||
+                (selectedPaymentPlan ? getPaymentPlanStatus(selectedPaymentPlan).active : false)
+              }
+              style={[
+                styles.primaryButton,
+                themed.activeFill,
+                (isSubmitting ||
+                  (selectedPaymentPlan ? getPaymentPlanStatus(selectedPaymentPlan).active : false)) &&
+                  styles.disabledButton
+              ]}
+              onPress={handlePaymentPurchase}
             >
               <Text selectable={false} style={[styles.primaryButtonText, themed.inverseText]}>
-                준비 중
+                {selectedPaymentPlan ? getPaymentActionLabel(selectedPaymentPlan) : "결제하기"}
               </Text>
             </Pressable>
           </View>

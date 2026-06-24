@@ -47,6 +47,19 @@ for (const snippet of [
   assert.ok(photoLibrarySource.includes(snippet), `photo storage should apply color adjustment: ${snippet}`);
 }
 
+const saveCapturedPhotoSource = photoLibrarySource.slice(
+  photoLibrarySource.indexOf("export const saveCapturedPhoto = async ({"),
+  photoLibrarySource.indexOf("export const saveEditedPhoto = async (")
+);
+const capturedPhotoPrepareCall = saveCapturedPhotoSource.slice(
+  saveCapturedPhotoSource.indexOf("const prepared = await prepareCapturedPhotoForStorage({"),
+  saveCapturedPhotoSource.indexOf("try {")
+);
+assert.ok(
+  capturedPhotoPrepareCall.includes("colorAdjustment"),
+  "saveCapturedPhoto should preserve colorAdjustment when preparing captured photo storage"
+);
+
 for (const snippet of [
   "NativeModules.AndroidImageAdjustment",
   "export const hasCameraColorAdjustment",

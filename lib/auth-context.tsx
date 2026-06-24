@@ -25,7 +25,9 @@ import {
   freeSubscription,
   getUserSubscriptionState,
   isPremiumSubscription,
+  saveLocalCheckoutSubscription,
   type SubscriptionCheckStatus,
+  type SubscriptionProductId,
   type UserSubscription
 } from "@/lib/subscription";
 
@@ -45,6 +47,7 @@ type AuthContextValue = {
   logOut: () => Promise<void>;
   sendVerificationEmail: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
+  purchaseProduct: (productId: Exclude<SubscriptionProductId, "free">) => Promise<void>;
   refreshUser: () => Promise<void>;
 };
 
@@ -175,6 +178,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await sendPasswordResetEmail(auth, email.trim());
   }, []);
 
+  const purchaseProduct = useCallback(
+    async (productId: Exclude<SubscriptionProductId, "free">) => {
+      const currentUser = ensureCurrentUser();
+      const nextSubscription = await saveLocalCheckoutSubscription(currentUser.uid, productId);
+
+      setVerifiedSubscription(nextSubscription);
+      setCachedSubscription(nextSubscription);
+      setSubscriptionStatus("verified");
+      setUser(ensureFirebaseAuth().currentUser);
+    },
+    []
+  );
+
   const refreshUser = useCallback(async () => {
     const currentUser = ensureCurrentUser();
     await currentUser.reload();
@@ -207,12 +223,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       logOut,
       sendVerificationEmail,
       resetPassword,
+      purchaseProduct,
       refreshUser
     }),
     [
       cachedSubscription,
       isAuthLoading,
       logOut,
+      purchaseProduct,
       refreshUser,
       resetPassword,
       sendVerificationEmail,
