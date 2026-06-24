@@ -1,7 +1,7 @@
+import { Feather } from "@expo/vector-icons";
 import { Link, type Href } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { ChevronIcon } from "@/components/chevron-icon";
 import { colors, controls, typography } from "@/constants/app-theme";
 import { useAppAppearance } from "@/lib/app-appearance";
 
@@ -75,7 +75,7 @@ export function ActionRow({ href, label, detail, mark = ">", onPress }: ActionRo
         ]}
       >
         {mark === ">" ? (
-          <ChevronIcon color={isDark ? palette.text : palette.inverse} size={10} />
+          <Feather name="chevron-right" color={isDark ? palette.text : palette.inverse} size={16} />
         ) : (
           <Text
             selectable={false}

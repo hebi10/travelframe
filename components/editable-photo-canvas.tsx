@@ -639,12 +639,7 @@ const styles = StyleSheet.create({
   cropBorder: {
     position: "absolute",
     borderWidth: 2,
-    borderColor: "rgba(255, 255, 255, 0.96)",
-    shadowColor: "#000000",
-    shadowOpacity: 0.45,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 0 },
-    elevation: 6
+    borderColor: "rgba(255, 255, 255, 0.96)"
   },
   emptyFrame: {
     flex: 1,

@@ -181,9 +181,6 @@ import { TripClipPhotoTab } from "@/features/trip-clip/components/TripClipPhotoT
 import { TripClipPreview } from "@/features/trip-clip/components/TripClipPreview";
 import { TripClipTimelineTab } from "@/features/trip-clip/components/TripClipTimelineTab";
 import { TripClipVideoTab } from "@/features/trip-clip/components/TripClipVideoTab";
-import { useTripClipDraft } from "@/features/trip-clip/hooks/useTripClipDraft";
-import { initialExportProgress, type ExportFormat, type ExportProgress, type SaveSelectedExportOptions } from "@/features/trip-clip/hooks/useTripClipExport";
-import { useTripClipGuide } from "@/features/trip-clip/hooks/useTripClipGuide";
 import { useTripClipMusic, type MusicMode } from "@/features/trip-clip/hooks/useTripClipMusic";
 import { useTripClipPhotos } from "@/features/trip-clip/hooks/useTripClipPhotos";
 import { useTripClipPlayback } from "@/features/trip-clip/hooks/useTripClipPlayback";
@@ -205,6 +202,25 @@ const FADE_OPTIONS = [
 ] as const;
 
 type EditorTab = "photos" | "timeline" | "video" | "guide" | "music" | "export";
+type ExportFormat = "mp4" | "images";
+type ExportProgress = {
+  visible: boolean;
+  percent: number;
+  title: string;
+  detail: string;
+  completedVideoId?: string;
+  error?: string;
+};
+type SaveSelectedExportOptions = {
+  returnToVideoWorks?: boolean;
+};
+
+const initialExportProgress: ExportProgress = {
+  visible: false,
+  percent: 0,
+  title: "",
+  detail: ""
+};
 
 const EXPORT_FORMAT_OPTIONS: {
   label: string;
@@ -251,6 +267,8 @@ const VIEW_RECORDER_FPS = 24;
 const TRIP_CLIP_DRAFT_AUTOSAVE_MS = 60000;
 const ANDROID_DURATION_KEYBOARD_FALLBACK_HEIGHT = 320;
 const DURATION_KEYBOARD_PANEL_GAP = 8;
+const ANDROID_DURATION_KEYBOARD_EXTRA_GAP = 56;
+const ANDROID_DURATION_KEYBOARD_RECHECK_DELAYS = [80, 180, 320] as const;
 
 const ratioAspect: Record<TripClipRatio, number> = {
   "9:16": 9 / 16,
@@ -364,7 +382,10 @@ export default function TripClipScreen() {
     useState<GridGuideLinePositions>(defaultGridGuideLinePositions);
   const [previewGuideShapePoints, setPreviewGuideShapePoints] =
     useState<GuideShapePoints>(defaultGuideShapePoints);
-  const { previewGuideSizeBounds } = useTripClipGuide(previewGuide);
+  const previewGuideSizeBounds = useMemo(
+    () => getGuideSizeBounds(previewGuide),
+    [previewGuide]
+  );
   const [isPreviewGuideMoving, setIsPreviewGuideMoving] = useState(false);
   const [previewFrameSize, setPreviewFrameSize] = useState({ width: 0, height: 0 });
   const [activeEditorTab, setActiveEditorTab] = useState<EditorTab>("photos");
@@ -390,7 +411,6 @@ export default function TripClipScreen() {
     useState<WeeklyVideoExportUsage | null>(null);
   const [exportProgress, setExportProgress] =
     useState<ExportProgress>(initialExportProgress);
-  const [isExportComingSoonVisible, setIsExportComingSoonVisible] = useState(false);
   const [isPostSaveAdVisible, setIsPostSaveAdVisible] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const [progressSeconds, setProgressSeconds] = useState(0);
@@ -401,6 +421,7 @@ export default function TripClipScreen() {
   const suppressAutoVideoSelectionRef = useRef(false);
   const autoDurationIdsRef = useRef<Set<string>>(new Set());
   const playbackOffsetRef = useRef(0);
+  const durationKeyboardRecheckTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const playbackProgress = useSharedValue(0);
   const previewGuideOffsetXValue = useSharedValue(0);
   const previewGuideOffsetYValue = useSharedValue(0);
@@ -451,26 +472,61 @@ export default function TripClipScreen() {
         : 0;
     const androidKeyboardOffset =
       Math.max(durationKeyboardHeight, ANDROID_DURATION_KEYBOARD_FALLBACK_HEIGHT) +
-      DURATION_KEYBOARD_PANEL_GAP;
+      DURATION_KEYBOARD_PANEL_GAP +
+      ANDROID_DURATION_KEYBOARD_EXTRA_GAP;
     const keyboardOffset =
       Platform.OS === "android" ? androidKeyboardOffset : measuredKeyboardOffset;
 
     return Math.max(bottomSafePadding, keyboardOffset);
   }, [bottomSafePadding, durationKeyboardHeight]);
 
+  const clearDurationKeyboardHeightRechecks = useCallback(() => {
+    durationKeyboardRecheckTimersRef.current.forEach((timer) => {
+      clearTimeout(timer);
+    });
+    durationKeyboardRecheckTimersRef.current = [];
+  }, []);
+
+  const updateDurationKeyboardHeightFromMetrics = useCallback(() => {
+    const metrics = Keyboard.metrics();
+    const metricsHeight = metrics?.height;
+
+    if (typeof metricsHeight !== "number" || metricsHeight <= 0) {
+      return;
+    }
+
+    setDurationKeyboardHeight((current) => Math.max(current, metricsHeight));
+  }, []);
+
+  const scheduleDurationKeyboardHeightRechecks = useCallback(() => {
+    clearDurationKeyboardHeightRechecks();
+
+    if (Platform.OS !== "android") {
+      return;
+    }
+
+    durationKeyboardRecheckTimersRef.current =
+      ANDROID_DURATION_KEYBOARD_RECHECK_DELAYS.map((delay) =>
+        setTimeout(updateDurationKeyboardHeightFromMetrics, delay)
+      );
+  }, [clearDurationKeyboardHeightRechecks, updateDurationKeyboardHeightFromMetrics]);
+
   useEffect(() => {
     const showSubscription = Keyboard.addListener("keyboardDidShow", (event) => {
       setDurationKeyboardHeight(event.endCoordinates.height);
+      scheduleDurationKeyboardHeightRechecks();
     });
     const hideSubscription = Keyboard.addListener("keyboardDidHide", () => {
+      clearDurationKeyboardHeightRechecks();
       setDurationKeyboardHeight(0);
     });
 
     return () => {
+      clearDurationKeyboardHeightRechecks();
       showSubscription.remove();
       hideSubscription.remove();
     };
-  }, []);
+  }, [clearDurationKeyboardHeightRechecks, scheduleDurationKeyboardHeightRechecks]);
 
   const updatePhotoAdjustment = useCallback(
     (photoId: string, adjustment: TripClipPhotoAdjustment) => {
@@ -613,7 +669,11 @@ export default function TripClipScreen() {
       workTitle
     ]
   );
-  const { latestTripClipDraftRef } = useTripClipDraft(createTripClipDraftPayload);
+  const latestTripClipDraftRef = useRef<Omit<TripClipDraft, "updatedAt"> | null>(null);
+
+  useEffect(() => {
+    latestTripClipDraftRef.current = createTripClipDraftPayload();
+  }, [createTripClipDraftPayload]);
 
   const persistTripClipDraft = useCallback(
     async (showMessage = false) => {
@@ -1714,11 +1774,6 @@ export default function TripClipScreen() {
       return null;
     }
 
-    if (Platform.OS === "web") {
-      setIsExportComingSoonVisible(true);
-      return null;
-    }
-
     try {
       const localUri = await recordTripClipVideo(onProgress);
       setRenderedVideoUri(localUri);
@@ -1821,11 +1876,6 @@ export default function TripClipScreen() {
     countWeeklyMp4?: boolean;
     returnToVideoWorks?: boolean;
   } = {}) => {
-    if (exportFormat === "mp4" && Platform.OS === "web") {
-      setIsExportComingSoonVisible(true);
-      return;
-    }
-
     if (selectedPhotos.length === 0 || isExporting) {
       setExportMessage("저장하기 전에 사진을 선택해 주세요.");
       return;
@@ -2175,11 +2225,6 @@ export default function TripClipScreen() {
           frameWidth: previewFrameSize.width,
           frameHeight: previewFrameSize.height
         });
-        return;
-      }
-
-      if (Platform.OS === "web") {
-        setIsExportComingSoonVisible(true);
         return;
       }
 
@@ -2654,35 +2699,6 @@ export default function TripClipScreen() {
               </View>
             ) : null}
             </ScrollView>
-          </View>
-        </View>
-      </Modal>
-      <Modal
-        visible={isExportComingSoonVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setIsExportComingSoonVisible(false)}
-      >
-        <View style={[styles.exportModalBackdrop, modalSafeStyle]}>
-          <View style={[styles.exportModalPanel, styles.comingSoonPanel]}>
-            <View style={styles.exportModalContent}>
-              <Text style={styles.exportModalTitle}>
-                준비중입니다
-              </Text>
-              <Text style={styles.exportModalDetail}>
-                핸드폰에 바로 저장하는 기능은 준비 중입니다. 지금은 미리보기와 편집 흐름을 먼저 사용할 수 있습니다.
-              </Text>
-            </View>
-            <View style={[styles.exportModalActions, styles.exportModalExternalActions]}>
-              <Pressable
-                style={[styles.primaryButton, styles.exportModalButton]}
-                onPress={() => setIsExportComingSoonVisible(false)}
-              >
-                <Text selectable={false} style={styles.primaryButtonText}>
-                  확인
-                </Text>
-              </Pressable>
-            </View>
           </View>
         </View>
       </Modal>

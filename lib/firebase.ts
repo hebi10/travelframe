@@ -1,4 +1,3 @@
-import { Platform } from "react-native";
 import { getApp, getApps, initializeApp, type FirebaseApp } from "firebase/app";
 import { getAuth, initializeAuth, type Auth, type Persistence } from "firebase/auth";
 import { getFunctions, type Functions } from "firebase/functions";
@@ -76,10 +75,6 @@ const getAsyncStoragePersistence = (storage: AsyncStorageLike) =>
 const createFirebaseAuth = () => {
   if (!firebaseApp) {
     return null;
-  }
-
-  if (Platform.OS === "web") {
-    return getAuth(firebaseApp);
   }
 
   try {

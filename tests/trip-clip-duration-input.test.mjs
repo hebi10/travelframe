@@ -4,7 +4,7 @@ import { readTripClipSource } from "./trip-clip-test-source.mjs";
 
 const source = [
   readTripClipSource(),
-  readFileSync("trip-clip-screen.components.tsx", "utf8"),
+  readFileSync("features/trip-clip/trip-clip-screen.components.tsx", "utf8"),
   readFileSync("features/trip-clip/trip-clip-screen.helpers.ts", "utf8")
 ].join("\n");
 const stylesSource = readFileSync(

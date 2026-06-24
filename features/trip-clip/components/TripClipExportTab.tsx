@@ -1,7 +1,7 @@
 import type { Dispatch, SetStateAction } from "react";
 import { Platform, Pressable, Text, View } from "react-native";
 
-import { DEFAULT_IMAGE_QUALITY, IMAGE_QUALITY_DESCRIPTION, IMAGE_QUALITY_OPTIONS, type ImageQuality } from "@/constants/image";
+import { IMAGE_QUALITY_DESCRIPTION, IMAGE_QUALITY_OPTIONS, type ImageQuality } from "@/constants/image";
 import { VIDEO_QUALITY_DESCRIPTION, VIDEO_QUALITY_OPTIONS, type VideoQualityId } from "@/constants/video";
 import { Chip, OptionRow, Section } from "@/features/trip-clip/trip-clip-screen.components";
 import { IMAGE_SAVE_FORMAT_OPTIONS } from "@/features/trip-clip/trip-clip-screen.constants";
@@ -79,7 +79,6 @@ export function TripClipExportTab({
   shareSelectedExport,
   exportMessage
 }: TripClipExportTabProps) {
-  void DEFAULT_IMAGE_QUALITY;
   return (
       <Section title="핸드폰에 저장">
         <View style={styles.exportPanel}>

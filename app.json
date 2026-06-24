@@ -7,7 +7,7 @@
       "com.haebi.photoguide"
     ],
     "description": "여행 사진의 구도를 맞추고 쇼츠·릴스용 콘텐츠 제작을 돕는 촬영 가이드 앱입니다.",
-    "version": "1.0.29",
+    "version": "1.0.30",
     "runtimeVersion": {
       "policy": "appVersion"
     },
@@ -20,16 +20,6 @@
     },
     "newArchEnabled": true,
     "userInterfaceStyle": "automatic",
-    "ios": {
-      "supportsTablet": false,
-      "bundleIdentifier": "com.haebi.photoguide",
-      "buildNumber": "1",
-      "infoPlist": {
-        "NSCameraUsageDescription": "트래블프레임에서 구도 가이드 촬영을 위해 카메라 접근 권한이 필요합니다.",
-        "NSPhotoLibraryUsageDescription": "트래블프레임에서 기준 사진을 불러오고 편집하기 위해 사진 보관함 접근 권한이 필요합니다.",
-        "NSPhotoLibraryAddUsageDescription": "트래블프레임에서 촬영 사진과 편집 결과를 저장하기 위해 사진 저장 권한이 필요합니다."
-      }
-    },
     "android": {
       "package": "com.haebi.photoguide",
       "allowBackup": false,
@@ -54,11 +44,6 @@
         "android.permission.READ_MEDIA_IMAGES",
         "com.google.android.gms.permission.AD_ID"
       ]
-    },
-    "web": {
-      "bundler": "metro",
-      "output": "static",
-      "favicon": "./assets/icons/favicon.png"
     },
     "plugins": [
       "expo-router",
@@ -93,12 +78,10 @@
           "enableBackgroundRecording": false
         }
       ],
-      "expo-web-browser",
       [
         "react-native-google-mobile-ads",
         {
           "androidAppId": "ca-app-pub-3239289311207399~9959086380",
-          "iosAppId": "ca-app-pub-3940256099942544~1458002511",
           "optimizeInitialization": true,
           "optimizeAdLoading": true
         }
@@ -108,8 +91,7 @@
       "typedRoutes": true
     },
     "react-native-google-mobile-ads": {
-      "android_app_id": "ca-app-pub-3239289311207399~9959086380",
-      "ios_app_id": "ca-app-pub-3940256099942544~1458002511"
+      "android_app_id": "ca-app-pub-3239289311207399~9959086380"
     },
     "extra": {
       "router": {},

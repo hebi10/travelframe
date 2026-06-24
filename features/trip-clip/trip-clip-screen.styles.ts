@@ -1357,9 +1357,6 @@ export const styles = StyleSheet.create({
     gap: 12,
     borderColor: colors.darkLine
   },
-  comingSoonPanel: {
-    maxWidth: 340
-  },
   exportModalTitle: {
     color: colors.text,
     fontSize: 21,

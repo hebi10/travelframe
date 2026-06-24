@@ -3,7 +3,6 @@ import {
   type ReactNode
 } from "react";
 import {
-  Platform,
   UIManager,
   View,
   type StyleProp,
@@ -38,10 +37,6 @@ type ViewRecorderModule = {
 let recorderModule: ViewRecorderModule | null | false = null;
 
 const getRecorderModule = () => {
-  if (Platform.OS === "web") {
-    return null;
-  }
-
   if (recorderModule === false) {
     return null;
   }
@@ -59,10 +54,6 @@ const getRecorderModule = () => {
 };
 
 export const isRecordingViewAvailable = () => {
-  if (Platform.OS === "web") {
-    return false;
-  }
-
   return Boolean(
     getRecorderModule() &&
       (UIManager.getViewManagerConfig?.("RecordingView") ??
