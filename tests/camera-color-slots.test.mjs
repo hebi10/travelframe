@@ -65,6 +65,24 @@ for (const snippet of [
   assert.ok(applySlotSource.includes(snippet), `empty color slot should reset to defaults: ${snippet}`);
 }
 
+const saveSlotSource = cameraSource.slice(
+  cameraSource.indexOf("const saveCameraColorSlot = useCallback("),
+  cameraSource.indexOf("const saveCameraColorSettings = saveCameraColorSlot;")
+);
+for (const snippet of [
+  "const isDefaultCameraColorValues =",
+  "nextValues.exposureBias === defaultAppSettings.cameraExposureBias",
+  "nextValues.temperature === defaultAppSettings.cameraColorTemperature",
+  "nextValues.tint === defaultAppSettings.cameraColorTint",
+  "nextValues.brightness === defaultAppSettings.cameraBrightness",
+  "nextValues.contrast === defaultAppSettings.cameraContrast",
+  "nextValues.saturation === defaultAppSettings.cameraSaturation",
+  "const nextSlot = isDefaultCameraColorValues ? null : nextValues;",
+  "index === selectedCameraColorSlot ? nextSlot : slot"
+]) {
+  assert.ok(saveSlotSource.includes(snippet), `default color values should clear saved slot marker: ${snippet}`);
+}
+
 for (const snippet of [
   "cameraColorHeaderRow",
   "cameraColorCloseButton",

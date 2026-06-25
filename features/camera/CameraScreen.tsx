@@ -905,8 +905,16 @@ export default function CameraScreen() {
 
   const saveCameraColorSlot = useCallback(() => {
     const nextValues = getCurrentCameraColorValues();
+    const isDefaultCameraColorValues =
+      nextValues.exposureBias === defaultAppSettings.cameraExposureBias &&
+      nextValues.temperature === defaultAppSettings.cameraColorTemperature &&
+      nextValues.tint === defaultAppSettings.cameraColorTint &&
+      nextValues.brightness === defaultAppSettings.cameraBrightness &&
+      nextValues.contrast === defaultAppSettings.cameraContrast &&
+      nextValues.saturation === defaultAppSettings.cameraSaturation;
+    const nextSlot = isDefaultCameraColorValues ? null : nextValues;
     const nextSlots = cameraColorSlots.map((slot, index) =>
-      index === selectedCameraColorSlot ? nextValues : slot
+      index === selectedCameraColorSlot ? nextSlot : slot
     );
 
     setCameraColorSlots(nextSlots);

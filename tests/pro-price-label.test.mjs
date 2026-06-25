@@ -7,13 +7,13 @@ const functionsSource = fs.readFileSync("functions/index.js", "utf8");
 
 assert.match(
   accountConstants,
-  /id:\s*"creator"[\s\S]*?title:\s*"Pro"[\s\S]*?price:\s*"월 2,900원"/,
-  "Pro plan card should show the monthly 2,900 won price"
+  /id:\s*"creator"[\s\S]*?title:\s*"Pro"[\s\S]*?price:\s*"월 990원"/,
+  "Pro plan card should show the monthly 990 won price"
 );
 assert.doesNotMatch(
   accountConstants,
-  /id:\s*"creator"[\s\S]*?price:\s*"월 3,900원"/,
-  "Pro plan card should not keep the old monthly 3,900 won price"
+  /id:\s*"creator"[\s\S]*?price:\s*"월 2,900원"/,
+  "Pro plan card should not keep the old monthly 2,900 won price"
 );
 
 for (const [name, source] of [
@@ -22,14 +22,14 @@ for (const [name, source] of [
 ]) {
   assert.match(
     source,
-    /creator_monthly:\s*\{[\s\S]*?priceLabel:\s*"월 2,900원"/,
-    `${name} should store the Pro monthly 2,900 won price label`
+    /creator_monthly:\s*\{[\s\S]*?priceLabel:\s*"월 990원"/,
+    `${name} should store the Pro monthly 990 won price label`
   );
   assert.doesNotMatch(
     source,
-    /creator_monthly:\s*\{[\s\S]*?priceLabel:\s*"월 3,900원"/,
-    `${name} should not keep the old Pro monthly 3,900 won price label`
+    /creator_monthly:\s*\{[\s\S]*?priceLabel:\s*"월 2,900원"/,
+    `${name} should not keep the old Pro monthly 2,900 won price label`
   );
 }
 
-console.log("ok - Pro price labels use monthly 2,900 won");
+console.log("ok - Pro price labels use monthly 990 won");

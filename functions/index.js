@@ -229,11 +229,11 @@ const buildWeeklyVideoExportResponse = ({ weekId, weekLabel, count, limit, reser
 const ADMIN_PRODUCT_META = {
   ad_remove: {
     productName: "광고 제거",
-    priceLabel: "3,900원"
+    priceLabel: "1,990원"
   },
   creator_monthly: {
     productName: "영상 내보내기",
-    priceLabel: "월 2,900원"
+    priceLabel: "월 990원"
   },
   expert_monthly: {
     productName: "전문가",

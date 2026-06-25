@@ -101,7 +101,7 @@ const productMeta = {
     statusId: "adRemoveStatusLabel",
     detailId: "adRemoveDetail",
     productName: "광고 제거",
-    priceLabel: "3,900원",
+    priceLabel: "1,990원",
     description: "1회 결제 상품입니다. 활성 상태면 광고 제거 혜택이 적용됩니다."
   },
   creator_monthly: {
@@ -109,7 +109,7 @@ const productMeta = {
     statusId: "creatorMonthlyStatusLabel",
     detailId: "creatorMonthlyDetail",
     productName: "영상 내보내기",
-    priceLabel: "월 2,900원",
+    priceLabel: "월 990원",
     description: "월결제 상품입니다. 활성 상태면 영상 내보내기와 백업 혜택이 적용됩니다."
   },
   expert_monthly: {

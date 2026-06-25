@@ -55,7 +55,7 @@ export const paymentPlans: PaymentPlan[] = [
   {
     id: "adRemove",
     title: "광고 제거",
-    price: "3,900원",
+    price: "1,990원",
     billing: "1회 결제",
     summary: "한 번 결제하면 광고를 영구 제거합니다. 무료 플랜 기능은 그대로 유지됩니다.",
     benefits: [
@@ -67,7 +67,7 @@ export const paymentPlans: PaymentPlan[] = [
   {
     id: "creator",
     title: "Pro",
-    price: "월 2,900원",
+    price: "월 990원",
     billing: "월 결제",
     summary: "Pro는 주 15회 영상 출력, 워터마크 제거, 클라우드 백업, 광고 제거를 함께 제공합니다.",
     benefits: [

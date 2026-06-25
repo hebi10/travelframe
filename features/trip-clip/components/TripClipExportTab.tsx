@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction } from "react";
-import { Platform, Pressable, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 
 import { IMAGE_QUALITY_DESCRIPTION, IMAGE_QUALITY_OPTIONS, type ImageQuality } from "@/constants/image";
 import { VIDEO_QUALITY_DESCRIPTION, VIDEO_QUALITY_OPTIONS, type VideoQualityId } from "@/constants/video";
@@ -270,13 +270,11 @@ export function TripClipExportTab({
               onPress={() => void saveSelectedExport()}
             >
               <Text selectable={false} style={styles.primaryButtonText}>
-                {exportFormat === "mp4" && Platform.OS === "web"
-                  ? "준비중"
-                  : isExporting
-                    ? "저장 중"
-                    : exportFormat === "mp4"
-                      ? "MP4 저장"
-                      : "이미지 저장"}
+                {isExporting
+                  ? "저장 중"
+                  : exportFormat === "mp4"
+                    ? "MP4 저장"
+                    : "이미지 저장"}
               </Text>
             </Pressable>
             <Pressable

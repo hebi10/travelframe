@@ -15,7 +15,6 @@ export const GOOGLE_SIGN_IN_MESSAGES = {
 } as const;
 
 type SignInWithGoogleAuthSessionInput = {
-  webClientId?: string;
   androidClientId?: string;
   signInWithGoogleIdToken: (idToken: string) => Promise<void>;
 };
@@ -24,7 +23,7 @@ type GoogleSignInResult = "success" | "cancelled";
 
 export const isGoogleSignInConfigured = ({
   androidClientId
-}: Pick<SignInWithGoogleAuthSessionInput, "webClientId" | "androidClientId">) =>
+}: Pick<SignInWithGoogleAuthSessionInput, "androidClientId">) =>
   Boolean(androidClientId);
 
 export const isGoogleAuthNativeModuleError = (error: unknown) => {
@@ -56,11 +55,10 @@ export const getGoogleSignInErrorMessage = (
 };
 
 export const signInWithGoogleAuthSession = async ({
-  webClientId,
   androidClientId,
   signInWithGoogleIdToken
 }: SignInWithGoogleAuthSessionInput): Promise<GoogleSignInResult> => {
-  if (!isGoogleSignInConfigured({ webClientId, androidClientId })) {
+  if (!isGoogleSignInConfigured({ androidClientId })) {
     throw new Error(GOOGLE_SIGN_IN_MESSAGES.missingConfig);
   }
 

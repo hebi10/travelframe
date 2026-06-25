@@ -103,10 +103,8 @@ export default function AccountScreen() {
   const [isBackupRestoreSubmitting, setIsBackupRestoreSubmitting] = useState(false);
   const [selectedPaymentPlan, setSelectedPaymentPlan] = useState<PaymentPlan | null>(null);
   const [showDeleteRequestInfo, setShowDeleteRequestInfo] = useState(false);
-  const googleWebClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
   const googleAndroidClientId = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;
   const isGoogleReady = isGoogleSignInConfigured({
-    webClientId: googleWebClientId,
     androidClientId: googleAndroidClientId
   });
   const isSubscriptionCheckFailed = subscriptionStatus === "failed";
@@ -242,7 +240,6 @@ export default function AccountScreen() {
       setIsGoogleSubmitting(true);
       setMessage(null);
       const result = await signInWithGoogleAuthSession({
-        webClientId: googleWebClientId,
         androidClientId: googleAndroidClientId,
         signInWithGoogleIdToken
       });

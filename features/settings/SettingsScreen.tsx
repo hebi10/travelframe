@@ -165,10 +165,8 @@ export default function SettingsScreen() {
   const [musicTracks, setMusicTracks] = useState<UserMusicTrack[]>([]);
   const [weeklyVideoExportUsage, setWeeklyVideoExportUsage] =
     useState<WeeklyVideoExportUsage | null>(null);
-  const googleWebClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
   const googleAndroidClientId = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;
   const isGoogleReady = isGoogleSignInConfigured({
-    webClientId: googleWebClientId,
     androidClientId: googleAndroidClientId
   });
   const planEntitlements = useMemo(
@@ -818,7 +816,6 @@ export default function SettingsScreen() {
       setIsGoogleSubmitting(true);
       setAuthMessage(null);
       const result = await signInWithGoogleAuthSession({
-        webClientId: googleWebClientId,
         androidClientId: googleAndroidClientId,
         signInWithGoogleIdToken
       });

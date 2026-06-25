@@ -26,7 +26,7 @@ const activeSubscription = (productId) => ({
   startedAt: "2026-05-20T00:00:00.000Z",
   expiresAt: "2999-01-01T00:00:00.000Z",
   lastPaymentAt: "2026-05-20T00:00:00.000Z",
-  priceLabel: "3,900원",
+  priceLabel: "1,990원",
   productName: productId
 });
 

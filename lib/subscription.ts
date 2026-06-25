@@ -228,12 +228,12 @@ const checkoutProductCopy: Record<
 > = {
   ad_remove: {
     productName: "광고 제거",
-    priceLabel: "3,900원",
+    priceLabel: "1,990원",
     expiresAt: null
   },
   creator_monthly: {
     productName: "Pro",
-    priceLabel: "월 2,900원",
+    priceLabel: "월 990원",
     expiresAt: null
   },
   expert_monthly: {

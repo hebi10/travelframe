@@ -26,7 +26,7 @@ const baseSubscription = {
   startedAt: "2026-05-18T00:00:00.000Z",
   expiresAt: null,
   lastPaymentAt: "2026-05-18T00:00:00.000Z",
-  priceLabel: "3,900원",
+  priceLabel: "1,990원",
   productName: "광고 제거"
 };
 
