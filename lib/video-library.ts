@@ -1,16 +1,20 @@
 import * as FileSystem from "expo-file-system/legacy";
 
-import { localStorageAdapter } from "@/lib/local-storage";
 import { assertLocalLibraryCapacity } from "@/lib/local-library-limit";
+import {
+  createLocalLibraryId,
+  isRemoteUri,
+  readStoredItems,
+  readStoredStringSet,
+  writeSortedItems,
+  writeStoredStringSet
+} from "@/lib/local-library-store";
 import { getNextTripClipTitle, TRIP_CLIP_TITLE_PREFIX } from "@/lib/trip-clip-title";
 import type { MadeVideoItem } from "@/types/video";
 
 const VIDEO_STORAGE_KEY = "travel-frame.videos.v1";
 const VIDEO_DELETION_MARKER_KEY = "travel-frame.video-deletion-markers.v1";
 const VIDEO_DIRECTORY = "made-videos/";
-
-const createVideoId = () =>
-  `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
 const sortVideos = (videos: MadeVideoItem[]) =>
   [...videos].sort(
@@ -76,7 +80,7 @@ const normalizeMadeVideoItem = (
   photoIds: normalizeStringArray(video.photoIds),
   durations: normalizeVideoDurations(video.durations),
   musicId: normalizeText(video.musicId, "none") as MadeVideoItem["musicId"],
-  musicLabel: normalizeText(video.musicLabel, "무음"),
+  musicLabel: normalizeText(video.musicLabel, "臾댁쓬"),
   storagePath: typeof video.storagePath === "string" ? video.storagePath : undefined,
   downloadURL: typeof video.downloadURL === "string" ? video.downloadURL : undefined,
   localUri: typeof video.localUri === "string" ? video.localUri : undefined,
@@ -106,30 +110,13 @@ const parseVideos = (value: string | null): MadeVideoItem[] => {
   }
 };
 
-const parseDeletedVideoIds = (value: string | null) => {
-  if (!value) {
-    return new Set<string>();
-  }
-
-  try {
-    const parsed = JSON.parse(value);
-    return new Set(
-      Array.isArray(parsed)
-        ? parsed.filter((item): item is string => typeof item === "string" && item.length > 0)
-        : []
-    );
-  } catch {
-    return new Set<string>();
-  }
-};
-
 const writeVideos = async (videos: MadeVideoItem[]) => {
-  await localStorageAdapter.setItem(VIDEO_STORAGE_KEY, JSON.stringify(sortVideos(videos)));
+  await writeSortedItems(VIDEO_STORAGE_KEY, videos, sortVideos);
 };
 
 const getVideoDirectory = () => {
   if (!FileSystem.documentDirectory) {
-    throw new Error("기기에서 영상 파일 저장소를 사용할 수 없습니다.");
+    throw new Error("湲곌린?먯꽌 ?곸긽 ?뚯씪 ??μ냼瑜??ъ슜?????놁뒿?덈떎.");
   }
 
   return `${FileSystem.documentDirectory}${VIDEO_DIRECTORY}`;
@@ -140,9 +127,6 @@ const ensureVideoDirectory = async () => {
   await FileSystem.makeDirectoryAsync(directory, { intermediates: true });
   return directory;
 };
-
-const isRemoteUri = (uri?: string | null) =>
-  typeof uri === "string" && /^https?:\/\//i.test(uri);
 
 const isFileUri = (uri?: string | null) =>
   typeof uri === "string" && uri.startsWith("file://");
@@ -199,22 +183,17 @@ const updateStoredVideo = async (video: MadeVideoItem) => {
 };
 
 export const getMadeVideos = async () => {
-  const value = await localStorageAdapter.getItem(VIDEO_STORAGE_KEY);
-  return parseVideos(value);
+  return readStoredItems(VIDEO_STORAGE_KEY, parseVideos);
 };
 
 export const getDeletedVideoIds = async () => {
-  const value = await localStorageAdapter.getItem(VIDEO_DELETION_MARKER_KEY);
-  return parseDeletedVideoIds(value);
+  return readStoredStringSet(VIDEO_DELETION_MARKER_KEY);
 };
 
 export const recordVideoLocalDeletion = async (id: string) => {
   const deletedVideoIds = await getDeletedVideoIds();
   deletedVideoIds.add(id);
-  await localStorageAdapter.setItem(
-    VIDEO_DELETION_MARKER_KEY,
-    JSON.stringify([...deletedVideoIds])
-  );
+  await writeStoredStringSet(VIDEO_DELETION_MARKER_KEY, deletedVideoIds);
 };
 
 export const wasVideoDeletedLocally = async (id: string) =>
@@ -241,9 +220,9 @@ export const saveMadeVideo = async (
   assertLocalLibraryCapacity({
     currentCount: videos.length,
     limit: options.localVideoLimit,
-    label: "영상"
+    label: "?곸긽"
   });
-  const videoId = createVideoId();
+  const videoId = createLocalLibraryId();
   const createdAt = new Date().toISOString();
   const persistedUri = await persistMadeVideoFile(video.uri, videoId);
   const savedVideo: MadeVideoItem = {

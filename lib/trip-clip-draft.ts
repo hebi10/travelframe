@@ -6,7 +6,7 @@ import type {
 } from "@/constants/trip-clip";
 import type { ImageQuality } from "@/constants/image";
 import type { VideoQualityId } from "@/constants/video";
-import { localStorageAdapter } from "@/lib/local-storage";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { defaultAppSettings } from "@/lib/app-settings";
 import type { ImageSaveFormat } from "@/lib/trip-clip-export";
 import type { TripClipPhotoAdjustmentMap } from "@/lib/trip-clip-photo-adjustment";
@@ -64,7 +64,7 @@ const parseTripClipDraft = (value: string | null): TripClipDraft | null => {
 };
 
 export const getTripClipDraft = async () => {
-  const value = await localStorageAdapter.getItem(TRIP_CLIP_DRAFT_STORAGE_KEY);
+  const value = await AsyncStorage.getItem(TRIP_CLIP_DRAFT_STORAGE_KEY);
   return parseTripClipDraft(value);
 };
 
@@ -76,7 +76,7 @@ export const saveTripClipDraft = async (
     updatedAt: new Date().toISOString()
   };
 
-  await localStorageAdapter.setItem(
+  await AsyncStorage.setItem(
     TRIP_CLIP_DRAFT_STORAGE_KEY,
     JSON.stringify(nextDraft)
   );
@@ -84,7 +84,7 @@ export const saveTripClipDraft = async (
 };
 
 export const clearTripClipDraft = async () => {
-  await localStorageAdapter.removeItem(TRIP_CLIP_DRAFT_STORAGE_KEY);
+  await AsyncStorage.removeItem(TRIP_CLIP_DRAFT_STORAGE_KEY);
 };
 
 export const hasTripClipDraftContent = (

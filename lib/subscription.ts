@@ -1,4 +1,4 @@
-import { localStorageAdapter } from "@/lib/local-storage";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { type User } from "firebase/auth";
 import {
   doc,
@@ -68,8 +68,8 @@ export const freeSubscription: UserSubscription = {
   startedAt: null,
   expiresAt: null,
   lastPaymentAt: null,
-  priceLabel: "무료",
-  productName: "무료 플랜"
+  priceLabel: "臾대즺",
+  productName: "臾대즺 ?뚮옖"
 };
 
 export const isPremiumSubscription = (subscription: UserSubscription | null) => {
@@ -143,7 +143,7 @@ export const getLocalSubscription = async (uid?: string | null) => {
     return freeSubscription;
   }
 
-  const value = await localStorageAdapter.getItem(createSubscriptionStorageKey(uid));
+  const value = await AsyncStorage.getItem(createSubscriptionStorageKey(uid));
   return parseSubscription(value);
 };
 
@@ -233,12 +233,12 @@ const checkoutProductCopy: Record<
   },
   creator_monthly: {
     productName: "Pro",
-    priceLabel: "월 990원",
+    priceLabel: "4,990원",
     expiresAt: null
   },
   expert_monthly: {
     productName: "Expert",
-    priceLabel: "월 5,900원",
+    priceLabel: "5,900원",
     expiresAt: null
   }
 };
@@ -311,7 +311,7 @@ export const getUserSubscriptionProducts = async (
 };
 
 const saveLocalSubscription = async (uid: string, subscription: UserSubscription) => {
-  await localStorageAdapter.setItem(
+  await AsyncStorage.setItem(
     createSubscriptionStorageKey(uid),
     JSON.stringify(subscription)
   );

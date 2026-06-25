@@ -1,6 +1,7 @@
 import { Image } from "expo-image";
 import { type Href, useRouter } from "expo-router";
-import { ActivityIndicator, FlatList, Image as NativeImage, Pressable, Text, View } from "react-native";
+import { useState } from "react";
+import { ActivityIndicator, FlatList, Image as NativeImage, Modal, Pressable, Text, View } from "react-native";
 
 import { SectionBlock } from "@/components/section-block";
 import { colors } from "@/constants/app-theme";
@@ -119,7 +120,8 @@ export function StudioIcon({
 }) {
   const { palette } = useAppAppearance();
   const isDark = palette.background !== colors.background;
-  const iconColor = active && !isDark ? palette.inverse : palette.text;
+  const isUploadIcon = kind === "upload";
+  const iconColor = active && !isDark && !isUploadIcon ? palette.inverse : palette.text;
   const lineStyle = { borderColor: iconColor, backgroundColor: iconColor };
 
   if (kind === "videos") {
@@ -163,6 +165,7 @@ export function PageSizeSelector({
   value: PageSize;
   onChange: (value: PageSize) => void;
 }) {
+  const [open, setOpen] = useState(false);
   const { palette } = useAppAppearance();
   const isDark = palette.background !== colors.background;
   const filledButtonStyle = {
@@ -178,36 +181,72 @@ export function PageSizeSelector({
       <Text selectable={false} style={styles.pageSizeLabel}>
         표시
       </Text>
-      <View style={styles.pageSizeOptions}>
-        {PAGE_SIZE_OPTIONS.map((option) => {
-          const isActive = value === option;
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ expanded: open }}
+        style={[
+          styles.pageSizeSelect,
+          { borderColor: palette.line, backgroundColor: palette.background }
+        ]}
+        onPress={() => setOpen(true)}
+      >
+        <Text selectable={false} style={[styles.pageSizeSelectText, { color: palette.text }]}>
+          {value}개
+        </Text>
+        <Text selectable={false} style={[styles.pageSizeSelectChevron, { color: palette.muted }]}>
+          v
+        </Text>
+      </Pressable>
+      <Modal
+        animationType="fade"
+        transparent
+        visible={open}
+        onRequestClose={() => setOpen(false)}
+      >
+        <View style={styles.pageSizeDropdownBackdrop}>
+          <Pressable style={styles.pageSizeDropdownDismissLayer} onPress={() => setOpen(false)} />
+          <View
+            style={[
+              styles.pageSizeDropdown,
+              { borderColor: palette.line, backgroundColor: palette.background }
+            ]}
+          >
+            {PAGE_SIZE_OPTIONS.map((option) => {
+              const isActive = value === option;
 
-          return (
-            <Pressable
-              key={option}
-              style={[
-                styles.pageSizeButton,
-                { borderColor: palette.line, backgroundColor: palette.background },
-                isActive && styles.pageSizeButtonActive,
-                isActive && filledButtonStyle
-              ]}
-              onPress={() => onChange(option)}
-            >
-              <Text
-                selectable={false}
-                style={[
-                  styles.pageSizeButtonText,
-                  { color: palette.text },
-                  isActive && styles.pageSizeButtonTextActive,
-                  isActive && filledButtonTextStyle
-                ]}
-              >
-                {option}개
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
+              return (
+                <Pressable
+                  key={option}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: isActive }}
+                  style={[
+                    styles.pageSizeDropdownItem,
+                    { borderColor: palette.line, backgroundColor: palette.background },
+                    isActive && styles.pageSizeDropdownItemActive,
+                    isActive && filledButtonStyle
+                  ]}
+                  onPress={() => {
+                    onChange(option);
+                    setOpen(false);
+                  }}
+                >
+                  <Text
+                    selectable={false}
+                    style={[
+                      styles.pageSizeDropdownItemText,
+                      { color: palette.text },
+                      isActive && styles.pageSizeDropdownItemTextActive,
+                      isActive && filledButtonTextStyle
+                    ]}
+                  >
+                    {option}개
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }

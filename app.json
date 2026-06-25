@@ -90,14 +90,10 @@
     "experiments": {
       "typedRoutes": true
     },
-    "react-native-google-mobile-ads": {
-      "android_app_id": "ca-app-pub-3239289311207399~9959086380"
-    },
     "extra": {
       "router": {},
       "privacyPolicyUrl": "https://travelframe-4e1fb.web.app/privacy",
       "admob": {
-        "androidAppId": "ca-app-pub-3239289311207399~9959086380",
         "androidBannerAdUnitId": "ca-app-pub-3239289311207399/3281997392",
         "androidInterstitialAdUnitId": "ca-app-pub-3239289311207399/5093683221"
       },

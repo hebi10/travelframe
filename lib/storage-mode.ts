@@ -23,26 +23,13 @@ export const STORAGE_MODE_OPTIONS: StorageModeOption[] = [
 ];
 
 export const isCloudBackupStorageMode = (storageMode: StorageMode) =>
-  storageMode === "local_backup" || storageMode === "local_saver";
-
-export const isStorageSaverMode = (
-  storageMode: StorageMode,
-  canBackupToCloud: boolean
-) =>
-  storageMode === "local_saver" &&
-  canBackupToCloud &&
-  STORAGE_MODE_OPTIONS.some((option) => option.value === storageMode);
+  storageMode === "local_backup";
 
 export const getEffectiveStorageMode = (
   storageMode: StorageMode,
   canBackupToCloud: boolean
 ): StorageMode => {
   void canBackupToCloud;
-
-  if (storageMode === "local_saver") {
-    return "local_backup";
-  }
-
   return storageMode;
 };
 

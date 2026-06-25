@@ -1,16 +1,20 @@
 import * as FileSystem from "expo-file-system/legacy";
 
-import { localStorageAdapter } from "@/lib/local-storage";
 import { assertLocalLibraryCapacity } from "@/lib/local-library-limit";
+import {
+  createLocalLibraryId,
+  isRemoteUri,
+  readStoredItems,
+  readStoredStringSet,
+  writeSortedItems,
+  writeStoredStringSet
+} from "@/lib/local-library-store";
 import { getNextTripClipTitle, TRIP_CLIP_TITLE_PREFIX } from "@/lib/trip-clip-title";
 import type { ImageBundleWorkItem } from "@/types/work";
 
 const IMAGE_BUNDLE_STORAGE_KEY = "travel-frame.image-bundles.v1";
 const IMAGE_BUNDLE_DELETION_MARKER_KEY = "travel-frame.image-bundle-deletion-markers.v1";
 const IMAGE_BUNDLE_DIRECTORY = "image-bundles/";
-
-const createWorkId = () =>
-  `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
 const sortImageBundles = (items: ImageBundleWorkItem[]) =>
   [...items].sort(
@@ -93,33 +97,13 @@ const parseImageBundles = (value: string | null): ImageBundleWorkItem[] => {
   }
 };
 
-const parseDeletedImageWorkIds = (value: string | null) => {
-  if (!value) {
-    return new Set<string>();
-  }
-
-  try {
-    const parsed = JSON.parse(value);
-    return new Set(
-      Array.isArray(parsed)
-        ? parsed.filter((item): item is string => typeof item === "string" && item.length > 0)
-        : []
-    );
-  } catch {
-    return new Set<string>();
-  }
-};
-
 const writeImageBundles = async (items: ImageBundleWorkItem[]) => {
-  await localStorageAdapter.setItem(
-    IMAGE_BUNDLE_STORAGE_KEY,
-    JSON.stringify(sortImageBundles(items))
-  );
+  await writeSortedItems(IMAGE_BUNDLE_STORAGE_KEY, items, sortImageBundles);
 };
 
 const getImageBundleDirectory = () => {
   if (!FileSystem.documentDirectory) {
-    throw new Error("기기에서 이미지 작업 파일 저장소를 사용할 수 없습니다.");
+    throw new Error("湲곌린?먯꽌 ?대?吏 ?묒뾽 ?뚯씪 ??μ냼瑜??ъ슜?????놁뒿?덈떎.");
   }
 
   return `${FileSystem.documentDirectory}${IMAGE_BUNDLE_DIRECTORY}`;
@@ -131,26 +115,18 @@ const ensureImageBundleDirectory = async () => {
   return directory;
 };
 
-const isRemoteUri = (uri?: string | null) =>
-  typeof uri === "string" && /^https?:\/\//i.test(uri);
-
 export const getImageBundleWorks = async () => {
-  const value = await localStorageAdapter.getItem(IMAGE_BUNDLE_STORAGE_KEY);
-  return parseImageBundles(value);
+  return readStoredItems(IMAGE_BUNDLE_STORAGE_KEY, parseImageBundles);
 };
 
 export const getDeletedImageWorkIds = async () => {
-  const value = await localStorageAdapter.getItem(IMAGE_BUNDLE_DELETION_MARKER_KEY);
-  return parseDeletedImageWorkIds(value);
+  return readStoredStringSet(IMAGE_BUNDLE_DELETION_MARKER_KEY);
 };
 
 export const recordImageWorkLocalDeletion = async (id: string) => {
   const deletedImageWorkIds = await getDeletedImageWorkIds();
   deletedImageWorkIds.add(id);
-  await localStorageAdapter.setItem(
-    IMAGE_BUNDLE_DELETION_MARKER_KEY,
-    JSON.stringify([...deletedImageWorkIds])
-  );
+  await writeStoredStringSet(IMAGE_BUNDLE_DELETION_MARKER_KEY, deletedImageWorkIds);
 };
 
 export const wasImageWorkDeletedLocally = async (id: string) =>
@@ -177,11 +153,11 @@ export const saveImageBundleWork = async (
   assertLocalLibraryCapacity({
     currentCount: items.length,
     limit: options.localImageLimit,
-    label: "이미지"
+    label: "?대?吏"
   });
   const savedItem: ImageBundleWorkItem = {
     ...item,
-    id: createWorkId(),
+    id: createLocalLibraryId(),
     kind: "image-bundle",
     createdAt: new Date().toISOString(),
     title: item.title ?? getNextTripClipTitle(items.map((work) => work.title))

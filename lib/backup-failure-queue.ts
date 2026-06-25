@@ -1,4 +1,4 @@
-import { localStorageAdapter } from "@/lib/local-storage";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export type BackupFailureKind = "photo" | "image-bundle" | "video";
 
@@ -38,14 +38,14 @@ const parseBackupFailures = (value: string | null): BackupFailureRecord[] => {
 };
 
 const writeBackupFailures = async (records: BackupFailureRecord[]) => {
-  await localStorageAdapter.setItem(
+  await AsyncStorage.setItem(
     BACKUP_FAILURE_QUEUE_KEY,
     JSON.stringify(records)
   );
 };
 
 export const getBackupFailures = async () => {
-  const value = await localStorageAdapter.getItem(BACKUP_FAILURE_QUEUE_KEY);
+  const value = await AsyncStorage.getItem(BACKUP_FAILURE_QUEUE_KEY);
   return parseBackupFailures(value);
 };
 

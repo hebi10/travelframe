@@ -365,7 +365,7 @@ export default function AccountScreen() {
     <>
       <ScreenShell
         eyebrow="계정"
-        title={isLoggedIn ? "내 계정과 사용 기록" : "로그인하고 작업을 보관하세요."}
+        title={isLoggedIn ? "계정 및 구독" : "로그인하고 작업을 보관하세요."}
         description={
           isLoggedIn
             ? "이메일 인증, 구독 상태, 저장한 작업 기록을 한곳에서 확인합니다."

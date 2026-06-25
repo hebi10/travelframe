@@ -1,8 +1,15 @@
 import * as FileSystem from "expo-file-system/legacy";
 import { manipulateAsync, SaveFormat, type Action } from "expo-image-manipulator";
 
-import { localStorageAdapter } from "@/lib/local-storage";
 import { assertLocalLibraryCapacity } from "@/lib/local-library-limit";
+import {
+  createLocalLibraryId,
+  isRemoteUri,
+  readStoredItems,
+  readStoredStringSet,
+  writeSortedItems,
+  writeStoredStringSet
+} from "@/lib/local-library-store";
 import { optimizeImageForStorage, resolveImageDimensions } from "@/lib/image-backup-utils";
 import { applyAndroidImageAdjustment, hasCameraColorAdjustment } from "@/lib/android-image-adjustment";
 import type {
@@ -42,12 +49,9 @@ const ratioPresets = [
   { label: "16:9", value: 16 / 9 }
 ];
 
-const createPhotoId = () =>
-  `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-
 const getPhotoDirectory = () => {
   if (!FileSystem.documentDirectory) {
-    throw new Error("이 기기에서는 파일 저장소를 사용할 수 없습니다.");
+    throw new Error("??湲곌린?먯꽌???뚯씪 ??μ냼瑜??ъ슜?????놁뒿?덈떎.");
   }
 
   return `${FileSystem.documentDirectory}${PHOTO_DIRECTORY}`;
@@ -61,7 +65,7 @@ const ensurePhotoDirectory = async () => {
 
 const getPhotoPreviewDirectory = () => {
   if (!FileSystem.documentDirectory) {
-    throw new Error("이 기기에서는 파일 저장소를 사용할 수 없습니다.");
+    throw new Error("??湲곌린?먯꽌???뚯씪 ??μ냼瑜??ъ슜?????놁뒿?덈떎.");
   }
 
   return `${FileSystem.documentDirectory}${PHOTO_PREVIEW_DIRECTORY}`;
@@ -75,7 +79,7 @@ const ensurePhotoPreviewDirectory = async () => {
 
 const getCaptureDraftDirectory = () => {
   if (!FileSystem.documentDirectory) {
-    throw new Error("이 기기에서는 파일 저장소를 사용할 수 없습니다.");
+    throw new Error("??湲곌린?먯꽌???뚯씪 ??μ냼瑜??ъ슜?????놁뒿?덈떎.");
   }
 
   return `${FileSystem.documentDirectory}${CAPTURE_DRAFT_DIRECTORY}`;
@@ -95,7 +99,7 @@ const getFileExtension = (uri: string) => {
 
 const getRatioLabel = (width?: number, height?: number) => {
   if (!width || !height) {
-    return "알 수 없음";
+    return "?????놁쓬";
   }
 
   const ratio = width / height;
@@ -264,47 +268,22 @@ const parsePhotos = (value: string | null): PhotoItem[] => {
   }
 };
 
-const parseDeletedPhotoIds = (value: string | null) => {
-  if (!value) {
-    return new Set<string>();
-  }
-
-  try {
-    const parsed = JSON.parse(value);
-    return new Set(
-      Array.isArray(parsed)
-        ? parsed.filter((item): item is string => typeof item === "string" && item.length > 0)
-        : []
-    );
-  } catch {
-    return new Set<string>();
-  }
-};
-
 const writePhotos = async (photos: PhotoItem[]) => {
-  await localStorageAdapter.setItem(
-    PHOTO_STORAGE_KEY,
-    JSON.stringify(sortPhotos(photos))
-  );
+  await writeSortedItems(PHOTO_STORAGE_KEY, photos, sortPhotos);
 };
 
 export const getPhotos = async () => {
-  const value = await localStorageAdapter.getItem(PHOTO_STORAGE_KEY);
-  return parsePhotos(value);
+  return readStoredItems(PHOTO_STORAGE_KEY, parsePhotos);
 };
 
 export const getDeletedPhotoIds = async () => {
-  const value = await localStorageAdapter.getItem(PHOTO_DELETION_MARKER_KEY);
-  return parseDeletedPhotoIds(value);
+  return readStoredStringSet(PHOTO_DELETION_MARKER_KEY);
 };
 
 export const recordPhotoLocalDeletion = async (id: string) => {
   const deletedPhotoIds = await getDeletedPhotoIds();
   deletedPhotoIds.add(id);
-  await localStorageAdapter.setItem(
-    PHOTO_DELETION_MARKER_KEY,
-    JSON.stringify([...deletedPhotoIds])
-  );
+  await writeStoredStringSet(PHOTO_DELETION_MARKER_KEY, deletedPhotoIds);
 };
 
 export const wasPhotoDeletedLocally = async (id: string) =>
@@ -327,7 +306,7 @@ export const replacePhotosFromBackup = async (photos: PhotoItem[]) => {
 };
 
 export const createCaptureDraft = async (sourceUri: string) => {
-  const id = createPhotoId();
+  const id = createLocalLibraryId();
   const extension = getFileExtension(sourceUri);
   const directory = await ensureCaptureDraftDirectory();
   const draftUri = `${directory}${id}.${extension}`;
@@ -351,9 +330,6 @@ export const deleteLocalFile = async (uri?: string | null) => {
 
   await FileSystem.deleteAsync(uri, { idempotent: true });
 };
-
-const isRemoteUri = (uri?: string | null) =>
-  typeof uri === "string" && /^https?:\/\//i.test(uri);
 
 export const restorePhotoOriginalIfNeeded = async (photo: PhotoItem) => {
   if (photo.localFileStatus !== "cloud_only") {
@@ -563,9 +539,9 @@ export const saveCapturedPhoto = async ({
   assertLocalLibraryCapacity({
     currentCount: photos.length,
     limit: localImageLimit,
-    label: "이미지"
+    label: "?대?吏"
   });
-  const id = createPhotoId();
+  const id = createLocalLibraryId();
   const shouldApplyRatio = ratioLabel !== "Original";
   const extension = "jpg";
   const directory = await ensurePhotoDirectory();
@@ -639,10 +615,10 @@ export const saveEditedPhoto = async ({
     assertLocalLibraryCapacity({
       currentCount: photos.length,
       limit: localImageLimit,
-      label: "이미지"
+      label: "?대?吏"
     });
   }
-  const id = targetPhotoId ?? createPhotoId();
+  const id = targetPhotoId ?? createLocalLibraryId();
   const directory = await ensurePhotoDirectory();
   const destinationUri = `${directory}${id}-edited.jpg`;
   const rendered = renderedUri

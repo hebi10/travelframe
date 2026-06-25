@@ -34,9 +34,7 @@
     "firebase:deploy-functions": "firebase deploy --only functions --project travelframe-4e1fb",
     "firebase:deploy-hosting": "firebase deploy --only hosting --project travelframe-4e1fb",
     "firebase:deploy-all": "firebase deploy --only hosting,firestore:rules,storage,functions --project travelframe-4e1fb",
-    "deploy:firebase": "firebase deploy --only hosting,firestore:rules,storage,functions --project travelframe-4e1fb",
-    "install:media": "npx expo install expo-media-library expo-image-manipulator expo-image-picker expo-audio expo-video expo-document-picker expo-file-system expo-sharing expo-haptics expo-image react-native-reanimated react-native-worklets react-native-gesture-handler @react-native-async-storage/async-storage && npm install react-native-vision-camera react-native-nitro-modules react-native-nitro-image",
-    "install:ads": "npx expo install react-native-google-mobile-ads"
+    "deploy:firebase": "firebase deploy --only hosting,firestore:rules,storage,functions --project travelframe-4e1fb"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",
@@ -57,7 +55,6 @@
     "expo-router": "^55.0.0",
     "expo-sharing": "^55.0.0",
     "expo-status-bar": "^55.0.0",
-    "expo-system-ui": "^55.0.0",
     "expo-video": "^55.0.0",
     "firebase": "^12.13.0",
     "react": "19.2.0",

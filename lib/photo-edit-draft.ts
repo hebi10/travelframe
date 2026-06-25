@@ -1,4 +1,4 @@
-import { localStorageAdapter } from "@/lib/local-storage";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { PhotoEditTransform } from "@/types/photo";
 
 const EDIT_DRAFT_STORAGE_KEY = "travel-frame.edit-draft.v1";
@@ -26,7 +26,7 @@ const parseEditDraft = (value: string | null): PhotoEditDraft | null => {
 };
 
 export const getEditDraft = async () => {
-  const value = await localStorageAdapter.getItem(EDIT_DRAFT_STORAGE_KEY);
+  const value = await AsyncStorage.getItem(EDIT_DRAFT_STORAGE_KEY);
   return parseEditDraft(value);
 };
 
@@ -36,12 +36,12 @@ export const saveEditDraft = async (draft: Omit<PhotoEditDraft, "updatedAt">) =>
     updatedAt: new Date().toISOString()
   };
 
-  await localStorageAdapter.setItem(EDIT_DRAFT_STORAGE_KEY, JSON.stringify(nextDraft));
+  await AsyncStorage.setItem(EDIT_DRAFT_STORAGE_KEY, JSON.stringify(nextDraft));
   return nextDraft;
 };
 
 export const clearEditDraft = async () => {
-  await localStorageAdapter.removeItem(EDIT_DRAFT_STORAGE_KEY);
+  await AsyncStorage.removeItem(EDIT_DRAFT_STORAGE_KEY);
 };
 
 export const isSameEditDraftSource = (

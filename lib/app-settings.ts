@@ -12,7 +12,7 @@ import {
 } from "@/constants/video";
 import type { PhotoRatioLabel } from "@/types/photo";
 import { normalizeGuideOffsetFrameSize } from "@/lib/guide-offset";
-import { localStorageAdapter } from "@/lib/local-storage";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const APP_SETTINGS_KEY = "travel-frame.settings.v1";
 const settingsListeners = new Set<(settings: AppSettings) => void>();
@@ -36,7 +36,7 @@ export type CameraFacing = "back" | "front";
 export type CameraShutterSoundMode = "silent" | "sound";
 export type TripClipExportFormat = "mp4" | "images";
 export type AppImageSaveFormat = "original" | "png" | "jpeg";
-export type StorageMode = "local_only" | "local_backup" | "local_saver";
+export type StorageMode = "local_only" | "local_backup";
 export type CloudBackupTarget = "photos" | "imageBundles" | "videos" | "music";
 export type CloudBackupTargets = Record<CloudBackupTarget, boolean>;
 export type GridGuideLineKey =
@@ -543,8 +543,9 @@ const normalizeSettings = (value: Partial<AppSettings> | null): AppSettings => {
     ...defaultAppSettings,
     ...(value ?? {})
   };
+  const storedStorageMode = String(nextSettings.storageMode);
   const normalizedStorageMode =
-    nextSettings.storageMode === "local_saver" ? "local_backup" : nextSettings.storageMode;
+    storedStorageMode === "local_saver" ? "local_backup" : nextSettings.storageMode;
   const hasStoredStorageMode =
     value?.storageMode !== undefined && storageModes.includes(normalizedStorageMode);
   const defaultGuide = GUIDE_TYPES.includes(nextSettings.defaultGuide)
@@ -642,7 +643,7 @@ const normalizeSettings = (value: Partial<AppSettings> | null): AppSettings => {
 };
 
 export const getAppSettings = async () => {
-  const value = await localStorageAdapter.getItem(APP_SETTINGS_KEY);
+  const value = await AsyncStorage.getItem(APP_SETTINGS_KEY);
 
   if (!value) {
     return defaultAppSettings;
@@ -656,13 +657,13 @@ export const getAppSettings = async () => {
 };
 
 export const hasStoredAppSettings = async () => {
-  const value = await localStorageAdapter.getItem(APP_SETTINGS_KEY);
+  const value = await AsyncStorage.getItem(APP_SETTINGS_KEY);
   return Boolean(value);
 };
 
 export const saveAppSettings = async (settings: AppSettings) => {
   const normalizedSettings = normalizeSettings(settings);
-  await localStorageAdapter.setItem(
+  await AsyncStorage.setItem(
     APP_SETTINGS_KEY,
     JSON.stringify(normalizedSettings)
   );

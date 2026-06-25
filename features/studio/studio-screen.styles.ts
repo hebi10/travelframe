@@ -49,30 +49,66 @@ export const styles = StyleSheet.create({
     fontWeight: "800",
     letterSpacing: 0
   },
-  pageSizeOptions: {
-    flexDirection: "row",
-    gap: 0
-  },
-  pageSizeButton: {
-    minWidth: 58,
+  pageSizeSelect: {
+    minWidth: 96,
     minHeight: 40,
+    flexDirection: "row",
+    alignItems: "center",
     justifyContent: "center",
+    gap: 8,
     paddingHorizontal: 12,
     borderWidth: 1,
     borderColor: colors.line,
     backgroundColor: colors.background
   },
-  pageSizeButtonActive: {
-    borderColor: colors.text,
-    backgroundColor: colors.text
-  },
-  pageSizeButtonText: {
+  pageSizeSelectText: {
     color: colors.text,
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: "800",
     letterSpacing: 0
   },
-  pageSizeButtonTextActive: {
+  pageSizeSelectChevron: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: "900",
+    letterSpacing: 0
+  },
+  pageSizeDropdownBackdrop: {
+    flex: 1,
+    alignItems: "flex-end",
+    paddingTop: 132,
+    paddingRight: 18,
+    backgroundColor: "rgba(0, 0, 0, 0.12)"
+  },
+  pageSizeDropdownDismissLayer: {
+    ...StyleSheet.absoluteFillObject
+  },
+  pageSizeDropdown: {
+    minWidth: 112,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.background
+  },
+  pageSizeDropdownItem: {
+    minHeight: 42,
+    justifyContent: "center",
+    paddingHorizontal: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.line,
+    backgroundColor: colors.background
+  },
+  pageSizeDropdownItemActive: {
+    borderColor: colors.text,
+    backgroundColor: colors.text
+  },
+  pageSizeDropdownItemText: {
+    color: colors.text,
+    fontSize: 12,
+    fontWeight: "800",
+    letterSpacing: 0
+  },
+  pageSizeDropdownItemTextActive: {
     color: colors.inverse
   },
   clipCta: {

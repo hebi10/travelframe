@@ -34,28 +34,25 @@ import {
   optimizeImageForBackup,
   type OptimizedBackupImage
 } from "@/lib/image-backup-utils";
-import { localStorageAdapter } from "@/lib/local-storage";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getPlanTier } from "@/lib/plan-entitlements";
 import {
   getDeletedPhotoIds,
   getPhotos,
-  markPhotoCloudOnly,
   replacePhotosFromBackup,
   wasPhotoDeletedLocally
 } from "@/lib/photo-library";
 import { isCreatorSubscriptionActive, type UserSubscription } from "@/lib/subscription";
-import { isStorageSaverMode, shouldUseCloudBackupForStorageMode } from "@/lib/storage-mode";
+import { shouldUseCloudBackupForStorageMode } from "@/lib/storage-mode";
 import {
   getDeletedVideoIds,
   getMadeVideos,
-  markMadeVideoCloudOnly,
   replaceMadeVideosFromBackup,
   wasVideoDeletedLocally
 } from "@/lib/video-library";
 import {
   getDeletedImageWorkIds,
   getImageBundleWorks,
-  markImageBundleCloudOnly,
   replaceImageBundleWorksFromBackup,
   wasImageWorkDeletedLocally
 } from "@/lib/work-library";
@@ -133,40 +130,6 @@ export type LocalWorkspaceSummary = {
   totalCount: number;
 };
 
-const applyStorageSaverPolicy = async ({
-  settings,
-  photo,
-  photoBackup,
-  imageBundle,
-  imageBundleBackup,
-  video,
-  videoBackup
-}: {
-  settings: AppSettings;
-  photo?: PhotoItem;
-  photoBackup?: Partial<PhotoItem> | null;
-  imageBundle?: ImageBundleWorkItem;
-  imageBundleBackup?: Partial<ImageBundleWorkItem> | null;
-  video?: MadeVideoItem;
-  videoBackup?: Partial<MadeVideoItem> | null;
-}) => {
-  if (!isStorageSaverMode(settings.storageMode, true)) {
-    return;
-  }
-
-  if (photo) {
-    await markPhotoCloudOnly(photo.id, photoBackup ?? null);
-  }
-
-  if (imageBundle) {
-    await markImageBundleCloudOnly(imageBundle.id, imageBundleBackup ?? null);
-  }
-
-  if (video) {
-    await markMadeVideoCloudOnly(video.id, videoBackup ?? null);
-  }
-};
-
 const DEVICE_ID_STORAGE_KEY = "travel-frame.backup-device-id.v1";
 
 const emitBackupProgress = (
@@ -231,7 +194,7 @@ const callBackupFunction = async <Request, Response>(
   data: Request
 ): Promise<Response> => {
   if (!firebaseFunctions) {
-    throw new Error("클라우드 백업을 지금 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.");
+    throw new Error("?대씪?곕뱶 諛깆뾽??吏湲??ъ슜?????놁뒿?덈떎. ?좎떆 ???ㅼ떆 ?쒕룄??二쇱꽭??");
   }
 
   const callable = httpsCallable<Request, Response>(firebaseFunctions, name);
@@ -250,7 +213,7 @@ const callBackupFunction = async <Request, Response>(
       message.includes("not-found") ||
       message.includes("NOT_FOUND")
     ) {
-      throw new Error("클라우드 백업을 지금 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.");
+      throw new Error("?대씪?곕뱶 諛깆뾽??吏湲??ъ슜?????놁뒿?덈떎. ?좎떆 ???ㅼ떆 ?쒕룄??二쇱꽭??");
     }
 
     if (
@@ -258,7 +221,7 @@ const callBackupFunction = async <Request, Response>(
       message.includes("Active backup subscription")
     ) {
       throw new Error(
-        "구독이 활성화된 계정만 백업할 수 있습니다. 관리자 페이지에서 구독 상태를 확인해 주세요."
+        "援щ룆???쒖꽦?붾맂 怨꾩젙留?諛깆뾽?????덉뒿?덈떎. 愿由ъ옄 ?섏씠吏?먯꽌 援щ룆 ?곹깭瑜??뺤씤??二쇱꽭??"
       );
     }
 
@@ -331,13 +294,13 @@ const normalizeDateValue = (value: unknown) => {
 };
 
 const getSourceDeviceId = async () => {
-  const storedDeviceId = await localStorageAdapter.getItem(DEVICE_ID_STORAGE_KEY);
+  const storedDeviceId = await AsyncStorage.getItem(DEVICE_ID_STORAGE_KEY);
   if (storedDeviceId) {
     return storedDeviceId;
   }
 
   const nextDeviceId = `device-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-  await localStorageAdapter.setItem(DEVICE_ID_STORAGE_KEY, nextDeviceId);
+  await AsyncStorage.setItem(DEVICE_ID_STORAGE_KEY, nextDeviceId);
   return nextDeviceId;
 };
 
@@ -356,7 +319,7 @@ const uploadLocalFile = async ({
   mediaKind: BackupMediaKind;
 }): Promise<UploadedBackupFile> => {
   if (!firebaseStorage) {
-    throw new Error("클라우드 백업을 지금 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.");
+    throw new Error("?대씪?곕뱶 諛깆뾽??吏湲??ъ슜?????놁뒿?덈떎. ?좎떆 ???ㅼ떆 ?쒕룄??二쇱꽭??");
   }
 
   const response = await fetch(uri);
@@ -727,7 +690,7 @@ export const ensureBackupAvailable = (subscription: UserSubscription) => {
   }
 
   throw new Error(
-    "구독 기간이 만료되어 백업을 사용할 수 없습니다. 기존 백업 데이터 삭제는 설정에서 직접 요청할 수 있습니다."
+    "援щ룆 湲곌컙??留뚮즺?섏뼱 諛깆뾽???ъ슜?????놁뒿?덈떎. 湲곗〈 諛깆뾽 ?곗씠????젣???ㅼ젙?먯꽌 吏곸젒 ?붿껌?????덉뒿?덈떎."
   );
 };
 
@@ -741,16 +704,16 @@ export const backupCurrentWorkspace = async ({
   onProgress?: (progress: BackupProgressUpdate) => void;
 }): Promise<BackupSummary> => {
   if (!user) {
-    throw new Error("로그인 후 백업할 수 있습니다.");
+    throw new Error("濡쒓렇????諛깆뾽?????덉뒿?덈떎.");
   }
 
   if (!firestore || !firebaseStorage) {
-    throw new Error("Firebase 연결 정보가 아직 설정되지 않았습니다.");
+    throw new Error("Firebase ?곌껐 ?뺣낫媛 ?꾩쭅 ?ㅼ젙?섏? ?딆븯?듬땲??");
   }
 
   ensureBackupAvailable(subscription);
   const backupLimitTier = getBackupLimitTier(subscription);
-  emitBackupProgress(onProgress, 3, "백업할 데이터를 준비하고 있습니다.");
+  emitBackupProgress(onProgress, 3, "諛깆뾽???곗씠?곕? 以鍮꾪븯怨??덉뒿?덈떎.");
 
   const [settings, photos, imageBundles, videos] = await Promise.all([
     getAppSettings(),
@@ -797,7 +760,7 @@ export const backupCurrentWorkspace = async ({
     }
     backupableVideoBackups.push(video);
   }
-  emitBackupProgress(onProgress, 8, "백업할 데이터를 확인하고 있습니다.");
+  emitBackupProgress(onProgress, 8, "諛깆뾽???곗씠?곕? ?뺤씤?섍퀬 ?덉뒿?덈떎.");
   const backedUpAt = new Date().toISOString();
   const sourceDeviceId = await getSourceDeviceId();
   const totalOptimizeItems =
@@ -809,7 +772,7 @@ export const backupCurrentWorkspace = async ({
     emitBackupProgress(
       onProgress,
       10 + (optimizedItemCount / Math.max(1, totalOptimizeItems)) * 35,
-      "이미지를 최적화하고 있습니다."
+      "?대?吏瑜?理쒖쟻?뷀븯怨??덉뒿?덈떎."
     );
   };
   const optimizedImagesForCleanup: OptimizedBackupImageCleanup[] = [];
@@ -879,7 +842,7 @@ export const backupCurrentWorkspace = async ({
     Boolean(item)
   );
   if (totalOptimizeItems === 0) {
-    emitBackupProgress(onProgress, 45, "백업할 이미지가 있는지 확인하고 있습니다.");
+    emitBackupProgress(onProgress, 45, "諛깆뾽???대?吏媛 ?덈뒗吏 ?뺤씤?섍퀬 ?덉뒿?덈떎.");
   }
   const allOptimizedImages = [
     ...optimizedPhotos.map((item) => item.optimized),
@@ -892,7 +855,7 @@ export const backupCurrentWorkspace = async ({
     excludeImageWorkIds: optimizedImageBundles.map(({ work }) => work.id),
     tier: backupLimitTier
   });
-  emitBackupProgress(onProgress, 50, "백업 용량을 확인했습니다.");
+  emitBackupProgress(onProgress, 50, "諛깆뾽 ?⑸웾???뺤씤?덉뒿?덈떎.");
 
   const totalUploadItems =
     backupablePhotoBackups.length +
@@ -904,7 +867,7 @@ export const backupCurrentWorkspace = async ({
     emitBackupProgress(
       onProgress,
       52 + (uploadedItemCount / Math.max(1, totalUploadItems)) * 40,
-      "Firebase에 백업하고 있습니다."
+      "Firebase??諛깆뾽?섍퀬 ?덉뒿?덈떎."
     );
   };
 
@@ -967,16 +930,6 @@ export const backupCurrentWorkspace = async ({
       continue;
     }
 
-    await applyStorageSaverPolicy({
-      settings,
-      photo,
-      photoBackup: {
-        downloadURL: photoDownloadUrl,
-        storagePath: photoUpload.storagePath,
-        previewUri: photo.previewUri,
-        backupStatus: "backed_up"
-      }
-    });
     updateUploadProgress();
   }
 
@@ -1052,15 +1005,6 @@ export const backupCurrentWorkspace = async ({
     ) {
       continue;
     }
-    await applyStorageSaverPolicy({
-      settings,
-      imageBundle: work,
-      imageBundleBackup: {
-        imageUris: backedUpImageUris,
-        storagePath: storagePaths[0],
-        backupStatus: "backed_up"
-      }
-    });
   }
 
   for (const video of backupableVideoBackups) {
@@ -1133,24 +1077,14 @@ export const backupCurrentWorkspace = async ({
     ) {
       continue;
     }
-    await applyStorageSaverPolicy({
-      settings,
-      video,
-      videoBackup: {
-        downloadURL: downloadUrl,
-        uri: downloadUrl,
-        storagePath: upload.storagePath,
-        backupStatus: "backed_up"
-      }
-    });
     updateUploadProgress();
   }
 
   if (totalUploadItems === 0) {
-    emitBackupProgress(onProgress, 92, "Firebase에 백업할 파일을 확인했습니다.");
+    emitBackupProgress(onProgress, 92, "Firebase??諛깆뾽???뚯씪???뺤씤?덉뒿?덈떎.");
   }
 
-  emitBackupProgress(onProgress, 96, "백업을 마무리하고 있습니다.");
+  emitBackupProgress(onProgress, 96, "諛깆뾽??留덈Т由ы븯怨??덉뒿?덈떎.");
   const overview = await refreshBackupOverview(user.uid, backedUpAt);
   await setDoc(
     doc(firestore, "users", user.uid, "backups", "current"),
@@ -1164,7 +1098,7 @@ export const backupCurrentWorkspace = async ({
     },
     { merge: true }
   );
-  emitBackupProgress(onProgress, 100, "백업을 완료했습니다.");
+  emitBackupProgress(onProgress, 100, "諛깆뾽???꾨즺?덉뒿?덈떎.");
 
   return {
     photoCount: overview.photoCount,
@@ -1196,7 +1130,7 @@ export const backupPhoto = async ({
   }
 
   if (!firestore || !firebaseStorage) {
-    throw new Error("Firebase 연결 정보가 아직 설정되지 않았습니다.");
+    throw new Error("Firebase ?곌껐 ?뺣낫媛 ?꾩쭅 ?ㅼ젙?섏? ?딆븯?듬땲??");
   }
 
   if (!(await isPhotoStillBackupEligible(photo.id))) {
@@ -1306,17 +1240,6 @@ export const backupPhoto = async ({
   }
 
   await refreshBackupOverview(user.uid, backedUpAt);
-  await applyStorageSaverPolicy({
-    settings,
-    photo,
-    photoBackup: {
-      downloadURL,
-      uri: downloadURL,
-      storagePath: upload.storagePath,
-      previewUri: photo.previewUri,
-      backupStatus: "backed_up"
-    }
-  });
 
   return {
     ...photo,
@@ -1378,7 +1301,7 @@ export const backupImageBundleWork = async ({
   }
 
   if (!firestore || !firebaseStorage) {
-    throw new Error("Firebase 연결 정보가 아직 설정되지 않았습니다.");
+    throw new Error("Firebase ?곌껐 ?뺣낫媛 ?꾩쭅 ?ㅼ젙?섏? ?딆븯?듬땲??");
   }
 
   const settings = await getAppSettings();
@@ -1505,15 +1428,6 @@ export const backupImageBundleWork = async ({
   }
 
   await refreshBackupOverview(user.uid, backedUpAt);
-  await applyStorageSaverPolicy({
-    settings,
-    imageBundle: work,
-    imageBundleBackup: {
-      imageUris: backedUpImageUris,
-      storagePath: storagePaths[0],
-      backupStatus: "backed_up"
-    }
-  });
 
   return {
     ...work,
@@ -1540,7 +1454,7 @@ export const backupMadeVideo = async ({
   }
 
   if (!firestore || !firebaseStorage) {
-    throw new Error("Firebase 연결 정보가 아직 설정되지 않았습니다.");
+    throw new Error("Firebase ?곌껐 ?뺣낫媛 ?꾩쭅 ?ㅼ젙?섏? ?딆븯?듬땲??");
   }
 
   const [sourceDeviceId, settings] = await Promise.all([
@@ -1585,7 +1499,7 @@ export const backupMadeVideo = async ({
   const videoLimit = getCloudBackupVideoLimit(backupLimitTier);
   if (!canBackupMoreVideos(currentVideoCount, backupLimitTier)) {
     throw new Error(
-      `영상 백업 한도 ${videoLimit}개를 모두 사용했습니다. 설정에서 기존 영상 백업을 정리한 뒤 다시 시도해 주세요.`
+      `?곸긽 諛깆뾽 ?쒕룄 ${videoLimit}媛쒕? 紐⑤몢 ?ъ슜?덉뒿?덈떎. ?ㅼ젙?먯꽌 湲곗〈 ?곸긽 諛깆뾽???뺣━?????ㅼ떆 ?쒕룄??二쇱꽭??`
     );
   }
 
@@ -1635,16 +1549,6 @@ export const backupMadeVideo = async ({
   }
 
   await refreshBackupOverview(user.uid, backedUpAt);
-  await applyStorageSaverPolicy({
-    settings,
-    video,
-    videoBackup: {
-      downloadURL: downloadUrl,
-      uri: downloadUrl,
-      storagePath: upload.storagePath,
-      backupStatus: "backed_up"
-    }
-  });
 
   return {
     ...video,
@@ -1686,7 +1590,7 @@ const normalizeImageWorkBackup = (
   ...(data as ImageBundleWorkItem),
   id,
   kind: "image-bundle",
-  title: typeof data.title === "string" ? data.title : "클라우드 백업 작업",
+  title: typeof data.title === "string" ? data.title : "?대씪?곕뱶 諛깆뾽 ?묒뾽",
   createdAt: normalizeDateValue(data.createdAt) ?? new Date().toISOString(),
   ratio:
     data.ratio === "4:5" || data.ratio === "1:1" || data.ratio === "16:9" || data.ratio === "3:4"
@@ -1707,7 +1611,7 @@ const normalizeVideoBackup = (
   uri: typeof data.uri === "string" ? data.uri : "",
   coverUri: typeof data.coverUri === "string" ? data.coverUri : undefined,
   createdAt: normalizeDateValue(data.createdAt) ?? new Date().toISOString(),
-  title: typeof data.title === "string" ? data.title : "클라우드 백업 영상",
+  title: typeof data.title === "string" ? data.title : "?대씪?곕뱶 諛깆뾽 ?곸긽",
   ratio:
     data.ratio === "4:5" || data.ratio === "1:1" || data.ratio === "16:9" || data.ratio === "3:4"
       ? data.ratio
@@ -1725,7 +1629,7 @@ const normalizeVideoBackup = (
       ? (data.durations as Record<string, number>)
       : {},
   musicId: data.musicId === "custom" || typeof data.musicId === "string" ? (data.musicId as MadeVideoItem["musicId"]) : "none",
-  musicLabel: typeof data.musicLabel === "string" ? data.musicLabel : "무음",
+  musicLabel: typeof data.musicLabel === "string" ? data.musicLabel : "臾댁쓬",
   downloadURL:
     (typeof data.downloadURL === "string" && data.downloadURL) ||
     (typeof data.uri === "string" && /^https?:\/\//i.test(data.uri) && data.uri) ||
@@ -1736,11 +1640,11 @@ const normalizeVideoBackup = (
 
 export const restoreCloudBackupToLocal = async ({ user }: { user: User | null }) => {
   if (!user) {
-    throw new Error("로그인이 필요합니다.");
+    throw new Error("濡쒓렇?몄씠 ?꾩슂?⑸땲??");
   }
 
   if (!firestore) {
-    throw new Error("Firebase 연결 정보가 아직 설정되지 않았습니다.");
+    throw new Error("Firebase ?곌껐 ?뺣낫媛 ?꾩쭅 ?ㅼ젙?섏? ?딆븯?듬땲??");
   }
 
   const [photoSnapshot, imageWorkSnapshot, videoSnapshot] = await Promise.all([
@@ -1829,7 +1733,7 @@ export const markBackupExpired = async ({
 
 export const deleteCloudBackupData = async ({ user }: { user: User | null }) => {
   if (!user) {
-    throw new Error("로그인 후 백업 데이터를 삭제할 수 있습니다.");
+    throw new Error("濡쒓렇????諛깆뾽 ?곗씠?곕? ??젣?????덉뒿?덈떎.");
   }
 
   return deleteCloudBackupDataCallable();

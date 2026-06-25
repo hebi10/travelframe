@@ -4,7 +4,7 @@ import {
   type AppGuideTabKey
 } from "@/constants/app-guide-steps";
 import { hasStoredAppSettings } from "@/lib/app-settings";
-import { localStorageAdapter } from "@/lib/local-storage";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const GUIDE_PROGRESS_KEY = "travel-frame.guide-progress.v1";
 
@@ -41,12 +41,12 @@ const normalizeGuideProgress = (value: Partial<GuideProgress> | null): GuideProg
 });
 
 const saveGuideProgress = async (progress: GuideProgress) => {
-  await localStorageAdapter.setItem(GUIDE_PROGRESS_KEY, JSON.stringify(progress));
+  await AsyncStorage.setItem(GUIDE_PROGRESS_KEY, JSON.stringify(progress));
   return progress;
 };
 
 export const getGuideProgress = async () => {
-  const stored = await localStorageAdapter.getItem(GUIDE_PROGRESS_KEY);
+  const stored = await AsyncStorage.getItem(GUIDE_PROGRESS_KEY);
 
   if (stored) {
     try {
@@ -61,7 +61,7 @@ export const getGuideProgress = async () => {
         seenTabs: createEmptySeenTabs()
       });
     } catch {
-      await localStorageAdapter.removeItem(GUIDE_PROGRESS_KEY);
+      await AsyncStorage.removeItem(GUIDE_PROGRESS_KEY);
     }
   }
 

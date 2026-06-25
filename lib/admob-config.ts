@@ -5,7 +5,6 @@ import { initializeNativeAdMob } from "@/lib/admob-native";
 import { resolveInterstitialAdUnitId } from "@/lib/admob-units";
 
 type AdMobExtra = {
-  androidAppId?: string;
   androidBannerAdUnitId?: string;
   androidInterstitialAdUnitId?: string;
 };
@@ -17,10 +16,7 @@ const extra = Constants.expoConfig?.extra as
   | undefined;
 
 export const admobConfig = {
-  androidAppId:
-    extra?.admob?.androidAppId ?? "ca-app-pub-3239289311207399~9959086380",
-  androidBannerAdUnitId:
-    extra?.admob?.androidBannerAdUnitId ?? "ca-app-pub-3239289311207399/3281997392",
+  androidBannerAdUnitId: extra?.admob?.androidBannerAdUnitId ?? null,
   androidInterstitialAdUnitId:
     extra?.admob?.androidInterstitialAdUnitId ?? null
 } as const;

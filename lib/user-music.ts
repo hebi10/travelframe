@@ -9,9 +9,7 @@ import { httpsCallable } from "firebase/functions";
 import { deleteObject, getDownloadURL, ref, uploadBytes } from "firebase/storage";
 
 import { firestore, firebaseFunctions, firebaseStorage } from "@/lib/firebase";
-import { getAppSettings } from "@/lib/app-settings";
-import { localStorageAdapter } from "@/lib/local-storage";
-import { isStorageSaverMode } from "@/lib/storage-mode";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export type UserMusicTrack = {
   id: string;
@@ -36,7 +34,7 @@ const getMusicCacheKey = (userId: string) => `${MUSIC_CACHE_PREFIX}:${userId}`;
 
 const getMusicDirectory = (userId: string) => {
   if (!FileSystem.documentDirectory) {
-    throw new Error("이 기기에서는 음악 파일을 저장할 수 없습니다.");
+    throw new Error("??湲곌린?먯꽌???뚯븙 ?뚯씪????ν븷 ???놁뒿?덈떎.");
   }
 
   return `${FileSystem.documentDirectory}user-music/${userId}/`;
@@ -83,7 +81,7 @@ const getExtension = (name?: string | null, mimeType?: string | null) => {
 
 const normalizeTrackName = (name?: string | null) => {
   const trimmed = name?.trim();
-  return trimmed && trimmed.length > 0 ? trimmed : "내 음악";
+  return trimmed && trimmed.length > 0 ? trimmed : "???뚯븙";
 };
 
 const getContentType = (mimeType?: string | null) =>
@@ -120,7 +118,7 @@ const callMusicFunction = async <Request, Response>(
   data: Request
 ): Promise<Response> => {
   if (!firebaseFunctions) {
-    throw new Error("음악 백업을 지금 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.");
+    throw new Error("?뚯븙 諛깆뾽??吏湲??ъ슜?????놁뒿?덈떎. ?좎떆 ???ㅼ떆 ?쒕룄??二쇱꽭??");
   }
 
   const callable = httpsCallable<Request, Response>(firebaseFunctions, name);
@@ -154,7 +152,7 @@ const deleteUserBackupItem = (data: { itemType: "music"; itemId: string }) =>
   callMusicFunction<typeof data, { deleted: boolean }>("deleteUserBackupItem", data);
 
 const saveTracksToCache = async (userId: string, tracks: UserMusicTrack[]) => {
-  await localStorageAdapter.setItem(getMusicCacheKey(userId), JSON.stringify(tracks));
+  await AsyncStorage.setItem(getMusicCacheKey(userId), JSON.stringify(tracks));
 };
 
 export const getUserMusicTracks = async (userId?: string | null) => {
@@ -162,7 +160,7 @@ export const getUserMusicTracks = async (userId?: string | null) => {
     return [];
   }
 
-  const value = await localStorageAdapter.getItem(getMusicCacheKey(userId));
+  const value = await AsyncStorage.getItem(getMusicCacheKey(userId));
   if (!value) {
     return [];
   }
@@ -190,7 +188,7 @@ const uploadLocalAudioFile = async ({
   createdAt: string;
 }) => {
   if (!firebaseStorage) {
-    throw new Error("음악 백업을 지금 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.");
+    throw new Error("?뚯븙 諛깆뾽??吏湲??ъ슜?????놁뒿?덈떎. ?좎떆 ???ㅼ떆 ?쒕룄??二쇱꽭??");
   }
 
   const response = await fetch(uri);
@@ -242,7 +240,6 @@ export const syncUserMusicTracks = async (user: User | null) => {
   const snapshot = await getDocs(collection(firestore, "users", user.uid, "musicTracks"));
   const remoteTrackIds = new Set(snapshot.docs.map((item) => item.id));
   const directory = await ensureMusicDirectory(user.uid);
-  const settings = await getAppSettings();
   const nextTracks: UserMusicTrack[] = [];
 
   for (const item of snapshot.docs) {
@@ -265,7 +262,7 @@ export const syncUserMusicTracks = async (user: User | null) => {
       }
     }
 
-    if (!localUri && remoteDownloadUrl && !isStorageSaverMode(settings.storageMode, true)) {
+    if (!localUri && remoteDownloadUrl) {
       const extension = getExtension(data.name, data.mimeType);
       const fileName = `${item.id}-${sanitizeFileName(data.name)}.${extension}`;
       const destination = `${directory}${fileName}`;
@@ -337,13 +334,13 @@ export const pickAndUploadUserMusicTrack = async (
   options: { uploadToCloud?: boolean } = {}
 ) => {
   if (!user) {
-    throw new Error("로그인 후 내 음악을 추가할 수 있습니다.");
+    throw new Error("濡쒓렇???????뚯븙??異붽??????덉뒿?덈떎.");
   }
 
   const { uploadToCloud = true } = options;
 
   if (uploadToCloud && (!firestore || !firebaseStorage)) {
-    throw new Error("Firebase 연결 정보가 아직 설정되지 않았습니다.");
+    throw new Error("Firebase ?곌껐 ?뺣낫媛 ?꾩쭅 ?ㅼ젙?섏? ?딆븯?듬땲??");
   }
 
   const currentTracks = await syncUserMusicTracks(user);
@@ -353,11 +350,11 @@ export const pickAndUploadUserMusicTrack = async (
   );
 
   if (safeMusicTrackLimit <= 0) {
-    throw new Error("Pro 구독 후 내 음악을 추가할 수 있습니다.");
+    throw new Error("Pro 援щ룆 ?????뚯븙??異붽??????덉뒿?덈떎.");
   }
 
   if (currentTracks.length >= safeMusicTrackLimit) {
-    throw new Error(`내 음악은 최대 ${safeMusicTrackLimit}개까지 저장할 수 있습니다.`);
+    throw new Error(`???뚯븙? 理쒕? ${safeMusicTrackLimit}媛쒓퉴吏 ??ν븷 ???덉뒿?덈떎.`);
   }
 
   const result = await DocumentPicker.getDocumentAsync({
@@ -424,19 +421,7 @@ export const pickAndUploadUserMusicTrack = async (
     createdAt
   };
 
-  const settings = await getAppSettings();
-  const savedTrack = isStorageSaverMode(settings.storageMode, true)
-    ? {
-        ...track,
-        uri: downloadUrl
-      }
-    : track;
-
-  if (isStorageSaverMode(settings.storageMode, true)) {
-    await deleteLocalMusicFile(track);
-  }
-
-  const nextTracks = [savedTrack, ...currentTracks].slice(0, safeMusicTrackLimit);
+  const nextTracks = [track, ...currentTracks].slice(0, safeMusicTrackLimit);
   await saveTracksToCache(user.uid, nextTracks);
   return nextTracks;
 };
@@ -449,7 +434,7 @@ export const deleteUserMusicTrack = async ({
   track: UserMusicTrack;
 }) => {
   if (!user) {
-    throw new Error("로그인 후 내 음악을 삭제할 수 있습니다.");
+    throw new Error("濡쒓렇???????뚯븙????젣?????덉뒿?덈떎.");
   }
 
   if (track.storagePath) {
