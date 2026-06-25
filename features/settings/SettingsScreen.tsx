@@ -1773,6 +1773,10 @@ export default function SettingsScreen() {
                       현재 저장 방식
                     </Text>
                     <Text selectable style={[styles.backupStatusDetail, themed.mutedText]}>
+                      현재 플랜: {planEntitlements.label} · 클라우드 백업{" "}
+                      {planEntitlements.canBackupToCloud ? "사용 가능" : "Pro 전용"}
+                    </Text>
+                    <Text selectable style={[styles.backupStatusDetail, themed.mutedText]}>
                       {getStorageModeLabel(effectiveStorageMode)}
                     </Text>
                     <Text selectable style={[styles.backupStatusDetail, themed.mutedText]}>
@@ -1816,9 +1820,11 @@ export default function SettingsScreen() {
                   </View>
                   {STORAGE_MODE_OPTIONS.map((option) => {
                     const isCloudBackupOptionDisabled =
-                      option.value !== "local_only" && !canSelectCloudSaveTarget;
+                      option.requiresBackupPlan && !canSelectCloudSaveTarget;
                     const isDisabled = isBackupSubmitting || isCloudBackupOptionDisabled;
-                    const detail = option.detail;
+                    const detail = isCloudBackupOptionDisabled
+                      ? `${option.detail} Pro 플랜부터 선택할 수 있습니다. 무료 로그인은 앱 보관함에만 저장됩니다.`
+                      : option.detail;
                     const onPress = () => {
                       if (option.value === "local_only") {
                         void updateSetting({
@@ -1834,7 +1840,11 @@ export default function SettingsScreen() {
                     return (
                       <OptionButton
                         key={option.value}
-                        label={option.label}
+                        label={
+                          option.requiresBackupPlan
+                            ? `${option.label} (Pro 전용)`
+                            : option.label
+                        }
                         detail={detail}
                         active={settings.storageMode === option.value}
                         disabled={isDisabled}

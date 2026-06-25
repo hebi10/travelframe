@@ -6,14 +6,20 @@ export const styles = StyleSheet.create({
   tabs: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8
+    gap: 10
   },
   tab: {
-    minHeight: controls.compactHeight,
+    flexGrow: 1,
+    minWidth: 96,
+    minHeight: 52,
+    flexDirection: "row",
+    alignItems: "center",
     justifyContent: "center",
+    gap: 10,
     paddingHorizontal: 12,
     borderWidth: 1,
     borderColor: colors.line,
+    borderRadius: 6,
     backgroundColor: colors.background
   },
   tabActive: {
@@ -45,12 +51,13 @@ export const styles = StyleSheet.create({
   },
   pageSizeOptions: {
     flexDirection: "row",
-    gap: 6
+    gap: 0
   },
   pageSizeButton: {
-    minHeight: 32,
+    minWidth: 58,
+    minHeight: 40,
     justifyContent: "center",
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
     borderWidth: 1,
     borderColor: colors.line,
     backgroundColor: colors.background
@@ -77,10 +84,13 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.background
   },
   importImageCta: {
-    gap: 16,
-    paddingVertical: 16,
+    minHeight: 184,
+    alignItems: "center",
+    gap: 14,
+    paddingVertical: 22,
     paddingHorizontal: 16,
     borderWidth: 1,
+    borderRadius: 8,
     borderColor: colors.text,
     backgroundColor: colors.background
   },
@@ -90,6 +100,9 @@ export const styles = StyleSheet.create({
   clipCopy: {
     gap: 8
   },
+  importImageCopy: {
+    alignItems: "center"
+  },
   clipTitle: {
     color: colors.text,
     fontSize: typography.body,
@@ -97,11 +110,20 @@ export const styles = StyleSheet.create({
     lineHeight: 20,
     letterSpacing: 0
   },
+  importImageTitle: {
+    fontSize: typography.section,
+    lineHeight: 22,
+    textAlign: "center"
+  },
   clipDetail: {
     color: colors.muted,
     fontSize: typography.small,
     lineHeight: 18,
     letterSpacing: 0
+  },
+  importImageDetail: {
+    maxWidth: 300,
+    textAlign: "center"
   },
   clipAction: {
     minHeight: 40,
@@ -119,6 +141,79 @@ export const styles = StyleSheet.create({
     lineHeight: 19,
     textAlign: "center",
     letterSpacing: 0
+  },
+  importIconWrap: {
+    width: 42,
+    height: 42,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  studioIconBox: {
+    width: 18,
+    height: 18,
+    borderWidth: 2,
+    borderRadius: 2
+  },
+  studioIconDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 999,
+    marginTop: 3,
+    marginLeft: 3
+  },
+  studioIconBase: {
+    width: 10,
+    height: 2,
+    marginTop: 5,
+    marginLeft: 3
+  },
+  studioIconPlay: {
+    width: 0,
+    height: 0,
+    marginTop: 3,
+    marginLeft: 5,
+    borderTopWidth: 4,
+    borderBottomWidth: 4,
+    borderLeftWidth: 6,
+    borderTopColor: "transparent",
+    borderBottomColor: "transparent"
+  },
+  studioFolderIcon: {
+    width: 20,
+    height: 18,
+    justifyContent: "flex-end"
+  },
+  studioFolderTab: {
+    width: 8,
+    height: 3,
+    marginLeft: 2,
+    borderTopLeftRadius: 2,
+    borderTopRightRadius: 2
+  },
+  studioFolderBody: {
+    width: 20,
+    height: 14,
+    borderWidth: 2,
+    borderRadius: 2
+  },
+  studioUploadIcon: {
+    width: 26,
+    height: 24,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  studioUploadStem: {
+    width: 3,
+    height: 16
+  },
+  studioUploadHead: {
+    position: "absolute",
+    top: 3,
+    width: 11,
+    height: 11,
+    borderLeftWidth: 3,
+    borderTopWidth: 3,
+    transform: [{ rotate: "45deg" }]
   },
   importProgressBackdrop: {
     flex: 1,
@@ -207,11 +302,16 @@ export const styles = StyleSheet.create({
     flexShrink: 0
   },
   photoCard: {
-    gap: 10
+    gap: 10,
+    padding: 10,
+    borderWidth: 1,
+    borderRadius: 8,
+    backgroundColor: colors.background
   },
   thumbnail: {
     width: "100%",
     aspectRatio: 1,
+    borderRadius: 6,
     borderWidth: 1,
     borderColor: colors.line,
     backgroundColor: colors.surface

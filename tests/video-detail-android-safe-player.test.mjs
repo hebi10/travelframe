@@ -11,6 +11,7 @@ for (const snippet of [
   "<VideoPlayerFrame source={videoSource as string} />",
   "nativeControls",
   "contentFit=\"contain\"",
+  "surfaceType=\"textureView\"",
   "useExoShutter",
   "영상을 재생할 파일을 찾지 못했습니다.",
   "onPress={() => router.replace(\"/studio?tab=works\" as Href)}"

@@ -4,7 +4,7 @@ import fs from "node:fs";
 const settingsSource = fs.readFileSync("features/settings/SettingsScreen.tsx", "utf8");
 
 assert.ok(
-  settingsSource.includes('option.value !== "local_only" && !canSelectCloudSaveTarget'),
+  settingsSource.includes("option.requiresBackupPlan && !canSelectCloudSaveTarget"),
   "storage mode cloud backup option should be disabled before Pro"
 );
 assert.ok(

@@ -4,7 +4,7 @@ import { ActivityIndicator, FlatList, Image as NativeImage, Pressable, Text, Vie
 
 import { SectionBlock } from "@/components/section-block";
 import { colors } from "@/constants/app-theme";
-import { PAGE_SIZE_OPTIONS, formatDate, formatDuration, type PageSize, type StudioWorkItem } from "@/features/studio/studio-screen.model";
+import { PAGE_SIZE_OPTIONS, formatDate, formatDuration, type PageSize, type StudioTab, type StudioWorkItem } from "@/features/studio/studio-screen.model";
 import { styles } from "@/features/studio/studio-screen.styles";
 import { useAppAppearance } from "@/lib/app-appearance";
 import type { PhotoItem } from "@/types/photo";
@@ -54,7 +54,7 @@ function PhotoCard({
   };
 
   return (
-    <View style={styles.photoCard}>
+    <View style={[styles.photoCard, { borderColor: palette.line, backgroundColor: palette.background }]}>
       <Pressable onPress={() => router.push(`/photo/${photo.id}` as Href)}>
         <NativeImage
           source={{ uri: photo.uri }}
@@ -106,6 +106,52 @@ function PhotoCard({
           </Text>
         </Pressable>
       </View>
+    </View>
+  );
+}
+
+export function StudioIcon({
+  kind,
+  active = false
+}: {
+  kind: StudioTab | "upload";
+  active?: boolean;
+}) {
+  const { palette } = useAppAppearance();
+  const isDark = palette.background !== colors.background;
+  const iconColor = active && !isDark ? palette.inverse : palette.text;
+  const lineStyle = { borderColor: iconColor, backgroundColor: iconColor };
+
+  if (kind === "videos") {
+    return (
+      <View style={[styles.studioIconBox, { borderColor: iconColor }]}>
+        <View style={[styles.studioIconPlay, { borderLeftColor: iconColor }]} />
+      </View>
+    );
+  }
+
+  if (kind === "works") {
+    return (
+      <View style={styles.studioFolderIcon}>
+        <View style={[styles.studioFolderTab, lineStyle]} />
+        <View style={[styles.studioFolderBody, { borderColor: iconColor }]} />
+      </View>
+    );
+  }
+
+  if (kind === "upload") {
+    return (
+      <View style={styles.studioUploadIcon}>
+        <View style={[styles.studioUploadStem, lineStyle]} />
+        <View style={[styles.studioUploadHead, { borderColor: iconColor }]} />
+      </View>
+    );
+  }
+
+  return (
+    <View style={[styles.studioIconBox, { borderColor: iconColor }]}>
+      <View style={[styles.studioIconDot, lineStyle]} />
+      <View style={[styles.studioIconBase, lineStyle]} />
     </View>
   );
 }

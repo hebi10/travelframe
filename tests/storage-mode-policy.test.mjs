@@ -31,6 +31,7 @@ for (const snippet of [
   "사진과 작업물을 이 핸드폰의 앱 보관함에만 저장합니다.",
   "클라우드 백업",
   "앱 보관함에 저장하고 클라우드 백업 설정이 켜져 있으면 계정에도 백업합니다.",
+  "requiresBackupPlan: true",
   "isCloudBackupStorageMode",
   "isStorageSaverMode",
   "getEffectiveStorageMode"
@@ -98,7 +99,10 @@ for (const snippet of [
   "앱 보관함 / 핸드폰 앨범 / 클라우드",
   "getStorageModeLabel(effectiveStorageMode)",
   "getEffectiveStorageMode",
-  "STORAGE_MODE_OPTIONS"
+  "STORAGE_MODE_OPTIONS",
+  "현재 플랜:",
+  "Pro 전용",
+  "무료 로그인은 앱 보관함에만 저장됩니다."
 ]) {
   assert.ok(settingsSource.includes(snippet), `settings storage mode UI missing: ${snippet}`);
 }

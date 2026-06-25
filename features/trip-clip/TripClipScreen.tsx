@@ -2063,7 +2063,7 @@ export default function TripClipScreen() {
         visible: true,
         percent: 88,
         title: "핸드폰에 저장 중",
-        detail: "완성된 MP4 영상을 앨범에 저장하고 있습니다."
+        detail: "완성된 MP4 영상을 다운로드 폴더에 저장하고 있습니다."
       });
       await saveVideoToLibrary(videoUri);
       setExportProgress({
@@ -2164,8 +2164,8 @@ export default function TripClipScreen() {
         percent: 100,
         title: "저장 완료",
         detail: backupWarning
-          ? "저장한 영상은 핸드폰 갤러리에 저장됐습니다. 클라우드 백업은 나중에 다시 시도할 수 있습니다."
-          : "저장한 영상은 핸드폰 갤러리에 저장됐습니다.",
+          ? "저장한 영상은 핸드폰 다운로드 폴더에 저장됐습니다. 클라우드 백업은 나중에 다시 시도할 수 있습니다."
+          : "저장한 영상은 핸드폰 다운로드 폴더에 저장됐습니다.",
         completedVideoId: savedVideo.id
       });
       await clearTripClipDraft();

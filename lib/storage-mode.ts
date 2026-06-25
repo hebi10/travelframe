@@ -18,7 +18,7 @@ export const STORAGE_MODE_OPTIONS: StorageModeOption[] = [
     value: "local_backup",
     label: "클라우드 백업",
     detail: "앱 보관함에 저장하고 클라우드 백업 설정이 켜져 있으면 계정에도 백업합니다.",
-    requiresBackupPlan: false
+    requiresBackupPlan: true
   }
 ];
 

@@ -15,8 +15,8 @@ const readStyleBlock = (name) => {
 };
 
 assert.ok(
-  tripClipSource.includes("저장한 영상은 핸드폰 갤러리에 저장됐습니다."),
-  "MP4 save completion should mention phone gallery"
+  tripClipSource.includes("저장한 영상은 핸드폰 다운로드 폴더에 저장됐습니다."),
+  "MP4 save completion should mention phone downloads"
 );
 assert.ok(
   tripClipSource.includes("<View\n            style={[\n              styles.exportModalPanel"),

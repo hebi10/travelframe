@@ -45,8 +45,8 @@ export const initialSubscriptionProducts: UserSubscriptionProducts = {
 };
 
 export const signedInBenefits = [
+  "비로그인/무료 로그인: 이미지 100개, 영상 30개, 클라우드 백업 없음",
   "사진 편집과 MP4 영상 주 1회",
-  "앱 내 보관함 이미지 100개, 영상 30개",
   "워터마크 포함, 광고 표시",
   "클라우드 백업은 Pro부터 사용 가능"
 ];
@@ -75,8 +75,7 @@ export const paymentPlans: PaymentPlan[] = [
       "구독 기간 동안 앱 전반의 광고 제거",
       "워터마크/브랜딩 제거",
       "고급 출력 기능과 고해상도 저장",
-      "앱 내 보관함 이미지 200개, 영상 50개, 음악 10개",
-      "서버 백업 총 2GB",
+      "Pro: 이미지 200개, 영상 50개, 음악 10개, 클라우드 백업 2GB",
       "백업/복원 및 기기 변경 시 복원"
     ]
   }

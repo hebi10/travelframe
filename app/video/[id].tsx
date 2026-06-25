@@ -295,6 +295,7 @@ function NativeVideoPlayerFrame({
       style={styles.video}
       nativeControls
       contentFit="contain"
+      surfaceType="textureView"
       fullscreenOptions={{ enable: true }}
       useExoShutter
     />

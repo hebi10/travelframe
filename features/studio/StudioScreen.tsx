@@ -39,7 +39,7 @@ import { deleteImageBundleWork, getImageBundleWorks } from "@/lib/work-library";
 import type { PhotoItem } from "@/types/photo";
 import type { MadeVideoItem } from "@/types/video";
 import type { ImageBundleWorkItem } from "@/types/work";
-import { EmptyState, LibraryErrorState, LoadingState, PageSizeSelector, PaginatedPhotoGrid, UsageBadge, WorkSection } from "@/features/studio/studio-screen.components";
+import { EmptyState, LibraryErrorState, LoadingState, PageSizeSelector, PaginatedPhotoGrid, StudioIcon, UsageBadge, WorkSection } from "@/features/studio/studio-screen.components";
 import { initialBackupOverview, isSyncedPhoto, tabs, type DeleteProgress, type ImportProgress, type PageSize, type StudioTab, type StudioWorkItem } from "@/features/studio/studio-screen.model";
 import { styles } from "@/features/studio/studio-screen.styles";
 
@@ -390,6 +390,10 @@ export default function StudioScreen() {
     borderColor: palette.text,
     backgroundColor: palette.background
   };
+  const importPanelStyle = {
+    borderColor: palette.line,
+    backgroundColor: palette.background
+  };
   const pressedPanelStyle = {
     backgroundColor: palette.surfaceStrong
   };
@@ -417,6 +421,7 @@ export default function StudioScreen() {
               ]}
               onPress={() => setActiveTab(tab.value)}
             >
+              <StudioIcon kind={tab.value} active={isActive} />
               <Text
                 selectable={false}
                 style={[
@@ -448,17 +453,20 @@ export default function StudioScreen() {
               disabled={isImportingImage}
               style={({ pressed }) => [
                 styles.importImageCta,
-                panelStyle,
+                importPanelStyle,
                 pressed && pressedPanelStyle,
                 isImportingImage && styles.disabledAction
               ]}
               onPress={importImageToApp}
             >
-              <View style={styles.clipCopy}>
-                <Text selectable={false} style={styles.clipTitle}>
+              <View style={styles.importIconWrap}>
+                <StudioIcon kind="upload" active />
+              </View>
+              <View style={[styles.clipCopy, styles.importImageCopy]}>
+                <Text selectable={false} style={[styles.clipTitle, styles.importImageTitle]}>
                   앱에 이미지 저장
                 </Text>
-                <Text selectable={false} style={styles.clipDetail}>
+                <Text selectable={false} style={[styles.clipDetail, styles.importImageDetail]}>
                   핸드폰 앨범에서 이미지를 여러 장 골라 앱 사진 목록에 보관합니다.
                 </Text>
               </View>
