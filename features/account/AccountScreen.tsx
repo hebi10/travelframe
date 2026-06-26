@@ -773,6 +773,13 @@ export default function AccountScreen() {
                   <Text selectable style={[styles.benefitText, themed.mutedText]}>
                     {plan.summary}
                   </Text>
+                  <View style={styles.benefitList}>
+                    {plan.benefits.map((benefit) => (
+                      <Text key={benefit} selectable style={[styles.benefitText, themed.mutedText]}>
+                        {benefit}
+                      </Text>
+                    ))}
+                  </View>
                   <View style={[styles.paymentOpenButton, themed.activeFill]}>
                     <Text selectable={false} style={[styles.primaryButtonText, themed.inverseText]}>
                       안내 보기

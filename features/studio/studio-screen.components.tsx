@@ -525,10 +525,7 @@ function WorkCard({
         ) : (
           <View style={styles.videoThumbEmpty} />
         )}
-        <Pressable
-          style={({ pressed }) => [styles.videoCopy, pressed && pressedPanelStyle]}
-          onPress={() => router.push(`/video/${video.id}` as Href)}
-        >
+        <View style={styles.videoCopy}>
           <Text selectable={false} style={styles.videoKind}>
             저장한 영상
           </Text>
@@ -541,7 +538,7 @@ function WorkCard({
           <Text selectable={false} style={styles.metaText}>
             사진 {video.photoIds.length}장 / {video.musicLabel}
           </Text>
-        </Pressable>
+        </View>
         <View style={styles.workActions}>
           <Pressable
             style={styles.workEditButton}

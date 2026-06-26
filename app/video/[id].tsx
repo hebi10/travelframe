@@ -11,6 +11,7 @@ import {
   View
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import Video from "react-native-video";
 
 import { AdBanner } from "@/components/ad-banner";
 import { colors, controls, spacing, typography } from "@/constants/app-theme";
@@ -18,18 +19,6 @@ import { useAuth } from "@/lib/auth-context";
 import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 import { getMadeVideoById } from "@/lib/video-library";
 import type { MadeVideoItem } from "@/types/video";
-
-type ExpoVideoModule = typeof import("expo-video");
-
-const getExpoVideoModule = (): ExpoVideoModule | null => {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    return require("expo-video") as ExpoVideoModule;
-  } catch (error) {
-    console.error("영상 재생 모듈을 불러오지 못했습니다.", error);
-    return null;
-  }
-};
 
 const formatDate = (value: string) =>
   new Intl.DateTimeFormat("ko-KR", {
@@ -217,9 +206,9 @@ export default function VideoDetailScreen() {
 }
 
 function VideoPlayerFrame({ source }: { source: string }) {
-  const expoVideoModule = getExpoVideoModule();
+  const [playbackError, setPlaybackError] = useState(false);
 
-  if (!expoVideoModule) {
+  if (playbackError) {
     return (
       <View style={styles.videoUnavailable}>
         <Text selectable style={styles.videoUnavailableText}>
@@ -237,7 +226,19 @@ function VideoPlayerFrame({ source }: { source: string }) {
     );
   }
 
-  return <NativeVideoPlayerFrame source={source} videoModule={expoVideoModule} />;
+  return (
+    <Video
+      source={{ uri: source }}
+      style={styles.video}
+      controls
+      repeat
+      resizeMode="contain"
+      onError={(error) => {
+        console.error("영상 재생에 실패했습니다.", error);
+        setPlaybackError(true);
+      }}
+    />
+  );
 }
 
 class VideoPlaybackBoundary extends Component<
@@ -275,30 +276,6 @@ class VideoPlaybackBoundary extends Component<
 
     return this.props.children;
   }
-}
-
-function NativeVideoPlayerFrame({
-  source,
-  videoModule
-}: {
-  source: string;
-  videoModule: ExpoVideoModule;
-}) {
-  const { useVideoPlayer, VideoView } = videoModule;
-  const player = useVideoPlayer(source, (instance) => {
-    instance.loop = true;
-  });
-
-  return (
-    <VideoView
-      player={player}
-      style={styles.video}
-      nativeControls
-      contentFit="contain"
-      fullscreenOptions={{ enable: true }}
-      useExoShutter
-    />
-  );
 }
 
 function MetaRow({ label, value }: { label: string; value: string }) {
