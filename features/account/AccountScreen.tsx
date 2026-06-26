@@ -299,14 +299,25 @@ export default function AccountScreen() {
 
   const getPaymentProductId = (
     plan: PaymentPlan
-  ): Exclude<SubscriptionProductId, "free"> =>
-    plan.id === "adRemove" ? "ad_remove" : "creator_monthly";
+  ): Exclude<SubscriptionProductId, "free"> => {
+    if (plan.id === "adRemove") {
+      return "ad_remove";
+    }
+
+    if (plan.id === "expert") {
+      return "expert_monthly";
+    }
+
+    return "creator_monthly";
+  };
 
   const getPaymentActionLabel = (plan: PaymentPlan) =>
     getPaymentPlanStatus(plan).active
       ? "사용 중"
       : plan.id === "adRemove"
         ? "구매하기"
+        : plan.id === "expert" && effectiveSubscriptionProducts.creatorMonthly
+          ? "업그레이드"
         : "구독하기";
 
   const handlePaymentPurchase = async () => {
@@ -350,13 +361,26 @@ export default function AccountScreen() {
       };
     }
 
-    return {
-      active: Boolean(
-        effectiveSubscriptionProducts.creatorMonthly || effectiveSubscriptionProducts.expertMonthly
-      ),
-      label:
-        effectiveSubscriptionProducts.creatorMonthly || effectiveSubscriptionProducts.expertMonthly
+    if (plan.id === "creator") {
+      return {
+        active: Boolean(
+          effectiveSubscriptionProducts.creatorMonthly ||
+            effectiveSubscriptionProducts.expertMonthly
+        ),
+        label: effectiveSubscriptionProducts.creatorMonthly
           ? "구독 중"
+          : effectiveSubscriptionProducts.expertMonthly
+            ? "Expert 포함"
+            : "미구독"
+      };
+    }
+
+    return {
+      active: Boolean(effectiveSubscriptionProducts.expertMonthly),
+      label: effectiveSubscriptionProducts.expertMonthly
+        ? "구독 중"
+        : effectiveSubscriptionProducts.creatorMonthly
+          ? "업그레이드"
           : "미구독"
     };
   };
@@ -605,6 +629,18 @@ export default function AccountScreen() {
                     ? "확인 중..."
                     : effectiveSubscriptionProducts.creatorMonthly ||
                       effectiveSubscriptionProducts.expertMonthly
+                      ? "구독 중"
+                      : "미구독"
+                }
+              />
+              <InfoRow
+                label="Expert"
+                value={
+                  isSubscriptionCheckFailed
+                    ? "확인 불가"
+                    : isSubscriptionProductsLoading
+                    ? "확인 중..."
+                    : effectiveSubscriptionProducts.expertMonthly
                       ? "구독 중"
                       : "미구독"
                 }

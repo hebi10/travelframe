@@ -2,7 +2,7 @@ import type { CloudBackupOverview } from "@/lib/cloud-backup";
 import type { UserSubscriptionProducts } from "@/lib/subscription";
 
 export type AuthMode = "signIn" | "signUp" | "recover";
-export type PaymentPlanId = "adRemove" | "creator";
+export type PaymentPlanId = "adRemove" | "creator" | "expert";
 
 export type PaymentPlan = {
   id: PaymentPlanId;
@@ -77,6 +77,19 @@ export const paymentPlans: PaymentPlan[] = [
       "고급 출력 기능과 고해상도 저장",
       "Pro: 이미지 200개, 영상 50개, 음악 10개, 클라우드 백업 2GB",
       "백업/복원 및 기기 변경 시 복원"
+    ]
+  },
+  {
+    id: "expert",
+    title: "Expert",
+    price: "1,990원",
+    billing: "월 결제",
+    summary: "Expert는 Pro 기능에 더 큰 저장 한도와 주 30회 영상 출력을 제공합니다.",
+    benefits: [
+      "영상 출력 주 30회",
+      "광고 제거, 워터마크 제거, 고급 출력",
+      "이미지 300개, 영상 100개, 음악 20개, 클라우드 백업 5GB",
+      "Pro 기능 모두 포함"
     ]
   }
 ];

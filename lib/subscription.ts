@@ -238,7 +238,7 @@ const checkoutProductCopy: Record<
   },
   expert_monthly: {
     productName: "Expert",
-    priceLabel: "5,900원",
+    priceLabel: "1,990원",
     expiresAt: null
   }
 };

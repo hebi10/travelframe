@@ -2,7 +2,7 @@ import { Feather } from "@expo/vector-icons";
 import { Link, type Href } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { colors, controls, typography } from "@/constants/app-theme";
+import { colors, typography } from "@/constants/app-theme";
 import { useAppAppearance } from "@/lib/app-appearance";
 
 type ActionRowProps = {
@@ -13,17 +13,15 @@ type ActionRowProps = {
   onPress?: () => void;
 };
 
-export function ActionRow({ href, label, detail, mark = ">", onPress }: ActionRowProps) {
+export function ActionRow({ href, label, mark = ">", onPress }: ActionRowProps) {
   const { palette, fontSizeScale, layoutScale, emphasisWeight, fontFamily } = useAppAppearance();
-  const isDark = palette.background !== colors.background;
   const content = (
     <Pressable
       style={[
         styles.row,
         {
-          minHeight: Math.round(96 * layoutScale),
-          paddingVertical: Math.round(15 * layoutScale),
-          paddingHorizontal: Math.round(14 * layoutScale),
+          minHeight: Math.round(54 * layoutScale),
+          paddingVertical: Math.round(10 * layoutScale),
           borderColor: palette.line,
           backgroundColor: palette.background
         }
@@ -46,11 +44,15 @@ export function ActionRow({ href, label, detail, mark = ">", onPress }: ActionRo
         >
           {label}
         </Text>
-        {detail ? (
+      </View>
+      <View style={styles.markBox}>
+        {mark === ">" ? (
+          <Feather name="chevron-right" color={palette.muted} size={18} />
+        ) : (
           <Text
-            selectable
+            selectable={false}
             style={[
-              styles.detail,
+              styles.markText,
               {
                 color: palette.muted,
                 fontSize: Math.round(typography.small * fontSizeScale),
@@ -59,36 +61,7 @@ export function ActionRow({ href, label, detail, mark = ">", onPress }: ActionRo
                 fontWeight: "700"
               }
             ]}
-          >
-            {detail}
-          </Text>
-        ) : null}
-      </View>
-      <View
-        style={[
-          styles.markBox,
-          {
-            minHeight: Math.round(controls.compactHeight * layoutScale),
-            borderColor: palette.text,
-            backgroundColor: isDark ? "transparent" : palette.text
-          }
-        ]}
-      >
-        {mark === ">" ? (
-          <Feather name="chevron-right" color={isDark ? palette.text : palette.inverse} size={16} />
-        ) : (
-          <Text
-            selectable={false}
-            style={[
-              styles.markText,
-              {
-                color: isDark ? palette.text : palette.inverse,
-                fontSize: Math.round(typography.button * fontSizeScale),
-                lineHeight: Math.round(18 * fontSizeScale),
-                fontFamily,
-                fontWeight: emphasisWeight
-              }
-            ]}
+            numberOfLines={1}
           >
             {mark}
           </Text>
@@ -110,11 +83,14 @@ export function ActionRow({ href, label, detail, mark = ">", onPress }: ActionRo
 
 const styles = StyleSheet.create({
   row: {
-    gap: 12,
-    borderWidth: 1
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    borderBottomWidth: 1
   },
   copy: {
-    gap: 4
+    flex: 1,
+    minWidth: 0
   },
   label: {
     fontSize: typography.body,
@@ -122,21 +98,15 @@ const styles = StyleSheet.create({
     lineHeight: 21,
     letterSpacing: 0
   },
-  detail: {
-    fontSize: typography.small,
-    lineHeight: 18,
-    letterSpacing: 0
-  },
   markBox: {
-    minHeight: controls.compactHeight,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1
+    maxWidth: "56%"
   },
   markText: {
-    fontSize: typography.button,
-    fontWeight: "800",
-    textAlign: "center",
+    fontSize: typography.small,
+    fontWeight: "700",
+    textAlign: "right",
     lineHeight: 18,
     letterSpacing: 0
   }

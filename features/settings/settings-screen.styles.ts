@@ -320,16 +320,6 @@ export const styles = StyleSheet.create({
     height: "48%",
     backgroundColor: "#161817"
   },
-  guidePreviewSubject: {
-    position: "absolute",
-    left: "38%",
-    bottom: 30,
-    width: "24%",
-    height: "42%",
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.38)",
-    backgroundColor: "rgba(255, 255, 255, 0.12)"
-  },
   guidePreviewDisabled: {
     ...StyleSheet.absoluteFillObject,
     alignItems: "center",

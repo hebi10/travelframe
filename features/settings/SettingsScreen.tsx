@@ -173,6 +173,11 @@ export default function SettingsScreen() {
     () => getPlanEntitlements({ isLoggedIn, subscription }),
     [isLoggedIn, subscription]
   );
+  const planBadgeLabel = isLoggedIn
+    ? planEntitlements.canBackupToCloud
+      ? "Pro 이상"
+      : planEntitlements.label
+    : "무료";
   const canSelectCloudSaveTarget = planEntitlements.canBackupToCloud;
   const localImageUsage = usageStats.photos + usageStats.imageBundles;
   const effectiveStorageMode = getEffectiveStorageMode(
@@ -877,7 +882,7 @@ export default function SettingsScreen() {
                     isLoggedIn && themed.inverseText
                   ]}
                 >
-                  {isLoggedIn ? "전체" : "무료"}
+                  {planBadgeLabel}
                 </Text>
               </View>
             </View>
@@ -1189,7 +1194,6 @@ export default function SettingsScreen() {
               <View style={styles.guidePreviewFrame}>
                 <View style={styles.guidePreviewSky} />
                 <View style={styles.guidePreviewGround} />
-                <View style={styles.guidePreviewSubject} />
                 <CameraGuideOverlay
                   guide={settings.defaultGuide}
                   visible={settings.guideVisible}
