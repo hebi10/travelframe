@@ -18,6 +18,10 @@ export type PlanEntitlements = {
 };
 
 export const GIB = 1024 * 1024 * 1024;
+const isLocalCheckoutEnabled =
+  typeof __DEV__ !== "undefined" &&
+  __DEV__ &&
+  process.env.EXPO_PUBLIC_ENABLE_LOCAL_CHECKOUT === "true";
 
 export const PLAN_ENTITLEMENTS: Record<PlanTier, PlanEntitlements> = {
   guest: {
@@ -111,6 +115,7 @@ const isActivePremiumProduct = (
     !subscription ||
     subscription.plan !== "premium" ||
     subscription.status !== "active" ||
+    (subscription.provider === "local_checkout" && !isLocalCheckoutEnabled) ||
     normalizedProductId !== productId
   ) {
     return false;

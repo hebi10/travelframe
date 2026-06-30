@@ -6,6 +6,11 @@ export const emptySubscriptionProducts: UserSubscriptionProducts = {
   expertMonthly: null
 };
 
+const isLocalCheckoutEnabled =
+  typeof __DEV__ !== "undefined" &&
+  __DEV__ &&
+  process.env.EXPO_PUBLIC_ENABLE_LOCAL_CHECKOUT === "true";
+
 const isActivePremiumProduct = (
   subscription: UserSubscription | null,
   productId: "ad_remove" | "creator_monthly" | "expert_monthly"
@@ -25,6 +30,7 @@ const isActivePremiumProduct = (
     !subscription ||
     subscription.plan !== "premium" ||
     subscription.status !== "active" ||
+    (subscription.provider === "local_checkout" && !isLocalCheckoutEnabled) ||
     normalizedProductId !== productId
   ) {
     return false;

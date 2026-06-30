@@ -2,12 +2,31 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const subscriptionSource = fs.readFileSync("lib/subscription.ts", "utf8");
+const planEntitlementsSource = fs.readFileSync("lib/plan-entitlements.ts", "utf8");
+const subscriptionProductsSource = fs.readFileSync("lib/subscription-products.ts", "utf8");
 
 assert.match(
   subscriptionSource,
-  /export const isLocalCheckoutEnabled =\s*__DEV__ && process\.env\.EXPO_PUBLIC_ENABLE_LOCAL_CHECKOUT === "true"/,
+  /export const isLocalCheckoutEnabled =\s*typeof __DEV__ !== "undefined" &&\s*__DEV__ &&\s*process\.env\.EXPO_PUBLIC_ENABLE_LOCAL_CHECKOUT === "true"/,
   "local checkout should only be enabled in explicit development builds"
 );
+
+assert.match(
+  subscriptionSource,
+  /subscription\.provider === "local_checkout" && !isLocalCheckoutEnabled/,
+  "local checkout provider should not count as a premium subscription when the dev gate is off"
+);
+
+for (const [name, source] of [
+  ["plan entitlements", planEntitlementsSource],
+  ["subscription products", subscriptionProductsSource]
+]) {
+  assert.match(
+    source,
+    /subscription\.provider === "local_checkout" && !isLocalCheckoutEnabled/,
+    `${name} should reject local checkout premium access when the dev gate is off`
+  );
+}
 
 assert.doesNotMatch(
   subscriptionSource,

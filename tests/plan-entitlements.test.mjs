@@ -54,6 +54,16 @@ assert.equal(
   getPlanTier({ isLoggedIn: true, subscription: activeSubscription("expert_monthly") }),
   "expert"
 );
+assert.equal(
+  getPlanTier({
+    isLoggedIn: true,
+    subscription: {
+      ...activeSubscription("creator_monthly"),
+      provider: "local_checkout"
+    }
+  }),
+  "free"
+);
 
 assert.equal(PLAN_ENTITLEMENTS.guest.canExportVideo, false);
 assert.equal(PLAN_ENTITLEMENTS.guest.localImageLimit, 100);

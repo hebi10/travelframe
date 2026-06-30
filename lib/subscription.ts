@@ -39,7 +39,9 @@ export type UserSubscriptionState = {
 };
 
 export const isLocalCheckoutEnabled =
-  __DEV__ && process.env.EXPO_PUBLIC_ENABLE_LOCAL_CHECKOUT === "true";
+  typeof __DEV__ !== "undefined" &&
+  __DEV__ &&
+  process.env.EXPO_PUBLIC_ENABLE_LOCAL_CHECKOUT === "true";
 
 const createSubscriptionStorageKey = (uid: string) =>
   `travel-frame.subscription.${uid}.v1`;
@@ -77,6 +79,10 @@ export const freeSubscription: UserSubscription = {
 
 export const isPremiumSubscription = (subscription: UserSubscription | null) => {
   if (!subscription || subscription.plan !== "premium" || subscription.status !== "active") {
+    return false;
+  }
+
+  if (subscription.provider === "local_checkout" && !isLocalCheckoutEnabled) {
     return false;
   }
 
