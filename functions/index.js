@@ -25,8 +25,11 @@ admin.initializeApp();
 const db = admin.firestore();
 const bucket = admin.storage().bucket();
 const FieldValue = admin.firestore.FieldValue;
-// Enable only after the Android client initializes Firebase App Check.
-const CALLABLE_RUNTIME_OPTIONS = process.env.FUNCTIONS_ENFORCE_APP_CHECK === "true"
+const SHOULD_ENFORCE_APP_CHECK =
+  process.env.FUNCTIONS_EMULATOR === "true"
+    ? process.env.FUNCTIONS_ENFORCE_APP_CHECK === "true"
+    : process.env.FUNCTIONS_ENFORCE_APP_CHECK !== "false";
+const CALLABLE_RUNTIME_OPTIONS = SHOULD_ENFORCE_APP_CHECK
   ? { enforceAppCheck: true }
   : {};
 const secureOnCall = (handler) => onCall(CALLABLE_RUNTIME_OPTIONS, handler);
@@ -236,8 +239,8 @@ const ADMIN_PRODUCT_META = {
     priceLabel: "월 990원"
   },
   expert_monthly: {
-    productName: "전문가",
-    priceLabel: "월 9,900원"
+    productName: "Expert",
+    priceLabel: "월 1,990원"
   }
 };
 const ADMIN_PRODUCT_IDS = Object.keys(ADMIN_PRODUCT_META);

@@ -412,6 +412,7 @@ export default function TripClipScreen() {
     useState<WeeklyVideoExportUsage | null>(null);
   const [exportProgress, setExportProgress] =
     useState<ExportProgress>(initialExportProgress);
+  const [isPostSaveAdPending, setIsPostSaveAdPending] = useState(false);
   const [isPostSaveAdVisible, setIsPostSaveAdVisible] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const [progressSeconds, setProgressSeconds] = useState(0);
@@ -2063,7 +2064,7 @@ export default function TripClipScreen() {
         visible: true,
         percent: 88,
         title: "핸드폰에 저장 중",
-        detail: "완성된 MP4 영상을 다운로드 폴더에 저장하고 있습니다."
+        detail: "완성된 MP4 영상을 핸드폰에 저장하고 있습니다."
       });
       await saveVideoToLibrary(videoUri);
       setExportProgress({
@@ -2164,8 +2165,8 @@ export default function TripClipScreen() {
         percent: 100,
         title: "저장 완료",
         detail: backupWarning
-          ? "저장한 영상은 핸드폰 다운로드 폴더에 저장됐습니다. 클라우드 백업은 나중에 다시 시도할 수 있습니다."
-          : "저장한 영상은 핸드폰 다운로드 폴더에 저장됐습니다.",
+          ? "저장한 영상은 핸드폰에 저장됐습니다. 클라우드 백업은 나중에 다시 시도할 수 있습니다."
+          : "저장한 영상은 핸드폰에 저장됐습니다.",
         completedVideoId: savedVideo.id
       });
       await clearTripClipDraft();
@@ -2180,9 +2181,10 @@ export default function TripClipScreen() {
         return;
       }
       if (planEntitlements.showAds) {
-        setIsPostSaveAdVisible(true);
+        setIsPostSaveAdPending(true);
       }
     } catch (error) {
+      setIsPostSaveAdPending(false);
       if (weeklyExportReservationId && user && !weeklyExportSaveSucceeded) {
         await releaseWeeklyVideoExport(user, weeklyExportReservationId).catch(() => null);
       }
@@ -2252,6 +2254,18 @@ export default function TripClipScreen() {
       setExportMessage(getUserFacingErrorMessage(error, "공유하지 못했습니다."));
     } finally {
       setIsExporting(false);
+    }
+  };
+
+  const closeExportProgress = () => {
+    const shouldShowPostSaveAd =
+      Boolean(exportProgress.completedVideoId) && isPostSaveAdPending;
+
+    setExportProgress(initialExportProgress);
+    setIsPostSaveAdPending(false);
+
+    if (shouldShowPostSaveAd) {
+      setIsPostSaveAdVisible(true);
     }
   };
 
@@ -2624,7 +2638,7 @@ export default function TripClipScreen() {
         animationType="fade"
         onRequestClose={() => {
           if (!isExporting) {
-            setExportProgress(initialExportProgress);
+            closeExportProgress();
           }
         }}
       >
@@ -2683,9 +2697,11 @@ export default function TripClipScreen() {
                 {exportProgress.completedVideoId ? (
                   <Pressable
                     style={styles.primaryButton}
-                    onPress={() =>
-                      router.replace("/studio?tab=works" as Href)
-                    }
+                    onPress={() => {
+                      setIsPostSaveAdPending(false);
+                      setExportProgress(initialExportProgress);
+                      router.replace("/studio?tab=works" as Href);
+                    }}
                   >
                     <Text selectable={false} style={styles.primaryButtonText}>
                       작업물로 이동
@@ -2697,7 +2713,7 @@ export default function TripClipScreen() {
                     exportProgress.error ? styles.primaryButton : styles.secondaryButton,
                     styles.exportModalButton
                   ]}
-                  onPress={() => setExportProgress(initialExportProgress)}
+                  onPress={closeExportProgress}
                 >
                   <Text
                     selectable={false}

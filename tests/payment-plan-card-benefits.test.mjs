@@ -22,8 +22,8 @@ assert.ok(
 );
 
 assert.ok(
-  /id:\s*"expert"[\s\S]*?price:\s*"1,990원"/.test(constantsSource),
-  "Expert payment plan should show the 1,990 won price"
+  /id:\s*"expert"[\s\S]*?price:\s*"월 1,990원"/.test(constantsSource),
+  "Expert payment plan should show the monthly 1,990 won price"
 );
 
 assert.ok(

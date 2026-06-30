@@ -82,7 +82,7 @@ export const paymentPlans: PaymentPlan[] = [
   {
     id: "expert",
     title: "Expert",
-    price: "1,990원",
+    price: "월 1,990원",
     billing: "월 결제",
     summary: "Expert는 Pro 기능에 더 큰 저장 한도와 주 30회 영상 출력을 제공합니다.",
     benefits: [

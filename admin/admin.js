@@ -117,7 +117,7 @@ const productMeta = {
     statusId: "expertMonthlyStatusLabel",
     detailId: "expertMonthlyDetail",
     productName: "Expert",
-    priceLabel: "월 9,900원",
+    priceLabel: "월 1,990원",
     description: "월결제 상품입니다. 활성 상태면 주 30개 영상 출력, 5GiB 백업, 음악 20개 혜택이 적용됩니다."
   }
 };

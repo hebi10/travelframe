@@ -160,6 +160,13 @@ const saveImageToAndroidDownload = async (
 const saveVideoToAndroidDownload = async (uri: string) =>
   saveFileToAndroidDownload(uri, "video/mp4", "travel-frame-video");
 
+const saveVideoToAndroidAlbum = async (uri: string) => {
+  const MediaLibrary = await requestSavePermission("video");
+  assertCanSaveToMediaLibrary(MediaLibrary);
+  await MediaLibrary.saveToLibraryAsync(uri);
+  return uri;
+};
+
 const saveFileToAndroidDownload = async (
   uri: string,
   mimeType: string,
@@ -254,7 +261,22 @@ export const prepareImageForLibrarySave = async (
 export const saveVideoToLibrary = async (uri: string) => {
   try {
     if (Platform.OS === "android") {
-      return await saveVideoToAndroidDownload(uri);
+      try {
+        return await saveVideoToAndroidAlbum(uri);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error ?? "");
+
+        if (
+          message.includes(MEDIA_LIBRARY_SAVE_UNAVAILABLE_MESSAGE) ||
+          message.includes("Expo Go can no longer provide full access") ||
+          message.includes("requestPermissionsAsync has been rejected") ||
+          message.includes("saveToLibraryAsync is not a function")
+        ) {
+          return await saveVideoToAndroidDownload(uri);
+        }
+
+        throw error;
+      }
     }
 
     const MediaLibrary = await requestSavePermission("video");

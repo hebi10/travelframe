@@ -38,6 +38,9 @@ export type UserSubscriptionState = {
   subscriptionStatus: Exclude<SubscriptionCheckStatus, "loading">;
 };
 
+export const isLocalCheckoutEnabled =
+  __DEV__ && process.env.EXPO_PUBLIC_ENABLE_LOCAL_CHECKOUT === "true";
+
 const createSubscriptionStorageKey = (uid: string) =>
   `travel-frame.subscription.${uid}.v1`;
 
@@ -201,16 +204,11 @@ export const getUserSubscriptionState = async (
 
   try {
     const verifiedSubscription = await getVerifiedSubscriptionFromFirestore(user);
-    // ponytail: local checkout preview; remove this fallback when Play verification writes server subscriptions.
-    const effectiveSubscription =
-      isPremiumSubscription(cachedSubscription) && !isPremiumSubscription(verifiedSubscription)
-        ? cachedSubscription
-        : verifiedSubscription;
-    await saveLocalSubscription(user.uid, effectiveSubscription);
+    await saveLocalSubscription(user.uid, verifiedSubscription);
 
     return {
-      verifiedSubscription: effectiveSubscription,
-      cachedSubscription: effectiveSubscription,
+      verifiedSubscription,
+      cachedSubscription: verifiedSubscription,
       subscriptionStatus: "verified"
     };
   } catch {
@@ -233,12 +231,12 @@ const checkoutProductCopy: Record<
   },
   creator_monthly: {
     productName: "Pro",
-    priceLabel: "4,990원",
+    priceLabel: "월 990원",
     expiresAt: null
   },
   expert_monthly: {
     productName: "Expert",
-    priceLabel: "1,990원",
+    priceLabel: "월 1,990원",
     expiresAt: null
   }
 };
@@ -247,6 +245,10 @@ export const saveLocalCheckoutSubscription = async (
   uid: string,
   productId: Exclude<SubscriptionProductId, "free">
 ) => {
+  if (!isLocalCheckoutEnabled) {
+    throw new Error("결제 기능은 출시 준비 중입니다.");
+  }
+
   const product = checkoutProductCopy[productId];
   const subscription: UserSubscription = {
     plan: "premium",
