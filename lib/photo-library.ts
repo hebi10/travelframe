@@ -51,7 +51,7 @@ const ratioPresets = [
 
 const getPhotoDirectory = () => {
   if (!FileSystem.documentDirectory) {
-    throw new Error("??湲곌린?먯꽌???뚯씪 ??μ냼瑜??ъ슜?????놁뒿?덈떎.");
+    throw new Error("이 기기에서는 파일 저장소를 사용할 수 없습니다.");
   }
 
   return `${FileSystem.documentDirectory}${PHOTO_DIRECTORY}`;
@@ -65,7 +65,7 @@ const ensurePhotoDirectory = async () => {
 
 const getPhotoPreviewDirectory = () => {
   if (!FileSystem.documentDirectory) {
-    throw new Error("??湲곌린?먯꽌???뚯씪 ??μ냼瑜??ъ슜?????놁뒿?덈떎.");
+    throw new Error("이 기기에서는 파일 저장소를 사용할 수 없습니다.");
   }
 
   return `${FileSystem.documentDirectory}${PHOTO_PREVIEW_DIRECTORY}`;
@@ -79,7 +79,7 @@ const ensurePhotoPreviewDirectory = async () => {
 
 const getCaptureDraftDirectory = () => {
   if (!FileSystem.documentDirectory) {
-    throw new Error("??湲곌린?먯꽌???뚯씪 ??μ냼瑜??ъ슜?????놁뒿?덈떎.");
+    throw new Error("이 기기에서는 파일 저장소를 사용할 수 없습니다.");
   }
 
   return `${FileSystem.documentDirectory}${CAPTURE_DRAFT_DIRECTORY}`;

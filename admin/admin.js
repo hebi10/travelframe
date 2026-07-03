@@ -665,7 +665,7 @@ const renderUserList = () => {
 const loadUsers = async () => {
   setMessage("userListMessage", "사용자 목록을 불러오는 중입니다.");
   try {
-    const snapshot = await getDocs(collection(db, "users"));
+    const snapshot = await getDocs(query(collection(db, "users"), limit(usersPageSize)));
     allUsers = sortUsers(
       snapshot.docs.map((item) => ({
         id: item.id,
@@ -675,7 +675,7 @@ const loadUsers = async () => {
     renderUserList();
     setMessage(
       "userListMessage",
-      allUsers.length ? `${allUsers.length}명의 사용자를 불러왔습니다.` : "아직 가입한 사용자가 없습니다."
+      allUsers.length ? `최근 사용자 ${allUsers.length}명을 불러왔습니다. 더 찾으려면 검색해 주세요.` : "아직 표시할 사용자가 없습니다."
     );
   } catch (error) {
     setMessage("userListMessage", error?.message ?? "사용자 목록을 불러오지 못했습니다.");

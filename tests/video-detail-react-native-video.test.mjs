@@ -31,4 +31,20 @@ assert.ok(
   "video detail should render the react-native-video component"
 );
 
-console.log("ok - video detail uses react-native-video");
+assert.match(
+  source,
+  /const loadVideoRequestRef = useRef\(0\);/,
+  "video detail should track the latest load request"
+);
+assert.match(
+  source,
+  /if \(loadVideoRequestRef\.current !== requestId\)/,
+  "video detail should ignore stale async load results"
+);
+assert.match(
+  source,
+  /if \(!id\) \{[\s\S]*?setVideo\(null\);[\s\S]*?setIsLoading\(false\);/,
+  "video detail should clear stale video state when no id is available"
+);
+
+console.log("ok - video detail uses react-native-video and guards stale loads");

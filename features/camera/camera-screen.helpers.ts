@@ -19,6 +19,62 @@ const GUIDE_SHAPE_POINT_MAX_PERCENT = 98;
 type CameraFrame = { width: number; height: number };
 type GuideOffset = { x: number; y: number };
 
+export function getConstrainedGuideControlFrame(
+  frame: CameraFrame,
+  aspectRatio?: number | null
+) {
+  if (
+    frame.width <= 0 ||
+    frame.height <= 0 ||
+    !aspectRatio ||
+    !Number.isFinite(aspectRatio) ||
+    aspectRatio <= 0
+  ) {
+    return { left: 0, top: 0, width: frame.width, height: frame.height };
+  }
+
+  const heightFromWidth = frame.width / aspectRatio;
+  if (heightFromWidth <= frame.height) {
+    return {
+      left: 0,
+      top: (frame.height - heightFromWidth) / 2,
+      width: frame.width,
+      height: heightFromWidth
+    };
+  }
+
+  const widthFromHeight = frame.height * aspectRatio;
+  return {
+    left: (frame.width - widthFromHeight) / 2,
+    top: 0,
+    width: widthFromHeight,
+    height: frame.height
+  };
+}
+
+export function getGridGuideControlPoint({
+  x,
+  y,
+  frame,
+  aspectRatio
+}: {
+  x: number;
+  y: number;
+  frame: CameraFrame;
+  aspectRatio?: number | null;
+}) {
+  const controlFrame = getConstrainedGuideControlFrame(frame, aspectRatio);
+
+  return {
+    x: Math.max(0, Math.min(controlFrame.width, x - controlFrame.left)),
+    y: Math.max(0, Math.min(controlFrame.height, y - controlFrame.top)),
+    frame: {
+      width: controlFrame.width,
+      height: controlFrame.height
+    }
+  };
+}
+
 export function getDefaultGridGuideLinePositions(size: number): GridGuideLinePositions {
   const safeGridSize = Math.max(GUIDE_SIZE_MIN, Math.min(GUIDE_SIZE_MAX, size));
   const inset = Math.round(((100 - safeGridSize) / 2) * 10) / 10;

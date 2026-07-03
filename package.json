@@ -24,7 +24,7 @@
     "format:check": "npm run lint",
     "test": "node scripts/run-tests.mjs",
     "test:firebase-rules": "node scripts/run-firebase-rules-tests.mjs",
-    "quality": "npm run typecheck && npm run format:check && npm test && npm run security:secrets",
+    "quality": "npm run typecheck && npm run format:check && npm test && npm run security:secrets && npm run quality:firebase-rules",
     "quality:functions": "npm --prefix functions run quality",
     "quality:firebase-rules": "npm run test:firebase-rules",
     "release:check": "node scripts/check-release-config.mjs",

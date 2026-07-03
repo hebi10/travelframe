@@ -156,10 +156,10 @@ export const defaultCloudBackupTargets: CloudBackupTargets = {
 const cameraSaveScopeTargets: Record<CameraSaveScope, CameraSaveTargets> = {
   app: { app: true, device: false, cloud: false },
   device: { app: false, device: true, cloud: false },
-  cloud: { app: false, device: false, cloud: true },
+  cloud: { app: true, device: false, cloud: true },
   app_device: { app: true, device: true, cloud: false },
   app_cloud: { app: true, device: false, cloud: true },
-  device_cloud: { app: false, device: true, cloud: true },
+  device_cloud: { app: true, device: true, cloud: true },
   all: { app: true, device: true, cloud: true }
 };
 
@@ -178,10 +178,10 @@ export const createCameraSaveScope = (targets: CameraSaveTargets): CameraSaveSco
     return "app_cloud";
   }
   if (targets.device && targets.cloud) {
-    return "device_cloud";
+    return "all";
   }
   if (targets.cloud) {
-    return "cloud";
+    return "app_cloud";
   }
   if (targets.device) {
     return "device";

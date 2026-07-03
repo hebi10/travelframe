@@ -2,7 +2,7 @@ import { Feather } from "@expo/vector-icons";
 import { Link, type Href } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { colors, typography } from "@/constants/app-theme";
+import { typography } from "@/constants/app-theme";
 import { useAppAppearance } from "@/lib/app-appearance";
 
 type ActionRowProps = {
@@ -13,7 +13,7 @@ type ActionRowProps = {
   onPress?: () => void;
 };
 
-export function ActionRow({ href, label, mark = ">", onPress }: ActionRowProps) {
+export function ActionRow({ href, label, detail, mark = ">", onPress }: ActionRowProps) {
   const { palette, fontSizeScale, layoutScale, emphasisWeight, fontFamily } = useAppAppearance();
   const content = (
     <Pressable
@@ -44,6 +44,22 @@ export function ActionRow({ href, label, mark = ">", onPress }: ActionRowProps) 
         >
           {label}
         </Text>
+        {detail ? (
+          <Text
+            selectable
+            style={[
+              styles.detail,
+              {
+                color: palette.muted,
+                fontSize: Math.round(typography.small * fontSizeScale),
+                lineHeight: Math.round(18 * fontSizeScale),
+                fontFamily
+              }
+            ]}
+          >
+            {detail}
+          </Text>
+        ) : null}
       </View>
       <View style={styles.markBox}>
         {mark === ">" ? (
@@ -96,6 +112,12 @@ const styles = StyleSheet.create({
     fontSize: typography.body,
     fontWeight: "800",
     lineHeight: 21,
+    letterSpacing: 0
+  },
+  detail: {
+    fontSize: typography.small,
+    fontWeight: "400",
+    lineHeight: 18,
     letterSpacing: 0
   },
   markBox: {

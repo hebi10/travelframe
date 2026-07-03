@@ -73,8 +73,8 @@ export const freeSubscription: UserSubscription = {
   startedAt: null,
   expiresAt: null,
   lastPaymentAt: null,
-  priceLabel: "臾대즺",
-  productName: "臾대즺 ?뚮옖"
+  priceLabel: "무료",
+  productName: "무료 플랜"
 };
 
 export const isPremiumSubscription = (subscription: UserSubscription | null) => {

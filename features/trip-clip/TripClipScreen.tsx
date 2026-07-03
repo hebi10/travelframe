@@ -755,9 +755,11 @@ export default function TripClipScreen() {
     Alert.alert(
       "로그인이 필요합니다",
       "동영상 만들기는 로그인 후 주 1회 무료로 사용할 수 있습니다.",
-      [{ text: "확인", onPress: () => router.replace("/account" as Href) }]
+      [
+        { text: "나중에", style: "cancel" },
+        { text: "로그인하기", onPress: () => router.push("/account" as Href) }
+      ]
     );
-    router.replace("/account" as Href);
   }, [canUseVideoCreation, isAuthLoading]);
 
   const handleHeaderSavePress = () => {

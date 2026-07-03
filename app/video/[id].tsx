@@ -1,6 +1,6 @@
 import { Image } from "expo-image";
 import { Stack, router, type Href, useFocusEffect, useLocalSearchParams } from "expo-router";
-import { Component, type ReactNode, useCallback, useState } from "react";
+import { Component, type ReactNode, useCallback, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -45,11 +45,16 @@ export default function VideoDetailScreen() {
   const [video, setVideo] = useState<MadeVideoItem | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
+  const loadVideoRequestRef = useRef(0);
   const videoSource = video?.uri || null;
   const hasPlayableVideoSource = Boolean(videoSource);
 
   const loadVideo = useCallback(async () => {
+    const requestId = loadVideoRequestRef.current + 1;
+    loadVideoRequestRef.current = requestId;
+
     if (!id) {
+      setVideo(null);
       setIsLoading(false);
       return;
     }
@@ -57,12 +62,21 @@ export default function VideoDetailScreen() {
     try {
       setIsLoading(true);
       setMessage(null);
+      setVideo(null);
       const storedVideo = await getMadeVideoById(id);
+      if (loadVideoRequestRef.current !== requestId) {
+        return;
+      }
       setVideo(storedVideo);
     } catch (error) {
+      if (loadVideoRequestRef.current !== requestId) {
+        return;
+      }
       setMessage(getUserFacingErrorMessage(error, "영상을 불러오지 못했습니다."));
     } finally {
-      setIsLoading(false);
+      if (loadVideoRequestRef.current === requestId) {
+        setIsLoading(false);
+      }
     }
   }, [id]);
 

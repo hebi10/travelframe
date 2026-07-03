@@ -103,7 +103,7 @@ const writeImageBundles = async (items: ImageBundleWorkItem[]) => {
 
 const getImageBundleDirectory = () => {
   if (!FileSystem.documentDirectory) {
-    throw new Error("湲곌린?먯꽌 ?대?吏 ?묒뾽 ?뚯씪 ??μ냼瑜??ъ슜?????놁뒿?덈떎.");
+    throw new Error("기기에서 이미지 작업 파일 저장소를 사용할 수 없습니다.");
   }
 
   return `${FileSystem.documentDirectory}${IMAGE_BUNDLE_DIRECTORY}`;

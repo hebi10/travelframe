@@ -80,7 +80,7 @@ const normalizeMadeVideoItem = (
   photoIds: normalizeStringArray(video.photoIds),
   durations: normalizeVideoDurations(video.durations),
   musicId: normalizeText(video.musicId, "none") as MadeVideoItem["musicId"],
-  musicLabel: normalizeText(video.musicLabel, "臾댁쓬"),
+  musicLabel: normalizeText(video.musicLabel, "무음"),
   storagePath: typeof video.storagePath === "string" ? video.storagePath : undefined,
   downloadURL: typeof video.downloadURL === "string" ? video.downloadURL : undefined,
   localUri: typeof video.localUri === "string" ? video.localUri : undefined,
@@ -116,7 +116,7 @@ const writeVideos = async (videos: MadeVideoItem[]) => {
 
 const getVideoDirectory = () => {
   if (!FileSystem.documentDirectory) {
-    throw new Error("湲곌린?먯꽌 ?곸긽 ?뚯씪 ??μ냼瑜??ъ슜?????놁뒿?덈떎.");
+    throw new Error("기기에서 영상 파일 저장소를 사용할 수 없습니다.");
   }
 
   return `${FileSystem.documentDirectory}${VIDEO_DIRECTORY}`;

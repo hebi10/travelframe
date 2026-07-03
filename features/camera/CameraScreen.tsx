@@ -61,6 +61,7 @@ import {
 import {
   clampGridGuideLinePositions,
   getDefaultGridGuideLinePositions,
+  getGridGuideControlPoint,
   getNearestGridGuideLine,
   getNearestGuideShapePoint,
   isShapeGuide,
@@ -1398,17 +1399,23 @@ export default function CameraScreen() {
 
   const handleGridLineControlStart = useCallback(
     (x: number, y: number) => {
-      const selectedLine = getNearestGridGuideLine({
+      const controlPoint = getGridGuideControlPoint({
         x,
         y,
         frame: cameraFrame,
+        aspectRatio: selectedCameraRatioAspect
+      });
+      const selectedLine = getNearestGridGuideLine({
+        x: controlPoint.x,
+        y: controlPoint.y,
+        frame: controlPoint.frame,
         positions: gridGuideLinePositionsRef.current
       });
       const nextPositions = updateGridGuideLineFromPoint({
         line: selectedLine,
-        x,
-        y,
-        frame: cameraFrame,
+        x: controlPoint.x,
+        y: controlPoint.y,
+        frame: controlPoint.frame,
         positions: gridGuideLinePositionsRef.current
       });
 
@@ -1416,24 +1423,30 @@ export default function CameraScreen() {
       setSelectedGridGuideLine(selectedLine);
       applyGridGuideLinePositionsState(nextPositions);
     },
-    [applyGridGuideLinePositionsState, cameraFrame]
+    [applyGridGuideLinePositionsState, cameraFrame, selectedCameraRatioAspect]
   );
 
   const handleGridLineControlMove = useCallback(
     (x: number, y: number) => {
+      const controlPoint = getGridGuideControlPoint({
+        x,
+        y,
+        frame: cameraFrame,
+        aspectRatio: selectedCameraRatioAspect
+      });
       const selectedLine =
         selectedGridGuideLineRef.current ??
         getNearestGridGuideLine({
-          x,
-          y,
-          frame: cameraFrame,
+          x: controlPoint.x,
+          y: controlPoint.y,
+          frame: controlPoint.frame,
           positions: gridGuideLinePositionsRef.current
         });
       const nextPositions = updateGridGuideLineFromPoint({
         line: selectedLine,
-        x,
-        y,
-        frame: cameraFrame,
+        x: controlPoint.x,
+        y: controlPoint.y,
+        frame: controlPoint.frame,
         positions: gridGuideLinePositionsRef.current
       });
 
@@ -1441,7 +1454,7 @@ export default function CameraScreen() {
       setSelectedGridGuideLine(selectedLine);
       applyGridGuideLinePositionsState(nextPositions);
     },
-    [applyGridGuideLinePositionsState, cameraFrame]
+    [applyGridGuideLinePositionsState, cameraFrame, selectedCameraRatioAspect]
   );
 
   const openPersonalGallery = () => {
@@ -1673,15 +1686,15 @@ export default function CameraScreen() {
       setErrorMessage(message);
       Alert.alert(
         "핸드폰 앨범 저장 권한이 필요합니다.",
-        `${message}\n\n설정에서 사진 및 동영상 권한을 허용하거나 클라우드로만 저장하도록 바꿀 수 있습니다.`,
+        `${message}\n\n설정에서 사진 및 동영상 권한을 허용하거나 앱 보관함과 클라우드에 저장하도록 바꿀 수 있습니다.`,
         [
           { text: "나중에", style: "cancel" },
           {
             text: "클라우드로 저장",
             onPress: () => {
-              setCameraSaveScope("app");
+              setCameraSaveScope("app_cloud");
               queueAppSettingsUpdate({
-                cameraSaveScope: "app",
+                cameraSaveScope: "app_cloud",
                 storageMode: "local_backup",
                 cloudBackupEnabled: true
               });

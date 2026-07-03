@@ -66,7 +66,7 @@ export const getCurrentVideoExportWeek = (date = new Date()) => {
 
 const getWeeklyUsageRef = (user: User, weekId: string) => {
   if (!firestore) {
-    throw new Error("Firebase ?곌껐 ?뺣낫媛 ?꾩쭅 ?ㅼ젙?섏? ?딆븯?듬땲??");
+    throw new Error("Firebase 연결 정보가 아직 설정되지 않았습니다.");
   }
 
   return doc(firestore, "users", user.uid, "usage", "videoExports", "weeks", weekId);
@@ -74,7 +74,7 @@ const getWeeklyUsageRef = (user: User, weekId: string) => {
 
 const reserveWeeklyVideoExportCallable = () => {
   if (!firebaseFunctions) {
-    throw new Error("Firebase ?곌껐 ?뺣낫媛 ?꾩쭅 ?ㅼ젙?섏? ?딆븯?듬땲??");
+    throw new Error("Firebase 연결 정보가 아직 설정되지 않았습니다.");
   }
 
   return httpsCallable(firebaseFunctions, "reserveWeeklyVideoExport");
@@ -82,7 +82,7 @@ const reserveWeeklyVideoExportCallable = () => {
 
 const releaseWeeklyVideoExportCallable = () => {
   if (!firebaseFunctions) {
-    throw new Error("Firebase ?곌껐 ?뺣낫媛 ?꾩쭅 ?ㅼ젙?섏? ?딆븯?듬땲??");
+    throw new Error("Firebase 연결 정보가 아직 설정되지 않았습니다.");
   }
 
   return httpsCallable(firebaseFunctions, "releaseWeeklyVideoExport");
@@ -90,7 +90,7 @@ const releaseWeeklyVideoExportCallable = () => {
 
 const completeWeeklyVideoExportCallable = () => {
   if (!firebaseFunctions) {
-    throw new Error("Firebase ?곌껐 ?뺣낫媛 ?꾩쭅 ?ㅼ젙?섏? ?딆븯?듬땲??");
+    throw new Error("Firebase 연결 정보가 아직 설정되지 않았습니다.");
   }
 
   return httpsCallable(firebaseFunctions, "completeWeeklyVideoExport");
@@ -123,7 +123,7 @@ export const buildWeeklyVideoExportReservation = (
   data: Partial<WeeklyVideoExportReservation>
 ): WeeklyVideoExportReservation => {
   if (typeof data.reservationId !== "string" || !data.reservationId) {
-    throw new Error("MP4 ????덉빟 ?뺣낫瑜??뺤씤?섏? 紐삵뻽?듬땲??");
+    throw new Error("MP4 저장 예약 정보를 확인하지 못했습니다.");
   }
 
   return {
@@ -220,7 +220,7 @@ export const reserveWeeklyVideoExport = async (
   limit = FREE_WEEKLY_VIDEO_EXPORT_LIMIT
 ): Promise<WeeklyVideoExportReservation> => {
   if (!user) {
-    throw new Error("濡쒓렇????MP4 ?곸긽??留뚮뱾 ???덉뒿?덈떎.");
+    throw new Error("로그인해야 MP4 영상을 만들 수 있습니다.");
   }
 
   const result = await reserveWeeklyVideoExportCallable()({ limit });

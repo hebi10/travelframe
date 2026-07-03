@@ -34,7 +34,7 @@ const getMusicCacheKey = (userId: string) => `${MUSIC_CACHE_PREFIX}:${userId}`;
 
 const getMusicDirectory = (userId: string) => {
   if (!FileSystem.documentDirectory) {
-    throw new Error("??湲곌린?먯꽌???뚯븙 ?뚯씪????ν븷 ???놁뒿?덈떎.");
+    throw new Error("이 기기에서는 음악 파일을 저장할 수 없습니다.");
   }
 
   return `${FileSystem.documentDirectory}user-music/${userId}/`;
@@ -118,7 +118,7 @@ const callMusicFunction = async <Request, Response>(
   data: Request
 ): Promise<Response> => {
   if (!firebaseFunctions) {
-    throw new Error("?뚯븙 諛깆뾽??吏湲??ъ슜?????놁뒿?덈떎. ?좎떆 ???ㅼ떆 ?쒕룄??二쇱꽭??");
+    throw new Error("음악 백업을 지금 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.");
   }
 
   const callable = httpsCallable<Request, Response>(firebaseFunctions, name);
@@ -188,7 +188,7 @@ const uploadLocalAudioFile = async ({
   createdAt: string;
 }) => {
   if (!firebaseStorage) {
-    throw new Error("?뚯븙 諛깆뾽??吏湲??ъ슜?????놁뒿?덈떎. ?좎떆 ???ㅼ떆 ?쒕룄??二쇱꽭??");
+    throw new Error("음악 백업을 지금 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.");
   }
 
   const response = await fetch(uri);
@@ -334,13 +334,13 @@ export const pickAndUploadUserMusicTrack = async (
   options: { uploadToCloud?: boolean } = {}
 ) => {
   if (!user) {
-    throw new Error("濡쒓렇???????뚯븙??異붽??????덉뒿?덈떎.");
+    throw new Error("로그인해야 음악을 추가할 수 있습니다.");
   }
 
   const { uploadToCloud = true } = options;
 
   if (uploadToCloud && (!firestore || !firebaseStorage)) {
-    throw new Error("Firebase ?곌껐 ?뺣낫媛 ?꾩쭅 ?ㅼ젙?섏? ?딆븯?듬땲??");
+    throw new Error("Firebase 연결 정보가 아직 설정되지 않았습니다.");
   }
 
   const currentTracks = await syncUserMusicTracks(user);
@@ -350,11 +350,11 @@ export const pickAndUploadUserMusicTrack = async (
   );
 
   if (safeMusicTrackLimit <= 0) {
-    throw new Error("Pro 援щ룆 ?????뚯븙??異붽??????덉뒿?덈떎.");
+    throw new Error("Pro 구독 후 음악을 추가할 수 있습니다.");
   }
 
   if (currentTracks.length >= safeMusicTrackLimit) {
-    throw new Error(`???뚯븙? 理쒕? ${safeMusicTrackLimit}媛쒓퉴吏 ??ν븷 ???덉뒿?덈떎.`);
+    throw new Error(`음악은 최대 ${safeMusicTrackLimit}개까지 저장할 수 있습니다.`);
   }
 
   const result = await DocumentPicker.getDocumentAsync({
@@ -434,7 +434,7 @@ export const deleteUserMusicTrack = async ({
   track: UserMusicTrack;
 }) => {
   if (!user) {
-    throw new Error("濡쒓렇???????뚯븙????젣?????덉뒿?덈떎.");
+    throw new Error("로그인해야 음악을 삭제할 수 있습니다.");
   }
 
   if (track.storagePath) {

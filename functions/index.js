@@ -1686,6 +1686,10 @@ exports.completeAdminBackupUpload = secureOnCall(async (request) => {
       throw new HttpsError("failed-precondition", "Admin upload session is not active.");
     }
 
+    if (session.expiresAt?.toMillis && session.expiresAt.toMillis() < Date.now()) {
+      throw new HttpsError("deadline-exceeded", "Admin upload session expired.");
+    }
+
     const [metadata] = await bucket.file(session.storagePath).getMetadata();
     if (
       Number(metadata.size) !== Number(session.fileSize) ||
@@ -1696,14 +1700,16 @@ exports.completeAdminBackupUpload = secureOnCall(async (request) => {
     }
 
     const now = new Date().toISOString();
-    const itemId = `${session.itemType}-${Date.now()}`;
+    const itemId = session.itemId ?? `${session.itemType}-${uploadSessionId}`;
     const safeDownloadUrl = getDownloadUrlFromStorageMetadata({
       storagePath: session.storagePath,
       metadata
     });
+    const itemRef = getBackupItemRef({ uid: targetUid, itemType: session.itemType, itemId });
+    let itemData;
 
     if (session.itemType === "photo") {
-      await db.doc(`users/${targetUid}/photoBackups/${itemId}`).set({
+      itemData = {
         id: itemId,
         userId: targetUid,
         localId: itemId,
@@ -1721,9 +1727,9 @@ exports.completeAdminBackupUpload = secureOnCall(async (request) => {
         backedUpAt: now,
         sourceDeviceId: "admin",
         updatedAt: FieldValue.serverTimestamp()
-      });
+      };
     } else if (session.itemType === "video") {
-      await db.doc(`users/${targetUid}/videos/${itemId}`).set({
+      itemData = {
         id: itemId,
         userId: targetUid,
         localId: itemId,
@@ -1739,9 +1745,9 @@ exports.completeAdminBackupUpload = secureOnCall(async (request) => {
         backedUpAt: now,
         sourceDeviceId: "admin",
         updatedAt: FieldValue.serverTimestamp()
-      });
+      };
     } else {
-      await db.doc(`users/${targetUid}/musicTracks/${itemId}`).set({
+      itemData = {
         id: itemId,
         userId: targetUid,
         name: session.fileName,
@@ -1751,20 +1757,48 @@ exports.completeAdminBackupUpload = secureOnCall(async (request) => {
         downloadUrl: safeDownloadUrl,
         createdAt: now,
         updatedAt: FieldValue.serverTimestamp()
-      });
+      };
     }
 
-    await sessionRef.set(
-      {
-        status: "completed",
-        itemId,
-        completedAt: FieldValue.serverTimestamp()
-      },
-      { merge: true }
-    );
+    let completedItemId = itemId;
+    await db.runTransaction(async (transaction) => {
+      const freshSessionSnapshot = await transaction.get(sessionRef);
+      if (!freshSessionSnapshot.exists) {
+        throw new HttpsError("not-found", "Admin upload session was not found.");
+      }
+
+      const freshSession = freshSessionSnapshot.data();
+      if (freshSession.adminUid !== adminUid || freshSession.targetUid !== targetUid) {
+        throw new HttpsError("permission-denied", "Admin upload session does not belong to this request.");
+      }
+
+      if (freshSession.status === "completed") {
+        completedItemId = freshSession.itemId;
+        return;
+      }
+
+      if (freshSession.status !== "reserved") {
+        throw new HttpsError("failed-precondition", "Admin upload session is not active.");
+      }
+
+      if (freshSession.expiresAt?.toMillis && freshSession.expiresAt.toMillis() < Date.now()) {
+        throw new HttpsError("deadline-exceeded", "Admin upload session expired.");
+      }
+
+      transaction.set(itemRef, itemData);
+      transaction.set(
+        sessionRef,
+        {
+          status: "completed",
+          itemId,
+          completedAt: FieldValue.serverTimestamp()
+        },
+        { merge: true }
+      );
+    });
     await refreshAdminBackupOverview(targetUid);
 
-    return { itemId, itemType: session.itemType };
+    return { itemId: completedItemId, itemType: session.itemType };
   } catch (error) {
     throw toHttpsError(error);
   }

@@ -42,7 +42,7 @@ export function useAccountMusicActions({
         }
       );
       setMusicTracks(nextTracks);
-      setMessage("???뚯븙????ν뻽?듬땲?? ?곸긽 留뚮뱾湲곗뿉???좏깮?????덉뒿?덈떎.");
+      setMessage("내 음악을 저장했습니다. 영상 만들기에서 선택할 수 있습니다.");
     } catch (error) {
       setMessage(getAuthErrorMessage(error));
     } finally {

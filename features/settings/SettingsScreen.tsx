@@ -201,6 +201,11 @@ export default function SettingsScreen() {
       let isActive = true;
 
       const loadSettings = async () => {
+        const latestSubscription = user ? await getUserSubscription(user) : subscription;
+        const latestPlanEntitlements = getPlanEntitlements({
+          isLoggedIn: Boolean(user),
+          subscription: latestSubscription
+        });
         const [
           storedSettings,
           storedBackupFailures,
@@ -216,9 +221,9 @@ export default function SettingsScreen() {
           getImageBundleWorks(),
           getMadeVideos(),
           user ? syncUserMusicTracks(user) : Promise.resolve([]),
-          getWeeklyVideoExportUsage(user, planEntitlements.weeklyVideoExportLimit)
+          getWeeklyVideoExportUsage(user, latestPlanEntitlements.weeklyVideoExportLimit)
         ]);
-        await markBackupExpired({ user, subscription });
+        await markBackupExpired({ user, subscription: latestSubscription });
         if (isActive) {
           setSettings(storedSettings);
           setBackupFailures(storedBackupFailures);
@@ -232,12 +237,16 @@ export default function SettingsScreen() {
         }
       };
 
-      loadSettings();
+      loadSettings().catch((error) => {
+        if (isActive) {
+          setAuthMessage(getUserFacingErrorMessage(error, "설정을 불러오지 못했습니다."));
+        }
+      });
 
       return () => {
         isActive = false;
       };
-    }, [planEntitlements.weeklyVideoExportLimit, subscription, user])
+    }, [subscription, user])
   );
 
   useEffect(

@@ -49,7 +49,7 @@ export function AppGuideOverlay({
     goNext,
     skip
   } = useAppGuide(tabKey, replaySignal);
-  const activeVisualIndex = Math.min(stepIndex, guideVisualSlides.length - 1);
+  const activeVisualIndex = stepIndex;
   const visualPageIndexes = Array.from({ length: totalSteps });
   const visualPages = visualPageIndexes.map((_, index) => ({
     index,
