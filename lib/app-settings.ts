@@ -144,6 +144,7 @@ export type AppSettings = {
   cloudBackupEnabled: boolean;
   cloudBackupTargets: CloudBackupTargets;
   imageBackupQuality: ImageQuality;
+  cameraWelcomePromptDismissed: boolean;
 };
 
 export const defaultCloudBackupTargets: CloudBackupTargets = {
@@ -238,7 +239,8 @@ export const defaultAppSettings: AppSettings = {
   storageMode: "local_only",
   cloudBackupEnabled: false,
   cloudBackupTargets: defaultCloudBackupTargets,
-  imageBackupQuality: DEFAULT_IMAGE_QUALITY
+  imageBackupQuality: DEFAULT_IMAGE_QUALITY,
+  cameraWelcomePromptDismissed: false
 };
 
 let appSettingsUpdateChain: Promise<AppSettings> = Promise.resolve(defaultAppSettings);
@@ -638,7 +640,11 @@ const normalizeSettings = (value: Partial<AppSettings> | null): AppSettings => {
     cloudBackupTargets: normalizeCloudBackupTargets(nextSettings.cloudBackupTargets),
     imageBackupQuality: imageBackupQualities.includes(nextSettings.imageBackupQuality)
       ? nextSettings.imageBackupQuality
-      : defaultAppSettings.imageBackupQuality
+      : defaultAppSettings.imageBackupQuality,
+    cameraWelcomePromptDismissed:
+      typeof nextSettings.cameraWelcomePromptDismissed === "boolean"
+        ? nextSettings.cameraWelcomePromptDismissed
+        : defaultAppSettings.cameraWelcomePromptDismissed
   };
 };
 

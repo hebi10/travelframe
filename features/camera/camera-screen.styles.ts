@@ -1120,5 +1120,139 @@ export const styles = StyleSheet.create({
     fontSize: typography.button,
     fontWeight: "800",
     letterSpacing: 0
+  },
+  welcomeBackdrop: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 18,
+    backgroundColor: "rgba(0, 0, 0, 0.44)"
+  },
+  welcomePanel: {
+    width: "100%",
+    maxWidth: 360,
+    gap: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: colors.text,
+    backgroundColor: colors.background
+  },
+  welcomeHeader: {
+    minHeight: 28,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10
+  },
+  welcomeBrand: {
+    color: colors.text,
+    fontSize: typography.small,
+    fontWeight: "900",
+    letterSpacing: 0
+  },
+  welcomeCloseButton: {
+    width: 30,
+    height: 30,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: colors.line
+  },
+  welcomeTitle: {
+    color: colors.text,
+    fontSize: 26,
+    fontWeight: "900",
+    lineHeight: 32,
+    letterSpacing: 0
+  },
+  welcomePreviewBox: {
+    minHeight: 92,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: colors.text,
+    backgroundColor: colors.surface
+  },
+  welcomePreviewImage: {
+    width: 64,
+    height: 64,
+    backgroundColor: colors.surfaceStrong
+  },
+  welcomePreviewEmpty: {
+    width: 64,
+    height: 64,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.background
+  },
+  welcomePreviewCopy: {
+    flex: 1,
+    minWidth: 0,
+    gap: 4
+  },
+  welcomePreviewTitle: {
+    color: colors.text,
+    fontSize: typography.body,
+    fontWeight: "900",
+    lineHeight: 20,
+    letterSpacing: 0
+  },
+  welcomePreviewDetail: {
+    color: colors.muted,
+    fontSize: typography.small,
+    lineHeight: 18,
+    letterSpacing: 0
+  },
+  welcomeActionRow: {
+    flexDirection: "row",
+    gap: 8
+  },
+  welcomePrimaryButton: {
+    flex: 1,
+    minHeight: controls.height,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.text
+  },
+  welcomePrimaryButtonText: {
+    color: colors.inverse,
+    fontSize: typography.button,
+    fontWeight: "900",
+    letterSpacing: 0
+  },
+  welcomeFlowText: {
+    color: colors.muted,
+    fontSize: typography.small,
+    lineHeight: 18,
+    letterSpacing: 0
+  },
+  welcomeCheckRow: {
+    minHeight: 34,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    alignSelf: "flex-start"
+  },
+  welcomeCheckbox: {
+    width: 20,
+    height: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: colors.text,
+    backgroundColor: colors.background
+  },
+  welcomeCheckboxActive: {
+    backgroundColor: colors.text
+  },
+  welcomeCheckText: {
+    color: colors.text,
+    fontSize: typography.small,
+    fontWeight: "800",
+    letterSpacing: 0
   }
 });

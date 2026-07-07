@@ -4,6 +4,7 @@ node_modules/
 .gradle-workspace/
 .android-workspace/
 .tmp/
+.superpowers/
 codex-tmp/
 .android-version-code
 android/

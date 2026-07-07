@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
-import { router, useFocusEffect } from "expo-router";
+import { router, type Href, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -42,11 +42,13 @@ import { PhotoReferenceOverlay, type PhotoReferenceOverlayHandle } from "@/compo
 import { colors } from "@/constants/app-theme";
 import { GUIDE_LABELS, GUIDE_TYPES, type GuideType } from "@/constants/camera-guides";
 import {
+  CameraWelcomePrompt,
   CameraSettingToggleRow,
   CameraShutterSoundChoice,
   ExposureBiasControl,
   GuideSizeSlider,
-  SmoothValueSlider
+  SmoothValueSlider,
+  type CameraWelcomePromptPreview
 } from "@/features/camera/camera-screen.components";
 import {
   CAMERA_FOCUS_CONTROLS_DISMISS_MS,
@@ -150,7 +152,52 @@ import { getPlanEntitlements } from "@/lib/plan-entitlements";
 import { isMediaLibraryAccessGranted, requestMediaLibraryAccess } from "@/lib/request-media-library-access";
 import { deleteLocalFile, getRecentPhoto, saveCapturedPhoto, saveCapturedPhotoToDevice } from "@/lib/photo-library";
 import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
+import { getMadeVideos } from "@/lib/video-library";
 import type { PhotoItem, PhotoRatioLabel, SaveCapturedPhotoInput } from "@/types/photo";
+
+const emptyWelcomePromptPreview: CameraWelcomePromptPreview = {
+  kind: "empty",
+  title: "최근 촬영/클립 미리보기",
+  detail: "아직 최근 사진이나 영상이 없습니다."
+};
+
+const getCameraWelcomePromptPreview = (
+  latestPhoto: PhotoItem | null,
+  videos: Awaited<ReturnType<typeof getMadeVideos>>
+): CameraWelcomePromptPreview => {
+  const latestVideo = videos.reduce<(typeof videos)[number] | null>((latest, video) => {
+    if (!latest) {
+      return video;
+    }
+
+    return new Date(video.createdAt).getTime() > new Date(latest.createdAt).getTime()
+      ? video
+      : latest;
+  }, null);
+  const latestPhotoTime = latestPhoto ? new Date(latestPhoto.createdAt).getTime() : -1;
+  const latestVideoTime = latestVideo ? new Date(latestVideo.createdAt).getTime() : -1;
+
+  if (latestVideo && latestVideoTime > latestPhotoTime) {
+    return {
+      kind: "video",
+      title: latestVideo.title || "최근 여행 클립",
+      detail: "최근 저장한 영상을 이어서 확인할 수 있습니다.",
+      uri: latestVideo.coverUri
+    };
+  }
+
+  if (latestPhoto) {
+    return {
+      kind: "photo",
+      title: latestPhoto.edited ? "최근 편집 사진" : "최근 촬영 사진",
+      detail: "이 사진을 기준으로 같은 구도를 다시 맞춰볼 수 있습니다.",
+      uri: latestPhoto.previewUri ?? latestPhoto.uri
+    };
+  }
+
+  return emptyWelcomePromptPreview;
+};
+
 export default function CameraScreen() {
   const { user, subscription } = useAuth();
   const planEntitlements = useMemo(
@@ -160,6 +207,7 @@ export default function CameraScreen() {
   const canSelectCloudSaveTarget = planEntitlements.canBackupToCloud;
   const cameraRef = useRef<CameraRef>(null);
   const referenceOverlayRef = useRef<PhotoReferenceOverlayHandle>(null);
+  const welcomePromptSeenThisSessionRef = useRef(false);
   const pendingSettingsPatchRef = useRef<CameraSettingsPatch | null>(null);
   const settingsSaveChainRef = useRef<Promise<void>>(Promise.resolve());
   const {
@@ -232,6 +280,10 @@ export default function CameraScreen() {
   const [overlayLocked, setOverlayLocked] = useState(false);
   const [overlayResetKey, setOverlayResetKey] = useState(0);
   const [recentPhoto, setRecentPhoto] = useState<PhotoItem | null>(null);
+  const [welcomePromptVisible, setWelcomePromptVisible] = useState(false);
+  const [welcomePromptDoNotShowAgain, setWelcomePromptDoNotShowAgain] = useState(false);
+  const [welcomePromptPreview, setWelcomePromptPreview] =
+    useState<CameraWelcomePromptPreview>(emptyWelcomePromptPreview);
   const [cameraFrame, setCameraFrame] = useState({ width: 0, height: 0 });
   const [cameraPreviewViewport, setCameraPreviewViewport] = useState({ width: 0, height: 0 });
   const [cameraTopBarHeight, setCameraTopBarHeight] = useState(0);
@@ -521,7 +573,11 @@ export default function CameraScreen() {
       let isActive = true;
 
       const loadSettings = async () => {
-        const [settings, latestPhoto] = await Promise.all([getAppSettings(), getRecentPhoto()]);
+        const [settings, latestPhoto, videos] = await Promise.all([
+          getAppSettings(),
+          getRecentPhoto(),
+          getMadeVideos()
+        ]);
         if (!isActive) {
           return;
         }
@@ -564,6 +620,12 @@ export default function CameraScreen() {
         setCameraColorSlots(settings.cameraColorSlots);
         setSelectedCameraColorSlot(settings.selectedCameraColorSlot);
         setRecentPhoto(latestPhoto);
+        setWelcomePromptPreview(getCameraWelcomePromptPreview(latestPhoto, videos));
+        if (!settings.cameraWelcomePromptDismissed && !welcomePromptSeenThisSessionRef.current) {
+          welcomePromptSeenThisSessionRef.current = true;
+          setWelcomePromptDoNotShowAgain(false);
+          setWelcomePromptVisible(true);
+        }
       };
 
       void loadSettings();
@@ -1207,6 +1269,23 @@ export default function CameraScreen() {
   const openCameraSettingsMenu = () => {
     setCameraSettingsOpen(true);
   };
+
+  const dismissWelcomePrompt = useCallback(() => {
+    setWelcomePromptVisible(false);
+    if (welcomePromptDoNotShowAgain) {
+      queueAppSettingsUpdate({ cameraWelcomePromptDismissed: true });
+    }
+  }, [queueAppSettingsUpdate, welcomePromptDoNotShowAgain]);
+
+  const openWelcomeGuideSettings = useCallback(() => {
+    dismissWelcomePrompt();
+    setGuideSettingsOpen(true);
+  }, [dismissWelcomePrompt]);
+
+  const openWelcomeVideoTab = useCallback(() => {
+    dismissWelcomePrompt();
+    router.push("/studio?tab=videos" as Href);
+  }, [dismissWelcomePrompt]);
 
   const openLineGuideSettings = () => {
     setGuideSettingsOpen(true);
@@ -3025,7 +3104,16 @@ export default function CameraScreen() {
           </Pressable>
         </View>
       ) : null}
-      <AppGuideOverlay tabKey="camera" transparentBackdrop />
+      <CameraWelcomePrompt
+        visible={welcomePromptVisible}
+        preview={welcomePromptPreview}
+        doNotShowAgain={welcomePromptDoNotShowAgain}
+        onToggleDoNotShowAgain={() => setWelcomePromptDoNotShowAgain((value) => !value)}
+        onClose={dismissWelcomePrompt}
+        onOpenGuideSettings={openWelcomeGuideSettings}
+        onOpenVideoTab={openWelcomeVideoTab}
+      />
+      {!welcomePromptVisible ? <AppGuideOverlay tabKey="camera" transparentBackdrop /> : null}
     </View>
   );
 }

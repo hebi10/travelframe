@@ -1,6 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Image as NativeImage, Modal, Pressable, Text, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { runOnJS, useDerivedValue, useSharedValue } from "react-native-reanimated";
 
@@ -21,6 +21,103 @@ import {
   GUIDE_SIZE_MIN,
   type CameraShutterSoundMode
 } from "@/lib/app-settings";
+
+export type CameraWelcomePromptPreview = {
+  kind: "photo" | "video" | "empty";
+  title: string;
+  detail: string;
+  uri?: string | null;
+};
+
+type CameraWelcomePromptProps = {
+  visible: boolean;
+  preview: CameraWelcomePromptPreview;
+  doNotShowAgain: boolean;
+  onToggleDoNotShowAgain: () => void;
+  onClose: () => void;
+  onOpenGuideSettings: () => void;
+  onOpenVideoTab: () => void;
+};
+
+export function CameraWelcomePrompt({
+  visible,
+  preview,
+  doNotShowAgain,
+  onToggleDoNotShowAgain,
+  onClose,
+  onOpenGuideSettings,
+  onOpenVideoTab
+}: CameraWelcomePromptProps) {
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <View style={styles.welcomeBackdrop}>
+        <View style={styles.welcomePanel}>
+          <View style={styles.welcomeHeader}>
+            <Text selectable={false} style={styles.welcomeBrand}>
+              TravelFrame
+            </Text>
+            <Pressable
+              style={styles.welcomeCloseButton}
+              onPress={onClose}
+              accessibilityRole="button"
+              accessibilityLabel="시작 안내 닫기"
+            >
+              <Feather name="x" size={18} color={colors.text} />
+            </Pressable>
+          </View>
+          <Text selectable={false} style={styles.welcomeTitle}>
+            같은 구도로 찍고{"\n"}여행 클립으로 완성
+          </Text>
+          <View style={styles.welcomePreviewBox}>
+            {preview.uri ? (
+              <NativeImage source={{ uri: preview.uri }} style={styles.welcomePreviewImage} resizeMode="cover" />
+            ) : (
+              <View style={styles.welcomePreviewEmpty}>
+                <Feather name={preview.kind === "video" ? "film" : "image"} size={24} color={colors.faint} />
+              </View>
+            )}
+            <View style={styles.welcomePreviewCopy}>
+              <Text selectable={false} style={styles.welcomePreviewTitle}>
+                {preview.title}
+              </Text>
+              <Text selectable={false} style={styles.welcomePreviewDetail}>
+                {preview.detail}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.welcomeActionRow}>
+            <Pressable style={styles.welcomePrimaryButton} onPress={onOpenGuideSettings}>
+              <Text selectable={false} style={styles.welcomePrimaryButtonText}>
+                가이드 촬영
+              </Text>
+            </Pressable>
+            <Pressable style={styles.welcomePrimaryButton} onPress={onOpenVideoTab}>
+              <Text selectable={false} style={styles.welcomePrimaryButtonText}>
+                영상 만들기
+              </Text>
+            </Pressable>
+          </View>
+          <Text selectable={false} style={styles.welcomeFlowText}>
+            1. 사진 맞춰 찍기 → 2. 고르기 → 3. 클립 저장
+          </Text>
+          <Pressable
+            style={styles.welcomeCheckRow}
+            onPress={onToggleDoNotShowAgain}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: doNotShowAgain }}
+          >
+            <View style={[styles.welcomeCheckbox, doNotShowAgain && styles.welcomeCheckboxActive]}>
+              {doNotShowAgain ? <Feather name="check" size={14} color={colors.inverse} /> : null}
+            </View>
+            <Text selectable={false} style={styles.welcomeCheckText}>
+              다시 보지 않기
+            </Text>
+          </Pressable>
+        </View>
+      </View>
+    </Modal>
+  );
+}
 
 export type GuideSizeSliderProps = {
   value: number;

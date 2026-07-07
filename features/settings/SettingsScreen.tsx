@@ -318,6 +318,10 @@ export default function SettingsScreen() {
       return "폰트 크기";
     }
 
+    if (activeSetting === "cameraWelcomePrompt") {
+      return "시작 안내 팝업";
+    }
+
     if (activeSetting === "storageMode") {
       return "저장 방식";
     }
@@ -345,6 +349,10 @@ export default function SettingsScreen() {
     setSettings(nextSettings);
     await saveAppSettings(nextSettings);
     setActiveSetting(null);
+  };
+
+  const updateCameraWelcomePromptEnabled = (nextEnabled: boolean) => {
+    void updateSetting({ cameraWelcomePromptDismissed: !nextEnabled });
   };
 
   const toggleCameraSaveTarget = async (target: CameraSaveTarget) => {
@@ -1111,6 +1119,12 @@ export default function SettingsScreen() {
             mark={fontSizeLabel[settings.fontSize]}
             onPress={() => setActiveSetting("fontSize")}
           />
+          <ActionRow
+            label="시작 안내 팝업"
+            detail="카메라를 열 때 같은 구도 촬영과 영상 만들기 안내를 보여줍니다."
+            mark={settings.cameraWelcomePromptDismissed ? "꺼짐" : "켜짐"}
+            onPress={() => setActiveSetting("cameraWelcomePrompt")}
+          />
           <View style={[styles.guidePopupPanel, themed.panel]}>
             <View style={styles.guidePopupCopy}>
               <Text selectable style={[styles.guidePopupTitle, themed.text]}>
@@ -1765,6 +1779,23 @@ export default function SettingsScreen() {
                     />
                   ))
                 : null}
+
+              {activeSetting === "cameraWelcomePrompt" ? (
+                <>
+                  <OptionButton
+                    label="켜짐"
+                    detail="앱 실행 후 카메라 화면에서 시작 안내 팝업을 보여줍니다."
+                    active={!settings.cameraWelcomePromptDismissed}
+                    onPress={() => updateCameraWelcomePromptEnabled(true)}
+                  />
+                  <OptionButton
+                    label="꺼짐"
+                    detail="시작 안내 팝업을 숨깁니다. 필요하면 이 화면에서 다시 켤 수 있습니다."
+                    active={settings.cameraWelcomePromptDismissed}
+                    onPress={() => updateCameraWelcomePromptEnabled(false)}
+                  />
+                </>
+              ) : null}
 
               {activeSetting === "cloudBackupTargets"
                 ? backupTargetOptions.map((option) => (
