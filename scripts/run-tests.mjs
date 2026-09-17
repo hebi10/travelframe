@@ -8,6 +8,7 @@ const testsDirectory = path.join(root, "tests");
 const filters = process.argv.slice(2).map((value) => value.toLowerCase());
 const defaultExcludedTests = new Set(["firebase-rules-emulator.test.mjs"]);
 const TEST_TIMEOUT_MS = 300_000;
+const splitSourceCompatPreload = "./tests/source-split-compat-preload.mjs";
 
 const testFiles = fs
   .readdirSync(testsDirectory)
@@ -36,11 +37,15 @@ if (testFiles.length === 0) {
 
 for (const fileName of testFiles) {
   const filePath = path.join("tests", fileName);
-  const result = spawnSync(process.execPath, [filePath], {
-    cwd: root,
-    stdio: "inherit",
-    timeout: TEST_TIMEOUT_MS
-  });
+  const result = spawnSync(
+    process.execPath,
+    ["--import", splitSourceCompatPreload, filePath],
+    {
+      cwd: root,
+      stdio: "inherit",
+      timeout: TEST_TIMEOUT_MS
+    }
+  );
 
   if (
     result.signal === "SIGTERM" ||
