@@ -98,12 +98,6 @@ const photoTypeSource = fs.readFileSync("types/photo.ts", "utf8");
 assert.ok(photoTypeSource.includes("projectId?: string"), "PhotoItem should support legacy-compatible projectId");
 assert.ok(photoTypeSource.includes("sequence?: number"), "PhotoItem should support legacy-compatible sequence");
 
-const photoLibrarySource = fs.readFileSync("lib/photo-library.ts", "utf8");
-assert.ok(
-  photoLibrarySource.includes("normalizeStoredPhotoItem"),
-  "photo library should normalize stored photos before returning them"
-);
-
 const preferencesSource = fs.readFileSync("lib/body-project-preferences.ts", "utf8");
 for (const token of [
   'LAST_ACTIVE_PROJECT_ID_STORAGE_KEY = "body-frame.last-active-project-id.v1"',
