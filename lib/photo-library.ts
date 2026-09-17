@@ -27,6 +27,18 @@ const cleanupOrphanProjectFiles = async (photo?: PhotoItem | null) => {
   ]);
 };
 
+const rollbackLegacyProjectDraft = async (photo?: PhotoItem | null) => {
+  if (!photo) {
+    return;
+  }
+
+  const photos = await getPhotos();
+  await replacePhotosFromBackup(
+    photos.filter((item) => item.id !== photo.id)
+  );
+  await cleanupOrphanProjectFiles(photo);
+};
+
 export const saveCapturedPhoto = async (input: SaveCapturedPhotoInput) => {
   const reserved = reserveBodyFrameCameraCapture({
     projectId: input.projectId,
@@ -96,6 +108,9 @@ export const saveCapturedPhoto = async (input: SaveCapturedPhotoInput) => {
   } catch (error) {
     if (projectPhoto) {
       await cleanupOrphanProjectFiles(projectPhoto);
+    }
+    if (legacyPhoto) {
+      await rollbackLegacyProjectDraft(legacyPhoto);
     }
     finishBodyFrameCameraCapture({
       sequence: resolvedSequence,
