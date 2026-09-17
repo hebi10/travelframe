@@ -11,7 +11,7 @@ import { StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { BodyFrameProjectSwitcher } from "@/features/camera/BodyFrameProjectSwitcher";
-import LegacyCameraScreen from "@/features/camera/LegacyCameraScreen";
+import CameraScreen from "@/features/camera/CameraScreen";
 import {
   getBodyProjectProgressSummary,
   getBodyProjectReferenceUri,
@@ -43,7 +43,7 @@ type CreateProjectInput = {
   referenceMode: ReferencePhotoMode;
 };
 
-export default function CameraScreen() {
+export default function BodyFrameCameraScreen() {
   const insets = useSafeAreaInsets();
   const session = useSyncExternalStore(
     subscribeBodyFrameCameraSession,
@@ -192,7 +192,7 @@ export default function CameraScreen() {
 
   return (
     <View style={styles.screen}>
-      <LegacyCameraScreen />
+      <CameraScreen />
 
       <View
         pointerEvents="box-none"
