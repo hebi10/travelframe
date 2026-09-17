@@ -55,6 +55,8 @@ export type PhotoItem = BackupMetadata & {
   kind: PhotoKind;
   edited: boolean;
   addedToVideo: boolean;
+  projectId?: string;
+  sequence?: number;
   sourcePhotoId?: string;
   edit?: PhotoEditTransform;
 };

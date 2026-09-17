@@ -15,9 +15,17 @@ export type PlanEntitlements = {
   localVideoLimit: number;
   musicTrackLimit: number;
   backupStorageBytes: number;
+  maxProgressPhotos: number | null;
+  maxProgressVideoSeconds: number | null;
+  maxProjectCount: number | null;
 };
 
 export const GIB = 1024 * 1024 * 1024;
+
+const FREE_PROGRESS_PHOTO_LIMIT = 100;
+const FREE_PROGRESS_VIDEO_SECONDS = 10;
+const PRO_PROGRESS_PHOTO_MINIMUM = 365;
+const PRO_PROGRESS_VIDEO_SECONDS_MINIMUM = 36.5;
 
 export const PLAN_ENTITLEMENTS: Record<PlanTier, PlanEntitlements> = {
   guest: {
@@ -32,7 +40,10 @@ export const PLAN_ENTITLEMENTS: Record<PlanTier, PlanEntitlements> = {
     localImageLimit: 100,
     localVideoLimit: 30,
     musicTrackLimit: 0,
-    backupStorageBytes: 0
+    backupStorageBytes: 0,
+    maxProgressPhotos: FREE_PROGRESS_PHOTO_LIMIT,
+    maxProgressVideoSeconds: FREE_PROGRESS_VIDEO_SECONDS,
+    maxProjectCount: null
   },
   free: {
     tier: "free",
@@ -46,7 +57,10 @@ export const PLAN_ENTITLEMENTS: Record<PlanTier, PlanEntitlements> = {
     localImageLimit: 100,
     localVideoLimit: 30,
     musicTrackLimit: 0,
-    backupStorageBytes: 0
+    backupStorageBytes: 0,
+    maxProgressPhotos: FREE_PROGRESS_PHOTO_LIMIT,
+    maxProgressVideoSeconds: FREE_PROGRESS_VIDEO_SECONDS,
+    maxProjectCount: null
   },
   ad_remove: {
     tier: "ad_remove",
@@ -60,7 +74,10 @@ export const PLAN_ENTITLEMENTS: Record<PlanTier, PlanEntitlements> = {
     localImageLimit: 100,
     localVideoLimit: 30,
     musicTrackLimit: 0,
-    backupStorageBytes: 0
+    backupStorageBytes: 0,
+    maxProgressPhotos: FREE_PROGRESS_PHOTO_LIMIT,
+    maxProgressVideoSeconds: FREE_PROGRESS_VIDEO_SECONDS,
+    maxProjectCount: null
   },
   pro: {
     tier: "pro",
@@ -74,7 +91,10 @@ export const PLAN_ENTITLEMENTS: Record<PlanTier, PlanEntitlements> = {
     localImageLimit: 200,
     localVideoLimit: 50,
     musicTrackLimit: 10,
-    backupStorageBytes: 2 * GIB
+    backupStorageBytes: 2 * GIB,
+    maxProgressPhotos: PRO_PROGRESS_PHOTO_MINIMUM,
+    maxProgressVideoSeconds: PRO_PROGRESS_VIDEO_SECONDS_MINIMUM,
+    maxProjectCount: null
   },
   expert: {
     tier: "expert",
@@ -88,7 +108,10 @@ export const PLAN_ENTITLEMENTS: Record<PlanTier, PlanEntitlements> = {
     localImageLimit: 300,
     localVideoLimit: 100,
     musicTrackLimit: 20,
-    backupStorageBytes: 5 * GIB
+    backupStorageBytes: 5 * GIB,
+    maxProgressPhotos: null,
+    maxProgressVideoSeconds: null,
+    maxProjectCount: null
   }
 };
 
