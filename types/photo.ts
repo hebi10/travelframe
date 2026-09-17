@@ -68,6 +68,8 @@ export type SaveCapturedPhotoInput = {
   ratioLabel?: PhotoRatioLabel;
   colorAdjustment?: CameraColorAdjustment;
   localImageLimit?: number;
+  projectId?: string;
+  sequence?: number;
 };
 
 export type SaveEditedPhotoInput = {
@@ -82,4 +84,6 @@ export type SaveEditedPhotoInput = {
   renderedWidth?: number;
   renderedHeight?: number;
   localImageLimit?: number;
+  projectId?: string;
+  sequence?: number;
 };
