@@ -106,16 +106,21 @@ export const saveCapturedPhoto = async (input: SaveCapturedPhotoInput) => {
     });
     return projectPhoto;
   } catch (error) {
-    if (projectPhoto) {
-      await cleanupOrphanProjectFiles(projectPhoto);
+    try {
+      if (projectPhoto) {
+        await cleanupOrphanProjectFiles(projectPhoto);
+      }
+      if (legacyPhoto) {
+        await rollbackLegacyProjectDraft(legacyPhoto);
+      }
+    } catch {
+      // Preserve the original capture/save error; cleanup is best-effort.
+    } finally {
+      finishBodyFrameCameraCapture({
+        sequence: resolvedSequence,
+        success: false
+      });
     }
-    if (legacyPhoto) {
-      await rollbackLegacyProjectDraft(legacyPhoto);
-    }
-    finishBodyFrameCameraCapture({
-      sequence: resolvedSequence,
-      success: false
-    });
     throw error;
   }
 };
