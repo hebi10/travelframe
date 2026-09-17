@@ -5,6 +5,7 @@ export type MadeVideoItem = BackupMetadata & {
   id: string;
   uri: string;
   coverUri?: string;
+  projectId?: string;
   createdAt: string;
   title: string;
   ratio: TripClipRatio;
