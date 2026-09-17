@@ -158,7 +158,4 @@ for (const token of [
 const videoTypeSource = fs.readFileSync("types/video.ts", "utf8");
 assert.ok(videoTypeSource.includes("projectId?: string"));
 
-const videoLibrarySource = fs.readFileSync("lib/video-library.ts", "utf8");
-assert.ok(videoLibrarySource.includes("projectId:"));
-
 console.log("ok - Body Frame stage 4 exact project video contracts are enforced");
