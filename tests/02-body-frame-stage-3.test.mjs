@@ -160,7 +160,9 @@ for (const token of [
   "projectId",
   "sequence",
   "projectId: resolvedProjectId",
-  "sequence: resolvedSequence"
+  "sequence: resolvedSequence",
+  "rollbackLegacyProjectDraft",
+  "rollbackLegacyProjectDraft(legacyPhoto)"
 ]) {
   assert.ok(photoLibrarySource.includes(token), `project-aware photo save should contain ${token}`);
 }
