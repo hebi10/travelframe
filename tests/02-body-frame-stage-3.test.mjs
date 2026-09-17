@@ -119,7 +119,10 @@ assert.equal(summary.targetPhotoCount, 100);
 assert.equal(summary.durationSeconds, 0.3);
 assert.equal(summary.nextSequence, 4);
 
-const cameraSource = fs.readFileSync("features/camera/CameraScreen.tsx", "utf8");
+const cameraSource = fs.readFileSync(
+  "features/camera/BodyFrameCameraScreen.tsx",
+  "utf8"
+);
 for (const token of [
   "BodyFrameProjectSwitcher",
   "getBodyProjects",
