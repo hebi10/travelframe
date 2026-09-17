@@ -23,7 +23,7 @@ const toSafePhotoCount = (value: number) =>
 const getSequenceSortValue = (value: unknown) =>
   typeof value === "number" && Number.isInteger(value) && value > 0
     ? value
-    : Number.POSITIVE_INFINITY;
+    : null;
 
 const getCreatedAtSortValue = (value: unknown) => {
   if (typeof value !== "string") {
@@ -41,16 +41,25 @@ export const getBodyFrameVideoPhotos = <T extends BodyFrameVideoPhotoLike>(
   photos
     .filter((photo) => photo.projectId === projectId)
     .sort((first, second) => {
-      const sequenceDiff =
-        getSequenceSortValue(first.sequence) - getSequenceSortValue(second.sequence);
-      if (Number.isFinite(sequenceDiff) && sequenceDiff !== 0) {
-        return sequenceDiff;
+      const firstSequence = getSequenceSortValue(first.sequence);
+      const secondSequence = getSequenceSortValue(second.sequence);
+
+      if (firstSequence !== null || secondSequence !== null) {
+        if (firstSequence === null) {
+          return 1;
+        }
+        if (secondSequence === null) {
+          return -1;
+        }
+        if (firstSequence !== secondSequence) {
+          return firstSequence - secondSequence;
+        }
       }
 
-      const createdAtDiff =
-        getCreatedAtSortValue(first.createdAt) - getCreatedAtSortValue(second.createdAt);
-      if (Number.isFinite(createdAtDiff) && createdAtDiff !== 0) {
-        return createdAtDiff;
+      const firstCreatedAt = getCreatedAtSortValue(first.createdAt);
+      const secondCreatedAt = getCreatedAtSortValue(second.createdAt);
+      if (firstCreatedAt !== secondCreatedAt) {
+        return firstCreatedAt - secondCreatedAt;
       }
 
       return first.id.localeCompare(second.id);
