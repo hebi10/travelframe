@@ -2,6 +2,7 @@ import * as FileSystem from "expo-file-system/legacy";
 import { manipulateAsync, SaveFormat } from "expo-image-manipulator";
 import { Image } from "react-native";
 
+import { BODY_FRAME_MEDIA_POLICY } from "@/constants/body-frame";
 import {
   DEFAULT_IMAGE_QUALITY,
   IMAGE_QUALITY_OPTIONS,
@@ -152,6 +153,47 @@ export const optimizeImageForStorage = async ({
       size,
       quality: option.quality,
       imageQuality: option.value,
+      originalSize
+    };
+  } catch {
+    throw new Error(IMAGE_OPTIMIZATION_FAILED_MESSAGE);
+  }
+};
+
+export const optimizeBodyFramePhotoForStorage = async ({
+  uri,
+  width,
+  height
+}: {
+  uri: string;
+  width?: number | null;
+  height?: number | null;
+}): Promise<OptimizedBackupImage> => {
+  try {
+    const originalSize = await getLocalFileSize(uri);
+    const dimensions = await resolveImageDimensions({ uri, width, height });
+    const resizeAction = getImageResizeAction({
+      width: dimensions?.width,
+      height: dimensions?.height,
+      maxLongSide: BODY_FRAME_MEDIA_POLICY.appImageMaxLongSide
+    });
+    const result = await manipulateAsync(
+      uri,
+      resizeAction ? [resizeAction] : [],
+      {
+        compress: BODY_FRAME_MEDIA_POLICY.appImageJpegQuality,
+        format: SaveFormat.JPEG
+      }
+    );
+    const size = await getLocalFileSize(result.uri);
+
+    return {
+      uri: result.uri,
+      width: result.width ?? dimensions?.width ?? null,
+      height: result.height ?? dimensions?.height ?? null,
+      size,
+      quality: BODY_FRAME_MEDIA_POLICY.appImageJpegQuality,
+      imageQuality: "high",
       originalSize
     };
   } catch {
