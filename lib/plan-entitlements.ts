@@ -1,7 +1,3 @@
-import {
-  BODY_FRAME_FREE_LIMITS,
-  BODY_FRAME_PRO_MINIMUMS
-} from "@/constants/body-frame";
 import type { UserSubscription } from "@/lib/subscription";
 
 export type PlanTier = "guest" | "free" | "ad_remove" | "pro" | "expert";
@@ -26,6 +22,11 @@ export type PlanEntitlements = {
 
 export const GIB = 1024 * 1024 * 1024;
 
+const FREE_PROGRESS_PHOTO_LIMIT = 100;
+const FREE_PROGRESS_VIDEO_SECONDS = 10;
+const PRO_PROGRESS_PHOTO_MINIMUM = 365;
+const PRO_PROGRESS_VIDEO_SECONDS_MINIMUM = 36.5;
+
 export const PLAN_ENTITLEMENTS: Record<PlanTier, PlanEntitlements> = {
   guest: {
     tier: "guest",
@@ -40,8 +41,8 @@ export const PLAN_ENTITLEMENTS: Record<PlanTier, PlanEntitlements> = {
     localVideoLimit: 30,
     musicTrackLimit: 0,
     backupStorageBytes: 0,
-    maxProgressPhotos: BODY_FRAME_FREE_LIMITS.maxProgressPhotos,
-    maxProgressVideoSeconds: BODY_FRAME_FREE_LIMITS.maxProgressVideoSeconds,
+    maxProgressPhotos: FREE_PROGRESS_PHOTO_LIMIT,
+    maxProgressVideoSeconds: FREE_PROGRESS_VIDEO_SECONDS,
     maxProjectCount: null
   },
   free: {
@@ -57,8 +58,8 @@ export const PLAN_ENTITLEMENTS: Record<PlanTier, PlanEntitlements> = {
     localVideoLimit: 30,
     musicTrackLimit: 0,
     backupStorageBytes: 0,
-    maxProgressPhotos: BODY_FRAME_FREE_LIMITS.maxProgressPhotos,
-    maxProgressVideoSeconds: BODY_FRAME_FREE_LIMITS.maxProgressVideoSeconds,
+    maxProgressPhotos: FREE_PROGRESS_PHOTO_LIMIT,
+    maxProgressVideoSeconds: FREE_PROGRESS_VIDEO_SECONDS,
     maxProjectCount: null
   },
   ad_remove: {
@@ -74,8 +75,8 @@ export const PLAN_ENTITLEMENTS: Record<PlanTier, PlanEntitlements> = {
     localVideoLimit: 30,
     musicTrackLimit: 0,
     backupStorageBytes: 0,
-    maxProgressPhotos: BODY_FRAME_FREE_LIMITS.maxProgressPhotos,
-    maxProgressVideoSeconds: BODY_FRAME_FREE_LIMITS.maxProgressVideoSeconds,
+    maxProgressPhotos: FREE_PROGRESS_PHOTO_LIMIT,
+    maxProgressVideoSeconds: FREE_PROGRESS_VIDEO_SECONDS,
     maxProjectCount: null
   },
   pro: {
@@ -91,8 +92,8 @@ export const PLAN_ENTITLEMENTS: Record<PlanTier, PlanEntitlements> = {
     localVideoLimit: 50,
     musicTrackLimit: 10,
     backupStorageBytes: 2 * GIB,
-    maxProgressPhotos: BODY_FRAME_PRO_MINIMUMS.maxProgressPhotos,
-    maxProgressVideoSeconds: BODY_FRAME_PRO_MINIMUMS.maxProgressVideoSeconds,
+    maxProgressPhotos: PRO_PROGRESS_PHOTO_MINIMUM,
+    maxProgressVideoSeconds: PRO_PROGRESS_VIDEO_SECONDS_MINIMUM,
     maxProjectCount: null
   },
   expert: {
