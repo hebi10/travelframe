@@ -1,3 +1,3 @@
-import CameraScreen from "@/features/camera/CameraScreen";
+import BodyFrameCameraScreen from "@/features/camera/BodyFrameCameraScreen";
 
-export default CameraScreen;
+export default BodyFrameCameraScreen;
