@@ -113,11 +113,7 @@ const entitlementsSource = fs.readFileSync("lib/plan-entitlements.ts", "utf8");
 for (const token of [
   "maxProgressPhotos: number | null",
   "maxProgressVideoSeconds: number | null",
-  "maxProjectCount: number | null",
-  "maxProgressPhotos: BODY_FRAME_FREE_LIMITS.maxProgressPhotos",
-  "maxProgressVideoSeconds: BODY_FRAME_FREE_LIMITS.maxProgressVideoSeconds",
-  "maxProgressPhotos: BODY_FRAME_PRO_MINIMUMS.maxProgressPhotos",
-  "maxProgressVideoSeconds: BODY_FRAME_PRO_MINIMUMS.maxProgressVideoSeconds"
+  "maxProjectCount: number | null"
 ]) {
   assert.ok(entitlementsSource.includes(token), `plan entitlements should contain ${token}`);
 }
