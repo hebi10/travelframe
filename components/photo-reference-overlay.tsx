@@ -49,6 +49,10 @@ export const PhotoReferenceOverlay = forwardRef<
     getBodyFrameCameraSessionSnapshot
   );
   const manualProjectRevisionRef = useRef(session.projectRevision);
+  const manualSignalRef = useRef<{ uri: string | null; resetKey: number }>({
+    uri: null,
+    resetKey: -1
+  });
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
   const scale = useSharedValue(1);
@@ -59,9 +63,15 @@ export const PhotoReferenceOverlay = forwardRef<
   const startRotation = useSharedValue(0);
 
   useEffect(() => {
-    if (uri) {
+    const manualSignalChanged =
+      manualSignalRef.current.uri !== uri ||
+      manualSignalRef.current.resetKey !== resetKey;
+
+    if (uri && manualSignalChanged) {
       manualProjectRevisionRef.current = session.projectRevision;
     }
+
+    manualSignalRef.current = { uri, resetKey };
   }, [resetKey, session.projectRevision, uri]);
 
   const effectiveUri =
