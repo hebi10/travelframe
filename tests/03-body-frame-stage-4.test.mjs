@@ -89,7 +89,7 @@ assert.ok(
   "video tab should use BodyFrameVideoScreen"
 );
 
-const wrapperSource = fs.readFileSync(
+const screenSource = fs.readFileSync(
   "features/trip-clip/BodyFrameVideoScreen.tsx",
   "utf8"
 );
@@ -98,26 +98,26 @@ for (const token of [
   "getLastActiveProjectId",
   "setLastActiveProjectId",
   "selectActiveBodyProject",
-  "bodyFrameProjectId"
-]) {
-  assert.ok(wrapperSource.includes(token), `Body Frame video wrapper should contain ${token}`);
-}
-
-const tripClipSource = fs.readFileSync("features/trip-clip/TripClipScreen.tsx", "utf8");
-for (const token of [
-  "bodyFrameProjectId?: string | null",
-  "isBodyFrameMode",
-  "BODY_FRAME_VIDEO_FPS",
   "getBodyFrameVideoPhotos",
   "createBodyFrameVideoDurations",
   "getBodyFrameVideoDuration",
   "getBodyFrameVideoTotalFrames",
+  "BODY_FRAME_VIDEO_FPS",
+  "BODY_FRAME_VIDEO_MAX_OUTPUT_SIZE",
   "BODY_FRAME_VIDEO_RATIO",
   "BODY_FRAME_VIDEO_TRANSITION",
   "BODY_FRAME_VIDEO_TRANSITION_DURATION",
-  "projectId: bodyFrameProjectId ?? undefined"
+  "TripClipRecordingCanvas",
+  "OptionalRecordingView",
+  "useOptionalViewRecorder",
+  "getRecordingFrame",
+  "saveVideoToLibrary",
+  "saveMadeVideo",
+  "fps: BODY_FRAME_VIDEO_FPS",
+  "codec: \"h264\"",
+  "projectId: activeProject.id"
 ]) {
-  assert.ok(tripClipSource.includes(token), `TripClip Body Frame mode should contain ${token}`);
+  assert.ok(screenSource.includes(token), `Body Frame video screen should contain ${token}`);
 }
 
 const videoTypeSource = fs.readFileSync("types/video.ts", "utf8");
