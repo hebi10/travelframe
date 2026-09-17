@@ -83,6 +83,41 @@ assert.deepEqual(video.createBodyFrameVideoDurations(projectPhotos), {
   "a-3": 0.1
 });
 
+const malformedPhotos = [
+  {
+    id: "legacy-early",
+    uri: "file:///legacy-early.jpg",
+    createdAt: "2026-01-01T00:00:00.000Z",
+    projectId: "project-a"
+  },
+  {
+    id: "valid-2",
+    uri: "file:///valid-2.jpg",
+    createdAt: "2026-09-02T00:00:00.000Z",
+    projectId: "project-a",
+    sequence: 2
+  },
+  {
+    id: "valid-1",
+    uri: "file:///valid-1.jpg",
+    createdAt: "2026-09-01T00:00:00.000Z",
+    projectId: "project-a",
+    sequence: 1
+  },
+  {
+    id: "legacy-late",
+    uri: "file:///legacy-late.jpg",
+    createdAt: "2026-02-01T00:00:00.000Z",
+    projectId: "project-a",
+    sequence: 0
+  }
+];
+assert.deepEqual(
+  video.getBodyFrameVideoPhotos(malformedPhotos, "project-a").map((photo) => photo.id),
+  ["valid-1", "valid-2", "legacy-early", "legacy-late"],
+  "valid positive sequences must stay ahead of malformed legacy records"
+);
+
 const routeSource = fs.readFileSync("app/(tabs)/trip-clip.tsx", "utf8");
 assert.ok(
   routeSource.includes("BodyFrameVideoScreen"),
