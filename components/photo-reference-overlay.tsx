@@ -1,5 +1,11 @@
 import { Image } from "expo-image";
-import { forwardRef, useEffect, useImperativeHandle } from "react";
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useSyncExternalStore
+} from "react";
 import { StyleSheet } from "react-native";
 import {
   Gesture,
@@ -9,6 +15,11 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue
 } from "react-native-reanimated";
+
+import {
+  getBodyFrameCameraSessionSnapshot,
+  subscribeBodyFrameCameraSession
+} from "@/lib/body-frame-camera-session";
 
 type PhotoReferenceOverlayProps = {
   uri: string | null;
@@ -32,6 +43,12 @@ export const PhotoReferenceOverlay = forwardRef<
   locked,
   resetKey
 }: PhotoReferenceOverlayProps, ref) {
+  const session = useSyncExternalStore(
+    subscribeBodyFrameCameraSession,
+    getBodyFrameCameraSessionSnapshot,
+    getBodyFrameCameraSessionSnapshot
+  );
+  const manualProjectRevisionRef = useRef(session.projectRevision);
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
   const scale = useSharedValue(1);
@@ -42,11 +59,29 @@ export const PhotoReferenceOverlay = forwardRef<
   const startRotation = useSharedValue(0);
 
   useEffect(() => {
+    if (uri) {
+      manualProjectRevisionRef.current = session.projectRevision;
+    }
+  }, [resetKey, session.projectRevision, uri]);
+
+  const effectiveUri =
+    uri && manualProjectRevisionRef.current === session.projectRevision
+      ? uri
+      : session.automaticReferenceUri;
+
+  useEffect(() => {
     translateX.value = 0;
     translateY.value = 0;
     scale.value = 1;
     rotation.value = 0;
-  }, [resetKey, rotation, scale, translateX, translateY]);
+  }, [
+    resetKey,
+    session.projectRevision,
+    rotation,
+    scale,
+    translateX,
+    translateY
+  ]);
 
   useImperativeHandle(ref, () => ({
     reset: () => {
@@ -105,14 +140,14 @@ export const PhotoReferenceOverlay = forwardRef<
     ]
   }));
 
-  if (!uri) {
+  if (!effectiveUri) {
     return null;
   }
 
   return (
     <GestureDetector gesture={composedGesture}>
       <Animated.View style={[styles.layer, animatedStyle]}>
-        <Image source={{ uri }} style={styles.image} contentFit="contain" />
+        <Image source={{ uri: effectiveUri }} style={styles.image} contentFit="contain" />
       </Animated.View>
     </GestureDetector>
   );
