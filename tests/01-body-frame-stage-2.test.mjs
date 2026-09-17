@@ -108,49 +108,55 @@ for (const token of [
   assert.ok(projectLibrarySource.includes(token), `project library should contain ${token}`);
 }
 
-const photoLibrarySource = fs.readFileSync("lib/photo-library.ts", "utf8");
+const storageSource = fs.readFileSync("lib/body-frame-photo-storage.ts", "utf8");
 for (const token of [
-  "getLastActiveProjectId",
   "buildProjectPhotoRelativePath",
   "buildProjectPreviewRelativePath",
   "optimizeBodyFramePhotoForStorage",
   "BODY_FRAME_MEDIA_POLICY.previewJpegQuality",
-  "getPhotosByProjectId",
-  "getNextPhotoSequence",
-  "replacePhotosForMigration"
+  "storeBodyFramePhotoFile",
+  "migratePhotoFilesToProject",
+  "cleanupMigratedSourceFiles"
 ]) {
-  assert.ok(photoLibrarySource.includes(token), `photo library should contain ${token}`);
+  assert.ok(storageSource.includes(token), `Body Frame photo storage should contain ${token}`);
 }
+assert.ok(
+  storageSource.includes(".migrating") &&
+    storageSource.indexOf("FileSystem.copyAsync") < storageSource.indexOf("FileSystem.moveAsync"),
+  "project file replacement should copy through a temporary file before final move"
+);
 
 const photoTypeSource = fs.readFileSync("types/photo.ts", "utf8");
-assert.ok(
-  photoTypeSource.includes("projectId?: string") && photoTypeSource.includes("sequence?: number"),
-  "photo save inputs should remain project-compatible"
-);
+for (const token of ["projectId?: string", "sequence?: number"]) {
+  assert.ok(photoTypeSource.includes(token), `photo types should contain ${token}`);
+}
 
 const migrationSource = fs.readFileSync("lib/body-frame-stage2-migration.ts", "utf8");
 for (const token of [
   'BODY_FRAME_STAGE2_MIGRATION_KEY = "body-frame.stage-2-migration.v1"',
   "ensureBodyFrameStage2Migration",
-  "legacy-photos",
+  "LEGACY_BODY_PROJECT_ID",
   "replaceBodyProjects",
-  "replacePhotosForMigration",
+  "replacePhotosFromBackup",
   "setLastActiveProjectId"
 ]) {
   assert.ok(migrationSource.includes(token), `migration should contain ${token}`);
 }
 const persistProjectsIndex = migrationSource.indexOf("await replaceBodyProjects");
-const persistPhotosIndex = migrationSource.indexOf("await replacePhotosForMigration");
+const persistPhotosIndex = migrationSource.indexOf("await replacePhotosFromBackup");
 const cleanupIndex = migrationSource.indexOf("await cleanupMigratedSourceFiles");
 assert.ok(persistProjectsIndex >= 0, "migration should persist project metadata");
 assert.ok(persistPhotosIndex > persistProjectsIndex, "migration should persist photos after projects");
 assert.ok(cleanupIndex > persistPhotosIndex, "source cleanup must happen only after metadata persistence");
 
 const imageUtilsSource = fs.readFileSync("lib/image-backup-utils.ts", "utf8");
-assert.ok(
-  imageUtilsSource.includes("optimizeBodyFramePhotoForStorage"),
-  "image utils should expose the fixed Body Frame local-storage optimizer"
-);
+for (const token of [
+  "optimizeBodyFramePhotoForStorage",
+  "BODY_FRAME_MEDIA_POLICY.appImageMaxLongSide",
+  "BODY_FRAME_MEDIA_POLICY.appImageJpegQuality"
+]) {
+  assert.ok(imageUtilsSource.includes(token), `image utils should contain ${token}`);
+}
 
 const layoutSource = fs.readFileSync("app/_layout.tsx", "utf8");
 assert.ok(
