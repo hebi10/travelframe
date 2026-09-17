@@ -8,12 +8,14 @@ import { AuthProvider } from "@/lib/auth-context";
 import { useAppAppearance } from "@/lib/app-appearance";
 import { initializeAdMob } from "@/lib/admob-config";
 import { FontLoadProvider } from "@/lib/app-fonts";
+import { ensureBodyFrameStage2Migration } from "@/lib/body-frame-stage2-migration";
 
 function AppStack() {
   const { palette, effectiveThemeMode, fontSizeScale, emphasisWeight, fontFamily } = useAppAppearance();
 
   useEffect(() => {
     void initializeAdMob();
+    void ensureBodyFrameStage2Migration().catch(() => undefined);
   }, []);
 
   return (
