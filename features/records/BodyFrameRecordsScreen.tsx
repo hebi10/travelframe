@@ -16,7 +16,7 @@ import {
   getBodyProjectPhotos,
   getBodyProjectProgressSummary
 } from "@/lib/body-frame-camera-project";
-import { getBodyProjects } from "@/lib/body-project-library";
+import { archiveBodyProject, getBodyProjects } from "@/lib/body-project-library";
 import { setLastActiveProjectId } from "@/lib/body-project-preferences";
 import { getPhotos } from "@/lib/photo-library";
 import { useAppAppearance } from "@/lib/app-appearance";
@@ -49,6 +49,7 @@ export default function BodyFrameRecordsScreen() {
   const insets = useSafeAreaInsets();
   const { palette } = useAppAppearance();
   const [projects, setProjects] = useState<BodyProject[]>([]);
+  const [archivedProjects, setArchivedProjects] = useState<BodyProject[]>([]);
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -60,6 +61,7 @@ export default function BodyFrameRecordsScreen() {
         getPhotos()
       ]);
       setProjects(storedProjects.filter((project) => !project.archived));
+      setArchivedProjects(storedProjects.filter((project) => project.archived));
       setPhotos(storedPhotos);
     } finally {
       setLoading(false);
@@ -89,6 +91,15 @@ export default function BodyFrameRecordsScreen() {
       params: { id: project.id }
     });
   }, []);
+
+  const restoreProject = useCallback(
+    async (project: BodyProject) => {
+      await archiveBodyProject(project.id, false);
+      await setLastActiveProjectId(project.id);
+      await reload();
+    },
+    [reload]
+  );
 
   if (loading) {
     return (
@@ -240,6 +251,53 @@ export default function BodyFrameRecordsScreen() {
           </View>
         )}
 
+        {archivedProjects.length > 0 ? (
+          <View style={styles.archivedSection}>
+            <Text style={[styles.archivedTitle, { color: palette.text }]}>
+              보관된 프로젝트
+            </Text>
+            <Text style={[styles.archivedDetail, { color: palette.muted }]}>
+              보관한 프로젝트는 촬영 목록에서 숨겨집니다. 필요할 때 다시 복원할 수 있습니다.
+            </Text>
+            <View style={styles.archivedList}>
+              {archivedProjects.map((project) => (
+                <View
+                  key={project.id}
+                  style={[
+                    styles.archivedRow,
+                    {
+                      borderColor: palette.line,
+                      backgroundColor: palette.surface
+                    }
+                  ]}
+                >
+                  <View style={styles.archivedCopy}>
+                    <Text
+                      numberOfLines={1}
+                      style={[styles.archivedName, { color: palette.text }]}
+                    >
+                      {project.name}
+                    </Text>
+                    <Text style={[styles.archivedMeta, { color: palette.muted }]}>
+                      목표 {project.targetPhotoCount}장 · 기준{" "}
+                      {project.referenceMode === "first" ? "첫 사진" : "최근 사진"}
+                    </Text>
+                  </View>
+                  <Pressable
+                    accessibilityRole="button"
+                    style={[styles.restoreButton, { borderColor: palette.line }]}
+                    onPress={() => void restoreProject(project)}
+                  >
+                    <Text style={[styles.restoreButtonText, { color: palette.text }]}>
+                      복원
+                    </Text>
+                  </Pressable>
+                </View>
+              ))}
+            </View>
+          </View>
+        ) : null}
+
       </ScrollView>
 
       <AppGuideOverlay tabKey="studio" />
@@ -351,6 +409,57 @@ const styles = StyleSheet.create({
   progressFill: {
     height: "100%",
     borderRadius: 2
+  },
+  archivedSection: {
+    gap: 8,
+    marginTop: 28
+  },
+  archivedTitle: {
+    fontSize: 18,
+    fontWeight: "600"
+  },
+  archivedDetail: {
+    fontSize: 13,
+    lineHeight: 19,
+    marginBottom: 4
+  },
+  archivedList: {
+    gap: 8
+  },
+  archivedRow: {
+    minHeight: 64,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderRadius: 8
+  },
+  archivedCopy: {
+    flex: 1,
+    gap: 3
+  },
+  archivedName: {
+    fontSize: 14,
+    fontWeight: "600"
+  },
+  archivedMeta: {
+    fontSize: 12,
+    lineHeight: 17
+  },
+  restoreButton: {
+    minWidth: 58,
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderRadius: 8
+  },
+  restoreButtonText: {
+    fontSize: 13,
+    fontWeight: "600"
   },
   emptyCard: {
     gap: 12,
