@@ -107,6 +107,14 @@ export const normalizeBodyMeasurementEntry = (
     typeof record.note === "string" && record.note.trim()
       ? record.note.trim().slice(0, 500)
       : undefined;
+  const sourceRecordId =
+    typeof record.sourceRecordId === "string" && record.sourceRecordId.trim()
+      ? record.sourceRecordId.trim()
+      : undefined;
+  const sourceAppPackage =
+    typeof record.sourceAppPackage === "string" && record.sourceAppPackage.trim()
+      ? record.sourceAppPackage.trim()
+      : undefined;
 
   return {
     id,
@@ -137,7 +145,9 @@ export const normalizeBodyMeasurementEntry = (
       ? { waistCm: normalizeOptionalNumber(record.waistCm, measurementRanges.waistCm) }
       : {}),
     ...(note ? { note } : {}),
-    source: record.source === "health_connect" ? "health_connect" : "manual"
+    source: record.source === "health_connect" ? "health_connect" : "manual",
+    ...(sourceRecordId ? { sourceRecordId } : {}),
+    ...(sourceAppPackage ? { sourceAppPackage } : {})
   };
 };
 
