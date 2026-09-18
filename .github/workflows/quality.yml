@@ -34,6 +34,12 @@ jobs:
       - name: Format / Lint
         run: npm run format:check
 
+      - name: Prebuild Android
+        run: npm run android:prebuild:ci
+
+      - name: Release Source Verify
+        run: npm run release:verify
+
       - name: Test
         run: npm test
 
@@ -109,6 +115,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Prebuild Android
+        run: npm run android:prebuild:ci
 
       - name: Verify Android Kotlin
         run: npm run android:verify:kotlin
