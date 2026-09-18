@@ -15,96 +15,64 @@ assert.ok(
   "app launch should open the camera tab after removing home"
 );
 
-assert.ok(
-  !tabsLayoutSource.includes('name="home"'),
-  "home should not be rendered as a bottom tab"
-);
-assert.ok(
-  tabsLayoutSource.includes('name="trip-clip"'),
-  "trip clip route should remain registered"
-);
-assert.ok(
-  /name="trip-clip"[\s\S]*?href: null[\s\S]*?tabBarStyle: \{ display: "none" \}/.test(
-    tabsLayoutSource
-  ),
-  "clip should be reachable as a hidden route without occupying a bottom tab"
-);
-assert.ok(
-  /name="account"[\s\S]*?title: isLoggedIn \? "마이페이지" : "로그인"[\s\S]*?tabBarIcon: \(\{ focused \}\) => <TabGlyph kind="account" focused=\{focused\} \/>/.test(
-    tabsLayoutSource
-  ),
-  "account should occupy a bottom tab with login or my page label"
-);
+assert.ok(!tabsLayoutSource.includes('name="home"'), "home should not be rendered as a bottom tab");
 
 for (const tabTitle of [
   'title: "촬영"',
-  'title: isLoggedIn ? "마이페이지" : "로그인"',
-  'title: "보관함"',
+  'title: "기록"',
+  'title: "영상"',
   'title: "설정"'
 ]) {
   assert.ok(tabsLayoutSource.includes(tabTitle), `bottom tabs should include ${tabTitle}`);
 }
 
 assert.ok(
-  fs.existsSync("app/(tabs)/trip-clip.tsx"),
-  "trip clip route should live inside the tabs group"
+  /name="account"[\s\S]*?href: null/.test(tabsLayoutSource),
+  "account should remain routable but hidden from the bottom navigation"
 );
 assert.ok(
-  !fs.existsSync("app/(tabs)/home.tsx"),
-  "home route file should be removed from the tabs group"
+  !/name="trip-clip"[\s\S]*?href: null/.test(tabsLayoutSource),
+  "video should occupy a visible bottom tab"
 );
+assert.ok(
+  !/name="camera"[\s\S]*?tabBarStyle: \{ display: "none" \}/.test(tabsLayoutSource),
+  "camera should keep the shared bottom navigation visible"
+);
+
+assert.ok(fs.existsSync("app/(tabs)/trip-clip.tsx"), "video route should live inside the tabs group");
+assert.ok(!fs.existsSync("app/(tabs)/home.tsx"), "home route file should remain removed");
 assert.ok(
   !rootLayoutSource.includes('<Stack.Screen name="trip-clip"'),
-  "trip clip should no longer be registered as a standalone stack screen"
+  "video should remain a tabs route rather than a duplicate standalone stack route"
 );
 
-assert.ok(
-  !cameraSource.includes('router.push("/home")'),
-  "camera top-left button should no longer navigate to home"
-);
-assert.ok(
-  cameraSource.includes("styles.accountIconButton"),
-  "camera top-left button style should be named for the account entry"
-);
+assert.ok(!cameraSource.includes('router.push("/home")'), "camera must not navigate to removed home");
 assert.ok(
   cameraSource.includes('router.push("/account")'),
-  "camera top-left button should navigate to account"
+  "camera account shortcut may continue to open the hidden account route"
 );
+
+assert.ok(!tabGlyphSource.includes('"home"'), "tab glyph variants should not include home");
+assert.ok(tabGlyphSource.includes('"video"'), "tab glyph variants should include video");
+assert.ok(!tabGlyphSource.includes('"account"'), "hidden account route should not need a bottom-tab glyph");
 assert.ok(
-  cameraSource.includes('name="user"'),
-  "camera top-left button should use a user icon"
-);
-assert.ok(
-  cameraSource.includes('user ? "마이페이지로 이동" : "로그인으로 이동"'),
-  "camera account button should expose a login or my page accessibility label"
+  tabGlyphSource.includes("activeIndicator"),
+  "active bottom tab should use a short underline indicator"
 );
 
 assert.ok(
-  !tabGlyphSource.includes('"home"'),
-  "tab glyph variants should no longer include home"
-);
-assert.ok(
-  tabGlyphSource.includes('"account"'),
-  "tab glyph variants should include account"
-);
-
-assert.ok(
-  !useAppGuideSource.includes('tabKey !== "camera"'),
-  "first-run app guide should not be limited to the camera tab"
-);
-assert.ok(
-  !useAppGuideSource.includes('tabKey !== "home"'),
-  "app guide should not depend on the removed home tab"
+  !useAppGuideSource.includes('tabKey !== "camera"') &&
+    !useAppGuideSource.includes('tabKey !== "home"'),
+  "first-run app guide should work across Body Frame tabs"
 );
 assert.ok(
   !guideProgressSource.includes('tabKey === "home"'),
   "guide progress should not keep removed home tab checks"
 );
-assert.ok(
-  appGuideOverlaySource.includes(
-    "const activeVisualIndex = Math.min(stepIndex, guideVisualSlides.length - 1)"
-  ),
-  "guide visuals should stay within available slides when camera guide has more steps"
+assert.equal(
+  appGuideOverlaySource.includes("guideVisualSlides"),
+  false,
+  "Body Frame onboarding should not depend on old travel visual slides"
 );
 
-console.log("ok - home removed while account remains in bottom tabs");
+console.log("ok - Body Frame uses four primary bottom tabs");
