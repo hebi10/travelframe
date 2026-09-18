@@ -141,6 +141,7 @@ $task = switch ($Mode) {
 }
 $arguments = @(
   "--no-daemon",
+  "--build-cache",
   "--console=plain",
   "-Pkotlin.compiler.execution.strategy=in-process"
 )
