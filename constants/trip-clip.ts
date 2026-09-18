@@ -62,7 +62,7 @@ export const MUSIC_TRACKS: MusicTrack[] = [
   {
     id: "calm",
     label: "Calm",
-    detail: "부드럽고 느린 여행 무드입니다.",
+    detail: "부드럽고 느린 변화 기록 무드입니다.",
     source: require("../assets/audio/calm.wav")
   },
   {
