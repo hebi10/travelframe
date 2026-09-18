@@ -9,6 +9,7 @@ import {
   type BodyMeasurementSettings
 } from "@/types/body-measurement";
 
+// Local-only AsyncStorage identifiers. These values are not credentials or remote API keys.
 export const BODY_MEASUREMENT_STORAGE_ID = "body-frame.measurements.v1";
 export const BODY_MEASUREMENT_SETTINGS_STORAGE_ID =
   "body-frame.measurement-settings.v1";
