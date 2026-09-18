@@ -1426,7 +1426,7 @@ export default function SettingsScreen() {
           />
           <ActionRow
             label="기본 비율"
-            detail="여행 클립을 열 때 먼저 선택되는 화면 비율"
+            detail="변화 영상을 열 때 먼저 선택되는 화면 비율"
             mark={settings.defaultRatio}
             onPress={() => setActiveSetting("defaultRatio")}
           />
@@ -1598,7 +1598,7 @@ export default function SettingsScreen() {
                     <OptionButton
                       key={color.label}
                       label={color.label}
-                      detail="카메라, 사진 편집, 여행 클립에 공통 적용"
+                      detail="카메라, 사진 편집, 변화 영상에 공통 적용"
                       active={settings.guideColor === color.value}
                       onPress={() => updateSetting({ guideColor: color.value, guideVisible: true })}
                     />
@@ -1651,7 +1651,7 @@ export default function SettingsScreen() {
                     <OptionButton
                       key={ratio}
                       label={ratio}
-                      detail="여행 클립 기본 화면 비율"
+                      detail="변화 영상 기본 화면 비율"
                       active={settings.defaultRatio === ratio}
                       onPress={() => updateSetting({ defaultRatio: ratio as TripClipRatio })}
                     />
