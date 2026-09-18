@@ -109,6 +109,19 @@ for (const token of [
   assert.ok(detailSource.includes(token), `project detail should contain ${token}`);
 }
 
+for (const token of [
+  "getPlanEntitlements",
+  "isBodyFrameProjectTargetAllowed",
+  "maxProgressPhotos",
+  "getBodyFrameUpgradeLabel",
+  "플랜 보기"
+]) {
+  assert.ok(
+    detailSource.includes(token),
+    `project detail target editing should preserve Stage 5 plan limit via ${token}`
+  );
+}
+
 assert.ok(
   fs.existsSync("features/settings/BodyFrameSettingsScreen.tsx"),
   "Body Frame settings home should exist"
