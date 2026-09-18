@@ -271,6 +271,15 @@ const createGooglePlayBillingService = ({
         ])
       );
 
+      const linkedSnapshot =
+        linkedRef ? snapshots[1 + productIds.length] ?? null : null;
+      const linkedProductId =
+        linkedSnapshot?.exists &&
+        linkedSnapshot.data()?.uid === uid &&
+        PRODUCT_IDS.includes(linkedSnapshot.data()?.productId)
+          ? linkedSnapshot.data().productId
+          : null;
+
       const existingProduct = currentProducts[productId];
       const keepAdminOverride =
         existingProduct?.provider === "admin" &&
@@ -286,14 +295,45 @@ const createGooglePlayBillingService = ({
         tokenHash,
         source
       });
+
+      let replacedSubscription = null;
+      if (
+        result.active &&
+        linkedProductId &&
+        linkedProductId !== productId &&
+        currentProducts[linkedProductId]?.provider === "google_play"
+      ) {
+        replacedSubscription = {
+          ...currentProducts[linkedProductId],
+          plan: "free",
+          status: "expired",
+          expiresAt: new Date().toISOString(),
+          googleState: "SUBSCRIPTION_STATE_REPLACED",
+          verificationSource: source,
+          replacedByProductId: productId,
+          updatedAt: FieldValue.serverTimestamp()
+        };
+      }
+
       const nextProduct = keepAdminOverride
         ? existingProduct
         : googleSubscription;
       const nextProducts = {
         ...currentProducts,
+        ...(replacedSubscription && linkedProductId
+          ? { [linkedProductId]: replacedSubscription }
+          : {}),
         [productId]: nextProduct
       };
       const effective = getEffectiveSubscription(nextProducts);
+
+      if (replacedSubscription && linkedProductId) {
+        transaction.set(
+          productRefs[linkedProductId],
+          replacedSubscription,
+          { merge: true }
+        );
+      }
 
       if (!keepAdminOverride) {
         transaction.set(productRefs[productId], googleSubscription, {
@@ -334,8 +374,6 @@ const createGooglePlayBillingService = ({
       );
 
       if (linkedRef) {
-        const linkedSnapshot =
-          snapshots[1 + productIds.length] ?? null;
         if (
           linkedSnapshot?.exists &&
           linkedSnapshot.data()?.uid === uid
