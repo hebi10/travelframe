@@ -147,6 +147,7 @@ import {
 } from "@/lib/app-settings";
 import {
   getBodyFrameCameraSessionSnapshot,
+  isBodyFrameCameraCaptureBlocked,
   subscribeBodyFrameCameraSession
 } from "@/lib/body-frame-camera-session";
 import { getPlanEntitlements } from "@/lib/plan-entitlements";
@@ -166,9 +167,9 @@ export default function CameraScreen() {
     getBodyFrameCameraSessionSnapshot,
     getBodyFrameCameraSessionSnapshot
   );
-  const bodyFrameCaptureBlocked = Boolean(
-    bodyFrameCameraSession.captureBlockedReason
-  );
+  const bodyFrameCaptureBlocked =
+    Boolean(bodyFrameCameraSession.captureBlockedReason) ||
+    isBodyFrameCameraCaptureBlocked();
   const bodyFrameCaptureAllowed = !bodyFrameCaptureBlocked;
   const cameraRef = useRef<CameraRef>(null);
   const referenceOverlayRef = useRef<PhotoReferenceOverlayHandle>(null);
@@ -447,7 +448,7 @@ export default function CameraScreen() {
     () =>
       isCameraReadyRef.current &&
       isCameraSessionActiveRef.current &&
-      !getBodyFrameCameraSessionSnapshot().captureBlockedReason,
+      !isBodyFrameCameraCaptureBlocked(),
     []
   );
   const selectedCameraRatioAspect = cameraRatioAspect[cameraRatio] ?? undefined;
