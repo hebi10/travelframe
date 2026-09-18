@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { bodyFrameDesign, bodyFrameTypography } from "@/constants/app-theme";
 import { getBodyProjectProgressSummary } from "@/lib/body-frame-camera-project";
 import { isBodyFrameProjectTargetAllowed } from "@/lib/body-frame-plan-limits";
 import type { BodyProject, ReferencePhotoMode } from "@/types/body-project";
@@ -365,9 +366,9 @@ export function BodyFrameProjectSwitcher({
 const styles = StyleSheet.create({
   headerButton: {
     minHeight: 54,
-    borderWidth: 1,
+    borderWidth: bodyFrameDesign.borderWidth,
     borderColor: "#2A2A2E",
-    borderRadius: 8,
+    borderRadius: bodyFrameDesign.buttonRadius,
     backgroundColor: "rgba(11,11,12,0.88)",
     paddingHorizontal: 14,
     paddingVertical: 8,
@@ -399,9 +400,9 @@ const styles = StyleSheet.create({
   sheet: {
     maxHeight: "82%",
     backgroundColor: "#131315",
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
-    borderWidth: 1,
+    borderTopLeftRadius: bodyFrameDesign.bottomSheetRadius,
+    borderTopRightRadius: bodyFrameDesign.bottomSheetRadius,
+    borderWidth: bodyFrameDesign.borderWidth,
     borderColor: "#2A2A2E",
     paddingHorizontal: 16,
     paddingTop: 10
@@ -424,16 +425,14 @@ const styles = StyleSheet.create({
   projectRow: {
     minHeight: 62,
     flexDirection: "row",
-    alignItems: "center",
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#2A2A2E"
+    alignItems: "center"
   },
   projectRowPressed: { opacity: 0.7 },
   projectTextWrap: { flex: 1 },
   projectName: { color: "#F5F5F5", fontSize: 15, fontWeight: "500" },
   projectMeta: { color: "#A0A0A6", fontSize: 12, marginTop: 4 },
   sheetActions: { marginTop: 8 },
-  actionRow: { minHeight: 48, justifyContent: "center" },
+  actionRow: { minHeight: bodyFrameDesign.primaryButtonHeight, justifyContent: "center" },
   actionText: { color: "#F5F5F5", fontSize: 15, fontWeight: "600" },
   actionTextSecondary: { color: "#A0A0A6", fontSize: 14 },
   label: { color: "#A0A0A6", fontSize: 12, marginTop: 12, marginBottom: 8 },
@@ -443,10 +442,10 @@ const styles = StyleSheet.create({
     fontSize: 12
   },
   input: {
-    minHeight: 48,
-    borderWidth: 1,
+    minHeight: bodyFrameDesign.primaryButtonHeight,
+    borderWidth: bodyFrameDesign.borderWidth,
     borderColor: "#2A2A2E",
-    borderRadius: 8,
+    borderRadius: bodyFrameDesign.buttonRadius,
     color: "#F5F5F5",
     backgroundColor: "#0B0B0C",
     paddingHorizontal: 12
@@ -454,15 +453,15 @@ const styles = StyleSheet.create({
   choiceRow: { flexDirection: "row", gap: 8 },
   choice: {
     flex: 1,
-    minHeight: 44,
+    minHeight: bodyFrameDesign.minTouchSize,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1,
+    borderWidth: bodyFrameDesign.borderWidth,
     borderColor: "#2A2A2E",
     borderRadius: 8
   },
   choiceSelected: { borderColor: "#F5F5F5" },
-  choiceText: { color: "#F5F5F5", fontSize: 13 },
+  choiceText: { color: "#F5F5F5", fontSize: bodyFrameTypography.caption },
   referenceChoice: {
     minHeight: 64,
     flexDirection: "row",
@@ -474,7 +473,7 @@ const styles = StyleSheet.create({
     marginBottom: 8
   },
   referenceChoiceSelected: { borderColor: "#F5F5F5" },
-  referenceTitle: { color: "#F5F5F5", fontSize: 14, fontWeight: "500" },
+  referenceTitle: { color: "#F5F5F5", fontSize: bodyFrameTypography.rowTitle, fontWeight: "500" },
   referenceMeta: { color: "#A0A0A6", fontSize: 12, marginTop: 3 },
   limitNotice: {
     marginTop: 10,
@@ -494,7 +493,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1,
+    borderWidth: bodyFrameDesign.borderWidth,
     borderColor: "#F5F5F5",
     borderRadius: 8
   },
