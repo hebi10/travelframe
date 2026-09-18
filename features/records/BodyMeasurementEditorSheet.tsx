@@ -130,6 +130,12 @@ export function BodyMeasurementEditorSheet({
       return;
     }
 
+    const hasValue = activeMetrics.some((metric) => parsed[metric] !== undefined);
+    if (!hasValue && !note.trim()) {
+      Alert.alert("수치 기록", "수치 또는 메모를 하나 이상 입력해 주세요.");
+      return;
+    }
+
     setSaving(true);
     try {
       const saved = await saveBodyMeasurement({
