@@ -5,7 +5,10 @@ const accountConstants = fs.readFileSync(
   "features/account/account-screen.constants.ts",
   "utf8"
 );
-const accountSource = fs.readFileSync("features/account/AccountScreen.tsx", "utf8");
+const billingHookSource = fs.readFileSync(
+  "features/account/hooks/useGooglePlayBilling.ts",
+  "utf8"
+);
 const billingSource = fs.readFileSync("lib/google-play-billing.ts", "utf8");
 const adminSource = fs.readFileSync("admin/admin.js", "utf8");
 const functionsSource = fs.readFileSync("functions/index.js", "utf8");
@@ -21,7 +24,8 @@ assert.match(
   "Expert plan card fallback should defer to Google Play pricing"
 );
 assert.ok(
-  accountSource.includes("getGooglePlayStorePrice") &&
+  billingHookSource.includes("getGooglePlayStorePrice") &&
+    billingHookSource.includes("getStorePrice") &&
     billingSource.includes("displayPrice"),
   "account pricing should prefer the store-provided Google Play display price"
 );
