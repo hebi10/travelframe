@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useFocusEffect } from "expo-router";
 import {
   ActivityIndicator,
   Alert,
@@ -31,7 +32,6 @@ import {
   getEffectiveStorageMode,
   getStorageModeLabel
 } from "@/lib/storage-mode";
-import { type UserMusicTrack } from "@/lib/user-music";
 import { useAppAppearance } from "@/lib/app-appearance";
 import {
   GOOGLE_SIGN_IN_MESSAGES,
@@ -44,7 +44,7 @@ import {
   formatImageBackupUsage
 } from "@/lib/image-backup-utils";
 import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
-import { InfoRow, StatCard, StatusBadge } from "@/features/account/account-screen.components";
+import { InfoRow, StatusBadge } from "@/features/account/account-screen.components";
 import {
   paymentPlans,
   signedInBenefits,
@@ -53,15 +53,19 @@ import {
 } from "@/features/account/account-screen.constants";
 import {
   formatDateTime,
-  formatQuotaValue,
-  formatStorageQuotaValue,
   getAuthErrorMessage
 } from "@/features/account/account-screen.helpers";
 import { createAccountThemedStyles, styles } from "@/features/account/account-screen.styles";
 import { useAccountBackupOverview } from "@/features/account/hooks/useAccountBackup";
-import { useAccountMusicActions } from "@/features/account/hooks/useAccountMusic";
 import { useAccountStats } from "@/features/account/hooks/useAccountStats";
 import { useGooglePlayBilling } from "@/features/account/hooks/useGooglePlayBilling";
+import {
+  getBodyProjectProgressSummary,
+  selectActiveBodyProject
+} from "@/lib/body-frame-camera-project";
+import { getBodyProjects } from "@/lib/body-project-library";
+import { getLastActiveProjectId } from "@/lib/body-project-preferences";
+import { getPhotos } from "@/lib/photo-library";
 
 export default function AccountScreen() {
   const insets = useSafeAreaInsets();
@@ -131,24 +135,60 @@ export default function AccountScreen() {
     [isLoggedIn, subscription]
   );
   const {
-    stats,
     storageMode,
     isSubscriptionProductsLoading,
-    subscriptionProducts,
-    musicTracks,
-    setMusicTracks,
-    weeklyVideoExportUsage
+    subscriptionProducts
   } = useAccountStats({
     user,
     weeklyVideoExportLimit: planEntitlements.weeklyVideoExportLimit
   });
   const backupOverview = useAccountBackupOverview(user);
-  const { isMusicSubmitting, handleUploadMusic, handleDeleteMusic } = useAccountMusicActions({
-    user,
-    musicTrackLimit: planEntitlements.musicTrackLimit,
-    setMessage,
-    setMusicTracks
-  });
+  const [currentProjectSummary, setCurrentProjectSummary] = useState<{
+    name: string;
+    photoCount: number;
+    targetPhotoCount: number;
+  } | null>(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+
+      const loadCurrentProject = async () => {
+        const [projects, photos, lastActiveProjectId] = await Promise.all([
+          getBodyProjects(),
+          getPhotos(),
+          getLastActiveProjectId()
+        ]);
+        const selectedProject = selectActiveBodyProject(projects, lastActiveProjectId);
+
+        if (!isActive) {
+          return;
+        }
+
+        if (!selectedProject) {
+          setCurrentProjectSummary(null);
+          return;
+        }
+
+        const summary = getBodyProjectProgressSummary(photos, selectedProject);
+        setCurrentProjectSummary({
+          name: selectedProject.name,
+          photoCount: summary.photoCount,
+          targetPhotoCount: summary.targetPhotoCount
+        });
+      };
+
+      void loadCurrentProject().catch(() => {
+        if (isActive) {
+          setCurrentProjectSummary(null);
+        }
+      });
+
+      return () => {
+        isActive = false;
+      };
+    }, [])
+  );
   const derivedSubscriptionProducts = useMemo(
     () => getSubscriptionProductsFromSubscription(subscription),
     [subscription]
@@ -166,10 +206,6 @@ export default function AccountScreen() {
     storageMode,
     planEntitlements.canBackupToCloud
   );
-  const localImageUsage =
-    stats.originalPhotos + stats.editedPhotos + stats.imageBundles;
-  const weeklyVideoUsed =
-    weeklyVideoExportUsage?.count ?? 0;
   const subscriptionDisplayName = isSubscriptionCheckFailed
     ? isPremiumSubscription(cachedSubscription)
       ? `확인 불가 (최근 캐시: ${cachedSubscription.productName})`
@@ -289,7 +325,7 @@ export default function AccountScreen() {
       setMessage(null);
       const summary = await restoreCloudBackupToLocal({ user });
       setMessage(
-        `클라우드 백업에서 현재 앱에 없는 항목만 불러왔습니다. 사진 ${summary.photoCount}장, 여러 사진 작업 ${summary.imageBundleCount}개, 영상 ${summary.videoCount}개를 추가했습니다.`
+        `클라우드 백업에서 현재 앱에 없는 항목만 불러왔습니다. 사진 ${summary.photoCount}장, 영상 ${summary.videoCount}개를 추가했습니다.`
       );
     } catch (error) {
       setMessage(getUserFacingErrorMessage(error, "클라우드 백업을 불러오지 못했습니다."));
@@ -301,7 +337,7 @@ export default function AccountScreen() {
   const confirmCloudRestore = () => {
     Alert.alert(
       "백업 데이터 불러오기",
-      "클라우드 백업 데이터 중 현재 앱에 없는 사진, 작업물, 영상만 불러옵니다. 이미 저장된 항목은 그대로 둡니다. 계속하시겠습니까?",
+      "클라우드 백업 데이터 중 현재 앱에 없는 사진과 영상만 불러옵니다. 이미 저장된 항목은 그대로 둡니다. 계속하시겠습니까?",
       [
         { text: "취소", style: "cancel" },
         {
@@ -415,10 +451,10 @@ export default function AccountScreen() {
     <>
       <ScreenShell
         eyebrow="계정"
-        title={isLoggedIn ? "내 계정과 사용 기록" : "로그인하고 작업을 보관하세요."}
+        title={isLoggedIn ? "내 계정과 플랜" : "로그인하고 기록을 보호하세요."}
         description={
           isLoggedIn
-            ? "이메일 인증, 구독 상태, 저장한 작업 기록을 한곳에서 확인합니다."
+            ? "계정, 현재 기록, 백업 상태와 Google Play 플랜을 관리합니다."
             : "로그인하면 Google Play 구매·복원과 계정 기능을 사용할 수 있습니다. 무료 플랜은 프로젝트당 100장과 최대 10초 변화 영상을 지원합니다."
         }
         safeTop
