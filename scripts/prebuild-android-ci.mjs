@@ -1,9 +1,11 @@
 import { spawnSync } from "node:child_process";
+import { createRequire } from "node:module";
 import process from "node:process";
 
-const command = process.platform === "win32" ? "npx.cmd" : "npx";
+const require = createRequire(import.meta.url);
+const expoCli = require.resolve("expo/bin/cli");
 const args = [
-  "expo",
+  expoCli,
   "prebuild",
   "--platform",
   "android",
@@ -12,7 +14,7 @@ const args = [
 ];
 
 console.log("Generating clean Android project for CI/release verification...");
-const result = spawnSync(command, args, {
+const result = spawnSync(process.execPath, args, {
   stdio: "inherit",
   env: {
     ...process.env,
