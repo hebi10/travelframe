@@ -24,6 +24,10 @@ import {
   getBodyProjectById,
   updateBodyProject
 } from "@/lib/body-project-library";
+import {
+  getBodyMeasurementSettings,
+  updateBodyMeasurementSettings
+} from "@/lib/body-measurement-library";
 import { setLastActiveProjectId } from "@/lib/body-project-preferences";
 import {
   getBodyFrameUpgradeLabel,
@@ -34,6 +38,12 @@ import { useAppAppearance } from "@/lib/app-appearance";
 import { useAuth } from "@/lib/auth-context";
 import { getPlanEntitlements } from "@/lib/plan-entitlements";
 import type { BodyProject, ReferencePhotoMode } from "@/types/body-project";
+import {
+  bodyMeasurementMetricMeta,
+  defaultBodyMeasurementSettings,
+  type BodyMeasurementMetric,
+  type BodyMeasurementSettings
+} from "@/types/body-measurement";
 import type { PhotoItem } from "@/types/photo";
 
 const formatDuration = (seconds: number) =>
@@ -81,6 +91,10 @@ export default function BodyFrameProjectDetailScreen() {
   const [targetDraft, setTargetDraft] = useState("");
   const [saving, setSaving] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [measurementSettings, setMeasurementSettings] =
+    useState<BodyMeasurementSettings>(defaultBodyMeasurementSettings);
+  const [measurementDraft, setMeasurementDraft] =
+    useState<BodyMeasurementSettings>(defaultBodyMeasurementSettings);
 
   const reload = useCallback(async () => {
     if (!projectId) {
@@ -88,13 +102,17 @@ export default function BodyFrameProjectDetailScreen() {
       return;
     }
 
-    const [storedProject, storedPhotos] = await Promise.all([
-      getBodyProjectById(projectId),
-      getPhotos()
-    ]);
+    const [storedProject, storedPhotos, storedMeasurementSettings] =
+      await Promise.all([
+        getBodyProjectById(projectId),
+        getPhotos(),
+        getBodyMeasurementSettings(projectId)
+      ]);
 
     setProject(storedProject);
     setPhotos(storedPhotos);
+    setMeasurementSettings(storedMeasurementSettings);
+    setMeasurementDraft(storedMeasurementSettings);
     if (storedProject) {
       setNameDraft(storedProject.name);
       setTargetDraft(String(storedProject.targetPhotoCount));
@@ -135,6 +153,14 @@ export default function BodyFrameProjectDetailScreen() {
     }
 
     if (
+      measurementDraft.enabled &&
+      !Object.values(measurementDraft.fields).some(Boolean)
+    ) {
+      Alert.alert("수치 기록", "기록할 수치를 하나 이상 선택해 주세요.");
+      return;
+    }
+
+    if (
       target !== project.targetPhotoCount &&
       !isBodyFrameProjectTargetAllowed({
         targetPhotoCount: target,
@@ -150,10 +176,13 @@ export default function BodyFrameProjectDetailScreen() {
 
     setSaving(true);
     try {
-      await updateBodyProject(project.id, {
-        name: nameDraft.trim(),
-        targetPhotoCount: target
-      });
+      await Promise.all([
+        updateBodyProject(project.id, {
+          name: nameDraft.trim(),
+          targetPhotoCount: target
+        }),
+        updateBodyMeasurementSettings(project.id, measurementDraft)
+      ]);
       await reload();
       setSettingsOpen(false);
     } finally {
@@ -163,6 +192,7 @@ export default function BodyFrameProjectDetailScreen() {
     nameDraft,
     planEntitlements.label,
     planEntitlements.maxProgressPhotos,
+    measurementDraft,
     project,
     reload,
     saving,
@@ -277,7 +307,10 @@ export default function BodyFrameProjectDetailScreen() {
             accessibilityRole="button"
             accessibilityLabel="프로젝트 설정 열기"
             style={[styles.settingsButton, { borderColor: palette.line }]}
-            onPress={() => setSettingsOpen(true)}
+            onPress={() => {
+              setMeasurementDraft(measurementSettings);
+              setSettingsOpen(true);
+            }}
           >
             <Text style={[styles.settingsButtonText, { color: palette.text }]}>설정</Text>
           </Pressable>
@@ -544,6 +577,172 @@ export default function BodyFrameProjectDetailScreen() {
                   );
                 })}
               </View>
+
+              <View style={styles.settingDivider} />
+
+              <Text style={[styles.settingTitle, { color: palette.text }]}>
+                수치 기록
+              </Text>
+              <Text style={[styles.settingDetail, { color: palette.muted }]}>
+                원하는 경우에만 몸무게 같은 수치를 사진 기록과 함께 저장합니다. 현재 기기에만 저장됩니다.
+              </Text>
+              <View style={styles.choiceRow}>
+                {([
+                  [false, "사용 안 함"],
+                  [true, "사용"]
+                ] as const).map(([enabled, label]) => {
+                  const active = measurementDraft.enabled === enabled;
+                  return (
+                    <Pressable
+                      key={label}
+                      accessibilityRole="button"
+                      style={[
+                        styles.choiceButton,
+                        {
+                          borderColor: active ? palette.text : palette.line,
+                          backgroundColor: active ? palette.text : palette.background
+                        }
+                      ]}
+                      onPress={() =>
+                        setMeasurementDraft((current) => ({ ...current, enabled }))
+                      }
+                    >
+                      <Text
+                        style={[
+                          styles.choiceText,
+                          { color: active ? palette.inverse : palette.text }
+                        ]}
+                      >
+                        {label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+
+              {measurementDraft.enabled ? (
+                <>
+                  <Text style={[styles.label, { color: palette.muted }]}>
+                    기록 항목
+                  </Text>
+                  <View style={styles.metricChoiceGrid}>
+                    {(Object.keys(bodyMeasurementMetricMeta) as BodyMeasurementMetric[]).map(
+                      (metric) => {
+                        const active = measurementDraft.fields[metric];
+                        return (
+                          <Pressable
+                            key={metric}
+                            accessibilityRole="button"
+                            style={[
+                              styles.metricChoice,
+                              {
+                                borderColor: active ? palette.text : palette.line,
+                                backgroundColor: active
+                                  ? palette.surfaceStrong
+                                  : palette.background
+                              }
+                            ]}
+                            onPress={() =>
+                              setMeasurementDraft((current) => ({
+                                ...current,
+                                fields: {
+                                  ...current.fields,
+                                  [metric]: !current.fields[metric]
+                                }
+                              }))
+                            }
+                          >
+                            <Text style={[styles.metricChoiceText, { color: palette.text }]}>
+                              {bodyMeasurementMetricMeta[metric].label}
+                            </Text>
+                          </Pressable>
+                        );
+                      }
+                    )}
+                  </View>
+
+                  <Text style={[styles.label, { color: palette.muted }]}>
+                    대표 수치
+                  </Text>
+                  <View style={styles.metricChoiceGrid}>
+                    {(Object.keys(bodyMeasurementMetricMeta) as BodyMeasurementMetric[])
+                      .filter((metric) => measurementDraft.fields[metric])
+                      .map((metric) => {
+                        const active = measurementDraft.primaryMetric === metric;
+                        return (
+                          <Pressable
+                            key={metric}
+                            accessibilityRole="button"
+                            style={[
+                              styles.metricChoice,
+                              {
+                                borderColor: active ? palette.text : palette.line,
+                                backgroundColor: active
+                                  ? palette.text
+                                  : palette.background
+                              }
+                            ]}
+                            onPress={() =>
+                              setMeasurementDraft((current) => ({
+                                ...current,
+                                primaryMetric: metric
+                              }))
+                            }
+                          >
+                            <Text
+                              style={[
+                                styles.metricChoiceText,
+                                { color: active ? palette.inverse : palette.text }
+                              ]}
+                            >
+                              {bodyMeasurementMetricMeta[metric].label}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                  </View>
+
+                  <Text style={[styles.label, { color: palette.muted }]}>
+                    촬영 후 기록 제안
+                  </Text>
+                  <View style={styles.choiceRow}>
+                    {([
+                      [false, "끔"],
+                      [true, "켬"]
+                    ] as const).map(([enabled, label]) => {
+                      const active = measurementDraft.promptAfterCapture === enabled;
+                      return (
+                        <Pressable
+                          key={label}
+                          accessibilityRole="button"
+                          style={[
+                            styles.choiceButton,
+                            {
+                              borderColor: active ? palette.text : palette.line,
+                              backgroundColor: active ? palette.text : palette.background
+                            }
+                          ]}
+                          onPress={() =>
+                            setMeasurementDraft((current) => ({
+                              ...current,
+                              promptAfterCapture: enabled
+                            }))
+                          }
+                        >
+                          <Text
+                            style={[
+                              styles.choiceText,
+                              { color: active ? palette.inverse : palette.text }
+                            ]}
+                          >
+                            {label}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </>
+              ) : null}
 
               <Pressable
                 disabled={saving}
@@ -875,6 +1074,25 @@ const styles = StyleSheet.create({
   },
   choiceText: {
     fontSize: 13,
+    fontWeight: "600"
+  },
+  metricChoiceGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8
+  },
+  metricChoice: {
+    minWidth: "47%",
+    minHeight: bodyFrameDesign.minTouchSize,
+    flexGrow: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 10,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderRadius: bodyFrameDesign.buttonRadius
+  },
+  metricChoiceText: {
+    fontSize: bodyFrameTypography.caption,
     fontWeight: "600"
   },
   saveButton: {
