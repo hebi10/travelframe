@@ -1,6 +1,6 @@
 import { StyleSheet } from "react-native";
 
-import { bodyFrameDesign, colors, controls, typography } from "@/constants/app-theme";
+import { bodyFrameDesign, bodyFrameTypography, colors, controls, typography } from "@/constants/app-theme";
 import {
   CAMERA_CONTROL_TRAY_HORIZONTAL_PADDING,
   CAMERA_FOCUS_INDICATOR_RADIUS,
@@ -265,7 +265,7 @@ export const styles = StyleSheet.create({
   },
   overlaySetupHint: {
     color: "rgba(255, 255, 255, 0.64)",
-    fontSize: 11,
+    fontSize: bodyFrameTypography.caption,
     lineHeight: 16,
     letterSpacing: 0
   },
@@ -518,7 +518,7 @@ export const styles = StyleSheet.create({
   },
   modalEyebrow: {
     color: colors.faint,
-    fontSize: typography.eyebrow,
+    fontSize: bodyFrameTypography.caption,
     fontWeight: "800",
     letterSpacing: 0,
     textTransform: "uppercase"
@@ -615,14 +615,14 @@ export const styles = StyleSheet.create({
   compactSliderLabel: {
     minWidth: 48,
     color: colors.muted,
-    fontSize: 10,
+    fontSize: bodyFrameTypography.caption,
     fontWeight: "800",
     letterSpacing: 0
   },
   compactSliderValue: {
     minWidth: 30,
     color: colors.text,
-    fontSize: 10,
+    fontSize: bodyFrameTypography.caption,
     fontWeight: "800",
     textAlign: "right",
     letterSpacing: 0,
@@ -635,7 +635,7 @@ export const styles = StyleSheet.create({
   },
   sizeSliderMetaText: {
     color: colors.muted,
-    fontSize: 11,
+    fontSize: bodyFrameTypography.caption,
     fontWeight: "800",
     letterSpacing: 0
   },
@@ -703,7 +703,7 @@ export const styles = StyleSheet.create({
   },
   colorLabel: {
     color: colors.text,
-    fontSize: 10,
+    fontSize: bodyFrameTypography.caption,
     fontWeight: "800",
     letterSpacing: 0
   },
@@ -863,7 +863,7 @@ export const styles = StyleSheet.create({
   },
   cameraColorHint: {
     color: colors.muted,
-    fontSize: 11,
+    fontSize: bodyFrameTypography.caption,
     lineHeight: 16,
     letterSpacing: 0
   },
@@ -1006,7 +1006,7 @@ export const styles = StyleSheet.create({
   },
   overlayQuickLabel: {
     color: "rgba(255, 255, 255, 0.72)",
-    fontSize: 9,
+    fontSize: bodyFrameTypography.caption,
     fontWeight: "700",
     letterSpacing: 0
   },
@@ -1034,7 +1034,7 @@ export const styles = StyleSheet.create({
   },
   gallerySavingText: {
     color: colors.inverse,
-    fontSize: 11,
+    fontSize: bodyFrameTypography.caption,
     fontWeight: "900",
     letterSpacing: 0
   },
