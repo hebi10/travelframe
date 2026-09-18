@@ -123,6 +123,11 @@ for (const token of [
 }
 
 assert.ok(
+  detailSource.includes("target !== project.targetPhotoCount"),
+  "a downgraded user must still be able to rename a project whose existing target exceeds the current plan"
+);
+
+assert.ok(
   fs.existsSync("features/settings/BodyFrameSettingsScreen.tsx"),
   "Body Frame settings home should exist"
 );
