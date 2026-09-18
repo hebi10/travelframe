@@ -13,6 +13,12 @@ const reactNativeGoogleMobileAdsRoot = path.join(
   "node_modules",
   "react-native-google-mobile-ads"
 );
+const reactNativeGradlePluginRoot = path.join(
+  root,
+  "node_modules",
+  "@react-native",
+  "gradle-plugin"
+);
 const packageJson = JSON.parse(
   fs.readFileSync(path.join(root, "package.json"), "utf8")
 );
@@ -94,10 +100,55 @@ function patchVisionCameraAndroidShutterSound() {
 `
     }
   ]);
+  source = source
+    .replace(/\s*\|\|\s*CameraInfo\.mustPlayShutterSound\(\)/g, "")
+    .replace(/CameraInfo\.mustPlayShutterSound\(\)\s*\|\|\s*/g, "");
   source = replaceOptional(source, "import androidx.camera.core.CameraInfo\n", "");
+
+  if (source.includes("CameraInfo.mustPlayShutterSound()")) {
+    throw new Error(
+      "VisionCamera Android shutter sound patch found an unsupported CameraInfo.mustPlayShutterSound() usage"
+    );
+  }
 
   writeTo(reactNativeVisionCameraRoot, relativePath, source);
   console.info("applied local VisionCamera Android shutter sound patch");
+}
+
+function patchReactNativeGradleFoojayResolver() {
+  if (!packageJson.dependencies?.["react-native"]) {
+    console.info("react-native is not declared; skipping React Native Gradle plugin patch");
+    return;
+  }
+
+  if (!fs.existsSync(reactNativeGradlePluginRoot)) {
+    console.info("@react-native/gradle-plugin is not installed; skipping Foojay patch");
+    return;
+  }
+
+  const relativePath = "settings.gradle.kts";
+  const source = readFrom(reactNativeGradlePluginRoot, relativePath);
+  const supported = source
+    .replace(
+      'id("org.gradle.toolchains.foojay-resolver-convention").version("0.5.0")',
+      'id("org.gradle.toolchains.foojay-resolver-convention").version("1.0.0")'
+    )
+    .replace(
+      'id("org.gradle.toolchains.foojay-resolver-convention") version "0.5.0"',
+      'id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"'
+    );
+
+  if (
+    !supported.includes("foojay-resolver-convention") ||
+    !supported.includes("1.0.0")
+  ) {
+    throw new Error(
+      "React Native Gradle plugin Foojay resolver patch target was not found"
+    );
+  }
+
+  writeTo(reactNativeGradlePluginRoot, relativePath, supported);
+  console.info("applied React Native Gradle Foojay resolver compatibility patch");
 }
 
 function patchGoogleMobileAdsExpoConfig() {
@@ -145,4 +196,5 @@ function patchGoogleMobileAdsExpoConfig() {
 }
 
 patchVisionCameraAndroidShutterSound();
+patchReactNativeGradleFoojayResolver();
 patchGoogleMobileAdsExpoConfig();
