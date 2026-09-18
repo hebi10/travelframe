@@ -11,19 +11,19 @@
 - [x] Required generated R8 keep rules are owned by the Expo config plugin.
 - [x] Release source verifier checks brand, package, EAS, billing, policy and assets.
 - [x] Gitleaks full-history scan uses exact legacy fingerprint suppressions only.
-- [ ] Merge final Stage 8 after CI is green.
+- [x] Stage 8 final merged after green CI.
 
 ## Stage 8 CI
-- [ ] `npm run android:prebuild:ci` PASS.
-- [ ] `npm run release:verify` PASS.
-- [ ] TypeScript PASS.
-- [ ] Expo lint PASS.
-- [ ] Full `npm test` PASS.
-- [ ] Functions PASS.
-- [ ] Firebase Rules PASS.
-- [ ] Secret Scan history PASS.
-- [ ] Android Kotlin PASS.
-- [ ] Android release manifest PASS.
+- [x] `npm run android:prebuild:ci` PASS.
+- [x] `npm run release:verify` PASS.
+- [x] TypeScript PASS.
+- [x] Expo lint PASS.
+- [x] Full `npm test` PASS.
+- [x] Functions PASS.
+- [x] Firebase Rules PASS.
+- [x] Secret Scan history PASS.
+- [x] Android Kotlin PASS.
+- [x] Android release manifest PASS.
 
 ## Google Play Billing / external configuration
 - [ ] Create/activate `ad_remove`.
@@ -39,6 +39,17 @@
 - [ ] Verify cancellation then access until expiry.
 - [ ] Verify expiry.
 - [ ] Verify refund/revocation.
+
+## Health Connect / health data
+- [x] Source requests read-only Weight and Body Fat permissions only.
+- [x] No background access or extended-history permission in Stage 9-7.
+- [x] Health Connect import remains user-initiated and Local Only after import.
+- [ ] Deploy the updated public privacy policy before submitting the Health Connect build.
+- [ ] Complete the Google Play Health apps / Health Connect declaration for Weight and Body Fat.
+- [ ] Update Play Data Safety answers for health and fitness data based on the production build.
+- [ ] Confirm generated release manifest contains READ_WEIGHT / READ_BODY_FAT only.
+- [ ] Verify permission denial, revoke, provider-update-required, and no-data states on a physical Android device.
+- [ ] Verify duplicate Health Connect records are not imported twice.
 
 ## Production build
 - [ ] Confirm EAS Android credentials / upload key.
@@ -75,8 +86,8 @@ Use `docs/manual-device-qa.md`.
 - [ ] Final phone screenshots uploaded directly to Google Play Console.
 - [ ] Privacy URL opens the current Body Frame policy.
 - [ ] Account deletion URL opens the current Body Frame instructions.
-- [ ] Data Safety answers match actual Firebase/AdMob/Billing behavior.
+- [ ] Data Safety answers match actual Firebase/AdMob/Billing/Health Connect behavior.
 - [ ] Advertising ID declaration matches AdMob usage.
-- [ ] Permission declarations match generated release manifest.
+- [ ] Permission declarations match generated release manifest, including Health Connect read permissions.
 
 Release/store artwork is not uploaded to Firebase.
