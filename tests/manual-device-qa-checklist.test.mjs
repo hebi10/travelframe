@@ -21,29 +21,43 @@ assert.equal(packageJson.scripts.ios, undefined, "package scripts should not exp
 assert.equal(packageJson.scripts.web, undefined, "package scripts should not expose web commands");
 
 for (const snippet of [
-  "Android 실기기",
-  "카메라 가이드",
-  "위치·모양 조절",
-  "MediaLibrary",
-  "Firebase 백업",
-  "백업 데이터 삭제",
-  "실패한 백업 다시 시도",
-  "여행클립 MP4",
-  "구독"
+  "Android 핵심 플로우",
+  "BF 모노그램",
+  "첫 카메라 진입",
+  "기준 사진",
+  "2열 9:16 Photo Grid",
+  "3열 기록 Grid",
+  "사진 1장당 0.1초",
+  "Google Play 구매",
+  "클라우드 백업",
+  "6개 그룹",
+  "/legacy-studio"
 ]) {
   assert.ok(checklist.includes(snippet), `manual QA checklist missing: ${snippet}`);
 }
 
 for (const snippet of [
   "## Android 표시/접근성 QA",
-  "큰 글씨",
-  "작은 화면",
+  "360dp급 작은 화면",
+  "44×44dp",
+  "Safe Area",
   "다크 모드",
-  "실제 Android 기기",
-  "텍스트가 겹치지 않으며",
-  "터치 대상에 접근 가능한지"
+  "라이트 모드",
+  "폴더블",
+  "한쪽 면만 사용하는",
+  "이전 제품 용어"
 ]) {
-  assert.ok(checklist.includes(snippet), `manual Android display QA checklist missing: ${snippet}`);
+  assert.ok(checklist.includes(snippet), `manual display QA checklist missing: ${snippet}`);
 }
 
-console.log("ok - manual device QA checklist covers native-only service flows");
+for (const snippet of [
+  "## 출시 전 브랜드 QA",
+  "app-icon.png",
+  "adaptive-icon.png",
+  "#0B0B0C",
+  "1024×1024"
+]) {
+  assert.ok(checklist.includes(snippet), `manual brand QA checklist missing: ${snippet}`);
+}
+
+console.log("ok - final Body Frame manual device QA checklist covers product and brand flows");
