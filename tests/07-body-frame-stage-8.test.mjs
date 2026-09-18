@@ -16,6 +16,11 @@ assert.equal(
 );
 assert.ok(fs.existsSync("scripts/prebuild-android-ci.mjs"));
 assert.ok(fs.existsSync("scripts/verify-release-readiness.mjs"));
+const prebuildSource = fs.readFileSync("scripts/prebuild-android-ci.mjs", "utf8");
+assert.ok(
+  prebuildSource.indexOf("prebuild") < prebuildSource.lastIndexOf("scripts/apply-patches.mjs"),
+  "required node_modules patches must be reapplied after Expo prebuild"
+);
 
 const qualityTestIndex = quality.indexOf("run: npm test");
 const qualityPrebuildIndex = quality.indexOf("run: npm run android:prebuild:ci");
