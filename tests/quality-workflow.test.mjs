@@ -22,10 +22,10 @@ for (const snippet of [
   "distribution: temurin",
   "java-version: \"21\"",
   "npm run test:firebase-rules",
-  "name: Android Kotlin and Release Manifest Verify",
-  "runs-on: windows-latest",
-  "npm run android:verify:kotlin",
-  "npm run android:manifest:release"
+  "name: Android Gradle and Release Manifest Verify",
+  "runs-on: ubuntu-latest",
+  ":app:processReleaseMainManifest",
+  ":app:compileDebugKotlin"
 ]) {
   assert.ok(source.includes(snippet), `quality workflow missing: ${snippet}`);
 }
@@ -74,8 +74,10 @@ assert.ok(
 
 const androidJobSource = source.slice(androidJobStart);
 assert.ok(
-  androidJobSource.includes("npm run android:manifest:release"),
-  "CI Android job should include bounded release manifest verification"
+  androidJobSource.includes(":app:processReleaseMainManifest") &&
+    androidJobSource.includes(":app:compileDebugKotlin") &&
+    androidJobSource.includes("-PreactNativeArchitectures=x86_64"),
+  "CI Android job should verify the release manifest and one-ABI Kotlin compile"
 );
 assert.equal(
   androidJobSource.includes("npm run android:verify:debug") ||
