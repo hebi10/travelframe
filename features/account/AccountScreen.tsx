@@ -498,7 +498,7 @@ export default function AccountScreen() {
               />
             ) : (
               <Text selectable style={[styles.helpText, themed.mutedText]}>
-                트래블프레임의 아이디는 이메일입니다. 보안상 가입 여부는 직접 표시하지 않고,
+                바디 프레임의 아이디는 이메일입니다. 보안상 가입 여부는 직접 표시하지 않고,
                 입력한 이메일로 비밀번호 재설정 메일을 보냅니다.
               </Text>
             )}
