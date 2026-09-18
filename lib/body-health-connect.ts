@@ -7,7 +7,8 @@ import {
   readRecords,
   requestPermission,
   SdkAvailabilityStatus,
-  type Permission
+  type Permission,
+  type RecordResult
 } from "react-native-health-connect";
 
 export type BodyHealthConnectMetric = "weight" | "bodyFat";
@@ -69,7 +70,7 @@ const createFallbackRecordId = ({
   [metric, recordedAt, String(value), sourceAppPackage ?? "unknown"].join("|");
 
 const toWeightCandidate = (
-  record: Awaited<ReturnType<typeof readRecords<"Weight">>>["records"][number]
+  record: RecordResult<"Weight">
 ): BodyHealthConnectCandidate | null => {
   const value = record.weight?.inKilograms;
   if (!Number.isFinite(value) || value <= 0) return null;
@@ -91,7 +92,7 @@ const toWeightCandidate = (
 };
 
 const toBodyFatCandidate = (
-  record: Awaited<ReturnType<typeof readRecords<"BodyFat">>>["records"][number]
+  record: RecordResult<"BodyFat">
 ): BodyHealthConnectCandidate | null => {
   const value = record.percentage;
   if (!Number.isFinite(value) || value <= 0) return null;
