@@ -170,10 +170,11 @@ for (const group of [
 assert.ok(settingsSource.includes("/advanced-settings"));
 assert.ok(settingsSource.includes("/account"));
 
-assert.ok(
-  settingsSource.includes("/legacy-studio") &&
+assert.equal(
+  settingsSource.includes("/legacy-studio") ||
     settingsSource.includes("기존 편집 보관함"),
-  "legacy studio should remain reachable only from the advanced area in Settings"
+  false,
+  "legacy studio should remain preserved as a route without cluttering the primary Body Frame settings home"
 );
 
 for (const token of [
