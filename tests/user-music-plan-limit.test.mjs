@@ -26,10 +26,10 @@ assert.ok(
     tripClipSource.includes("planEntitlements.musicTrackLimit"),
   "trip clip should pass the active plan music limit"
 );
-assert.ok(
-  accountSource.includes("pickAndUploadUserMusicTrack(") &&
-    accountSource.includes("planEntitlements.musicTrackLimit"),
-  "account should pass the active plan music limit"
+assert.equal(
+  accountSource.includes("pickAndUploadUserMusicTrack("),
+  false,
+  "Body Frame account should not restore the legacy music upload UI"
 );
 assert.ok(
   functionsSource.includes("const MAX_USER_MUSIC_TRACKS = 20;"),
@@ -40,4 +40,4 @@ assert.ok(
   "server should derive music track limits from the verified subscription"
 );
 
-console.log("ok - user music uploads are gated by plan music limits");
+console.log("ok - legacy TripClip music uploads are gated by plan limits without Account music UI");
