@@ -1,8 +1,13 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
 
 import { readStudioSource } from "./studio-test-source.mjs";
 
 const source = readStudioSource();
+const stylesSource = fs.readFileSync(
+  "features/studio/studio-screen.styles.ts",
+  "utf8"
+);
 
 for (const snippet of [
   "let importSuccessCount = 0;",
@@ -27,9 +32,9 @@ assert.equal(
   "studio load failures should render an inline retry state instead of repeated alerts"
 );
 
-const photoGridItemBlock = source.slice(
-  source.indexOf("photoGridItem: {"),
-  source.indexOf("photoCard: {")
+const photoGridItemBlock = stylesSource.slice(
+  stylesSource.indexOf("photoGridItem: {"),
+  stylesSource.indexOf("photoCard: {")
 );
 assert.equal(
   photoGridItemBlock.includes("flexGrow: 1"),
