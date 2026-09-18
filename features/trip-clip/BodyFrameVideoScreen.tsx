@@ -1,6 +1,6 @@
 import { Image } from "expo-image";
 import * as FileSystem from "expo-file-system/legacy";
-import { useFocusEffect } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -26,6 +26,10 @@ import {
   getBodyFrameVideoTotalFrames
 } from "@/lib/body-frame-video";
 import { selectActiveBodyProject } from "@/lib/body-frame-camera-project";
+import {
+  getBodyFrameUpgradeLabel,
+  getBodyFrameVideoLimitState
+} from "@/lib/body-frame-plan-limits";
 import {
   getLastActiveProjectId,
   setLastActiveProjectId
@@ -106,6 +110,15 @@ export default function BodyFrameVideoScreen() {
   );
   const totalDuration = getBodyFrameVideoDuration(projectPhotos.length);
   const totalFrames = getBodyFrameVideoTotalFrames(projectPhotos.length);
+  const videoLimitState = useMemo(
+    () =>
+      getBodyFrameVideoLimitState({
+        durationSeconds: totalDuration,
+        maxProgressVideoSeconds: planEntitlements.maxProgressVideoSeconds
+      }),
+    [planEntitlements.maxProgressVideoSeconds, totalDuration]
+  );
+  const upgradePlanLabel = getBodyFrameUpgradeLabel(planEntitlements.tier);
   const previewPhoto = projectPhotos[0] ?? null;
   const recordingFrame = useMemo(
     () =>
@@ -236,6 +249,15 @@ export default function BodyFrameVideoScreen() {
       return;
     }
 
+    if (!videoLimitState.allowed) {
+      setMessage(
+        `${planEntitlements.label} 플랜의 변화 영상 한도는 ${formatDuration(
+          videoLimitState.limit ?? 0
+        )}입니다. 현재 영상은 ${formatDuration(totalDuration)}입니다.`
+      );
+      return;
+    }
+
     try {
       setIsExporting(true);
       setExportProgress(5);
@@ -282,10 +304,13 @@ export default function BodyFrameVideoScreen() {
     isExporting,
     planEntitlements.canExportVideo,
     planEntitlements.localVideoLimit,
+    planEntitlements.label,
     previewPhoto?.uri,
     projectPhotos,
     recordProjectVideo,
-    totalDuration
+    totalDuration,
+    videoLimitState.allowed,
+    videoLimitState.limit
   ]);
 
   if (isLoading || activeProject === undefined) {
@@ -340,20 +365,60 @@ export default function BodyFrameVideoScreen() {
           <SummaryRow label="사진" value={`${projectPhotos.length}장`} />
           <SummaryRow label="간격" value="0.1초" />
           <SummaryRow label="영상 길이" value={formatDuration(totalDuration)} />
+          <SummaryRow
+            label="플랜 한도"
+            value={
+              planEntitlements.maxProgressVideoSeconds === null
+                ? "제한 없음"
+                : formatDuration(planEntitlements.maxProgressVideoSeconds)
+            }
+          />
           <SummaryRow label="프레임" value={`${BODY_FRAME_VIDEO_FPS}fps · ${totalFrames}프레임`} />
           <SummaryRow label="화질" value="1080p" />
           <SummaryRow label="비율" value={BODY_FRAME_VIDEO_RATIO} />
           <SummaryRow label="전환 효과" value="없음" last />
         </View>
 
+        {!videoLimitState.allowed ? (
+          <View style={styles.limitNotice}>
+            <Text style={styles.limitNoticeText}>
+              {planEntitlements.label} 플랜에서는 최대{" "}
+              {formatDuration(videoLimitState.limit ?? 0)}까지 만들 수 있습니다.
+              현재 프로젝트는 {formatDuration(totalDuration)}입니다.
+            </Text>
+            {upgradePlanLabel ? (
+              <Pressable
+                accessibilityRole="button"
+                style={styles.limitPlanButton}
+                onPress={() => router.push("/account")}
+              >
+                <Text style={styles.limitPlanButtonText}>
+                  플랜 보기 · {upgradePlanLabel}
+                </Text>
+              </Pressable>
+            ) : null}
+          </View>
+        ) : null}
+
         <Pressable
           accessibilityRole="button"
-          disabled={projectPhotos.length === 0 || isExporting}
+          disabled={
+            projectPhotos.length === 0 ||
+            isExporting ||
+            !videoLimitState.allowed
+          }
           onPress={() => void createVideo()}
           style={({ pressed }) => [
             styles.primaryButton,
-            (projectPhotos.length === 0 || isExporting) && styles.disabled,
-            pressed && projectPhotos.length > 0 && !isExporting && styles.pressed
+            (projectPhotos.length === 0 ||
+              isExporting ||
+              !videoLimitState.allowed) &&
+              styles.disabled,
+            pressed &&
+              projectPhotos.length > 0 &&
+              !isExporting &&
+              videoLimitState.allowed &&
+              styles.pressed
           ]}
         >
           {isExporting ? (
@@ -518,6 +583,33 @@ const styles = StyleSheet.create({
     color: "#F5F5F5",
     fontSize: 14,
     fontWeight: "500"
+  },
+  limitNotice: {
+    marginTop: 16,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "#2A2A2E",
+    borderRadius: 8,
+    backgroundColor: "#131315"
+  },
+  limitNoticeText: {
+    color: "#D7D7DB",
+    fontSize: 13,
+    lineHeight: 19
+  },
+  limitPlanButton: {
+    minHeight: 44,
+    marginTop: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#F5F5F5",
+    borderRadius: 8
+  },
+  limitPlanButtonText: {
+    color: "#F5F5F5",
+    fontSize: 13,
+    fontWeight: "600"
   },
   primaryButton: {
     minHeight: 50,
