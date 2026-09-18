@@ -9,8 +9,8 @@ const MAX_APP_WIDTH = 750;
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
   const { palette, fontSizeScale, layoutScale, emphasisWeight, fontFamily } = useAppAppearance();
-  const tabBarBottomPadding = Math.max(insets.bottom + 6, 12);
-  const tabBarHeight = 54 + tabBarBottomPadding;
+  const tabBarBottomPadding = Math.max(insets.bottom + 8, 16);
+  const tabBarHeight = 58 + tabBarBottomPadding;
 
   return (
     <Tabs
