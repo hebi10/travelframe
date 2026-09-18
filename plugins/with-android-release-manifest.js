@@ -14,6 +14,13 @@ const DEFAULT_ANDROID_PACKAGE = "com.haebi.photoguide";
 const ANDROID_IMAGE_ADJUSTMENT_PACKAGE_FILE = "AndroidImageAdjustmentPackage.kt";
 const ANDROID_IMAGE_ADJUSTMENT_MODULE_FILE = "AndroidImageAdjustmentModule.kt";
 
+const REQUIRED_RELEASE_PROGUARD_RULES = [
+  "-keep class com.margelo.nitro.camera.** { *; }",
+  "-keep class com.margelo.nitro.image.** { *; }",
+  "-keep class com.mrousavy.camera.** { *; }",
+  "-keep class com.google.android.gms.ads.** { *; }"
+];
+
 function createAndroidImageAdjustmentPackageSource(androidPackage) {
   return `package ${androidPackage}.image
 
@@ -233,6 +240,32 @@ function writeAndroidImageAdjustmentFiles(config) {
   );
 }
 
+function ensureReleaseProguardRules(config) {
+  const platformProjectRoot =
+    config.modRequest.platformProjectRoot ??
+    path.join(config.modRequest.projectRoot, "android");
+  const proguardPath = path.join(platformProjectRoot, "app", "proguard-rules.pro");
+  const existing = fs.existsSync(proguardPath)
+    ? fs.readFileSync(proguardPath, "utf8")
+    : "";
+  const missingRules = REQUIRED_RELEASE_PROGUARD_RULES.filter(
+    (rule) => !existing.includes(rule)
+  );
+
+  if (missingRules.length === 0) {
+    return;
+  }
+
+  fs.mkdirSync(path.dirname(proguardPath), { recursive: true });
+  const prefix =
+    existing.length === 0
+      ? "# Body Frame generated release keep rules\n"
+      : existing.endsWith("\n")
+        ? "\n# Body Frame generated release keep rules\n"
+        : "\n\n# Body Frame generated release keep rules\n";
+  fs.appendFileSync(proguardPath, `${prefix}${missingRules.join("\n")}\n`);
+}
+
 function ensureKotlinImport(source, importLine) {
   if (source.includes(importLine)) {
     return source;
@@ -297,6 +330,7 @@ function withAndroidReleaseManifest(config) {
     (config) => {
       if (!config.modRequest.introspect) {
         writeAndroidImageAdjustmentFiles(config);
+        ensureReleaseProguardRules(config);
       }
 
       return config;
