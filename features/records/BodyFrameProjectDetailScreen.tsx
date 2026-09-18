@@ -390,6 +390,12 @@ export default function BodyFrameProjectDetailScreen() {
           <BodyMeasurementSummaryCard
             metric={measurementSettings.primaryMetric}
             series={measurementSeries}
+            onOpenHistory={() =>
+              router.push({
+                pathname: "/project/[id]/measurements",
+                params: { id: project.id }
+              })
+            }
             onAddMeasurement={
               projectPhotos[0]
                 ? () =>
@@ -400,7 +406,11 @@ export default function BodyFrameProjectDetailScreen() {
                         measurement: "1"
                       }
                     })
-                : undefined
+                : () =>
+                    router.push({
+                      pathname: "/project/[id]/measurements",
+                      params: { id: project.id, add: "1" }
+                    })
             }
           />
         ) : null}
