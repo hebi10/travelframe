@@ -403,6 +403,18 @@ const createGooglePlayBillingService = ({
       };
     }
 
+    if (payload.voidedPurchaseNotification) {
+      return {
+        purchaseToken: payload.voidedPurchaseNotification.purchaseToken,
+        productId: null,
+        notificationType: "voided",
+        kind:
+          payload.voidedPurchaseNotification.productType === 1
+            ? "subs"
+            : "in-app"
+      };
+    }
+
     return null;
   };
 
