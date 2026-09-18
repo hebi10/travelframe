@@ -138,10 +138,10 @@ export function BodyMeasurementEditorSheet({
         photoId,
         sequence,
         recordedAt,
-        weightKg: parsed.weight,
-        bodyFatPercent: parsed.bodyFat,
-        skeletalMuscleKg: parsed.skeletalMuscle,
-        waistCm: parsed.waist,
+        weightKg: parsed.weight ?? undefined,
+        bodyFatPercent: parsed.bodyFat ?? undefined,
+        skeletalMuscleKg: parsed.skeletalMuscle ?? undefined,
+        waistCm: parsed.waist ?? undefined,
         note
       });
       onSaved(saved);
