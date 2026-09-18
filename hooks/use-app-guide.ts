@@ -23,7 +23,7 @@ export function useAppGuide(tabKey: AppGuideTabKey, replaySignal = 0) {
       let isActive = true;
 
       const loadGuide = async () => {
-        if (steps.length <= 0) {
+        if (steps.length <= 0 || tabKey !== "camera") {
           return;
         }
         if (isAuthLoading || isLoggedIn) {
@@ -43,7 +43,7 @@ export function useAppGuide(tabKey: AppGuideTabKey, replaySignal = 0) {
       return () => {
         isActive = false;
       };
-    }, [isAuthLoading, isLoggedIn, steps.length])
+    }, [isAuthLoading, isLoggedIn, steps.length, tabKey])
   );
 
   useEffect(() => {
