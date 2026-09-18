@@ -25,7 +25,7 @@ for (const snippet of [
 for (const snippet of [
   "useState<PhotoRatioLabel>(defaultAppSettings.cameraRatio)",
   "useState<CameraSaveScope>(defaultAppSettings.cameraSaveScope)",
-  "setCameraRatio(settings.cameraRatio)",
+  "setCameraRatio(effectiveRatio)",
   "setCameraSaveScope(settings.cameraSaveScope)",
   "ratioLabel: cameraRatio",
   "getCameraSaveScopeTargets(saveScope)",
@@ -94,4 +94,4 @@ assert.ok(
   "settings camera save scope controls should show app, phone album, and cloud toggles"
 );
 
-console.log("ok - camera defaults use 9:16 and app plus phone album while preserving valid settings");
+console.log("ok - camera defaults remain valid while project capture context can override them");
