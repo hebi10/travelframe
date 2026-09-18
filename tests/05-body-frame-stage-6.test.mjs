@@ -87,9 +87,13 @@ assert.equal(
   "cached premium state must not override verified server state"
 );
 assert.equal(
-  subscriptionSource.includes('"local_checkout"'),
+  subscriptionSource.includes('provider: "none" | "admin" | "google_play" | "local_checkout"'),
   false,
   "legacy local_checkout must not remain a valid subscription provider"
+);
+assert.ok(
+  subscriptionSource.includes('parsed.provider === ("local_checkout" as unknown)'),
+  "legacy local_checkout cache should be detected and downgraded to free"
 );
 
 for (const token of [
