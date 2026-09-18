@@ -170,16 +170,19 @@ export default function BodyFrameRecordsScreen() {
             </Pressable>
           </View>
         ) : (
-          <View style={styles.projectList}>
+          <View style={styles.projectGrid}>
             {cards.map(({ project, summary, cover }) => {
               const progress = Math.min(
                 1,
                 summary.photoCount / Math.max(1, summary.targetPhotoCount)
               );
+              const progressPercent = Math.round(progress * 100);
+
               return (
                 <Pressable
                   key={project.id}
                   accessibilityRole="button"
+                  accessibilityLabel={`${project.name} 프로젝트 열기`}
                   onPress={() => void openProject(project)}
                   style={({ pressed }) => [
                     styles.projectCard,
@@ -213,21 +216,22 @@ export default function BodyFrameRecordsScreen() {
                   </View>
 
                   <View style={styles.projectCopy}>
-                    <View style={styles.projectTopRow}>
-                      <Text
-                        numberOfLines={1}
-                        style={[styles.projectName, { color: palette.text }]}
-                      >
-                        {project.name}
-                      </Text>
-                      <Text style={[styles.projectArrow, { color: palette.faint }]}>›</Text>
-                    </View>
-                    <Text style={[styles.projectMeta, { color: palette.muted }]}>
-                      {summary.photoCount} / {summary.targetPhotoCount}장 ·{" "}
-                      {formatDuration(summary.durationSeconds)}
+                    <Text
+                      numberOfLines={1}
+                      style={[styles.projectName, { color: palette.text }]}
+                    >
+                      {project.name}
                     </Text>
-                    <Text style={[styles.projectMeta, { color: palette.faint }]}>
-                      기준 사진 · {project.referenceMode === "first" ? "첫 사진" : "최근 사진"}
+                    <View style={styles.projectStatsRow}>
+                      <Text style={[styles.projectMeta, { color: palette.muted }]}>
+                        {summary.photoCount} / {summary.targetPhotoCount}장
+                      </Text>
+                      <Text style={[styles.projectPercent, { color: palette.faint }]}>
+                        {progressPercent}%
+                      </Text>
+                    </View>
+                    <Text style={[styles.projectDuration, { color: palette.faint }]}>
+                      변화 영상 {formatDuration(summary.durationSeconds)}
                     </Text>
                     <View
                       style={[
@@ -240,7 +244,7 @@ export default function BodyFrameRecordsScreen() {
                           styles.progressFill,
                           {
                             backgroundColor: palette.text,
-                            width: `${Math.round(progress * 100)}%`
+                            width: `${progressPercent}%`
                           }
                         ]}
                       />
@@ -349,22 +353,23 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "600"
   },
-  projectList: {
+  projectGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
     gap: 12
   },
   projectCard: {
-    minHeight: 166,
-    flexDirection: "row",
-    gap: 14,
-    padding: 12,
+    width: "48%",
+    overflow: "hidden",
     borderWidth: bodyFrameDesign.borderWidth,
     borderRadius: bodyFrameDesign.cardRadius
   },
   coverFrame: {
-    width: 82,
+    width: "100%",
     aspectRatio: 9 / 16,
-    overflow: "hidden",
-    borderRadius: 6
+    overflow: "hidden"
   },
   coverImage: {
     width: "100%",
@@ -374,33 +379,39 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 6
+    paddingHorizontal: 8
   },
   coverEmptyText: {
-    fontSize: 11,
+    fontSize: bodyFrameTypography.caption,
     textAlign: "center"
   },
   projectCopy: {
-    flex: 1,
-    justifyContent: "center",
-    gap: 8
-  },
-  projectTopRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8
+    gap: 6,
+    padding: 10
   },
   projectName: {
-    flex: 1,
-    fontSize: 17,
+    fontSize: 15,
     fontWeight: "600"
   },
-  projectArrow: {
-    fontSize: 22
+  projectStatsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8
   },
   projectMeta: {
-    fontSize: 13,
-    lineHeight: 18
+    flexShrink: 1,
+    fontSize: bodyFrameTypography.caption,
+    lineHeight: 17
+  },
+  projectPercent: {
+    fontSize: 11,
+    fontWeight: "600",
+    fontVariant: ["tabular-nums"]
+  },
+  projectDuration: {
+    fontSize: 11,
+    lineHeight: 16
   },
   progressTrack: {
     height: 4,
