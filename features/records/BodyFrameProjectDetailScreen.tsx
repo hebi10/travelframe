@@ -1,5 +1,5 @@
 import { Image } from "expo-image";
-import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import { router, type Href, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -367,7 +367,7 @@ export default function BodyFrameProjectDetailScreen() {
                       backgroundColor: palette.surfaceStrong
                     }
                   ]}
-                  onPress={() => router.push(`/photo/${photo.id}` as never)}
+                  onPress={() => router.push(`/photo/${photo.id}` as Href)}
                 >
                   <Image
                     source={{ uri: photo.previewUri ?? photo.uri }}
