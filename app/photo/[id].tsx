@@ -207,7 +207,7 @@ export default function PhotoDetailScreen() {
             accessibilityRole="button"
             accessibilityLabel="기록으로 돌아가기"
             style={[styles.iconButton, { borderColor: palette.line }]}
-            onPress={() => router.back()}
+            onPress={returnToRecord}
           >
             <Text style={[styles.backButtonText, { color: palette.text }]}>‹</Text>
           </Pressable>
