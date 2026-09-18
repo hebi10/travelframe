@@ -12,7 +12,6 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { AppGuideOverlay } from "@/components/app-guide-overlay";
 import { ScreenShell } from "@/components/screen-shell";
 import { SectionBlock } from "@/components/section-block";
 import {
@@ -593,7 +592,7 @@ export default function AccountScreen() {
               {!hasFullAccess ? (
                 <View style={styles.verifyPanel}>
                   <Text selectable style={[styles.helpText, themed.mutedText]}>
-                    이메일 인증과 Pro 활성화가 완료되면 워터마크 제거, 클라우드 백업, 고급 출력 기능을 사용할 수 있습니다.
+                    이메일 인증과 Pro 활성화가 완료되면 워터마크 제거와 클라우드 백업을 사용할 수 있습니다.
                   </Text>
                   <View style={styles.inlineActions}>
                     <Pressable
@@ -959,7 +958,6 @@ export default function AccountScreen() {
           </View>
         </View>
       </Modal>
-      <AppGuideOverlay tabKey="account" />
     </>
   );
 }
