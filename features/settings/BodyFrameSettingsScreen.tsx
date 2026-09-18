@@ -18,6 +18,12 @@ const themeLabel = {
   system: "시스템"
 } as const;
 
+const fontSizeLabel = {
+  small: "작게",
+  medium: "보통",
+  large: "크게"
+} as const;
+
 function BodyFrameSettingRow({
   label,
   detail,
@@ -145,22 +151,16 @@ export default function BodyFrameSettingsScreen() {
 
         <SectionBlock title="변화 영상">
           <BodyFrameSettingRow
-            label="기본 영상"
-            detail="프로젝트 사진 1장당 0.1초 · 30fps"
+            label="사진 간격"
+            detail="프로젝트 사진 1장당 고정 재생 시간"
             mark="0.1초"
             onPress={() => router.push("/trip-clip")}
           />
           <BodyFrameSettingRow
-            label="영상 규격"
-            detail="세로 기록 영상 기본 규격"
+            label="출력 규격"
+            detail="세로 변화 영상 기본 저장 규격"
             mark="9:16 · 1080p"
             onPress={() => router.push("/trip-clip")}
-          />
-          <BodyFrameSettingRow
-            label="영상 세부 설정"
-            detail="저장 화질과 기존 고급 영상 옵션"
-            mark="열기"
-            onPress={() => router.push("/advanced-settings")}
           />
         </SectionBlock>
 
@@ -172,9 +172,15 @@ export default function BodyFrameSettingsScreen() {
             onPress={() => router.push("/advanced-settings")}
           />
           <BodyFrameSettingRow
-            label="화면 세부 설정"
-            detail="글자 크기와 화면 밀도"
-            mark="열기"
+            label="글자 크기"
+            detail="앱 전체에서 사용할 기본 글자 크기"
+            mark={fontSizeLabel[settings.fontSize]}
+            onPress={() => router.push("/advanced-settings")}
+          />
+          <BodyFrameSettingRow
+            label="사용 가이드"
+            detail="촬영과 기록 화면의 사용 안내를 다시 확인합니다."
+            mark="다시 보기"
             onPress={() => router.push("/advanced-settings")}
           />
         </SectionBlock>
@@ -205,18 +211,6 @@ export default function BodyFrameSettingsScreen() {
             detail="권한 사용과 데이터 처리 안내"
             mark="열기"
             onPress={() => void Linking.openURL(PRIVACY_POLICY_URL)}
-          />
-          <BodyFrameSettingRow
-            label="고급 설정"
-            detail="기존 촬영·편집·백업의 전체 세부 설정"
-            mark="열기"
-            onPress={() => router.push("/advanced-settings")}
-          />
-          <BodyFrameSettingRow
-            label="기존 편집 보관함"
-            detail="이전 사진 편집 작업과 저장한 작업물을 확인합니다."
-            mark="열기"
-            onPress={() => router.push("/legacy-studio")}
           />
         </SectionBlock>
       </ScrollView>

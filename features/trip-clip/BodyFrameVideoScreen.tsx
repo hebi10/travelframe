@@ -391,21 +391,11 @@ export default function BodyFrameVideoScreen() {
             }
           ]}
         >
-          <SummaryRow label="사진" value={`${projectPhotos.length}장`} />
-          <SummaryRow label="간격" value="0.1초" />
+          <SummaryRow label="사진 수" value={`${projectPhotos.length}장`} />
+          <SummaryRow label="사진 간격" value="0.1초" />
           <SummaryRow label="영상 길이" value={formatDuration(totalDuration)} />
-          <SummaryRow
-            label="플랜 한도"
-            value={
-              planEntitlements.maxProgressVideoSeconds === null
-                ? "제한 없음"
-                : formatDuration(planEntitlements.maxProgressVideoSeconds)
-            }
-          />
-          <SummaryRow label="프레임" value={`${BODY_FRAME_VIDEO_FPS}fps · ${totalFrames}프레임`} />
           <SummaryRow label="화질" value="1080p" />
-          <SummaryRow label="비율" value={BODY_FRAME_VIDEO_RATIO} />
-          <SummaryRow label="전환 효과" value="없음" last />
+          <SummaryRow label="화면 비율" value={BODY_FRAME_VIDEO_RATIO} />
         </View>
 
         {!videoLimitState.allowed ? (
@@ -514,20 +504,15 @@ export default function BodyFrameVideoScreen() {
 
 function SummaryRow({
   label,
-  value,
-  last = false
+  value
 }: {
   label: string;
   value: string;
-  last?: boolean;
 }) {
   const { palette } = useAppAppearance();
-  void last;
 
   return (
-    <View
-      style={styles.summaryRow}
-    >
+    <View style={styles.summaryRow}>
       <Text style={[styles.summaryLabel, { color: palette.muted }]}>{label}</Text>
       <Text style={[styles.summaryValue, { color: palette.text }]}>{value}</Text>
     </View>
@@ -643,7 +628,7 @@ const styles = StyleSheet.create({
     marginTop: 20,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 8,
+    borderRadius: bodyFrameDesign.buttonRadius,
     paddingHorizontal: 16
   },
   primaryButtonText: {
