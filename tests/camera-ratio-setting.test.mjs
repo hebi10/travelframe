@@ -23,7 +23,7 @@ for (const snippet of [
   "CAMERA_RATIO_OPTIONS",
   "cameraRatioAspect",
   "const [cameraRatio, setCameraRatio] = useState<PhotoRatioLabel>(defaultAppSettings.cameraRatio)",
-  "setCameraRatio(settings.cameraRatio)",
+  "setCameraRatio(effectiveRatio)",
   "const selectedCameraRatioAspect = cameraRatioAspect[cameraRatio] ?? undefined",
   "const cameraPreviewViewportStyle = useMemo(",
   "const [cameraControlsHeight, setCameraControlsHeight] = useState(0)",
