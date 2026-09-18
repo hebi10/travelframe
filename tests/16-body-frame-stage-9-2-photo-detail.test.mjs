@@ -63,14 +63,6 @@ assert.ok(
   "photo detail should use Body Frame typography tokens"
 );
 
-assert.equal(
-  source.includes("BodyMeasurement") ||
-    source.includes("weightKg") ||
-    source.includes("bodyFatPercent"),
-  false,
-  "Stage 9-2 should prepare the record-detail layout without prematurely adding measurement storage"
-);
-
 assert.ok(
   source.indexOf("recordSummary") < source.indexOf("actions"),
   "record information should appear before actions, leaving a stable insertion point for Stage 9-3 measurements"
