@@ -28,4 +28,18 @@ if (result.error) {
   console.error(result.error.message);
   process.exit(1);
 }
-process.exit(result.status ?? 1);
+if ((result.status ?? 1) !== 0) {
+  process.exit(result.status ?? 1);
+}
+
+console.log("Reapplying required node_modules patches after prebuild...");
+const patchResult = spawnSync(process.execPath, ["scripts/apply-patches.mjs"], {
+  stdio: "inherit",
+  env: process.env,
+  shell: false
+});
+if (patchResult.error) {
+  console.error(patchResult.error.message);
+  process.exit(1);
+}
+process.exit(patchResult.status ?? 1);
