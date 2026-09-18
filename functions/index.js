@@ -79,7 +79,7 @@ exports.verifyGooglePlayPurchase = secureOnCall(async (request) => {
       productId,
       purchaseToken,
       source: "client",
-      acknowledge: true
+      acknowledge: false
     });
   } catch (error) {
     throw toHttpsError(error);
