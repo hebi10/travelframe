@@ -3,7 +3,7 @@
 ## 1. Clean Android CI
 - [x] Add `android:prebuild:ci`.
 - [x] Run clean prebuild before generated-Android tests.
-- [x] Run clean prebuild before Windows Kotlin/manifest verification.
+- [x] Run clean prebuild before Android Kotlin/manifest verification.
 - [x] Reapply node_modules patches after prebuild.
 
 ## 2. Generated release policy
