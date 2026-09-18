@@ -102,6 +102,7 @@ export const saveCapturedPhoto = async (input: SaveCapturedPhotoInput) => {
     }
 
     finishBodyFrameCameraCapture({
+      projectId: resolvedProjectId,
       sequence: resolvedSequence,
       success: true
     });
