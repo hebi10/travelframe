@@ -592,6 +592,14 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    match /googlePlayPurchases/{purchaseId} {
+      allow read, write: if false;
+    }
+
+    match /unresolvedGooglePlayNotifications/{notificationId} {
+      allow read, write: if false;
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }

@@ -47,6 +47,7 @@
     },
     "plugins": [
       "expo-router",
+      "expo-iap",
       "./plugins/with-android-release-manifest",
       [
         "expo-image-picker",

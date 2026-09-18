@@ -1,4 +1,5 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { onMessagePublished } = require("firebase-functions/v2/pubsub");
 const admin = require("firebase-admin");
 const {
   assertBackupUploadAllowed,
@@ -25,6 +26,13 @@ admin.initializeApp();
 const db = admin.firestore();
 const bucket = admin.storage().bucket();
 const FieldValue = admin.firestore.FieldValue;
+const { createGooglePlayBillingService } = require("./google-play-billing");
+const googlePlayBilling = createGooglePlayBillingService({
+  admin,
+  db,
+  FieldValue,
+  HttpsError
+});
 // Enable only after the Android client initializes Firebase App Check.
 const CALLABLE_RUNTIME_OPTIONS = process.env.FUNCTIONS_ENFORCE_APP_CHECK === "true"
   ? { enforceAppCheck: true }
@@ -61,6 +69,55 @@ const requireUid = (request) => {
 
   return uid;
 };
+
+exports.verifyGooglePlayPurchase = secureOnCall(async (request) => {
+  try {
+    const uid = requireUid(request);
+    const { productId, purchaseToken } = request.data ?? {};
+    return await googlePlayBilling.syncGooglePlayPurchase({
+      uid,
+      productId,
+      purchaseToken,
+      source: "client",
+      acknowledge: false
+    });
+  } catch (error) {
+    throw toHttpsError(error);
+  }
+});
+
+const decodeGooglePlayRtdn = (event) => {
+  const message = event?.data?.message;
+  if (!message) {
+    return null;
+  }
+
+  if (message.json && typeof message.json === "object") {
+    return message.json;
+  }
+
+  if (typeof message.data === "string" && message.data) {
+    try {
+      return JSON.parse(Buffer.from(message.data, "base64").toString("utf8"));
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
+};
+
+exports.handleGooglePlayBillingNotification = onMessagePublished(
+  googlePlayBilling.GOOGLE_PLAY_TOPIC,
+  async (event) => {
+    const payload = decodeGooglePlayRtdn(event);
+    if (!payload) {
+      return;
+    }
+
+    await googlePlayBilling.handleGooglePlayBillingNotification(payload);
+  }
+);
 
 const getBackupSubscription = async (uid) => {
   const [currentSnapshot, creatorSnapshot, expertSnapshot] = await Promise.all([
