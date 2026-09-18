@@ -38,8 +38,8 @@ assert.ok(
   "Quality must prebuild and verify release sources before generated-Android tests"
 );
 
-const androidManifestIndex = quality.indexOf("run: npm run android:manifest:release");
-const androidVerifyIndex = quality.indexOf("run: npm run android:verify:kotlin");
+const androidManifestIndex = quality.indexOf(":app:processReleaseMainManifest");
+const androidVerifyIndex = quality.indexOf(":app:compileDebugKotlin");
 const androidJobPrebuildIndex = quality.lastIndexOf(
   "run: npm run android:prebuild:ci",
   androidManifestIndex
@@ -48,14 +48,14 @@ assert.ok(
   androidJobPrebuildIndex >= 0 &&
     androidJobPrebuildIndex < androidManifestIndex &&
     androidManifestIndex < androidVerifyIndex,
-  "Windows Android CI must prebuild, verify the release manifest, then run the Kotlin smoke build"
+  "Android CI must prebuild, verify the release manifest, then run the Kotlin smoke build"
 );
 
 assert.ok(
-  quality.includes("actions/cache@v4") &&
-    quality.includes("C:/g/caches") &&
-    quality.includes("C:/g/wrapper"),
-  "Windows Android CI should persist the short Gradle cache"
+  quality.includes("runs-on: ubuntu-latest") &&
+    quality.includes("cache: gradle") &&
+    quality.includes("-PreactNativeArchitectures=x86_64"),
+  "Android CI should use Gradle caching and a bounded single-ABI Kotlin compile"
 );
 
 for (const snippet of [
