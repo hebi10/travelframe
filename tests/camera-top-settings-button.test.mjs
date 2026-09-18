@@ -14,81 +14,68 @@ for (const removedSnippet of [
   "navigateFromCamera",
   "페이지 이동",
   "styles.cameraDropdown",
-  "styles.iconMenuLine"
+  "styles.iconMenuLine",
+  "styles.cameraInstantControlRow",
+  "styles.cameraInstantControlButton"
 ]) {
   assert.ok(
     !cameraSource.includes(removedSnippet),
-    `camera top bar should remove hamburger navigation flow: ${removedSnippet}`
+    `camera top bar should remove legacy/instant control clutter: ${removedSnippet}`
   );
 }
 
 for (const requiredSnippet of [
-  "styles.cameraInstantControlRow",
-  "styles.cameraInstantControlButton",
+  "styles.cameraHeaderButton",
+  "onPress={openCameraSettingsMenu}",
+  'accessibilityLabel="촬영 도구 열기"',
+  "openCameraToolFromSettings",
+  "styles.cameraToolGrid",
+  "styles.cameraToolButton",
   "openLineGuideSettings",
   "openPhotoGuideSettings",
+  "openColorControls",
   "openZoomControls",
   "openLightControls",
-  "onPress={openCameraSettingsMenu}",
   'accessibilityLabel="라인 가이드 설정 열기"',
-  'accessibilityLabel="사진 오버레이 열기"',
+  'accessibilityLabel="기준 사진 설정 열기"',
+  'accessibilityLabel="색감 설정 열기"',
   'accessibilityLabel="확대 설정 열기"',
-  'accessibilityLabel="라이트 켜기 끄기"',
-  'accessibilityLabel="카메라 설정 열기"',
-  'name="zoom-in"',
-  'name="settings"',
+  'accessibilityLabel="라이트 설정 열기"',
+  "toggleCameraFacing",
   "setCameraSettingsOpen(true)"
 ]) {
   assert.ok(
     cameraSource.includes(requiredSnippet),
-    `camera top bar should expose instant camera controls: ${requiredSnippet}`
+    `camera tools should remain reachable from the compact tool sheet: ${requiredSnippet}`
   );
 }
 
 assert.ok(
-  !cameraSource.includes("styles.cameraSettingsIconButton"),
-  "camera settings should no longer be a standalone top-right-only button"
-);
-
-const topLightButtonSource = cameraSource.slice(
-  cameraSource.indexOf('accessibilityLabel="라이트 켜기 끄기"') - 280,
-  cameraSource.indexOf('accessibilityLabel="카메라 설정 열기"')
-);
-assert.ok(
-  topLightButtonSource.includes("onPress={openLightControls}"),
-  "top light button should open the bottom light controls"
-);
-assert.ok(
-  !topLightButtonSource.includes("disabled={!cameraLightReady}") &&
-    !topLightButtonSource.includes("disabled={!cameraLightAvailable}"),
-  "top light button should stay clickable even before native torch controls are ready"
-);
-assert.ok(
   cameraSource.includes('export type CameraControlPanel = "color" | "zoom" | "light"'),
-  "camera controls should include a light panel"
+  "camera controls should keep color, zoom and light panels"
 );
 assert.ok(
   cameraSource.includes('activeCameraControlPanel === "light"') &&
     cameraSource.includes('setActiveCameraControlPanel((current) => (current === "light" ? null : "light"))'),
-  "top light button should toggle the bottom light panel"
+  "light tool should continue to toggle the bottom light panel"
 );
 assert.ok(
   cameraSource.includes("onPress={() => setLightEnabled(false)}") &&
     cameraSource.includes("onPress={() => setLightEnabled(true)}"),
-  "bottom light panel should expose explicit off and on buttons"
+  "bottom light panel should keep explicit off and on buttons"
 );
 
 for (const requiredStyleSnippet of [
-  "left: 12",
-  "right: 12",
-  "gap: 8",
-  "width: 38",
-  "width: 40"
+  "cameraHeaderButton",
+  "width: bodyFrameDesign.minTouchSize",
+  "height: bodyFrameDesign.minTouchSize",
+  "cameraToolGrid",
+  "minHeight: bodyFrameDesign.minTouchSize"
 ]) {
   assert.ok(
     stylesSource.includes(requiredStyleSnippet),
-    `camera top bar should fit five instant controls on narrow Android widths: ${requiredStyleSnippet}`
+    `camera chrome should follow the Body Frame touch contract: ${requiredStyleSnippet}`
   );
 }
 
-console.log("ok - camera top bar exposes instant controls directly");
+console.log("ok - camera top bar exposes one compact tool entry");
