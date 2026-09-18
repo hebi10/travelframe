@@ -19,7 +19,8 @@ import {
 } from "@/lib/body-measurement-library";
 import {
   getBodyMeasurementMetricValue,
-  getBodyMeasurementSeries
+  getBodyMeasurementSeries,
+  getBodyMeasurementSeriesSummary
 } from "@/lib/body-measurement-series";
 import { getBodyProjectById } from "@/lib/body-project-library";
 import { useAppAppearance } from "@/lib/app-appearance";
@@ -118,6 +119,10 @@ export default function BodyMeasurementHistoryScreen() {
   const series = useMemo(
     () => getBodyMeasurementSeries(entries, selectedMetric),
     [entries, selectedMetric]
+  );
+  const seriesSummary = useMemo(
+    () => getBodyMeasurementSeriesSummary(series),
+    [series]
   );
   const visibleEntries = useMemo(
     () =>
@@ -286,6 +291,55 @@ export default function BodyMeasurementHistoryScreen() {
           })}
         </ScrollView>
 
+        <View style={styles.overviewGrid}>
+          <OverviewStat
+            label="시작"
+            value={
+              seriesSummary.first
+                ? String(seriesSummary.first.value) + metricMeta.unit
+                : "-"
+            }
+            textColor={palette.text}
+            mutedColor={palette.muted}
+            borderColor={palette.line}
+            backgroundColor={palette.surface}
+          />
+          <OverviewStat
+            label="현재"
+            value={
+              seriesSummary.latest
+                ? String(seriesSummary.latest.value) + metricMeta.unit
+                : "-"
+            }
+            textColor={palette.text}
+            mutedColor={palette.muted}
+            borderColor={palette.line}
+            backgroundColor={palette.surface}
+          />
+          <OverviewStat
+            label="변화"
+            value={
+              seriesSummary.change === null
+                ? "-"
+                : (seriesSummary.change > 0 ? "+" : "") +
+                  seriesSummary.change +
+                  metricMeta.unit
+            }
+            textColor={palette.text}
+            mutedColor={palette.muted}
+            borderColor={palette.line}
+            backgroundColor={palette.surface}
+          />
+          <OverviewStat
+            label="기록"
+            value={String(seriesSummary.count) + "회"}
+            textColor={palette.text}
+            mutedColor={palette.muted}
+            borderColor={palette.line}
+            backgroundColor={palette.surface}
+          />
+        </View>
+
         <BodyMeasurementSummaryCard
           metric={selectedMetric}
           series={series}
@@ -415,6 +469,34 @@ export default function BodyMeasurementHistoryScreen() {
   );
 }
 
+function OverviewStat({
+  label,
+  value,
+  textColor,
+  mutedColor,
+  borderColor,
+  backgroundColor
+}: {
+  label: string;
+  value: string;
+  textColor: string;
+  mutedColor: string;
+  borderColor: string;
+  backgroundColor: string;
+}) {
+  return (
+    <View
+      style={[
+        styles.overviewStat,
+        { borderColor, backgroundColor }
+      ]}
+    >
+      <Text style={[styles.overviewLabel, { color: mutedColor }]}>{label}</Text>
+      <Text style={[styles.overviewValue, { color: textColor }]}>{value}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   screen: {
     flex: 1
@@ -492,6 +574,29 @@ const styles = StyleSheet.create({
   metricButtonText: {
     fontSize: bodyFrameTypography.button,
     fontWeight: "600"
+  },
+  overviewGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    gap: 8,
+    marginBottom: 12
+  },
+  overviewStat: {
+    width: "48%",
+    minHeight: 72,
+    justifyContent: "space-between",
+    padding: 12,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderRadius: bodyFrameDesign.cardRadius
+  },
+  overviewLabel: {
+    fontSize: bodyFrameTypography.caption
+  },
+  overviewValue: {
+    fontSize: bodyFrameTypography.sectionTitle,
+    fontWeight: "600",
+    fontVariant: ["tabular-nums"]
   },
   historySection: {
     gap: 12
