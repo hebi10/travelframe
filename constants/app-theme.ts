@@ -58,5 +58,15 @@ export const bodyFrameDesign = {
   cardRadius: 8,
   buttonRadius: 8,
   modalRadius: 10,
-  bottomSheetRadius: 12
+  bottomSheetRadius: 12,
+  borderWidth: 1
+} as const;
+
+export const bodyFrameTypography = {
+  pageTitle: 28,
+  sectionTitle: 18,
+  rowTitle: 14,
+  body: 14,
+  caption: 12,
+  button: 14
 } as const;
