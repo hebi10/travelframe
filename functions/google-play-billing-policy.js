@@ -74,7 +74,17 @@ const parseOneTimePurchase = ({ data, productId }) => {
     data?.purchaseStateContext?.purchaseState ??
     data?.purchaseState ??
     "PURCHASE_STATE_UNSPECIFIED";
-  const active = Boolean(lineItem && googleState === "PURCHASED");
+  const refundableQuantity =
+    lineItem?.productOfferDetails?.refundableQuantity;
+  const hasRemainingEntitlement =
+    refundableQuantity === undefined ||
+    refundableQuantity === null ||
+    Number(refundableQuantity) > 0;
+  const active = Boolean(
+    lineItem &&
+      googleState === "PURCHASED" &&
+      hasRemainingEntitlement
+  );
 
   return {
     verified: Boolean(lineItem),
@@ -84,7 +94,7 @@ const parseOneTimePurchase = ({ data, productId }) => {
     productId,
     expiresAt: null,
     startedAt: toIsoOrNull(data?.purchaseCompletionTime),
-    orderId: lineItem?.productOfferDetails?.offerId ?? data?.orderId ?? null,
+    orderId: data?.orderId ?? null,
     linkedPurchaseToken: null,
     acknowledgementState: data?.acknowledgementState ?? null,
     acknowledged: isAcknowledged(data?.acknowledgementState),
