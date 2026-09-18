@@ -11,17 +11,31 @@ const requiredCopy = [
   {
     file: "features/account/AccountScreen.tsx",
     snippets: [
-      'title: "Pro"',
-      "Pro는 주 15회 영상 출력, 워터마크 제거, 클라우드 백업, 광고 제거를 함께 제공합니다.",
-      "비로그인/무료 로그인: 이미지 100개, 영상 30개, 클라우드 백업 없음",
-      "구독 기간 동안 앱 전반의 광고 제거",
-      "영상 출력 주 15회",
-      "Pro: 이미지 200개, 영상 50개, 음악 10개, 클라우드 백업 2GB",
+      "무료 플랜은 프로젝트당 100장과 최대 10초 변화 영상을 지원합니다.",
+      'SectionBlock title="현재 상태"',
+      'label="현재 플랜"',
+      'label="현재 프로젝트"',
+      'label="현재 기록"',
+      'SectionBlock title="클라우드 백업"',
+      'SectionBlock title="플랜 및 결제"',
       '"구독 포함"',
       '"확인 중..."',
       '"구매하기"',
       '"구독하기"',
-      "결제가 완료되었습니다."
+      "결제가 완료되었습니다.",
+      "getStorePrice"
+    ]
+  },
+  {
+    file: "features/account/account-screen.constants.ts",
+    snippets: [
+      'title: "Pro"',
+      'price: "Google Play 가격"',
+      "Pro는 바디 프레임 365장 기록과 36.5초 변화 영상",
+      "프로젝트당 최대 365장 기록",
+      "최대 36.5초 변화 영상",
+      "구독 기간 동안 앱 전반의 광고 제거",
+      "클라우드 백업과 상위 기록 한도"
     ]
   },
   {
@@ -60,12 +74,7 @@ for (const directory of checkedDirs) {
 }
 
 for (const requirement of requiredCopy) {
-  const source = [
-    fs.readFileSync(path.join(root, requirement.file), "utf8"),
-    requirement.file === "features/account/AccountScreen.tsx"
-      ? fs.readFileSync(path.join(root, "features/account/account-screen.constants.ts"), "utf8")
-      : ""
-  ].join("\n");
+  const source = fs.readFileSync(path.join(root, requirement.file), "utf8");
 
   for (const snippet of requirement.snippets) {
     assert.ok(
@@ -75,4 +84,4 @@ for (const requirement of requiredCopy) {
   }
 }
 
-console.log("ok - subscription copy describes Pro plan benefits and ad removal");
+console.log("ok - subscription copy describes Body Frame plans and Google Play pricing");
