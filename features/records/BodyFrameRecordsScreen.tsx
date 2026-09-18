@@ -12,6 +12,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppGuideOverlay } from "@/components/app-guide-overlay";
+import { bodyFrameDesign, bodyFrameTypography } from "@/constants/app-theme";
 import {
   getBodyProjectPhotos,
   getBodyProjectProgressSummary
@@ -310,7 +311,7 @@ const styles = StyleSheet.create({
     flex: 1
   },
   content: {
-    paddingHorizontal: 16
+    paddingHorizontal: bodyFrameDesign.horizontalPadding
   },
   centered: {
     flex: 1,
@@ -331,18 +332,18 @@ const styles = StyleSheet.create({
     gap: 6
   },
   pageTitle: {
-    fontSize: 28,
+    fontSize: bodyFrameTypography.pageTitle,
     fontWeight: "600"
   },
   pageDetail: {
-    fontSize: 14,
+    fontSize: bodyFrameTypography.body,
     lineHeight: 20
   },
   captureButton: {
-    minHeight: 44,
+    minHeight: bodyFrameDesign.minTouchSize,
     justifyContent: "center",
     paddingHorizontal: 14,
-    borderRadius: 8
+    borderRadius: bodyFrameDesign.buttonRadius
   },
   captureButtonText: {
     fontSize: 13,
@@ -356,8 +357,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 14,
     padding: 12,
-    borderWidth: 1,
-    borderRadius: 8
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderRadius: bodyFrameDesign.cardRadius
   },
   coverFrame: {
     width: 82,
@@ -415,7 +416,7 @@ const styles = StyleSheet.create({
     marginTop: 28
   },
   archivedTitle: {
-    fontSize: 18,
+    fontSize: bodyFrameTypography.sectionTitle,
     fontWeight: "600"
   },
   archivedDetail: {
@@ -427,7 +428,7 @@ const styles = StyleSheet.create({
     gap: 8
   },
   archivedRow: {
-    minHeight: 64,
+    minHeight: Math.max(64, bodyFrameDesign.minTouchSize),
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
@@ -450,7 +451,7 @@ const styles = StyleSheet.create({
   },
   restoreButton: {
     minWidth: 58,
-    minHeight: 44,
+    minHeight: bodyFrameDesign.minTouchSize,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 10,
@@ -476,7 +477,7 @@ const styles = StyleSheet.create({
     lineHeight: 20
   },
   primaryButton: {
-    minHeight: 48,
+    minHeight: bodyFrameDesign.primaryButtonHeight,
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 8,
