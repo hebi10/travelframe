@@ -35,6 +35,7 @@ import {
   getLastActiveProjectId,
   setLastActiveProjectId
 } from "@/lib/body-project-preferences";
+import { getBodyMeasurementSettings } from "@/lib/body-measurement-library";
 import {
   createBodyProject,
   getBodyProjects
@@ -67,6 +68,8 @@ export default function BodyFrameCameraScreen() {
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [measurementPromptPhotoId, setMeasurementPromptPhotoId] =
+    useState<string | null>(null);
   const lastHandledSaveAtRef = useRef(0);
 
   const reloadProjectState = useCallback(async () => {
@@ -179,13 +182,48 @@ export default function BodyFrameCameraScreen() {
 
     lastHandledSaveAtRef.current = session.lastSavedAt;
     setSaveMessage(`${session.lastSavedSequence}번째 사진을 저장했습니다.`);
-    void reloadProjectState();
+    setMeasurementPromptPhotoId(null);
+
+    void (async () => {
+      const projectId = session.projectId;
+      if (!projectId) {
+        await reloadProjectState();
+        return;
+      }
+
+      const [storedPhotos, measurementSettings] = await Promise.all([
+        getPhotos(),
+        getBodyMeasurementSettings(projectId)
+      ]);
+      const savedPhoto =
+        storedPhotos.find(
+          (photo) =>
+            photo.projectId === projectId &&
+            photo.sequence === session.lastSavedSequence
+        ) ?? null;
+
+      if (
+        measurementSettings.enabled &&
+        measurementSettings.promptAfterCapture &&
+        savedPhoto
+      ) {
+        setMeasurementPromptPhotoId(savedPhoto.id);
+      }
+
+      await reloadProjectState();
+    })();
 
     const timeout = setTimeout(() => {
       setSaveMessage(null);
-    }, 2200);
+      setMeasurementPromptPhotoId(null);
+    }, 4200);
     return () => clearTimeout(timeout);
-  }, [reloadProjectState, session.lastSavedAt, session.lastSavedSequence]);
+  }, [
+    reloadProjectState,
+    session.lastSavedAt,
+    session.lastSavedSequence,
+    session.projectId
+  ]);
 
   const handleSelectProject = useCallback(
     (project: BodyProject) => {
@@ -264,8 +302,22 @@ export default function BodyFrameCameraScreen() {
       </View>
 
       {saveMessage ? (
-        <View pointerEvents="none" style={styles.snackbar}>
+        <View style={styles.snackbar}>
           <Text style={styles.snackbarText}>{saveMessage}</Text>
+          {measurementPromptPhotoId ? (
+            <Pressable
+              accessibilityRole="button"
+              style={styles.snackbarAction}
+              onPress={() =>
+                router.push({
+                  pathname: "/photo/[id]",
+                  params: { id: measurementPromptPhotoId, measurement: "1" }
+                })
+              }
+            >
+              <Text style={styles.snackbarActionText}>수치 기록</Text>
+            </Pressable>
+          ) : null}
         </View>
       ) : null}
     </View>
@@ -316,9 +368,11 @@ const styles = StyleSheet.create({
     left: bodyFrameDesign.horizontalPadding,
     right: bodyFrameDesign.horizontalPadding,
     bottom: 118,
-    minHeight: 44,
+    minHeight: bodyFrameDesign.minTouchSize,
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
+    justifyContent: "space-between",
+    gap: 12,
     paddingHorizontal: 14,
     borderWidth: bodyFrameDesign.borderWidth,
     borderColor: "#2A2A2E",
@@ -327,8 +381,19 @@ const styles = StyleSheet.create({
     zIndex: 50
   },
   snackbarText: {
+    flex: 1,
     color: "#F5F5F5",
     fontSize: 13,
     fontWeight: "500"
+  },
+  snackbarAction: {
+    minHeight: bodyFrameDesign.minTouchSize,
+    justifyContent: "center",
+    paddingHorizontal: 8
+  },
+  snackbarActionText: {
+    color: "#F5F5F5",
+    fontSize: bodyFrameTypography.button,
+    fontWeight: "700"
   }
 });
