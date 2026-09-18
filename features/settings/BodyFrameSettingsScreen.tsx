@@ -5,9 +5,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppGuideOverlay } from "@/components/app-guide-overlay";
 import { SectionBlock } from "@/components/section-block";
+import { bodyFrameDesign, bodyFrameTypography } from "@/constants/app-theme";
 import { PRIVACY_POLICY_URL } from "@/constants/legal-links";
 import { useAppAppearance } from "@/lib/app-appearance";
-import { getFontOptionLabel } from "@/lib/app-fonts";
 import { useAuth } from "@/lib/auth-context";
 import { getPlanEntitlements } from "@/lib/plan-entitlements";
 import { getStorageModeLabel } from "@/lib/storage-mode";
@@ -172,12 +172,6 @@ export default function BodyFrameSettingsScreen() {
             onPress={() => router.push("/advanced-settings")}
           />
           <BodyFrameSettingRow
-            label="글꼴"
-            detail="앱 전체에 적용할 글꼴"
-            mark={getFontOptionLabel(settings.fontStyle)}
-            onPress={() => router.push("/advanced-settings")}
-          />
-          <BodyFrameSettingRow
             label="화면 세부 설정"
             detail="글자 크기와 화면 밀도"
             mark="열기"
@@ -237,47 +231,47 @@ const styles = StyleSheet.create({
     flex: 1
   },
   content: {
-    paddingHorizontal: 16
+    paddingHorizontal: bodyFrameDesign.horizontalPadding
   },
   header: {
     gap: 6,
     marginBottom: 24
   },
   settingRow: {
-    minHeight: 64,
+    minHeight: Math.max(64, bodyFrameDesign.minTouchSize),
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: 12,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    borderWidth: 1,
-    borderRadius: 8
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderRadius: bodyFrameDesign.cardRadius
   },
   settingRowCopy: {
     flex: 1,
     gap: 3
   },
   settingRowLabel: {
-    fontSize: 14,
+    fontSize: bodyFrameTypography.rowTitle,
     fontWeight: "600"
   },
   settingRowDetail: {
-    fontSize: 12,
+    fontSize: bodyFrameTypography.caption,
     lineHeight: 17
   },
   settingRowMark: {
     maxWidth: 118,
-    fontSize: 12,
+    fontSize: bodyFrameTypography.caption,
     fontWeight: "600",
     textAlign: "right"
   },
   pageTitle: {
-    fontSize: 28,
+    fontSize: bodyFrameTypography.pageTitle,
     fontWeight: "600"
   },
   pageDetail: {
-    fontSize: 14,
+    fontSize: bodyFrameTypography.body,
     lineHeight: 20
   }
 });
