@@ -388,7 +388,7 @@ const createGooglePlayBillingService = ({
     if (payload.subscriptionNotification) {
       return {
         purchaseToken: payload.subscriptionNotification.purchaseToken,
-        productId: payload.subscriptionNotification.subscriptionId ?? null,
+        productId: null,
         notificationType: payload.subscriptionNotification.notificationType,
         kind: "subs"
       };
