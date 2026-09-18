@@ -240,15 +240,6 @@ export default function BodyFrameRecordsScreen() {
           </View>
         )}
 
-        <Pressable
-          accessibilityRole="button"
-          style={[styles.legacyLink, { borderColor: palette.line }]}
-          onPress={() => router.push("/legacy-studio")}
-        >
-          <Text style={[styles.legacyLinkText, { color: palette.muted }]}>
-            기존 편집 보관함 열기
-          </Text>
-        </Pressable>
       </ScrollView>
 
       <AppGuideOverlay tabKey="studio" />
@@ -386,16 +377,4 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600"
   },
-  legacyLink: {
-    minHeight: 44,
-    marginTop: 24,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderRadius: 8
-  },
-  legacyLinkText: {
-    fontSize: 13,
-    fontWeight: "500"
-  }
 });
