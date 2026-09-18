@@ -15,7 +15,7 @@ export type SubscriptionProductId = "free" | "ad_remove" | "creator_monthly" | "
 export type UserSubscription = {
   plan: SubscriptionPlan;
   status: SubscriptionStatus;
-  provider: "none" | "admin" | "google_play" | "local_checkout";
+  provider: "none" | "admin" | "google_play";
   productId: SubscriptionProductId;
   startedAt: string | null;
   expiresAt: string | null;
@@ -59,6 +59,11 @@ const normalizeSubscriptionProductId = (
 
   return "free";
 };
+
+const normalizeSubscriptionProvider = (
+  provider: unknown
+): UserSubscription["provider"] =>
+  provider === "admin" || provider === "google_play" ? provider : "none";
 
 export const freeSubscription: UserSubscription = {
   plan: "free",
@@ -128,9 +133,14 @@ const parseSubscription = (value: string | null): UserSubscription => {
 
   try {
     const parsed = JSON.parse(value) as Partial<UserSubscription>;
+    if (parsed.provider === ("local_checkout" as unknown)) {
+      return freeSubscription;
+    }
+
     return {
       ...freeSubscription,
       ...parsed,
+      provider: normalizeSubscriptionProvider(parsed.provider),
       productId: normalizeSubscriptionProductId(parsed.productId, parsed.plan)
     };
   } catch {
@@ -201,16 +211,11 @@ export const getUserSubscriptionState = async (
 
   try {
     const verifiedSubscription = await getVerifiedSubscriptionFromFirestore(user);
-    // ponytail: local checkout preview; remove this fallback when Play verification writes server subscriptions.
-    const effectiveSubscription =
-      isPremiumSubscription(cachedSubscription) && !isPremiumSubscription(verifiedSubscription)
-        ? cachedSubscription
-        : verifiedSubscription;
-    await saveLocalSubscription(user.uid, effectiveSubscription);
+    await saveLocalSubscription(user.uid, verifiedSubscription);
 
     return {
-      verifiedSubscription: effectiveSubscription,
-      cachedSubscription: effectiveSubscription,
+      verifiedSubscription,
+      cachedSubscription: verifiedSubscription,
       subscriptionStatus: "verified"
     };
   } catch {
@@ -220,48 +225,6 @@ export const getUserSubscriptionState = async (
       subscriptionStatus: "failed"
     };
   }
-};
-
-const checkoutProductCopy: Record<
-  Exclude<SubscriptionProductId, "free">,
-  { productName: string; priceLabel: string; expiresAt: string | null }
-> = {
-  ad_remove: {
-    productName: "광고 제거",
-    priceLabel: "1,990원",
-    expiresAt: null
-  },
-  creator_monthly: {
-    productName: "Pro",
-    priceLabel: "월 990원",
-    expiresAt: null
-  },
-  expert_monthly: {
-    productName: "Expert",
-    priceLabel: "월 5,900원",
-    expiresAt: null
-  }
-};
-
-export const saveLocalCheckoutSubscription = async (
-  uid: string,
-  productId: Exclude<SubscriptionProductId, "free">
-) => {
-  const product = checkoutProductCopy[productId];
-  const subscription: UserSubscription = {
-    plan: "premium",
-    status: "active",
-    provider: "local_checkout",
-    productId,
-    startedAt: new Date().toISOString(),
-    expiresAt: product.expiresAt,
-    lastPaymentAt: new Date().toISOString(),
-    priceLabel: product.priceLabel,
-    productName: product.productName
-  };
-
-  await saveLocalSubscription(uid, subscription);
-  return subscription;
 };
 
 export const getUserSubscription = async (user: User | null) => {
