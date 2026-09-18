@@ -94,6 +94,12 @@ for (const token of [
 ]) {
   assert.ok(recordsSource.includes(token), `records screen should contain ${token}`);
 }
+
+assert.equal(
+  recordsSource.includes("기존 편집 보관함 열기"),
+  false,
+  "legacy editor entry should not clutter the primary records screen"
+);
 const detailSource = fs.readFileSync(
   "features/records/BodyFrameProjectDetailScreen.tsx",
   "utf8"
@@ -156,6 +162,12 @@ for (const group of [
 }
 assert.ok(settingsSource.includes("/advanced-settings"));
 assert.ok(settingsSource.includes("/account"));
+
+assert.ok(
+  settingsSource.includes("/legacy-studio") &&
+    settingsSource.includes("기존 편집 보관함"),
+  "legacy studio should remain reachable only from the advanced area in Settings"
+);
 
 for (const token of [
   "function BodyFrameSettingRow",
