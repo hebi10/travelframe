@@ -5,17 +5,17 @@ const cameraSource = fs.readFileSync("features/camera/CameraScreen.tsx", "utf8")
 
 assert.ok(
   cameraSource.includes("const isLineGuideActive = guideVisible;"),
-  "camera guide quick controls should mark the line guide active when the line guide is visible"
+  "camera tools should mark the line guide active when the guide is visible"
 );
 
 assert.ok(
-  cameraSource.includes("isLineGuideActive && styles.cameraInstantControlButtonActive"),
-  "line guide instant button should use the active style while the line guide is visible"
+  cameraSource.includes("isLineGuideActive && styles.cameraToolButtonActive"),
+  "line guide tool should use the active style while the guide is visible"
 );
 
 assert.ok(
-  cameraSource.includes("<Text selectable={false} style={styles.cameraInstantControlText}>라인</Text>"),
-  "line guide instant button should keep a visible line label"
+  cameraSource.includes("<Text selectable={false} style={styles.cameraToolText}>라인</Text>"),
+  "line guide tool should keep a visible line label"
 );
 
-console.log("ok - camera line guide instant button reflects visible guide state");
+console.log("ok - camera line guide tool reflects visible guide state");
