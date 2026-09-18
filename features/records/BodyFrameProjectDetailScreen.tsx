@@ -1,4 +1,5 @@
 import { Image } from "expo-image";
+import { BodyMeasurementSummaryCard } from "@/components/body-measurement-summary-card";
 import { router, type Href, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
 import {
@@ -25,9 +26,11 @@ import {
   updateBodyProject
 } from "@/lib/body-project-library";
 import {
+  getBodyMeasurements,
   getBodyMeasurementSettings,
   updateBodyMeasurementSettings
 } from "@/lib/body-measurement-library";
+import { getBodyMeasurementSeries } from "@/lib/body-measurement-series";
 import { setLastActiveProjectId } from "@/lib/body-project-preferences";
 import {
   getBodyFrameUpgradeLabel,
@@ -41,6 +44,7 @@ import type { BodyProject, ReferencePhotoMode } from "@/types/body-project";
 import {
   bodyMeasurementMetricMeta,
   defaultBodyMeasurementSettings,
+  type BodyMeasurementEntry,
   type BodyMeasurementMetric,
   type BodyMeasurementSettings
 } from "@/types/body-measurement";
@@ -95,6 +99,7 @@ export default function BodyFrameProjectDetailScreen() {
     useState<BodyMeasurementSettings>(defaultBodyMeasurementSettings);
   const [measurementDraft, setMeasurementDraft] =
     useState<BodyMeasurementSettings>(defaultBodyMeasurementSettings);
+  const [measurements, setMeasurements] = useState<BodyMeasurementEntry[]>([]);
 
   const reload = useCallback(async () => {
     if (!projectId) {
@@ -102,17 +107,23 @@ export default function BodyFrameProjectDetailScreen() {
       return;
     }
 
-    const [storedProject, storedPhotos, storedMeasurementSettings] =
-      await Promise.all([
-        getBodyProjectById(projectId),
-        getPhotos(),
-        getBodyMeasurementSettings(projectId)
-      ]);
+    const [
+      storedProject,
+      storedPhotos,
+      storedMeasurementSettings,
+      storedMeasurements
+    ] = await Promise.all([
+      getBodyProjectById(projectId),
+      getPhotos(),
+      getBodyMeasurementSettings(projectId),
+      getBodyMeasurements(projectId)
+    ]);
 
     setProject(storedProject);
     setPhotos(storedPhotos);
     setMeasurementSettings(storedMeasurementSettings);
     setMeasurementDraft(storedMeasurementSettings);
+    setMeasurements(storedMeasurements);
     if (storedProject) {
       setNameDraft(storedProject.name);
       setTargetDraft(String(storedProject.targetPhotoCount));
@@ -137,6 +148,21 @@ export default function BodyFrameProjectDetailScreen() {
         ? sortProjectPhotos(getBodyProjectPhotos(photos, project.id))
         : [],
     [photos, project]
+  );
+
+  const measurementSeries = useMemo(
+    () =>
+      measurementSettings.enabled
+        ? getBodyMeasurementSeries(
+            measurements,
+            measurementSettings.primaryMetric
+          )
+        : [],
+    [
+      measurementSettings.enabled,
+      measurementSettings.primaryMetric,
+      measurements
+    ]
   );
 
   const saveBasicInfo = useCallback(async () => {
@@ -342,6 +368,25 @@ export default function BodyFrameProjectDetailScreen() {
             />
           </View>
         </View>
+
+        {measurementSettings.enabled ? (
+          <BodyMeasurementSummaryCard
+            metric={measurementSettings.primaryMetric}
+            series={measurementSeries}
+            onAddMeasurement={
+              projectPhotos[0]
+                ? () =>
+                    router.push({
+                      pathname: "/photo/[id]",
+                      params: {
+                        id: projectPhotos[0].id,
+                        measurement: "1"
+                      }
+                    })
+                : undefined
+            }
+          />
+        ) : null}
 
         <View style={styles.statGrid}>
           <View
