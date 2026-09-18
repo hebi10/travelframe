@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useColorScheme } from "react-native";
 
-import { colors } from "@/constants/app-theme";
+import { bodyFrameDarkColors, colors } from "@/constants/app-theme";
 import {
   type FontStyle,
   defaultAppSettings,
@@ -21,17 +21,7 @@ let cachedAppSettings: AppSettings = defaultAppSettings;
 let appSettingsCacheVersion = 0;
 
 const darkPalette: AppPalette = {
-  background: "#000000",
-  chrome: "#000000",
-  surface: "#171717",
-  surfaceStrong: "#202020",
-  text: "#eeeeee",
-  muted: "#d6d6d6",
-  faint: "#a8a8a8",
-  line: "#2d2d2d",
-  darkLine: "#777777",
-  inverse: "#000000",
-  ink: "#f2f2f2"
+  ...bodyFrameDarkColors
 };
 
 export const getEffectiveThemeMode = (
