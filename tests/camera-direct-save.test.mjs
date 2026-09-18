@@ -125,7 +125,7 @@ for (const snippet of [
   "gallerySavingOverlay",
   "gallerySavingText",
   "position: \"absolute\"",
-  "fontSize: 11",
+  "fontSize: bodyFrameTypography.caption",
   "fontWeight: \"900\""
 ]) {
   assert.ok(cameraStyleSource.includes(snippet), `camera saving indicator style missing: ${snippet}`);

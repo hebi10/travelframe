@@ -63,8 +63,10 @@ export const bodyFrameDesign = {
 } as const;
 
 export const bodyFrameTypography = {
-  pageTitle: 28,
+  pageTitle: 26,
+  projectTitle: 24,
   sectionTitle: 18,
+  metric: 22,
   rowTitle: 14,
   body: 14,
   caption: 12,
