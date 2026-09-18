@@ -99,9 +99,9 @@ assert.ok(
 );
 
 assert.ok(
-  imageBackupTest.includes('fs.readFileSync("constants/body-frame.ts"') &&
-    imageBackupTest.includes('from "\@/constants/body-frame"') &&
-    imageBackupTest.includes("bodyFrameModuleUrl"),
+  imageBackupTest.includes('const bodyFrameSource = fs.readFileSync("constants/body-frame.ts"') &&
+    imageBackupTest.includes("const bodyFrameModuleUrl") &&
+    (imageBackupTest.match(/bodyFrameModuleUrl/g) ?? []).length >= 3,
   "image backup data-URL harness must rewrite the Body Frame constants alias"
 );
 
