@@ -1,0 +1,401 @@
+import { Image } from "expo-image";
+import { router, useFocusEffect } from "expo-router";
+import { useCallback, useMemo, useState } from "react";
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+import { AppGuideOverlay } from "@/components/app-guide-overlay";
+import {
+  getBodyProjectPhotos,
+  getBodyProjectProgressSummary
+} from "@/lib/body-frame-camera-project";
+import { getBodyProjects } from "@/lib/body-project-library";
+import { setLastActiveProjectId } from "@/lib/body-project-preferences";
+import { getPhotos } from "@/lib/photo-library";
+import { useAppAppearance } from "@/lib/app-appearance";
+import type { BodyProject } from "@/types/body-project";
+import type { PhotoItem } from "@/types/photo";
+
+const getProjectCover = (project: BodyProject, photos: PhotoItem[]) => {
+  const projectPhotos = getBodyProjectPhotos(photos, project.id);
+  if (project.coverPhotoId) {
+    const explicit = projectPhotos.find((photo) => photo.id === project.coverPhotoId);
+    if (explicit) return explicit;
+  }
+
+  return [...projectPhotos].sort((first, second) => {
+    const firstSequence = first.sequence ?? 0;
+    const secondSequence = second.sequence ?? 0;
+    if (firstSequence !== secondSequence) {
+      return secondSequence - firstSequence;
+    }
+    return new Date(second.createdAt).getTime() - new Date(first.createdAt).getTime();
+  })[0] ?? null;
+};
+
+const formatDuration = (seconds: number) =>
+  seconds < 60
+    ? `${seconds.toFixed(1)}초`
+    : `${Math.floor(seconds / 60)}분 ${Math.round(seconds % 60)}초`;
+
+export default function BodyFrameRecordsScreen() {
+  const insets = useSafeAreaInsets();
+  const { palette } = useAppAppearance();
+  const [projects, setProjects] = useState<BodyProject[]>([]);
+  const [photos, setPhotos] = useState<PhotoItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const reload = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [storedProjects, storedPhotos] = await Promise.all([
+        getBodyProjects(),
+        getPhotos()
+      ]);
+      setProjects(storedProjects.filter((project) => !project.archived));
+      setPhotos(storedPhotos);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      void reload();
+    }, [reload])
+  );
+
+  const cards = useMemo(
+    () =>
+      projects.map((project) => ({
+        project,
+        summary: getBodyProjectProgressSummary(photos, project),
+        cover: getProjectCover(project, photos)
+      })),
+    [photos, projects]
+  );
+
+  const openProject = useCallback(async (project: BodyProject) => {
+    await setLastActiveProjectId(project.id);
+    router.push({
+      pathname: "/project/[id]",
+      params: { id: project.id }
+    });
+  }, []);
+
+  if (loading) {
+    return (
+      <View style={[styles.centered, { backgroundColor: palette.background }]}>
+        <ActivityIndicator color={palette.text} />
+        <Text style={[styles.emptyDetail, { color: palette.muted }]}>
+          프로젝트 기록을 불러오는 중입니다.
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={[styles.screen, { backgroundColor: palette.background }]}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[
+          styles.content,
+          {
+            paddingTop: Math.max(insets.top + 20, 28),
+            paddingBottom: insets.bottom + 36
+          }
+        ]}
+      >
+        <View style={styles.header}>
+          <View style={styles.headerCopy}>
+            <Text style={[styles.pageTitle, { color: palette.text }]}>기록</Text>
+            <Text style={[styles.pageDetail, { color: palette.muted }]}>
+              프로젝트별 몸의 변화를 한눈에 확인합니다.
+            </Text>
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            style={[styles.captureButton, { backgroundColor: palette.text }]}
+            onPress={() => router.push("/camera")}
+          >
+            <Text style={[styles.captureButtonText, { color: palette.inverse }]}>
+              촬영하기
+            </Text>
+          </Pressable>
+        </View>
+
+        {cards.length === 0 ? (
+          <View
+            style={[
+              styles.emptyCard,
+              {
+                backgroundColor: palette.surface,
+                borderColor: palette.line
+              }
+            ]}
+          >
+            <Text style={[styles.emptyTitle, { color: palette.text }]}>
+              아직 프로젝트가 없습니다.
+            </Text>
+            <Text style={[styles.emptyDetail, { color: palette.muted }]}>
+              촬영 화면에서 첫 프로젝트를 만들고 같은 위치와 자세로 기록을 시작하세요.
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              style={[styles.primaryButton, { backgroundColor: palette.text }]}
+              onPress={() => router.push("/camera")}
+            >
+              <Text style={[styles.primaryButtonText, { color: palette.inverse }]}>
+                첫 프로젝트 만들기
+              </Text>
+            </Pressable>
+          </View>
+        ) : (
+          <View style={styles.projectList}>
+            {cards.map(({ project, summary, cover }) => {
+              const progress = Math.min(
+                1,
+                summary.photoCount / Math.max(1, summary.targetPhotoCount)
+              );
+              return (
+                <Pressable
+                  key={project.id}
+                  accessibilityRole="button"
+                  onPress={() => void openProject(project)}
+                  style={({ pressed }) => [
+                    styles.projectCard,
+                    {
+                      backgroundColor: palette.surface,
+                      borderColor: palette.line,
+                      opacity: pressed ? 0.82 : 1
+                    }
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles.coverFrame,
+                      { backgroundColor: palette.surfaceStrong }
+                    ]}
+                  >
+                    {cover ? (
+                      <Image
+                        source={{ uri: cover.previewUri ?? cover.uri }}
+                        style={styles.coverImage}
+                        contentFit="cover"
+                        cachePolicy="memory-disk"
+                      />
+                    ) : (
+                      <View style={styles.coverEmpty}>
+                        <Text style={[styles.coverEmptyText, { color: palette.faint }]}>
+                          첫 기록 전
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+
+                  <View style={styles.projectCopy}>
+                    <View style={styles.projectTopRow}>
+                      <Text
+                        numberOfLines={1}
+                        style={[styles.projectName, { color: palette.text }]}
+                      >
+                        {project.name}
+                      </Text>
+                      <Text style={[styles.projectArrow, { color: palette.faint }]}>›</Text>
+                    </View>
+                    <Text style={[styles.projectMeta, { color: palette.muted }]}>
+                      {summary.photoCount} / {summary.targetPhotoCount}장 ·{" "}
+                      {formatDuration(summary.durationSeconds)}
+                    </Text>
+                    <Text style={[styles.projectMeta, { color: palette.faint }]}>
+                      기준 사진 · {project.referenceMode === "first" ? "첫 사진" : "최근 사진"}
+                    </Text>
+                    <View
+                      style={[
+                        styles.progressTrack,
+                        { backgroundColor: palette.surfaceStrong }
+                      ]}
+                    >
+                      <View
+                        style={[
+                          styles.progressFill,
+                          {
+                            backgroundColor: palette.text,
+                            width: `${Math.round(progress * 100)}%`
+                          }
+                        ]}
+                      />
+                    </View>
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
+        )}
+
+        <Pressable
+          accessibilityRole="button"
+          style={[styles.legacyLink, { borderColor: palette.line }]}
+          onPress={() => router.push("/legacy-studio")}
+        >
+          <Text style={[styles.legacyLinkText, { color: palette.muted }]}>
+            기존 편집 보관함 열기
+          </Text>
+        </Pressable>
+      </ScrollView>
+
+      <AppGuideOverlay tabKey="studio" />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  screen: {
+    flex: 1
+  },
+  content: {
+    paddingHorizontal: 16
+  },
+  centered: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    paddingHorizontal: 24
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 12,
+    marginBottom: 24
+  },
+  headerCopy: {
+    flex: 1,
+    gap: 6
+  },
+  pageTitle: {
+    fontSize: 28,
+    fontWeight: "600"
+  },
+  pageDetail: {
+    fontSize: 14,
+    lineHeight: 20
+  },
+  captureButton: {
+    minHeight: 44,
+    justifyContent: "center",
+    paddingHorizontal: 14,
+    borderRadius: 8
+  },
+  captureButtonText: {
+    fontSize: 13,
+    fontWeight: "600"
+  },
+  projectList: {
+    gap: 12
+  },
+  projectCard: {
+    minHeight: 166,
+    flexDirection: "row",
+    gap: 14,
+    padding: 12,
+    borderWidth: 1,
+    borderRadius: 8
+  },
+  coverFrame: {
+    width: 82,
+    aspectRatio: 9 / 16,
+    overflow: "hidden",
+    borderRadius: 6
+  },
+  coverImage: {
+    width: "100%",
+    height: "100%"
+  },
+  coverEmpty: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 6
+  },
+  coverEmptyText: {
+    fontSize: 11,
+    textAlign: "center"
+  },
+  projectCopy: {
+    flex: 1,
+    justifyContent: "center",
+    gap: 8
+  },
+  projectTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8
+  },
+  projectName: {
+    flex: 1,
+    fontSize: 17,
+    fontWeight: "600"
+  },
+  projectArrow: {
+    fontSize: 22
+  },
+  projectMeta: {
+    fontSize: 13,
+    lineHeight: 18
+  },
+  progressTrack: {
+    height: 4,
+    overflow: "hidden",
+    borderRadius: 2
+  },
+  progressFill: {
+    height: "100%",
+    borderRadius: 2
+  },
+  emptyCard: {
+    gap: 12,
+    padding: 18,
+    borderWidth: 1,
+    borderRadius: 8
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: "600"
+  },
+  emptyDetail: {
+    fontSize: 14,
+    lineHeight: 20
+  },
+  primaryButton: {
+    minHeight: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 8,
+    marginTop: 4
+  },
+  primaryButtonText: {
+    fontSize: 14,
+    fontWeight: "600"
+  },
+  legacyLink: {
+    minHeight: 44,
+    marginTop: 24,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderRadius: 8
+  },
+  legacyLinkText: {
+    fontSize: 13,
+    fontWeight: "500"
+  }
+});
