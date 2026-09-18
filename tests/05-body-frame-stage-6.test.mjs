@@ -1,0 +1,136 @@
+import assert from "node:assert/strict";
+import fs from "node:fs";
+
+const packageJson = JSON.parse(fs.readFileSync("package.json", "utf8"));
+const appJson = JSON.parse(fs.readFileSync("app.json", "utf8"));
+const subscriptionSource = fs.readFileSync("lib/subscription.ts", "utf8");
+const authSource = fs.readFileSync("lib/auth-context.tsx", "utf8");
+const accountSource = fs.readFileSync("features/account/AccountScreen.tsx", "utf8");
+const functionsSource = fs.readFileSync("functions/index.js", "utf8");
+const firestoreRules = fs.readFileSync("firestore.rules", "utf8");
+
+assert.equal(
+  packageJson.dependencies?.["expo-iap"],
+  "5.6.2",
+  "Stage 6 must pin expo-iap 5.6.2"
+);
+assert.ok(
+  appJson.expo?.plugins?.some((plugin) =>
+    Array.isArray(plugin) ? plugin[0] === "expo-iap" : plugin === "expo-iap"
+  ),
+  "app config must install the expo-iap config plugin"
+);
+
+assert.ok(
+  fs.existsSync("lib/google-play-billing.ts"),
+  "Google Play billing adapter must exist"
+);
+assert.ok(
+  fs.existsSync("features/account/hooks/useGooglePlayBilling.ts"),
+  "Google Play billing hook must exist"
+);
+assert.ok(
+  fs.existsSync("functions/google-play-billing.js"),
+  "server Google Play verifier must exist"
+);
+assert.ok(
+  fs.existsSync("functions/google-play-billing-policy.js"),
+  "pure Google Play verification policy must exist"
+);
+
+const billingSource = fs.readFileSync("lib/google-play-billing.ts", "utf8");
+for (const token of [
+  "ad_remove",
+  "creator_monthly",
+  "expert_monthly",
+  "verifyGooglePlayPurchase",
+  "purchaseToken"
+]) {
+  assert.ok(billingSource.includes(token), `billing adapter should contain ${token}`);
+}
+
+const billingHookSource = fs.readFileSync(
+  "features/account/hooks/useGooglePlayBilling.ts",
+  "utf8"
+);
+for (const token of [
+  "useIAP",
+  "fetchProducts",
+  "requestPurchase",
+  "finishTransaction",
+  "getAvailablePurchases",
+  "subscriptionOffers",
+  "obfuscatedAccountId",
+  "verifyGooglePlayPurchase"
+]) {
+  assert.ok(billingHookSource.includes(token), `billing hook should contain ${token}`);
+}
+
+assert.equal(
+  subscriptionSource.includes("saveLocalCheckoutSubscription"),
+  false,
+  "local checkout fulfillment must be removed"
+);
+assert.equal(
+  authSource.includes("saveLocalCheckoutSubscription"),
+  false,
+  "AuthContext must not grant paid entitlement locally"
+);
+assert.equal(
+  authSource.includes("purchaseProduct:"),
+  false,
+  "AuthContext local purchase action must be removed"
+);
+assert.equal(
+  subscriptionSource.includes("isPremiumSubscription(cachedSubscription) && !isPremiumSubscription(verifiedSubscription)"),
+  false,
+  "cached premium state must not override verified server state"
+);
+assert.equal(
+  subscriptionSource.includes('"local_checkout"'),
+  false,
+  "legacy local_checkout must not remain a valid subscription provider"
+);
+
+for (const token of [
+  "useGooglePlayBilling",
+  "purchaseProduct",
+  "restorePurchases",
+  "구매 복원"
+]) {
+  assert.ok(accountSource.includes(token), `Account screen should contain ${token}`);
+}
+
+for (const token of [
+  "verifyGooglePlayPurchase",
+  "handleGooglePlayBillingNotification",
+  "google-play-billing",
+  "syncGooglePlayPurchase"
+]) {
+  assert.ok(functionsSource.includes(token), `Functions entry should contain ${token}`);
+}
+
+const serverBillingSource = fs.readFileSync("functions/google-play-billing.js", "utf8");
+for (const token of [
+  "androidpublisher",
+  "purchases/subscriptionsv2/tokens",
+  "purchases/productsv2/tokens",
+  ":acknowledge",
+  "googlePlayPurchases",
+  "sha256",
+  "linkedPurchaseToken",
+  "paymentEvents",
+  'provider: "google_play"'
+]) {
+  assert.ok(serverBillingSource.includes(token), `server billing should contain ${token}`);
+}
+
+for (const token of [
+  "match /googlePlayPurchases/{purchaseId}",
+  "match /unresolvedGooglePlayNotifications/{notificationId}",
+  "allow read, write: if false;"
+]) {
+  assert.ok(firestoreRules.includes(token), `Firestore rules should contain ${token}`);
+}
+
+console.log("ok - Body Frame stage 6 Google Play Billing contracts are enforced");
