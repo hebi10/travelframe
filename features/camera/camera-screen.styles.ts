@@ -222,8 +222,8 @@ export const styles = StyleSheet.create({
     gap: 8
   },
   overlayButton: {
-    minHeight: controls.compactHeight,
-    minWidth: 42,
+    minHeight: bodyFrameDesign.minTouchSize,
+    minWidth: bodyFrameDesign.minTouchSize,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 11,
@@ -284,7 +284,7 @@ export const styles = StyleSheet.create({
     paddingTop: 2
   },
   overlayCompactButton: {
-    minHeight: controls.compactHeight,
+    minHeight: bodyFrameDesign.minTouchSize,
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
@@ -304,7 +304,7 @@ export const styles = StyleSheet.create({
     color: "#FFB3B6"
   },
   overlayConfirmButton: {
-    minHeight: controls.compactHeight,
+    minHeight: bodyFrameDesign.minTouchSize,
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
@@ -531,7 +531,7 @@ export const styles = StyleSheet.create({
     letterSpacing: 0
   },
   modalCloseButton: {
-    minHeight: controls.compactHeight,
+    minHeight: bodyFrameDesign.minTouchSize,
     justifyContent: "center",
     paddingHorizontal: 12,
     borderWidth: 1,
@@ -571,7 +571,7 @@ export const styles = StyleSheet.create({
     gap: 8
   },
   optionButton: {
-    minHeight: controls.compactHeight,
+    minHeight: bodyFrameDesign.minTouchSize,
     justifyContent: "center",
     paddingHorizontal: 12,
     borderWidth: 1,
@@ -868,8 +868,8 @@ export const styles = StyleSheet.create({
     letterSpacing: 0
   },
   cameraColorCloseButton: {
-    width: 34,
-    height: 34,
+    width: bodyFrameDesign.minTouchSize,
+    height: bodyFrameDesign.minTouchSize,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
@@ -877,14 +877,14 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.surface
   },
   cameraColorSlotRow: {
-    minHeight: 38,
+    minHeight: bodyFrameDesign.minTouchSize,
     flexDirection: "row",
     gap: 7
   },
   cameraColorSlotButton: {
     flex: 1,
     minWidth: 0,
-    height: 38,
+    height: bodyFrameDesign.minTouchSize,
     position: "relative",
     alignItems: "center",
     justifyContent: "center",
@@ -927,7 +927,7 @@ export const styles = StyleSheet.create({
     gap: 8
   },
   quickButtonRow: {
-    minHeight: 42,
+    minHeight: bodyFrameDesign.minTouchSize,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -935,7 +935,7 @@ export const styles = StyleSheet.create({
   },
   quickPillButton: {
     minWidth: 48,
-    minHeight: 38,
+    minHeight: bodyFrameDesign.minTouchSize,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 12,
@@ -1039,8 +1039,8 @@ export const styles = StyleSheet.create({
     letterSpacing: 0
   },
   opacityStepButton: {
-    width: 34,
-    height: controls.height,
+    width: bodyFrameDesign.minTouchSize,
+    height: bodyFrameDesign.minTouchSize,
     alignItems: "center",
     justifyContent: "center"
   },
