@@ -6,14 +6,16 @@ const cameraSource = fs.readFileSync("features/camera/CameraScreen.tsx", "utf8")
 for (const snippet of [
   "openLineGuideSettings",
   "openPhotoGuideSettings",
-  "onPress={openLineGuideSettings}",
-  "onPress={openPhotoGuideSettings}",
-  "라인",
-  "오버레이",
+  "openCameraToolFromSettings(openLineGuideSettings)",
+  "openCameraToolFromSettings(openPhotoGuideSettings)",
+  'accessibilityLabel="라인 가이드 설정 열기"',
+  'accessibilityLabel="기준 사진 설정 열기"',
+  "<Text selectable={false} style={styles.cameraToolText}>라인</Text>",
+  "<Text selectable={false} style={styles.cameraToolText}>기준 사진</Text>",
   "setGuideSettingsOpen(true)",
   "reopenOverlaySetup();"
 ]) {
-  assert.ok(cameraSource.includes(snippet), `camera instant guide entry missing: ${snippet}`);
+  assert.ok(cameraSource.includes(snippet), `camera guide tool entry missing: ${snippet}`);
 }
 
 assert.ok(
@@ -30,7 +32,8 @@ for (const removed of [
   "guideLaunchLabel",
   "hiddenGuideSettingsLabel",
   "guideSettingsValue",
-  "guideOnlyLabel"
+  "guideOnlyLabel",
+  "styles.cameraInstantControlRow"
 ]) {
   assert.ok(!cameraSource.includes(removed), `camera guide UI should not keep hidden legacy code: ${removed}`);
 }
@@ -50,4 +53,4 @@ assert.ok(
   "line guide and photo guide should remain independently renderable"
 );
 
-console.log("ok - camera guide entry modal routes line and photo guides");
+console.log("ok - camera tool sheet routes line and reference guide settings");
