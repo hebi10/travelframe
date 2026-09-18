@@ -1,6 +1,6 @@
 import Constants from "expo-constants";
 import { router } from "expo-router";
-import { Linking, StyleSheet, Text, View } from "react-native";
+import { Linking, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ActionRow } from "@/components/action-row";
@@ -28,12 +28,13 @@ export default function BodyFrameSettingsScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: palette.background }]}>
-      <View
-        style={[
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[
           styles.content,
           {
             paddingTop: Math.max(insets.top + 20, 28),
-            paddingBottom: insets.bottom + 28
+            paddingBottom: insets.bottom + 36
           }
         ]}
       >
@@ -166,7 +167,7 @@ export default function BodyFrameSettingsScreen() {
             onPress={() => router.push("/advanced-settings")}
           />
         </SectionBlock>
-      </View>
+      </ScrollView>
 
       <AppGuideOverlay tabKey="settings" />
     </View>
@@ -178,7 +179,6 @@ const styles = StyleSheet.create({
     flex: 1
   },
   content: {
-    flex: 1,
     paddingHorizontal: 16
   },
   header: {
