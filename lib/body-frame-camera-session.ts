@@ -159,13 +159,17 @@ export const reserveBodyFrameCameraCapture = ({
 };
 
 export const finishBodyFrameCameraCapture = ({
+  projectId,
   sequence,
   success
 }: {
+  projectId?: string | null;
   sequence: number;
   success: boolean;
 }) => {
-  const nextProjectPhotoCount = success
+  const savedIntoActiveProject =
+    success && (!projectId || projectId === snapshot.projectId);
+  const nextProjectPhotoCount = savedIntoActiveProject
     ? snapshot.projectPhotoCount + 1
     : snapshot.projectPhotoCount;
   const limitReached =
