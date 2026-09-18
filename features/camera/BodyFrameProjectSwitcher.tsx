@@ -12,6 +12,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { getBodyProjectProgressSummary } from "@/lib/body-frame-camera-project";
+import { isBodyFrameProjectTargetAllowed } from "@/lib/body-frame-plan-limits";
 import type { BodyProject, ReferencePhotoMode } from "@/types/body-project";
 import type { PhotoItem } from "@/types/photo";
 
@@ -26,8 +27,11 @@ type BodyFrameProjectSwitcherProps = {
   photos: PhotoItem[];
   activeProject: BodyProject | null;
   disabled?: boolean;
+  maxProgressPhotos?: number | null;
+  upgradePlanLabel?: string | null;
   onSelectProject: (project: BodyProject) => void;
   onCreateProject: (input: CreateProjectInput) => Promise<void> | void;
+  onUpgrade?: () => void;
   onManageProjects?: () => void;
 };
 
@@ -39,8 +43,11 @@ export function BodyFrameProjectSwitcher({
   photos,
   activeProject,
   disabled = false,
+  maxProgressPhotos = null,
+  upgradePlanLabel = null,
   onSelectProject,
   onCreateProject,
+  onUpgrade,
   onManageProjects
 }: BodyFrameProjectSwitcherProps) {
   const insets = useSafeAreaInsets();
@@ -51,6 +58,7 @@ export function BodyFrameProjectSwitcher({
   const [customTarget, setCustomTarget] = useState("100");
   const [referenceMode, setReferenceMode] = useState<ReferencePhotoMode>("latest");
   const [submitting, setSubmitting] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
 
   const activeSummary = useMemo(
     () =>
@@ -83,6 +91,19 @@ export function BodyFrameProjectSwitcher({
           ? Math.max(1, Math.floor(Number.isFinite(parsedCustom) ? parsedCustom : 100))
           : 100;
 
+    if (
+      !isBodyFrameProjectTargetAllowed({
+        targetPhotoCount,
+        maxProgressPhotos
+      })
+    ) {
+      setCreateError(
+        `현재 플랜에서는 프로젝트 목표를 최대 ${maxProgressPhotos ?? targetPhotoCount}장까지 설정할 수 있습니다.`
+      );
+      return;
+    }
+
+    setCreateError(null);
     setSubmitting(true);
     try {
       await onCreateProject({
@@ -95,6 +116,7 @@ export function BodyFrameProjectSwitcher({
       setTargetPreset("100");
       setCustomTarget("100");
       setReferenceMode("latest");
+      setCreateError(null);
     } finally {
       setSubmitting(false);
     }
@@ -218,31 +240,78 @@ export function BodyFrameProjectSwitcher({
             />
 
             <Text style={styles.label}>목표 기록 수</Text>
+            {maxProgressPhotos !== null ? (
+              <Text style={styles.planLimitText}>
+                현재 플랜 최대 {maxProgressPhotos}장
+              </Text>
+            ) : null}
             <View style={styles.choiceRow}>
-              {(["100", "365", "custom"] as const).map((value) => (
-                <Pressable
-                  key={value}
-                  style={[
-                    styles.choice,
-                    targetPreset === value && styles.choiceSelected
-                  ]}
-                  onPress={() => setTargetPreset(value)}
-                >
-                  <Text style={styles.choiceText}>
-                    {value === "custom" ? "직접 입력" : value}
-                  </Text>
-                </Pressable>
-              ))}
+              {(["100", "365", "custom"] as const).map((value) => {
+                const presetTarget =
+                  value === "100" ? 100 : value === "365" ? 365 : null;
+                const locked =
+                  presetTarget !== null &&
+                  !isBodyFrameProjectTargetAllowed({
+                    targetPhotoCount: presetTarget,
+                    maxProgressPhotos
+                  });
+
+                return (
+                  <Pressable
+                    key={value}
+                    disabled={locked}
+                    style={[
+                      styles.choice,
+                      targetPreset === value && styles.choiceSelected,
+                      locked && styles.disabled
+                    ]}
+                    onPress={() => {
+                      setTargetPreset(value);
+                      setCreateError(null);
+                    }}
+                  >
+                    <Text style={styles.choiceText}>
+                      {value === "custom"
+                        ? "직접 입력"
+                        : locked
+                          ? `${value} · ${upgradePlanLabel ?? "상위 플랜"}`
+                          : value}
+                    </Text>
+                  </Pressable>
+                );
+              })}
             </View>
             {targetPreset === "custom" ? (
               <TextInput
                 value={customTarget}
-                onChangeText={setCustomTarget}
+                onChangeText={(value) => {
+                  setCustomTarget(value);
+                  setCreateError(null);
+                }}
                 keyboardType="number-pad"
                 style={styles.input}
                 placeholder="100"
                 placeholderTextColor="#68686E"
               />
+            ) : null}
+            {createError ? (
+              <View style={styles.limitNotice}>
+                <Text style={styles.limitNoticeText}>{createError}</Text>
+                {upgradePlanLabel && onUpgrade ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    style={styles.limitUpgradeButton}
+                    onPress={() => {
+                      closeAll();
+                      onUpgrade();
+                    }}
+                  >
+                    <Text style={styles.limitUpgradeButtonText}>
+                      플랜 보기 · {upgradePlanLabel}
+                    </Text>
+                  </Pressable>
+                ) : null}
+              </View>
             ) : null}
 
             <Text style={styles.label}>기준 사진</Text>
@@ -368,6 +437,11 @@ const styles = StyleSheet.create({
   actionText: { color: "#F5F5F5", fontSize: 15, fontWeight: "600" },
   actionTextSecondary: { color: "#A0A0A6", fontSize: 14 },
   label: { color: "#A0A0A6", fontSize: 12, marginTop: 12, marginBottom: 8 },
+  planLimitText: {
+    marginBottom: 8,
+    color: "#68686E",
+    fontSize: 12
+  },
   input: {
     minHeight: 48,
     borderWidth: 1,
@@ -402,6 +476,33 @@ const styles = StyleSheet.create({
   referenceChoiceSelected: { borderColor: "#F5F5F5" },
   referenceTitle: { color: "#F5F5F5", fontSize: 14, fontWeight: "500" },
   referenceMeta: { color: "#A0A0A6", fontSize: 12, marginTop: 3 },
+  limitNotice: {
+    marginTop: 10,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "#2A2A2E",
+    borderRadius: 8,
+    backgroundColor: "#0B0B0C"
+  },
+  limitNoticeText: {
+    color: "#D7D7DB",
+    fontSize: 12,
+    lineHeight: 18
+  },
+  limitUpgradeButton: {
+    minHeight: 44,
+    marginTop: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#F5F5F5",
+    borderRadius: 8
+  },
+  limitUpgradeButtonText: {
+    color: "#F5F5F5",
+    fontSize: 13,
+    fontWeight: "600"
+  },
   primaryButton: {
     minHeight: 48,
     alignItems: "center",

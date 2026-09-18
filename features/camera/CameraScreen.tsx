@@ -2,7 +2,7 @@ import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -145,6 +145,11 @@ import {
   type GridGuideLinePositions,
   type GuideShapePoints
 } from "@/lib/app-settings";
+import {
+  getBodyFrameCameraSessionSnapshot,
+  isBodyFrameCameraCaptureBlocked,
+  subscribeBodyFrameCameraSession
+} from "@/lib/body-frame-camera-session";
 import { getPlanEntitlements } from "@/lib/plan-entitlements";
 import { isMediaLibraryAccessGranted, requestMediaLibraryAccess } from "@/lib/request-media-library-access";
 import { deleteLocalFile, getRecentPhoto, saveCapturedPhoto, saveCapturedPhotoToDevice } from "@/lib/photo-library";
@@ -157,6 +162,15 @@ export default function CameraScreen() {
     [subscription, user]
   );
   const canSelectCloudSaveTarget = planEntitlements.canBackupToCloud;
+  const bodyFrameCameraSession = useSyncExternalStore(
+    subscribeBodyFrameCameraSession,
+    getBodyFrameCameraSessionSnapshot,
+    getBodyFrameCameraSessionSnapshot
+  );
+  const bodyFrameCaptureBlocked =
+    Boolean(bodyFrameCameraSession.captureBlockedReason) ||
+    isBodyFrameCameraCaptureBlocked();
+  const bodyFrameCaptureAllowed = !bodyFrameCaptureBlocked;
   const cameraRef = useRef<CameraRef>(null);
   const referenceOverlayRef = useRef<PhotoReferenceOverlayHandle>(null);
   const pendingSettingsPatchRef = useRef<CameraSettingsPatch | null>(null);
@@ -433,7 +447,8 @@ export default function CameraScreen() {
   const canCaptureWithCurrentSession = useCallback(
     () =>
       isCameraReadyRef.current &&
-      isCameraSessionActiveRef.current,
+      isCameraSessionActiveRef.current &&
+      !isBodyFrameCameraCaptureBlocked(),
     []
   );
   const selectedCameraRatioAspect = cameraRatioAspect[cameraRatio] ?? undefined;
@@ -2944,10 +2959,10 @@ export default function CameraScreen() {
                   </Pressable>
                   <Pressable
                     android_disableSound
-                    disabled={!isCameraReady || isCapturing || !cameraDevice}
+                    disabled={!isCameraReady || isCapturing || !cameraDevice || !bodyFrameCaptureAllowed}
                     style={[
                       styles.shutterOuter,
-                      (!isCameraReady || isCapturing || !cameraDevice) && styles.shutterDisabled
+                      (!isCameraReady || isCapturing || !cameraDevice || !bodyFrameCaptureAllowed) && styles.shutterDisabled
                     ]}
                     onPress={takePhoto}
                     accessibilityRole="button"

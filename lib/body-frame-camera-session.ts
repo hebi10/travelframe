@@ -4,6 +4,9 @@ export type BodyFrameCameraSessionSnapshot = {
   automaticReferenceUri: string | null;
   projectRevision: number;
   pendingSaveCount: number;
+  projectPhotoCount: number;
+  maxProgressPhotos: number | null;
+  captureBlockedReason: string | null;
   lastSavedSequence: number | null;
   lastSavedAt: number;
 };
@@ -14,6 +17,9 @@ let snapshot: BodyFrameCameraSessionSnapshot = {
   automaticReferenceUri: null,
   projectRevision: 0,
   pendingSaveCount: 0,
+  projectPhotoCount: 0,
+  maxProgressPhotos: null,
+  captureBlockedReason: null,
   lastSavedSequence: null,
   lastSavedAt: 0
 };
@@ -29,6 +35,17 @@ const setSnapshot = (next: BodyFrameCameraSessionSnapshot) => {
   emit();
 };
 
+const normalizePhotoCount = (value: number) =>
+  Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
+
+const normalizePhotoLimit = (value: number | null | undefined) =>
+  typeof value === "number" &&
+  Number.isFinite(value) &&
+  Number.isInteger(value) &&
+  value > 0
+    ? value
+    : null;
+
 export const getBodyFrameCameraSessionSnapshot = () => snapshot;
 
 export const subscribeBodyFrameCameraSession = (listener: () => void) => {
@@ -36,14 +53,26 @@ export const subscribeBodyFrameCameraSession = (listener: () => void) => {
   return () => listeners.delete(listener);
 };
 
+export const isBodyFrameCameraCaptureBlocked = () =>
+  Boolean(snapshot.captureBlockedReason) ||
+  (snapshot.maxProgressPhotos !== null &&
+    snapshot.projectPhotoCount + snapshot.pendingSaveCount >=
+      snapshot.maxProgressPhotos);
+
 export const setBodyFrameCameraSession = ({
   projectId,
   sequence,
-  automaticReferenceUri
+  automaticReferenceUri,
+  projectPhotoCount = 0,
+  maxProgressPhotos = null,
+  captureBlockedReason = null
 }: {
   projectId: string;
   sequence: number;
   automaticReferenceUri?: string | null;
+  projectPhotoCount?: number;
+  maxProgressPhotos?: number | null;
+  captureBlockedReason?: string | null;
 }) => {
   const projectChanged = snapshot.projectId !== projectId;
   setSnapshot({
@@ -54,7 +83,14 @@ export const setBodyFrameCameraSession = ({
     automaticReferenceUri: automaticReferenceUri ?? null,
     projectRevision: projectChanged
       ? snapshot.projectRevision + 1
-      : snapshot.projectRevision
+      : snapshot.projectRevision,
+    pendingSaveCount: projectChanged ? 0 : snapshot.pendingSaveCount,
+    projectPhotoCount: normalizePhotoCount(projectPhotoCount),
+    maxProgressPhotos: normalizePhotoLimit(maxProgressPhotos),
+    captureBlockedReason:
+      typeof captureBlockedReason === "string" && captureBlockedReason.length > 0
+        ? captureBlockedReason
+        : null
   });
 };
 
@@ -69,7 +105,10 @@ export const clearBodyFrameCameraSession = () => {
     sequence: 1,
     automaticReferenceUri: null,
     projectRevision: snapshot.projectRevision + 1,
-    pendingSaveCount: 0
+    pendingSaveCount: 0,
+    projectPhotoCount: 0,
+    maxProgressPhotos: null,
+    captureBlockedReason: null
   });
 };
 
@@ -95,6 +134,14 @@ export const reserveBodyFrameCameraCapture = ({
     return null;
   }
 
+  const isActiveBodyFrameProject = resolvedProjectId === snapshot.projectId;
+  if (isActiveBodyFrameProject && isBodyFrameCameraCaptureBlocked()) {
+    throw new Error(
+      snapshot.captureBlockedReason ??
+        "현재 플랜의 프로젝트 사진 한도에 도달했습니다."
+    );
+  }
+
   setSnapshot({
     ...snapshot,
     pendingSaveCount: snapshot.pendingSaveCount + 1,
@@ -111,15 +158,31 @@ export const reserveBodyFrameCameraCapture = ({
 };
 
 export const finishBodyFrameCameraCapture = ({
+  projectId,
   sequence,
   success
 }: {
+  projectId?: string | null;
   sequence: number;
   success: boolean;
 }) => {
+  const savedIntoActiveProject =
+    success && (!projectId || projectId === snapshot.projectId);
+  const nextProjectPhotoCount = savedIntoActiveProject
+    ? snapshot.projectPhotoCount + 1
+    : snapshot.projectPhotoCount;
+  const limitReached =
+    snapshot.maxProgressPhotos !== null &&
+    nextProjectPhotoCount >= snapshot.maxProgressPhotos;
+
   setSnapshot({
     ...snapshot,
     pendingSaveCount: Math.max(0, snapshot.pendingSaveCount - 1),
+    projectPhotoCount: nextProjectPhotoCount,
+    captureBlockedReason: limitReached
+      ? snapshot.captureBlockedReason ??
+        "현재 플랜의 프로젝트 사진 한도에 도달했습니다."
+      : snapshot.captureBlockedReason,
     ...(success
       ? {
           lastSavedSequence: sequence,

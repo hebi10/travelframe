@@ -7,11 +7,12 @@ import {
   useState,
   useSyncExternalStore
 } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { BodyFrameProjectSwitcher } from "@/features/camera/BodyFrameProjectSwitcher";
 import CameraScreen from "@/features/camera/CameraScreen";
+import { useAuth } from "@/lib/auth-context";
 import {
   getBodyProjectProgressSummary,
   getBodyProjectReferenceUri,
@@ -26,6 +27,10 @@ import {
   subscribeBodyFrameCameraSession
 } from "@/lib/body-frame-camera-session";
 import {
+  getBodyFrameCaptureLimitState,
+  getBodyFrameUpgradeLabel
+} from "@/lib/body-frame-plan-limits";
+import {
   getLastActiveProjectId,
   setLastActiveProjectId
 } from "@/lib/body-project-preferences";
@@ -34,6 +39,7 @@ import {
   getBodyProjects
 } from "@/lib/body-project-library";
 import { getPhotos } from "@/lib/photo-library";
+import { getPlanEntitlements } from "@/lib/plan-entitlements";
 import type { BodyProject, ReferencePhotoMode } from "@/types/body-project";
 import type { PhotoItem } from "@/types/photo";
 
@@ -45,6 +51,12 @@ type CreateProjectInput = {
 
 export default function BodyFrameCameraScreen() {
   const insets = useSafeAreaInsets();
+  const { isLoggedIn, subscription } = useAuth();
+  const planEntitlements = useMemo(
+    () => getPlanEntitlements({ isLoggedIn, subscription }),
+    [isLoggedIn, subscription]
+  );
+  const upgradePlanLabel = getBodyFrameUpgradeLabel(planEntitlements.tier);
   const session = useSyncExternalStore(
     subscribeBodyFrameCameraSession,
     getBodyFrameCameraSessionSnapshot,
@@ -118,6 +130,20 @@ export default function BodyFrameCameraScreen() {
     [activeProject, photos]
   );
 
+  const captureLimitState = useMemo(
+    () =>
+      getBodyFrameCaptureLimitState({
+        photoCount: activeSummary?.photoCount ?? 0,
+        maxProgressPhotos: planEntitlements.maxProgressPhotos
+      }),
+    [activeSummary?.photoCount, planEntitlements.maxProgressPhotos]
+  );
+
+  const captureBlockedReason =
+    activeProject && !captureLimitState.allowed && captureLimitState.limit
+      ? `${planEntitlements.label} 플랜은 프로젝트당 ${captureLimitState.limit}장까지 기록할 수 있습니다.`
+      : null;
+
   useEffect(() => {
     if (!activeProject) {
       clearBodyFrameCameraSession();
@@ -127,9 +153,19 @@ export default function BodyFrameCameraScreen() {
     setBodyFrameCameraSession({
       projectId: activeProject.id,
       sequence: nextProjectSequence,
-      automaticReferenceUri
+      automaticReferenceUri,
+      projectPhotoCount: activeSummary?.photoCount ?? 0,
+      maxProgressPhotos: planEntitlements.maxProgressPhotos,
+      captureBlockedReason
     });
-  }, [activeProject, automaticReferenceUri, nextProjectSequence]);
+  }, [
+    activeProject,
+    activeSummary?.photoCount,
+    automaticReferenceUri,
+    captureBlockedReason,
+    nextProjectSequence,
+    planEntitlements.maxProgressPhotos
+  ]);
 
   useEffect(() => {
     if (
@@ -183,8 +219,9 @@ export default function BodyFrameCameraScreen() {
     []
   );
 
-  const firstPhotoHint =
-    activeProject && activeSummary?.photoCount === 0
+  const firstPhotoHint = captureBlockedReason
+    ? captureBlockedReason
+    : activeProject && activeSummary?.photoCount === 0
       ? "첫 사진을 찍어 기준을 만들어주세요."
       : activeProject
         ? `오늘 ${nextProjectSequence}번째 기록`
@@ -206,11 +243,23 @@ export default function BodyFrameCameraScreen() {
           photos={photos}
           activeProject={activeProject}
           disabled={session.pendingSaveCount > 0}
+          maxProgressPhotos={planEntitlements.maxProgressPhotos}
+          upgradePlanLabel={upgradePlanLabel}
           onSelectProject={handleSelectProject}
           onCreateProject={handleCreateProject}
+          onUpgrade={() => router.push("/account")}
           onManageProjects={() => router.push("/studio")}
         />
         <Text style={styles.captureHint}>{firstPhotoHint}</Text>
+        {captureBlockedReason && upgradePlanLabel ? (
+          <Pressable
+            accessibilityRole="button"
+            style={styles.planButton}
+            onPress={() => router.push("/account")}
+          >
+            <Text style={styles.planButtonText}>플랜 보기 · {upgradePlanLabel}</Text>
+          </Pressable>
+        ) : null}
       </View>
 
       {saveMessage ? (
@@ -243,6 +292,23 @@ const styles = StyleSheet.create({
     color: "#D7D7DB",
     backgroundColor: "rgba(11,11,12,0.72)",
     fontSize: 12
+  },
+  planButton: {
+    alignSelf: "center",
+    minHeight: 44,
+    marginTop: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: "#F5F5F5",
+    borderRadius: 8,
+    backgroundColor: "rgba(11,11,12,0.88)"
+  },
+  planButtonText: {
+    color: "#F5F5F5",
+    fontSize: 13,
+    fontWeight: "600"
   },
   snackbar: {
     position: "absolute",

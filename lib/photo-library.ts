@@ -57,6 +57,7 @@ export const saveCapturedPhoto = async (input: SaveCapturedPhotoInput) => {
   try {
     legacyPhoto = await saveLegacyCapturedPhoto({
       ...input,
+      localImageLimit: undefined,
       projectId: undefined,
       sequence: undefined
     });
@@ -101,6 +102,7 @@ export const saveCapturedPhoto = async (input: SaveCapturedPhotoInput) => {
     }
 
     finishBodyFrameCameraCapture({
+      projectId: resolvedProjectId,
       sequence: resolvedSequence,
       success: true
     });
