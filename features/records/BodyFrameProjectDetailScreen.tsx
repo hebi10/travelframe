@@ -348,6 +348,7 @@ export default function BodyFrameProjectDetailScreen() {
             ]}
           />
           {planEntitlements.maxProgressPhotos !== null &&
+          Number.parseInt(targetDraft, 10) !== project.targetPhotoCount &&
           Number.parseInt(targetDraft, 10) > planEntitlements.maxProgressPhotos &&
           upgradePlanLabel ? (
             <Pressable
