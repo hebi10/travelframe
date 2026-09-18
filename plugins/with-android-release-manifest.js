@@ -10,6 +10,10 @@ const OPTIONAL_ANDROID_FEATURES = [
   "android.hardware.camera",
   "android.hardware.microphone"
 ];
+const RELEASE_BLOCKED_PERMISSIONS = new Set([
+  "android.permission.SYSTEM_ALERT_WINDOW",
+  "android.permission.MODIFY_AUDIO_SETTINGS"
+]);
 const DEFAULT_ANDROID_PACKAGE = "com.haebi.photoguide";
 const ANDROID_IMAGE_ADJUSTMENT_PACKAGE_FILE = "AndroidImageAdjustmentPackage.kt";
 const ANDROID_IMAGE_ADJUSTMENT_MODULE_FILE = "AndroidImageAdjustmentModule.kt";
@@ -305,6 +309,12 @@ function ensureAndroidImageAdjustmentPackageRegistered(source, androidPackage) {
 function withAndroidReleaseManifest(config) {
   config = withAndroidManifest(config, (config) => {
     const androidManifest = config.modResults;
+    const requestedPermissions = androidManifest.manifest["uses-permission"] ?? [];
+    androidManifest.manifest["uses-permission"] = requestedPermissions.filter(
+      (permission) =>
+        !RELEASE_BLOCKED_PERMISSIONS.has(permission?.$?.["android:name"])
+    );
+
     for (const featureName of OPTIONAL_ANDROID_FEATURES) {
       ensureOptionalFeature(androidManifest, featureName);
     }
