@@ -377,8 +377,7 @@ export default function BodyFrameProjectDetailScreen() {
                   />
                   <View style={styles.photoMetaOverlay}>
                     <Text style={styles.photoMetaText}>
-                      {photo.sequence ? `#${photo.sequence} · ` : ""}
-                      {formatDate(photo.createdAt)}
+                      {photo.sequence ? `#${photo.sequence}` : "기록"}
                     </Text>
                   </View>
                 </Pressable>
@@ -645,8 +644,8 @@ const styles = StyleSheet.create({
     marginBottom: 20
   },
   projectName: {
-    fontSize: 26,
-    lineHeight: 34,
+    fontSize: bodyFrameTypography.projectTitle,
+    lineHeight: 31,
     fontWeight: "600"
   },
   progressHeading: {
@@ -656,7 +655,7 @@ const styles = StyleSheet.create({
     gap: 12
   },
   progressCount: {
-    fontSize: 22,
+    fontSize: bodyFrameTypography.metric,
     fontWeight: "600",
     fontVariant: ["tabular-nums"]
   },
@@ -749,7 +748,7 @@ const styles = StyleSheet.create({
   },
   photoMetaText: {
     color: "#F5F5F5",
-    fontSize: 9,
+    fontSize: bodyFrameTypography.caption,
     fontWeight: "600",
     textAlign: "center",
     fontVariant: ["tabular-nums"]
@@ -831,7 +830,7 @@ const styles = StyleSheet.create({
     fontSize: bodyFrameTypography.caption
   },
   limitLabel: {
-    fontSize: 11
+    fontSize: bodyFrameTypography.caption
   },
   input: {
     minHeight: bodyFrameDesign.primaryButtonHeight,
