@@ -2,7 +2,7 @@ import type { CloudBackupOverview } from "@/lib/cloud-backup";
 import type { UserSubscriptionProducts } from "@/lib/subscription";
 
 export type AuthMode = "signIn" | "signUp" | "recover";
-export type PaymentPlanId = "adRemove" | "creator";
+export type PaymentPlanId = "adRemove" | "creator" | "expert";
 
 export type PaymentPlan = {
   id: PaymentPlanId;
@@ -67,16 +67,28 @@ export const paymentPlans: PaymentPlan[] = [
   {
     id: "creator",
     title: "Pro",
-    price: "월 990원",
-    billing: "월 결제",
-    summary: "Pro는 주 15회 영상 출력, 워터마크 제거, 클라우드 백업, 광고 제거를 함께 제공합니다.",
+    price: "Google Play 가격",
+    billing: "월 구독",
+    summary: "Pro는 바디 프레임 365장 기록과 36.5초 변화 영상, 광고·워터마크 제거, 클라우드 백업을 제공합니다.",
     benefits: [
-      "영상 출력 주 15회",
+      "프로젝트당 최대 365장 기록",
+      "최대 36.5초 변화 영상",
       "구독 기간 동안 앱 전반의 광고 제거",
       "워터마크/브랜딩 제거",
-      "고급 출력 기능과 고해상도 저장",
-      "Pro: 이미지 200개, 영상 50개, 음악 10개, 클라우드 백업 2GB",
-      "백업/복원 및 기기 변경 시 복원"
+      "고급 출력 기능과 클라우드 백업"
+    ]
+  },
+  {
+    id: "expert",
+    title: "Expert",
+    price: "Google Play 가격",
+    billing: "월 구독",
+    summary: "Expert는 현재 바디 프레임 기록·변화 영상 길이 제한을 해제하고 상위 저장·백업 한도를 제공합니다.",
+    benefits: [
+      "바디 프레임 기록 수 제한 해제",
+      "변화 영상 길이 제한 해제",
+      "광고 및 워터마크 제거",
+      "상위 로컬 저장·음악·클라우드 백업 한도"
     ]
   }
 ];
