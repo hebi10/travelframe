@@ -61,10 +61,12 @@ for (const snippet of [
   assert.ok(cameraSource.includes(snippet), `camera color controls missing: ${snippet}`);
 }
 
-const toolGridSource = cameraSource.slice(
-  cameraSource.indexOf("style={styles.cameraToolGrid}"),
-  cameraSource.indexOf('accessibilityLabel="카메라 방향"')
+const toolGridStart = cameraSource.indexOf("style={styles.cameraToolGrid}");
+const toolGridEnd = cameraSource.indexOf(
+  "<Text selectable={false} style={styles.modalSectionTitle}>카메라 방향</Text>",
+  toolGridStart
 );
+const toolGridSource = cameraSource.slice(toolGridStart, toolGridEnd);
 assert.ok(
   toolGridSource.includes("openColorControls") &&
     toolGridSource.indexOf("openColorControls") < toolGridSource.indexOf("openZoomControls"),
