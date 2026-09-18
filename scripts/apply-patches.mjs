@@ -94,7 +94,16 @@ function patchVisionCameraAndroidShutterSound() {
 `
     }
   ]);
+  source = source
+    .replace(/\s*\|\|\s*CameraInfo\.mustPlayShutterSound\(\)/g, "")
+    .replace(/CameraInfo\.mustPlayShutterSound\(\)\s*\|\|\s*/g, "");
   source = replaceOptional(source, "import androidx.camera.core.CameraInfo\n", "");
+
+  if (source.includes("CameraInfo.mustPlayShutterSound()")) {
+    throw new Error(
+      "VisionCamera Android shutter sound patch found an unsupported CameraInfo.mustPlayShutterSound() usage"
+    );
+  }
 
   writeTo(reactNativeVisionCameraRoot, relativePath, source);
   console.info("applied local VisionCamera Android shutter sound patch");
