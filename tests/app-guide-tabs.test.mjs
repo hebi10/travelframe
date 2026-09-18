@@ -46,13 +46,17 @@ assert.ok(
   progressSource.includes("seenTabs: createExistingUserSeenTabs()"),
   "existing users should only pre-complete legacy guide tabs, leaving new tab guides available"
 );
-assert.ok(
-  overlaySource.includes("Array.from({ length: totalSteps })"),
-  "guide overlay swipe pages should be based on guide step count, not visual asset count"
+assert.equal(
+  overlaySource.includes("guideVisualSlides"),
+  false,
+  "Body Frame guide should not keep the old travel visual slide carousel"
 );
 assert.ok(
-  overlaySource.includes("Math.min(totalSteps - 1, nextIndex)"),
-  "guide overlay swipe should allow reaching the final guide step"
+  overlaySource.includes("AppGuideCard") &&
+    overlaySource.includes("current={stepIndex + 1}") &&
+    overlaySource.includes("total={totalSteps}") &&
+    overlaySource.includes("onNext={goNext}"),
+  "Body Frame guide should navigate all steps through the monochrome guide card"
 );
 
 console.log("ok - app guide supports all defined tabs");
