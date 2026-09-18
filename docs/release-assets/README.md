@@ -2,6 +2,8 @@
 
 ## Approved BF v2 assets
 
+승인 방향: **BF 모노그램 v2** / 검정 정사각형 앱 아이콘
+
 Approved artwork is stored in Google Drive:
 
 - Release assets root: https://drive.google.com/drive/folders/1gEl1UkYS79iD8rM_0-Dh5giJDJmmWdTg
