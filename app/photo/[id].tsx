@@ -13,13 +13,25 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { bodyFrameDesign, bodyFrameTypography } from "@/constants/app-theme";
+import { BodyMeasurementEditorSheet } from "@/features/records/BodyMeasurementEditorSheet";
 import { useAppAppearance } from "@/lib/app-appearance";
 import { useAuth } from "@/lib/auth-context";
 import { getBodyProjectById } from "@/lib/body-project-library";
+import {
+  getBodyMeasurementByPhotoId,
+  getBodyMeasurementSettings
+} from "@/lib/body-measurement-library";
 import { deletePhoto, getPhotoById } from "@/lib/photo-library";
 import { saveImageToLibrary } from "@/lib/trip-clip-export";
 import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 import type { BodyProject } from "@/types/body-project";
+import {
+  bodyMeasurementMetricMeta,
+  defaultBodyMeasurementSettings,
+  type BodyMeasurementEntry,
+  type BodyMeasurementMetric,
+  type BodyMeasurementSettings
+} from "@/types/body-measurement";
 import type { PhotoItem } from "@/types/photo";
 
 const formatDate = (value: string) =>
@@ -47,12 +59,20 @@ const getPhotoAspectRatio = (photo: PhotoItem) => {
 };
 
 export default function PhotoDetailScreen() {
-  const { id } = useLocalSearchParams<{ id?: string }>();
+  const { id, measurement } = useLocalSearchParams<{
+    id?: string;
+    measurement?: string;
+  }>();
   const { user } = useAuth();
   const { palette } = useAppAppearance();
   const insets = useSafeAreaInsets();
   const [photo, setPhoto] = useState<PhotoItem | null>(null);
   const [project, setProject] = useState<BodyProject | null>(null);
+  const [measurementSettings, setMeasurementSettings] =
+    useState<BodyMeasurementSettings>(defaultBodyMeasurementSettings);
+  const [measurementEntry, setMeasurementEntry] =
+    useState<BodyMeasurementEntry | null>(null);
+  const [measurementEditorOpen, setMeasurementEditorOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSavingToDevice, setIsSavingToDevice] = useState(false);
@@ -70,11 +90,28 @@ export default function PhotoDetailScreen() {
     setMessage(null);
     try {
       const storedPhoto = await getPhotoById(id);
-      const storedProject = storedPhoto?.projectId
-        ? await getBodyProjectById(storedPhoto.projectId)
-        : null;
+      if (!storedPhoto?.projectId) {
+        setPhoto(storedPhoto);
+        setProject(null);
+        setMeasurementSettings(defaultBodyMeasurementSettings);
+        setMeasurementEntry(null);
+        return;
+      }
+
+      const [storedProject, storedSettings, storedMeasurement] =
+        await Promise.all([
+          getBodyProjectById(storedPhoto.projectId),
+          getBodyMeasurementSettings(storedPhoto.projectId),
+          getBodyMeasurementByPhotoId(storedPhoto.projectId, storedPhoto.id)
+        ]);
+
       setPhoto(storedPhoto);
       setProject(storedProject);
+      setMeasurementSettings(storedSettings);
+      setMeasurementEntry(storedMeasurement);
+      if (measurement === "1" && storedSettings.enabled) {
+        setMeasurementEditorOpen(true);
+      }
     } catch (error) {
       setPhoto(null);
       setProject(null);
@@ -82,7 +119,7 @@ export default function PhotoDetailScreen() {
     } finally {
       setIsLoading(false);
     }
-  }, [id]);
+  }, [id, measurement]);
 
   useFocusEffect(
     useCallback(() => {
@@ -304,6 +341,68 @@ export default function PhotoDetailScreen() {
           </View>
         </View>
 
+        {photo.projectId && measurementSettings.enabled ? (
+          <View
+            style={[
+              styles.measurementCard,
+              {
+                borderColor: palette.line,
+                backgroundColor: palette.surface
+              }
+            ]}
+          >
+            <View style={styles.measurementHeader}>
+              <View style={styles.measurementHeaderCopy}>
+                <Text style={[styles.measurementTitle, { color: palette.text }]}>
+                  수치 기록
+                </Text>
+                <Text style={[styles.measurementDetail, { color: palette.muted }]}>
+                  현재 기기에만 저장됩니다.
+                </Text>
+              </View>
+              <Pressable
+                accessibilityRole="button"
+                style={[styles.measurementButton, { borderColor: palette.line }]}
+                onPress={() => setMeasurementEditorOpen(true)}
+              >
+                <Text style={[styles.measurementButtonText, { color: palette.text }]}>
+                  {measurementEntry ? "수정" : "추가"}
+                </Text>
+              </Pressable>
+            </View>
+
+            {measurementEntry ? (
+              <View style={styles.measurementValues}>
+                {(Object.keys(bodyMeasurementMetricMeta) as BodyMeasurementMetric[])
+                  .filter(
+                    (metric) =>
+                      measurementSettings.fields[metric] &&
+                      getMeasurementValue(measurementEntry, metric) !== undefined
+                  )
+                  .map((metric) => (
+                    <View key={metric} style={styles.measurementValueRow}>
+                      <Text style={[styles.measurementLabel, { color: palette.muted }]}>
+                        {bodyMeasurementMetricMeta[metric].label}
+                      </Text>
+                      <Text style={[styles.measurementValue, { color: palette.text }]}>
+                        {formatMeasurementValue(measurementEntry, metric)}
+                      </Text>
+                    </View>
+                  ))}
+                {measurementEntry.note ? (
+                  <Text style={[styles.measurementNote, { color: palette.muted }]}>
+                    {measurementEntry.note}
+                  </Text>
+                ) : null}
+              </View>
+            ) : (
+              <Text style={[styles.measurementEmpty, { color: palette.muted }]}>
+                이 사진에 연결된 수치가 없습니다.
+              </Text>
+            )}
+          </View>
+        ) : null}
+
         <View style={styles.actions}>
           <Pressable
             accessibilityRole="button"
@@ -360,9 +459,44 @@ export default function PhotoDetailScreen() {
           ) : null}
         </View>
       </ScrollView>
+
+      {photo.projectId && measurementSettings.enabled ? (
+        <BodyMeasurementEditorSheet
+          visible={measurementEditorOpen}
+          projectId={photo.projectId}
+          photoId={photo.id}
+          sequence={photo.sequence}
+          recordedAt={photo.createdAt}
+          settings={measurementSettings}
+          entry={measurementEntry}
+          onClose={() => setMeasurementEditorOpen(false)}
+          onSaved={setMeasurementEntry}
+          onDeleted={() => setMeasurementEntry(null)}
+        />
+      ) : null}
     </View>
   );
 }
+
+const getMeasurementValue = (
+  entry: BodyMeasurementEntry,
+  metric: BodyMeasurementMetric
+) => {
+  if (metric === "weight") return entry.weightKg;
+  if (metric === "bodyFat") return entry.bodyFatPercent;
+  if (metric === "skeletalMuscle") return entry.skeletalMuscleKg;
+  return entry.waistCm;
+};
+
+const formatMeasurementValue = (
+  entry: BodyMeasurementEntry,
+  metric: BodyMeasurementMetric
+) => {
+  const value = getMeasurementValue(entry, metric);
+  return value === undefined
+    ? "-"
+    : `${value}${bodyMeasurementMetricMeta[metric].unit}`;
+};
 
 function MetaRow({
   label,
@@ -494,6 +628,68 @@ const styles = StyleSheet.create({
     fontSize: bodyFrameTypography.body,
     fontWeight: "600",
     textAlign: "right"
+  },
+  measurementCard: {
+    gap: 12,
+    marginTop: 14,
+    padding: 14,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderRadius: bodyFrameDesign.cardRadius
+  },
+  measurementHeader: {
+    minHeight: bodyFrameDesign.minTouchSize,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12
+  },
+  measurementHeaderCopy: {
+    flex: 1,
+    gap: 3
+  },
+  measurementTitle: {
+    fontSize: bodyFrameTypography.sectionTitle,
+    fontWeight: "600"
+  },
+  measurementDetail: {
+    fontSize: bodyFrameTypography.caption
+  },
+  measurementButton: {
+    minHeight: bodyFrameDesign.minTouchSize,
+    justifyContent: "center",
+    paddingHorizontal: 12,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderRadius: bodyFrameDesign.buttonRadius
+  },
+  measurementButtonText: {
+    fontSize: bodyFrameTypography.button,
+    fontWeight: "600"
+  },
+  measurementValues: {
+    gap: 8
+  },
+  measurementValueRow: {
+    minHeight: 30,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12
+  },
+  measurementLabel: {
+    fontSize: bodyFrameTypography.caption
+  },
+  measurementValue: {
+    fontSize: bodyFrameTypography.body,
+    fontWeight: "600",
+    fontVariant: ["tabular-nums"]
+  },
+  measurementNote: {
+    fontSize: bodyFrameTypography.caption,
+    lineHeight: 18
+  },
+  measurementEmpty: {
+    fontSize: bodyFrameTypography.body,
+    lineHeight: 20
   },
   actions: {
     gap: 10,
