@@ -1,6 +1,6 @@
 import { StyleSheet } from "react-native";
 
-import { colors, controls, typography } from "@/constants/app-theme";
+import { bodyFrameDesign, colors, controls, typography } from "@/constants/app-theme";
 import {
   CAMERA_CONTROL_TRAY_HORIZONTAL_PADDING,
   CAMERA_FOCUS_INDICATOR_RADIUS,
@@ -140,55 +140,22 @@ export const styles = StyleSheet.create({
   },
   topBar: {
     position: "absolute",
-    left: 12,
-    right: 12,
+    left: bodyFrameDesign.horizontalPadding,
+    right: bodyFrameDesign.horizontalPadding,
     top: 0,
     zIndex: 20,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    gap: 8
+    justifyContent: "space-between"
   },
-  brand: {
-    display: "none",
-    color: colors.inverse,
-    fontSize: typography.small,
-    fontWeight: "800",
-    letterSpacing: 0
-  },
-  accountIconButton: {
-    width: 38,
-    height: 36,
-    alignItems: "center",
-    justifyContent: "center"
-  },
-  cameraInstantControlRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "flex-end",
-    gap: 4,
-    flexShrink: 1
-  },
-  cameraInstantControlButton: {
-    width: 40,
-    height: 36,
+  cameraHeaderButton: {
+    width: bodyFrameDesign.minTouchSize,
+    height: bodyFrameDesign.minTouchSize,
     alignItems: "center",
     justifyContent: "center",
-    gap: 2,
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.55)",
-    backgroundColor: "rgba(0, 0, 0, 0.28)"
-  },
-  cameraInstantControlButtonActive: {
-    borderColor: colors.inverse,
-    backgroundColor: "rgba(255, 255, 255, 0.22)"
-  },
-  cameraInstantControlText: {
-    color: colors.inverse,
-    fontSize: 8,
-    fontWeight: "900",
-    lineHeight: 11,
-    letterSpacing: 0
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderColor: "rgba(255, 255, 255, 0.42)",
+    backgroundColor: "rgba(0, 0, 0, 0.34)"
   },
   countdownOverlay: {
     position: "absolute",
@@ -434,6 +401,35 @@ export const styles = StyleSheet.create({
   guideSettingsContent: {
     gap: 16,
     paddingBottom: 2
+  },
+  cameraToolGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8
+  },
+  cameraToolButton: {
+    width: "31%",
+    minWidth: 88,
+    minHeight: bodyFrameDesign.minTouchSize,
+    flexGrow: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+    paddingHorizontal: 10,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderColor: colors.line,
+    backgroundColor: colors.surface
+  },
+  cameraToolButtonActive: {
+    borderColor: colors.text,
+    backgroundColor: colors.surfaceStrong
+  },
+  cameraToolText: {
+    color: colors.text,
+    fontSize: typography.button,
+    fontWeight: "800",
+    letterSpacing: 0
   },
   cameraSettingBlock: {
     gap: 10
@@ -986,20 +982,33 @@ export const styles = StyleSheet.create({
     borderColor: "rgba(255, 255, 255, 0.62)",
     backgroundColor: "rgba(0, 0, 0, 0.38)"
   },
-  cameraFlipButton: {
+  overlayQuickButton: {
     position: "absolute",
     right: CAMERA_CONTROL_TRAY_HORIZONTAL_PADDING,
-    width: 54,
+    width: 76,
     height: 54,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1,
+    gap: 2,
+    borderWidth: bodyFrameDesign.borderWidth,
     borderColor: "rgba(255, 255, 255, 0.62)",
     backgroundColor: "rgba(0, 0, 0, 0.38)"
   },
-  cameraFlipButtonActive: {
-    borderColor: colors.inverse,
-    backgroundColor: "rgba(255, 255, 255, 0.16)"
+  overlayQuickButtonDisabled: {
+    opacity: 0.42
+  },
+  overlayQuickValue: {
+    color: colors.inverse,
+    fontSize: typography.body,
+    fontWeight: "800",
+    letterSpacing: 0,
+    fontVariant: ["tabular-nums"]
+  },
+  overlayQuickLabel: {
+    color: "rgba(255, 255, 255, 0.72)",
+    fontSize: 9,
+    fontWeight: "700",
+    letterSpacing: 0
   },
   galleryThumb: {
     width: "100%",
