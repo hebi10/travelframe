@@ -64,6 +64,87 @@ if (packageJson.scripts?.["release:verify"] !== "node scripts/verify-release-rea
   fail("release:verify script is missing");
 }
 
+if (packageJson.dependencies?.["react-native-health-connect"] !== "4.1.3") {
+  fail("react-native-health-connect must remain pinned to 4.1.3");
+}
+if (!appExpo.plugins?.includes("react-native-health-connect")) {
+  fail("Health Connect Expo plugin is missing");
+}
+
+const androidPermissions = appExpo.android?.permissions ?? [];
+for (const permission of [
+  "android.permission.health.READ_WEIGHT",
+  "android.permission.health.READ_BODY_FAT"
+]) {
+  if (!androidPermissions.includes(permission)) {
+    fail(`Health Connect read permission missing: ${permission}`);
+  }
+}
+for (const forbiddenPermission of [
+  "android.permission.health.WRITE_WEIGHT",
+  "android.permission.health.WRITE_BODY_FAT",
+  "android.permission.health.READ_HEALTH_DATA_HISTORY",
+  "android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND"
+]) {
+  if (androidPermissions.includes(forbiddenPermission)) {
+    fail(`Health Connect permission should not be requested: ${forbiddenPermission}`);
+  }
+}
+
+const androidPlugin = fs.readFileSync(
+  path.join(root, "plugins/with-android-release-manifest.js"),
+  "utf8"
+);
+if (
+  !androidPlugin.includes('key === "android.minSdkVersion"') ||
+  !androidPlugin.includes('value = "26"')
+) {
+  fail("Health Connect requires generated Android minSdk 26");
+}
+
+const healthConnectSource = fs.readFileSync(
+  path.join(root, "lib/body-health-connect.ts"),
+  "utf8"
+);
+for (const token of [
+  '"Weight"',
+  '"BodyFat"',
+  "days = 30",
+  "requestBodyHealthConnectReadPermissions",
+  "readLatestBodyHealthConnectMeasurements"
+]) {
+  if (!healthConnectSource.includes(token)) {
+    fail(`Health Connect source invariant missing: ${token}`);
+  }
+}
+for (const forbidden of [
+  "LeanBodyMass",
+  "insertRecords",
+  "BackgroundAccessPermission",
+  "ReadHealthDataHistoryPermission"
+]) {
+  if (healthConnectSource.includes(forbidden)) {
+    fail(`Health Connect integration should not use ${forbidden}`);
+  }
+}
+
+const privacyPolicy = fs.readFileSync(
+  path.join(root, "privacy/privacy-policy.md"),
+  "utf8"
+);
+for (const token of [
+  "Health Connect",
+  "몸무게",
+  "체지방률",
+  "최근 30일",
+  "Firebase",
+  "자동 업로드되지 않"
+]) {
+  if (!privacyPolicy.includes(token)) {
+    fail(`privacy policy Health Connect disclosure missing: ${token}`);
+  }
+}
+
 const releaseAssets = fs.readFileSync(
   path.join(root, "docs/release-assets/README.md"),
   "utf8"
