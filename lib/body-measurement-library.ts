@@ -176,8 +176,10 @@ export const detachBodyMeasurementsFromPhoto = async (photoId: string) =>
     const next = entries.map((entry) => {
       if (entry.photoId !== photoId) return entry;
       changed = true;
-      const { photoId: _photoId, ...rest } = entry;
-      return rest;
+      return {
+        ...entry,
+        photoId: undefined
+      };
     });
 
     if (changed) {
