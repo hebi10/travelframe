@@ -238,7 +238,7 @@ const styles = StyleSheet.create({
     marginBottom: 24
   },
   settingRow: {
-    minHeight: Math.max(64, bodyFrameDesign.minTouchSize),
+    minHeight: 64,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
