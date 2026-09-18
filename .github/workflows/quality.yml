@@ -129,8 +129,8 @@ jobs:
       - name: Prebuild Android
         run: npm run android:prebuild:ci
 
-      - name: Verify Android Kotlin
-        run: npm run android:verify:kotlin
-
       - name: Verify Android Release Manifest
         run: npm run android:manifest:release
+
+      - name: Verify Android Kotlin
+        run: npm run android:verify:kotlin
