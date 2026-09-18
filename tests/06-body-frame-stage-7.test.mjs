@@ -100,6 +100,13 @@ assert.equal(
   false,
   "legacy editor entry should not clutter the primary records screen"
 );
+
+assert.ok(
+  recordsSource.includes("보관된 프로젝트") &&
+    recordsSource.includes("archiveBodyProject") &&
+    recordsSource.includes("archiveBodyProject(project.id, false)"),
+  "archived projects should have a reversible restore path from Records"
+);
 const detailSource = fs.readFileSync(
   "features/records/BodyFrameProjectDetailScreen.tsx",
   "utf8"
