@@ -143,6 +143,67 @@ assert.equal(limits.getBodyFrameUpgradeLabel("free"), "Pro");
 assert.equal(limits.getBodyFrameUpgradeLabel("pro"), "Expert");
 assert.equal(limits.getBodyFrameUpgradeLabel("expert"), null);
 
+const cameraSession = await importTsModule("lib/body-frame-camera-session.ts");
+
+cameraSession.setBodyFrameCameraSession({
+  projectId: "project-a",
+  sequence: 100,
+  projectPhotoCount: 99,
+  maxProgressPhotos: 100,
+  captureBlockedReason: null
+});
+const reserved99 = cameraSession.reserveBodyFrameCameraCapture();
+assert.equal(reserved99?.projectId, "project-a");
+assert.equal(cameraSession.getBodyFrameCameraSessionSnapshot().pendingSaveCount, 1);
+assert.throws(
+  () => cameraSession.reserveBodyFrameCameraCapture(),
+  /프로젝트 사진 한도/
+);
+cameraSession.finishBodyFrameCameraCapture({
+  projectId: "project-a",
+  sequence: 100,
+  success: false
+});
+assert.equal(cameraSession.getBodyFrameCameraSessionSnapshot().projectPhotoCount, 99);
+assert.equal(cameraSession.getBodyFrameCameraSessionSnapshot().pendingSaveCount, 0);
+
+const reserved100 = cameraSession.reserveBodyFrameCameraCapture();
+assert.equal(reserved100?.sequence, 101);
+cameraSession.finishBodyFrameCameraCapture({
+  projectId: "project-a",
+  sequence: 101,
+  success: true
+});
+assert.equal(cameraSession.getBodyFrameCameraSessionSnapshot().projectPhotoCount, 100);
+assert.ok(cameraSession.getBodyFrameCameraSessionSnapshot().captureBlockedReason);
+assert.throws(
+  () => cameraSession.reserveBodyFrameCameraCapture(),
+  /한도/
+);
+
+cameraSession.setBodyFrameCameraSession({
+  projectId: "project-a",
+  sequence: 3,
+  projectPhotoCount: 2,
+  maxProgressPhotos: null,
+  captureBlockedReason: null
+});
+const otherProjectReservation = cameraSession.reserveBodyFrameCameraCapture({
+  projectId: "project-b",
+  sequence: 7
+});
+assert.equal(otherProjectReservation?.projectId, "project-b");
+cameraSession.finishBodyFrameCameraCapture({
+  projectId: "project-b",
+  sequence: 7,
+  success: true
+});
+assert.equal(
+  cameraSession.getBodyFrameCameraSessionSnapshot().projectPhotoCount,
+  2,
+  "finishing another project must not increment the active project's count"
+);
+
 const sessionSource = fs.readFileSync("lib/body-frame-camera-session.ts", "utf8");
 for (const token of [
   "projectPhotoCount",
