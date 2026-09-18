@@ -38,14 +38,17 @@ assert.ok(
   "Quality must prebuild and verify release sources before generated-Android tests"
 );
 
+const androidManifestIndex = quality.indexOf("run: npm run android:manifest:release");
 const androidVerifyIndex = quality.indexOf("run: npm run android:verify:kotlin");
 const androidJobPrebuildIndex = quality.lastIndexOf(
   "run: npm run android:prebuild:ci",
-  androidVerifyIndex
+  androidManifestIndex
 );
 assert.ok(
-  androidJobPrebuildIndex >= 0 && androidJobPrebuildIndex < androidVerifyIndex,
-  "Windows Android CI must prebuild before Kotlin verification"
+  androidJobPrebuildIndex >= 0 &&
+    androidJobPrebuildIndex < androidManifestIndex &&
+    androidManifestIndex < androidVerifyIndex,
+  "Windows Android CI must prebuild, verify the release manifest, then run the Kotlin smoke build"
 );
 
 assert.ok(
