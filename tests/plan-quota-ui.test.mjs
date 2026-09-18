@@ -6,23 +6,49 @@ import { readSettingsSource } from "./settings-test-source.mjs";
 const accountSource = readAccountSource();
 const settingsSource = readSettingsSource();
 
-for (const [name, source] of [
-  ["account", accountSource],
-  ["settings", settingsSource]
+for (const token of [
+  'SectionBlock title="현재 상태"',
+  'label="현재 플랜"',
+  'label="현재 프로젝트"',
+  'label="현재 기록"',
+  'SectionBlock title="클라우드 백업"',
+  'SectionBlock title="플랜 및 결제"',
+  "구매 복원"
 ]) {
-  assert.ok(source.includes('SectionBlock title="플랜 한도"'), `${name} should show a plan quota section`);
   assert.ok(
-    source.includes("영상 출력 (주간 한도)"),
-    `${name} should label weekly video export quota`
+    accountSource.includes(token),
+    `Body Frame account should contain ${token}`
   );
-  assert.ok(source.includes("이미지 보관함"), `${name} should show image library quota`);
-  assert.ok(source.includes("영상 보관함"), `${name} should show video library quota`);
-  assert.ok(source.includes("음악 보관함"), `${name} should show music library quota`);
-  assert.ok(source.includes("클라우드 백업"), `${name} should show cloud backup storage quota`);
-  assert.ok(source.includes("getWeeklyVideoExportUsage"), `${name} should load weekly video usage`);
-  assert.ok(source.includes("planEntitlements.backupStorageBytes"), `${name} should use the plan backup storage limit`);
-  assert.ok(source.includes("formatQuotaValue"), `${name} should format used and remaining quotas`);
-  assert.ok(source.includes("formatBackupStorageUsage"), `${name} should show backup storage percentage`);
 }
 
-console.log("ok - account and settings show plan quota usage");
+for (const legacy of [
+  'SectionBlock title="플랜 한도"',
+  "영상 출력 (주간 한도)",
+  "이미지 보관함",
+  "영상 보관함",
+  "음악 보관함",
+  'SectionBlock title="사용 기록"',
+  'SectionBlock title="내 음악 관리"'
+]) {
+  assert.equal(
+    accountSource.includes(legacy),
+    false,
+    `Body Frame account should not expose legacy quota UI: ${legacy}`
+  );
+}
+
+for (const group of [
+  "촬영",
+  "저장 및 백업",
+  "변화 영상",
+  "화면",
+  "계정 및 플랜",
+  "정보 및 개인정보"
+]) {
+  assert.ok(
+    settingsSource.includes(`SectionBlock title="${group}"`),
+    `Body Frame settings should keep ${group}`
+  );
+}
+
+console.log("ok - Body Frame account and settings expose product-relevant status only");
