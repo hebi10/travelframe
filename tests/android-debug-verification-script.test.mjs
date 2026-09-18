@@ -9,6 +9,18 @@ assert.ok(
   "Android verification script should support bounded Kotlin, assemble, and manifest checks"
 );
 assert.ok(
+  script.includes('$Mode -eq "Kotlin"') &&
+    script.includes('"--parallel"') &&
+    script.includes('"--max-workers=2"') &&
+    script.includes('$NativeArchitectures = "x86_64"'),
+  "Kotlin smoke verification should use bounded parallelism and one native ABI"
+);
+assert.ok(
+  script.includes('"--no-parallel"') &&
+    script.includes('"--max-workers=1"'),
+  "assemble and manifest verification should retain conservative Gradle execution"
+);
+assert.ok(
   script.includes("-Pkotlin.compiler.execution.strategy=in-process"),
   "Android verification should avoid the Kotlin daemon in restricted Windows environments"
 );
