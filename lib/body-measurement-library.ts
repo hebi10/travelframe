@@ -9,8 +9,8 @@ import {
   type BodyMeasurementSettings
 } from "@/types/body-measurement";
 
-export const BODY_MEASUREMENT_STORAGE_KEY = "body-frame.measurements.v1";
-export const BODY_MEASUREMENT_SETTINGS_STORAGE_KEY =
+export const BODY_MEASUREMENT_STORAGE_ID = "body-frame.measurements.v1";
+export const BODY_MEASUREMENT_SETTINGS_STORAGE_ID =
   "body-frame.measurement-settings.v1";
 
 let mutationChain = Promise.resolve();
@@ -28,7 +28,7 @@ const createMeasurementId = () =>
   `measurement-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
 const readEntries = async () => {
-  const raw = await localStorageAdapter.getItem(BODY_MEASUREMENT_STORAGE_KEY);
+  const raw = await localStorageAdapter.getItem(BODY_MEASUREMENT_STORAGE_ID);
   if (!raw) return [] as BodyMeasurementEntry[];
 
   try {
@@ -52,14 +52,14 @@ const writeEntries = async (entries: BodyMeasurementEntry[]) => {
     .filter((entry): entry is BodyMeasurementEntry => Boolean(entry));
 
   await localStorageAdapter.setItem(
-    BODY_MEASUREMENT_STORAGE_KEY,
+    BODY_MEASUREMENT_STORAGE_ID,
     JSON.stringify(normalized)
   );
 };
 
 const readSettingsMap = async () => {
   const raw = await localStorageAdapter.getItem(
-    BODY_MEASUREMENT_SETTINGS_STORAGE_KEY
+    BODY_MEASUREMENT_SETTINGS_STORAGE_ID
   );
 
   if (!raw) return {} as Record<string, BodyMeasurementSettings>;
@@ -101,7 +101,7 @@ export const updateBodyMeasurementSettings = async (
 
     const nextMap = { ...map, [projectId]: next };
     await localStorageAdapter.setItem(
-      BODY_MEASUREMENT_SETTINGS_STORAGE_KEY,
+      BODY_MEASUREMENT_SETTINGS_STORAGE_ID,
       JSON.stringify(nextMap)
     );
     return next;
