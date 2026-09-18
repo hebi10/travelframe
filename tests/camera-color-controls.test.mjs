@@ -61,13 +61,16 @@ for (const snippet of [
   assert.ok(cameraSource.includes(snippet), `camera color controls missing: ${snippet}`);
 }
 
-const instantControlsSource = cameraSource.slice(
-  cameraSource.indexOf("style={styles.cameraInstantControlRow}"),
-  cameraSource.indexOf('accessibilityLabel="?뺣? ?ㅼ젙 ?닿린"')
+const toolGridStart = cameraSource.indexOf("style={styles.cameraToolGrid}");
+const toolGridEnd = cameraSource.indexOf(
+  "<Text selectable={false} style={styles.modalSectionTitle}>카메라 방향</Text>",
+  toolGridStart
 );
+const toolGridSource = cameraSource.slice(toolGridStart, toolGridEnd);
 assert.ok(
-  instantControlsSource.includes("openColorControls"),
-  "camera color button should be placed before the zoom button"
+  toolGridSource.includes("openColorControls") &&
+    toolGridSource.indexOf("openColorControls") < toolGridSource.indexOf("openZoomControls"),
+  "camera color tool should remain available before the zoom tool"
 );
 
-console.log("ok - camera color controls are persisted and available before zoom");
+console.log("ok - camera color controls are persisted and available from the tool sheet");

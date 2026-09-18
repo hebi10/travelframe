@@ -236,7 +236,7 @@ export default function BodyFrameCameraScreen() {
         pointerEvents="box-none"
         style={[
           styles.projectSwitcherWrap,
-          { top: Math.max(insets.top + 74, 84) }
+          { top: Math.max(insets.top + 64, 76) }
         ]}
       >
         <BodyFrameProjectSwitcher

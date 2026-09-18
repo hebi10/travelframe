@@ -291,7 +291,10 @@ export default function CameraScreen() {
     ? [styles.controls, { paddingBottom: bottomSafePadding }]
     : styles.controls;
   const isLineGuideActive = guideVisible;
-  const isPhotoGuideActive = Boolean(referenceUri);
+  const hasReferenceOverlay = Boolean(
+    referenceUri || bodyFrameCameraSession.automaticReferenceUri
+  );
+  const isPhotoGuideActive = hasReferenceOverlay;
   const isPhotoSavePending = pendingPhotoSaveCount > 0;
   const guideSizeBounds = useMemo(() => getGuideSizeBounds(guide), [guide]);
   const applyGridGuideLinePositionsState = useCallback(
@@ -1209,7 +1212,7 @@ export default function CameraScreen() {
   };
 
   const reopenOverlaySetup = () => {
-    if (!referenceUri) {
+    if (!hasReferenceOverlay) {
       void pickReferencePhoto();
       return;
     }
@@ -1220,6 +1223,11 @@ export default function CameraScreen() {
 
   const openCameraSettingsMenu = () => {
     setCameraSettingsOpen(true);
+  };
+
+  const openCameraToolFromSettings = (action: () => void) => {
+    setCameraSettingsOpen(false);
+    requestAnimationFrame(action);
   };
 
   const openLineGuideSettings = () => {
@@ -2138,88 +2146,21 @@ export default function CameraScreen() {
           onLayout={handleCameraTopBarLayout}
         >
           <Pressable
-            style={styles.accountIconButton}
+            style={styles.cameraHeaderButton}
             onPress={() => router.push("/account")}
             accessibilityRole="button"
             accessibilityLabel={user ? "마이페이지로 이동" : "로그인으로 이동"}
           >
-            <Feather name="user" size={22} color={colors.inverse} />
+            <Feather name="user" size={20} color={colors.inverse} />
           </Pressable>
-          <Text selectable={false} style={styles.brand}>
-            바디 프레임
-          </Text>
-          <View style={styles.cameraInstantControlRow}>
-            <Pressable
-              style={[
-                styles.cameraInstantControlButton,
-                isLineGuideActive && styles.cameraInstantControlButtonActive
-              ]}
-              onPress={openLineGuideSettings}
-              accessibilityRole="button"
-              accessibilityLabel="라인 가이드 설정 열기"
-            >
-              <Feather name="crosshair" size={15} color={colors.inverse} />
-              <Text selectable={false} style={styles.cameraInstantControlText}>라인</Text>
-            </Pressable>
-            <Pressable
-              style={[
-                styles.cameraInstantControlButton,
-                isPhotoGuideActive && styles.cameraInstantControlButtonActive
-              ]}
-              onPress={openPhotoGuideSettings}
-              accessibilityRole="button"
-              accessibilityLabel="사진 오버레이 열기"
-            >
-              <Feather name="image" size={15} color={colors.inverse} />
-              <Text selectable={false} style={styles.cameraInstantControlText}>오버레이</Text>
-            </Pressable>
-            <Pressable
-              style={[
-                styles.cameraInstantControlButton,
-                activeCameraControlPanel === "color" && styles.cameraInstantControlButtonActive
-              ]}
-              onPress={openColorControls}
-              accessibilityRole="button"
-              accessibilityLabel="색감 설정 열기"
-            >
-              <Feather name="sliders" size={15} color={colors.inverse} />
-              <Text selectable={false} style={styles.cameraInstantControlText}>색감</Text>
-            </Pressable>
-            <Pressable
-              style={[
-                styles.cameraInstantControlButton,
-                activeCameraControlPanel === "zoom" && styles.cameraInstantControlButtonActive
-              ]}
-              onPress={openZoomControls}
-              accessibilityRole="button"
-              accessibilityLabel="확대 설정 열기"
-            >
-              <Feather name="zoom-in" size={15} color={colors.inverse} />
-              <Text selectable={false} style={styles.cameraInstantControlText}>확대</Text>
-            </Pressable>
-            <Pressable
-              style={[
-                styles.cameraInstantControlButton,
-                (activeCameraControlPanel === "light" || visibleTorchEnabled) &&
-                  styles.cameraInstantControlButtonActive
-              ]}
-              onPress={openLightControls}
-              accessibilityRole="button"
-              accessibilityLabel="라이트 켜기 끄기"
-            >
-              <Feather name="zap" size={15} color={colors.inverse} />
-              <Text selectable={false} style={styles.cameraInstantControlText}>라이트</Text>
-            </Pressable>
-            <Pressable
-              style={styles.cameraInstantControlButton}
-              onPress={openCameraSettingsMenu}
-              accessibilityRole="button"
-              accessibilityLabel="카메라 설정 열기"
-            >
-              <Feather name="settings" size={15} color={colors.inverse} />
-              <Text selectable={false} style={styles.cameraInstantControlText}>설정</Text>
-            </Pressable>
-          </View>
+          <Pressable
+            style={styles.cameraHeaderButton}
+            onPress={openCameraSettingsMenu}
+            accessibilityRole="button"
+            accessibilityLabel="촬영 도구 열기"
+          >
+            <Feather name="sliders" size={20} color={colors.inverse} />
+          </Pressable>
         </View>
       ) : null}
 
@@ -2234,7 +2175,7 @@ export default function CameraScreen() {
             <View style={styles.modalHeader}>
               <View style={styles.modalTitleGroup}>
                 <Text selectable={false} style={styles.modalEyebrow}>CAMERA</Text>
-                <Text selectable={false} style={styles.modalTitle}>카메라 설정</Text>
+                <Text selectable={false} style={styles.modalTitle}>촬영 도구</Text>
               </View>
               <Pressable style={styles.modalCloseButton} onPress={() => setCameraSettingsOpen(false)}>
                 <Text selectable={false} style={styles.modalCloseText}>닫기</Text>
@@ -2253,6 +2194,89 @@ export default function CameraScreen() {
                 showsVerticalScrollIndicator
                 persistentScrollbar
               >
+                <View style={styles.cameraSettingBlock}>
+                  <Text selectable={false} style={styles.modalSectionTitle}>촬영 도구</Text>
+                  <Text selectable={false} style={styles.modalSectionDetail}>
+                    자주 쓰지 않는 기능은 촬영 화면을 가리지 않도록 이곳에서 엽니다.
+                  </Text>
+                  <View style={styles.cameraToolGrid}>
+                    <Pressable
+                      style={[
+                        styles.cameraToolButton,
+                        isLineGuideActive && styles.cameraToolButtonActive
+                      ]}
+                      onPress={() => openCameraToolFromSettings(openLineGuideSettings)}
+                      accessibilityRole="button"
+                      accessibilityLabel="라인 가이드 설정 열기"
+                    >
+                      <Feather name="crosshair" size={18} color={colors.text} />
+                      <Text selectable={false} style={styles.cameraToolText}>라인</Text>
+                    </Pressable>
+                    <Pressable
+                      style={[
+                        styles.cameraToolButton,
+                        isPhotoGuideActive && styles.cameraToolButtonActive
+                      ]}
+                      onPress={() => openCameraToolFromSettings(openPhotoGuideSettings)}
+                      accessibilityRole="button"
+                      accessibilityLabel="기준 사진 설정 열기"
+                    >
+                      <Feather name="image" size={18} color={colors.text} />
+                      <Text selectable={false} style={styles.cameraToolText}>기준 사진</Text>
+                    </Pressable>
+                    <Pressable
+                      style={[
+                        styles.cameraToolButton,
+                        activeCameraControlPanel === "color" && styles.cameraToolButtonActive
+                      ]}
+                      onPress={() => openCameraToolFromSettings(openColorControls)}
+                      accessibilityRole="button"
+                      accessibilityLabel="색감 설정 열기"
+                    >
+                      <Feather name="sliders" size={18} color={colors.text} />
+                      <Text selectable={false} style={styles.cameraToolText}>색감</Text>
+                    </Pressable>
+                    <Pressable
+                      style={[
+                        styles.cameraToolButton,
+                        activeCameraControlPanel === "zoom" && styles.cameraToolButtonActive
+                      ]}
+                      onPress={() => openCameraToolFromSettings(openZoomControls)}
+                      accessibilityRole="button"
+                      accessibilityLabel="확대 설정 열기"
+                    >
+                      <Feather name="zoom-in" size={18} color={colors.text} />
+                      <Text selectable={false} style={styles.cameraToolText}>확대</Text>
+                    </Pressable>
+                    <Pressable
+                      style={[
+                        styles.cameraToolButton,
+                        (activeCameraControlPanel === "light" || visibleTorchEnabled) &&
+                          styles.cameraToolButtonActive
+                      ]}
+                      onPress={() => openCameraToolFromSettings(openLightControls)}
+                      accessibilityRole="button"
+                      accessibilityLabel="라이트 설정 열기"
+                    >
+                      <Feather name="zap" size={18} color={colors.text} />
+                      <Text selectable={false} style={styles.cameraToolText}>라이트</Text>
+                    </Pressable>
+                    <Pressable
+                      style={styles.cameraToolButton}
+                      onPress={toggleCameraFacing}
+                      accessibilityRole="button"
+                      accessibilityLabel={
+                        cameraFacing === "front" ? "후면 카메라로 전환" : "전면 카메라로 전환"
+                      }
+                    >
+                      <Feather name="refresh-cw" size={18} color={colors.text} />
+                      <Text selectable={false} style={styles.cameraToolText}>
+                        {cameraFacing === "front" ? "후면" : "전면"}
+                      </Text>
+                    </Pressable>
+                  </View>
+                </View>
+
                 <View style={styles.cameraSettingBlock}>
                   <Text selectable={false} style={styles.modalSectionTitle}>카메라 방향</Text>
                   <View style={styles.optionRow}>
@@ -2645,7 +2669,7 @@ export default function CameraScreen() {
         <View style={controlsStyle}>
           {errorMessage ? <Text selectable style={styles.errorText}>{errorMessage}</Text> : null}
 
-          {overlaySetupActive && referenceUri ? (
+          {overlaySetupActive && hasReferenceOverlay ? (
             <View style={styles.captureRow}>
               <View style={styles.overlaySetupPanel}>
                 <View style={styles.overlaySetupHeader}>
@@ -2679,14 +2703,16 @@ export default function CameraScreen() {
                   <Pressable style={styles.overlayCompactButton} onPress={resetOverlay}>
                     <Text selectable={false} style={styles.overlayCompactText}>초기화</Text>
                   </Pressable>
-                  <Pressable
-                    style={[styles.overlayCompactButton, styles.overlayRemoveButton]}
-                    onPress={removeReferenceOverlay}
-                  >
-                    <Text selectable={false} style={[styles.overlayCompactText, styles.overlayRemoveText]}>
-                      제거
-                    </Text>
-                  </Pressable>
+                  {referenceUri ? (
+                    <Pressable
+                      style={[styles.overlayCompactButton, styles.overlayRemoveButton]}
+                      onPress={removeReferenceOverlay}
+                    >
+                      <Text selectable={false} style={[styles.overlayCompactText, styles.overlayRemoveText]}>
+                        제거
+                      </Text>
+                    </Pressable>
+                  ) : null}
                   <Pressable style={styles.overlayConfirmButton} onPress={confirmOverlaySetup}>
                     <Text selectable={false} style={styles.overlayConfirmText}>확인</Text>
                   </Pressable>
@@ -2975,17 +3001,23 @@ export default function CameraScreen() {
                     <View style={styles.shutterInner} />
                   </Pressable>
                   <Pressable
+                    disabled={!hasReferenceOverlay}
                     style={[
-                      styles.cameraFlipButton,
-                      cameraFacing === "front" && styles.cameraFlipButtonActive
+                      styles.overlayQuickButton,
+                      !hasReferenceOverlay && styles.overlayQuickButtonDisabled
                     ]}
-                    onPress={toggleCameraFacing}
+                    onPress={reopenOverlaySetup}
                     accessibilityRole="button"
                     accessibilityLabel={
-                      cameraFacing === "front" ? "후면 카메라로 전환" : "전면 카메라로 전환"
+                      hasReferenceOverlay
+                        ? `기준 사진 투명도 ${Math.round(overlayOpacity * 100)}퍼센트`
+                        : "기준 사진 없음"
                     }
                   >
-                    <Feather name="refresh-cw" size={26} color={colors.inverse} />
+                    <Text selectable={false} style={styles.overlayQuickValue}>
+                      {hasReferenceOverlay ? `${Math.round(overlayOpacity * 100)}%` : "--"}
+                    </Text>
+                    <Text selectable={false} style={styles.overlayQuickLabel}>투명도</Text>
                   </Pressable>
                 </View>
               </View>
