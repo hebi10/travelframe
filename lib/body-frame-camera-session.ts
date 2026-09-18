@@ -53,6 +53,12 @@ export const subscribeBodyFrameCameraSession = (listener: () => void) => {
   return () => listeners.delete(listener);
 };
 
+export const isBodyFrameCameraCaptureBlocked = () =>
+  Boolean(snapshot.captureBlockedReason) ||
+  (snapshot.maxProgressPhotos !== null &&
+    snapshot.projectPhotoCount + snapshot.pendingSaveCount >=
+      snapshot.maxProgressPhotos);
+
 export const setBodyFrameCameraSession = ({
   projectId,
   sequence,
@@ -129,18 +135,11 @@ export const reserveBodyFrameCameraCapture = ({
   }
 
   const isActiveBodyFrameProject = resolvedProjectId === snapshot.projectId;
-  if (isActiveBodyFrameProject) {
-    if (snapshot.captureBlockedReason) {
-      throw new Error(snapshot.captureBlockedReason);
-    }
-
-    if (
-      snapshot.maxProgressPhotos !== null &&
-      snapshot.projectPhotoCount + snapshot.pendingSaveCount >=
-        snapshot.maxProgressPhotos
-    ) {
-      throw new Error("현재 플랜의 프로젝트 사진 한도에 도달했습니다.");
-    }
+  if (isActiveBodyFrameProject && isBodyFrameCameraCaptureBlocked()) {
+    throw new Error(
+      snapshot.captureBlockedReason ??
+        "현재 플랜의 프로젝트 사진 한도에 도달했습니다."
+    );
   }
 
   setSnapshot({
