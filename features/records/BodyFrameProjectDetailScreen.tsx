@@ -117,6 +117,7 @@ export default function BodyFrameProjectDetailScreen() {
     }
 
     if (
+      target !== project.targetPhotoCount &&
       !isBodyFrameProjectTargetAllowed({
         targetPhotoCount: target,
         maxProgressPhotos: planEntitlements.maxProgressPhotos
