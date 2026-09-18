@@ -25,6 +25,10 @@ assert.ok(
   "Android verification should avoid the Kotlin daemon in restricted Windows environments"
 );
 assert.ok(
+  script.includes('"--build-cache"'),
+  "Android verification should reuse Gradle build outputs across CI runs"
+);
+assert.ok(
   script.includes("$process.WaitForExit($TimeoutSeconds * 1000)"),
   "Android verification should enforce a timeout"
 );
@@ -58,7 +62,7 @@ assert.ok(
 );
 assert.equal(
   packageJson.scripts["android:verify:kotlin"],
-  "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-android-debug.ps1 -Mode Kotlin -TimeoutSeconds 600 -KillStaleProcesses",
+  "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-android-debug.ps1 -Mode Kotlin -TimeoutSeconds 1200 -KillStaleProcesses",
   "package.json should expose a bounded Kotlin verification command that tolerates a cold Gradle download"
 );
 assert.equal(
