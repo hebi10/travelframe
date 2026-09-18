@@ -57,8 +57,8 @@ function Sparkline({
             style={[
               styles.chartLine,
               {
-                left: point.x,
-                top: point.y - LINE_HEIGHT / 2,
+                left: (point.x + next.x) / 2 - length / 2,
+                top: (point.y + next.y) / 2 - LINE_HEIGHT / 2,
                 width: length,
                 backgroundColor: lineColor,
                 transform: [{ rotateZ: `${angle}rad` }]
@@ -240,7 +240,6 @@ const styles = StyleSheet.create({
   chartLine: {
     position: "absolute",
     height: LINE_HEIGHT,
-    transformOrigin: "left center"
   },
   chartPoint: {
     position: "absolute",
