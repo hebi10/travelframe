@@ -42,10 +42,12 @@ for (const forbidden of [
 
 for (const token of [
   "BODY_CAPTURE_CONTEXT_STORAGE_KEY",
-  '["body",',
-  '"capture",',
-  '"context",',
+  '"body"',
+  '"frame"',
+  '"capture"',
+  '"context"',
   '"v1"',
+  '.join(".")',
   "getBodyCaptureContextState",
   "updateBodyCaptureContextEnabled",
   "saveBodyCaptureContext",
