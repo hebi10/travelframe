@@ -856,8 +856,8 @@ export default function SettingsScreen() {
                   {isLoggedIn
                     ? planEntitlements.canBackupToCloud
                       ? `${user?.email ?? "계정"}으로 Pro 기능과 클라우드 백업을 사용할 수 있습니다.`
-                      : `${user?.email ?? "계정"}으로 로그인하면 사진 편집과 MP4 영상 주 1회 기능을 사용할 수 있습니다.`
-                    : "비로그인 상태에서는 촬영과 앱 보관함 저장만 사용할 수 있습니다."}
+                      : `${user?.email ?? "계정"}으로 로그인하면 무료 플랜에서 프로젝트당 100장과 최대 10초 변화 영상을 사용할 수 있습니다.`
+                    : "비로그인 상태에서는 기본 촬영과 로컬 기록을 사용할 수 있습니다."}
                 </Text>
               </View>
               <View
