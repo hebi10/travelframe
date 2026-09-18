@@ -2,10 +2,8 @@ import { readTripClipSource } from "./trip-clip-test-source.mjs";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 
-import { readAccountSource } from "./account-test-source.mjs";
-
 const userMusicSource = fs.readFileSync("lib/user-music.ts", "utf8");
-const accountSource = readAccountSource();
+const accountSource = fs.readFileSync("features/account/AccountScreen.tsx", "utf8");
 const tripClipSource = readTripClipSource();
 const functionsSource = fs.readFileSync("functions/index.js", "utf8");
 
