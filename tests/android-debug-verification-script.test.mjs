@@ -46,8 +46,8 @@ assert.ok(
 );
 assert.equal(
   packageJson.scripts["android:verify:kotlin"],
-  "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-android-debug.ps1 -Mode Kotlin -TimeoutSeconds 180 -KillStaleProcesses",
-  "package.json should expose a short Android Kotlin verification command"
+  "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-android-debug.ps1 -Mode Kotlin -TimeoutSeconds 600 -KillStaleProcesses",
+  "package.json should expose a bounded Kotlin verification command that tolerates a cold Gradle download"
 );
 assert.equal(
   packageJson.scripts["android:verify:debug"],
