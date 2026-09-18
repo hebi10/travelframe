@@ -88,11 +88,26 @@
 - [x] Include active Body Frame project ID in the saved video payload.
 
 ### Task 6: Verification and review
-- [ ] Typecheck PASS on final Stage 4 head.
-- [ ] Lint PASS on final Stage 4 head.
-- [ ] Stage 1/2/3/4 contracts PASS before repository baseline failure.
-- [ ] Functions PASS.
-- [ ] Firebase Rules PASS.
-- [ ] Confirm known `android/app/proguard-rules.pro`, Android Kotlin and historical Secret Scan baseline failures are unchanged.
-- [ ] Review diff for Stage 5+ scope creep.
-- [ ] Keep PR against `main` until merge is requested.
+- [x] Typecheck PASS on final Stage 4 code head.
+- [x] Lint PASS on final Stage 4 code head.
+- [x] Stage 1/2/3/4 contracts PASS before repository baseline failure.
+- [x] Functions PASS.
+- [x] Firebase Rules PASS.
+- [x] Confirm repository baseline failures are unchanged:
+  - `npm test` stops after Stage 1~4 and existing tests at missing `android/app/proguard-rules.pro`.
+  - Android Kotlin verification stops because `android/gradlew.bat` is absent and requires Expo prebuild.
+  - historical Secret Scan/Gitleaks remains red from repository history.
+- [x] Review diff: only the Body Frame video route/screen, fixed-policy helper, video metadata type, tests and Stage 4 docs changed; legacy `TripClipScreen.tsx` and Stage 5+ policy code are untouched.
+- [x] Keep PR against `main` until merge is requested.
+
+## Verification evidence
+Latest verified Stage 4 code head before this documentation-only completion commit:
+- TypeScript `tsc --noEmit`: PASS
+- Expo lint: PASS
+- `ok - Body Frame stage 1 data and policy contracts are enforced`
+- `ok - Body Frame stage 2 project, storage, and migration contracts are enforced`
+- `ok - Body Frame stage 3 camera and project contracts are enforced`
+- `ok - Body Frame stage 4 exact project video contracts are enforced`
+- Functions syntax: PASS
+- Firebase Rules: PASS
+- Whole Quality workflow remains red only because the existing Android baseline checks described above remain unresolved.
