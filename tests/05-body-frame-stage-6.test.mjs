@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import { createRequire } from "node:module";
+
+const require = createRequire(import.meta.url);
 
 const packageJson = JSON.parse(fs.readFileSync("package.json", "utf8"));
 const appJson = JSON.parse(fs.readFileSync("app.json", "utf8"));
@@ -136,5 +139,114 @@ for (const token of [
 ]) {
   assert.ok(firestoreRules.includes(token), `Firestore rules should contain ${token}`);
 }
+
+const {
+  parseOneTimePurchase,
+  parseSubscriptionPurchase
+} = require("../functions/google-play-billing-policy.js");
+
+const future = new Date(Date.now() + 60_000).toISOString();
+const past = new Date(Date.now() - 60_000).toISOString();
+
+assert.equal(
+  parseSubscriptionPurchase({
+    productId: "creator_monthly",
+    data: {
+      subscriptionState: "SUBSCRIPTION_STATE_ACTIVE",
+      acknowledgementState: "ACKNOWLEDGEMENT_STATE_PENDING",
+      externalAccountIdentifiers: { obfuscatedExternalAccountId: "user-1" },
+      lineItems: [
+        {
+          productId: "creator_monthly",
+          expiryTime: future,
+          latestSuccessfulOrderId: "GPA.active"
+        }
+      ]
+    }
+  }).active,
+  true,
+  "active non-expired subscription must grant access"
+);
+
+assert.equal(
+  parseSubscriptionPurchase({
+    productId: "creator_monthly",
+    data: {
+      subscriptionState: "SUBSCRIPTION_STATE_CANCELED",
+      lineItems: [{ productId: "creator_monthly", expiryTime: future }]
+    }
+  }).active,
+  true,
+  "canceled subscription remains active until expiry"
+);
+
+assert.equal(
+  parseSubscriptionPurchase({
+    productId: "creator_monthly",
+    data: {
+      subscriptionState: "SUBSCRIPTION_STATE_CANCELED",
+      lineItems: [{ productId: "creator_monthly", expiryTime: past }]
+    }
+  }).active,
+  false,
+  "expired canceled subscription must not grant access"
+);
+
+assert.equal(
+  parseSubscriptionPurchase({
+    productId: "creator_monthly",
+    data: {
+      subscriptionState: "SUBSCRIPTION_STATE_ON_HOLD",
+      lineItems: [{ productId: "creator_monthly", expiryTime: future }]
+    }
+  }).active,
+  false,
+  "on-hold subscription must not grant access"
+);
+
+assert.equal(
+  parseOneTimePurchase({
+    productId: "ad_remove",
+    data: {
+      purchaseStateContext: { purchaseState: "PURCHASED" },
+      acknowledgementState: "ACKNOWLEDGEMENT_STATE_PENDING",
+      productLineItem: [
+        {
+          productId: "ad_remove",
+          productOfferDetails: { refundableQuantity: 1 }
+        }
+      ]
+    }
+  }).active,
+  true,
+  "purchased non-consumable must grant access"
+);
+
+assert.equal(
+  parseOneTimePurchase({
+    productId: "ad_remove",
+    data: {
+      purchaseStateContext: { purchaseState: "PURCHASED" },
+      productLineItem: [
+        {
+          productId: "ad_remove",
+          productOfferDetails: { refundableQuantity: 0 }
+        }
+      ]
+    }
+  }).active,
+  false,
+  "fully refunded one-time purchase must not grant access"
+);
+
+assert.ok(
+  serverBillingSource.includes("voidedPurchaseNotification"),
+  "RTDN handler must process voided/refunded purchases"
+);
+assert.ok(
+  functionsSource.includes('source: "client"') &&
+    functionsSource.includes("acknowledge: false"),
+  "client purchase verification should let finishTransaction acknowledge only after server verification"
+);
 
 console.log("ok - Body Frame stage 6 Google Play Billing contracts are enforced");
