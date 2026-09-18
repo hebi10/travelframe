@@ -42,3 +42,27 @@ devices based only on hardware feature filters.
 Before Play Console upload, verify the merged release manifest with
 `npm run android:manifest:release` and confirm the Play Console permission and data
 safety declarations match the permissions above.
+
+
+## Clean native verification
+
+The repository intentionally ignores the generated `android/` directory. CI and release
+verification therefore run `npm run android:prebuild:ci` before any test or Gradle
+verification that depends on generated Android files.
+
+The clean prebuild:
+- regenerates Android from `app.json` and Expo config plugins,
+- recreates Body Frame native image adjustment sources,
+- recreates the release ProGuard/R8 keep rules,
+- reapplies required local node_modules patches after prebuild.
+
+This prevents a developer's stale local `android/` folder from becoming a hidden release
+dependency.
+
+## Release artwork
+
+Launcher, adaptive icon, splash, Play feature graphic, and store screenshots are not
+Firebase assets. Approved app-bundle images belong under `assets/icons`; Play listing
+graphics are uploaded directly in Google Play Console. Candidate Stage 8 artwork is kept
+in the Google Drive release-assets handoff folder documented in
+`docs/release-assets/README.md`.
