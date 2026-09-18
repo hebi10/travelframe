@@ -244,6 +244,11 @@ assert.ok(
   "RTDN handler must process voided/refunded purchases"
 );
 assert.ok(
+  serverBillingSource.includes("SUBSCRIPTION_STATE_REPLACED") &&
+    serverBillingSource.includes("replacedByProductId"),
+  "linked subscription replacement must retire the previous Google Play entitlement"
+);
+assert.ok(
   functionsSource.includes('source: "client"') &&
     functionsSource.includes("acknowledge: false"),
   "client purchase verification should let finishTransaction acknowledge only after server verification"
