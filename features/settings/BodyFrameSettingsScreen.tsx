@@ -218,6 +218,12 @@ export default function BodyFrameSettingsScreen() {
             mark="열기"
             onPress={() => router.push("/advanced-settings")}
           />
+          <BodyFrameSettingRow
+            label="기존 편집 보관함"
+            detail="이전 사진 편집 작업과 저장한 작업물을 확인합니다."
+            mark="열기"
+            onPress={() => router.push("/legacy-studio")}
+          />
         </SectionBlock>
       </ScrollView>
 
