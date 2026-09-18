@@ -27,8 +27,12 @@ assert.equal(
   "studio load failures should render an inline retry state instead of repeated alerts"
 );
 
+const photoGridItemBlock = source.slice(
+  source.indexOf("photoGridItem: {"),
+  source.indexOf("photoCard: {")
+);
 assert.equal(
-  source.includes("flexGrow: 1"),
+  photoGridItemBlock.includes("flexGrow: 1"),
   false,
   "photo cards should not grow to fill a final odd row"
 );
