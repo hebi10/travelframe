@@ -10,6 +10,7 @@ import {
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { bodyFrameDesign, bodyFrameTypography } from "@/constants/app-theme";
 import { BodyFrameProjectSwitcher } from "@/features/camera/BodyFrameProjectSwitcher";
 import CameraScreen from "@/features/camera/CameraScreen";
 import { useAuth } from "@/lib/auth-context";
@@ -278,8 +279,8 @@ const styles = StyleSheet.create({
   },
   projectSwitcherWrap: {
     position: "absolute",
-    left: 16,
-    right: 16,
+    left: bodyFrameDesign.horizontalPadding,
+    right: bodyFrameDesign.horizontalPadding,
     zIndex: 40
   },
   captureHint: {
@@ -287,22 +288,22 @@ const styles = StyleSheet.create({
     marginTop: 7,
     paddingHorizontal: 10,
     paddingVertical: 5,
-    borderRadius: 8,
+    borderRadius: bodyFrameDesign.buttonRadius,
     overflow: "hidden",
     color: "#D7D7DB",
     backgroundColor: "rgba(11,11,12,0.72)",
-    fontSize: 12
+    fontSize: bodyFrameTypography.caption
   },
   planButton: {
     alignSelf: "center",
-    minHeight: 44,
+    minHeight: bodyFrameDesign.minTouchSize,
     marginTop: 8,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 14,
-    borderWidth: 1,
+    borderWidth: bodyFrameDesign.borderWidth,
     borderColor: "#F5F5F5",
-    borderRadius: 8,
+    borderRadius: bodyFrameDesign.buttonRadius,
     backgroundColor: "rgba(11,11,12,0.88)"
   },
   planButtonText: {
@@ -312,16 +313,16 @@ const styles = StyleSheet.create({
   },
   snackbar: {
     position: "absolute",
-    left: 20,
-    right: 20,
+    left: bodyFrameDesign.horizontalPadding,
+    right: bodyFrameDesign.horizontalPadding,
     bottom: 118,
     minHeight: 44,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 14,
-    borderWidth: 1,
+    borderWidth: bodyFrameDesign.borderWidth,
     borderColor: "#2A2A2E",
-    borderRadius: 8,
+    borderRadius: bodyFrameDesign.cardRadius,
     backgroundColor: "#1A1A1D",
     zIndex: 50
   },
