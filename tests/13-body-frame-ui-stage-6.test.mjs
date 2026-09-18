@@ -102,6 +102,11 @@ assert.ok(
   guideHookSource.includes('tabKey !== "camera"'),
   "automatic first-run guide should only open on camera"
 );
+assert.equal(
+  guideHookSource.includes("isLoggedIn") || guideHookSource.includes("useAuth"),
+  false,
+  "first-run welcome should not depend on authentication state"
+);
 assert.ok(
   guideOverlaySource.includes("isWelcome") &&
     guideOverlaySource.includes("시작하기"),
