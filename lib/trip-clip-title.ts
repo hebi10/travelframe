@@ -1,6 +1,6 @@
 export const TRIP_CLIP_TITLE_PREFIX = "변화 영상";
 
-const tripClipTitlePattern = /^여행\s*클립\s*(\d+)$/;
+const tripClipTitlePattern = /^(?:변화\s*영상|여행\s*클립)\s*(\d+)$/;
 
 export const getNextTripClipTitle = (existingTitles: (string | null | undefined)[]) => {
   const maxNumber = existingTitles.reduce((maxNumber, title) => {
