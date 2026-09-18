@@ -26,6 +26,10 @@ import {
   updateBodyProject
 } from "@/lib/body-project-library";
 import {
+  getBodyCaptureContextState,
+  updateBodyCaptureContextEnabled
+} from "@/lib/body-frame-capture-context";
+import {
   getBodyMeasurements,
   getBodyMeasurementSettings,
   updateBodyMeasurementSettings
@@ -100,6 +104,9 @@ export default function BodyFrameProjectDetailScreen() {
   const [measurementDraft, setMeasurementDraft] =
     useState<BodyMeasurementSettings>(defaultBodyMeasurementSettings);
   const [measurements, setMeasurements] = useState<BodyMeasurementEntry[]>([]);
+  const [rememberCaptureContext, setRememberCaptureContext] = useState(true);
+  const [rememberCaptureContextDraft, setRememberCaptureContextDraft] =
+    useState(true);
 
   const reload = useCallback(async () => {
     if (!projectId) {
@@ -111,12 +118,14 @@ export default function BodyFrameProjectDetailScreen() {
       storedProject,
       storedPhotos,
       storedMeasurementSettings,
-      storedMeasurements
+      storedMeasurements,
+      storedCaptureContextState
     ] = await Promise.all([
       getBodyProjectById(projectId),
       getPhotos(),
       getBodyMeasurementSettings(projectId),
-      getBodyMeasurements(projectId)
+      getBodyMeasurements(projectId),
+      getBodyCaptureContextState(projectId)
     ]);
 
     setProject(storedProject);
@@ -124,6 +133,8 @@ export default function BodyFrameProjectDetailScreen() {
     setMeasurementSettings(storedMeasurementSettings);
     setMeasurementDraft(storedMeasurementSettings);
     setMeasurements(storedMeasurements);
+    setRememberCaptureContext(storedCaptureContextState.enabled);
+    setRememberCaptureContextDraft(storedCaptureContextState.enabled);
     if (storedProject) {
       setNameDraft(storedProject.name);
       setTargetDraft(String(storedProject.targetPhotoCount));
@@ -207,7 +218,11 @@ export default function BodyFrameProjectDetailScreen() {
           name: nameDraft.trim(),
           targetPhotoCount: target
         }),
-        updateBodyMeasurementSettings(project.id, measurementDraft)
+        updateBodyMeasurementSettings(project.id, measurementDraft),
+        updateBodyCaptureContextEnabled(
+          project.id,
+          rememberCaptureContextDraft
+        )
       ]);
       await reload();
       setSettingsOpen(false);
@@ -219,6 +234,7 @@ export default function BodyFrameProjectDetailScreen() {
     planEntitlements.label,
     planEntitlements.maxProgressPhotos,
     measurementDraft,
+    rememberCaptureContextDraft,
     project,
     reload,
     saving,
@@ -335,6 +351,7 @@ export default function BodyFrameProjectDetailScreen() {
             style={[styles.settingsButton, { borderColor: palette.line }]}
             onPress={() => {
               setMeasurementDraft(measurementSettings);
+              setRememberCaptureContextDraft(rememberCaptureContext);
               setSettingsOpen(true);
             }}
           >
@@ -609,6 +626,48 @@ export default function BodyFrameProjectDetailScreen() {
                           backgroundColor: active ? palette.text : palette.background
                         }
                       ]}
+                    >
+                      <Text
+                        style={[
+                          styles.choiceText,
+                          { color: active ? palette.inverse : palette.text }
+                        ]}
+                      >
+                        {label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+
+              <View style={styles.settingDivider} />
+
+              <Text style={[styles.settingTitle, { color: palette.text }]}>
+                촬영 설정 기억
+              </Text>
+              <Text style={[styles.settingDetail, { color: palette.muted }]}>
+                이 프로젝트의 카메라 방향, 비율, 확대, 노출과 색감을 기억합니다. 라이트와 타이머는 자동으로 복원하지 않습니다.
+              </Text>
+              <View style={styles.choiceRow}>
+                {([
+                  [false, "사용 안 함"],
+                  [true, "사용"]
+                ] as const).map(([enabled, label]) => {
+                  const active = rememberCaptureContextDraft === enabled;
+                  return (
+                    <Pressable
+                      key={label}
+                      accessibilityRole="button"
+                      style={[
+                        styles.choiceButton,
+                        {
+                          borderColor: active ? palette.text : palette.line,
+                          backgroundColor: active
+                            ? palette.text
+                            : palette.background
+                        }
+                      ]}
+                      onPress={() => setRememberCaptureContextDraft(enabled)}
                     >
                       <Text
                         style={[

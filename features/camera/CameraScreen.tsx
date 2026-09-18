@@ -150,10 +150,15 @@ import {
   isBodyFrameCameraCaptureBlocked,
   subscribeBodyFrameCameraSession
 } from "@/lib/body-frame-camera-session";
+import {
+  getBodyCaptureContextState,
+  saveBodyCaptureContext
+} from "@/lib/body-frame-capture-context";
 import { getPlanEntitlements } from "@/lib/plan-entitlements";
 import { isMediaLibraryAccessGranted, requestMediaLibraryAccess } from "@/lib/request-media-library-access";
 import { deleteLocalFile, getRecentPhoto, saveCapturedPhoto, saveCapturedPhotoToDevice } from "@/lib/photo-library";
 import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
+import type { BodyCaptureContext } from "@/types/body-capture-context";
 import type { PhotoItem, PhotoRatioLabel, SaveCapturedPhotoInput } from "@/types/photo";
 export default function CameraScreen() {
   const { user, subscription } = useAuth();
@@ -538,10 +543,41 @@ export default function CameraScreen() {
       let isActive = true;
 
       const loadSettings = async () => {
-        const [settings, latestPhoto] = await Promise.all([getAppSettings(), getRecentPhoto()]);
+        const projectId = bodyFrameCameraSession.projectId;
+        const [settings, latestPhoto, captureContextState] = await Promise.all([
+          getAppSettings(),
+          getRecentPhoto(),
+          projectId
+            ? getBodyCaptureContextState(projectId)
+            : Promise.resolve(null)
+        ]);
         if (!isActive) {
           return;
         }
+
+        const projectCaptureContext =
+          captureContextState?.enabled && captureContextState.context
+            ? captureContextState.context
+            : null;
+        const effectiveFacing =
+          projectCaptureContext?.cameraFacing ?? settings.cameraFacing;
+        const effectiveRatio =
+          projectCaptureContext?.cameraRatio ?? settings.cameraRatio;
+        const effectiveZoom =
+          projectCaptureContext?.cameraZoomPercent ?? settings.cameraZoomPercent;
+        const effectiveExposure =
+          projectCaptureContext?.cameraExposureBias ?? settings.cameraExposureBias;
+        const effectiveTemperature =
+          projectCaptureContext?.cameraColorTemperature ??
+          settings.cameraColorTemperature;
+        const effectiveTint =
+          projectCaptureContext?.cameraColorTint ?? settings.cameraColorTint;
+        const effectiveBrightness =
+          projectCaptureContext?.cameraBrightness ?? settings.cameraBrightness;
+        const effectiveContrast =
+          projectCaptureContext?.cameraContrast ?? settings.cameraContrast;
+        const effectiveSaturation =
+          projectCaptureContext?.cameraSaturation ?? settings.cameraSaturation;
 
         defaultOverlayOpacity.current = settings.overlayOpacity;
         setGuide(settings.defaultGuide);
@@ -564,20 +600,25 @@ export default function CameraScreen() {
         guideOffsetXValue.value = settings.guideOffsetX;
         guideOffsetYValue.value = settings.guideOffsetY;
         setOverlayOpacity(settings.overlayOpacity);
-        setZoomPercent(settings.cameraZoomPercent);
-        const restoredTorchEnabled = settings.cameraTorchEnabled && settings.cameraFacing === "back";
+        setZoomPercent(effectiveZoom);
+        const projectCaptureMemoryEnabled =
+          Boolean(projectId) && captureContextState?.enabled === true;
+        const restoredTorchEnabled =
+          !projectCaptureMemoryEnabled &&
+          settings.cameraTorchEnabled &&
+          effectiveFacing === "back";
         setTorchEnabled(restoredTorchEnabled);
-        setCameraFacing(settings.cameraFacing);
-        setCameraRatio(settings.cameraRatio);
+        setCameraFacing(effectiveFacing);
+        setCameraRatio(effectiveRatio);
         setCameraSaveScope(settings.cameraSaveScope);
         setCameraShutterSoundMode(settings.cameraShutterSoundMode);
-        cameraExposureBiasRef.current = settings.cameraExposureBias;
-        setCameraExposureBias(settings.cameraExposureBias);
-        setCameraColorTemperature(settings.cameraColorTemperature);
-        setCameraColorTint(settings.cameraColorTint);
-        setCameraBrightness(settings.cameraBrightness);
-        setCameraContrast(settings.cameraContrast);
-        setCameraSaturation(settings.cameraSaturation);
+        cameraExposureBiasRef.current = effectiveExposure;
+        setCameraExposureBias(effectiveExposure);
+        setCameraColorTemperature(effectiveTemperature);
+        setCameraColorTint(effectiveTint);
+        setCameraBrightness(effectiveBrightness);
+        setCameraContrast(effectiveContrast);
+        setCameraSaturation(effectiveSaturation);
         setCameraColorSlots(settings.cameraColorSlots);
         setSelectedCameraColorSlot(settings.selectedCameraColorSlot);
         setRecentPhoto(latestPhoto);
@@ -588,7 +629,11 @@ export default function CameraScreen() {
       return () => {
         isActive = false;
       };
-    }, [guideOffsetXValue, guideOffsetYValue])
+    }, [
+      bodyFrameCameraSession.projectId,
+      guideOffsetXValue,
+      guideOffsetYValue
+    ])
   );
 
   useEffect(
@@ -877,6 +922,31 @@ export default function CameraScreen() {
     cameraExposureBias,
     cameraSaturation
   ]);
+
+  const getCurrentBodyCaptureContext = useCallback(
+    (): BodyCaptureContext => ({
+      cameraFacing,
+      cameraRatio,
+      cameraZoomPercent: zoomPercent,
+      cameraExposureBias,
+      cameraColorTemperature,
+      cameraColorTint,
+      cameraBrightness,
+      cameraContrast,
+      cameraSaturation
+    }),
+    [
+      cameraBrightness,
+      cameraColorTemperature,
+      cameraColorTint,
+      cameraContrast,
+      cameraExposureBias,
+      cameraFacing,
+      cameraRatio,
+      cameraSaturation,
+      zoomPercent
+    ]
+  );
 
   const persistCameraColorValues = useCallback((
     values: CameraColorValues,
@@ -1722,12 +1792,14 @@ export default function CameraScreen() {
       captureInput,
       saveScope,
       backupUser,
-      backupSubscription
+      backupSubscription,
+      captureContext
     }: {
       captureInput: SaveCapturedPhotoInput;
       saveScope: CameraSaveScope;
       backupUser: typeof user;
       backupSubscription: typeof subscription;
+      captureContext: BodyCaptureContext;
     }) => {
       setPendingPhotoSaveCount((count) => count + 1);
       const runSaveJob = async () => {
@@ -1749,6 +1821,17 @@ export default function CameraScreen() {
           }
           if (savedPhoto) {
             setRecentPhoto(savedPhoto);
+            if (savedPhoto.projectId) {
+              const captureState = await getBodyCaptureContextState(
+                savedPhoto.projectId
+              );
+              if (captureState.enabled) {
+                await saveBodyCaptureContext(
+                  savedPhoto.projectId,
+                  captureContext
+                );
+              }
+            }
             if (targets.cloud) {
               try {
                 await backupPhotoIfEnabled({
@@ -1843,7 +1926,8 @@ export default function CameraScreen() {
         captureInput,
         saveScope: captureSaveScope,
         backupUser: user,
-        backupSubscription: subscription
+        backupSubscription: subscription,
+        captureContext: getCurrentBodyCaptureContext()
       });
       photoUri = null;
     } catch (error) {
