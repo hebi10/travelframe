@@ -1,5 +1,6 @@
 import Constants from "expo-constants";
 import { router } from "expo-router";
+import { useState } from "react";
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -83,6 +84,7 @@ export default function BodyFrameSettingsScreen() {
   const { isLoggedIn, subscription, user } = useAuth();
   const planEntitlements = getPlanEntitlements({ isLoggedIn, subscription });
   const version = Constants.expoConfig?.version ?? "1.0.0";
+  const [guideReplaySignal, setGuideReplaySignal] = useState(0);
 
   return (
     <View style={[styles.screen, { backgroundColor: palette.background }]}>
@@ -179,9 +181,9 @@ export default function BodyFrameSettingsScreen() {
           />
           <BodyFrameSettingRow
             label="사용 가이드"
-            detail="촬영과 기록 화면의 사용 안내를 다시 확인합니다."
+            detail="바디 프레임의 핵심 사용 방법을 다시 확인합니다."
             mark="다시 보기"
-            onPress={() => router.push("/advanced-settings")}
+            onPress={() => setGuideReplaySignal((value) => value + 1)}
           />
         </SectionBlock>
 
@@ -215,7 +217,7 @@ export default function BodyFrameSettingsScreen() {
         </SectionBlock>
       </ScrollView>
 
-      <AppGuideOverlay tabKey="settings" />
+      <AppGuideOverlay tabKey="settings" replaySignal={guideReplaySignal} />
     </View>
   );
 }
