@@ -142,7 +142,10 @@ export function BodyMeasurementEditorSheet({
         bodyFatPercent: parsed.bodyFat ?? undefined,
         skeletalMuscleKg: parsed.skeletalMuscle ?? undefined,
         waistCm: parsed.waist ?? undefined,
-        note
+        note,
+        source: entry?.source ?? "manual",
+        sourceRecordId: entry?.sourceRecordId,
+        sourceAppPackage: entry?.sourceAppPackage
       });
       onSaved(saved);
       onClose();
