@@ -135,8 +135,11 @@ export const saveBodyMeasurement = async ({
   bodyFatPercent,
   skeletalMuscleKg,
   waistCm,
-  note
-}: Omit<BodyMeasurementEntry, "id" | "source"> & { id?: string }) =>
+  note,
+  source = "manual",
+  sourceRecordId,
+  sourceAppPackage
+}: Omit<BodyMeasurementEntry, "id"> & { id?: string; source?: BodyMeasurementEntry["source"] }) =>
   runMutation(async () => {
     const entries = await readEntries();
     const nowId = id ?? createMeasurementId();
@@ -151,7 +154,9 @@ export const saveBodyMeasurement = async ({
       skeletalMuscleKg,
       waistCm,
       note,
-      source: "manual"
+      source,
+      sourceRecordId,
+      sourceAppPackage
     });
 
     if (!normalized) {
@@ -165,6 +170,20 @@ export const saveBodyMeasurement = async ({
     await writeEntries(nextEntries);
     return normalized;
   });
+
+export const getBodyMeasurementBySourceRecordId = async (
+  projectId: string,
+  sourceRecordId: string
+) => {
+  const entries = await getBodyMeasurements(projectId);
+  return (
+    entries.find(
+      (entry) =>
+        entry.source === "health_connect" &&
+        entry.sourceRecordId === sourceRecordId
+    ) ?? null
+  );
+};
 
 export const deleteBodyMeasurement = async (id: string) =>
   runMutation(async () => {
