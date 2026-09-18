@@ -158,6 +158,18 @@ assert.ok(settingsSource.includes("/advanced-settings"));
 assert.ok(settingsSource.includes("/account"));
 
 for (const token of [
+  "function BodyFrameSettingRow",
+  "minHeight: 64",
+  'flexDirection: "row"',
+  'justifyContent: "space-between"'
+]) {
+  assert.ok(
+    settingsSource.includes(token),
+    `Body Frame settings should use compact horizontal rows via ${token}`
+  );
+}
+
+for (const token of [
   "#0B0B0C",
   "#131315",
   "#1A1A1D",
