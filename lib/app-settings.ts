@@ -231,7 +231,7 @@ export const defaultAppSettings: AppSettings = {
   videoQuality: DEFAULT_VIDEO_QUALITY,
   tripClipExportFormat: "mp4",
   imageSaveFormat: "original",
-  themeMode: "light",
+  themeMode: "dark",
   fontStyle: "noto_sans_kr",
   fontSize: "medium",
   screenLayout: "compact",
