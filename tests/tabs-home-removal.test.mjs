@@ -61,9 +61,13 @@ assert.ok(
 );
 
 assert.ok(
-  !useAppGuideSource.includes('tabKey !== "camera"') &&
-    !useAppGuideSource.includes('tabKey !== "home"'),
-  "first-run app guide should work across Body Frame tabs"
+  useAppGuideSource.includes('tabKey !== "camera"'),
+  "first-run onboarding should only open automatically on the camera entry"
+);
+assert.equal(
+  useAppGuideSource.includes('tabKey !== "home"'),
+  false,
+  "guide progress should not keep removed home-tab conditions"
 );
 assert.ok(
   !guideProgressSource.includes('tabKey === "home"'),
