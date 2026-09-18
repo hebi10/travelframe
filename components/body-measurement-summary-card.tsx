@@ -88,11 +88,13 @@ function Sparkline({
 export function BodyMeasurementSummaryCard({
   metric,
   series,
-  onAddMeasurement
+  onAddMeasurement,
+  onOpenHistory
 }: {
   metric: BodyMeasurementMetric;
   series: BodyMeasurementSeriesPoint[];
   onAddMeasurement?: () => void;
+  onOpenHistory?: () => void;
 }) {
   const { palette } = useAppAppearance();
   const meta = bodyMeasurementMetricMeta[metric];
@@ -132,9 +134,22 @@ export function BodyMeasurementSummaryCard({
             ) : null}
           </View>
         </View>
-        <Text style={[styles.count, { color: palette.faint }]}>
-          {summary.count}회
-        </Text>
+        <View style={styles.headerActions}>
+          <Text style={[styles.count, { color: palette.faint }]}>
+            {summary.count}회
+          </Text>
+          {onOpenHistory ? (
+            <Pressable
+              accessibilityRole="button"
+              style={[styles.historyButton, { borderColor: palette.line }]}
+              onPress={onOpenHistory}
+            >
+              <Text style={[styles.historyButtonText, { color: palette.text }]}>
+                전체 보기
+              </Text>
+            </Pressable>
+          ) : null}
+        </View>
       </View>
 
       {series.length >= 2 ? (
@@ -222,6 +237,21 @@ const styles = StyleSheet.create({
   count: {
     fontSize: bodyFrameTypography.caption,
     fontVariant: ["tabular-nums"]
+  },
+  headerActions: {
+    alignItems: "flex-end",
+    gap: 6
+  },
+  historyButton: {
+    minHeight: bodyFrameDesign.minTouchSize,
+    justifyContent: "center",
+    paddingHorizontal: 10,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderRadius: bodyFrameDesign.buttonRadius
+  },
+  historyButtonText: {
+    fontSize: bodyFrameTypography.caption,
+    fontWeight: "600"
   },
   chart: {
     position: "relative",
