@@ -113,6 +113,16 @@ jobs:
           distribution: temurin
           java-version: "21"
 
+      - name: Cache Android Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            C:/g/caches
+            C:/g/wrapper
+          key: ${{ runner.os }}-body-frame-gradle-${{ hashFiles('package-lock.json', 'app.json', 'plugins/with-android-release-manifest.js') }}
+          restore-keys: |
+            ${{ runner.os }}-body-frame-gradle-
+
       - name: Install dependencies
         run: npm ci
 
