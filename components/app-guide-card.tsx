@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { colors, controls, typography } from "@/constants/app-theme";
+import { bodyFrameDesign, colors, controls, typography } from "@/constants/app-theme";
 import type { AppGuideStep } from "@/constants/app-guide-steps";
 import { useAppAppearance } from "@/lib/app-appearance";
 
@@ -92,10 +92,7 @@ const styles = StyleSheet.create({
     width: "100%",
     gap: 16,
     padding: 18,
-    borderTopWidth: 1,
-    borderLeftWidth: 0,
-    borderRightWidth: 0,
-    borderBottomWidth: 0,
+    borderWidth: 0,
     backgroundColor: colors.background
   },
   textBase: {
@@ -119,7 +116,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 10,
     borderWidth: 1,
-    borderRadius: 8
+    borderRadius: bodyFrameDesign.buttonRadius
   },
   targetText: {
     color: colors.text,
@@ -156,7 +153,7 @@ const styles = StyleSheet.create({
     gap: 8
   },
   textButton: {
-    minHeight: 44,
+    minHeight: bodyFrameDesign.minTouchSize,
     justifyContent: "center",
     paddingHorizontal: 10,
     borderWidth: 1,

@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { bodyFrameDesign, bodyFrameTypography } from "@/constants/app-theme";
 import {
   getBodyProjectPhotos,
   getBodyProjectProgressSummary
@@ -461,7 +462,7 @@ const styles = StyleSheet.create({
     flex: 1
   },
   content: {
-    paddingHorizontal: 16
+    paddingHorizontal: bodyFrameDesign.horizontalPadding
   },
   centered: {
     flex: 1,
@@ -478,12 +479,12 @@ const styles = StyleSheet.create({
     marginBottom: 20
   },
   backButton: {
-    width: 44,
-    height: 44,
+    width: bodyFrameDesign.minTouchSize,
+    height: bodyFrameDesign.minTouchSize,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1,
-    borderRadius: 8
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderRadius: bodyFrameDesign.buttonRadius
   },
   backButtonText: {
     marginTop: -2,
@@ -491,7 +492,7 @@ const styles = StyleSheet.create({
     fontWeight: "400"
   },
   pageTitle: {
-    fontSize: 18,
+    fontSize: bodyFrameTypography.sectionTitle,
     fontWeight: "600"
   },
   topSpacer: {
@@ -507,8 +508,8 @@ const styles = StyleSheet.create({
     width: 104,
     aspectRatio: 9 / 16,
     overflow: "hidden",
-    borderWidth: 1,
-    borderRadius: 8
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderRadius: bodyFrameDesign.cardRadius
   },
   coverImage: {
     width: "100%",
@@ -546,15 +547,16 @@ const styles = StyleSheet.create({
   section: {
     gap: 10,
     marginBottom: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderRadius: 8
+    padding: bodyFrameDesign.horizontalPadding,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderRadius: bodyFrameDesign.cardRadius
   },
   dangerSection: {
     gap: 10,
     marginTop: 8,
-    paddingTop: 20,
-    borderTopWidth: 1
+    padding: bodyFrameDesign.horizontalPadding,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderRadius: bodyFrameDesign.cardRadius
   },
   sectionTitle: {
     fontSize: 17,
@@ -578,14 +580,14 @@ const styles = StyleSheet.create({
     fontSize: 11
   },
   input: {
-    minHeight: 48,
+    minHeight: bodyFrameDesign.primaryButtonHeight,
     paddingHorizontal: 12,
-    borderWidth: 1,
-    borderRadius: 8,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderRadius: bodyFrameDesign.buttonRadius,
     fontSize: 15
   },
   upgradeButton: {
-    minHeight: 44,
+    minHeight: bodyFrameDesign.minTouchSize,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
@@ -596,7 +598,7 @@ const styles = StyleSheet.create({
     fontWeight: "600"
   },
   primaryButton: {
-    minHeight: 48,
+    minHeight: bodyFrameDesign.primaryButtonHeight,
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 8,

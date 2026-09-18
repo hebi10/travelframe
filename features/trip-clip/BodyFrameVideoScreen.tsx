@@ -13,6 +13,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { TripClipRecordingCanvas } from "@/components/trip-clip-recording-canvas";
+import { bodyFrameDesign, bodyFrameTypography } from "@/constants/app-theme";
 import {
   BODY_FRAME_VIDEO_FPS,
   BODY_FRAME_VIDEO_MAX_OUTPUT_SIZE,
@@ -521,14 +522,11 @@ function SummaryRow({
   last?: boolean;
 }) {
   const { palette } = useAppAppearance();
+  void last;
 
   return (
     <View
-      style={[
-        styles.summaryRow,
-        { borderBottomColor: palette.line },
-        last && styles.summaryRowLast
-      ]}
+      style={styles.summaryRow}
     >
       <Text style={[styles.summaryLabel, { color: palette.muted }]}>{label}</Text>
       <Text style={[styles.summaryValue, { color: palette.text }]}>{value}</Text>
@@ -541,7 +539,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    paddingHorizontal: 16
+    paddingHorizontal: bodyFrameDesign.horizontalPadding
   },
   centered: {
     flex: 1,
@@ -551,7 +549,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
   pageTitle: {
-    fontSize: 28,
+    fontSize: bodyFrameTypography.pageTitle,
     fontWeight: "600"
   },
   projectName: {
@@ -580,8 +578,8 @@ const styles = StyleSheet.create({
     maxWidth: 280,
     aspectRatio: BODY_FRAME_ASPECT_RATIO,
     overflow: "hidden",
-    borderWidth: 1,
-    borderRadius: 8,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderRadius: bodyFrameDesign.cardRadius,
     backgroundColor: "#131315"
   },
   previewImage: {
@@ -600,19 +598,15 @@ const styles = StyleSheet.create({
   },
   summaryCard: {
     marginTop: 24,
-    borderWidth: 1,
-    borderRadius: 8,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderRadius: bodyFrameDesign.cardRadius,
     paddingHorizontal: 14
   },
   summaryRow: {
-    minHeight: 48,
+    minHeight: bodyFrameDesign.primaryButtonHeight,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  summaryRowLast: {
-    borderBottomWidth: 0
+    justifyContent: "space-between"
   },
   summaryLabel: {
     fontSize: 14
@@ -624,8 +618,8 @@ const styles = StyleSheet.create({
   limitNotice: {
     marginTop: 16,
     padding: 12,
-    borderWidth: 1,
-    borderRadius: 8,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderRadius: bodyFrameDesign.cardRadius,
     backgroundColor: "#131315"
   },
   limitNoticeText: {
@@ -633,19 +627,19 @@ const styles = StyleSheet.create({
     lineHeight: 19
   },
   limitPlanButton: {
-    minHeight: 44,
+    minHeight: bodyFrameDesign.minTouchSize,
     marginTop: 10,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1,
-    borderRadius: 8
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderRadius: bodyFrameDesign.buttonRadius
   },
   limitPlanButtonText: {
     fontSize: 13,
     fontWeight: "600"
   },
   primaryButton: {
-    minHeight: 50,
+    minHeight: bodyFrameDesign.primaryButtonHeight,
     marginTop: 20,
     alignItems: "center",
     justifyContent: "center",
