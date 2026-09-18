@@ -4,18 +4,21 @@ import fs from "node:fs";
 const photoSource = fs.readFileSync("app/photo/[id].tsx", "utf8");
 const videoSource = fs.readFileSync("app/video/[id].tsx", "utf8");
 
-for (const [name, source] of [
-  ["photo detail", photoSource],
-  ["video detail", videoSource]
+assert.ok(
+  photoSource.includes("useSafeAreaInsets") &&
+    photoSource.includes("const insets = useSafeAreaInsets();") &&
+    photoSource.includes("paddingTop: Math.max(insets.top + 12, 20)") &&
+    photoSource.includes("paddingBottom: insets.bottom + 36"),
+  "Body Frame photo detail should reserve top and bottom safe areas"
+);
+
+for (const snippet of [
+  "useSafeAreaInsets",
+  "const insets = useSafeAreaInsets();",
+  "const bottomSafePadding = Math.max(insets.bottom + spacing.screen, spacing.screen);",
+  "contentContainerStyle={[styles.content, { paddingBottom: bottomSafePadding }]}"
 ]) {
-  for (const snippet of [
-    "useSafeAreaInsets",
-    "const insets = useSafeAreaInsets();",
-    "const bottomSafePadding = Math.max(insets.bottom + spacing.screen, spacing.screen);",
-    "contentContainerStyle={[styles.content, { paddingBottom: bottomSafePadding }]}"
-  ]) {
-    assert.ok(source.includes(snippet), `${name} safe area missing: ${snippet}`);
-  }
+  assert.ok(videoSource.includes(snippet), `video detail safe area missing: ${snippet}`);
 }
 
-console.log("ok - media detail screens reserve bottom safe area");
+console.log("ok - media detail screens reserve safe areas");
