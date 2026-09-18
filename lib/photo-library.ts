@@ -4,8 +4,10 @@ import {
   reserveBodyFrameCameraCapture
 } from "@/lib/body-frame-camera-session";
 import { updateBodyProject } from "@/lib/body-project-library";
+import { detachBodyMeasurementsFromPhoto } from "@/lib/body-measurement-library";
 import {
   deleteLocalFile,
+  deletePhoto as deleteLegacyPhoto,
   getPhotos,
   replacePhotosFromBackup,
   saveCapturedPhoto as saveLegacyCapturedPhoto
@@ -13,6 +15,11 @@ import {
 import type { PhotoItem, SaveCapturedPhotoInput } from "@/types/photo";
 
 export * from "@/lib/legacy-photo-library";
+
+export const deletePhoto = async (id: string) => {
+  await detachBodyMeasurementsFromPhoto(id);
+  return deleteLegacyPhoto(id);
+};
 
 const cleanupOrphanProjectFiles = async (photo?: PhotoItem | null) => {
   if (!photo) {
