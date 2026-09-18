@@ -1,26 +1,11 @@
-import { Image } from "expo-image";
-import { useEffect, useRef } from "react";
-import {
-  type NativeScrollEvent,
-  type NativeSyntheticEvent,
-  Modal,
-  ScrollView,
-  StyleSheet,
-  useWindowDimensions,
-  View
-} from "react-native";
+import { Text, Modal, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppGuideCard } from "@/components/app-guide-card";
 import { AppGuideHighlight } from "@/components/app-guide-highlight";
 import type { AppGuideTabKey } from "@/constants/app-guide-steps";
 import { useAppGuide } from "@/hooks/use-app-guide";
-
-const guideVisualSlides = [
-  require("@/assets/images/home-slide-camera.png"),
-  require("@/assets/images/home-slide-edit.png"),
-  require("@/assets/images/home-slide-video.png")
-];
+import { useAppAppearance } from "@/lib/app-appearance";
 
 type AppGuideOverlayProps = {
   tabKey: AppGuideTabKey;
@@ -34,10 +19,7 @@ export function AppGuideOverlay({
   replaySignal = 0
 }: AppGuideOverlayProps) {
   const insets = useSafeAreaInsets();
-  const { width } = useWindowDimensions();
-  const visualScrollerRef = useRef<ScrollView>(null);
-  const stageWidth = Math.min(width - 36, 750);
-  const visualWidth = Math.max(1, stageWidth - 36);
+  const { palette } = useAppAppearance();
   const {
     visible,
     step,
@@ -45,34 +27,13 @@ export function AppGuideOverlay({
     totalSteps,
     canGoBack,
     goBack,
-    goToStep,
     goNext,
     skip
   } = useAppGuide(tabKey, replaySignal);
-  const activeVisualIndex = Math.min(stepIndex, guideVisualSlides.length - 1);
-  const visualPageIndexes = Array.from({ length: totalSteps });
-  const visualPages = visualPageIndexes.map((_, index) => ({
-    index,
-    source: guideVisualSlides[Math.min(index, guideVisualSlides.length - 1)]
-  }));
-
-  useEffect(() => {
-    requestAnimationFrame(() => {
-      visualScrollerRef.current?.scrollTo({
-        x: activeVisualIndex * visualWidth,
-        animated: visible
-      });
-    });
-  }, [activeVisualIndex, visualWidth, visible]);
 
   if (!step) {
     return null;
   }
-
-  const handleVisualScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const nextIndex = Math.round(event.nativeEvent.contentOffset.x / visualWidth);
-    goToStep(Math.max(0, Math.min(totalSteps - 1, nextIndex)));
-  };
 
   return (
     <Modal
@@ -85,68 +46,45 @@ export function AppGuideOverlay({
       <View
         style={[
           styles.backdrop,
-          transparentBackdrop ? styles.clearBackdrop : styles.dimBackdrop,
           {
-            paddingTop: Math.max(insets.top + 16, 24),
-            paddingBottom: Math.max(insets.bottom + 16, 24)
+            paddingTop: Math.max(insets.top + 20, 28),
+            paddingBottom: Math.max(insets.bottom + 20, 28),
+            backgroundColor: transparentBackdrop
+              ? "transparent"
+              : "rgba(0,0,0,0.68)"
           }
         ]}
       >
-        <View style={[styles.content, { maxWidth: stageWidth }]}>
-          <View style={styles.stage}>
-            <View style={styles.visualArea}>
-              <ScrollView
-                ref={visualScrollerRef}
-                horizontal
-                pagingEnabled
-                disableIntervalMomentum
-                showsHorizontalScrollIndicator={false}
-                snapToInterval={visualWidth}
-                snapToAlignment="start"
-                decelerationRate="fast"
-                onMomentumScrollEnd={handleVisualScroll}
-                style={styles.visualScroller}
-                contentContainerStyle={styles.visualTrack}
-              >
-                {visualPages.map(({ index, source }) => (
-                  <View
-                    key={index}
-                    style={[styles.visualSlide, { width: visualWidth }]}
-                  >
-                    <Image
-                      source={source}
-                      style={styles.stageImage}
-                      contentFit="contain"
-                    />
-                  </View>
-                ))}
-              </ScrollView>
-              <View pointerEvents="none" style={styles.visualDots}>
-                {visualPages.map(({ index }) => (
-                  <View
-                    key={index}
-                    style={[
-                      styles.visualDot,
-                      activeVisualIndex === index && styles.visualDotActive
-                    ]}
-                  />
-                ))}
-              </View>
-            </View>
-            <View pointerEvents="none" style={styles.stageWash} />
-            <View style={styles.stageTop}>
-              <AppGuideHighlight label={step.targetLabel} />
-            </View>
-            <AppGuideCard
-              step={step}
-              current={stepIndex + 1}
-              total={totalSteps}
-              canGoBack={canGoBack}
-              onBack={goBack}
-              onNext={goNext}
-              onSkip={skip}
-            />
+        <View
+          style={[
+            styles.modal,
+            {
+              backgroundColor: palette.surface,
+              borderColor: palette.line
+            }
+          ]}
+        >
+          <View style={styles.brandBlock}>
+            <Text style={[styles.eyebrow, { color: palette.muted }]}>BODY FRAME</Text>
+            <Text style={[styles.brandTitle, { color: palette.text }]}>바디 프레임</Text>
+            <Text style={[styles.brandDetail, { color: palette.muted }]}>
+              같은 위치와 자세로 몸의 변화를 기록합니다.
+            </Text>
           </View>
+
+          <View style={styles.highlightWrap}>
+            <AppGuideHighlight label={step.targetLabel ?? "현재 기능"} />
+          </View>
+
+          <AppGuideCard
+            step={step}
+            current={stepIndex + 1}
+            total={totalSteps}
+            canGoBack={canGoBack}
+            onBack={goBack}
+            onNext={goNext}
+            onSkip={skip}
+          />
         </View>
       </View>
     </Modal>
@@ -156,88 +94,38 @@ export function AppGuideOverlay({
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
+    justifyContent: "center",
     paddingHorizontal: 18
   },
-  dimBackdrop: {
-    backgroundColor: "rgba(0, 0, 0, 0.28)"
-  },
-  clearBackdrop: {
-    backgroundColor: "transparent"
-  },
-  content: {
-    flex: 1,
+  modal: {
     width: "100%",
+    maxWidth: 520,
     alignSelf: "center",
-    justifyContent: "center"
-  },
-  stage: {
-    width: "100%",
-    height: "78%",
-    maxHeight: 680,
-    minHeight: 520,
     overflow: "hidden",
-    position: "relative",
     borderWidth: 1,
-    borderColor: "#111111",
-    backgroundColor: "#F3F1EA"
+    borderRadius: 10
   },
-  visualArea: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingTop: 18,
+  brandBlock: {
+    gap: 6,
+    paddingHorizontal: 18,
+    paddingTop: 20,
+    paddingBottom: 16
+  },
+  eyebrow: {
+    fontSize: 11,
+    fontWeight: "600",
+    letterSpacing: 1.2
+  },
+  brandTitle: {
+    fontSize: 26,
+    fontWeight: "600"
+  },
+  brandDetail: {
+    fontSize: 14,
+    lineHeight: 20
+  },
+  highlightWrap: {
     paddingHorizontal: 18,
     paddingBottom: 10
-  },
-  visualScroller: {
-    width: "100%",
-    height: "100%"
-  },
-  visualTrack: {
-    alignItems: "center"
-  },
-  visualSlide: {
-    height: "100%",
-    alignItems: "center",
-    justifyContent: "center"
-  },
-  visualDots: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 8,
-    minHeight: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6
-  },
-  visualDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: "#111111",
-    backgroundColor: "transparent"
-  },
-  visualDotActive: {
-    backgroundColor: "#111111"
-  },
-  stageWash: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(255, 255, 255, 0.04)"
-  },
-  stageImage: {
-    width: "100%",
-    height: "100%",
-    maxWidth: 430,
-    aspectRatio: 2 / 3
-  },
-  stageTop: {
-    position: "absolute",
-    top: 16,
-    left: 16,
-    right: 16,
-    alignItems: "flex-start"
   }
 });
