@@ -601,8 +601,10 @@ export default function CameraScreen() {
         guideOffsetYValue.value = settings.guideOffsetY;
         setOverlayOpacity(settings.overlayOpacity);
         setZoomPercent(effectiveZoom);
+        const projectCaptureMemoryEnabled =
+          Boolean(projectId) && captureContextState?.enabled === true;
         const restoredTorchEnabled =
-          !projectCaptureContext &&
+          !projectCaptureMemoryEnabled &&
           settings.cameraTorchEnabled &&
           effectiveFacing === "back";
         setTorchEnabled(restoredTorchEnabled);
