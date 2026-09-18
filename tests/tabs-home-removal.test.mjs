@@ -26,12 +26,25 @@ for (const tabTitle of [
   assert.ok(tabsLayoutSource.includes(tabTitle), `bottom tabs should include ${tabTitle}`);
 }
 
+const getTabScreenBlock = (name) => {
+  const start = tabsLayoutSource.indexOf(`name="${name}"`);
+  const nextScreen = tabsLayoutSource.indexOf("<Tabs.Screen", start + 1);
+  return tabsLayoutSource.slice(
+    start,
+    nextScreen >= 0 ? nextScreen : tabsLayoutSource.length
+  );
+};
+
+const accountTabBlock = getTabScreenBlock("account");
+const videoTabBlock = getTabScreenBlock("trip-clip");
+
 assert.ok(
-  /name="account"[\s\S]*?href: null/.test(tabsLayoutSource),
+  accountTabBlock.includes("href: null"),
   "account should remain routable but hidden from the bottom navigation"
 );
-assert.ok(
-  !/name="trip-clip"[\s\S]*?href: null/.test(tabsLayoutSource),
+assert.equal(
+  videoTabBlock.includes("href: null"),
+  false,
   "video should occupy a visible bottom tab"
 );
 assert.ok(
