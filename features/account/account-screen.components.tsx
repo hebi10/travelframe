@@ -43,7 +43,7 @@ export function InfoRow({ label, value }: { label: string; value: string }) {
   );
 
   return (
-    <View style={[styles.infoRow, themed.bottomBorder]}>
+    <View style={[styles.infoRow, themed.rowBorder]}>
       <Text selectable style={[styles.infoLabel, themed.mutedText]}>
         {label}
       </Text>

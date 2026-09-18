@@ -1,6 +1,6 @@
 import { StyleSheet } from "react-native";
 
-import { colors, controls, spacing, typography } from "@/constants/app-theme";
+import { bodyFrameDesign, colors, controls, spacing, typography } from "@/constants/app-theme";
 import type { AppPalette } from "@/lib/app-appearance";
 
 export const createAccountThemedStyles = (palette: AppPalette, fontFamily?: string) => {
@@ -43,8 +43,8 @@ export const createAccountThemedStyles = (palette: AppPalette, fontFamily?: stri
       color: isDark ? palette.text : palette.inverse,
       ...fontTextStyle
     },
-    bottomBorder: {
-      borderBottomColor: palette.line
+    rowBorder: {
+      borderColor: palette.line
     }
   });
 };
@@ -73,7 +73,7 @@ export const styles = StyleSheet.create({
     gap: 8
   },
   segmentButton: {
-    minHeight: controls.compactHeight,
+    minHeight: bodyFrameDesign.minTouchSize,
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
@@ -216,17 +216,17 @@ export const styles = StyleSheet.create({
     gap: 8
   },
   infoList: {
-    borderTopWidth: 1,
-    borderTopColor: colors.line
+    gap: 8
   },
   infoRow: {
-    minHeight: 48,
+    minHeight: bodyFrameDesign.primaryButtonHeight,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.line
+    paddingHorizontal: 12,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderRadius: bodyFrameDesign.cardRadius
   },
   infoLabel: {
     color: colors.muted,
@@ -325,7 +325,7 @@ export const styles = StyleSheet.create({
     gap: 12
   },
   modalCloseButton: {
-    minHeight: controls.compactHeight,
+    minHeight: bodyFrameDesign.minTouchSize,
     justifyContent: "center",
     paddingHorizontal: 12,
     borderWidth: 1,
