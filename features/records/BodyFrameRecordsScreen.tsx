@@ -350,7 +350,7 @@ const styles = StyleSheet.create({
     borderRadius: bodyFrameDesign.buttonRadius
   },
   captureButtonText: {
-    fontSize: 13,
+    fontSize: bodyFrameTypography.button,
     fontWeight: "600"
   },
   projectGrid: {
@@ -405,13 +405,13 @@ const styles = StyleSheet.create({
     lineHeight: 17
   },
   projectPercent: {
-    fontSize: 11,
+    fontSize: bodyFrameTypography.caption,
     fontWeight: "600",
     fontVariant: ["tabular-nums"]
   },
   projectDuration: {
-    fontSize: 11,
-    lineHeight: 16
+    fontSize: bodyFrameTypography.caption,
+    lineHeight: 17
   },
   progressTrack: {
     height: 4,
@@ -495,7 +495,7 @@ const styles = StyleSheet.create({
     marginTop: 4
   },
   primaryButtonText: {
-    fontSize: 14,
+    fontSize: bodyFrameTypography.button,
     fontWeight: "600"
   },
 });
