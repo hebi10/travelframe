@@ -659,97 +659,45 @@ export default function AccountScreen() {
             </View>
           </SectionBlock>
 
-          <SectionBlock title="계정 기록">
-            <View style={styles.infoList}>
-              <InfoRow label="가입일" value={formatDateTime(user?.metadata.creationTime)} />
-              <InfoRow label="마지막 로그인" value={formatDateTime(user?.metadata.lastSignInTime)} />
-              <InfoRow
-                label="구독 상태"
-                value={subscriptionDisplayName}
-              />
-              <InfoRow
-                label="광고 제거"
-                value={
-                  isSubscriptionCheckFailed
-                    ? "확인 불가"
-                    : isSubscriptionProductsLoading
-                    ? "확인 중..."
-                    : effectiveSubscriptionProducts.adRemove
-                    ? "구매 완료"
-                    : effectiveSubscriptionProducts.creatorMonthly ||
-                      effectiveSubscriptionProducts.expertMonthly
-                      ? "구독 포함"
-                      : "미구매"
-                }
-              />
-              <InfoRow
-                label="구독"
-                value={
-                  isSubscriptionCheckFailed
-                    ? "확인 불가"
-                    : isSubscriptionProductsLoading
-                    ? "확인 중..."
-                    : effectiveSubscriptionProducts.creatorMonthly ||
-                      effectiveSubscriptionProducts.expertMonthly
-                      ? "구독 중"
-                      : "미구독"
-                }
-              />
-              <InfoRow
-                label="구독 시작일"
-                value={displaySubscription.startedAt ? formatDateTime(displaySubscription.startedAt) : "아직 구독 전"}
-              />
-              <InfoRow
-                label="다음 갱신일"
-                value={displaySubscription.expiresAt ? formatDateTime(displaySubscription.expiresAt) : "없음"}
-              />
-              <InfoRow
-                label="클라우드 백업"
-                value={
-                  isSubscriptionCheckFailed
-                    ? "확인 불가"
-                    : hasFullAccess
-                      ? "사용 가능"
-                      : "프리미엄 활성 후 사용 권장"
-                }
-              />
-            </View>
-          </SectionBlock>
-
-          <SectionBlock title="플랜 한도">
+          <SectionBlock title="현재 상태">
             <View style={styles.infoList}>
               <InfoRow
                 label="현재 플랜"
                 value={planEntitlements.label}
               />
               <InfoRow
-                label="영상 출력 (주간 한도)"
-                value={formatQuotaValue(
-                  weeklyVideoUsed,
-                  planEntitlements.weeklyVideoExportLimit
-                )}
+                label="구독 상태"
+                value={subscriptionDisplayName}
               />
               <InfoRow
-                label="이미지 보관함"
-                value={formatQuotaValue(localImageUsage, planEntitlements.localImageLimit)}
+                label="현재 프로젝트"
+                value={currentProjectSummary?.name ?? "프로젝트 없음"}
               />
               <InfoRow
-                label="영상 보관함"
-                value={formatQuotaValue(stats.videos, planEntitlements.localVideoLimit)}
-              />
-              <InfoRow
-                label="음악 보관함"
-                value={formatQuotaValue(
-                  musicTracks.length,
-                  planEntitlements.musicTrackLimit
-                )}
+                label="현재 기록"
+                value={
+                  currentProjectSummary
+                    ? `${currentProjectSummary.photoCount} / ${currentProjectSummary.targetPhotoCount}장`
+                    : "기록 없음"
+                }
               />
               <InfoRow
                 label="클라우드 백업"
-                value={formatStorageQuotaValue(
-                  backupOverview.imageBackupBytes,
-                  planEntitlements.backupStorageBytes
-                )}
+                value={
+                  effectiveStorageMode === "local_only"
+                    ? "꺼짐"
+                    : planEntitlements.canBackupToCloud
+                      ? "켜짐"
+                      : "플랜 확인 필요"
+                }
+              />
+              <InfoRow
+                label="다음 갱신일"
+                value={
+                  displaySubscription.expiresAt
+                    ? formatDateTime(displaySubscription.expiresAt)
+                    : "없음"
+                }
               />
             </View>
           </SectionBlock>
@@ -779,7 +727,7 @@ export default function AccountScreen() {
                 />
                 <InfoRow
                   label="백업 데이터"
-                  value={`사진 ${backupOverview.photoCount}장 / 여러 사진 작업 ${backupOverview.imageBundleCount}개 / 영상 ${backupOverview.videoCount}개`}
+                  value={`사진 ${backupOverview.photoCount}장 / 영상 ${backupOverview.videoCount}개`}
                 />
                 <InfoRow
                   label="이미지 용량"
@@ -813,7 +761,7 @@ export default function AccountScreen() {
             </View>
           </SectionBlock>
 
-          <SectionBlock title="결제">
+          <SectionBlock title="플랜 및 결제">
             <View style={[styles.planCard, themed.panelStrong]}>
               <View style={styles.planHeader}>
                 <View style={styles.planCopy}>
@@ -887,81 +835,6 @@ export default function AccountScreen() {
             </Text>
           </SectionBlock>
 
-          <SectionBlock title="사용 기록">
-            <View style={styles.statsGrid}>
-              <StatCard label="원본 사진" value={stats.originalPhotos} />
-              <StatCard label="편집 사진" value={stats.editedPhotos} />
-              <StatCard label="여러 사진 작업" value={stats.imageBundles} />
-              <StatCard label="만든 영상" value={stats.videos} />
-            </View>
-          </SectionBlock>
-
-          <SectionBlock title="내 음악 관리">
-            <View style={styles.musicPanel}>
-              <Text selectable style={[styles.helpText, themed.mutedText]}>
-                Pro 구독 중에는 핸드폰에 있는 음악을 최대 {planEntitlements.musicTrackLimit}개까지 저장하고 영상 만들기에서 사용할 수 있습니다.
-              </Text>
-              <View style={styles.musicHeader}>
-                <Text selectable style={[styles.musicCount, themed.text]}>
-                  {musicTracks.length} / {planEntitlements.musicTrackLimit}
-                </Text>
-                <Pressable
-                  disabled={
-                    isMusicSubmitting ||
-                    planEntitlements.musicTrackLimit <= 0 ||
-                    musicTracks.length >= planEntitlements.musicTrackLimit
-                  }
-                  style={[
-                    styles.secondaryButton,
-                    themed.secondaryButton,
-                    styles.musicUploadButton,
-                    (isMusicSubmitting ||
-                      planEntitlements.musicTrackLimit <= 0 ||
-                      musicTracks.length >= planEntitlements.musicTrackLimit) &&
-                      styles.disabledButton
-                  ]}
-                  onPress={handleUploadMusic}
-                >
-                  <Text selectable={false} style={[styles.secondaryButtonText, themed.text]}>
-                    음악 추가
-                  </Text>
-                </Pressable>
-              </View>
-              <View style={styles.musicList}>
-                {musicTracks.length > 0 ? (
-                  musicTracks.map((track) => (
-                    <View key={track.id} style={[styles.musicItem, themed.panel]}>
-                      <View style={styles.musicCopy}>
-                        <Text selectable style={[styles.musicTitle, themed.text]}>
-                          {track.name}
-                        </Text>
-                        <Text selectable style={[styles.musicDetail, themed.mutedText]}>
-                          {formatDateTime(track.createdAt)}
-                        </Text>
-                      </View>
-                      <Pressable
-                        disabled={isMusicSubmitting}
-                        style={[
-                          styles.musicDeleteButton,
-                          themed.secondaryButton,
-                          isMusicSubmitting && styles.disabledButton
-                        ]}
-                        onPress={() => handleDeleteMusic(track)}
-                      >
-                        <Text selectable={false} style={[styles.musicDeleteText, themed.text]}>
-                          삭제
-                        </Text>
-                      </Pressable>
-                    </View>
-                  ))
-                ) : (
-                  <Text selectable style={[styles.helpText, themed.mutedText]}>
-                    아직 저장한 음악이 없습니다.
-                  </Text>
-                )}
-              </View>
-            </View>
-          </SectionBlock>
 
         </>
       ) : null}
