@@ -21,10 +21,8 @@ import {
 } from "@/constants/legal-links";
 import { useAuth } from "@/lib/auth-context";
 import {
-  getUserSubscriptionProducts,
   isPremiumSubscription,
-  type SubscriptionProductId,
-  type UserSubscriptionProducts
+  type SubscriptionProductId
 } from "@/lib/subscription";
 import { getSubscriptionProductsFromSubscription } from "@/lib/subscription-products";
 import { getPlanEntitlements } from "@/lib/plan-entitlements";
@@ -138,10 +136,7 @@ export default function AccountScreen() {
     storageMode,
     isSubscriptionProductsLoading,
     subscriptionProducts
-  } = useAccountStats({
-    user,
-    weeklyVideoExportLimit: planEntitlements.weeklyVideoExportLimit
-  });
+  } = useAccountStats({ user });
   const backupOverview = useAccountBackupOverview(user);
   const [currentProjectSummary, setCurrentProjectSummary] = useState<{
     name: string;
