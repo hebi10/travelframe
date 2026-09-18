@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -61,6 +61,7 @@ import { createAccountThemedStyles, styles } from "@/features/account/account-sc
 import { useAccountBackupOverview } from "@/features/account/hooks/useAccountBackup";
 import { useAccountMusicActions } from "@/features/account/hooks/useAccountMusic";
 import { useAccountStats } from "@/features/account/hooks/useAccountStats";
+import { useGooglePlayBilling } from "@/features/account/hooks/useGooglePlayBilling";
 
 export default function AccountScreen() {
   const insets = useSafeAreaInsets();
@@ -91,7 +92,6 @@ export default function AccountScreen() {
     logOut,
     sendVerificationEmail,
     resetPassword,
-    purchaseProduct,
     refreshUser
   } = useAuth();
   const [mode, setMode] = useState<AuthMode>("signIn");
@@ -103,6 +103,23 @@ export default function AccountScreen() {
   const [isBackupRestoreSubmitting, setIsBackupRestoreSubmitting] = useState(false);
   const [selectedPaymentPlan, setSelectedPaymentPlan] = useState<PaymentPlan | null>(null);
   const [showDeleteRequestInfo, setShowDeleteRequestInfo] = useState(false);
+  const {
+    connected: billingConnected,
+    billingMessage,
+    isRestoring: isPurchaseRestoring,
+    purchaseProduct,
+    restorePurchases,
+    getStorePrice
+  } = useGooglePlayBilling({
+    user,
+    refreshUser
+  });
+
+  useEffect(() => {
+    if (billingMessage) {
+      setMessage(billingMessage);
+    }
+  }, [billingMessage]);
   const googleAndroidClientId = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;
   const isGoogleReady = isGoogleSignInConfigured({
     androidClientId: googleAndroidClientId
@@ -300,14 +317,20 @@ export default function AccountScreen() {
   const getPaymentProductId = (
     plan: PaymentPlan
   ): Exclude<SubscriptionProductId, "free"> =>
-    plan.id === "adRemove" ? "ad_remove" : "creator_monthly";
+    plan.id === "adRemove"
+      ? "ad_remove"
+      : plan.id === "expert"
+        ? "expert_monthly"
+        : "creator_monthly";
 
   const getPaymentActionLabel = (plan: PaymentPlan) =>
     getPaymentPlanStatus(plan).active
       ? "사용 중"
-      : plan.id === "adRemove"
-        ? "구매하기"
-        : "구독하기";
+      : !billingConnected
+        ? "Google Play 연결 중..."
+        : plan.id === "adRemove"
+          ? "구매하기"
+          : "구독하기";
 
   const handlePaymentPurchase = async () => {
     if (isSubmitting || !selectedPaymentPlan) {
@@ -324,6 +347,24 @@ export default function AccountScreen() {
       setMessage(getUserFacingErrorMessage(error, "결제를 완료하지 못했습니다."));
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleRestorePurchases = async () => {
+    if (isPurchaseRestoring || isSubmitting) {
+      return;
+    }
+
+    try {
+      setMessage(null);
+      const restoredCount = await restorePurchases();
+      setMessage(
+        restoredCount > 0
+          ? `Google Play 구매 ${restoredCount}건을 확인하고 복원했습니다.`
+          : "복원할 활성 Google Play 구매를 찾지 못했습니다."
+      );
+    } catch (error) {
+      setMessage(getUserFacingErrorMessage(error, "구매를 복원하지 못했습니다."));
     }
   };
 
@@ -350,12 +391,21 @@ export default function AccountScreen() {
       };
     }
 
+    if (plan.id === "expert") {
+      return {
+        active: Boolean(effectiveSubscriptionProducts.expertMonthly),
+        label: effectiveSubscriptionProducts.expertMonthly ? "구독 중" : "미구독"
+      };
+    }
+
     return {
       active: Boolean(
-        effectiveSubscriptionProducts.creatorMonthly || effectiveSubscriptionProducts.expertMonthly
+        effectiveSubscriptionProducts.creatorMonthly ||
+          effectiveSubscriptionProducts.expertMonthly
       ),
       label:
-        effectiveSubscriptionProducts.creatorMonthly || effectiveSubscriptionProducts.expertMonthly
+        effectiveSubscriptionProducts.creatorMonthly ||
+        effectiveSubscriptionProducts.expertMonthly
           ? "구독 중"
           : "미구독"
     };
@@ -762,7 +812,7 @@ export default function AccountScreen() {
                         {plan.title}
                       </Text>
                       <Text selectable style={[styles.planPrice, themed.text]}>
-                        {plan.price}
+                        {getStorePrice(getPaymentProductId(plan)) ?? plan.price}
                       </Text>
                     </View>
                     <StatusBadge
@@ -781,6 +831,24 @@ export default function AccountScreen() {
                 </Pressable>
               ))}
             </View>
+            <Pressable
+              accessibilityRole="button"
+              disabled={!billingConnected || isPurchaseRestoring || isSubmitting}
+              style={[
+                styles.secondaryButton,
+                themed.secondaryButton,
+                (!billingConnected || isPurchaseRestoring || isSubmitting) &&
+                  styles.disabledButton
+              ]}
+              onPress={() => void handleRestorePurchases()}
+            >
+              <Text selectable={false} style={[styles.secondaryButtonText, themed.text]}>
+                {isPurchaseRestoring ? "구매 복원 중..." : "구매 복원"}
+              </Text>
+            </Pressable>
+            <Text selectable style={[styles.helpText, themed.mutedText]}>
+              같은 Google Play 계정으로 구매한 광고 제거와 활성 구독을 다시 확인합니다.
+            </Text>
           </SectionBlock>
 
           <SectionBlock title="사용 기록">
@@ -932,7 +1000,10 @@ export default function AccountScreen() {
                   {selectedPaymentPlan?.title}
                 </Text>
                 <Text selectable style={[styles.planPrice, themed.text]}>
-                  {selectedPaymentPlan?.price}
+                  {selectedPaymentPlan
+                    ? getStorePrice(getPaymentProductId(selectedPaymentPlan)) ??
+                      selectedPaymentPlan.price
+                    : ""}
                 </Text>
                 <Text selectable style={[styles.benefitText, themed.mutedText]}>
                   {selectedPaymentPlan?.billing}
@@ -963,6 +1034,7 @@ export default function AccountScreen() {
             <Pressable
               disabled={
                 isSubmitting ||
+                !billingConnected ||
                 !selectedPaymentPlan ||
                 (selectedPaymentPlan ? getPaymentPlanStatus(selectedPaymentPlan).active : false)
               }
@@ -970,6 +1042,7 @@ export default function AccountScreen() {
                 styles.primaryButton,
                 themed.activeFill,
                 (isSubmitting ||
+                  !billingConnected ||
                   (selectedPaymentPlan ? getPaymentPlanStatus(selectedPaymentPlan).active : false)) &&
                   styles.disabledButton
               ]}
