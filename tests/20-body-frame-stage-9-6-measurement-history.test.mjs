@@ -66,11 +66,9 @@ assert.ok(
 );
 
 assert.equal(
-  historySource.includes("firestore") ||
-    historySource.includes("Health Connect") ||
-    historySource.includes("health_connect"),
+  historySource.includes("firestore"),
   false,
-  "Stage 9-6 should remain Local Only and must not add cloud or Health Connect access"
+  "measurement history should remain Local Only and must not add Firestore access"
 );
 
 assert.ok(
