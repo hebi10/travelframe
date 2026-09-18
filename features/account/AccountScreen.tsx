@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useFocusEffect } from "expo-router";
 import {
   ActivityIndicator,
   Alert,
@@ -11,7 +12,6 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { AppGuideOverlay } from "@/components/app-guide-overlay";
 import { ScreenShell } from "@/components/screen-shell";
 import { SectionBlock } from "@/components/section-block";
 import {
@@ -20,10 +20,8 @@ import {
 } from "@/constants/legal-links";
 import { useAuth } from "@/lib/auth-context";
 import {
-  getUserSubscriptionProducts,
   isPremiumSubscription,
-  type SubscriptionProductId,
-  type UserSubscriptionProducts
+  type SubscriptionProductId
 } from "@/lib/subscription";
 import { getSubscriptionProductsFromSubscription } from "@/lib/subscription-products";
 import { getPlanEntitlements } from "@/lib/plan-entitlements";
@@ -31,7 +29,6 @@ import {
   getEffectiveStorageMode,
   getStorageModeLabel
 } from "@/lib/storage-mode";
-import { type UserMusicTrack } from "@/lib/user-music";
 import { useAppAppearance } from "@/lib/app-appearance";
 import {
   GOOGLE_SIGN_IN_MESSAGES,
@@ -44,7 +41,7 @@ import {
   formatImageBackupUsage
 } from "@/lib/image-backup-utils";
 import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
-import { InfoRow, StatCard, StatusBadge } from "@/features/account/account-screen.components";
+import { InfoRow, StatusBadge } from "@/features/account/account-screen.components";
 import {
   paymentPlans,
   signedInBenefits,
@@ -53,15 +50,19 @@ import {
 } from "@/features/account/account-screen.constants";
 import {
   formatDateTime,
-  formatQuotaValue,
-  formatStorageQuotaValue,
   getAuthErrorMessage
 } from "@/features/account/account-screen.helpers";
 import { createAccountThemedStyles, styles } from "@/features/account/account-screen.styles";
 import { useAccountBackupOverview } from "@/features/account/hooks/useAccountBackup";
-import { useAccountMusicActions } from "@/features/account/hooks/useAccountMusic";
 import { useAccountStats } from "@/features/account/hooks/useAccountStats";
 import { useGooglePlayBilling } from "@/features/account/hooks/useGooglePlayBilling";
+import {
+  getBodyProjectProgressSummary,
+  selectActiveBodyProject
+} from "@/lib/body-frame-camera-project";
+import { getBodyProjects } from "@/lib/body-project-library";
+import { getLastActiveProjectId } from "@/lib/body-project-preferences";
+import { getPhotos } from "@/lib/photo-library";
 
 export default function AccountScreen() {
   const insets = useSafeAreaInsets();
@@ -131,24 +132,57 @@ export default function AccountScreen() {
     [isLoggedIn, subscription]
   );
   const {
-    stats,
     storageMode,
     isSubscriptionProductsLoading,
-    subscriptionProducts,
-    musicTracks,
-    setMusicTracks,
-    weeklyVideoExportUsage
-  } = useAccountStats({
-    user,
-    weeklyVideoExportLimit: planEntitlements.weeklyVideoExportLimit
-  });
+    subscriptionProducts
+  } = useAccountStats({ user });
   const backupOverview = useAccountBackupOverview(user);
-  const { isMusicSubmitting, handleUploadMusic, handleDeleteMusic } = useAccountMusicActions({
-    user,
-    musicTrackLimit: planEntitlements.musicTrackLimit,
-    setMessage,
-    setMusicTracks
-  });
+  const [currentProjectSummary, setCurrentProjectSummary] = useState<{
+    name: string;
+    photoCount: number;
+    targetPhotoCount: number;
+  } | null>(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+
+      const loadCurrentProject = async () => {
+        const [projects, photos, lastActiveProjectId] = await Promise.all([
+          getBodyProjects(),
+          getPhotos(),
+          getLastActiveProjectId()
+        ]);
+        const selectedProject = selectActiveBodyProject(projects, lastActiveProjectId);
+
+        if (!isActive) {
+          return;
+        }
+
+        if (!selectedProject) {
+          setCurrentProjectSummary(null);
+          return;
+        }
+
+        const summary = getBodyProjectProgressSummary(photos, selectedProject);
+        setCurrentProjectSummary({
+          name: selectedProject.name,
+          photoCount: summary.photoCount,
+          targetPhotoCount: summary.targetPhotoCount
+        });
+      };
+
+      void loadCurrentProject().catch(() => {
+        if (isActive) {
+          setCurrentProjectSummary(null);
+        }
+      });
+
+      return () => {
+        isActive = false;
+      };
+    }, [])
+  );
   const derivedSubscriptionProducts = useMemo(
     () => getSubscriptionProductsFromSubscription(subscription),
     [subscription]
@@ -166,10 +200,6 @@ export default function AccountScreen() {
     storageMode,
     planEntitlements.canBackupToCloud
   );
-  const localImageUsage =
-    stats.originalPhotos + stats.editedPhotos + stats.imageBundles;
-  const weeklyVideoUsed =
-    weeklyVideoExportUsage?.count ?? 0;
   const subscriptionDisplayName = isSubscriptionCheckFailed
     ? isPremiumSubscription(cachedSubscription)
       ? `확인 불가 (최근 캐시: ${cachedSubscription.productName})`
@@ -289,7 +319,7 @@ export default function AccountScreen() {
       setMessage(null);
       const summary = await restoreCloudBackupToLocal({ user });
       setMessage(
-        `클라우드 백업에서 현재 앱에 없는 항목만 불러왔습니다. 사진 ${summary.photoCount}장, 여러 사진 작업 ${summary.imageBundleCount}개, 영상 ${summary.videoCount}개를 추가했습니다.`
+        `클라우드 백업에서 현재 앱에 없는 항목만 불러왔습니다. 사진 ${summary.photoCount}장, 영상 ${summary.videoCount}개를 추가했습니다.`
       );
     } catch (error) {
       setMessage(getUserFacingErrorMessage(error, "클라우드 백업을 불러오지 못했습니다."));
@@ -301,7 +331,7 @@ export default function AccountScreen() {
   const confirmCloudRestore = () => {
     Alert.alert(
       "백업 데이터 불러오기",
-      "클라우드 백업 데이터 중 현재 앱에 없는 사진, 작업물, 영상만 불러옵니다. 이미 저장된 항목은 그대로 둡니다. 계속하시겠습니까?",
+      "클라우드 백업 데이터 중 현재 앱에 없는 사진과 영상만 불러옵니다. 이미 저장된 항목은 그대로 둡니다. 계속하시겠습니까?",
       [
         { text: "취소", style: "cancel" },
         {
@@ -415,10 +445,10 @@ export default function AccountScreen() {
     <>
       <ScreenShell
         eyebrow="계정"
-        title={isLoggedIn ? "내 계정과 사용 기록" : "로그인하고 작업을 보관하세요."}
+        title={isLoggedIn ? "내 계정과 플랜" : "로그인하고 기록을 보호하세요."}
         description={
           isLoggedIn
-            ? "이메일 인증, 구독 상태, 저장한 작업 기록을 한곳에서 확인합니다."
+            ? "계정, 현재 기록, 백업 상태와 Google Play 플랜을 관리합니다."
             : "로그인하면 Google Play 구매·복원과 계정 기능을 사용할 수 있습니다. 무료 플랜은 프로젝트당 100장과 최대 10초 변화 영상을 지원합니다."
         }
         safeTop
@@ -562,7 +592,7 @@ export default function AccountScreen() {
               {!hasFullAccess ? (
                 <View style={styles.verifyPanel}>
                   <Text selectable style={[styles.helpText, themed.mutedText]}>
-                    이메일 인증과 Pro 활성화가 완료되면 워터마크 제거, 클라우드 백업, 고급 출력 기능을 사용할 수 있습니다.
+                    이메일 인증과 Pro 활성화가 완료되면 워터마크 제거와 클라우드 백업을 사용할 수 있습니다.
                   </Text>
                   <View style={styles.inlineActions}>
                     <Pressable
@@ -623,97 +653,45 @@ export default function AccountScreen() {
             </View>
           </SectionBlock>
 
-          <SectionBlock title="계정 기록">
-            <View style={styles.infoList}>
-              <InfoRow label="가입일" value={formatDateTime(user?.metadata.creationTime)} />
-              <InfoRow label="마지막 로그인" value={formatDateTime(user?.metadata.lastSignInTime)} />
-              <InfoRow
-                label="구독 상태"
-                value={subscriptionDisplayName}
-              />
-              <InfoRow
-                label="광고 제거"
-                value={
-                  isSubscriptionCheckFailed
-                    ? "확인 불가"
-                    : isSubscriptionProductsLoading
-                    ? "확인 중..."
-                    : effectiveSubscriptionProducts.adRemove
-                    ? "구매 완료"
-                    : effectiveSubscriptionProducts.creatorMonthly ||
-                      effectiveSubscriptionProducts.expertMonthly
-                      ? "구독 포함"
-                      : "미구매"
-                }
-              />
-              <InfoRow
-                label="구독"
-                value={
-                  isSubscriptionCheckFailed
-                    ? "확인 불가"
-                    : isSubscriptionProductsLoading
-                    ? "확인 중..."
-                    : effectiveSubscriptionProducts.creatorMonthly ||
-                      effectiveSubscriptionProducts.expertMonthly
-                      ? "구독 중"
-                      : "미구독"
-                }
-              />
-              <InfoRow
-                label="구독 시작일"
-                value={displaySubscription.startedAt ? formatDateTime(displaySubscription.startedAt) : "아직 구독 전"}
-              />
-              <InfoRow
-                label="다음 갱신일"
-                value={displaySubscription.expiresAt ? formatDateTime(displaySubscription.expiresAt) : "없음"}
-              />
-              <InfoRow
-                label="클라우드 백업"
-                value={
-                  isSubscriptionCheckFailed
-                    ? "확인 불가"
-                    : hasFullAccess
-                      ? "사용 가능"
-                      : "프리미엄 활성 후 사용 권장"
-                }
-              />
-            </View>
-          </SectionBlock>
-
-          <SectionBlock title="플랜 한도">
+          <SectionBlock title="현재 상태">
             <View style={styles.infoList}>
               <InfoRow
                 label="현재 플랜"
                 value={planEntitlements.label}
               />
               <InfoRow
-                label="영상 출력 (주간 한도)"
-                value={formatQuotaValue(
-                  weeklyVideoUsed,
-                  planEntitlements.weeklyVideoExportLimit
-                )}
+                label="구독 상태"
+                value={subscriptionDisplayName}
               />
               <InfoRow
-                label="이미지 보관함"
-                value={formatQuotaValue(localImageUsage, planEntitlements.localImageLimit)}
+                label="현재 프로젝트"
+                value={currentProjectSummary?.name ?? "프로젝트 없음"}
               />
               <InfoRow
-                label="영상 보관함"
-                value={formatQuotaValue(stats.videos, planEntitlements.localVideoLimit)}
-              />
-              <InfoRow
-                label="음악 보관함"
-                value={formatQuotaValue(
-                  musicTracks.length,
-                  planEntitlements.musicTrackLimit
-                )}
+                label="현재 기록"
+                value={
+                  currentProjectSummary
+                    ? `${currentProjectSummary.photoCount} / ${currentProjectSummary.targetPhotoCount}장`
+                    : "기록 없음"
+                }
               />
               <InfoRow
                 label="클라우드 백업"
-                value={formatStorageQuotaValue(
-                  backupOverview.imageBackupBytes,
-                  planEntitlements.backupStorageBytes
-                )}
+                value={
+                  effectiveStorageMode === "local_only"
+                    ? "꺼짐"
+                    : planEntitlements.canBackupToCloud
+                      ? "켜짐"
+                      : "플랜 확인 필요"
+                }
+              />
+              <InfoRow
+                label="다음 갱신일"
+                value={
+                  displaySubscription.expiresAt
+                    ? formatDateTime(displaySubscription.expiresAt)
+                    : "없음"
+                }
               />
             </View>
           </SectionBlock>
@@ -743,7 +721,7 @@ export default function AccountScreen() {
                 />
                 <InfoRow
                   label="백업 데이터"
-                  value={`사진 ${backupOverview.photoCount}장 / 여러 사진 작업 ${backupOverview.imageBundleCount}개 / 영상 ${backupOverview.videoCount}개`}
+                  value={`사진 ${backupOverview.photoCount}장 / 영상 ${backupOverview.videoCount}개`}
                 />
                 <InfoRow
                   label="이미지 용량"
@@ -777,7 +755,7 @@ export default function AccountScreen() {
             </View>
           </SectionBlock>
 
-          <SectionBlock title="결제">
+          <SectionBlock title="플랜 및 결제">
             <View style={[styles.planCard, themed.panelStrong]}>
               <View style={styles.planHeader}>
                 <View style={styles.planCopy}>
@@ -851,81 +829,6 @@ export default function AccountScreen() {
             </Text>
           </SectionBlock>
 
-          <SectionBlock title="사용 기록">
-            <View style={styles.statsGrid}>
-              <StatCard label="원본 사진" value={stats.originalPhotos} />
-              <StatCard label="편집 사진" value={stats.editedPhotos} />
-              <StatCard label="여러 사진 작업" value={stats.imageBundles} />
-              <StatCard label="만든 영상" value={stats.videos} />
-            </View>
-          </SectionBlock>
-
-          <SectionBlock title="내 음악 관리">
-            <View style={styles.musicPanel}>
-              <Text selectable style={[styles.helpText, themed.mutedText]}>
-                Pro 구독 중에는 핸드폰에 있는 음악을 최대 {planEntitlements.musicTrackLimit}개까지 저장하고 영상 만들기에서 사용할 수 있습니다.
-              </Text>
-              <View style={styles.musicHeader}>
-                <Text selectable style={[styles.musicCount, themed.text]}>
-                  {musicTracks.length} / {planEntitlements.musicTrackLimit}
-                </Text>
-                <Pressable
-                  disabled={
-                    isMusicSubmitting ||
-                    planEntitlements.musicTrackLimit <= 0 ||
-                    musicTracks.length >= planEntitlements.musicTrackLimit
-                  }
-                  style={[
-                    styles.secondaryButton,
-                    themed.secondaryButton,
-                    styles.musicUploadButton,
-                    (isMusicSubmitting ||
-                      planEntitlements.musicTrackLimit <= 0 ||
-                      musicTracks.length >= planEntitlements.musicTrackLimit) &&
-                      styles.disabledButton
-                  ]}
-                  onPress={handleUploadMusic}
-                >
-                  <Text selectable={false} style={[styles.secondaryButtonText, themed.text]}>
-                    음악 추가
-                  </Text>
-                </Pressable>
-              </View>
-              <View style={styles.musicList}>
-                {musicTracks.length > 0 ? (
-                  musicTracks.map((track) => (
-                    <View key={track.id} style={[styles.musicItem, themed.panel]}>
-                      <View style={styles.musicCopy}>
-                        <Text selectable style={[styles.musicTitle, themed.text]}>
-                          {track.name}
-                        </Text>
-                        <Text selectable style={[styles.musicDetail, themed.mutedText]}>
-                          {formatDateTime(track.createdAt)}
-                        </Text>
-                      </View>
-                      <Pressable
-                        disabled={isMusicSubmitting}
-                        style={[
-                          styles.musicDeleteButton,
-                          themed.secondaryButton,
-                          isMusicSubmitting && styles.disabledButton
-                        ]}
-                        onPress={() => handleDeleteMusic(track)}
-                      >
-                        <Text selectable={false} style={[styles.musicDeleteText, themed.text]}>
-                          삭제
-                        </Text>
-                      </Pressable>
-                    </View>
-                  ))
-                ) : (
-                  <Text selectable style={[styles.helpText, themed.mutedText]}>
-                    아직 저장한 음악이 없습니다.
-                  </Text>
-                )}
-              </View>
-            </View>
-          </SectionBlock>
 
         </>
       ) : null}
@@ -1055,7 +958,6 @@ export default function AccountScreen() {
           </View>
         </View>
       </Modal>
-      <AppGuideOverlay tabKey="account" />
     </>
   );
 }

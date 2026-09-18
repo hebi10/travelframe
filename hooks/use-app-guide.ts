@@ -6,14 +6,12 @@ import {
   type AppGuideStep,
   type AppGuideTabKey
 } from "@/constants/app-guide-steps";
-import { useAuth } from "@/lib/auth-context";
 import {
   markAppGuideIntroSeen,
   shouldShowInitialAppGuide
 } from "@/lib/guide-progress";
 
 export function useAppGuide(tabKey: AppGuideTabKey, replaySignal = 0) {
-  const { isAuthLoading, isLoggedIn } = useAuth();
   const steps = useMemo(() => APP_GUIDE_STEPS[tabKey] ?? [], [tabKey]);
   const [visible, setVisible] = useState(false);
   const [stepIndex, setStepIndex] = useState(0);
@@ -23,13 +21,9 @@ export function useAppGuide(tabKey: AppGuideTabKey, replaySignal = 0) {
       let isActive = true;
 
       const loadGuide = async () => {
-        if (steps.length <= 0) {
+        if (steps.length <= 0 || tabKey !== "camera") {
           return;
         }
-        if (isAuthLoading || isLoggedIn) {
-          return;
-        }
-
         const shouldShow = await shouldShowInitialAppGuide();
 
         if (isActive && shouldShow && steps.length > 0) {
@@ -43,7 +37,7 @@ export function useAppGuide(tabKey: AppGuideTabKey, replaySignal = 0) {
       return () => {
         isActive = false;
       };
-    }, [isAuthLoading, isLoggedIn, steps.length])
+    }, [steps.length, tabKey])
   );
 
   useEffect(() => {

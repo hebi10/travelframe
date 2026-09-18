@@ -223,7 +223,7 @@ assert.equal(
 );
 
 assert.ok(
-  guideStepsSource.includes("APP_GUIDE_VERSION = 2"),
+  guideStepsSource.includes("APP_GUIDE_VERSION = 3"),
   "Body Frame onboarding should increment guide version"
 );
 assert.equal(
@@ -233,7 +233,7 @@ assert.equal(
   false,
   "new onboarding should not use old travel slide images"
 );
-for (const token of ["바디 프레임", "프로젝트", "기준 사진", "변화 영상"]) {
+for (const token of ["바디 프레임에 오신 것을 환영합니다.", "같은 위치와 자세", "변화 영상"]) {
   assert.ok(
     guideSource.includes(token) || guideStepsSource.includes(token),
     `onboarding should contain ${token}`

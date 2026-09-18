@@ -1,8 +1,9 @@
-import { Text, Modal, StyleSheet, View } from "react-native";
+import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppGuideCard } from "@/components/app-guide-card";
 import { AppGuideHighlight } from "@/components/app-guide-highlight";
+import { bodyFrameDesign } from "@/constants/app-theme";
 import type { AppGuideTabKey } from "@/constants/app-guide-steps";
 import { useAppGuide } from "@/hooks/use-app-guide";
 import { useAppAppearance } from "@/lib/app-appearance";
@@ -35,6 +36,8 @@ export function AppGuideOverlay({
     return null;
   }
 
+  const isWelcome = tabKey === "camera" && step.id === "body-frame-welcome";
+
   return (
     <Modal
       animationType="fade"
@@ -49,9 +52,11 @@ export function AppGuideOverlay({
           {
             paddingTop: Math.max(insets.top + 20, 28),
             paddingBottom: Math.max(insets.bottom + 20, 28),
-            backgroundColor: transparentBackdrop
-              ? "transparent"
-              : "rgba(0,0,0,0.68)"
+            backgroundColor: isWelcome
+              ? "rgba(0,0,0,0.72)"
+              : transparentBackdrop
+                ? "transparent"
+                : "rgba(0,0,0,0.68)"
           }
         ]}
       >
@@ -64,27 +69,49 @@ export function AppGuideOverlay({
             }
           ]}
         >
-          <View style={styles.brandBlock}>
-            <Text style={[styles.eyebrow, { color: palette.muted }]}>BODY FRAME</Text>
-            <Text style={[styles.brandTitle, { color: palette.text }]}>바디 프레임</Text>
-            <Text style={[styles.brandDetail, { color: palette.muted }]}>
-              같은 위치와 자세로 몸의 변화를 기록합니다.
-            </Text>
-          </View>
+          {isWelcome ? (
+            <View style={styles.welcomeContent}>
+              <Text style={[styles.welcomeTitle, { color: palette.text }]}>
+                {step.title}
+              </Text>
+              <Text style={[styles.welcomeDescription, { color: palette.muted }]}>
+                {step.description}
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                style={[styles.welcomeButton, { backgroundColor: palette.text }]}
+                onPress={goNext}
+              >
+                <Text style={[styles.welcomeButtonText, { color: palette.inverse }]}>
+                  시작하기
+                </Text>
+              </Pressable>
+            </View>
+          ) : (
+            <>
+              <View style={styles.brandBlock}>
+                <Text style={[styles.eyebrow, { color: palette.muted }]}>BODY FRAME</Text>
+                <Text style={[styles.brandTitle, { color: palette.text }]}>바디 프레임</Text>
+                <Text style={[styles.brandDetail, { color: palette.muted }]}>
+                  같은 위치와 자세로 몸의 변화를 기록합니다.
+                </Text>
+              </View>
 
-          <View style={styles.highlightWrap}>
-            <AppGuideHighlight label={step.targetLabel ?? "현재 기능"} />
-          </View>
+              <View style={styles.highlightWrap}>
+                <AppGuideHighlight label={step.targetLabel ?? "현재 기능"} />
+              </View>
 
-          <AppGuideCard
-            step={step}
-            current={stepIndex + 1}
-            total={totalSteps}
-            canGoBack={canGoBack}
-            onBack={goBack}
-            onNext={goNext}
-            onSkip={skip}
-          />
+              <AppGuideCard
+                step={step}
+                current={stepIndex + 1}
+                total={totalSteps}
+                canGoBack={canGoBack}
+                onBack={goBack}
+                onNext={goNext}
+                onSkip={skip}
+              />
+            </>
+          )}
         </View>
       </View>
     </Modal>
@@ -127,5 +154,29 @@ const styles = StyleSheet.create({
   highlightWrap: {
     paddingHorizontal: 18,
     paddingBottom: 10
+  },
+  welcomeContent: {
+    gap: 16,
+    padding: 22
+  },
+  welcomeTitle: {
+    fontSize: 24,
+    lineHeight: 31,
+    fontWeight: "600"
+  },
+  welcomeDescription: {
+    fontSize: 14,
+    lineHeight: 21
+  },
+  welcomeButton: {
+    minHeight: bodyFrameDesign.primaryButtonHeight,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 4,
+    borderRadius: bodyFrameDesign.buttonRadius
+  },
+  welcomeButtonText: {
+    fontSize: 14,
+    fontWeight: "700"
   }
 });
