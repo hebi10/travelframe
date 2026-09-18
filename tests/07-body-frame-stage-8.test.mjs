@@ -48,6 +48,13 @@ assert.ok(
   "Windows Android CI must prebuild before Kotlin verification"
 );
 
+assert.ok(
+  quality.includes("actions/cache@v4") &&
+    quality.includes("C:/g/caches") &&
+    quality.includes("C:/g/wrapper"),
+  "Windows Android CI should persist the short Gradle cache"
+);
+
 for (const snippet of [
   "-keep class com.margelo.nitro.camera.** { *; }",
   "-keep class com.margelo.nitro.image.** { *; }",
