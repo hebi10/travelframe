@@ -2,6 +2,7 @@ import { Tabs } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { TabGlyph } from "@/components/tab-glyph";
+import { bodyFrameDesign } from "@/constants/app-theme";
 import { useAppAppearance } from "@/lib/app-appearance";
 
 const MAX_APP_WIDTH = 750;
@@ -28,16 +29,14 @@ export default function TabsLayout() {
           alignSelf: "center",
           paddingTop: 6,
           paddingBottom: tabBarBottomPadding,
-          backgroundColor: palette.chrome,
-          borderTopColor: palette.line,
-          borderTopWidth: 1
+          backgroundColor: palette.chrome
         },
         tabBarIconStyle: {
           marginTop: 0,
           marginBottom: 1
         },
         tabBarItemStyle: {
-          minHeight: 46,
+          minHeight: bodyFrameDesign.minTouchSize,
           paddingVertical: Math.round(2 * layoutScale)
         },
         tabBarLabelStyle: {
