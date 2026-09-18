@@ -1,3 +1,3 @@
-import SettingsScreen from "@/features/settings/SettingsScreen";
+import BodyFrameSettingsScreen from "@/features/settings/BodyFrameSettingsScreen";
 
-export default SettingsScreen;
+export default BodyFrameSettingsScreen;
