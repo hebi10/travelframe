@@ -155,6 +155,11 @@ cameraSession.setBodyFrameCameraSession({
 const reserved99 = cameraSession.reserveBodyFrameCameraCapture();
 assert.equal(reserved99?.projectId, "project-a");
 assert.equal(cameraSession.getBodyFrameCameraSessionSnapshot().pendingSaveCount, 1);
+assert.equal(
+  cameraSession.isBodyFrameCameraCaptureBlocked(),
+  true,
+  "a pending save that fills the last slot must block another native capture"
+);
 assert.throws(
   () => cameraSession.reserveBodyFrameCameraCapture(),
   /프로젝트 사진 한도/
