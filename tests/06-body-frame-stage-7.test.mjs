@@ -188,6 +188,20 @@ assert.ok(
   "dark mode should be the default for new installs"
 );
 
+const videoScreenSource = fs.readFileSync(
+  "features/trip-clip/BodyFrameVideoScreen.tsx",
+  "utf8"
+);
+assert.ok(
+  videoScreenSource.includes("useAppAppearance"),
+  "Body Frame video screen should follow the shared light/dark palette"
+);
+assert.equal(
+  videoScreenSource.includes('backgroundColor: "#0B0B0C"'),
+  false,
+  "video screen should not hard-code the dark page background"
+);
+
 assert.ok(
   guideStepsSource.includes("APP_GUIDE_VERSION = 2"),
   "Body Frame onboarding should increment guide version"
