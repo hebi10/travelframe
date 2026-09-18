@@ -2175,7 +2175,7 @@ export default function CameraScreen() {
             <View style={styles.modalHeader}>
               <View style={styles.modalTitleGroup}>
                 <Text selectable={false} style={styles.modalEyebrow}>CAMERA</Text>
-                <Text selectable={false} style={styles.modalTitle}>카메라 설정</Text>
+                <Text selectable={false} style={styles.modalTitle}>촬영 도구</Text>
               </View>
               <Pressable style={styles.modalCloseButton} onPress={() => setCameraSettingsOpen(false)}>
                 <Text selectable={false} style={styles.modalCloseText}>닫기</Text>
