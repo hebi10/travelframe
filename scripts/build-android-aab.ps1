@@ -485,6 +485,8 @@ Write-Host "Preparing Android project..." -ForegroundColor Cyan
 Invoke-External "node" @("scripts/apply-patches.mjs")
 Assert-VisionCameraAndroidShutterSoundPatch -ProjectRoot $projectRoot
 Invoke-External "npx" @("expo", "prebuild", "--platform", "android", "--no-install")
+Invoke-External "node" @("scripts/apply-patches.mjs")
+Assert-VisionCameraAndroidShutterSoundPatch -ProjectRoot $projectRoot
 Remove-DuplicateLauncherPngResources -ProjectRoot $projectRoot
 
 $gradlePropertiesPath = Join-Path $projectRoot "android\gradle.properties"

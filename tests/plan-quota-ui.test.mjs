@@ -1,10 +1,13 @@
 import assert from "node:assert/strict";
 
 import { readAccountSource } from "./account-test-source.mjs";
-import { readSettingsSource } from "./settings-test-source.mjs";
+import fs from "node:fs";
 
 const accountSource = readAccountSource();
-const settingsSource = readSettingsSource();
+const settingsSource = fs.readFileSync(
+  "features/settings/BodyFrameSettingsScreen.tsx",
+  "utf8"
+);
 
 for (const token of [
   'SectionBlock title="현재 상태"',

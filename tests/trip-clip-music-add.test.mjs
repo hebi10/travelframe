@@ -2,10 +2,7 @@ import { readTripClipSource } from "./trip-clip-test-source.mjs";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 
-import { readAccountSource } from "./account-test-source.mjs";
-
 const tripClipSource = readTripClipSource();
-const accountSource = readAccountSource();
 const userMusicSource = fs.readFileSync("lib/user-music.ts", "utf8");
 
 for (const snippet of [
@@ -13,14 +10,6 @@ for (const snippet of [
   "copyToCacheDirectory: true"
 ]) {
   assert.ok(userMusicSource.includes(snippet), `music picker should open audio files: ${snippet}`);
-}
-
-for (const snippet of [
-  "pickAndUploadUserMusicTrack(",
-  'uploadToCloud: isCloudBackupTargetEnabled(appSettings, "music")',
-  "음악 추가"
-]) {
-  assert.ok(accountSource.includes(snippet), `account music upload missing: ${snippet}`);
 }
 
 for (const snippet of [
@@ -46,4 +35,4 @@ assert.ok(
   "trip clip music add should open the audio picker directly instead of routing to account"
 );
 
-console.log("ok - trip clip can add audio directly from the music screen");
+console.log("ok - legacy TripClip can add audio directly without Account music UI");

@@ -1,17 +1,26 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
+const appThemeSource = readFileSync("constants/app-theme.ts", "utf8");
 const appAppearanceSource = readFileSync("lib/app-appearance.ts", "utf8");
 const settingsStylesSource = readFileSync("features/settings/settings-screen.styles.ts", "utf8");
 const settingsSource = readFileSync("features/settings/SettingsScreen.tsx", "utf8");
 
 for (const snippet of [
-  'background: "#000000"',
-  'chrome: "#000000"',
-  'inverse: "#000000"'
+  'background: "#0B0B0C"',
+  'chrome: "#0B0B0C"',
+  'inverse: "#111111"'
 ]) {
-  assert.ok(appAppearanceSource.includes(snippet), `dark palette background should be black: ${snippet}`);
+  assert.ok(
+    appThemeSource.includes(snippet),
+    `Body Frame dark palette token missing: ${snippet}`
+  );
 }
+
+assert.ok(
+  appAppearanceSource.includes("...bodyFrameDarkColors"),
+  "app appearance should source the dark palette from Body Frame theme tokens"
+);
 
 for (const snippet of [
   "activeFill: {",
@@ -35,4 +44,4 @@ assert.ok(
   "settings usage guide button should use themed active button colors"
 );
 
-console.log("ok - settings dark mode buttons use dark backgrounds and light text");
+console.log("ok - settings dark mode uses the approved Body Frame palette");

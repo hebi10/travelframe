@@ -9,8 +9,24 @@ assert.ok(
   "Android verification script should support bounded Kotlin, assemble, and manifest checks"
 );
 assert.ok(
+  script.includes('$Mode -eq "Kotlin"') &&
+    script.includes('"--parallel"') &&
+    script.includes('"--max-workers=2"') &&
+    script.includes('$NativeArchitectures = "x86_64"'),
+  "Kotlin smoke verification should use bounded parallelism and one native ABI"
+);
+assert.ok(
+  script.includes('"--no-parallel"') &&
+    script.includes('"--max-workers=1"'),
+  "assemble and manifest verification should retain conservative Gradle execution"
+);
+assert.ok(
   script.includes("-Pkotlin.compiler.execution.strategy=in-process"),
   "Android verification should avoid the Kotlin daemon in restricted Windows environments"
+);
+assert.ok(
+  script.includes('"--build-cache"'),
+  "Android verification should reuse Gradle build outputs across CI runs"
 );
 assert.ok(
   script.includes("$process.WaitForExit($TimeoutSeconds * 1000)"),
@@ -46,8 +62,8 @@ assert.ok(
 );
 assert.equal(
   packageJson.scripts["android:verify:kotlin"],
-  "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-android-debug.ps1 -Mode Kotlin -TimeoutSeconds 180 -KillStaleProcesses",
-  "package.json should expose a short Android Kotlin verification command"
+  "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-android-debug.ps1 -Mode Kotlin -TimeoutSeconds 1200 -KillStaleProcesses",
+  "package.json should expose a bounded Kotlin verification command that tolerates a cold Gradle download"
 );
 assert.equal(
   packageJson.scripts["android:verify:debug"],

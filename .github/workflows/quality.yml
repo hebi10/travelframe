@@ -34,6 +34,12 @@ jobs:
       - name: Format / Lint
         run: npm run format:check
 
+      - name: Prebuild Android
+        run: npm run android:prebuild:ci
+
+      - name: Release Source Verify
+        run: npm run release:verify
+
       - name: Test
         run: npm test
 
@@ -89,8 +95,8 @@ jobs:
         run: npm run test:firebase-rules
 
   android-kotlin:
-    name: Android Kotlin and Release Manifest Verify
-    runs-on: windows-latest
+    name: Android Gradle and Release Manifest Verify
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -101,17 +107,28 @@ jobs:
           node-version: "20"
           cache: npm
 
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prebuild Android
+        run: npm run android:prebuild:ci
+
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "21"
+          cache: gradle
 
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Verify Android Kotlin
-        run: npm run android:verify:kotlin
+      - name: Make Gradle wrapper executable
+        run: chmod +x android/gradlew
 
       - name: Verify Android Release Manifest
-        run: npm run android:manifest:release
+        working-directory: android
+        timeout-minutes: 10
+        run: ./gradlew --no-daemon --build-cache --parallel --max-workers=2 --console=plain :app:processReleaseMainManifest
+
+      - name: Verify Android Kotlin
+        working-directory: android
+        timeout-minutes: 20
+        run: ./gradlew --no-daemon --build-cache --parallel --max-workers=2 --console=plain -Pkotlin.compiler.execution.strategy=in-process -PreactNativeArchitectures=x86_64 :app:compileDebugKotlin

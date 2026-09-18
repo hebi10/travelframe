@@ -14,7 +14,7 @@ for (const snippet of [
   "const tabBarBottomPadding = Math.max(insets.bottom + 8, 16);",
   "const tabBarHeight = 58 + tabBarBottomPadding;",
   "paddingTop: 6",
-  "minHeight: 46"
+  "minHeight: bodyFrameDesign.minTouchSize"
 ]) {
   assert.ok(tabsLayoutSource.includes(snippet), `tab spacing missing: ${snippet}`);
 }

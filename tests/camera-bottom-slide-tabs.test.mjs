@@ -11,7 +11,7 @@ for (const snippet of [
   'activeCameraControlPanel === "zoom"',
   'setActiveCameraControlPanel((current) => (current === "zoom" ? null : "zoom"))',
   'accessibilityLabel="확대 설정 열기"',
-  '<Text selectable={false} style={styles.cameraInstantControlText}>확대</Text>',
+  '<Text selectable={false} style={styles.cameraToolText}>확대</Text>',
   "cameraZoomPresets",
   "1x",
   "3x",
@@ -20,7 +20,7 @@ for (const snippet of [
   "setZoomPreset",
   "toggleCameraFacing",
   'name="refresh-cw"',
-  "size={26}",
+  "size={18}",
   "styles.cameraFloatingPanelWrap",
   "styles.cameraFloatingPanelRaised",
   "styles.cameraControlBottomTray",
@@ -128,4 +128,4 @@ for (const snippet of [
   assert.ok(settingsSource.includes(snippet), `camera quick setting persistence missing: ${snippet}`);
 }
 
-console.log("ok - camera bottom controls keep only capture actions while top controls open zoom");
+console.log("ok - camera bottom controls keep capture actions while the tool sheet opens zoom");
