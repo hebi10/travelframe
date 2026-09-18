@@ -177,6 +177,22 @@ export function useGooglePlayBilling({
       }
 
       const type = getGooglePlayProductType(productId);
+      const availablePurchases =
+        type === "subs"
+          ? await getAvailablePurchases({
+              includeSuspendedAndroid: false
+            })
+          : [];
+      const creatorPurchase =
+        productId === "expert_monthly"
+          ? availablePurchases.find(
+              (purchase) =>
+                purchase.productId === "creator_monthly" &&
+                purchase.purchaseState === "purchased" &&
+                Boolean(purchase.purchaseToken)
+            ) ?? null
+          : null;
+
       let request:
         | {
             type: "in-app";
@@ -211,7 +227,16 @@ export function useGooglePlayBilling({
             google: {
               skus: [productId],
               subscriptionOffers: [{ sku: productId, offerToken }],
-              obfuscatedAccountId: user.uid
+              obfuscatedAccountId: user.uid,
+              ...(creatorPurchase?.purchaseToken
+                ? {
+                    purchaseToken: creatorPurchase.purchaseToken,
+                    subscriptionProductReplacementParams: {
+                      oldProductId: "creator_monthly",
+                      replacementMode: "charge-prorated-price" as const
+                    }
+                  }
+                : {})
             }
           }
         };
