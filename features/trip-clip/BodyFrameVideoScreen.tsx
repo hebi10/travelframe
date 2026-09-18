@@ -40,6 +40,7 @@ import {
   defaultGridGuideLinePositions,
   defaultGuideShapePoints
 } from "@/lib/app-settings";
+import { useAppAppearance } from "@/lib/app-appearance";
 import { useAuth } from "@/lib/auth-context";
 import { ensurePhotoPreviews, getPhotos } from "@/lib/photo-library";
 import { getPlanEntitlements } from "@/lib/plan-entitlements";
@@ -87,6 +88,7 @@ const formatDuration = (seconds: number) =>
 
 export default function BodyFrameVideoScreen() {
   const insets = useSafeAreaInsets();
+  const { palette } = useAppAppearance();
   const recorder = useOptionalViewRecorder();
   const recordingViewAvailable = isRecordingViewAvailable();
   const { isLoggedIn, subscription } = useAuth();
@@ -315,27 +317,33 @@ export default function BodyFrameVideoScreen() {
 
   if (isLoading || activeProject === undefined) {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator color="#F5F5F5" />
-        <Text style={styles.detail}>프로젝트를 불러오는 중입니다.</Text>
+      <View style={[styles.centered, { backgroundColor: palette.background }]}>
+        <ActivityIndicator color={palette.text} />
+        <Text style={[styles.detail, { color: palette.muted }]}>
+          프로젝트를 불러오는 중입니다.
+        </Text>
       </View>
     );
   }
 
   if (!activeProject) {
     return (
-      <View style={styles.centered}>
-        <Text style={styles.title}>변화 영상을 만들 프로젝트가 없습니다.</Text>
-        <Text style={styles.detail}>
+      <View style={[styles.centered, { backgroundColor: palette.background }]}>
+        <Text style={[styles.title, { color: palette.text }]}>
+          변화 영상을 만들 프로젝트가 없습니다.
+        </Text>
+        <Text style={[styles.detail, { color: palette.muted }]}>
           촬영 화면에서 프로젝트를 만든 뒤 다시 확인해 주세요.
         </Text>
-        {message ? <Text style={styles.errorText}>{message}</Text> : null}
+        {message ? (
+          <Text style={[styles.errorText, { color: palette.muted }]}>{message}</Text>
+        ) : null}
       </View>
     );
   }
 
   return (
-    <View style={styles.screen}>
+    <View style={[styles.screen, { backgroundColor: palette.background }]}>
       <ScrollView
         contentContainerStyle={[
           styles.content,
@@ -343,10 +351,20 @@ export default function BodyFrameVideoScreen() {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.pageTitle}>변화 영상</Text>
-        <Text style={styles.projectName}>{activeProject.name}</Text>
+        <Text style={[styles.pageTitle, { color: palette.text }]}>변화 영상</Text>
+        <Text style={[styles.projectName, { color: palette.muted }]}>
+          {activeProject.name}
+        </Text>
 
-        <View style={styles.previewFrame}>
+        <View
+          style={[
+            styles.previewFrame,
+            {
+              borderColor: palette.line,
+              backgroundColor: palette.surface
+            }
+          ]}
+        >
           {previewPhoto ? (
             <Image
               source={{ uri: previewPhoto.previewUri ?? previewPhoto.uri }}
@@ -356,12 +374,22 @@ export default function BodyFrameVideoScreen() {
             />
           ) : (
             <View style={styles.previewEmpty}>
-              <Text style={styles.previewEmptyText}>아직 기록된 사진이 없습니다.</Text>
+              <Text style={[styles.previewEmptyText, { color: palette.faint }]}>
+                아직 기록된 사진이 없습니다.
+              </Text>
             </View>
           )}
         </View>
 
-        <View style={styles.summaryCard}>
+        <View
+          style={[
+            styles.summaryCard,
+            {
+              borderColor: palette.line,
+              backgroundColor: palette.surface
+            }
+          ]}
+        >
           <SummaryRow label="사진" value={`${projectPhotos.length}장`} />
           <SummaryRow label="간격" value="0.1초" />
           <SummaryRow label="영상 길이" value={formatDuration(totalDuration)} />
@@ -380,8 +408,16 @@ export default function BodyFrameVideoScreen() {
         </View>
 
         {!videoLimitState.allowed ? (
-          <View style={styles.limitNotice}>
-            <Text style={styles.limitNoticeText}>
+          <View
+            style={[
+              styles.limitNotice,
+              {
+                borderColor: palette.line,
+                backgroundColor: palette.surface
+              }
+            ]}
+          >
+            <Text style={[styles.limitNoticeText, { color: palette.muted }]}>
               {planEntitlements.label} 플랜에서는 최대{" "}
               {formatDuration(videoLimitState.limit ?? 0)}까지 만들 수 있습니다.
               현재 프로젝트는 {formatDuration(totalDuration)}입니다.
@@ -389,10 +425,10 @@ export default function BodyFrameVideoScreen() {
             {upgradePlanLabel ? (
               <Pressable
                 accessibilityRole="button"
-                style={styles.limitPlanButton}
+                style={[styles.limitPlanButton, { borderColor: palette.text }]}
                 onPress={() => router.push("/account")}
               >
-                <Text style={styles.limitPlanButtonText}>
+                <Text style={[styles.limitPlanButtonText, { color: palette.text }]}>
                   플랜 보기 · {upgradePlanLabel}
                 </Text>
               </Pressable>
@@ -410,6 +446,7 @@ export default function BodyFrameVideoScreen() {
           onPress={() => void createVideo()}
           style={({ pressed }) => [
             styles.primaryButton,
+            { backgroundColor: palette.text },
             (projectPhotos.length === 0 ||
               isExporting ||
               !videoLimitState.allowed) &&
@@ -423,15 +460,21 @@ export default function BodyFrameVideoScreen() {
         >
           {isExporting ? (
             <View style={styles.buttonLoadingRow}>
-              <ActivityIndicator size="small" color="#111111" />
-              <Text style={styles.primaryButtonText}>영상 만드는 중 {exportProgress}%</Text>
+              <ActivityIndicator size="small" color={palette.inverse} />
+              <Text style={[styles.primaryButtonText, { color: palette.inverse }]}>
+                영상 만드는 중 {exportProgress}%
+              </Text>
             </View>
           ) : (
-            <Text style={styles.primaryButtonText}>영상 만들기</Text>
+            <Text style={[styles.primaryButtonText, { color: palette.inverse }]}>
+              영상 만들기
+            </Text>
           )}
         </Pressable>
 
-        {message ? <Text style={styles.message}>{message}</Text> : null}
+        {message ? (
+          <Text style={[styles.message, { color: palette.muted }]}>{message}</Text>
+        ) : null}
       </ScrollView>
 
       {recordingViewAvailable ? (
@@ -477,10 +520,18 @@ function SummaryRow({
   value: string;
   last?: boolean;
 }) {
+  const { palette } = useAppAppearance();
+
   return (
-    <View style={[styles.summaryRow, last && styles.summaryRowLast]}>
-      <Text style={styles.summaryLabel}>{label}</Text>
-      <Text style={styles.summaryValue}>{value}</Text>
+    <View
+      style={[
+        styles.summaryRow,
+        { borderBottomColor: palette.line },
+        last && styles.summaryRowLast
+      ]}
+    >
+      <Text style={[styles.summaryLabel, { color: palette.muted }]}>{label}</Text>
+      <Text style={[styles.summaryValue, { color: palette.text }]}>{value}</Text>
     </View>
   );
 }
@@ -488,7 +539,6 @@ function SummaryRow({
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: "#0B0B0C"
   },
   content: {
     paddingHorizontal: 16
@@ -499,34 +549,28 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 10,
     paddingHorizontal: 24,
-    backgroundColor: "#0B0B0C"
   },
   pageTitle: {
-    color: "#F5F5F5",
     fontSize: 28,
     fontWeight: "600"
   },
   projectName: {
     marginTop: 6,
     marginBottom: 20,
-    color: "#A0A0A6",
     fontSize: 14
   },
   title: {
-    color: "#F5F5F5",
     fontSize: 18,
     fontWeight: "600",
     textAlign: "center"
   },
   detail: {
-    color: "#A0A0A6",
     fontSize: 14,
     lineHeight: 20,
     textAlign: "center"
   },
   errorText: {
     marginTop: 8,
-    color: "#D7D7DB",
     fontSize: 13,
     textAlign: "center"
   },
@@ -537,7 +581,6 @@ const styles = StyleSheet.create({
     aspectRatio: BODY_FRAME_ASPECT_RATIO,
     overflow: "hidden",
     borderWidth: 1,
-    borderColor: "#2A2A2E",
     borderRadius: 8,
     backgroundColor: "#131315"
   },
@@ -552,16 +595,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16
   },
   previewEmptyText: {
-    color: "#68686E",
     fontSize: 13,
     textAlign: "center"
   },
   summaryCard: {
     marginTop: 24,
     borderWidth: 1,
-    borderColor: "#2A2A2E",
     borderRadius: 8,
-    backgroundColor: "#131315",
     paddingHorizontal: 14
   },
   summaryRow: {
@@ -570,17 +610,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#2A2A2E"
   },
   summaryRowLast: {
     borderBottomWidth: 0
   },
   summaryLabel: {
-    color: "#A0A0A6",
     fontSize: 14
   },
   summaryValue: {
-    color: "#F5F5F5",
     fontSize: 14,
     fontWeight: "500"
   },
@@ -588,12 +625,10 @@ const styles = StyleSheet.create({
     marginTop: 16,
     padding: 12,
     borderWidth: 1,
-    borderColor: "#2A2A2E",
     borderRadius: 8,
     backgroundColor: "#131315"
   },
   limitNoticeText: {
-    color: "#D7D7DB",
     fontSize: 13,
     lineHeight: 19
   },
@@ -603,11 +638,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: "#F5F5F5",
     borderRadius: 8
   },
   limitPlanButtonText: {
-    color: "#F5F5F5",
     fontSize: 13,
     fontWeight: "600"
   },
@@ -617,11 +650,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 8,
-    backgroundColor: "#F5F5F5",
     paddingHorizontal: 16
   },
   primaryButtonText: {
-    color: "#111111",
     fontSize: 15,
     fontWeight: "700"
   },
@@ -638,7 +669,6 @@ const styles = StyleSheet.create({
   },
   message: {
     marginTop: 14,
-    color: "#D7D7DB",
     fontSize: 13,
     lineHeight: 19,
     textAlign: "center"
