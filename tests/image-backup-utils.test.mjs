@@ -3,6 +3,7 @@ import fs from "node:fs";
 import ts from "typescript";
 
 const constantsSource = fs.readFileSync("constants/image.ts", "utf8");
+const bodyFrameSource = fs.readFileSync("constants/body-frame.ts", "utf8");
 const utilsSource = fs.readFileSync("lib/image-backup-utils.ts", "utf8");
 const transpile = (source) =>
   ts.transpileModule(source, {
@@ -12,18 +13,19 @@ const transpile = (source) =>
     }
   }).outputText;
 
-const constantsModule = await import(
-  `data:text/javascript,${encodeURIComponent(transpile(constantsSource))}`
-);
+const constantsModuleUrl =
+  `data:text/javascript,${encodeURIComponent(transpile(constantsSource))}`;
+const bodyFrameModuleUrl =
+  `data:text/javascript,${encodeURIComponent(transpile(bodyFrameSource))}`;
+const constantsModule = await import(constantsModuleUrl);
 const utilityOnlySource = utilsSource
   .replace(/import \* as FileSystem from "expo-file-system\/legacy";\n/, "")
   .replace(/import \{ manipulateAsync, SaveFormat \} from "expo-image-manipulator";\n/, "")
   .replace(/import \{ Image \} from "react-native";\n/, "")
   .replace(/export const optimizeImageForBackup[\s\S]*?;\n\nexport const calculateCombinedImageBackupSize/, "export const calculateCombinedImageBackupSize");
-const rewrittenUtils = transpile(utilityOnlySource).replace(
-  /from "\@\/constants\/image"/g,
-  `from "data:text/javascript,${encodeURIComponent(transpile(constantsSource))}"`
-);
+const rewrittenUtils = transpile(utilityOnlySource)
+  .replace(/from "\@\/constants\/image"/g, `from "${constantsModuleUrl}"`)
+  .replace(/from "\@\/constants\/body-frame"/g, `from "${bodyFrameModuleUrl}"`);
 const utilsModule = await import(
   `data:text/javascript,${encodeURIComponent(rewrittenUtils)}`
 );
@@ -85,10 +87,11 @@ const optimizableUtilsSource = utilsSource
   .replace(/import \* as FileSystem from "expo-file-system\/legacy";\n/, "")
   .replace(/import \{ manipulateAsync, SaveFormat \} from "expo-image-manipulator";\n/, "")
   .replace(/import \{ Image \} from "react-native";\n/, "");
-const rewrittenOptimizableUtils = transpile(`${optimizePrelude}\n${optimizableUtilsSource}`).replace(
-  /from "\@\/constants\/image"/g,
-  `from "data:text/javascript,${encodeURIComponent(transpile(constantsSource))}"`
-);
+const rewrittenOptimizableUtils = transpile(
+  `${optimizePrelude}\n${optimizableUtilsSource}`
+)
+  .replace(/from "\@\/constants\/image"/g, `from "${constantsModuleUrl}"`)
+  .replace(/from "\@\/constants\/body-frame"/g, `from "${bodyFrameModuleUrl}"`);
 const optimizableUtilsModule = await import(
   `data:text/javascript,${encodeURIComponent(rewrittenOptimizableUtils)}`
 );
