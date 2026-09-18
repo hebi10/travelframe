@@ -23,8 +23,14 @@ import {
   updateBodyProject
 } from "@/lib/body-project-library";
 import { setLastActiveProjectId } from "@/lib/body-project-preferences";
+import {
+  getBodyFrameUpgradeLabel,
+  isBodyFrameProjectTargetAllowed
+} from "@/lib/body-frame-plan-limits";
 import { getPhotos } from "@/lib/photo-library";
 import { useAppAppearance } from "@/lib/app-appearance";
+import { useAuth } from "@/lib/auth-context";
+import { getPlanEntitlements } from "@/lib/plan-entitlements";
 import type { BodyProject, ReferencePhotoMode } from "@/types/body-project";
 import type { PhotoItem } from "@/types/photo";
 
@@ -50,6 +56,12 @@ export default function BodyFrameProjectDetailScreen() {
   const projectId = Array.isArray(id) ? id[0] : id;
   const insets = useSafeAreaInsets();
   const { palette } = useAppAppearance();
+  const { isLoggedIn, subscription } = useAuth();
+  const planEntitlements = useMemo(
+    () => getPlanEntitlements({ isLoggedIn, subscription }),
+    [isLoggedIn, subscription]
+  );
+  const upgradePlanLabel = getBodyFrameUpgradeLabel(planEntitlements.tier);
   const [project, setProject] = useState<BodyProject | null | undefined>(undefined);
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
   const [nameDraft, setNameDraft] = useState("");
@@ -104,6 +116,19 @@ export default function BodyFrameProjectDetailScreen() {
       return;
     }
 
+    if (
+      !isBodyFrameProjectTargetAllowed({
+        targetPhotoCount: target,
+        maxProgressPhotos: planEntitlements.maxProgressPhotos
+      })
+    ) {
+      Alert.alert(
+        "현재 플랜 한도",
+        `${planEntitlements.label} 플랜에서는 프로젝트 목표를 최대 ${planEntitlements.maxProgressPhotos}장까지 설정할 수 있습니다.`
+      );
+      return;
+    }
+
     setSaving(true);
     try {
       await updateBodyProject(project.id, {
@@ -114,7 +139,15 @@ export default function BodyFrameProjectDetailScreen() {
     } finally {
       setSaving(false);
     }
-  }, [nameDraft, project, reload, saving, targetDraft]);
+  }, [
+    nameDraft,
+    planEntitlements.label,
+    planEntitlements.maxProgressPhotos,
+    project,
+    reload,
+    saving,
+    targetDraft
+  ]);
 
   const changeReferenceMode = useCallback(
     async (referenceMode: ReferencePhotoMode) => {
@@ -290,7 +323,14 @@ export default function BodyFrameProjectDetailScreen() {
               }
             ]}
           />
-          <Text style={[styles.label, { color: palette.muted }]}>목표 기록 수</Text>
+          <View style={styles.labelRow}>
+            <Text style={[styles.label, { color: palette.muted }]}>목표 기록 수</Text>
+            <Text style={[styles.limitLabel, { color: palette.faint }]}>
+              {planEntitlements.maxProgressPhotos === null
+                ? "제한 없음"
+                : `현재 플랜 최대 ${planEntitlements.maxProgressPhotos}장`}
+            </Text>
+          </View>
           <TextInput
             value={targetDraft}
             onChangeText={setTargetDraft}
@@ -306,6 +346,19 @@ export default function BodyFrameProjectDetailScreen() {
               }
             ]}
           />
+          {planEntitlements.maxProgressPhotos !== null &&
+          Number.parseInt(targetDraft, 10) > planEntitlements.maxProgressPhotos &&
+          upgradePlanLabel ? (
+            <Pressable
+              accessibilityRole="button"
+              style={[styles.upgradeButton, { borderColor: palette.line }]}
+              onPress={() => router.push("/account")}
+            >
+              <Text style={[styles.upgradeButtonText, { color: palette.text }]}>
+                플랜 보기 · {upgradePlanLabel}
+              </Text>
+            </Pressable>
+          ) : null}
           <Pressable
             disabled={saving}
             accessibilityRole="button"
@@ -509,9 +562,18 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 19
   },
-  label: {
+  labelRow: {
     marginTop: 2,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10
+  },
+  label: {
     fontSize: 12
+  },
+  limitLabel: {
+    fontSize: 11
   },
   input: {
     minHeight: 48,
@@ -519,6 +581,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 8,
     fontSize: 15
+  },
+  upgradeButton: {
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderRadius: 8
+  },
+  upgradeButtonText: {
+    fontSize: 13,
+    fontWeight: "600"
   },
   primaryButton: {
     minHeight: 48,
