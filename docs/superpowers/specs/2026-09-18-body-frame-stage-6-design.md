@@ -32,8 +32,10 @@ Firebase Functions owns entitlement fulfillment.
 Verify `ad_remove` with Google Play Developer API `purchases.productsv2.getproductpurchasev2`.
 - Require PURCHASED state.
 - Require the returned product line item to match `ad_remove`.
-- Acknowledge if Google reports the purchase is not acknowledged.
+- A fully refunded purchase (`refundableQuantity === 0`) does not grant entitlement.
 - Persist the verified result as provider `google_play`.
+- The client calls `finishTransaction` only after server verification succeeds.
+- RTDN/server resync can acknowledge an active purchase that remained unacknowledged because the client did not finish.
 
 ### Subscriptions
 Verify `creator_monthly` and `expert_monthly` with `purchases.subscriptionsv2.get`.
@@ -41,8 +43,10 @@ Verify `creator_monthly` and `expert_monthly` with `purchases.subscriptionsv2.ge
 - Access is active only for an access-granting Google state and a non-expired line item.
 - Canceled subscriptions remain active only until their current expiry.
 - Expired, pending, paused/on-hold states do not grant entitlement.
-- Acknowledge an unacknowledged initial purchase.
-- Linked purchase tokens are tracked so upgrades/replacements cannot leave duplicate stale ownership.
+- The client calls `finishTransaction` only after server verification succeeds.
+- RTDN/server resync can acknowledge an active purchase left unfinished by the client.
+- Pro → Expert uses the active Pro purchase token and Google Play subscription replacement with `charge-prorated-price`.
+- Linked purchase tokens are tracked; the replaced Google Play entitlement is marked expired so it cannot reappear after the new tier expires.
 
 ## Purchase-token ownership
 Purchase tokens are server-only.
@@ -91,13 +95,13 @@ Topic contract:
 
 The RTDN handler:
 1. validates package name,
-2. reads the purchase token/product from the notification,
-3. finds the existing server-only purchase-token owner mapping,
+2. reads the purchase token from the notification,
+3. resolves the product/owner from the existing server-only token mapping when the RTDN payload does not contain a product ID,
 4. re-queries Google Play instead of trusting the notification type,
 5. rewrites the Firestore entitlement to the current verified state,
 6. records a payment event.
 
-Renewal, cancellation, expiration, grace-period changes, hold/restore, revocation and refund therefore converge through the same verifier.
+Subscription RTDNs are token-based in the current Google schema. One-time RTDNs include the SKU. `voidedPurchaseNotification` is also handled so revocation/refund events re-enter the verifier. Renewal, cancellation, expiration, grace-period changes, hold/restore, revocation and refund therefore converge through the same state sync path.
 
 If an RTDN token has never been associated with an app user, store an unresolved server-only notification record instead of guessing an owner.
 
@@ -122,7 +126,7 @@ Remove the temporary local checkout path.
 ## Store metadata
 The Account purchase UI may use Google Play's localized title/price when available. Existing static labels remain only as fallback display copy and must not determine entitlement.
 
-For Android subscription purchase requests, use an offer token returned by the subscription details. Do not hard-code a base-plan offer token in source.
+For Android subscription purchase requests, use an offer token returned by the subscription details. Do not hard-code a base-plan offer token in source. When upgrading Pro to Expert, use the current Pro purchase token with product-level subscription replacement instead of creating a second independent subscription.
 
 ## Security
 - Firestore clients cannot write `subscriptions`, `paymentEvents`, `googlePlayPurchases`, or unresolved billing notification records.
