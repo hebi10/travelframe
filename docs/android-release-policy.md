@@ -42,3 +42,28 @@ devices based only on hardware feature filters.
 Before Play Console upload, verify the merged release manifest with
 `npm run android:manifest:release` and confirm the Play Console permission and data
 safety declarations match the permissions above.
+
+## Clean native verification
+
+The repository intentionally ignores the generated `android/` directory. CI and release
+verification therefore run `npm run android:prebuild:ci` before tests or Gradle
+verification that depend on generated Android files.
+
+The clean prebuild:
+- regenerates Android from `app.json` and Expo config plugins,
+- recreates Body Frame native image adjustment sources,
+- recreates the release ProGuard/R8 keep rules,
+- reapplies required VisionCamera, React Native Gradle/Foojay and Google Mobile Ads patches.
+
+This prevents a developer's stale local `android/` folder from becoming a hidden release
+dependency.
+
+## Release artwork
+
+The approved BF monogram v2 launcher and adaptive foreground are source-controlled under
+`assets/icons`. Android adaptive background remains `#0B0B0C`. The current splash is
+retained because the approved BF v2 package does not include a dedicated splash final.
+
+App/store artwork is not a Firebase upload. Google Play listing graphics are uploaded
+directly to Google Play Console. See `docs/release-assets/README.md`.
+
