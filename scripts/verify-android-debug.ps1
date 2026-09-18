@@ -141,11 +141,19 @@ $task = switch ($Mode) {
 }
 $arguments = @(
   "--no-daemon",
-  "--no-parallel",
-  "--max-workers=1",
   "--console=plain",
   "-Pkotlin.compiler.execution.strategy=in-process"
 )
+if ($Mode -eq "Kotlin") {
+  $arguments += "--parallel"
+  $arguments += "--max-workers=2"
+  if (-not $NativeArchitectures) {
+    $NativeArchitectures = "x86_64"
+  }
+} else {
+  $arguments += "--no-parallel"
+  $arguments += "--max-workers=1"
+}
 if ($NativeArchitectures) {
   $arguments += "-PreactNativeArchitectures=$NativeArchitectures"
 }
