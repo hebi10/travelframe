@@ -363,7 +363,7 @@ export function TripClipPreviewPlayer({
             {formatDate(photo.createdAt)}
           </Text>
           <Text selectable style={styles.filmText}>
-            트래블프레임
+            바디 프레임
           </Text>
         </View>
       ) : null}

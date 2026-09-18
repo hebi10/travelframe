@@ -1,3 +1,3 @@
-import StudioScreen from "@/features/studio/StudioScreen";
+import BodyFrameRecordsScreen from "@/features/records/BodyFrameRecordsScreen";
 
-export default StudioScreen;
+export default BodyFrameRecordsScreen;

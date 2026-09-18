@@ -2146,7 +2146,7 @@ export default function CameraScreen() {
             <Feather name="user" size={22} color={colors.inverse} />
           </Pressable>
           <Text selectable={false} style={styles.brand}>
-            트래블프레임
+            바디 프레임
           </Text>
           <View style={styles.cameraInstantControlRow}>
             <Pressable

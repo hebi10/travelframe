@@ -403,7 +403,7 @@ export default function StudioScreen() {
     <ScreenShell
       eyebrow="편집"
       title="사진과 영상을 관리하세요."
-      description="촬영 사진을 편집하고, 여행 클립을 만들고, 저장한 영상을 다시 확인합니다."
+      description="촬영 사진을 편집하고, 변화 영상을 만들고, 저장한 영상을 다시 확인합니다."
       safeTop
     >
       <View style={styles.tabs}>
@@ -562,7 +562,7 @@ export default function StudioScreen() {
               {savedVideoWorks.length > 0 ? (
                 <WorkSection
                   title="저장한 영상"
-                  emptyDetail="여행 클립을 저장하면 이곳에 표시됩니다."
+                  emptyDetail="변화 영상을 저장하면 이곳에 표시됩니다."
                   items={savedVideoWorks}
                   page={pages.videoWorks ?? 0}
                   pageSize={pageSize}
@@ -633,7 +633,7 @@ export default function StudioScreen() {
               {videoWorks.length > 0 ? (
                 <WorkSection
                   title="영상"
-                  emptyDetail="여행 클립을 저장하면 이곳에 표시됩니다."
+                  emptyDetail="변화 영상을 저장하면 이곳에 표시됩니다."
                   items={videoWorks}
                   page={pages.videos ?? 0}
                   pageSize={pageSize}

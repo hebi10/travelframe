@@ -2,9 +2,9 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const screens = [
-  ["studio", "StudioScreen", "features/studio/StudioScreen.tsx"],
+  ["studio", "BodyFrameRecordsScreen", "features/records/BodyFrameRecordsScreen.tsx"],
   ["account", "AccountScreen", "features/account/AccountScreen.tsx"],
-  ["settings", "SettingsScreen", "features/settings/SettingsScreen.tsx"],
+  ["settings", "BodyFrameSettingsScreen", "features/settings/BodyFrameSettingsScreen.tsx"],
   ["camera", "BodyFrameCameraScreen", "features/camera/BodyFrameCameraScreen.tsx"],
   ["trip-clip", "BodyFrameVideoScreen", "features/trip-clip/BodyFrameVideoScreen.tsx"]
 ];

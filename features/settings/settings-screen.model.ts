@@ -35,7 +35,7 @@ export const backupTargetOptions: {
   detail: string;
 }[] = [
   { value: "photos", label: "사진", detail: "앱 사진 목록을 백업합니다." },
-  { value: "imageBundles", label: "여러 사진 작업", detail: "편집/여행 클립 이미지 작업을 백업합니다." },
+  { value: "imageBundles", label: "여러 사진 작업", detail: "편집/변화 영상 이미지 작업을 백업합니다." },
   { value: "videos", label: "영상", detail: "완성된 MP4 영상을 백업합니다." },
   { value: "music", label: "음악", detail: "사용자 음악 파일을 백업합니다." }
 ];

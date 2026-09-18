@@ -92,7 +92,7 @@ const styles = StyleSheet.create({
     width: "100%",
     gap: 16,
     padding: 18,
-    borderWidth: 1,
+    borderTopWidth: 1,
     borderLeftWidth: 0,
     borderRightWidth: 0,
     borderBottomWidth: 0,
@@ -111,19 +111,20 @@ const styles = StyleSheet.create({
   meta: {
     color: colors.muted,
     fontSize: 12,
-    fontWeight: "900",
+    fontWeight: "600",
     letterSpacing: 0
   },
   targetPill: {
     minHeight: 28,
     justifyContent: "center",
     paddingHorizontal: 10,
-    borderWidth: 1
+    borderWidth: 1,
+    borderRadius: 8
   },
   targetText: {
     color: colors.text,
     fontSize: 11,
-    fontWeight: "900",
+    fontWeight: "600",
     letterSpacing: 0
   },
   copy: {
@@ -132,7 +133,7 @@ const styles = StyleSheet.create({
   title: {
     color: colors.text,
     fontSize: 23,
-    fontWeight: "900",
+    fontWeight: "600",
     lineHeight: 29,
     letterSpacing: 0
   },
@@ -155,43 +156,46 @@ const styles = StyleSheet.create({
     gap: 8
   },
   textButton: {
-    minHeight: controls.compactHeight,
+    minHeight: 44,
     justifyContent: "center",
     paddingHorizontal: 10,
-    borderWidth: 1
+    borderWidth: 1,
+    borderRadius: 8
   },
   textButtonLabel: {
     color: colors.muted,
     fontSize: typography.button,
-    fontWeight: "800",
+    fontWeight: "600",
     letterSpacing: 0
   },
   secondaryButton: {
     minWidth: 58,
-    minHeight: controls.compactHeight,
+    minHeight: 44,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 12,
-    borderWidth: 1
+    borderWidth: 1,
+    borderRadius: 8
   },
   secondaryButtonLabel: {
     color: colors.text,
     fontSize: typography.button,
-    fontWeight: "800",
+    fontWeight: "600",
     letterSpacing: 0
   },
   primaryButton: {
     minWidth: 64,
-    minHeight: controls.compactHeight,
+    minHeight: 44,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 14,
-    borderWidth: 1
+    borderWidth: 1,
+    borderRadius: 8
   },
   primaryButtonLabel: {
     color: colors.inverse,
     fontSize: typography.button,
-    fontWeight: "900",
+    fontWeight: "600",
     letterSpacing: 0
   }
 });

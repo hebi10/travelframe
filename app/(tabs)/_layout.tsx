@@ -2,7 +2,6 @@ import { Tabs } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { TabGlyph } from "@/components/tab-glyph";
-import { useAuth } from "@/lib/auth-context";
 import { useAppAppearance } from "@/lib/app-appearance";
 
 const MAX_APP_WIDTH = 750;
@@ -10,7 +9,6 @@ const MAX_APP_WIDTH = 750;
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
   const { palette, fontSizeScale, layoutScale, emphasisWeight, fontFamily } = useAppAppearance();
-  const { isLoggedIn } = useAuth();
   const tabBarBottomPadding = Math.max(insets.bottom + 8, 16);
   const tabBarHeight = 58 + tabBarBottomPadding;
 
@@ -21,11 +19,6 @@ export default function TabsLayout() {
         headerShadowVisible: false,
         headerStyle: { backgroundColor: palette.chrome },
         headerTintColor: palette.text,
-        headerTitleStyle: {
-          fontSize: 14,
-          fontFamily,
-          fontWeight: "800"
-        },
         tabBarActiveTintColor: palette.text,
         tabBarInactiveTintColor: palette.faint,
         tabBarStyle: {
@@ -36,15 +29,16 @@ export default function TabsLayout() {
           paddingTop: 6,
           paddingBottom: tabBarBottomPadding,
           backgroundColor: palette.chrome,
-          borderTopColor: palette.line
+          borderTopColor: palette.line,
+          borderTopWidth: 1
         },
         tabBarIconStyle: {
-          marginTop: 2,
-          marginBottom: 2
+          marginTop: 0,
+          marginBottom: 1
         },
         tabBarItemStyle: {
           minHeight: 46,
-          paddingVertical: Math.round(3 * layoutScale)
+          paddingVertical: Math.round(2 * layoutScale)
         },
         tabBarLabelStyle: {
           fontSize: Math.round(11 * fontSizeScale),
@@ -59,30 +53,28 @@ export default function TabsLayout() {
         name="camera"
         options={{
           title: "촬영",
-          tabBarStyle: { display: "none" },
           tabBarIcon: ({ focused }) => <TabGlyph kind="camera" focused={focused} />
         }}
       />
       <Tabs.Screen
         name="studio"
         options={{
-          title: "보관함",
+          title: "기록",
           tabBarIcon: ({ focused }) => <TabGlyph kind="studio" focused={focused} />
         }}
       />
       <Tabs.Screen
         name="trip-clip"
         options={{
-          title: "클립",
-          href: null,
-          tabBarStyle: { display: "none" },
+          title: "영상",
+          tabBarIcon: ({ focused }) => <TabGlyph kind="video" focused={focused} />
         }}
       />
       <Tabs.Screen
         name="account"
         options={{
-          title: isLoggedIn ? "마이페이지" : "로그인",
-          tabBarIcon: ({ focused }) => <TabGlyph kind="account" focused={focused} />
+          title: "계정",
+          href: null
         }}
       />
       <Tabs.Screen

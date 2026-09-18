@@ -45,8 +45,8 @@ export const initialSubscriptionProducts: UserSubscriptionProducts = {
 };
 
 export const signedInBenefits = [
-  "비로그인/무료 로그인: 이미지 100개, 영상 30개, 클라우드 백업 없음",
-  "사진 편집과 MP4 영상 주 1회",
+  "무료 플랜: 프로젝트당 최대 100장 기록",
+  "변화 영상 최대 10초",
   "워터마크 포함, 광고 표시",
   "클라우드 백업은 Pro부터 사용 가능"
 ];

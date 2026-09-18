@@ -150,7 +150,7 @@ export function TripClipRecordingCanvas({
       {isFilm ? (
         <View style={styles.recordingFilmMeta}>
           <Text selectable={false} style={styles.recordingFilmText}>
-            트래블프레임
+            바디 프레임
           </Text>
           <Text selectable={false} style={styles.recordingFilmText}>
             구도 편집
@@ -175,7 +175,7 @@ export function TripClipRecordingCanvas({
       {showWatermark ? (
         <View style={styles.recordingWatermark}>
           <Text selectable={false} style={styles.recordingWatermarkText}>
-            트래블프레임
+            바디 프레임
           </Text>
         </View>
       ) : null}

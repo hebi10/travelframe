@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 const appAppearance = readFileSync("lib/app-appearance.ts", "utf8");
+const appTheme = readFileSync("constants/app-theme.ts", "utf8");
 const settingsScreen = readFileSync("features/settings/SettingsScreen.tsx", "utf8");
 const accountScreen = [
   readFileSync("features/account/AccountScreen.tsx", "utf8"),
@@ -28,19 +29,23 @@ assert.ok(
   "appearance hook should expose font style weight"
 );
 for (const darkColor of [
-  'background: "#000000"',
-  'chrome: "#000000"',
-  'surface: "#171717"',
-  'surfaceStrong: "#202020"',
-  'text: "#eeeeee"',
-  'muted: "#d6d6d6"',
-  'faint: "#a8a8a8"',
-  'line: "#2d2d2d"',
-  'inverse: "#000000"',
-  'ink: "#f2f2f2"'
+  'background: "#0B0B0C"',
+  'chrome: "#0B0B0C"',
+  'surface: "#131315"',
+  'surfaceStrong: "#1A1A1D"',
+  'text: "#F5F5F5"',
+  'muted: "#A0A0A6"',
+  'faint: "#68686E"',
+  'line: "#2A2A2E"',
+  'inverse: "#111111"',
+  'ink: "#F5F5F5"'
 ]) {
-  assert.ok(appAppearance.includes(darkColor), `dark palette should include ${darkColor}`);
+  assert.ok(appTheme.includes(darkColor), `Body Frame dark palette should include ${darkColor}`);
 }
+assert.ok(
+  appAppearance.includes("bodyFrameDarkColors"),
+  "appearance hook should consume shared Body Frame dark tokens"
+);
 assert.ok(
   tabsLayout.includes("backgroundColor: palette.chrome"),
   "bottom tabs should use the chrome background color"

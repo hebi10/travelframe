@@ -419,7 +419,7 @@ export default function AccountScreen() {
         description={
           isLoggedIn
             ? "이메일 인증, 구독 상태, 저장한 작업 기록을 한곳에서 확인합니다."
-            : "무료 로그인하면 사진 편집과 MP4 영상 주 1회 저장을 사용할 수 있습니다. Pro부터 워터마크 제거와 클라우드 백업이 제공됩니다."
+            : "로그인하면 Google Play 구매·복원과 계정 기능을 사용할 수 있습니다. 무료 플랜은 프로젝트당 100장과 최대 10초 변화 영상을 지원합니다."
         }
         safeTop
       >
@@ -498,7 +498,7 @@ export default function AccountScreen() {
               />
             ) : (
               <Text selectable style={[styles.helpText, themed.mutedText]}>
-                트래블프레임의 아이디는 이메일입니다. 보안상 가입 여부는 직접 표시하지 않고,
+                바디 프레임의 아이디는 이메일입니다. 보안상 가입 여부는 직접 표시하지 않고,
                 입력한 이메일로 비밀번호 재설정 메일을 보냅니다.
               </Text>
             )}

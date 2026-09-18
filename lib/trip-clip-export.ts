@@ -34,7 +34,7 @@ type ImageExportOptions = {
 };
 let androidDownloadDirectoryUri: string | null = null;
 const TRIP_CLIP_ANDROID_DOWNLOAD_FOLDER = "TravelFrame";
-const TRIP_CLIP_MEDIA_ALBUM = "트래블프레임";
+const TRIP_CLIP_MEDIA_ALBUM = "바디 프레임";
 
 const getMediaLibrary = async (): Promise<MediaLibraryModule> =>
   import("expo-media-library");
@@ -334,7 +334,7 @@ export const shareVideo = async (uri: string) => {
 
   await Sharing.shareAsync(uri, {
     mimeType: "video/mp4",
-    dialogTitle: "여행 클립 공유"
+    dialogTitle: "변화 영상 공유"
   });
 };
 
