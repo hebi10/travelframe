@@ -1,4 +1,4 @@
-export const TRIP_CLIP_TITLE_PREFIX = "여행 클립";
+export const TRIP_CLIP_TITLE_PREFIX = "변화 영상";
 
 const tripClipTitlePattern = /^여행\s*클립\s*(\d+)$/;
 
