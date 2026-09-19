@@ -145,7 +145,7 @@ function Set-RequiredBuildGradleReplacement {
 function Set-ReleaseBuildSigningConfig {
   param([string]$BuildGradle)
 
-  $releasePattern = "(buildTypes\s*\{[\s\S]*?release\s*\{[\s\S]*?signingConfig\s+)signingConfigs\.release"
+  $releasePattern = "(buildTypes\s*\{[\s\S]*?release\s*\{[\s\S]*?signingConfig\s+(?:=\s*)?)signingConfigs\.release"
   $releaseSigningConfigMatches = [regex]::Matches($BuildGradle, $releasePattern)
   if ($releaseSigningConfigMatches.Count -eq 1) {
     return $BuildGradle
@@ -156,7 +156,7 @@ function Set-ReleaseBuildSigningConfig {
 
   return Set-RequiredBuildGradleReplacement `
     -Text $BuildGradle `
-    -Pattern "(buildTypes\s*\{[\s\S]*?release\s*\{[\s\S]*?signingConfig\s+)signingConfigs\.debug" `
+    -Pattern "(buildTypes\s*\{[\s\S]*?release\s*\{[\s\S]*?signingConfig\s+(?:=\s*)?)signingConfigs\.debug" `
     -Replacement '${1}signingConfigs.release' `
     -Description "release signingConfig"
 }
@@ -174,13 +174,16 @@ function Assert-AndroidAabBuildGradle {
 
   foreach ($requiredSnippet in @(
     "TRAVELFRAME_UPLOAD_STORE_FILE",
-    "signingConfig signingConfigs.release",
     "minifyEnabled enableMinifyInReleaseBuilds",
     "proguardFiles getDefaultProguardFile"
   )) {
     if (-not $BuildGradle.Contains($requiredSnippet)) {
       Stop-WithMessage "Generated build.gradle is missing required release setting: $requiredSnippet"
     }
+  }
+
+  if ($BuildGradle -notmatch 'buildTypes\s*\{[\s\S]*?release\s*\{[\s\S]*?signingConfig\s+(?:=\s*)?signingConfigs\.release\b') {
+    Stop-WithMessage "Generated build.gradle is missing the release signingConfig."
   }
 }
 
