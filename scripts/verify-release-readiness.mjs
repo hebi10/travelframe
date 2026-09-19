@@ -144,7 +144,7 @@ for (const token of [
   "자동 업로드되지 않",
   "자세 맞춤 도움",
   "기기 내",
-  "서버로 업로드하지 않",
+  "서버로 업로드하지 않습니다.",
   "임시 이미지"
 ]) {
   if (!privacyPolicy.includes(token)) {
