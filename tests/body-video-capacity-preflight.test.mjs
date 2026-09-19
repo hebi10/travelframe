@@ -81,7 +81,7 @@ assert.deepEqual(customized.savedVideos[0].durations, { one: 0.5, three: 0.5 });
 
 const videoHelpers = {};
 vm.runInNewContext(compile(fs.readFileSync("lib/body-frame-video.ts", "utf8")), { exports: videoHelpers });
-for (const ratio of ["9:16", "1:1", "16:9"]) {
+for (const ratio of ["3:4", "9:16", "1:1", "16:9"]) {
   for (const quality of [720, 1080]) {
     let nativeOptions;
     const outputSize = videoHelpers.getBodyFrameVideoOutputSize(ratio, quality);

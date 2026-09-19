@@ -25,7 +25,7 @@ for (const snippet of [
   "BF 모노그램",
   "첫 카메라 진입",
   "기준 사진",
-  "2열 9:16 Photo Grid",
+  "2열 3:4 Photo Grid",
   "3열 기록 Grid",
   "사진 1장당 0.1초",
   "Google Play 구매",
@@ -54,7 +54,7 @@ for (const snippet of [
   "## 출시 전 브랜드 QA",
   "app-icon.png",
   "adaptive-icon.png",
-  "#0B0B0C",
+  "#151719",
   "1024×1024"
 ]) {
   assert.ok(checklist.includes(snippet), `manual brand QA checklist missing: ${snippet}`);

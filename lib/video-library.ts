@@ -68,7 +68,7 @@ const normalizeMadeVideoItem = (
       : undefined,
   createdAt: normalizeDate(video.createdAt),
   title: normalizeText(video.title, `${TRIP_CLIP_TITLE_PREFIX} ${index + 1}`),
-  ratio: validRatios.has(video.ratio ?? "") ? video.ratio! : "9:16",
+  ratio: validRatios.has(video.ratio ?? "") ? video.ratio! : "3:4",
   template: validTemplates.has(video.template ?? "") ? video.template! : "minimal",
   transition: validTransitions.has(video.transition ?? "") ? video.transition! : "fade",
   transitionDuration: normalizeFiniteNumber(video.transitionDuration, 0.45),

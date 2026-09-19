@@ -31,6 +31,13 @@ export const getVideoQualityOption = (qualityId: VideoQualityId) =>
   VIDEO_QUALITY_OPTIONS.find((option) => option.id === DEFAULT_VIDEO_QUALITY) ??
   VIDEO_QUALITY_OPTIONS[0];
 
+export const getVideoAspectRatio = (ratio?: string) => {
+  const [width, height] = (ratio ?? "3:4").split(":").map(Number);
+  return Number.isFinite(width) && Number.isFinite(height) && width > 0 && height > 0
+    ? width / height
+    : 3 / 4;
+};
+
 export const getVideoQualityOutputSize = (
   qualityId: VideoQualityId,
   aspectRatio: number
@@ -38,7 +45,7 @@ export const getVideoQualityOutputSize = (
   const quality = getVideoQualityOption(qualityId);
   const safeAspectRatio = Number.isFinite(aspectRatio) && aspectRatio > 0
     ? aspectRatio
-    : 9 / 16;
+    : 3 / 4;
 
   if (safeAspectRatio <= 1) {
     return {

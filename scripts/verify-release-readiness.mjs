@@ -28,8 +28,8 @@ if (appExpo.android?.package !== "com.haebi.photoguide") {
 if (!eas.build?.production || eas.build.production.autoIncrement !== true) {
   fail("EAS production build must keep autoIncrement enabled");
 }
-if (appExpo.android?.adaptiveIcon?.backgroundColor !== "#0B0B0C") {
-  fail("Body Frame adaptive icon background must remain #0B0B0C");
+if (appExpo.android?.adaptiveIcon?.backgroundColor !== "#151719") {
+  fail("Body Frame adaptive icon background must remain #151719");
 }
 
 for (const assetPath of [

@@ -17,6 +17,7 @@ import { colors, controls, spacing, typography } from "@/constants/app-theme";
 import { useAuth } from "@/lib/auth-context";
 import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 import { getMadeVideoById } from "@/lib/video-library";
+import { getVideoAspectRatio } from "@/lib/video-utils";
 import type { MadeVideoItem } from "@/types/video";
 
 type ExpoVideoModule = typeof import("expo-video");
@@ -134,7 +135,7 @@ export default function VideoDetailScreen() {
         contentInsetAdjustmentBehavior="automatic"
       >
         <View
-          style={[styles.videoFrame, { aspectRatio: video.ratio === "16:9" ? 16 / 9 : 9 / 16 }]}
+          style={[styles.videoFrame, { aspectRatio: getVideoAspectRatio(video.ratio) }]}
         >
           {hasPlayableVideoSource ? (
             <VideoPlaybackBoundary>

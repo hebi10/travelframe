@@ -28,14 +28,14 @@ const video = await importTsModule("lib/body-frame-video.ts");
 assert.equal(video.BODY_FRAME_VIDEO_FPS, 30);
 assert.equal(video.BODY_FRAME_VIDEO_FRAMES_PER_PHOTO, 3);
 assert.equal(video.BODY_FRAME_VIDEO_SECONDS_PER_PHOTO, 0.1);
-assert.equal(video.BODY_FRAME_VIDEO_RATIO, "9:16");
+assert.equal(video.BODY_FRAME_VIDEO_RATIO, "3:4");
 assert.equal(video.BODY_FRAME_VIDEO_TEMPLATE, "minimal");
 assert.equal(video.BODY_FRAME_VIDEO_TRANSITION, "none");
 assert.equal(video.BODY_FRAME_VIDEO_TRANSITION_DURATION, 0);
-assert.deepEqual(video.DEFAULT_BODY_FRAME_VIDEO_OPTIONS, { interval: 0.1, quality: 1080, ratio: "9:16" });
+assert.deepEqual(video.DEFAULT_BODY_FRAME_VIDEO_OPTIONS, { interval: 0.1, quality: 1080, ratio: "3:4" });
 assert.deepEqual(video.BODY_FRAME_VIDEO_MAX_OUTPUT_SIZE, {
   width: 1080,
-  height: 1920
+  height: 1440
 });
 
 assert.equal(video.getBodyFrameVideoDuration(100), 10);
@@ -52,6 +52,8 @@ for (const interval of [0.1, 0.2, 0.5, 1]) {
   assert.equal(video.getBodyFrameVideoPhotoIndex(frames, interval), 1);
 }
 assert.deepEqual(video.getBodyFrameVideoOutputSize("9:16", 720), { width: 720, height: 1280 });
+assert.deepEqual(video.getBodyFrameVideoOutputSize("3:4", 720), { width: 720, height: 960 });
+assert.deepEqual(video.getBodyFrameVideoOutputSize("3:4", 1080), { width: 1080, height: 1440 });
 assert.deepEqual(video.getBodyFrameVideoOutputSize("1:1", 1080), { width: 1080, height: 1080 });
 assert.deepEqual(video.getBodyFrameVideoOutputSize("16:9", 1080), { width: 1920, height: 1080 });
 assert.equal(video.getBodyFrameVideoDuration(0, 1), 0);

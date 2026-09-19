@@ -349,7 +349,7 @@ export default function TripClipScreen() {
   const [durationKeyboardHeight, setDurationKeyboardHeight] = useState(0);
   const [photoAdjustments, setPhotoAdjustments] =
     useState<TripClipPhotoAdjustmentMap>({});
-  const [ratio, setRatio] = useState<TripClipRatio>("9:16");
+  const [ratio, setRatio] = useState<TripClipRatio>("3:4");
   const [videoQuality, setVideoQuality] =
     useState<VideoQualityId>(DEFAULT_VIDEO_QUALITY);
   const [imageQuality, setImageQuality] =

@@ -141,7 +141,7 @@ for (const token of [
   "app-icon.png",
   "adaptive-icon.png",
   "splash-icon.png",
-  "#0B0B0C"
+  "#151719"
 ]) {
   assert.ok(releaseVerify.includes(token), `release verifier should check ${token}`);
 }

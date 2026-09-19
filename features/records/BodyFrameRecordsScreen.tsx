@@ -368,7 +368,7 @@ const styles = StyleSheet.create({
   },
   coverFrame: {
     width: "100%",
-    aspectRatio: 9 / 16,
+    aspectRatio: 3 / 4,
     overflow: "hidden"
   },
   coverImage: {

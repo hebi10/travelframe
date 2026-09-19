@@ -8,13 +8,13 @@ type BodyFrameVideoPhotoLike = {
 export const BODY_FRAME_VIDEO_SECONDS_PER_PHOTO = 0.1;
 export const BODY_FRAME_VIDEO_FPS = 30;
 export const BODY_FRAME_VIDEO_FRAMES_PER_PHOTO = 3;
-export const BODY_FRAME_VIDEO_RATIO = "9:16" as const;
+export const BODY_FRAME_VIDEO_RATIO = "3:4" as const;
 export const BODY_FRAME_VIDEO_TEMPLATE = "minimal" as const;
 export const BODY_FRAME_VIDEO_TRANSITION = "none" as const;
 export const BODY_FRAME_VIDEO_TRANSITION_DURATION = 0;
 export const BODY_FRAME_VIDEO_INTERVALS = [0.1, 0.2, 0.5, 1] as const;
 export const BODY_FRAME_VIDEO_QUALITIES = [720, 1080] as const;
-export const BODY_FRAME_VIDEO_RATIOS = ["9:16", "1:1", "16:9"] as const;
+export const BODY_FRAME_VIDEO_RATIOS = ["3:4", "9:16", "1:1", "16:9"] as const;
 export type BodyFrameVideoOptions = {
   interval: (typeof BODY_FRAME_VIDEO_INTERVALS)[number];
   quality: (typeof BODY_FRAME_VIDEO_QUALITIES)[number];
@@ -30,7 +30,9 @@ export const getBodyFrameVideoOutputSize = (
   quality: BodyFrameVideoOptions["quality"]
 ) => {
   const longEdge = quality === 720 ? 1280 : 1920;
-  return ratio === "1:1"
+  return ratio === "3:4"
+    ? { width: quality, height: quality * 4 / 3 }
+    : ratio === "1:1"
     ? { width: quality, height: quality }
     : ratio === "16:9"
       ? { width: longEdge, height: quality }
@@ -42,7 +44,7 @@ export const getBodyFrameVideoPhotoIndex = (
 ) => Math.floor(Math.max(0, frameIndex) / Math.round(interval * BODY_FRAME_VIDEO_FPS));
 export const BODY_FRAME_VIDEO_MAX_OUTPUT_SIZE = {
   width: 1080,
-  height: 1920
+  height: 1440
 } as const;
 
 const toSafePhotoCount = (value: number) =>

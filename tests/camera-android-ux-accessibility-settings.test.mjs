@@ -74,7 +74,7 @@ for (const snippet of [
   "accessibilityState={{ selected: guide === type }}",
   "accessibilityState={{ selected: guideSize === option.value }}",
   "accessibilityState={{ selected: isActive }}",
-  "accessibilityState={{ selected: guideColor === option.value }}",
+  "accessibilityState={{ selected: guideColor === swatchColor }}",
   "accessibilityState={{ selected: guideVisible }}",
   "selected={visibleTorchEnabled}",
   "selected={guideVisible}",

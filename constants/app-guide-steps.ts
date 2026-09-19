@@ -42,7 +42,7 @@ export const APP_GUIDE_STEPS: Record<AppGuideTabKey, AppGuideStep[]> = {
       id: "body-frame-video",
       title: "변화 영상을 만드세요",
       description:
-        "현재 프로젝트의 기록 사진을 0.1초씩 이어 9:16 변화 영상으로 저장합니다.",
+        "기본 3:4 비율로 변화 영상을 만듭니다. 사진 간격과 비율은 영상 화면에서 바꿀 수 있습니다.",
       targetLabel: "변화 영상",
       placement: "center"
     }

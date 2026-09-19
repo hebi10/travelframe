@@ -1,6 +1,8 @@
 import {
   ErrorCode,
+  fetchProducts as fetchStoreProducts,
   getAvailablePurchases,
+  type Product,
   type ProductSubscription,
   type Purchase,
   useIAP
@@ -41,6 +43,11 @@ export function useGooglePlayBilling({
 }) {
   const [isRestoring, setIsRestoring] = useState(false);
   const [billingMessage, setBillingMessage] = useState<string | null>(null);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [subscriptions, setSubscriptions] = useState<ProductSubscription[]>([]);
+  const [productLoadError, setProductLoadError] = useState<string | null>(null);
+  const [isLoadingProducts, setIsLoadingProducts] = useState(false);
+  const productQueryVersionRef = useRef(0);
   const pendingPurchaseRef = useRef<PendingPurchase | null>(null);
   const finishTransactionRef = useRef<
     ((args: { purchase: Purchase; isConsumable?: boolean }) => Promise<void>) | null
@@ -82,9 +89,6 @@ export function useGooglePlayBilling({
 
   const {
     connected,
-    products,
-    subscriptions,
-    fetchProducts,
     requestPurchase,
     finishTransaction
   } = useIAP({
@@ -129,26 +133,37 @@ export function useGooglePlayBilling({
     finishTransactionRef.current = finishTransaction;
   }, [finishTransaction]);
 
-  useEffect(() => {
-    if (!connected || Platform.OS !== "android") {
-      return;
+  const reloadProducts = useCallback(async () => {
+    if (!user || !connected || Platform.OS !== "android") return;
+    const version = ++productQueryVersionRef.current;
+    setIsLoadingProducts(true);
+    setProductLoadError(null);
+    // Use the promise API so expected store availability errors are handled here,
+    // instead of useIAP's fetch wrapper also reporting them as console errors.
+    const results = await Promise.allSettled([
+      fetchStoreProducts({ skus: [...GOOGLE_PLAY_ONE_TIME_PRODUCT_IDS], type: "in-app" }),
+      fetchStoreProducts({ skus: [...GOOGLE_PLAY_SUBSCRIPTION_IDS], type: "subs" })
+    ]);
+    if (version !== productQueryVersionRef.current) return;
+    const [oneTime, recurring] = results;
+    setProducts(oneTime.status === "fulfilled" ? (oneTime.value ?? []) as Product[] : []);
+    setSubscriptions(recurring.status === "fulfilled" ? (recurring.value ?? []) as ProductSubscription[] : []);
+    if (results.some(result => result.status === "rejected" || !result.value?.length)) {
+      setProductLoadError("Google Play 상품 정보를 불러오지 못했습니다. 로그인과 무료 기능은 계속 사용할 수 있습니다. 잠시 후 다시 시도해주세요.");
     }
+    setIsLoadingProducts(false);
+  }, [connected, user]);
 
-    void Promise.all([
-      fetchProducts({
-        skus: [...GOOGLE_PLAY_ONE_TIME_PRODUCT_IDS],
-        type: "in-app"
-      }),
-      fetchProducts({
-        skus: [...GOOGLE_PLAY_SUBSCRIPTION_IDS],
-        type: "subs"
-      })
-    ]).catch((error) => {
-      setBillingMessage(
-        error instanceof Error ? error.message : "Google Play 상품 정보를 불러오지 못했습니다."
-      );
-    });
-  }, [connected, fetchProducts]);
+  useEffect(() => {
+    const queryVersion = productQueryVersionRef;
+    setProducts([]);
+    setSubscriptions([]);
+    setProductLoadError(null);
+    setBillingMessage(null);
+    setIsLoadingProducts(false);
+    void reloadProducts();
+    return () => { queryVersion.current++; };
+  }, [reloadProducts]);
 
   const subscriptionsById = useMemo(
     () =>
@@ -177,6 +192,9 @@ export function useGooglePlayBilling({
       }
 
       const type = getGooglePlayProductType(productId);
+      if (type === "in-app" && !products.some(product => product.id === productId)) {
+        throw new Error("Google Play 상품 정보를 먼저 불러와주세요. 상품 다시 불러오기를 눌러 재시도할 수 있습니다.");
+      }
       const availablePurchases =
         type === "subs"
           ? await getAvailablePurchases({
@@ -263,7 +281,7 @@ export function useGooglePlayBilling({
         });
       });
     },
-    [connected, requestPurchase, subscriptionsById, user]
+    [connected, products, requestPurchase, subscriptionsById, user]
   );
 
   const restorePurchases = useCallback(async () => {
@@ -319,6 +337,9 @@ export function useGooglePlayBilling({
   return {
     connected,
     billingMessage,
+    productLoadError,
+    isLoadingProducts,
+    reloadProducts,
     isRestoring,
     purchaseProduct,
     restorePurchases,

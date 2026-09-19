@@ -10,7 +10,7 @@ const settingsSource = readSettingsSource();
 const photoLibrarySource = fs.readFileSync("lib/photo-library.ts", "utf8");
 
 for (const snippet of [
-  'cameraRatio: "9:16"',
+  'cameraRatio: "3:4"',
   'cameraSaveScope: "app_device"',
   'const cameraRatios: PhotoRatioLabel[] = ["1:1", "3:4", "4:3", "4:5", "9:16", "16:9"]',
   "cameraRatios.includes(nextSettings.cameraRatio)",

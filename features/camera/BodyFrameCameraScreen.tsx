@@ -39,7 +39,8 @@ import { getBodyMeasurementSettings } from "@/lib/body-measurement-library";
 import { getBodyPoseAlignmentSettings } from "@/lib/body-pose-alignment";
 import {
   createBodyProject,
-  getBodyProjects
+  getBodyProjects,
+  updateBodyProject
 } from "@/lib/body-project-library";
 import { getPhotos } from "@/lib/photo-library";
 import { getPlanEntitlements } from "@/lib/plan-entitlements";
@@ -289,6 +290,13 @@ export default function BodyFrameCameraScreen() {
     []
   );
 
+  const handleChangeReferenceMode = useCallback(async (projectId: string, referenceMode: ReferencePhotoMode) => {
+    if (activeProject?.id !== projectId) throw new Error("선택한 프로젝트가 변경되었습니다. 다시 시도해주세요.");
+    const updatedProject = await updateBodyProject(projectId, { referenceMode });
+    if (!updatedProject) throw new Error("프로젝트를 찾을 수 없습니다.");
+    setProjects((current) => current.map((project) => project.id === projectId ? updatedProject : project));
+  }, [activeProject?.id]);
+
   const firstPhotoHint = captureBlockedReason
     ? captureBlockedReason
     : activeProject && activeSummary?.photoCount === 0
@@ -299,7 +307,10 @@ export default function BodyFrameCameraScreen() {
 
   return (
     <View style={styles.screen}>
-      <CameraScreen />
+      <CameraScreen
+        projectReferenceMode={activeProject?.referenceMode}
+        onProjectReferenceModeChange={activeProject ? handleChangeReferenceMode : undefined}
+      />
 
       <View
         pointerEvents="box-none"

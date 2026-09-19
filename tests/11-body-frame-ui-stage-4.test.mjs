@@ -12,7 +12,7 @@ for (const token of [
   "projectPhotos",
   "getBodyProjectPhotos",
   'width: "31%"',
-  "aspectRatio: 9 / 16",
+  "aspectRatio: 3 / 4",
   "photoMetaOverlay",
   "formatDate(project.createdAt)",
   "progressPercent",

@@ -495,7 +495,10 @@ const deleteTemporaryFiles = async (uris: string[]) => {
   await Promise.all(uris.map((uri) => deleteLocalFile(uri)));
 };
 
-const prepareCapturedPhotoForStorage = async (input: SaveCapturedPhotoInput) => {
+const prepareCapturedPhotoForStorage = async (
+  input: SaveCapturedPhotoInput,
+  deferProjectOptimization = false
+) => {
   const rendered = await renderCapturedPhotoForSave(input);
   const temporaryUris = [...rendered.temporaryUris];
   let adjusted: { uri: string; width?: number; height?: number } = {
@@ -512,13 +515,23 @@ const prepareCapturedPhotoForStorage = async (input: SaveCapturedPhotoInput) => 
   if (adjusted.uri !== rendered.uri && adjusted.uri !== input.uri) {
     temporaryUris.push(adjusted.uri);
   }
-  const settings = await getAppSettings();
-  const optimized = await optimizeImageForStorage({
-    uri: adjusted.uri,
-    width: adjusted.width ?? rendered.width,
-    height: adjusted.height ?? rendered.height,
-    imageQuality: settings.imageBackupQuality
-  });
+  // Project saves apply their fixed quality policy after this staging step.
+  const optimized = deferProjectOptimization
+    ? {
+        uri: adjusted.uri,
+        width: adjusted.width ?? rendered.width,
+        height: adjusted.height ?? rendered.height,
+        imageQuality: undefined,
+        quality: undefined,
+        size: undefined,
+        originalSize: undefined
+      }
+    : await optimizeImageForStorage({
+        uri: adjusted.uri,
+        width: adjusted.width ?? rendered.width,
+        height: adjusted.height ?? rendered.height,
+        imageQuality: (await getAppSettings()).imageBackupQuality
+      });
   const allTemporaryUris = [
     ...temporaryUris,
     rendered.uri !== input.uri ? rendered.uri : null,
@@ -557,7 +570,9 @@ export const saveCapturedPhoto = async ({
   ratioLabel = "Original",
   colorAdjustment,
   localImageLimit
-}: SaveCapturedPhotoInput) => {
+}: SaveCapturedPhotoInput, {
+  deferProjectOptimization = false
+}: { deferProjectOptimization?: boolean } = {}) => {
   return runPhotoLibraryMutation(async () => {
   const photos = await getPhotos();
   assertLocalLibraryCapacity({
@@ -576,7 +591,7 @@ export const saveCapturedPhoto = async ({
     height,
     ratioLabel,
     colorAdjustment
-  });
+  }, deferProjectOptimization);
 
   try {
     await FileSystem.copyAsync({
@@ -584,7 +599,8 @@ export const saveCapturedPhoto = async ({
       to: destinationUri
     });
 
-    const previewUri = await createPhotoPreview({
+    // Keep readers from generating a second preview while project storage is finishing.
+    const previewUri = deferProjectOptimization ? destinationUri : await createPhotoPreview({
       sourceUri: destinationUri,
       id,
       width: prepared.width,

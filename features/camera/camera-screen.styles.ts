@@ -1059,6 +1059,7 @@ export const styles = StyleSheet.create({
   },
   gallerySavingText: {
     color: colors.inverse,
+    textAlign: "center",
     fontSize: bodyFrameTypography.caption,
     fontWeight: "900",
     letterSpacing: 0

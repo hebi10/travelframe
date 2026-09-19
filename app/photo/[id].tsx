@@ -55,7 +55,7 @@ const getPhotoAspectRatio = (photo: PhotoItem) => {
   if (photo.ratioLabel === "4:5") return 4 / 5;
   if (photo.ratioLabel === "9:16") return 9 / 16;
   if (photo.ratioLabel === "16:9") return 16 / 9;
-  return 4 / 5;
+  return 3 / 4;
 };
 
 export default function PhotoDetailScreen() {

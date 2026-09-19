@@ -11,7 +11,7 @@ for (const token of [
   'flexDirection: "row"',
   'flexWrap: "wrap"',
   'width: "48%"',
-  "aspectRatio: 9 / 16",
+  "aspectRatio: 3 / 4",
   "progressPercent",
   "변화 영상",
   "setLastActiveProjectId",

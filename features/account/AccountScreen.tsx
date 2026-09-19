@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useFocusEffect } from "expo-router";
 import {
   ActivityIndicator,
@@ -107,6 +107,9 @@ export default function AccountScreen() {
   const {
     connected: billingConnected,
     billingMessage,
+    productLoadError,
+    isLoadingProducts,
+    reloadProducts,
     isRestoring: isPurchaseRestoring,
     purchaseProduct,
     restorePurchases,
@@ -116,11 +119,6 @@ export default function AccountScreen() {
     refreshUser
   });
 
-  useEffect(() => {
-    if (isLoggedIn && billingMessage) {
-      setMessage(billingMessage);
-    }
-  }, [billingMessage, isLoggedIn]);
   const googleAndroidClientId = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;
   const isGoogleReady = isGoogleSignInConfigured({
     androidClientId: googleAndroidClientId
@@ -777,6 +775,21 @@ export default function AccountScreen() {
               </View>
             </View>
 
+            {isLoggedIn && (productLoadError || billingMessage) ? (
+              <Text selectable style={[styles.helpText, themed.mutedText]}>
+                {productLoadError || billingMessage}
+              </Text>
+            ) : null}
+            {isLoggedIn && productLoadError ? (
+              <Pressable
+                accessibilityRole="button"
+                disabled={isLoadingProducts || !billingConnected}
+                style={[styles.secondaryButton, themed.secondaryButton, (isLoadingProducts || !billingConnected) && styles.disabledButton]}
+                onPress={() => void reloadProducts()}
+              >
+                <Text style={[styles.secondaryButtonText, themed.text]}>상품 다시 불러오기</Text>
+              </Pressable>
+            ) : null}
             <View style={styles.paymentGrid}>
               {paymentPlans.map((plan) => (
                 <Pressable

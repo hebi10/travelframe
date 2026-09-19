@@ -1344,6 +1344,7 @@ export default function SettingsScreen() {
               </Text>
               <View style={styles.colorGrid}>
                 {guideColorOptions.map((color) => {
+                  const swatchColor = color.value;
                   const isActive = settings.guideColor === color.value;
 
                   return (
@@ -1362,7 +1363,7 @@ export default function SettingsScreen() {
                       <View
                         style={[
                           styles.colorSwatch,
-                          { backgroundColor: color.value },
+                          { backgroundColor: swatchColor },
                           color.label === "흰색" && styles.colorSwatchLight
                         ]}
                       />

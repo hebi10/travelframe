@@ -1,15 +1,18 @@
 # Body Frame Release Assets
 
-## Approved BF v2 assets
+## Approved Body Frame symbol (2026-09-19)
 
-승인 방향: **BF 모노그램 v2** / 검정 정사각형 앱 아이콘
+승인 방향: **인물 윤곽 + 촬영 프레임 + 라임 포인트** / 차콜 배경. 이전 **BF 모노그램 v2**를 교체했습니다.
 
-Approved artwork is stored in Google Drive:
+현재 승인 원본: `assets/icons/body-frame-approved.png`.
+`node scripts/prepare-body-frame-icons.mjs`로 원본 디자인을 유지한 채 1024px 앱 아이콘과 Android 안전 여백을 적용한 adaptive/splash 이미지를 생성합니다.
+
+Previous BF v2 artwork archive in Google Drive:
 
 - Release assets root: https://drive.google.com/drive/folders/1gEl1UkYS79iD8rM_0-Dh5giJDJmmWdTg
 - Approved BF monogram v2: https://drive.google.com/drive/folders/1lpfMVjlvx7F_v5Jkd_ZVd9OK4HAVLt-_
 
-Approved v2 files:
+Previous v2 files:
 - `01_app_icon_BF_monogram_1024.png`
 - `02_adaptive_foreground_BF_1024.png`
 - `03_adaptive_background_1024.png`
@@ -17,10 +20,10 @@ Approved v2 files:
 Repository application:
 - App icon → `assets/icons/app-icon.png` **applied**
 - Android adaptive foreground → `assets/icons/adaptive-icon.png` **applied**
-- Android adaptive background → `#0B0B0C` in `app.json` **applied**
-- Splash → existing repository splash retained because the approved BF v2 package does not include a dedicated final splash image
+- Android adaptive background → `#151719` in `app.json` **applied**
+- Splash → approved Body Frame symbol in `assets/icons/splash-icon.png` **applied**
 
-The Stage 7 UI-finalization contract verifies that the repository app/adaptive icons match the approved BF v2 binary hashes.
+The Stage 7 UI-finalization contract verifies the updated app/adaptive asset hashes. Native launcher and splash changes require a new Android build/install; Metro reload alone cannot update them.
 
 ## Firebase policy
 

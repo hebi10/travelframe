@@ -9,11 +9,16 @@ const code = ts.transpileModule(source.slice(start, end), {
   compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext }
 }).outputText;
 
-function harness({ device = true, permission = async () => {}, canCapture = () => true } = {}) {
+class CaptureTimeout extends Error {}
+function harness({ device = true, permission = async () => {}, canCapture = () => true, timeout = false } = {}) {
   const events = [];
   const lock = { current: false };
   let capturing = false;
   const dependencies = {
+    __DEV__: false,
+    waitForCameraCapture: async promise => { if (timeout) throw new CaptureTimeout("timeout"); return promise; },
+    CameraCaptureTimeoutError: CaptureTimeout,
+    handleCameraSessionError: () => events.push("recover"),
     cameraDevice: { hasFlash: false },
     canCaptureWithCurrentSession: canCapture,
     isCapturing: false,
@@ -79,3 +84,10 @@ const localOnly = harness({ device: false });
 await localOnly.capture();
 assert.deepEqual(localOnly.events, ["reserve", "capture", "queue"]);
 console.log("ok - photo permission is resolved before capture and denied requests never enter the saving queue");
+const stalled = harness({ device: false, timeout: true });
+await stalled.capture();
+assert.ok(stalled.events.includes("recover"), "native capture timeout must restart the camera");
+assert.ok(stalled.events.includes("release"), "failed capture must release its project reservation");
+assert.ok(!stalled.events.includes("queue"));
+assert.equal(stalled.lock.current, false);
+assert.equal(stalled.isCapturing(), false);

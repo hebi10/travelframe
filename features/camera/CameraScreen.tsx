@@ -1,4 +1,5 @@
 import { Feather } from "@expo/vector-icons";
+import { CAMERA_CAPTURE_TIMEOUT_MESSAGE, CameraCaptureTimeoutError, waitForCameraCapture } from "@/lib/camera-capture-timeout";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 import { router, useFocusEffect } from "expo-router";
@@ -173,7 +174,19 @@ import type {
   BodyPoseMetrics
 } from "@/types/body-pose-alignment";
 import type { PhotoItem, PhotoRatioLabel, SaveCapturedPhotoInput } from "@/types/photo";
-export default function CameraScreen() {
+type CameraScreenProps = {
+  projectReferenceMode?: "first" | "latest";
+  onProjectReferenceModeChange?: (projectId: string, mode: "first" | "latest") => Promise<void>;
+};
+
+const CAMERA_PHOTO_TARGET_RESOLUTION = { width: 1920, height: 2560 };
+
+export default function CameraScreen({
+  projectReferenceMode = "latest",
+  onProjectReferenceModeChange
+}: CameraScreenProps = {}) {
+  const [isReferenceModeChanging, setIsReferenceModeChanging] = useState(false);
+  const referenceModeChangeInProgressRef = useRef(false);
   const { user, subscription } = useAuth();
   const planEntitlements = useMemo(
     () => getPlanEntitlements({ isLoggedIn: Boolean(user), subscription }),
@@ -255,6 +268,7 @@ export default function CameraScreen() {
   const [cameraSessionRestartKey, setCameraSessionRestartKey] = useState(0);
   const [isCapturing, setIsCapturing] = useState(false);
   const [pendingPhotoSaveCount, setPendingPhotoSaveCount] = useState(0);
+  const [photoSaveStage, setPhotoSaveStage] = useState<"app" | "device" | "cloud" | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [poseGuidance, setPoseGuidance] = useState<BodyPoseGuidance | null>(null);
   const [referenceUri, setReferenceUri] = useState<string | null>(null);
@@ -392,7 +406,10 @@ export default function CameraScreen() {
   );
   const photoOutputQuality =
     CAMERA_QUALITY_OPTIONS.find((option) => option.value === photoQuality)?.quality ?? 0.92;
-  const photoOutput = usePhotoOutput({ quality: photoOutputQuality });
+  const photoOutput = usePhotoOutput({
+    quality: photoOutputQuality,
+    targetResolution: CAMERA_PHOTO_TARGET_RESOLUTION
+  });
   const cameraOutputs = useMemo(() => [photoOutput], [photoOutput]);
   const cameraSupportsExposureBias = cameraDevice ? cameraDevice.supportsExposureBias : false;
   const cameraExposureMin =
@@ -1386,6 +1403,7 @@ export default function CameraScreen() {
       console.warn("[camera] VisionCamera session error", error);
     }
 
+    isCameraReadyRef.current = false;
     setIsCameraReady(false);
     setErrorMessage("카메라 연결이 불안정해 다시 시작합니다.");
 
@@ -1452,6 +1470,27 @@ export default function CameraScreen() {
     setOverlaySetupActive(false);
     setOverlayOpacity(defaultOverlayOpacity.current);
     referenceOverlayRef.current?.reset();
+  };
+
+  const toggleProjectReference = async () => {
+    const projectId = bodyFrameCameraSession.projectId;
+    if (!projectId || !onProjectReferenceModeChange ||
+        bodyFrameCameraSession.projectPhotoCount === 0 || referenceModeChangeInProgressRef.current) return;
+    referenceModeChangeInProgressRef.current = true;
+    setIsReferenceModeChanging(true);
+    setErrorMessage(null);
+    try {
+      await onProjectReferenceModeChange(projectId, projectReferenceMode === "first" ? "latest" : "first");
+      if (getBodyFrameCameraSessionSnapshot().projectId !== projectId) return;
+      setReferenceUri(null);
+      referenceOverlayRef.current?.reset();
+      setOverlayLocked(false);
+    } catch (error) {
+      setErrorMessage(getUserFacingErrorMessage(error, "기준 사진을 변경하지 못했습니다."));
+    } finally {
+      referenceModeChangeInProgressRef.current = false;
+      setIsReferenceModeChanging(false);
+    }
   };
 
   const reopenOverlaySetup = () => {
@@ -1992,6 +2031,8 @@ export default function CameraScreen() {
     }) => {
       setPendingPhotoSaveCount((count) => count + 1);
       const runSaveJob = async () => {
+        const saveStartedAt = Date.now();
+        setPhotoSaveStage("app");
         let savedPhoto: PhotoItem | null = null;
         let deviceSaveError: unknown = null;
         const targets = getCameraSaveScopeTargets(saveScope);
@@ -1999,17 +2040,20 @@ export default function CameraScreen() {
         try {
           if (targets.app || targets.cloud) {
             savedPhoto = await saveCapturedPhoto(captureInput, captureReservation);
+            if (__DEV__) console.info("[camera:save] app-complete", Date.now() - saveStartedAt);
+            setRecentPhoto(savedPhoto);
           }
           if (targets.device) {
+            setPhotoSaveStage("device");
             try {
               await saveCapturedPhotoToDevice(captureInput, savedPhoto?.uri);
+              if (__DEV__) console.info("[camera:save] album-complete", Date.now() - saveStartedAt);
             } catch (deviceError) {
               if (!savedPhoto) throw deviceError;
               deviceSaveError = deviceError;
             }
           }
           if (savedPhoto) {
-            setRecentPhoto(savedPhoto);
             if (savedPhoto.projectId) {
               const captureState = await getBodyCaptureContextState(
                 savedPhoto.projectId
@@ -2022,6 +2066,7 @@ export default function CameraScreen() {
               }
             }
             if (targets.cloud) {
+              setPhotoSaveStage("cloud");
               try {
                 await backupPhotoIfEnabled({
                   user: backupUser,
@@ -2062,6 +2107,7 @@ export default function CameraScreen() {
             // 저장 결과와 무관한 임시 파일 정리 실패는 촬영 실패로 표시하지 않습니다.
           }
           setPendingPhotoSaveCount((count) => Math.max(0, count - 1));
+          setPhotoSaveStage(null);
         }
       };
 
@@ -2108,10 +2154,20 @@ export default function CameraScreen() {
         if (!canCaptureWithCurrentSession()) return;
       }
       captureReservation = reserveBodyFrameCameraCapture();
-      const photo = await photoOutput.capturePhotoToFile({
+      const captureStartedAt = Date.now();
+      const logCaptureStage = (stage: string) => {
+        if (__DEV__) console.info("[camera:capture]", stage, Date.now() - captureStartedAt);
+      };
+      logCaptureStage("requested");
+      const photo = await waitForCameraCapture(photoOutput.capturePhotoToFile({
         flashMode: cameraDevice.hasFlash ? flashMode : "off",
         enableShutterSound: cameraShutterSoundMode === "sound"
-      }, {});
+      }, {
+        onWillBeginCapture: () => logCaptureStage("started"),
+        onWillCapturePhoto: () => logCaptureStage("exposing"),
+        onDidCapturePhoto: () => logCaptureStage("captured")
+      }), (latePhoto) => deleteLocalFile(`file://${latePhoto.filePath}`));
+      logCaptureStage("file-ready");
       photoUri = `file://${photo.filePath}`;
       const captureInput = {
         uri: photoUri,
@@ -2132,6 +2188,9 @@ export default function CameraScreen() {
       captureReservation = null;
       photoUri = null;
     } catch (error) {
+      if (error instanceof CameraCaptureTimeoutError) {
+        handleCameraSessionError(error);
+      }
       const message = getUserFacingErrorMessage(error, "사진을 촬영하지 못했습니다.");
       if (isDeviceAlbumPermissionError(error)) {
         showDeviceAlbumPermissionPrompt(message);
@@ -2270,7 +2329,7 @@ export default function CameraScreen() {
           onStarted={() => {
             isCameraReadyRef.current = true;
             setIsCameraReady(true);
-            if (errorMessage === "카메라 연결이 불안정해 다시 시작합니다.") {
+            if (errorMessage === "카메라 연결이 불안정해 다시 시작합니다." || errorMessage === CAMERA_CAPTURE_TIMEOUT_MESSAGE) {
               setErrorMessage(null);
             }
           }}
@@ -2936,18 +2995,18 @@ export default function CameraScreen() {
                 <View style={[styles.modalSection, styles.modalSectionSpaced]}>
                   <Text selectable={false} style={styles.modalSectionTitle}>색상</Text>
                   <View style={styles.colorRow}>
-                    {GUIDE_COLOR_OPTIONS.map((option) => (
+                    {GUIDE_COLOR_OPTIONS.map(({ label, value: swatchColor }) => (
                       <Pressable
-                        key={option.label}
+                        key={label}
                         style={[
                           styles.colorOption,
-                          guideColor === option.value && styles.colorOptionActive
+                          guideColor === swatchColor && styles.colorOptionActive
                         ]}
-                        onPress={() => updateGuideColor(option.value)}
-                        accessibilityState={{ selected: guideColor === option.value }}
+                        onPress={() => updateGuideColor(swatchColor)}
+                        accessibilityState={{ selected: guideColor === swatchColor }}
                       >
-                        <View style={[styles.colorSwatch, { backgroundColor: option.value }]} />
-                        <Text selectable={false} style={styles.colorLabel}>{option.label}</Text>
+                        <View style={[styles.colorSwatch, { backgroundColor: swatchColor }]} />
+                        <Text selectable={false} style={styles.colorLabel}>{label}</Text>
                       </Pressable>
                     ))}
                   </View>
@@ -2983,7 +3042,7 @@ export default function CameraScreen() {
               <View style={styles.overlaySetupPanel}>
                 <View style={styles.overlaySetupHeader}>
                   <View>
-                    <Text selectable={false} style={styles.overlaySetupTitle}>이전 사진 맞추기</Text>
+                    <Text selectable={false} style={styles.overlaySetupTitle}>사진 가이드</Text>
                     <Text selectable={false} style={styles.overlaySetupHint}>
                       드래그와 손가락 확대/축소로 직접 맞출 수 있습니다.
                     </Text>
@@ -3016,16 +3075,32 @@ export default function CameraScreen() {
                     <Text selectable={false} style={styles.overlayConfirmText}>확인</Text>
                   </Pressable>
                 </View>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="가이드 이미지만 제거, 원본 사진 유지"
-                  style={[styles.overlayCompactButton, styles.overlayRemoveButton, { flex: 0 }]}
-                  onPress={removeReferenceOverlay}
-                >
-                  <Text selectable={false} style={[styles.overlayCompactText, styles.overlayRemoveText]}>
-                    이미지 제거
-                  </Text>
-                </Pressable>
+                <View style={styles.overlaySetupActions}>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="가이드 이미지만 제거, 원본 사진 유지"
+                    style={[styles.overlayCompactButton, styles.overlayRemoveButton]}
+                    onPress={removeReferenceOverlay}
+                  >
+                    <Text selectable={false} style={[styles.overlayCompactText, styles.overlayRemoveText]}>
+                      이미지 제거
+                    </Text>
+                  </Pressable>
+                  {onProjectReferenceModeChange && bodyFrameCameraSession.projectId ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={projectReferenceMode === "first" ? "선택 프로젝트의 마지막 사진을 가이드로 사용" : "선택 프로젝트의 첫 사진을 가이드로 사용"}
+                      accessibilityState={{ disabled: isReferenceModeChanging || bodyFrameCameraSession.projectPhotoCount === 0, busy: isReferenceModeChanging }}
+                      disabled={isReferenceModeChanging || bodyFrameCameraSession.projectPhotoCount === 0}
+                      style={[styles.overlayCompactButton, (isReferenceModeChanging || bodyFrameCameraSession.projectPhotoCount === 0) && { opacity: 0.45 }]}
+                      onPress={() => void toggleProjectReference()}
+                    >
+                      <Text selectable={false} style={styles.overlayCompactText}>
+                        {isReferenceModeChanging ? "변경중" : projectReferenceMode === "first" ? "프로젝트 마지막 사진" : "프로젝트 첫번째 사진"}
+                      </Text>
+                    </Pressable>
+                  ) : null}
+                </View>
               </View>
             </View>
           ) : (
@@ -3288,7 +3363,9 @@ export default function CameraScreen() {
                     {isPhotoSavePending ? (
                       <View pointerEvents="none" style={styles.gallerySavingOverlay}>
                         <ActivityIndicator color={colors.inverse} size="small" />
-                        <Text selectable={false} style={styles.gallerySavingText}>저장중</Text>
+                        <Text selectable={false} style={styles.gallerySavingText}>
+                          {photoSaveStage === "device" ? "앨범\n저장중" : photoSaveStage === "cloud" ? "백업중" : "저장중"}
+                        </Text>
                       </View>
                     ) : null}
                   </Pressable>

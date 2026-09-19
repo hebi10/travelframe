@@ -942,23 +942,23 @@ export default function EditScreen() {
                 })}
               </View>
               <View style={styles.guideColorRow}>
-                {GUIDE_COLOR_OPTIONS.map((option) => (
+                {GUIDE_COLOR_OPTIONS.map(({ label, value: swatchColor }) => (
                   <Pressable
-                    key={option.label}
+                    key={label}
                     style={[
                       styles.guideColorOption,
-                      guideColor === option.value && styles.guideColorOptionActive
+                      guideColor === swatchColor && styles.guideColorOptionActive
                     ]}
-                    onPress={() => updateGuideColor(option.value)}
+                    onPress={() => updateGuideColor(swatchColor)}
                   >
                     <View
                       style={[
                         styles.guideColorSwatch,
-                        { backgroundColor: option.value }
+                        { backgroundColor: swatchColor }
                       ]}
                     />
                     <Text selectable={false} style={styles.guideColorLabel}>
-                      {option.label}
+                      {label}
                     </Text>
                   </Pressable>
                 ))}

@@ -22,13 +22,13 @@ assert.equal(
 );
 assert.equal(
   appJson.expo.android.adaptiveIcon.backgroundColor,
-  "#0B0B0C"
+  "#151719"
 );
 
 assert.deepEqual(pngDimensions(appIcon), {
   width: 1024,
   height: 1024,
-  colorType: 2
+  colorType: 6
 });
 assert.deepEqual(pngDimensions(adaptiveIcon), {
   width: 1024,
@@ -38,13 +38,13 @@ assert.deepEqual(pngDimensions(adaptiveIcon), {
 
 assert.equal(
   sha256(appIcon),
-  "389c088f2cb32ea5fed3dcc6be4edfc29e5ce3e51b0d11bc6cf6aa2a528f90df",
-  "app icon should match the approved BF monogram v2 asset"
+  "891e4d5fb09248587d0547ca09c00c31a833c9d1a750f571e3ceaf14b87447c7",
+  "app icon should match the approved body outline and frame asset"
 );
 assert.equal(
   sha256(adaptiveIcon),
-  "6bcf2348ed7e7a7adbdcae9cf853761d43595fa1c71d5382418c806a443b9770",
-  "adaptive foreground should match the approved BF v2 asset"
+  "0438c59759fe1ffdf898c2010b057f61a358a167a207e6777df954df74b365df",
+  "adaptive foreground should match the approved symbol with safe-area padding"
 );
 
 const primaryUiFiles = [

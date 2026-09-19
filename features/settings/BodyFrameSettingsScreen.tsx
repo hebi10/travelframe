@@ -161,7 +161,7 @@ export default function BodyFrameSettingsScreen() {
           <BodyFrameSettingRow
             label="출력 규격"
             detail="기본은 세로 1080p이며 영상 화면에서 변경합니다."
-            mark="9:16 · 1080p"
+            mark="3:4 · 1080p"
             onPress={() => router.push("/trip-clip")}
           />
         </SectionBlock>

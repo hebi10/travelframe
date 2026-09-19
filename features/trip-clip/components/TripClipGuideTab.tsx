@@ -183,6 +183,7 @@ export function TripClipGuideTab({
         </Text>
         <View style={styles.guideColorRow}>
           {guideColorOptions.map((option) => {
+            const swatchColor = option.value;
             const isActive = previewGuideColor === option.value;
 
             return (
@@ -194,7 +195,7 @@ export function TripClipGuideTab({
                 <View
                   style={[
                     styles.guideColorSwatch,
-                    { backgroundColor: option.value }
+                    { backgroundColor: swatchColor }
                   ]}
                 />
                 <Text selectable={false} style={styles.guideColorLabel}>

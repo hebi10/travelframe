@@ -1764,7 +1764,7 @@ const normalizeImageWorkBackup = (
   ratio:
     data.ratio === "4:5" || data.ratio === "1:1" || data.ratio === "16:9" || data.ratio === "3:4"
       ? data.ratio
-      : "9:16",
+      : "3:4",
   photoIds: Array.isArray(data.photoIds) ? (data.photoIds as string[]) : [],
   imageUris: Array.isArray(data.imageUris) ? (data.imageUris as string[]) : [],
   localFileStatus: "cloud_only",
@@ -1784,7 +1784,7 @@ const normalizeVideoBackup = (
   ratio:
     data.ratio === "4:5" || data.ratio === "1:1" || data.ratio === "16:9" || data.ratio === "3:4"
       ? data.ratio
-      : "9:16",
+      : "3:4",
   template:
     data.template === "film-log" || data.template === "center-cut" || data.template === "reel-basic"
       ? data.template

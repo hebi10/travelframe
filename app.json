@@ -17,7 +17,7 @@
     "splash": {
       "image": "./assets/icons/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#0B0B0C"
+      "backgroundColor": "#151719"
     },
     "newArchEnabled": true,
     "userInterfaceStyle": "automatic",
@@ -30,12 +30,12 @@
       ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/icons/adaptive-icon.png",
-        "backgroundColor": "#0B0B0C"
+        "backgroundColor": "#151719"
       },
       "splash": {
         "image": "./assets/icons/splash-icon.png",
         "resizeMode": "contain",
-        "backgroundColor": "#0B0B0C"
+        "backgroundColor": "#151719"
       },
       "permissions": [
         "android.permission.CAMERA",

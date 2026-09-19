@@ -1099,7 +1099,7 @@ const styles = StyleSheet.create({
   },
   photoTile: {
     width: "31%",
-    aspectRatio: 9 / 16,
+    aspectRatio: 3 / 4,
     overflow: "hidden",
     position: "relative",
     borderWidth: bodyFrameDesign.borderWidth,

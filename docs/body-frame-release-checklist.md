@@ -5,7 +5,7 @@
 - [x] UI Finalize Stage 1–7 merged.
 - [x] BF monogram v2 app icon applied.
 - [x] BF adaptive foreground v2 applied.
-- [x] Android adaptive background is `#0B0B0C`.
+- [x] Android adaptive background is `#151719`.
 - [x] Final Android manual QA checklist updated.
 - [x] Android generated project is produced by clean Expo prebuild in CI.
 - [x] Required generated R8 keep rules are owned by the Expo config plugin.

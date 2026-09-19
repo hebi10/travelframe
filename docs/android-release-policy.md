@@ -60,9 +60,9 @@ dependency.
 
 ## Release artwork
 
-The approved BF monogram v2 launcher and adaptive foreground are source-controlled under
-`assets/icons`. Android adaptive background remains `#0B0B0C`. The current splash is
-retained because the approved BF v2 package does not include a dedicated splash final.
+The approved body-outline/viewfinder symbol replaces BF monogram v2 under
+`assets/icons`. Android adaptive and splash backgrounds use `#151719`.
+The launcher and splash both use the approved symbol, with adaptive safe-area padding.
 
 App/store artwork is not a Firebase upload. Google Play listing graphics are uploaded
 directly to Google Play Console. See `docs/release-assets/README.md`.

@@ -71,7 +71,7 @@ export const saveCapturedPhoto = async (
       localImageLimit: undefined,
       projectId: undefined,
       sequence: undefined
-    });
+    }, { deferProjectOptimization: true });
 
     const stored = await storeBodyFramePhotoFile({
       sourceUri: legacyPhoto.uri,

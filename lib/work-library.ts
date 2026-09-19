@@ -55,7 +55,7 @@ const normalizeImageBundleWorkItem = (
     typeof work.coverUri === "string" && work.coverUri.length > 0
       ? work.coverUri
       : undefined,
-  ratio: validRatios.has(work.ratio ?? "") ? work.ratio! : "9:16",
+  ratio: validRatios.has(work.ratio ?? "") ? work.ratio! : "3:4",
   photoIds: normalizeStringArray(work.photoIds),
   imageUris: normalizeStringArray(work.imageUris),
   localImageUris: Array.isArray(work.localImageUris)

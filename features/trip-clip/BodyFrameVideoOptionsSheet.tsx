@@ -128,7 +128,7 @@ const styles = StyleSheet.create({
   action: { minHeight: bodyFrameDesign.minTouchSize, paddingHorizontal: 12, justifyContent: "center" },
   photoList: { flexGrow: 0, flexShrink: 1 },
   photoRow: { gap: 8 },
-  photo: { width: "31%", aspectRatio: 9 / 16, borderWidth: 2, borderRadius: 8, overflow: "hidden", marginBottom: 8 },
+  photo: { width: "31%", aspectRatio: 3 / 4, borderWidth: 2, borderRadius: 8, overflow: "hidden", marginBottom: 8 },
   photoImage: { width: "100%", height: "100%" },
   photoLabel: { position: "absolute", bottom: 0, left: 0, right: 0, padding: 6, color: "#FFFFFF", backgroundColor: "rgba(0,0,0,0.65)" },
   choices: { gap: 8 },

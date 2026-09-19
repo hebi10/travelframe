@@ -29,6 +29,6 @@ session.finishBodyFrameCameraCapture({ ...lastB, success: false });
 assert.equal(session.isBodyFrameCameraCaptureBlocked(), false);
 
 const camera = fs.readFileSync("features/camera/CameraScreen.tsx", "utf8");
-assert.ok(camera.indexOf("captureReservation = reserveBodyFrameCameraCapture()") < camera.indexOf("const photo = await photoOutput.capturePhotoToFile"));
+assert.ok(camera.indexOf("captureReservation = reserveBodyFrameCameraCapture()") < camera.indexOf("const photo = await waitForCameraCapture"));
 assert.ok(camera.includes("saveCapturedPhoto(captureInput, captureReservation)"));
 console.log("ok - queued camera reservations survive navigation and stale reloads");

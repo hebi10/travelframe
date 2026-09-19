@@ -57,4 +57,10 @@ assert.deepEqual(utilsModule.getVideoQualityOutputSize("1080p", 9 / 16), {
   height: 1920
 });
 
+assert.equal(utilsModule.getVideoAspectRatio(), 3 / 4);
+assert.equal(utilsModule.getVideoAspectRatio("invalid"), 3 / 4);
+assert.equal(utilsModule.getVideoAspectRatio("3:4"), 3 / 4);
+assert.equal(utilsModule.getVideoAspectRatio("9:16"), 9 / 16);
+assert.equal(utilsModule.getVideoAspectRatio("1:1"), 1);
+assert.equal(utilsModule.getVideoAspectRatio("16:9"), 16 / 9);
 console.log("ok - video duration and quality utilities work");
