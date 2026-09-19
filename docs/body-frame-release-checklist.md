@@ -10,6 +10,8 @@
 - [x] Android generated project is produced by clean Expo prebuild in CI.
 - [x] Required generated R8 keep rules are owned by the Expo config plugin.
 - [x] Release source verifier checks brand, package, EAS, billing, policy and assets.
+- [x] Pose alignment plugin generates bundled ML Kit Pose Detection and no extra runtime permission.
+- [x] Pose alignment privacy disclosure states on-device temporary processing with no server upload.
 - [x] Gitleaks full-history scan uses exact legacy fingerprint suppressions only.
 - [x] Stage 8 final merged after green CI.
 
@@ -76,6 +78,10 @@ Use `docs/manual-device-qa.md`.
 - [ ] Google Play purchase/restore/upgrade/refund.
 - [ ] Small-screen / large-font / Safe Area / foldable checks.
 - [ ] Dark and light appearance.
+- [ ] Pose alignment OFF leaves the existing camera flow unchanged.
+- [ ] Pose alignment ON shows low-frequency position guidance after a reference photo exists.
+- [ ] Pose analysis failure falls back without blocking capture.
+- [ ] Pose preview snapshots are temporary and not stored/uploaded.
 - [ ] No legacy TravelFrame wording in the primary Body Frame flow.
 
 ## Store listing / policy
