@@ -154,11 +154,20 @@ import {
   getBodyCaptureContextState,
   saveBodyCaptureContext
 } from "@/lib/body-frame-capture-context";
+import { analyzeAndroidPose } from "@/lib/android-pose-alignment";
+import {
+  BODY_POSE_ANALYSIS_INTERVAL_MS,
+  getBodyPoseGuidance
+} from "@/lib/body-pose-alignment";
 import { getPlanEntitlements } from "@/lib/plan-entitlements";
 import { isMediaLibraryAccessGranted, requestMediaLibraryAccess } from "@/lib/request-media-library-access";
 import { deleteLocalFile, getRecentPhoto, saveCapturedPhoto, saveCapturedPhotoToDevice } from "@/lib/photo-library";
 import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 import type { BodyCaptureContext } from "@/types/body-capture-context";
+import type {
+  BodyPoseGuidance,
+  BodyPoseMetrics
+} from "@/types/body-pose-alignment";
 import type { PhotoItem, PhotoRatioLabel, SaveCapturedPhotoInput } from "@/types/photo";
 export default function CameraScreen() {
   const { user, subscription } = useAuth();
@@ -243,6 +252,7 @@ export default function CameraScreen() {
   const [isCapturing, setIsCapturing] = useState(false);
   const [pendingPhotoSaveCount, setPendingPhotoSaveCount] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [poseGuidance, setPoseGuidance] = useState<BodyPoseGuidance | null>(null);
   const [referenceUri, setReferenceUri] = useState<string | null>(null);
   const [overlayOpacity, setOverlayOpacity] = useState(0.42);
   const defaultOverlayOpacity = useRef(0.4);
@@ -281,6 +291,8 @@ export default function CameraScreen() {
   const isCameraSessionActiveRef = useRef(false);
   const cameraNativeCaptureInProgressRef = useRef(false);
   const captureSaveQueueTailRef = useRef<Promise<void>>(Promise.resolve());
+  const poseAnalysisBusyRef = useRef(false);
+  const poseAlignmentWasAlignedRef = useRef(false);
   const insets = useSafeAreaInsets();
   const bottomSafePadding = Math.max(insets.bottom + 10, 24);
   const bottomModalPadding = Math.max(insets.bottom + 18, 28);
