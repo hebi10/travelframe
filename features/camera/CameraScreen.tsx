@@ -550,6 +550,147 @@ export default function CameraScreen() {
     }, [cancelPendingTimedCapture])
   );
 
+  useEffect(() => {
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let referenceResolved = false;
+    let referencePose: BodyPoseMetrics | null = null;
+    poseAlignmentWasAlignedRef.current = false;
+
+    const enabled = bodyFrameCameraSession.poseAlignmentEnabled;
+    const referenceUri = bodyFrameCameraSession.automaticReferenceUri;
+
+    if (!enabled) {
+      setPoseGuidance(null);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    if (!referenceUri) {
+      setPoseGuidance({
+        status: "reference_unavailable",
+        message: "첫 사진을 저장하면 자세 맞춤을 시작합니다.",
+        aligned: false
+      });
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    setPoseGuidance({
+      status: "analyzing",
+      message: "기준 사진을 분석하는 중입니다.",
+      aligned: false
+    });
+
+    const schedule = (delay = BODY_POSE_ANALYSIS_INTERVAL_MS) => {
+      if (cancelled) return;
+      timer = setTimeout(() => {
+        void runAnalysis();
+      }, delay);
+    };
+
+    const runAnalysis = async () => {
+      if (cancelled) return;
+
+      if (
+        poseAnalysisBusyRef.current ||
+        !isCameraScreenFocused ||
+        !isCameraReady ||
+        !isCameraSessionActiveRef.current ||
+        isCameraModalOpen ||
+        isCapturing
+      ) {
+        schedule();
+        return;
+      }
+
+      poseAnalysisBusyRef.current = true;
+      let snapshotPath: string | null = null;
+
+      try {
+        if (!referenceResolved) {
+          referenceResolved = true;
+          referencePose = await analyzeAndroidPose(referenceUri);
+        }
+
+        if (!referencePose?.detected) {
+          setPoseGuidance({
+            status: "reference_unavailable",
+            message: "기준 사진에서 자세를 확인할 수 없습니다.",
+            aligned: false
+          });
+          return;
+        }
+
+        const previewSnapshot = await cameraRef.current?.takeSnapshot();
+        if (!previewSnapshot) {
+          schedule();
+          return;
+        }
+
+        try {
+          snapshotPath = await previewSnapshot.saveToTemporaryFileAsync("jpg", 70);
+        } finally {
+          previewSnapshot.dispose();
+        }
+
+        const currentPose = await analyzeAndroidPose(snapshotPath);
+        if (cancelled) return;
+
+        const guidance = getBodyPoseGuidance({
+          reference: referencePose,
+          current: currentPose,
+          mirrorHorizontal: cameraFacing === "front"
+        });
+        setPoseGuidance(guidance);
+
+        if (guidance.aligned && !poseAlignmentWasAlignedRef.current) {
+          void Haptics.notificationAsync(
+            Haptics.NotificationFeedbackType.Success
+          ).catch(() => undefined);
+        }
+        poseAlignmentWasAlignedRef.current = guidance.aligned;
+      } catch {
+        if (!cancelled) {
+          setPoseGuidance({
+            status: "no_pose",
+            message: "자세 분석을 잠시 사용할 수 없습니다.",
+            aligned: false
+          });
+        }
+      } finally {
+        if (snapshotPath) {
+          const uri = snapshotPath.startsWith("file://")
+            ? snapshotPath
+            : `file://${snapshotPath}`;
+          await deleteLocalFile(uri).catch(() => undefined);
+        }
+        poseAnalysisBusyRef.current = false;
+        schedule();
+      }
+    };
+
+    schedule(350);
+
+    return () => {
+      cancelled = true;
+      poseAnalysisBusyRef.current = false;
+      if (timer) {
+        clearTimeout(timer);
+      }
+    };
+  }, [
+    bodyFrameCameraSession.automaticReferenceUri,
+    bodyFrameCameraSession.poseAlignmentEnabled,
+    cameraFacing,
+    isCameraModalOpen,
+    isCameraReady,
+    isCameraScreenFocused,
+    isCapturing
+  ]);
+
   useFocusEffect(
     useCallback(() => {
       let isActive = true;
