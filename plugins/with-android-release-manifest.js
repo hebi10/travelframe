@@ -3,6 +3,7 @@ const path = require("path");
 const {
   withAndroidManifest,
   withDangerousMod,
+  withGradleProperties,
   withMainApplication
 } = require("@expo/config-plugins");
 
@@ -307,6 +308,24 @@ function ensureAndroidImageAdjustmentPackageRegistered(source, androidPackage) {
 }
 
 function withAndroidReleaseManifest(config) {
+  config = withGradleProperties(config, (config) => {
+    const minSdkProperty = config.modResults.find(
+      (item) => item.type === "property" && item.key === "android.minSdkVersion"
+    );
+
+    if (minSdkProperty) {
+      minSdkProperty.value = "26";
+    } else {
+      config.modResults.push({
+        type: "property",
+        key: "android.minSdkVersion",
+        value: "26"
+      });
+    }
+
+    return config;
+  });
+
   config = withAndroidManifest(config, (config) => {
     const androidManifest = config.modResults;
     const requestedPermissions = androidManifest.manifest["uses-permission"] ?? [];

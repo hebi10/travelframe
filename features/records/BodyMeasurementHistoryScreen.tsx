@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { BodyHealthConnectImportCard } from "@/components/body-health-connect-import-card";
 import { BodyMeasurementSummaryCard } from "@/components/body-measurement-summary-card";
 import { bodyFrameDesign, bodyFrameTypography } from "@/constants/app-theme";
 import { BodyMeasurementEditorSheet } from "@/features/records/BodyMeasurementEditorSheet";
@@ -258,6 +259,12 @@ export default function BodyMeasurementHistoryScreen() {
           </Text>
         </View>
 
+        <BodyHealthConnectImportCard
+          projectId={project.id}
+          settings={settings}
+          onImported={() => void reload()}
+        />
+
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -391,6 +398,9 @@ export default function BodyMeasurementHistoryScreen() {
                             ? "#" + entry.sequence + " 기록"
                             : "사진과 연결되지 않은 기록"}
                           {entry.note ? " · 메모 있음" : ""}
+                          {entry.source === "health_connect"
+                            ? " · Health Connect"
+                            : ""}
                         </Text>
                       </View>
                       <Text style={[styles.historyValue, { color: palette.text }]}>

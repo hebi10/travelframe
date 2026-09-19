@@ -30,6 +30,8 @@ export type BodyMeasurementEntry = {
   waistCm?: number;
   note?: string;
   source: "manual" | "health_connect";
+  sourceRecordId?: string;
+  sourceAppPackage?: string;
 };
 
 export const defaultBodyMeasurementSettings: BodyMeasurementSettings = {
