@@ -555,6 +555,7 @@ export default function CameraScreen() {
     let timer: ReturnType<typeof setTimeout> | null = null;
     let referenceResolved = false;
     let referencePose: BodyPoseMetrics | null = null;
+    let analysisStopped = false;
     poseAlignmentWasAlignedRef.current = false;
 
     const enabled = bodyFrameCameraSession.poseAlignmentEnabled;
@@ -585,7 +586,7 @@ export default function CameraScreen() {
     });
 
     const schedule = (delay = BODY_POSE_ANALYSIS_INTERVAL_MS) => {
-      if (cancelled) return;
+      if (cancelled || analysisStopped) return;
       timer = setTimeout(() => {
         void runAnalysis();
       }, delay);
@@ -621,12 +622,12 @@ export default function CameraScreen() {
             message: "기준 사진에서 자세를 확인할 수 없습니다.",
             aligned: false
           });
+          analysisStopped = true;
           return;
         }
 
         const previewSnapshot = await cameraRef.current?.takeSnapshot();
         if (!previewSnapshot) {
-          schedule();
           return;
         }
 
@@ -659,6 +660,7 @@ export default function CameraScreen() {
             message: "자세 분석을 잠시 사용할 수 없습니다.",
             aligned: false
           });
+          analysisStopped = true;
         }
       } finally {
         if (snapshotPath) {
