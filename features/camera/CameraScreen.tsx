@@ -154,11 +154,20 @@ import {
   getBodyCaptureContextState,
   saveBodyCaptureContext
 } from "@/lib/body-frame-capture-context";
+import { analyzeAndroidPose } from "@/lib/android-pose-alignment";
+import {
+  BODY_POSE_ANALYSIS_INTERVAL_MS,
+  getBodyPoseGuidance
+} from "@/lib/body-pose-alignment";
 import { getPlanEntitlements } from "@/lib/plan-entitlements";
 import { isMediaLibraryAccessGranted, requestMediaLibraryAccess } from "@/lib/request-media-library-access";
 import { deleteLocalFile, getRecentPhoto, saveCapturedPhoto, saveCapturedPhotoToDevice } from "@/lib/photo-library";
 import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 import type { BodyCaptureContext } from "@/types/body-capture-context";
+import type {
+  BodyPoseGuidance,
+  BodyPoseMetrics
+} from "@/types/body-pose-alignment";
 import type { PhotoItem, PhotoRatioLabel, SaveCapturedPhotoInput } from "@/types/photo";
 export default function CameraScreen() {
   const { user, subscription } = useAuth();
@@ -243,6 +252,7 @@ export default function CameraScreen() {
   const [isCapturing, setIsCapturing] = useState(false);
   const [pendingPhotoSaveCount, setPendingPhotoSaveCount] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [poseGuidance, setPoseGuidance] = useState<BodyPoseGuidance | null>(null);
   const [referenceUri, setReferenceUri] = useState<string | null>(null);
   const [overlayOpacity, setOverlayOpacity] = useState(0.42);
   const defaultOverlayOpacity = useRef(0.4);
@@ -281,6 +291,8 @@ export default function CameraScreen() {
   const isCameraSessionActiveRef = useRef(false);
   const cameraNativeCaptureInProgressRef = useRef(false);
   const captureSaveQueueTailRef = useRef<Promise<void>>(Promise.resolve());
+  const poseAnalysisBusyRef = useRef(false);
+  const poseAlignmentWasAlignedRef = useRef(false);
   const insets = useSafeAreaInsets();
   const bottomSafePadding = Math.max(insets.bottom + 10, 24);
   const bottomModalPadding = Math.max(insets.bottom + 18, 28);
@@ -537,6 +549,149 @@ export default function CameraScreen() {
       };
     }, [cancelPendingTimedCapture])
   );
+
+  useEffect(() => {
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let referenceResolved = false;
+    let referencePose: BodyPoseMetrics | null = null;
+    let analysisStopped = false;
+    poseAlignmentWasAlignedRef.current = false;
+
+    const enabled = bodyFrameCameraSession.poseAlignmentEnabled;
+    const referenceUri = bodyFrameCameraSession.automaticReferenceUri;
+
+    if (!enabled) {
+      setPoseGuidance(null);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    if (!referenceUri) {
+      setPoseGuidance({
+        status: "reference_unavailable",
+        message: "첫 사진을 저장하면 자세 맞춤을 시작합니다.",
+        aligned: false
+      });
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    setPoseGuidance({
+      status: "analyzing",
+      message: "기준 사진을 분석하는 중입니다.",
+      aligned: false
+    });
+
+    const schedule = (delay = BODY_POSE_ANALYSIS_INTERVAL_MS) => {
+      if (cancelled || analysisStopped) return;
+      timer = setTimeout(() => {
+        void runAnalysis();
+      }, delay);
+    };
+
+    const runAnalysis = async () => {
+      if (cancelled) return;
+
+      if (
+        poseAnalysisBusyRef.current ||
+        !isCameraScreenFocused ||
+        !isCameraReady ||
+        !isCameraSessionActiveRef.current ||
+        isCameraModalOpen ||
+        isCapturing
+      ) {
+        schedule();
+        return;
+      }
+
+      poseAnalysisBusyRef.current = true;
+      let snapshotPath: string | null = null;
+
+      try {
+        if (!referenceResolved) {
+          referenceResolved = true;
+          referencePose = await analyzeAndroidPose(referenceUri);
+        }
+
+        if (!referencePose?.detected) {
+          setPoseGuidance({
+            status: "reference_unavailable",
+            message: "기준 사진에서 자세를 확인할 수 없습니다.",
+            aligned: false
+          });
+          analysisStopped = true;
+          return;
+        }
+
+        const previewSnapshot = await cameraRef.current?.takeSnapshot();
+        if (!previewSnapshot) {
+          return;
+        }
+
+        try {
+          snapshotPath = await previewSnapshot.saveToTemporaryFileAsync("jpg", 70);
+        } finally {
+          previewSnapshot.dispose();
+        }
+
+        const currentPose = await analyzeAndroidPose(snapshotPath);
+        if (cancelled) return;
+
+        const guidance = getBodyPoseGuidance({
+          reference: referencePose,
+          current: currentPose,
+          mirrorHorizontal: cameraFacing === "front"
+        });
+        setPoseGuidance(guidance);
+
+        if (guidance.aligned && !poseAlignmentWasAlignedRef.current) {
+          void Haptics.notificationAsync(
+            Haptics.NotificationFeedbackType.Success
+          ).catch(() => undefined);
+        }
+        poseAlignmentWasAlignedRef.current = guidance.aligned;
+      } catch {
+        if (!cancelled) {
+          setPoseGuidance({
+            status: "no_pose",
+            message: "자세 분석을 잠시 사용할 수 없습니다.",
+            aligned: false
+          });
+          analysisStopped = true;
+        }
+      } finally {
+        if (snapshotPath) {
+          const uri = snapshotPath.startsWith("file://")
+            ? snapshotPath
+            : `file://${snapshotPath}`;
+          await deleteLocalFile(uri).catch(() => undefined);
+        }
+        poseAnalysisBusyRef.current = false;
+        schedule();
+      }
+    };
+
+    schedule(350);
+
+    return () => {
+      cancelled = true;
+      poseAnalysisBusyRef.current = false;
+      if (timer) {
+        clearTimeout(timer);
+      }
+    };
+  }, [
+    bodyFrameCameraSession.automaticReferenceUri,
+    bodyFrameCameraSession.poseAlignmentEnabled,
+    cameraFacing,
+    isCameraModalOpen,
+    isCameraReady,
+    isCameraScreenFocused,
+    isCapturing
+  ]);
 
   useFocusEffect(
     useCallback(() => {
@@ -2117,6 +2272,21 @@ export default function CameraScreen() {
         locked={overlayLocked}
         resetKey={overlayResetKey}
       />
+
+      {bodyFrameCameraSession.poseAlignmentEnabled && poseGuidance ? (
+        <View
+          pointerEvents="none"
+          style={[
+            styles.poseAlignmentBanner,
+            poseGuidance.aligned && styles.poseAlignmentBannerAligned
+          ]}
+        >
+          <Text selectable={false} style={styles.poseAlignmentText}>
+            {poseGuidance.aligned ? "✓ " : ""}
+            {poseGuidance.message}
+          </Text>
+        </View>
+      ) : null}
 
       {isGuideShapePointAdjusting ? (
         <GestureDetector gesture={guideShapePointGesture}>

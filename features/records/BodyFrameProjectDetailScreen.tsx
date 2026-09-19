@@ -30,6 +30,10 @@ import {
   updateBodyCaptureContextEnabled
 } from "@/lib/body-frame-capture-context";
 import {
+  getBodyPoseAlignmentSettings,
+  updateBodyPoseAlignmentSettings
+} from "@/lib/body-pose-alignment";
+import {
   getBodyMeasurements,
   getBodyMeasurementSettings,
   updateBodyMeasurementSettings
@@ -107,6 +111,8 @@ export default function BodyFrameProjectDetailScreen() {
   const [rememberCaptureContext, setRememberCaptureContext] = useState(true);
   const [rememberCaptureContextDraft, setRememberCaptureContextDraft] =
     useState(true);
+  const [poseAlignmentEnabled, setPoseAlignmentEnabled] = useState(false);
+  const [poseAlignmentDraft, setPoseAlignmentDraft] = useState(false);
 
   const reload = useCallback(async () => {
     if (!projectId) {
@@ -119,13 +125,15 @@ export default function BodyFrameProjectDetailScreen() {
       storedPhotos,
       storedMeasurementSettings,
       storedMeasurements,
-      storedCaptureContextState
+      storedCaptureContextState,
+      storedPoseAlignmentSettings
     ] = await Promise.all([
       getBodyProjectById(projectId),
       getPhotos(),
       getBodyMeasurementSettings(projectId),
       getBodyMeasurements(projectId),
-      getBodyCaptureContextState(projectId)
+      getBodyCaptureContextState(projectId),
+      getBodyPoseAlignmentSettings(projectId)
     ]);
 
     setProject(storedProject);
@@ -135,6 +143,8 @@ export default function BodyFrameProjectDetailScreen() {
     setMeasurements(storedMeasurements);
     setRememberCaptureContext(storedCaptureContextState.enabled);
     setRememberCaptureContextDraft(storedCaptureContextState.enabled);
+    setPoseAlignmentEnabled(storedPoseAlignmentSettings.enabled);
+    setPoseAlignmentDraft(storedPoseAlignmentSettings.enabled);
     if (storedProject) {
       setNameDraft(storedProject.name);
       setTargetDraft(String(storedProject.targetPhotoCount));
@@ -222,7 +232,8 @@ export default function BodyFrameProjectDetailScreen() {
         updateBodyCaptureContextEnabled(
           project.id,
           rememberCaptureContextDraft
-        )
+        ),
+        updateBodyPoseAlignmentSettings(project.id, poseAlignmentDraft)
       ]);
       await reload();
       setSettingsOpen(false);
@@ -235,6 +246,7 @@ export default function BodyFrameProjectDetailScreen() {
     planEntitlements.maxProgressPhotos,
     measurementDraft,
     rememberCaptureContextDraft,
+    poseAlignmentDraft,
     project,
     reload,
     saving,
@@ -352,6 +364,7 @@ export default function BodyFrameProjectDetailScreen() {
             onPress={() => {
               setMeasurementDraft(measurementSettings);
               setRememberCaptureContextDraft(rememberCaptureContext);
+              setPoseAlignmentDraft(poseAlignmentEnabled);
               setSettingsOpen(true);
             }}
           >
@@ -691,6 +704,52 @@ export default function BodyFrameProjectDetailScreen() {
                   );
                 })}
               </View>
+
+              <View style={styles.settingDivider} />
+
+              <Text style={[styles.settingTitle, { color: palette.text }]}>
+                자세 맞춤 도움
+              </Text>
+              <Text style={[styles.settingDetail, { color: palette.muted }]}>
+                기준 사진과 현재 자세를 기기에서만 분석해 위치를 맞추는 안내를 표시합니다. 첫 기록 이후 사용할 수 있으며 분석 이미지는 서버로 전송하지 않습니다.
+              </Text>
+              <View style={styles.choiceRow}>
+                {([
+                  [false, "사용 안 함"],
+                  [true, "사용"]
+                ] as const).map(([enabled, label]) => {
+                  const active = poseAlignmentDraft === enabled;
+                  return (
+                    <Pressable
+                      key={label}
+                      accessibilityRole="button"
+                      style={[
+                        styles.choiceButton,
+                        {
+                          borderColor: active ? palette.text : palette.line,
+                          backgroundColor: active
+                            ? palette.text
+                            : palette.background
+                        }
+                      ]}
+                      onPress={() => setPoseAlignmentDraft(enabled)}
+                    >
+                      <Text
+                        style={[
+                          styles.choiceText,
+                          { color: active ? palette.inverse : palette.text }
+                        ]}
+                      >
+                        {label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+
+              <Text style={[styles.settingHint, { color: palette.faint }]}>
+                실험 기능 · 기기 성능에 따라 분석이 자동으로 중단될 수 있습니다.
+              </Text>
 
               <View style={styles.settingDivider} />
 
@@ -1173,6 +1232,10 @@ const styles = StyleSheet.create({
   settingDetail: {
     fontSize: 13,
     lineHeight: 19
+  },
+  settingHint: {
+    fontSize: bodyFrameTypography.caption,
+    lineHeight: 17
   },
   choiceRow: {
     flexDirection: "row",

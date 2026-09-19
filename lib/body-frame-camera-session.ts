@@ -2,6 +2,7 @@ export type BodyFrameCameraSessionSnapshot = {
   projectId: string | null;
   sequence: number;
   automaticReferenceUri: string | null;
+  poseAlignmentEnabled: boolean;
   projectRevision: number;
   pendingSaveCount: number;
   projectPhotoCount: number;
@@ -15,6 +16,7 @@ let snapshot: BodyFrameCameraSessionSnapshot = {
   projectId: null,
   sequence: 1,
   automaticReferenceUri: null,
+  poseAlignmentEnabled: false,
   projectRevision: 0,
   pendingSaveCount: 0,
   projectPhotoCount: 0,
@@ -63,6 +65,7 @@ export const setBodyFrameCameraSession = ({
   projectId,
   sequence,
   automaticReferenceUri,
+  poseAlignmentEnabled = false,
   projectPhotoCount = 0,
   maxProgressPhotos = null,
   captureBlockedReason = null
@@ -70,6 +73,7 @@ export const setBodyFrameCameraSession = ({
   projectId: string;
   sequence: number;
   automaticReferenceUri?: string | null;
+  poseAlignmentEnabled?: boolean;
   projectPhotoCount?: number;
   maxProgressPhotos?: number | null;
   captureBlockedReason?: string | null;
@@ -81,6 +85,7 @@ export const setBodyFrameCameraSession = ({
     sequence:
       Number.isInteger(sequence) && sequence > 0 ? sequence : 1,
     automaticReferenceUri: automaticReferenceUri ?? null,
+    poseAlignmentEnabled: poseAlignmentEnabled === true,
     projectRevision: projectChanged
       ? snapshot.projectRevision + 1
       : snapshot.projectRevision,
@@ -104,6 +109,7 @@ export const clearBodyFrameCameraSession = () => {
     projectId: null,
     sequence: 1,
     automaticReferenceUri: null,
+    poseAlignmentEnabled: false,
     projectRevision: snapshot.projectRevision + 1,
     pendingSaveCount: 0,
     projectPhotoCount: 0,

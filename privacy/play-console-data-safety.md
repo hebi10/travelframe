@@ -34,6 +34,8 @@
 - 계정 및 데이터 삭제 안내 URL: `https://travelframe-4e1fb.web.app/privacy/photo-guide-delete-account`
 - 앱에 광고 포함 여부: 예
 - 카메라 권한 사용 목적: 사용자가 직접 사진을 촬영하고 구도 가이드를 확인하기 위함
+- 자세 맞춤 도움: 프로젝트별 선택 기능. 카메라 프리뷰 스냅샷과 자세 좌표를 기기 내 ML Kit로 일시 처리하며 서버로 수집·공유·저장하지 않음
+- 자세 맞춤 도움 추가 권한: 없음. 기존 카메라 권한만 사용
 - 사진/미디어 접근 목적: 사용자가 선택한 사진, 영상, 음악을 편집, 저장, 백업하기 위함
 - Health Connect 사용 여부: 선택 기능 / 사용자 직접 연결 시에만 사용
 - Health Connect 읽기 권한: `android.permission.health.READ_WEIGHT`, `android.permission.health.READ_BODY_FAT`

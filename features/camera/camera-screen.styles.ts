@@ -40,6 +40,31 @@ export const styles = StyleSheet.create({
   camera: {
     ...StyleSheet.absoluteFillObject
   },
+  poseAlignmentBanner: {
+    position: "absolute",
+    left: 18,
+    right: 18,
+    bottom: 12,
+    minHeight: bodyFrameDesign.minTouchSize,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 12,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderColor: "rgba(255, 255, 255, 0.34)",
+    borderRadius: bodyFrameDesign.buttonRadius,
+    backgroundColor: "rgba(11, 11, 12, 0.82)",
+    zIndex: 10
+  },
+  poseAlignmentBannerAligned: {
+    borderColor: "rgba(255, 255, 255, 0.72)"
+  },
+  poseAlignmentText: {
+    color: colors.inverse,
+    fontSize: bodyFrameTypography.caption,
+    fontWeight: "700",
+    textAlign: "center",
+    letterSpacing: 0
+  },
   cameraColorOverlay: {
     ...StyleSheet.absoluteFillObject,
     zIndex: 2

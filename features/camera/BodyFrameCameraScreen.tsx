@@ -36,6 +36,7 @@ import {
   setLastActiveProjectId
 } from "@/lib/body-project-preferences";
 import { getBodyMeasurementSettings } from "@/lib/body-measurement-library";
+import { getBodyPoseAlignmentSettings } from "@/lib/body-pose-alignment";
 import {
   createBodyProject,
   getBodyProjects
@@ -70,6 +71,7 @@ export default function BodyFrameCameraScreen() {
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [measurementPromptPhotoId, setMeasurementPromptPhotoId] =
     useState<string | null>(null);
+  const [poseAlignmentEnabled, setPoseAlignmentEnabled] = useState(false);
   const lastHandledSaveAtRef = useRef(0);
 
   const reloadProjectState = useCallback(async () => {
@@ -108,6 +110,33 @@ export default function BodyFrameCameraScreen() {
       ) ?? selectActiveBodyProject(projects, activeProjectId),
     [activeProjectId, projects]
   );
+
+  useEffect(() => {
+    let active = true;
+    setPoseAlignmentEnabled(false);
+
+    if (!activeProject) {
+      return () => {
+        active = false;
+      };
+    }
+
+    void getBodyPoseAlignmentSettings(activeProject.id)
+      .then((settings) => {
+        if (active) {
+          setPoseAlignmentEnabled(settings.enabled);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setPoseAlignmentEnabled(false);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [activeProject?.id]);
 
   const nextProjectSequence = useMemo(
     () =>
@@ -158,6 +187,7 @@ export default function BodyFrameCameraScreen() {
       projectId: activeProject.id,
       sequence: nextProjectSequence,
       automaticReferenceUri,
+      poseAlignmentEnabled,
       projectPhotoCount: activeSummary?.photoCount ?? 0,
       maxProgressPhotos: planEntitlements.maxProgressPhotos,
       captureBlockedReason
@@ -166,6 +196,7 @@ export default function BodyFrameCameraScreen() {
     activeProject,
     activeSummary?.photoCount,
     automaticReferenceUri,
+    poseAlignmentEnabled,
     captureBlockedReason,
     nextProjectSequence,
     planEntitlements.maxProgressPhotos
