@@ -52,6 +52,7 @@
       "expo-router",
       "expo-iap",
       "react-native-health-connect",
+      "./plugins/with-body-pose-alignment",
       "./plugins/with-android-release-manifest",
       [
         "expo-image-picker",
