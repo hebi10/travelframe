@@ -2271,6 +2271,21 @@ export default function CameraScreen() {
         resetKey={overlayResetKey}
       />
 
+      {bodyFrameCameraSession.poseAlignmentEnabled && poseGuidance ? (
+        <View
+          pointerEvents="none"
+          style={[
+            styles.poseAlignmentBanner,
+            poseGuidance.aligned && styles.poseAlignmentBannerAligned
+          ]}
+        >
+          <Text selectable={false} style={styles.poseAlignmentText}>
+            {poseGuidance.aligned ? "✓ " : ""}
+            {poseGuidance.message}
+          </Text>
+        </View>
+      ) : null}
+
       {isGuideShapePointAdjusting ? (
         <GestureDetector gesture={guideShapePointGesture}>
           <View collapsable={false} pointerEvents="box-only" style={styles.guidePositionDragLayer} />
