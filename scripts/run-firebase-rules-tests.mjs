@@ -114,7 +114,7 @@ const selectJava = () => {
 
 const selectedJava = selectJava();
 const selectedJavaBin = selectedJava.home ? path.join(selectedJava.home, "bin") : undefined;
-const emulatorCommand = `firebase emulators:exec --only firestore,storage --log-verbosity SILENT "node ${runnerPath}"`;
+const emulatorCommand = `firebase emulators:exec --only firestore,storage "node ${runnerPath}"`;
 
 fs.mkdirSync(FIREBASE_CONFIG_DIR, { recursive: true });
 

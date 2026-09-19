@@ -1,0 +1,34 @@
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import ts from "typescript";
+
+const source = fs.readFileSync("lib/body-frame-camera-session.ts", "utf8");
+const js = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText;
+const session = await import(`data:text/javascript;base64,${Buffer.from(js).toString("base64")}`);
+session.setBodyFrameCameraSession({ projectId: "a", sequence: 1, maxProgressPhotos: 2 });
+const first = session.reserveBodyFrameCameraCapture();
+session.clearBodyFrameCameraSession();
+assert.equal(session.getBodyFrameCameraSessionSnapshot().pendingSaveCount, 1, "navigation must preserve pending reservation");
+session.setBodyFrameCameraSession({ projectId: "a", sequence: 1, maxProgressPhotos: 2 });
+const second = session.reserveBodyFrameCameraCapture();
+assert.equal(second.sequence, 2, "reload must not reuse a queued photo filename");
+session.finishBodyFrameCameraCapture({ ...first, success: false });
+assert.equal(session.getBodyFrameCameraSessionSnapshot().pendingSaveCount, 1);
+session.finishBodyFrameCameraCapture({ ...first, success: false });
+assert.equal(session.getBodyFrameCameraSessionSnapshot().pendingSaveCount, 1, "duplicate cleanup must not release another photo");
+session.finishBodyFrameCameraCapture({ ...second, success: true });
+assert.equal(session.getBodyFrameCameraSessionSnapshot().pendingSaveCount, 0);
+session.setBodyFrameCameraSession({ projectId: "a", sequence: 1 });
+assert.equal(session.reserveBodyFrameCameraCapture().sequence, 3, "a stale reload after completion must not overwrite a saved photo");
+session.setBodyFrameCameraSession({ projectId: "b", sequence: 100, projectPhotoCount: 99, maxProgressPhotos: 100 });
+assert.equal(session.getBodyFrameCameraSessionSnapshot().pendingSaveCount, 1, "global pending count must still protect project switching");
+assert.equal(session.isBodyFrameCameraCaptureBlocked(), false, "project a reservation must not consume project b quota");
+const lastB = session.reserveBodyFrameCameraCapture();
+assert.equal(session.isBodyFrameCameraCaptureBlocked(), true, "project b reservation must consume its own last slot");
+session.finishBodyFrameCameraCapture({ ...lastB, success: false });
+assert.equal(session.isBodyFrameCameraCaptureBlocked(), false);
+
+const camera = fs.readFileSync("features/camera/CameraScreen.tsx", "utf8");
+assert.ok(camera.indexOf("captureReservation = reserveBodyFrameCameraCapture()") < camera.indexOf("const photo = await photoOutput.capturePhotoToFile"));
+assert.ok(camera.includes("saveCapturedPhoto(captureInput, captureReservation)"));
+console.log("ok - queued camera reservations survive navigation and stale reloads");

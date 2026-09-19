@@ -214,7 +214,7 @@ for (const token of [
   "projectPhotoCount",
   "maxProgressPhotos",
   "captureBlockedReason",
-  "snapshot.projectPhotoCount + snapshot.pendingSaveCount",
+  "reservation.projectId === snapshot.projectId",
   "throw new Error"
 ]) {
   assert.ok(sessionSource.includes(token), `camera session should contain ${token}`);

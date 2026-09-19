@@ -41,18 +41,18 @@ const releaseBackupUploadSource = functionsSource.slice(
   releaseBackupUploadEnd
 );
 assert.equal(
-  releaseBackupUploadSource.includes('session.status === "completed"'),
-  false,
-  "releaseBackupUpload must not let clients release completed sessions and subtract completed usage"
+  releaseBackupUploadSource.includes("canonicalCompletedBackupUsage"),
+  true,
+  "orphan release must recompute authoritative usage rather than subtract completed usage"
 );
 assert.equal(
   releaseBackupUploadSource.includes("releaseCompletedBackupUsage"),
   false,
-  "completed backup usage should only be reduced by server-owned backup item deletion"
+  "completed usage must never be blindly subtracted"
 );
 assert.ok(
-  releaseBackupUploadSource.includes('session.status !== "reserved"'),
-  "releaseBackupUpload should be a no-op for every non-reserved session"
+  releaseBackupUploadSource.includes("if (referenced) return"),
+  "releaseBackupUpload must preserve uploads referenced by backup metadata"
 );
 
 const deleteBackupItemStart = functionsSource.indexOf("const deleteBackupItemForUser");

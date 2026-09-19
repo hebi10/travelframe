@@ -5,7 +5,7 @@ import { readCameraSource } from "./camera-test-source.mjs";
 
 const source = readCameraSource();
 const settingsSource = fs.readFileSync("lib/app-settings.ts", "utf8");
-const photoLibrarySource = fs.readFileSync("lib/photo-library.ts", "utf8");
+const photoLibrarySource = fs.readFileSync("lib/legacy-photo-library.ts", "utf8");
 const tripClipExportSource = fs.readFileSync("lib/trip-clip-export.ts", "utf8");
 const cameraStyleSource = fs.readFileSync("features/camera/camera-screen.styles.ts", "utf8");
 
@@ -53,7 +53,7 @@ for (const snippet of [
   "targets.app || targets.cloud",
   "targets.device",
   "targets.cloud",
-  "saveCapturedPhoto(captureInput)",
+  "saveCapturedPhoto(captureInput, captureReservation)",
   "saveCapturedPhotoToDevice(captureInput, savedPhoto?.uri)",
   "let deviceSaveError: unknown = null;",
   "if (!savedPhoto) throw deviceError;",
@@ -85,7 +85,7 @@ const capturePhotoSource = source.slice(capturePhotoStart, takePhotoStart);
 const nativeCaptureEnd = capturePhotoSource.indexOf("photoUri = `file://${photo.filePath}`");
 const unlockAfterNativeCapture = capturePhotoSource.indexOf("setIsCapturing(false)", nativeCaptureEnd);
 const queueCallStart = capturePhotoSource.indexOf("queueCapturedPhotoSave({", nativeCaptureEnd);
-const appSaveStart = queueSaveSource.indexOf("saveCapturedPhoto(captureInput)");
+const appSaveStart = queueSaveSource.indexOf("saveCapturedPhoto(captureInput, captureReservation)");
 const deviceSaveStart = queueSaveSource.indexOf("saveCapturedPhotoToDevice(captureInput, savedPhoto?.uri)");
 assert.ok(nativeCaptureEnd >= 0, "camera should derive a photo URI after native capture");
 assert.ok(

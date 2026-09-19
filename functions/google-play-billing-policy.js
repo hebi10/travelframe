@@ -132,7 +132,15 @@ const getEffectiveSubscription = (subscriptions, now = Date.now()) => {
   return expert ?? creator ?? adRemove ?? null;
 };
 
+const shouldUpdateSubscriptionForPurchase = ({ purchase, existingProduct, tokenHash, active, source }) => {
+  if (purchase?.supersededBy) return false;
+  const currentToken = existingProduct?.googlePurchaseTokenHash;
+  if (currentToken && currentToken !== tokenHash && (!active || source === "rtdn")) return false;
+  return true;
+};
+
 module.exports = {
+  shouldUpdateSubscriptionForPurchase,
   SUBSCRIPTION_ACCESS_STATES,
   getEffectiveSubscription,
   isActiveSubscriptionDocument,

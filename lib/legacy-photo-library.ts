@@ -681,9 +681,15 @@ export const saveEditedPhoto = async ({
     });
 
     const photo: PhotoItem = {
+      ...existingPhoto,
       id,
       uri: destinationUri,
       previewUri,
+      localUri: destinationUri,
+      localPreviewUri: previewUri,
+      localFileStatus: "available",
+      backupStatus: "pending",
+      updatedAt: new Date().toISOString(),
       createdAt: replaceCreatedAt ?? existingPhoto?.createdAt ?? new Date().toISOString(),
       width: prepared.width ?? 0,
       height: prepared.height ?? 0,

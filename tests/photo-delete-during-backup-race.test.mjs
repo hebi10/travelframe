@@ -69,7 +69,7 @@ const releaseBackupUploadStart = functionsSource.indexOf("exports.releaseBackupU
 const releaseBackupUploadEnd = functionsSource.indexOf("const getStringList", releaseBackupUploadStart);
 const releaseBackupUploadSource = functionsSource.slice(releaseBackupUploadStart, releaseBackupUploadEnd);
 assert.equal(
-  releaseBackupUploadSource.includes('session.status === "completed"'),
+  releaseBackupUploadSource.includes("releaseCompletedBackupUsage"),
   false,
   "releaseBackupUpload must not subtract completed usage after a backup item was already deleted"
 );

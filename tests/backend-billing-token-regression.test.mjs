@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
+const { shouldUpdateSubscriptionForPurchase } = require('../functions/google-play-billing-policy.js');
+assert.equal(shouldUpdateSubscriptionForPurchase({ purchase: { supersededBy: 'new' }, existingProduct: { googlePurchaseTokenHash: 'new' }, tokenHash: 'old', active: false }), false);
+assert.equal(shouldUpdateSubscriptionForPurchase({ purchase: {}, existingProduct: { googlePurchaseTokenHash: 'new' }, tokenHash: 'old', active: false }), false);
+assert.equal(shouldUpdateSubscriptionForPurchase({ purchase: {}, existingProduct: { googlePurchaseTokenHash: 'same' }, tokenHash: 'same', active: false }), true);
+assert.equal(shouldUpdateSubscriptionForPurchase({ purchase: {}, existingProduct: null, tokenHash: 'new', active: true }), true);
+assert.equal(shouldUpdateSubscriptionForPurchase({ purchase: {}, existingProduct: { googlePurchaseTokenHash: 'new' }, tokenHash: 'old', active: true, source: 'rtdn' }), false);
+console.log('ok - obsolete purchase tokens cannot revoke the current subscription');

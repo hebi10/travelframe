@@ -30,7 +30,13 @@ npm run android:build-prod
 
 ## 검증
 
-일반 로컬 품질 확인은 앱 코드 중심으로 실행합니다.
+일반 로컬 품질 확인은 앱 코드 중심으로 실행합니다. 전체 Node 테스트에는 Expo가 생성한 Android 파일의 구조 검사도 포함됩니다. 새 체크아웃에서 `android/`가 없거나 네이티브 플러그인을 변경했다면 먼저 Android 파일을 생성해 주세요.
+
+```bash
+npx expo prebuild --platform android --no-install
+```
+
+이 명령은 Android 생성 파일을 갱신합니다. 생성 파일이 없으면 테스트 실행기는 필요한 파일과 위 명령을 안내하고 실패하며, 해당 검사를 건너뛰어 성공으로 표시하지 않습니다. Android 파일이 필요 없는 개별 테스트는 `npm test -- test-runner`처럼 이름 필터로 실행할 수 있습니다.
 
 ```bash
 npm run quality

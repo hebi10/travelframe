@@ -1,7 +1,8 @@
 import { storeBodyFramePhotoFile } from "@/lib/body-frame-photo-storage";
 import {
   finishBodyFrameCameraCapture,
-  reserveBodyFrameCameraCapture
+  reserveBodyFrameCameraCapture,
+  type ReservedBodyFrameCapture
 } from "@/lib/body-frame-camera-session";
 import { updateBodyProject } from "@/lib/body-project-library";
 import { detachBodyMeasurementsFromPhoto } from "@/lib/body-measurement-library";
@@ -46,11 +47,14 @@ const rollbackLegacyProjectDraft = async (photo?: PhotoItem | null) => {
   await cleanupOrphanProjectFiles(photo);
 };
 
-export const saveCapturedPhoto = async (input: SaveCapturedPhotoInput) => {
-  const reserved = reserveBodyFrameCameraCapture({
+export const saveCapturedPhoto = async (
+  input: SaveCapturedPhotoInput,
+  captureReservation?: ReservedBodyFrameCapture | null
+) => {
+  const reserved = captureReservation === undefined ? reserveBodyFrameCameraCapture({
     projectId: input.projectId,
     sequence: input.sequence
-  });
+  }) : captureReservation;
 
   if (!reserved) {
     return saveLegacyCapturedPhoto(input);
@@ -109,6 +113,7 @@ export const saveCapturedPhoto = async (input: SaveCapturedPhotoInput) => {
     }
 
     finishBodyFrameCameraCapture({
+      reservationId: reserved.reservationId,
       projectId: resolvedProjectId,
       sequence: resolvedSequence,
       success: true
@@ -126,6 +131,7 @@ export const saveCapturedPhoto = async (input: SaveCapturedPhotoInput) => {
       // Preserve the original capture/save error; cleanup is best-effort.
     } finally {
       finishBodyFrameCameraCapture({
+        reservationId: reserved.reservationId,
         sequence: resolvedSequence,
         success: false
       });

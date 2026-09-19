@@ -45,6 +45,17 @@ export const assignLegacyPhotosToProject = <T extends ProjectAwarePhoto>(
   photos: T[],
   projectId = LEGACY_BODY_PROJECT_ID
 ): T[] => {
+  const lastSequence = photos.reduce((highest, photo) => {
+    if (
+      photo.projectId === projectId &&
+      typeof photo.sequence === "number" &&
+      Number.isInteger(photo.sequence) &&
+      photo.sequence > highest
+    ) {
+      return photo.sequence;
+    }
+    return highest;
+  }, 0);
   const sequenceById = new Map(
     photos
       .filter((photo) => !hasProjectId(photo))
@@ -52,7 +63,7 @@ export const assignLegacyPhotosToProject = <T extends ProjectAwarePhoto>(
         const createdAtDiff = timestamp(first.createdAt) - timestamp(second.createdAt);
         return createdAtDiff !== 0 ? createdAtDiff : first.id.localeCompare(second.id);
       })
-      .map((photo, index) => [photo.id, index + 1] as const)
+      .map((photo, index) => [photo.id, lastSequence + index + 1] as const)
   );
 
   return photos.map((photo) => {

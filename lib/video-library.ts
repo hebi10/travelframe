@@ -198,6 +198,16 @@ const updateStoredVideo = async (video: MadeVideoItem) => {
   await writeVideos(videos.map((item) => (item.id === video.id ? video : item)));
 };
 
+const persistVideoCover = async (uri: string | undefined, videoId: string) => {
+  if (!uri || isRemoteUri(uri)) return uri;
+  const directory = await ensureVideoDirectory();
+  const destinationUri = `${directory}${videoId}-cover.jpg`;
+  if (uri !== destinationUri) {
+    await FileSystem.copyAsync({ from: uri, to: destinationUri });
+  }
+  return destinationUri;
+};
+
 export const getMadeVideos = async () => {
   const value = await localStorageAdapter.getItem(VIDEO_STORAGE_KEY);
   return parseVideos(value);
@@ -246,8 +256,10 @@ export const saveMadeVideo = async (
   const videoId = createVideoId();
   const createdAt = new Date().toISOString();
   const persistedUri = await persistMadeVideoFile(video.uri, videoId);
+  const coverUri = await persistVideoCover(video.coverUri, videoId);
   const savedVideo: MadeVideoItem = {
     ...video,
+    coverUri,
     id: videoId,
     uri: persistedUri,
     localUri: isRemoteUri(persistedUri) ? video.localUri : persistedUri,
@@ -273,9 +285,13 @@ export const updateMadeVideo = async (
   const persistedUri = updates.uri
     ? await persistMadeVideoFile(updates.uri, id, { overwrite: true })
     : video.uri;
+  const coverUri = updates.coverUri
+    ? await persistVideoCover(updates.coverUri, id)
+    : video.coverUri;
   const updatedVideo: MadeVideoItem = {
     ...video,
     ...updates,
+    coverUri,
     id: video.id,
     uri: persistedUri,
     localUri: isRemoteUri(persistedUri) ? updates.localUri ?? video.localUri : persistedUri,
@@ -382,7 +398,12 @@ export const deleteMadeVideo = async (id: string) => {
   if (video?.uri && !isRemoteUri(video.uri)) {
     await FileSystem.deleteAsync(video.uri, { idempotent: true });
   }
-  if (video?.coverUri && !isRemoteUri(video.coverUri)) {
+  // Old records may share a project photo as their cover. Delete only our own copy.
+  if (
+    video?.coverUri &&
+    FileSystem.documentDirectory &&
+    video.coverUri === `${FileSystem.documentDirectory}${VIDEO_DIRECTORY}${video.id}-cover.jpg`
+  ) {
     await FileSystem.deleteAsync(video.coverUri, { idempotent: true });
   }
   await writeVideos(videos.filter((video) => video.id !== id));

@@ -147,6 +147,9 @@ import {
 } from "@/lib/app-settings";
 import {
   getBodyFrameCameraSessionSnapshot,
+  reserveBodyFrameCameraCapture,
+  finishBodyFrameCameraCapture,
+  type ReservedBodyFrameCapture,
   isBodyFrameCameraCaptureBlocked,
   subscribeBodyFrameCameraSession
 } from "@/lib/body-frame-camera-session";
@@ -1948,13 +1951,15 @@ export default function CameraScreen() {
       saveScope,
       backupUser,
       backupSubscription,
-      captureContext
+      captureContext,
+      captureReservation
     }: {
       captureInput: SaveCapturedPhotoInput;
       saveScope: CameraSaveScope;
       backupUser: typeof user;
       backupSubscription: typeof subscription;
       captureContext: BodyCaptureContext;
+      captureReservation: ReservedBodyFrameCapture | null;
     }) => {
       setPendingPhotoSaveCount((count) => count + 1);
       const runSaveJob = async () => {
@@ -1964,7 +1969,7 @@ export default function CameraScreen() {
 
         try {
           if (targets.app || targets.cloud) {
-            savedPhoto = await saveCapturedPhoto(captureInput);
+            savedPhoto = await saveCapturedPhoto(captureInput, captureReservation);
           }
           if (targets.device) {
             try {
@@ -2019,6 +2024,9 @@ export default function CameraScreen() {
             }
           }
         } finally {
+          if (captureReservation) {
+            finishBodyFrameCameraCapture({ ...captureReservation, success: false });
+          }
           try {
             await deleteLocalFile(captureInput.uri);
           } catch {
@@ -2053,11 +2061,13 @@ export default function CameraScreen() {
     }
 
     let photoUri: string | null = null;
+    let captureReservation: ReservedBodyFrameCapture | null = null;
 
     try {
       cameraNativeCaptureInProgressRef.current = true;
       setIsCapturing(true);
       setErrorMessage(null);
+      captureReservation = reserveBodyFrameCameraCapture();
       const photo = await photoOutput.capturePhotoToFile({
         flashMode: cameraDevice.hasFlash ? flashMode : "off",
         enableShutterSound: cameraShutterSoundMode === "sound"
@@ -2082,12 +2092,17 @@ export default function CameraScreen() {
         saveScope: captureSaveScope,
         backupUser: user,
         backupSubscription: subscription,
-        captureContext: getCurrentBodyCaptureContext()
+        captureContext: getCurrentBodyCaptureContext(),
+        captureReservation
       });
+      captureReservation = null;
       photoUri = null;
     } catch (error) {
       setErrorMessage(getUserFacingErrorMessage(error, "사진을 촬영하지 못했습니다."));
     } finally {
+      if (captureReservation) {
+        finishBodyFrameCameraCapture({ ...captureReservation, success: false });
+      }
       cameraNativeCaptureInProgressRef.current = false;
       if (photoUri) {
         try {

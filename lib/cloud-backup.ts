@@ -28,6 +28,9 @@ import {
   type CloudBackupLimitTier
 } from "@/lib/cloud-backup-limits";
 import { firebaseFunctions, firestore, firebaseStorage } from "@/lib/firebase";
+import { getBodyProjects, mergeBodyProjectsFromBackup } from "@/lib/body-project-library";
+import { isPhotoBackupCurrent, recoverMissingBodyProjects } from "@/lib/body-project-backup";
+import type { BodyProject } from "@/types/body-project";
 import {
   calculateCombinedImageBackupSize,
   isImageBackupSizeExceeded,
@@ -283,17 +286,35 @@ const completeBackupUpload = (data: { backupSessionId: string }) =>
     data
   );
 
-const completeImageWorkBackup = (data: {
+const completeImageWorkBackup = async (data: {
   workId: string;
   imageWork: Record<string, unknown>;
-}) =>
-  callBackupFunction<typeof data, { saved: boolean }>(
+}) => {
+  const userId = data.imageWork.userId;
+  const previous = firestore && typeof userId === "string"
+    ? (await getDoc(doc(firestore, "users", userId, "imageWorks", data.workId))).data()
+    : undefined;
+  const result = await callBackupFunction<typeof data, { saved: boolean }>(
     "completeImageWorkBackup",
     data
   );
+  if (Array.isArray(previous?.backupSessionIds)) {
+    await releaseBackupUploads(previous.backupSessionIds.filter((id): id is string => typeof id === "string"));
+  }
+  return result;
+};
 
-const releaseBackupUpload = (data: { backupSessionId: string }) =>
-  callBackupFunction<typeof data, { released: boolean }>("releaseBackupUpload", data);
+const releaseBackupUpload = async (data: { backupSessionId: string }) => {
+  try {
+    return await callBackupFunction<typeof data, { released: boolean }>("releaseBackupUpload", data);
+  } catch (error) {
+    const code = error && typeof error === "object" && "code" in error ? String(error.code) : "";
+    if (!/unavailable|deadline-exceeded|internal|unknown/.test(code)) throw error;
+    // Releasing is idempotent; retry transient Storage cleanup failures once.
+    await new Promise(resolve => setTimeout(resolve, 250));
+    return callBackupFunction<typeof data, { released: boolean }>("releaseBackupUpload", data);
+  }
+};
 
 const deleteCloudBackupDataCallable = () =>
   callBackupFunction<Record<string, never>, BackupSummary>(
@@ -345,6 +366,15 @@ const getBackupLimitTier = (
   subscription?: UserSubscription | null
 ): CloudBackupLimitTier =>
   getPlanTier({ isLoggedIn: Boolean(subscription), subscription: subscription ?? null });
+
+const backupBodyProjects = async (userId: string, projectId?: string) => {
+  if (!firestore) return;
+  const projects = await getBodyProjects();
+  for (const project of projects) {
+    if (projectId && project.id !== projectId) continue;
+    await setDoc(doc(firestore, "users", userId, "bodyProjects", project.id), project);
+  }
+};
 
 const uploadLocalFile = async ({
   uri,
@@ -767,12 +797,22 @@ export const backupCurrentWorkspace = async ({
   const selectedVideoBackups = isCloudBackupTargetEnabled(settings, "videos")
     ? videos
     : [];
+  if (isCloudBackupTargetEnabled(settings, "photos")) {
+    await backupBodyProjects(user.uid);
+  }
+  const existingPhotoSnapshot = await getDocs(collection(firestore, "users", user.uid, "photoBackups"));
+  const existingPhotoBackups = new Map(
+    existingPhotoSnapshot.docs.map(item => [item.id, item.data()])
+  );
   const backupablePhotoBackups: PhotoItem[] = [];
   for (const photo of selectedPhotoBackups) {
     if (photo.localFileStatus === "cloud_only") {
       continue;
     }
     if (!(await isPhotoStillBackupEligible(photo.id))) {
+      continue;
+    }
+    if (isPhotoBackupCurrent(photo, existingPhotoBackups.get(photo.id))) {
       continue;
     }
     backupablePhotoBackups.push(photo);
@@ -929,8 +969,10 @@ export const backupCurrentWorkspace = async ({
       continue;
     }
 
+    try {
     await setDoc(doc(firestore, "users", user.uid, "photoBackups", photo.id), {
       ...photo,
+      sourceUpdatedAt: photo.updatedAt ?? photo.createdAt,
       userId: user.uid,
       localId: photo.id,
       uri: photoDownloadUrl,
@@ -957,6 +999,14 @@ export const backupCurrentWorkspace = async ({
       backedUpAt,
       updatedAt: serverTimestamp()
     });
+    } catch (error) {
+      await releaseBackupUpload({ backupSessionId: photoUpload.backupSessionId }).catch(() => undefined);
+      throw error;
+    }
+    const previousSessionId = existingPhotoBackups.get(photo.id)?.backupSessionId;
+    if (typeof previousSessionId === "string" && previousSessionId !== photoUpload.backupSessionId) {
+      await releaseBackupUpload({ backupSessionId: previousSessionId }).catch(() => undefined);
+    }
     if (
       await removeBackupIfPhotoWasDeleted({
         user,
@@ -990,6 +1040,7 @@ export const backupCurrentWorkspace = async ({
     const backupSessionIds: string[] = [];
     let uploadedFileSize = 0;
     let cancelled = false;
+    try {
     for (const [index, optimized] of images.entries()) {
       if (!(await isImageWorkStillBackupEligible(work.id))) {
         cancelled = true;
@@ -1061,6 +1112,10 @@ export const backupCurrentWorkspace = async ({
         backupStatus: "backed_up"
       }
     });
+    } finally {
+      // The server retains sessions referenced by a successfully committed backup.
+      await releaseBackupUploads(backupSessionIds);
+    }
   }
 
   for (const video of backupableVideoBackups) {
@@ -1103,6 +1158,7 @@ export const backupCurrentWorkspace = async ({
       continue;
     }
 
+    try {
     await setDoc(
       doc(firestore, "users", user.uid, "videos", video.id),
       {
@@ -1124,6 +1180,10 @@ export const backupCurrentWorkspace = async ({
       },
       { merge: true }
     );
+    } catch (error) {
+      await releaseBackupUploads([upload.backupSessionId]);
+      throw error;
+    }
     if (
       await removeBackupIfVideoWasDeleted({
         user,
@@ -1208,15 +1268,11 @@ export const backupPhoto = async ({
     doc(firestore, "users", user.uid, "photoBackups", photo.id)
   );
   const existingData = existingSnapshot.data() as
-    | { localId?: string; storagePath?: string; backupStatus?: string }
+    | Record<string, unknown>
     | undefined;
 
-  if (
-    existingSnapshot.exists() &&
-    existingData?.localId === photo.id &&
-    existingData.storagePath &&
-    existingData.backupStatus === "backed_up"
-  ) {
+  if (photo.projectId) await backupBodyProjects(user.uid, photo.projectId);
+  if (existingSnapshot.exists() && isPhotoBackupCurrent(photo, existingData)) {
     return existingData;
   }
 
@@ -1264,10 +1320,12 @@ export const backupPhoto = async ({
 
   const downloadURL = upload.downloadURL;
 
+  try {
   await setDoc(
     doc(firestore, "users", user.uid, "photoBackups", photo.id),
     {
       ...photo,
+      sourceUpdatedAt: photo.updatedAt ?? photo.createdAt,
       userId: user.uid,
       localId: photo.id,
       uri: downloadURL,
@@ -1295,6 +1353,14 @@ export const backupPhoto = async ({
     },
     { merge: true }
   );
+  } catch (error) {
+    await releaseBackupUpload({ backupSessionId: upload.backupSessionId }).catch(() => undefined);
+    throw error;
+  }
+  const previousSessionId = existingData?.backupSessionId;
+  if (typeof previousSessionId === "string" && previousSessionId !== upload.backupSessionId) {
+    await releaseBackupUpload({ backupSessionId: previousSessionId }).catch(() => undefined);
+  }
   if (
     await removeBackupIfPhotoWasDeleted({
       user,
@@ -1402,6 +1468,7 @@ export const backupImageBundleWork = async ({
   const sourceDeviceId = await getSourceDeviceId();
   const backedUpAt = new Date().toISOString();
   const optimizedImagesForCleanup: OptimizedBackupImageCleanup[] = [];
+  const backupSessionIds: string[] = [];
   try {
   const optimizedImages = await mapWithConcurrencyLimit(
     work.imageUris,
@@ -1437,7 +1504,6 @@ export const backupImageBundleWork = async ({
 
   const backedUpImageUris: string[] = [];
   const storagePaths: string[] = [];
-  const backupSessionIds: string[] = [];
   let uploadedFileSize = 0;
   for (const [index, imageUri] of work.imageUris.entries()) {
     if (!(await isImageWorkStillBackupEligible(work.id))) {
@@ -1520,6 +1586,7 @@ export const backupImageBundleWork = async ({
     imageUris: backedUpImageUris
   };
   } finally {
+    await releaseBackupUploads(backupSessionIds);
     await cleanupOptimizedBackupImages(optimizedImagesForCleanup);
   }
 };
@@ -1603,6 +1670,7 @@ export const backupMadeVideo = async ({
     return null;
   }
 
+  try {
   await setDoc(
     doc(firestore, "users", user.uid, "videos", video.id),
     {
@@ -1624,6 +1692,10 @@ export const backupMadeVideo = async ({
     },
     { merge: true }
   );
+  } catch (error) {
+    await releaseBackupUploads([upload.backupSessionId]);
+    throw error;
+  }
   if (
     await removeBackupIfVideoWasDeleted({
       user,
@@ -1665,6 +1737,7 @@ const normalizePhotoBackup = (data: Record<string, unknown>, id: string): PhotoI
     (typeof data.downloadURL === "string" && data.downloadURL) ||
     undefined,
   createdAt: normalizeDateValue(data.createdAt) ?? new Date().toISOString(),
+  updatedAt: normalizeDateValue(data.sourceUpdatedAt) ?? normalizeDateValue(data.createdAt) ?? undefined,
   width: typeof data.width === "number" ? data.width : 0,
   height: typeof data.height === "number" ? data.height : 0,
   ratioLabel: typeof data.ratioLabel === "string" ? data.ratioLabel : "Original",
@@ -1743,10 +1816,11 @@ export const restoreCloudBackupToLocal = async ({ user }: { user: User | null })
     throw new Error("Firebase 연결 정보가 아직 설정되지 않았습니다.");
   }
 
-  const [photoSnapshot, imageWorkSnapshot, videoSnapshot] = await Promise.all([
+  const [photoSnapshot, imageWorkSnapshot, videoSnapshot, projectSnapshot] = await Promise.all([
     getDocs(collection(firestore, "users", user.uid, "photoBackups")),
     getDocs(collection(firestore, "users", user.uid, "imageWorks")),
-    getDocs(collection(firestore, "users", user.uid, "videos"))
+    getDocs(collection(firestore, "users", user.uid, "videos")),
+    getDocs(collection(firestore, "users", user.uid, "bodyProjects"))
   ]);
   const photos = photoSnapshot.docs.map((item) =>
     normalizePhotoBackup(item.data(), item.id)
@@ -1777,6 +1851,9 @@ export const restoreCloudBackupToLocal = async ({ user }: { user: User | null })
   const missingVideos = videos.filter(
     (item) => !existingVideoIds.has(item.id) && !deletedVideoIds.has(item.id)
   );
+
+  const projects = projectSnapshot.docs.map(item => ({ ...item.data(), id: item.id }) as BodyProject);
+  await mergeBodyProjectsFromBackup(recoverMissingBodyProjects(projects, [...localPhotos, ...missingPhotos]));
 
   await Promise.all([
     replacePhotosFromBackup([...localPhotos, ...missingPhotos]),

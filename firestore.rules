@@ -147,6 +147,7 @@ service cloud.firestore {
 
     function photoBackupKeys() {
       return [
+        "projectId", "sequence", "sourceUpdatedAt",
         "id",
         "userId",
         "localId",
@@ -188,6 +189,7 @@ service cloud.firestore {
 
     function photoBackupMutableKeys() {
       return [
+        "projectId", "sequence", "sourceUpdatedAt", "width", "height", "ratioLabel", "kind", "edited", "addedToVideo", "sourcePhotoId", "edit",
         "localUri",
         "localPreviewUri",
         "localFileStatus",
@@ -266,6 +268,7 @@ service cloud.firestore {
 
     function videoBackupKeys() {
       return [
+        "projectId",
         "id",
         "userId",
         "localId",
@@ -387,8 +390,16 @@ service cloud.firestore {
         && isValidBackupStatus(request.resource.data.status);
     }
 
+    function validPhotoProjectFields() {
+      return ((!request.resource.data.keys().hasAny(["projectId", "sequence"]))
+          || (request.resource.data.projectId is string && request.resource.data.projectId.size() > 0
+            && request.resource.data.sequence is int && request.resource.data.sequence > 0))
+        && (!request.resource.data.keys().hasAny(["sourceUpdatedAt"]) || request.resource.data.sourceUpdatedAt is string);
+    }
+
     function isValidPhotoBackup(userId, photoId) {
       return hasValidBackupOwner(userId)
+        && validPhotoProjectFields()
         && request.resource.data.keys().hasOnly(photoBackupKeys())
         && request.resource.data.localId == photoId
         && request.resource.data.storagePath is string
@@ -432,6 +443,7 @@ service cloud.firestore {
 
     function isValidVideoBackup(userId, videoId) {
       return hasValidBackupOwner(userId)
+        && (!request.resource.data.keys().hasAny(["projectId"]) || (request.resource.data.projectId is string && request.resource.data.projectId.size() > 0))
         && request.resource.data.keys().hasOnly(videoBackupKeys())
         && request.resource.data.localId == videoId
         && isValidBackupStoragePath(userId, request.resource.data.storagePath)
@@ -462,6 +474,7 @@ service cloud.firestore {
 
     function isValidPhotoBackupUpdate(userId, photoId) {
       return hasValidBackupOwner(userId)
+        && validPhotoProjectFields()
         && request.resource.data.keys().hasOnly(photoBackupKeys())
         && request.resource.data.localId == photoId
         && request.resource.data.storagePath is string
@@ -474,11 +487,14 @@ service cloud.firestore {
         && isValidBackupStatus(request.resource.data.backupStatus)
         && request.resource.data.userId == resource.data.userId
         && request.resource.data.localId == resource.data.localId
-        && request.resource.data.storagePath == resource.data.storagePath
+        && ((request.resource.data.storagePath == resource.data.storagePath
         && request.resource.data.backupSessionId == resource.data.backupSessionId
         && request.resource.data.fileSize == resource.data.fileSize
         && request.resource.data.fileType == resource.data.fileType
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(photoBackupMutableKeys());
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(photoBackupMutableKeys()))
+        || (request.resource.data.backupSessionId != resource.data.backupSessionId
+          && isValidPhotoBackup(userId, photoId)
+          && backupUploadSession(userId, request.resource.data.backupSessionId).data.status == "completed"));
     }
 
     function isValidImageWorkBackupUpdate(userId, workId) {
@@ -496,6 +512,7 @@ service cloud.firestore {
 
     function isValidVideoBackupUpdate(userId, videoId) {
       return hasValidBackupOwner(userId)
+        && (!request.resource.data.keys().hasAny(["projectId"]) || (request.resource.data.projectId is string && request.resource.data.projectId.size() > 0))
         && request.resource.data.keys().hasOnly(videoBackupKeys())
         && request.resource.data.localId == videoId
         && isValidBackupStoragePath(userId, request.resource.data.storagePath)
@@ -506,11 +523,14 @@ service cloud.firestore {
         && isValidBackupStatus(request.resource.data.backupStatus)
         && request.resource.data.userId == resource.data.userId
         && request.resource.data.localId == resource.data.localId
-        && request.resource.data.storagePath == resource.data.storagePath
+        && ((request.resource.data.storagePath == resource.data.storagePath
         && request.resource.data.backupSessionId == resource.data.backupSessionId
         && request.resource.data.fileSize == resource.data.fileSize
         && request.resource.data.fileType == resource.data.fileType
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(videoBackupMutableKeys());
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(videoBackupMutableKeys()))
+        || (request.resource.data.backupSessionId != resource.data.backupSessionId
+          && isValidVideoBackup(userId, videoId)
+          && backupUploadSession(userId, request.resource.data.backupSessionId).data.status == "completed"));
     }
 
     function isValidImageWorkBackupMetadata(userId, workId) {
@@ -522,6 +542,20 @@ service cloud.firestore {
       allow create: if isOwner(userId) && isValidUserWrite(userId);
       allow update: if isOwner(userId) && isValidUserUpdate(userId);
       allow delete: if false;
+
+      match /bodyProjects/{projectId} {
+        allow read, delete: if isOwner(userId);
+        allow create, update: if isOwner(userId)
+          && request.resource.data.keys().hasOnly(["id", "userId", "name", "createdAt", "updatedAt", "targetPhotoCount", "referenceMode", "coverPhotoId", "archived"])
+          && request.resource.data.id == projectId
+          && (!request.resource.data.keys().hasAny(["userId"]) || request.resource.data.userId == userId)
+          && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 200
+          && request.resource.data.createdAt is string && request.resource.data.updatedAt is string
+          && request.resource.data.targetPhotoCount is int && request.resource.data.targetPhotoCount > 0
+          && request.resource.data.referenceMode in ["first", "latest"]
+          && request.resource.data.archived is bool
+          && (!request.resource.data.keys().hasAny(["coverPhotoId"]) || request.resource.data.coverPhotoId is string);
+      }
 
       match /videos/{videoId} {
         allow read: if isOwner(userId) || isAdmin();

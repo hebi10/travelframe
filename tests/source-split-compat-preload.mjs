@@ -6,14 +6,15 @@ const originalReadFileSync = fs.readFileSync.bind(fs);
 
 fs.readFileSync = function readFileSyncWithSplitSource(filePath, ...args) {
   const result = originalReadFileSync(filePath, ...args);
+  if (typeof result !== "string") {
+    return result;
+  }
+  const source = result.replaceAll("\r\n", "\n");
   const normalizedPath =
     typeof filePath === "string" ? filePath.replaceAll("\\", "/") : "";
 
-  if (
-    !normalizedPath.endsWith("lib/photo-library.ts") ||
-    typeof result !== "string"
-  ) {
-    return result;
+  if (!normalizedPath.endsWith("lib/photo-library.ts")) {
+    return source;
   }
 
   const legacySource = originalReadFileSync(
@@ -23,7 +24,7 @@ fs.readFileSync = function readFileSyncWithSplitSource(filePath, ...args) {
 
   // Legacy source comes first so pre-Stage-3 source-order assertions keep
   // targeting the original implementation; the Stage-3 wrapper follows it.
-  return `${legacySource}\n${result}`;
+  return `${legacySource.replaceAll("\r\n", "\n")}\n${source}`;
 };
 
 syncBuiltinESMExports();

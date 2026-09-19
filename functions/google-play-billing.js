@@ -6,7 +6,8 @@ const {
   getEffectiveSubscription,
   isActiveSubscriptionDocument,
   parseOneTimePurchase,
-  parseSubscriptionPurchase
+  parseSubscriptionPurchase,
+  shouldUpdateSubscriptionForPurchase
 } = require("./google-play-billing-policy");
 
 const GOOGLE_PLAY_PACKAGE_NAME = "com.haebi.photoguide";
@@ -284,6 +285,10 @@ const createGooglePlayBillingService = ({
       const keepAdminOverride =
         existingProduct?.provider === "admin" &&
         isActiveSubscriptionDocument(existingProduct);
+      const updateEntitlement = shouldUpdateSubscriptionForPurchase({
+        purchase: purchaseSnapshot.data(), existingProduct, tokenHash,
+        active: result.active, source
+      });
 
       const googleSubscription = buildGoogleSubscription({
         productId,
@@ -298,7 +303,7 @@ const createGooglePlayBillingService = ({
 
       let replacedSubscription = null;
       if (
-        result.active &&
+        updateEntitlement && result.active &&
         linkedProductId &&
         linkedProductId !== productId &&
         currentProducts[linkedProductId]?.provider === "google_play"
@@ -315,7 +320,7 @@ const createGooglePlayBillingService = ({
         };
       }
 
-      const nextProduct = keepAdminOverride
+      const nextProduct = keepAdminOverride || !updateEntitlement
         ? existingProduct
         : googleSubscription;
       const nextProducts = {
@@ -335,12 +340,12 @@ const createGooglePlayBillingService = ({
         );
       }
 
-      if (!keepAdminOverride) {
+      if (!keepAdminOverride && updateEntitlement) {
         transaction.set(productRefs[productId], googleSubscription, {
           merge: true
         });
       }
-      transaction.set(
+      if (updateEntitlement) transaction.set(
         currentRef,
         effective ?? createFreeSubscription(),
         { merge: false }

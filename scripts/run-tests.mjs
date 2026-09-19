@@ -9,6 +9,20 @@ const filters = process.argv.slice(2).map((value) => value.toLowerCase());
 const defaultExcludedTests = new Set(["firebase-rules-emulator.test.mjs"]);
 const TEST_TIMEOUT_MS = 300_000;
 const splitSourceCompatPreload = "./tests/source-split-compat-preload.mjs";
+const androidGeneratedInputs = {
+  "22-body-frame-stage-9-8-pose-alignment.test.mjs": [
+    "android/app/src/main/java/com/haebi/photoguide/pose/AndroidPoseAlignmentModule.kt"
+  ],
+  "android-aab-patch-policy.test.mjs": ["android/app/proguard-rules.pro"],
+  "android-manifest-policy.test.mjs": [
+    "android/app/src/main/AndroidManifest.xml",
+    "android/app/src/debug/AndroidManifest.xml"
+  ],
+  "camera-color-adjustment-save.test.mjs": [
+    "android/app/src/main/java/com/haebi/photoguide/MainApplication.kt",
+    "android/app/src/main/java/com/haebi/photoguide/image/AndroidImageAdjustmentModule.kt"
+  ]
+};
 
 const testFiles = fs
   .readdirSync(testsDirectory)
@@ -32,6 +46,18 @@ if (testFiles.length === 0) {
       ? `No tests matched: ${filters.join(", ")}`
       : "No tests matched."
   );
+  process.exit(1);
+}
+
+const missingAndroidInputs = testFiles.flatMap((fileName) =>
+  (androidGeneratedInputs[fileName] ?? [])
+    .filter((filePath) => !fs.existsSync(path.join(root, filePath)))
+    .map((filePath) => `${fileName}: ${filePath}`)
+);
+if (missingAndroidInputs.length > 0) {
+  console.error("Android generated inputs are missing; selected tests have not run:");
+  console.error(missingAndroidInputs.join("\n"));
+  console.error("Run `npx expo prebuild --platform android --no-install`, then rerun the tests.");
   process.exit(1);
 }
 

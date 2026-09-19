@@ -48,7 +48,8 @@ import { getPlanEntitlements } from "@/lib/plan-entitlements";
 import { getRecordingFrame } from "@/lib/trip-clip-playback";
 import { saveVideoToLibrary } from "@/lib/trip-clip-export";
 import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
-import { saveMadeVideo } from "@/lib/video-library";
+import { getMadeVideos, saveMadeVideo } from "@/lib/video-library";
+import { assertLocalLibraryCapacity } from "@/lib/local-library-limit";
 import {
   isRecordingViewAvailable,
   OptionalRecordingView,
@@ -266,6 +267,12 @@ export default function BodyFrameVideoScreen() {
       setExportProgress(5);
       setMessage(null);
 
+      const storedVideos = await getMadeVideos();
+      assertLocalLibraryCapacity({
+        currentCount: storedVideos.length,
+        limit: planEntitlements.localVideoLimit,
+        label: "영상"
+      });
       const videoUri = await recordProjectVideo();
       setExportProgress(88);
       await saveVideoToLibrary(videoUri);
@@ -353,6 +360,16 @@ export default function BodyFrameVideoScreen() {
         showsVerticalScrollIndicator={false}
       >
         <Text style={[styles.pageTitle, { color: palette.text }]}>변화 영상</Text>
+        <Pressable
+          accessibilityRole="button"
+          disabled={isExporting}
+          onPress={() => router.push("/legacy-studio")}
+          style={[styles.limitPlanButton, { borderColor: palette.line }]}
+        >
+          <Text style={[styles.limitPlanButtonText, { color: palette.text }]}>
+            저장한 영상 관리
+          </Text>
+        </Pressable>
         <Text style={[styles.projectName, { color: palette.muted }]}>
           {activeProject.name}
         </Text>

@@ -219,3 +219,15 @@ export const replaceBodyProjects = async (projects: BodyProject[]) => {
   await writeProjects(projects);
   return getBodyProjects();
 };
+
+export const mergeBodyProjectsFromBackup = async (projects: BodyProject[]) =>
+  runProjectMutation(async () => {
+    const current = await getBodyProjects();
+    const existingIds = new Set(current.map(project => project.id));
+    const incoming = projects
+      .map(normalizeBodyProject)
+      .filter((project): project is BodyProject => Boolean(project))
+      .filter(project => !existingIds.has(project.id));
+    await writeProjects([...current, ...incoming]);
+    return getBodyProjects();
+  });

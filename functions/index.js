@@ -952,6 +952,32 @@ exports.completeBackupUpload = secureOnCall(async (request) => {
   }
 });
 
+const canonicalCompletedBackupUsage = (sessionSnapshot, collections, excludedSessionId = null) => {
+  const usage = { imageTotalBytes: 0, videoCount: 0, videoTotalBytes: 0, audioTotalBytes: 0 };
+  const paths = new Set();
+  const add = (kind, size) => {
+    const delta = getBackupUsageDelta({ mediaKind: kind, fileSize: size });
+    for (const key of Object.keys(usage)) usage[key] += delta[key];
+  };
+  for (const item of sessionSnapshot.docs) {
+    const data = item.data();
+    if (item.id !== excludedSessionId && data.status === "completed") {
+      paths.add(data.storagePath);
+      add(data.mediaKind, data.fileSize);
+    }
+  }
+  collections.forEach((snapshot, index) => {
+    for (const item of snapshot.docs) {
+      const data = item.data();
+      const itemPaths = data.storagePaths ?? [data.storagePath];
+      if (itemPaths.some((path) => paths.has(path))) continue;
+      add(index < 2 ? "image" : index === 2 ? "video" : "audio", data.fileSize ?? data.size ?? 0);
+      itemPaths.forEach((path) => paths.add(path));
+    }
+  });
+  return usage;
+};
+
 exports.releaseBackupUpload = secureOnCall(async (request) => {
   try {
     const uid = requireUid(request);
@@ -963,6 +989,7 @@ exports.releaseBackupUpload = secureOnCall(async (request) => {
     const sessionRef = getSessionRef(uid, backupSessionId);
     let sessionToDelete = null;
     await db.runTransaction(async (transaction) => {
+      sessionToDelete = null;
       const [sessionSnapshot, usageSnapshot] = await Promise.all([
         transaction.get(sessionRef),
         transaction.get(getUsageRef(uid))
@@ -972,12 +999,35 @@ exports.releaseBackupUpload = secureOnCall(async (request) => {
       }
 
       const session = sessionSnapshot.data();
-      if (session.status !== "reserved") {
+      if (session.status === "released") {
+        if (isOwnedCloudBackupStoragePath(uid, session.storagePath)) {
+          sessionToDelete = { ...session, backupSessionId };
+        }
+        return;
+      }
+      if (!["reserved", "completed"].includes(session.status)) {
         return;
       }
 
+      const references = await Promise.all(["photoBackups", "imageWorks", "videos", "musicTracks"].map(
+        (name) => transaction.get(db.collection(`users/${uid}/${name}`))
+      ));
+      const referenced = references.some((snapshot) => snapshot.docs.some((item) => {
+        const data = item.data();
+        return data.backupSessionId === backupSessionId
+          || data.backupSessionIds?.includes(backupSessionId)
+          || data.storagePath === session.storagePath
+          || data.previewStoragePath === session.storagePath
+          || data.storagePaths?.includes(session.storagePath);
+      }));
+      if (referenced) return;
+
+      const allSessions = await transaction.get(db.collection(`users/${uid}/backupUploadSessions`));
+
       const usageDelta = getBackupSessionUsageDelta(session);
-      const releasedUsage = releaseReservedBackupUsage(usageSnapshot.data(), usageDelta);
+      const releasedUsage = session.status === "completed"
+        ? { ...canonicalCompletedBackupUsage(allSessions, references, backupSessionId), pendingUsage: usageSnapshot.data()?.pendingUsage ?? {} }
+        : releaseReservedBackupUsage(usageSnapshot.data(), usageDelta);
       transaction.set(
         getUsageRef(uid),
         {
@@ -1133,24 +1183,23 @@ exports.completeImageWorkBackup = secureOnCall(async (request) => {
     }
 
     const imageWorkRef = db.doc(`users/${uid}/imageWorks/${workId}`);
-    const existingSnapshot = await imageWorkRef.get();
+    await db.runTransaction(async (transaction) => {
+    const existingSnapshot = await transaction.get(imageWorkRef);
+    const freshSessions = await Promise.all(backupSessionIds.map((id) => transaction.get(getSessionRef(uid, id))));
+    if (freshSessions.some((snapshot) => !snapshot.exists || snapshot.data().status !== "completed")) {
+      throw new HttpsError("failed-precondition", "Image work upload session is no longer completed.");
+    }
     if (existingSnapshot.exists) {
       const existing = existingSnapshot.data();
-      const storagePathsChanged =
-        JSON.stringify(existing.storagePaths ?? []) !== JSON.stringify(storagePaths);
-      const backupSessionIdsChanged =
-        JSON.stringify(existing.backupSessionIds ?? []) !== JSON.stringify(backupSessionIds);
       if (
         existing.userId !== uid ||
-        existing.localId !== workId ||
-        storagePathsChanged ||
-        backupSessionIdsChanged
+        existing.localId !== workId
       ) {
         throw new HttpsError("failed-precondition", "Image work backup identity fields cannot be changed.");
       }
     }
 
-    await imageWorkRef.set({
+    transaction.set(imageWorkRef, {
       ...data,
       id: workId,
       userId: uid,
@@ -1162,6 +1211,7 @@ exports.completeImageWorkBackup = secureOnCall(async (request) => {
       fileSize: totalFileSize,
       imageBackupSize: totalFileSize,
       updatedAt: FieldValue.serverTimestamp()
+    });
     });
 
     return { saved: true };
@@ -1612,13 +1662,13 @@ const refreshAdminBackupOverview = async (uid) => {
 
   for (const item of photoSnapshot.docs) {
     const data = item.data();
-    imageBackupBytes += Number(data.imageBackupSize ?? data.optimizedSize ?? data.fileSize ?? 0);
+    imageBackupBytes += Number(data.fileSize ?? 0);
     rememberLatest(data.backedUpAt ?? data.lastBackedUpAt ?? data.backupEnabledAt);
   }
 
   for (const item of imageWorkSnapshot.docs) {
     const data = item.data();
-    imageBackupBytes += Number(data.imageBackupSize ?? data.fileSize ?? 0);
+    imageBackupBytes += Number(data.fileSize ?? 0);
     rememberLatest(data.backedUpAt ?? data.lastBackedUpAt ?? data.backupEnabledAt);
   }
 
@@ -1649,16 +1699,16 @@ const refreshAdminBackupOverview = async (uid) => {
       },
       { merge: true }
     ),
-    getUsageRef(uid).set(
-      {
-        imageTotalBytes: imageBackupBytes,
-        videoCount: videoSnapshot.size,
-        videoTotalBytes,
-        audioTotalBytes,
+    db.runTransaction(async (transaction) => {
+      const snapshots = await Promise.all(["photoBackups", "imageWorks", "videos", "musicTracks", "backupUploadSessions"].map(
+        (name) => transaction.get(db.collection(`users/${uid}/${name}`))
+      ));
+      await transaction.get(getUsageRef(uid));
+      transaction.set(getUsageRef(uid), {
+        ...canonicalCompletedBackupUsage(snapshots[4], snapshots.slice(0, 4)),
         updatedAt: FieldValue.serverTimestamp()
-      },
-      { merge: true }
-    )
+      }, { merge: true });
+    })
   ]);
 
   return {
@@ -1862,7 +1912,13 @@ const deleteBackupItemForUser = async ({ uid, itemType, itemId }) => {
       deleteOwnedCloudBackupStoragePath(uid, storagePath)
     )
   );
-  await itemRef.delete();
+  const deletionBatch = db.batch();
+  const sessionIds = [...new Set([data.backupSessionId, ...(data.backupSessionIds ?? [])].filter(Boolean))];
+  for (const sessionId of sessionIds) {
+    deletionBatch.set(getSessionRef(uid, sessionId), { status: "released", releasedAt: FieldValue.serverTimestamp() }, { merge: true });
+  }
+  deletionBatch.delete(itemRef);
+  await deletionBatch.commit();
   const summary = await refreshAdminBackupOverview(uid);
 
   return { deleted: true, summary };
@@ -1940,15 +1996,17 @@ exports.deleteCloudBackupData = secureOnCall(async (request) => {
   try {
     const uid = requireUid(request);
     const userRef = db.doc(`users/${uid}`);
-    const [photoSnapshot, imageWorkSnapshot, videoSnapshot, musicSnapshot] = await Promise.all([
+    const [photoSnapshot, imageWorkSnapshot, videoSnapshot, musicSnapshot, projectSnapshot, sessionSnapshot] = await Promise.all([
       userRef.collection("photoBackups").get(),
       userRef.collection("imageWorks").get(),
       userRef.collection("videos").get(),
-      userRef.collection("musicTracks").get()
+      userRef.collection("musicTracks").get(),
+      userRef.collection("bodyProjects").get(),
+      userRef.collection("backupUploadSessions").get()
     ]);
 
     let imageBackupBytes = 0;
-    const documentDeletes = [];
+    const documentDeletes = [...projectSnapshot.docs, ...sessionSnapshot.docs].map((item) => item.ref);
     const storageDeletes = collectOwnedCloudBackupStoragePaths({
       uid,
       photoBackups: photoSnapshot.docs.map((item) => item.data()),
@@ -1956,6 +2014,7 @@ exports.deleteCloudBackupData = secureOnCall(async (request) => {
       videos: videoSnapshot.docs.map((item) => item.data()),
       musicTracks: musicSnapshot.docs.map((item) => item.data())
     }).map(deleteStoragePath);
+    storageDeletes.push(...sessionSnapshot.docs.map((item) => deleteOwnedCloudBackupStoragePath(uid, item.data().storagePath)));
 
     for (const item of photoSnapshot.docs) {
       const data = item.data();
@@ -2006,6 +2065,7 @@ exports.deleteCloudBackupData = secureOnCall(async (request) => {
           videoCount: 0,
           videoTotalBytes: 0,
           audioTotalBytes: 0,
+          pendingUsage: { imageTotalBytes: 0, videoCount: 0, videoTotalBytes: 0, audioTotalBytes: 0 },
           updatedAt: FieldValue.serverTimestamp()
         },
         { merge: true }

@@ -174,6 +174,8 @@ const validImageWorkBackup = (uid = ownerUid, workId = "work-1") => ({
   backupStatus: "backed_up"
 });
 
+const projectBackup = { id: "project-1", name: "Progress", createdAt: "2026-09-19T00:00:00Z", updatedAt: "2026-09-19T00:00:00Z", targetPhotoCount: 30, referenceMode: "first", archived: false };
+
 const validSubscription = (productId) => ({
   plan: "premium",
   provider: "admin",
@@ -248,6 +250,21 @@ const seedBackupUploadSession = async ({
 
 await seedDoc(`users/${ownerUid}`, { uid: ownerUid });
 await seedDoc(`users/${otherUid}`, { uid: otherUid });
+await expectAllowed("owner creates Body Frame project", firestoreRequest("PATCH", `users/${ownerUid}/bodyProjects/project-1`, { uid: ownerUid, data: projectBackup }));
+await expectDenied("other users cannot read Body Frame projects", firestoreRequest("GET", `users/${ownerUid}/bodyProjects/project-1`, { uid: otherUid }));
+await expectDenied("health data stays outside project backups", firestoreRequest("PATCH", `users/${ownerUid}/bodyProjects/project-1`, { uid: ownerUid, data: { ...projectBackup, weight: 65 } }));
+await expectAllowed("owner updates project metadata", firestoreRequest("PATCH", `users/${ownerUid}/bodyProjects/project-1`, { uid: ownerUid, data: { ...projectBackup, archived: true } }));
+await expectDenied("other users cannot delete project metadata", firestoreRequest("DELETE", `users/${ownerUid}/bodyProjects/project-1`, { uid: otherUid }));
+await seedBackupUploadSession({ sessionId: "body-photo", storagePath: `users/${ownerUid}/backups/photos/body.jpg`, fileSize: 1024, status: "completed" });
+const bodyPhoto = { ...validPhotoBackup(ownerUid, "body-photo"), storagePath: `users/${ownerUid}/backups/photos/body.jpg`, backupSessionId: "body-photo", projectId: "project-1", sequence: 1, sourceUpdatedAt: "2026-09-19T00:00:00Z" };
+await expectAllowed("first Body Frame photo backup", firestoreRequest("PATCH", `users/${ownerUid}/photoBackups/body-photo`, { uid: ownerUid, data: bodyPhoto }));
+await expectDenied("Body Frame sequence must be positive", firestoreRequest("PATCH", `users/${ownerUid}/photoBackups/body-photo`, { uid: ownerUid, data: { ...bodyPhoto, sequence: 0 } }));
+await seedBackupUploadSession({ sessionId: "body-replacement", storagePath: `users/${ownerUid}/backups/photos/body-new.jpg`, fileSize: 1024, status: "completed" });
+await expectAllowed("completed owned upload replaces edited photo", firestoreRequest("PATCH", `users/${ownerUid}/photoBackups/body-photo`, { uid: ownerUid, data: { ...bodyPhoto, storagePath: `users/${ownerUid}/backups/photos/body-new.jpg`, backupSessionId: "body-replacement", edited: true } }));
+await seedBackupUploadSession({ sessionId: "body-released", storagePath: `users/${ownerUid}/backups/photos/body-released.jpg`, fileSize: 1024, status: "released" });
+await expectDenied("released upload cannot replace a photo", firestoreRequest("PATCH", `users/${ownerUid}/photoBackups/body-photo`, { uid: ownerUid, data: { ...bodyPhoto, storagePath: `users/${ownerUid}/backups/photos/body-released.jpg`, backupSessionId: "body-released" } }));
+await seedBackupUploadSession({ sessionId: "body-video", storagePath: `users/${ownerUid}/backups/videos/body.mp4`, fileSize: 2048, contentType: "video/mp4", mediaKind: "video", status: "completed" });
+await expectAllowed("Body Frame video keeps its project", firestoreRequest("PATCH", `users/${ownerUid}/videos/body-video`, { uid: ownerUid, data: { ...validVideoBackup(ownerUid, "body-video"), storagePath: `users/${ownerUid}/backups/videos/body.mp4`, backupSessionId: "body-video", projectId: "project-1" } }));
 
 await expectDenied(
   "unauthenticated users cannot read backup overview",
