@@ -70,6 +70,9 @@ if (packageJson.dependencies?.["react-native-health-connect"] !== "4.1.3") {
 if (!appExpo.plugins?.includes("react-native-health-connect")) {
   fail("Health Connect Expo plugin is missing");
 }
+if (!appExpo.plugins?.includes("./plugins/with-body-pose-alignment")) {
+  fail("Body Frame pose alignment Expo plugin is missing");
+}
 
 const androidPermissions = appExpo.android?.permissions ?? [];
 for (const permission of [
@@ -138,10 +141,28 @@ for (const token of [
   "체지방률",
   "최근 30일",
   "Firebase",
-  "자동 업로드되지 않"
+  "자동 업로드되지 않",
+  "자세 맞춤 도움",
+  "기기 내",
+  "서버로 업로드하지 않",
+  "임시 이미지"
 ]) {
   if (!privacyPolicy.includes(token)) {
     fail(`privacy policy Health Connect disclosure missing: ${token}`);
+  }
+}
+
+const posePlugin = fs.readFileSync(
+  path.join(root, "plugins/with-body-pose-alignment.js"),
+  "utf8"
+);
+for (const token of [
+  "com.google.mlkit:pose-detection:18.0.0-beta5",
+  "PoseDetectorOptions.STREAM_MODE",
+  "AndroidPoseAlignmentModule"
+]) {
+  if (!posePlugin.includes(token)) {
+    fail(`pose alignment release invariant missing: ${token}`);
   }
 }
 
