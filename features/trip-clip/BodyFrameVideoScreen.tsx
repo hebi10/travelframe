@@ -1,7 +1,7 @@
 import { Image } from "expo-image";
 import * as FileSystem from "expo-file-system/legacy";
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -13,11 +13,14 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { TripClipRecordingCanvas } from "@/components/trip-clip-recording-canvas";
+import { BodyFrameVideoOptionsSheet, type VideoOptionKind } from "@/features/trip-clip/BodyFrameVideoOptionsSheet";
 import { bodyFrameDesign, bodyFrameTypography } from "@/constants/app-theme";
 import {
   BODY_FRAME_VIDEO_FPS,
-  BODY_FRAME_VIDEO_MAX_OUTPUT_SIZE,
-  BODY_FRAME_VIDEO_RATIO,
+  DEFAULT_BODY_FRAME_VIDEO_OPTIONS,
+  getBodyFrameVideoOutputSize,
+  getBodyFrameVideoPhotoIndex,
+  selectBodyFrameVideoPhotos,
   BODY_FRAME_VIDEO_TEMPLATE,
   BODY_FRAME_VIDEO_TRANSITION,
   BODY_FRAME_VIDEO_TRANSITION_DURATION,
@@ -45,7 +48,6 @@ import { useAppAppearance } from "@/lib/app-appearance";
 import { useAuth } from "@/lib/auth-context";
 import { ensurePhotoPreviews, getPhotos } from "@/lib/photo-library";
 import { getPlanEntitlements } from "@/lib/plan-entitlements";
-import { getRecordingFrame } from "@/lib/trip-clip-playback";
 import { saveVideoToLibrary } from "@/lib/trip-clip-export";
 import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 import { getMadeVideos, saveMadeVideo } from "@/lib/video-library";
@@ -59,7 +61,6 @@ import { RECORDING_VIEW_WIDTH } from "@/features/trip-clip/trip-clip-screen.cons
 import type { BodyProject } from "@/types/body-project";
 import type { PhotoItem } from "@/types/photo";
 
-const BODY_FRAME_ASPECT_RATIO = 9 / 16;
 const BODY_FRAME_VIDEO_BITRATE = 5_000_000;
 const EMPTY_ADJUSTMENTS = {};
 
@@ -101,7 +102,21 @@ export default function BodyFrameVideoScreen() {
   const [activeProject, setActiveProject] = useState<BodyProject | null | undefined>(
     undefined
   );
-  const [projectPhotos, setProjectPhotos] = useState<PhotoItem[]>([]);
+  const [availablePhotos, setAvailablePhotos] = useState<PhotoItem[]>([]);
+  const [selectedIds, setSelectedIds] = useState<string[] | null>(null);
+  const [videoOptions, setVideoOptions] = useState(DEFAULT_BODY_FRAME_VIDEO_OPTIONS);
+  const [optionKind, setOptionKind] = useState<VideoOptionKind | null>(null);
+  const loadedProjectId = useRef<string | null>(null);
+  const projectPhotos = useMemo(
+    () => selectBodyFrameVideoPhotos(availablePhotos, selectedIds),
+    [availablePhotos, selectedIds]
+  );
+  const recordingPhotos = useMemo(
+    () => projectPhotos.map(photo => ({ ...photo, previewUri: photo.uri })),
+    [projectPhotos]
+  );
+  const outputSize = getBodyFrameVideoOutputSize(videoOptions.ratio, videoOptions.quality);
+  const frameAspectRatio = outputSize.width / outputSize.height;
   const [isLoading, setIsLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
@@ -109,11 +124,11 @@ export default function BodyFrameVideoScreen() {
   const [recordingFrameIndex, setRecordingFrameIndex] = useState(0);
 
   const durations = useMemo(
-    () => createBodyFrameVideoDurations(projectPhotos),
-    [projectPhotos]
+    () => createBodyFrameVideoDurations(projectPhotos, videoOptions.interval),
+    [projectPhotos, videoOptions.interval]
   );
-  const totalDuration = getBodyFrameVideoDuration(projectPhotos.length);
-  const totalFrames = getBodyFrameVideoTotalFrames(projectPhotos.length);
+  const totalDuration = getBodyFrameVideoDuration(projectPhotos.length, videoOptions.interval);
+  const totalFrames = getBodyFrameVideoTotalFrames(projectPhotos.length, videoOptions.interval);
   const videoLimitState = useMemo(
     () =>
       getBodyFrameVideoLimitState({
@@ -125,16 +140,12 @@ export default function BodyFrameVideoScreen() {
   const upgradePlanLabel = getBodyFrameUpgradeLabel(planEntitlements.tier);
   const previewPhoto = projectPhotos[0] ?? null;
   const recordingFrame = useMemo(
-    () =>
-      getRecordingFrame({
-        frameIndex: recordingFrameIndex,
-        fps: BODY_FRAME_VIDEO_FPS,
-        photos: projectPhotos,
-        durations,
-        transition: BODY_FRAME_VIDEO_TRANSITION,
-        transitionDuration: BODY_FRAME_VIDEO_TRANSITION_DURATION
-      }),
-    [durations, projectPhotos, recordingFrameIndex]
+    () => ({
+      currentPhoto: recordingPhotos[getBodyFrameVideoPhotoIndex(recordingFrameIndex, videoOptions.interval)] ?? null,
+      nextPhoto: null,
+      transitionProgress: 0
+    }),
+    [recordingPhotos, recordingFrameIndex, videoOptions.interval]
   );
 
   const loadActiveProject = useCallback(async () => {
@@ -148,7 +159,12 @@ export default function BodyFrameVideoScreen() {
       const selectedProject = selectActiveBodyProject(projects, lastActiveProjectId);
 
       setActiveProject(selectedProject);
-      setProjectPhotos(
+      if (loadedProjectId.current !== (selectedProject?.id ?? null)) {
+        setSelectedIds(null);
+        setOptionKind(null);
+        loadedProjectId.current = selectedProject?.id ?? null;
+      }
+      setAvailablePhotos(
         selectedProject
           ? getBodyFrameVideoPhotos(storedPhotos, selectedProject.id)
           : []
@@ -159,7 +175,7 @@ export default function BodyFrameVideoScreen() {
       }
     } catch (error) {
       setActiveProject(null);
-      setProjectPhotos([]);
+      setAvailablePhotos([]);
       setMessage(
         getUserFacingErrorMessage(error, "프로젝트 사진을 불러오지 못했습니다.")
       );
@@ -175,7 +191,7 @@ export default function BodyFrameVideoScreen() {
   );
 
   const preloadProjectPhotos = useCallback(async () => {
-    const uris = projectPhotos.map((photo) => photo.previewUri ?? photo.uri);
+    const uris = recordingPhotos.map((photo) => photo.uri);
     if (uris.length === 0) {
       return;
     }
@@ -185,7 +201,7 @@ export default function BodyFrameVideoScreen() {
     } catch {
       // Preloading is best-effort. The recorder can still resolve the image URI.
     }
-  }, [projectPhotos]);
+  }, [recordingPhotos]);
 
   const recordProjectVideo = useCallback(async () => {
     if (!recordingViewAvailable) {
@@ -211,8 +227,8 @@ export default function BodyFrameVideoScreen() {
       output: toNativeFilePath(outputUri),
       fps: BODY_FRAME_VIDEO_FPS,
       totalFrames,
-      width: BODY_FRAME_VIDEO_MAX_OUTPUT_SIZE.width,
-      height: BODY_FRAME_VIDEO_MAX_OUTPUT_SIZE.height,
+      width: outputSize.width,
+      height: outputSize.height,
       codec: "h264",
       quality: 0.92,
       bitrate: BODY_FRAME_VIDEO_BITRATE,
@@ -240,6 +256,8 @@ export default function BodyFrameVideoScreen() {
     projectPhotos.length,
     recorder,
     recordingViewAvailable,
+    outputSize.width,
+    outputSize.height,
     totalFrames
   ]);
 
@@ -284,7 +302,7 @@ export default function BodyFrameVideoScreen() {
           coverUri: previewPhoto?.uri,
           projectId: activeProject.id,
           title: `${activeProject.name} 변화 영상`,
-          ratio: BODY_FRAME_VIDEO_RATIO,
+          ratio: videoOptions.ratio,
           template: BODY_FRAME_VIDEO_TEMPLATE,
           transition: BODY_FRAME_VIDEO_TRANSITION,
           transitionDuration: BODY_FRAME_VIDEO_TRANSITION_DURATION,
@@ -319,6 +337,7 @@ export default function BodyFrameVideoScreen() {
     projectPhotos,
     recordProjectVideo,
     totalDuration,
+    videoOptions.ratio,
     videoLimitState.allowed,
     videoLimitState.limit
   ]);
@@ -379,7 +398,8 @@ export default function BodyFrameVideoScreen() {
             styles.previewFrame,
             {
               borderColor: palette.line,
-              backgroundColor: palette.surface
+              backgroundColor: palette.surface,
+              aspectRatio: frameAspectRatio
             }
           ]}
         >
@@ -393,7 +413,7 @@ export default function BodyFrameVideoScreen() {
           ) : (
             <View style={styles.previewEmpty}>
               <Text style={[styles.previewEmptyText, { color: palette.faint }]}>
-                아직 기록된 사진이 없습니다.
+                영상에 사용할 사진을 선택해 주세요.
               </Text>
             </View>
           )}
@@ -408,11 +428,11 @@ export default function BodyFrameVideoScreen() {
             }
           ]}
         >
-          <SummaryRow label="사진 수" value={`${projectPhotos.length}장`} />
-          <SummaryRow label="사진 간격" value="0.1초" />
+          <SummaryRow label="사진 수" value={`${projectPhotos.length} / ${availablePhotos.length}장`} disabled={isExporting} onPress={() => setOptionKind("photos")} />
+          <SummaryRow label="사진 간격" value={`${videoOptions.interval}초`} disabled={isExporting} onPress={() => setOptionKind("interval")} />
           <SummaryRow label="영상 길이" value={formatDuration(totalDuration)} />
-          <SummaryRow label="화질" value="1080p" />
-          <SummaryRow label="화면 비율" value={BODY_FRAME_VIDEO_RATIO} />
+          <SummaryRow label="화질" value={`${videoOptions.quality}p`} disabled={isExporting} onPress={() => setOptionKind("quality")} />
+          <SummaryRow label="화면 비율" value={videoOptions.ratio} disabled={isExporting} onPress={() => setOptionKind("ratio")} />
         </View>
 
         {!videoLimitState.allowed ? (
@@ -485,19 +505,36 @@ export default function BodyFrameVideoScreen() {
         ) : null}
       </ScrollView>
 
+      {optionKind ? (
+        <BodyFrameVideoOptionsSheet
+          kind={optionKind}
+          options={videoOptions}
+          photos={availablePhotos}
+          selectedIds={selectedIds}
+          onCancel={() => setOptionKind(null)}
+          onApply={(options, ids) => {
+            setVideoOptions(options);
+            setSelectedIds(ids);
+            setRecordingFrameIndex(0);
+            setMessage(null);
+            setOptionKind(null);
+          }}
+        />
+      ) : null}
+
       {recordingViewAvailable ? (
-        <View pointerEvents="none" style={styles.recordingHost}>
+        <View pointerEvents="none" style={[styles.recordingHost, { height: RECORDING_VIEW_WIDTH / frameAspectRatio }]}>
           <OptionalRecordingView
             available={recordingViewAvailable}
             sessionId={recorder.sessionId}
-            style={styles.recordingView}
+            style={[styles.recordingView, { aspectRatio: frameAspectRatio }]}
           >
             <TripClipRecordingCanvas
               frame={recordingFrame}
               template={BODY_FRAME_VIDEO_TEMPLATE}
               transition={BODY_FRAME_VIDEO_TRANSITION}
               showWatermark={planEntitlements.showWatermark}
-              frameAspectRatio={BODY_FRAME_ASPECT_RATIO}
+              frameAspectRatio={frameAspectRatio}
               guideVisible={false}
               guide="circle"
               guideSize={44}
@@ -521,18 +558,22 @@ export default function BodyFrameVideoScreen() {
 
 function SummaryRow({
   label,
-  value
+  value,
+  onPress,
+  disabled = false
 }: {
   label: string;
   value: string;
+  onPress?: () => void;
+  disabled?: boolean;
 }) {
   const { palette } = useAppAppearance();
 
   return (
-    <View style={styles.summaryRow}>
+    <Pressable accessibilityRole={onPress ? "button" : undefined} disabled={disabled || !onPress} onPress={onPress} style={styles.summaryRow}>
       <Text style={[styles.summaryLabel, { color: palette.muted }]}>{label}</Text>
-      <Text style={[styles.summaryValue, { color: palette.text }]}>{value}</Text>
-    </View>
+      <Text style={[styles.summaryValue, { color: palette.text }]}>{value}{onPress ? "  ›" : ""}</Text>
+    </Pressable>
   );
 }
 
@@ -578,7 +619,6 @@ const styles = StyleSheet.create({
     alignSelf: "center",
     width: "58%",
     maxWidth: 280,
-    aspectRatio: BODY_FRAME_ASPECT_RATIO,
     overflow: "hidden",
     borderWidth: bodyFrameDesign.borderWidth,
     borderRadius: bodyFrameDesign.cardRadius,
@@ -673,12 +713,10 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 0,
     left: -10000,
-    width: RECORDING_VIEW_WIDTH,
-    height: RECORDING_VIEW_WIDTH / BODY_FRAME_ASPECT_RATIO
+    width: RECORDING_VIEW_WIDTH
   },
   recordingView: {
     width: RECORDING_VIEW_WIDTH,
-    aspectRatio: BODY_FRAME_ASPECT_RATIO,
     backgroundColor: "#000000"
   }
 });

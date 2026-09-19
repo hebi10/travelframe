@@ -77,6 +77,10 @@ const requestSavePermission = async (kind: MediaPermissionKind) => {
   return MediaLibrary;
 };
 
+export const requestPhotoSavePermission = async () => {
+  await requestSavePermission("photo");
+};
+
 const getAndroidExportDirectoryUri = async (parentDirectoryUri: string) => {
   try {
     return await FileSystem.StorageAccessFramework.makeDirectoryAsync(

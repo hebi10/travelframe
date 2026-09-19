@@ -117,10 +117,10 @@ export default function AccountScreen() {
   });
 
   useEffect(() => {
-    if (billingMessage) {
+    if (isLoggedIn && billingMessage) {
       setMessage(billingMessage);
     }
-  }, [billingMessage]);
+  }, [billingMessage, isLoggedIn]);
   const googleAndroidClientId = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;
   const isGoogleReady = isGoogleSignInConfigured({
     androidClientId: googleAndroidClientId

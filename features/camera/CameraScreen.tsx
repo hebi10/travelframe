@@ -121,6 +121,7 @@ import {
 import { styles } from "@/features/camera/camera-screen.styles";
 import { useAuth } from "@/lib/auth-context";
 import { recordBackupFailure } from "@/lib/backup-failure-queue";
+import { requestPhotoSavePermission } from "@/lib/trip-clip-export";
 import { calculateGuidePositionDragOffset, clampGuidePositionOffset } from "@/lib/camera-guide-position";
 import { getNormalizedCameraFocusPoint, getTapExposureControlPosition } from "@/lib/camera-focus-controls";
 import { backupPhotoIfEnabled } from "@/lib/cloud-backup";
@@ -257,6 +258,7 @@ export default function CameraScreen() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [poseGuidance, setPoseGuidance] = useState<BodyPoseGuidance | null>(null);
   const [referenceUri, setReferenceUri] = useState<string | null>(null);
+  const [hiddenReferenceProjects, setHiddenReferenceProjects] = useState<Set<string>>(new Set());
   const [overlayOpacity, setOverlayOpacity] = useState(0.42);
   const defaultOverlayOpacity = useRef(0.4);
   const [overlaySetupActive, setOverlaySetupActive] = useState(false);
@@ -311,11 +313,19 @@ export default function CameraScreen() {
     ? [styles.controls, { paddingBottom: bottomSafePadding }]
     : styles.controls;
   const isLineGuideActive = guideVisible;
-  const hasReferenceOverlay = Boolean(
+  const referenceProjectKey = bodyFrameCameraSession.projectId ?? "legacy";
+  const referenceOverlayVisible = !hiddenReferenceProjects.has(referenceProjectKey);
+  const hasReferenceSource = Boolean(
     referenceUri || bodyFrameCameraSession.automaticReferenceUri
   );
+  const hasReferenceOverlay = referenceOverlayVisible && hasReferenceSource;
   const isPhotoGuideActive = hasReferenceOverlay;
   const isPhotoSavePending = pendingPhotoSaveCount > 0;
+  useEffect(() => {
+    // A manually picked guide belongs to the project where it was selected.
+    setReferenceUri(null);
+    setOverlaySetupActive(false);
+  }, [bodyFrameCameraSession.projectRevision]);
   const guideSizeBounds = useMemo(() => getGuideSizeBounds(guide), [guide]);
   const applyGridGuideLinePositionsState = useCallback(
     (nextPositions: GridGuideLinePositions) => {
@@ -1407,6 +1417,11 @@ export default function CameraScreen() {
       });
 
       if (!result.canceled && result.assets[0]?.uri) {
+        setHiddenReferenceProjects((current) => {
+          const next = new Set(current);
+          next.delete(referenceProjectKey);
+          return next;
+        });
         setReferenceUri(result.assets[0].uri);
         setOverlayOpacity(defaultOverlayOpacity.current);
         setOverlaySetupActive(true);
@@ -1416,7 +1431,7 @@ export default function CameraScreen() {
     } catch (error) {
       setErrorMessage(getUserFacingErrorMessage(error, "사진을 불러오지 못했습니다."));
     }
-  }, [triggerFeedback]);
+  }, [referenceProjectKey, triggerFeedback]);
 
   const resetOverlay = () => {
     setOverlayOpacity(defaultOverlayOpacity.current);
@@ -1432,14 +1447,24 @@ export default function CameraScreen() {
   };
 
   const removeReferenceOverlay = () => {
-    setReferenceUri(null);
+    setHiddenReferenceProjects((current) => new Set(current).add(referenceProjectKey));
     setOverlayLocked(false);
     setOverlaySetupActive(false);
     setOverlayOpacity(defaultOverlayOpacity.current);
-    setOverlayResetKey((value) => value + 1);
+    referenceOverlayRef.current?.reset();
   };
 
   const reopenOverlaySetup = () => {
+    if (!referenceOverlayVisible && hasReferenceSource) {
+      setHiddenReferenceProjects((current) => {
+        const next = new Set(current);
+        next.delete(referenceProjectKey);
+        return next;
+      });
+      setOverlayLocked(false);
+      setOverlaySetupActive(true);
+      return;
+    }
     if (!hasReferenceOverlay) {
       void pickReferencePhoto();
       return;
@@ -1916,7 +1941,11 @@ export default function CameraScreen() {
 
   const isDeviceAlbumPermissionError = useCallback((error: unknown) => {
     const message = error instanceof Error ? error.message : String(error ?? "");
-    return message.includes("핸드폰 앨범 저장 권한") || message.includes("앨범 저장 권한");
+    return (
+      message.includes("앨범 저장 권한") ||
+      message.includes("사진 접근 권한") ||
+      message.includes("선택한 사진만")
+    );
   }, []);
 
   const showDeviceAlbumPermissionPrompt = useCallback(
@@ -2067,6 +2096,17 @@ export default function CameraScreen() {
       cameraNativeCaptureInProgressRef.current = true;
       setIsCapturing(true);
       setErrorMessage(null);
+      const captureSaveScope = canSelectCloudSaveTarget
+        ? cameraSaveScope
+        : createCameraSaveScope({
+            ...getCameraSaveScopeTargets(cameraSaveScope),
+            cloud: false
+          });
+      // Resolve the system dialog before a photo or a pending save exists.
+      if (getCameraSaveScopeTargets(captureSaveScope).device) {
+        await requestPhotoSavePermission();
+        if (!canCaptureWithCurrentSession()) return;
+      }
       captureReservation = reserveBodyFrameCameraCapture();
       const photo = await photoOutput.capturePhotoToFile({
         flashMode: cameraDevice.hasFlash ? flashMode : "off",
@@ -2081,12 +2121,6 @@ export default function CameraScreen() {
       };
       setIsCapturing(false);
       cameraNativeCaptureInProgressRef.current = false;
-      const captureSaveScope = canSelectCloudSaveTarget
-        ? cameraSaveScope
-        : createCameraSaveScope({
-            ...getCameraSaveScopeTargets(cameraSaveScope),
-            cloud: false
-          });
       queueCapturedPhotoSave({
         captureInput,
         saveScope: captureSaveScope,
@@ -2098,7 +2132,12 @@ export default function CameraScreen() {
       captureReservation = null;
       photoUri = null;
     } catch (error) {
-      setErrorMessage(getUserFacingErrorMessage(error, "사진을 촬영하지 못했습니다."));
+      const message = getUserFacingErrorMessage(error, "사진을 촬영하지 못했습니다.");
+      if (isDeviceAlbumPermissionError(error)) {
+        showDeviceAlbumPermissionPrompt(message);
+      } else {
+        setErrorMessage(message);
+      }
     } finally {
       if (captureReservation) {
         finishBodyFrameCameraCapture({ ...captureReservation, success: false });
@@ -2282,6 +2321,7 @@ export default function CameraScreen() {
       </Animated.View>
       <PhotoReferenceOverlay
         ref={referenceOverlayRef}
+        visible={referenceOverlayVisible}
         uri={referenceUri}
         opacity={overlayOpacity}
         locked={overlayLocked}
@@ -2972,20 +3012,20 @@ export default function CameraScreen() {
                   <Pressable style={styles.overlayCompactButton} onPress={resetOverlay}>
                     <Text selectable={false} style={styles.overlayCompactText}>초기화</Text>
                   </Pressable>
-                  {referenceUri ? (
-                    <Pressable
-                      style={[styles.overlayCompactButton, styles.overlayRemoveButton]}
-                      onPress={removeReferenceOverlay}
-                    >
-                      <Text selectable={false} style={[styles.overlayCompactText, styles.overlayRemoveText]}>
-                        제거
-                      </Text>
-                    </Pressable>
-                  ) : null}
                   <Pressable style={styles.overlayConfirmButton} onPress={confirmOverlaySetup}>
                     <Text selectable={false} style={styles.overlayConfirmText}>확인</Text>
                   </Pressable>
                 </View>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="가이드 이미지만 제거, 원본 사진 유지"
+                  style={[styles.overlayCompactButton, styles.overlayRemoveButton, { flex: 0 }]}
+                  onPress={removeReferenceOverlay}
+                >
+                  <Text selectable={false} style={[styles.overlayCompactText, styles.overlayRemoveText]}>
+                    이미지 제거
+                  </Text>
+                </Pressable>
               </View>
             </View>
           ) : (
@@ -3270,23 +3310,25 @@ export default function CameraScreen() {
                     <View style={styles.shutterInner} />
                   </Pressable>
                   <Pressable
-                    disabled={!hasReferenceOverlay}
+                    disabled={!hasReferenceSource}
                     style={[
                       styles.overlayQuickButton,
-                      !hasReferenceOverlay && styles.overlayQuickButtonDisabled
+                      !hasReferenceSource && styles.overlayQuickButtonDisabled
                     ]}
                     onPress={reopenOverlaySetup}
                     accessibilityRole="button"
                     accessibilityLabel={
                       hasReferenceOverlay
                         ? `기준 사진 투명도 ${Math.round(overlayOpacity * 100)}퍼센트`
-                        : "기준 사진 없음"
+                        : hasReferenceSource ? "가이드 이미지 다시 표시" : "기준 사진 없음"
                     }
                   >
                     <Text selectable={false} style={styles.overlayQuickValue}>
                       {hasReferenceOverlay ? `${Math.round(overlayOpacity * 100)}%` : "--"}
                     </Text>
-                    <Text selectable={false} style={styles.overlayQuickLabel}>투명도</Text>
+                    <Text selectable={false} style={styles.overlayQuickLabel}>
+                      {!referenceOverlayVisible && hasReferenceSource ? "다시 표시" : "투명도"}
+                    </Text>
                   </Pressable>
                 </View>
               </View>

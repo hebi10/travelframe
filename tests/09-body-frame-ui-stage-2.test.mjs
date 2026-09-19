@@ -53,7 +53,7 @@ assert.ok(
 );
 assert.ok(
   cameraSource.includes("styles.overlayQuickButton") &&
-    cameraSource.includes(">투명도</Text>"),
+    cameraSource.includes('"다시 표시" : "투명도"'),
   "bottom capture row should expose reference opacity instead of camera flip"
 );
 assert.equal(

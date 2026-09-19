@@ -32,6 +32,7 @@ assert.equal(video.BODY_FRAME_VIDEO_RATIO, "9:16");
 assert.equal(video.BODY_FRAME_VIDEO_TEMPLATE, "minimal");
 assert.equal(video.BODY_FRAME_VIDEO_TRANSITION, "none");
 assert.equal(video.BODY_FRAME_VIDEO_TRANSITION_DURATION, 0);
+assert.deepEqual(video.DEFAULT_BODY_FRAME_VIDEO_OPTIONS, { interval: 0.1, quality: 1080, ratio: "9:16" });
 assert.deepEqual(video.BODY_FRAME_VIDEO_MAX_OUTPUT_SIZE, {
   width: 1080,
   height: 1920
@@ -43,6 +44,17 @@ assert.equal(video.getBodyFrameVideoDuration(365), 36.5);
 assert.equal(video.getBodyFrameVideoTotalFrames(365), 1095);
 assert.equal(video.getBodyFrameVideoDuration(-1), 0);
 assert.equal(video.getBodyFrameVideoTotalFrames(Number.NaN), 0);
+for (const interval of [0.1, 0.2, 0.5, 1]) {
+  assert.equal(video.getBodyFrameVideoTotalFrames(365, interval), 365 * interval * 30);
+  assert.equal(video.getBodyFrameVideoDuration(100, interval), 100 * interval);
+  const frames = interval * 30;
+  assert.equal(video.getBodyFrameVideoPhotoIndex(frames - 1, interval), 0);
+  assert.equal(video.getBodyFrameVideoPhotoIndex(frames, interval), 1);
+}
+assert.deepEqual(video.getBodyFrameVideoOutputSize("9:16", 720), { width: 720, height: 1280 });
+assert.deepEqual(video.getBodyFrameVideoOutputSize("1:1", 1080), { width: 1080, height: 1080 });
+assert.deepEqual(video.getBodyFrameVideoOutputSize("16:9", 1080), { width: 1920, height: 1080 });
+assert.equal(video.getBodyFrameVideoDuration(0, 1), 0);
 
 const photos = [
   {
@@ -77,10 +89,17 @@ const photos = [
 
 const projectPhotos = video.getBodyFrameVideoPhotos(photos, "project-a");
 assert.deepEqual(projectPhotos.map((photo) => photo.id), ["a-1", "a-2", "a-3"]);
+assert.deepEqual(video.selectBodyFrameVideoPhotos(projectPhotos, ["a-3", "a-1", "b-1"]).map(photo => photo.id), ["a-1", "a-3"]);
+assert.deepEqual(video.selectBodyFrameVideoPhotos(projectPhotos, []), []);
+assert.deepEqual(video.selectBodyFrameVideoPhotos(projectPhotos, null), projectPhotos);
+assert.equal(video.getBodyFrameVideoDuration(video.selectBodyFrameVideoPhotos(projectPhotos, ["a-3", "a-1"]).length, 0.5), 1);
 assert.deepEqual(video.createBodyFrameVideoDurations(projectPhotos), {
   "a-1": 0.1,
   "a-2": 0.1,
   "a-3": 0.1
+});
+assert.deepEqual(video.createBodyFrameVideoDurations(projectPhotos.slice(1), 0.5), {
+  "a-2": 0.5, "a-3": 0.5
 });
 
 const malformedPhotos = [
@@ -138,14 +157,14 @@ for (const token of [
   "getBodyFrameVideoDuration",
   "getBodyFrameVideoTotalFrames",
   "BODY_FRAME_VIDEO_FPS",
-  "BODY_FRAME_VIDEO_MAX_OUTPUT_SIZE",
-  "BODY_FRAME_VIDEO_RATIO",
+  "DEFAULT_BODY_FRAME_VIDEO_OPTIONS",
+  "getBodyFrameVideoOutputSize",
   "BODY_FRAME_VIDEO_TRANSITION",
   "BODY_FRAME_VIDEO_TRANSITION_DURATION",
   "TripClipRecordingCanvas",
   "OptionalRecordingView",
   "useOptionalViewRecorder",
-  "getRecordingFrame",
+  "getBodyFrameVideoPhotoIndex",
   "saveVideoToLibrary",
   "saveMadeVideo",
   "fps: BODY_FRAME_VIDEO_FPS",

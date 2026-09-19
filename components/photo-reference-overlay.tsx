@@ -22,6 +22,7 @@ import {
 } from "@/lib/body-frame-camera-session";
 
 type PhotoReferenceOverlayProps = {
+  visible?: boolean;
   uri: string | null;
   opacity: number;
   locked: boolean;
@@ -38,6 +39,7 @@ export const PhotoReferenceOverlay = forwardRef<
   PhotoReferenceOverlayHandle,
   PhotoReferenceOverlayProps
 >(function PhotoReferenceOverlay({
+  visible = true,
   uri,
   opacity,
   locked,
@@ -150,7 +152,7 @@ export const PhotoReferenceOverlay = forwardRef<
     ]
   }));
 
-  if (!effectiveUri) {
+  if (!visible || !effectiveUri) {
     return null;
   }
 

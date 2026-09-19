@@ -555,13 +555,31 @@ export default function BodyFrameProjectDetailScreen() {
               <Text style={[styles.sheetTitle, { color: palette.text }]}>
                 프로젝트 설정
               </Text>
-              <Pressable
-                accessibilityRole="button"
-                style={[styles.sheetCloseButton, { borderColor: palette.line }]}
-                onPress={() => setSettingsOpen(false)}
-              >
-                <Text style={[styles.sheetCloseText, { color: palette.text }]}>닫기</Text>
-              </Pressable>
+              <View style={styles.sheetActions}>
+                <Pressable
+                  disabled={saving}
+                  accessibilityRole="button"
+                  style={[
+                    styles.saveButton,
+                    {
+                      backgroundColor: palette.text,
+                      opacity: saving ? 0.5 : 1
+                    }
+                  ]}
+                  onPress={() => void saveBasicInfo()}
+                >
+                  <Text style={[styles.saveButtonText, { color: palette.inverse }]}>
+                    변경 저장
+                  </Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  style={[styles.sheetCloseButton, { borderColor: palette.line }]}
+                  onPress={() => setSettingsOpen(false)}
+                >
+                  <Text style={[styles.sheetCloseText, { color: palette.text }]}>닫기</Text>
+                </Pressable>
+              </View>
             </View>
 
             <ScrollView
@@ -917,23 +935,6 @@ export default function BodyFrameProjectDetailScreen() {
                 </>
               ) : null}
 
-              <Pressable
-                disabled={saving}
-                accessibilityRole="button"
-                style={[
-                  styles.saveButton,
-                  {
-                    backgroundColor: palette.text,
-                    opacity: saving ? 0.5 : 1
-                  }
-                ]}
-                onPress={() => void saveBasicInfo()}
-              >
-                <Text style={[styles.saveButtonText, { color: palette.inverse }]}>
-                  변경 저장
-                </Text>
-              </Pressable>
-
               <View style={styles.settingDivider} />
 
               <Text style={[styles.settingTitle, { color: palette.text }]}>
@@ -1173,8 +1174,14 @@ const styles = StyleSheet.create({
     marginBottom: 10
   },
   sheetTitle: {
+    flex: 1,
     fontSize: 20,
     fontWeight: "600"
+  },
+  sheetActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8
   },
   sheetCloseButton: {
     minHeight: bodyFrameDesign.minTouchSize,
@@ -1277,7 +1284,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: bodyFrameDesign.buttonRadius,
-    marginTop: 4
+    paddingHorizontal: 12
   },
   saveButtonText: {
     fontSize: bodyFrameTypography.button,

@@ -154,13 +154,13 @@ export default function BodyFrameSettingsScreen() {
         <SectionBlock title="변화 영상">
           <BodyFrameSettingRow
             label="사진 간격"
-            detail="프로젝트 사진 1장당 고정 재생 시간"
-            mark="0.1초"
+            detail="영상 화면에서 사진 간격을 조절합니다."
+            mark="기본 0.1초"
             onPress={() => router.push("/trip-clip")}
           />
           <BodyFrameSettingRow
             label="출력 규격"
-            detail="세로 변화 영상 기본 저장 규격"
+            detail="기본은 세로 1080p이며 영상 화면에서 변경합니다."
             mark="9:16 · 1080p"
             onPress={() => router.push("/trip-clip")}
           />
@@ -227,11 +227,11 @@ const styles = StyleSheet.create({
     flex: 1
   },
   content: {
-    paddingHorizontal: bodyFrameDesign.horizontalPadding
+    paddingHorizontal: bodyFrameDesign.horizontalPadding,
+    gap: bodyFrameDesign.sectionGap
   },
   header: {
-    gap: 6,
-    marginBottom: 24
+    gap: 6
   },
   settingRow: {
     minHeight: 64,
