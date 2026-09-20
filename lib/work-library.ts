@@ -1,4 +1,5 @@
 import * as FileSystem from "expo-file-system/legacy";
+import { downloadPrivateFile } from "@/lib/private-storage";
 
 import { localStorageAdapter } from "@/lib/local-storage";
 import { assertLocalLibraryCapacity } from "@/lib/local-library-limit";
@@ -224,7 +225,7 @@ export const updateImageBundleWork = async (
 };
 
 export const restoreImageBundleWorkIfNeeded = async (work: ImageBundleWorkItem) => {
-  if (work.localFileStatus !== "cloud_only") {
+  if (work.localFileStatus !== "cloud_only" && !work.imageUris.some(isRemoteUri)) {
     return work;
   }
 
@@ -240,7 +241,7 @@ export const restoreImageBundleWorkIfNeeded = async (work: ImageBundleWorkItem) 
         return uri;
       }
 
-      const result = await FileSystem.downloadAsync(
+      const result = await downloadPrivateFile(
         uri,
         `${directory}${work.id}-${index}-restored.jpg`
       );

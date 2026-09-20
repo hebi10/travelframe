@@ -1,4 +1,4 @@
-import { Image } from "expo-image";
+import { Image } from "@/components/private-media-image";
 import { Stack, router, type Href, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { Component, type ReactNode, useCallback, useState } from "react";
 import {

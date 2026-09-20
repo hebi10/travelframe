@@ -1,4 +1,4 @@
-import { Image } from "expo-image";
+import { Image } from "@/components/private-media-image";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
 import {

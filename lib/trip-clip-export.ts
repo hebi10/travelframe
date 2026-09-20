@@ -1,5 +1,6 @@
 import * as FileSystem from "expo-file-system/legacy";
 import { manipulateAsync, SaveFormat, type Action } from "expo-image-manipulator";
+import { resolvePrivateMediaUri } from "@/lib/private-storage";
 import * as Sharing from "expo-sharing";
 import { Platform } from "react-native";
 import { type ImageQuality } from "@/constants/image";
@@ -214,6 +215,7 @@ export const prepareImageForLibrarySave = async (
   format: ImageSaveFormat,
   options: ImageExportOptions = {}
 ) => {
+  uri = await resolvePrivateMediaUri(uri);
   const qualityOption = options.imageQuality
     ? getImageQualityOption(options.imageQuality)
     : null;
@@ -257,6 +259,7 @@ export const prepareImageForLibrarySave = async (
 
 export const saveVideoToLibrary = async (uri: string) => {
   try {
+    uri = await resolvePrivateMediaUri(uri);
     if (Platform.OS === "android") {
       return await saveVideoToAndroidDownload(uri);
     }
@@ -330,6 +333,7 @@ const normalizeMediaSaveError = (error: unknown, fallback: string) => {
 };
 
 export const shareVideo = async (uri: string) => {
+  uri = await resolvePrivateMediaUri(uri);
   const available = await Sharing.isAvailableAsync();
 
   if (!available) {

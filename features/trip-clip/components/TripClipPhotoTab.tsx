@@ -1,4 +1,4 @@
-import { Image } from "expo-image";
+import { Image } from "@/components/private-media-image";
 import type { ReactNode } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
 

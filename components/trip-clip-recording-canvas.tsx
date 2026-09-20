@@ -1,4 +1,4 @@
-import { Image } from "expo-image";
+import { Image } from "@/components/private-media-image";
 import { StyleSheet, Text, View } from "react-native";
 
 import { CameraGuideOverlay } from "@/components/camera-guide-overlay";

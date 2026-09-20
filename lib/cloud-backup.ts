@@ -1,3 +1,5 @@
+import { privateStorageUrl } from "@/lib/private-storage";
+import { assertLocalLibraryOwner } from "@/lib/local-library-owner";
 import * as FileSystem from "expo-file-system/legacy";
 import { type User } from "firebase/auth";
 import {
@@ -10,7 +12,7 @@ import {
   setDoc
 } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
-import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
+import { ref, uploadBytes } from "firebase/storage";
 
 import {
   getAppSettings,
@@ -27,7 +29,7 @@ import {
   getCloudBackupVideoLimit,
   type CloudBackupLimitTier
 } from "@/lib/cloud-backup-limits";
-import { firebaseFunctions, firestore, firebaseStorage } from "@/lib/firebase";
+import { firebaseAuth, firebaseFunctions, firestore, firebaseStorage } from "@/lib/firebase";
 import { getBodyProjects, mergeBodyProjectsFromBackup } from "@/lib/body-project-library";
 import { isPhotoBackupCurrent, recoverMissingBodyProjects } from "@/lib/body-project-backup";
 import type { BodyProject } from "@/types/body-project";
@@ -280,7 +282,7 @@ const reserveBackupUpload = (data: {
     data
   );
 
-const completeBackupUpload = (data: { backupSessionId: string }) =>
+const completeBackupUpload = (data: { backupSessionId: string; privateDownload?: boolean }) =>
   callBackupFunction<typeof data, CompleteBackupUploadResponse>(
     "completeBackupUpload",
     data
@@ -389,9 +391,18 @@ const uploadLocalFile = async ({
     throw new Error("클라우드 백업을 지금 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.");
   }
 
+  const uploadUser = firebaseAuth?.currentUser;
+  if (!uploadUser || !storagePath.startsWith(`users/${uploadUser.uid}/`)) {
+    throw new Error("계정이 변경되어 백업을 중단했습니다. 다시 로그인해 주세요.");
+  }
+  await assertLocalLibraryOwner(uploadUser.uid);
+  const assertUploadAccount = () => {
+    if (firebaseAuth?.currentUser !== uploadUser) throw new Error("계정이 변경되어 백업을 중단했습니다.");
+  };
   const response = await fetch(uri);
   const blob = await response.blob();
   const contentType = getContentType(uri);
+  assertUploadAccount();
   const reservation = await reserveBackupUpload({
     mediaKind,
     fileSize: blob.size,
@@ -402,18 +413,22 @@ const uploadLocalFile = async ({
   const fileRef = ref(firebaseStorage, uploadStoragePath);
 
   try {
+    assertUploadAccount();
     await uploadBytes(fileRef, blob, {
       contentType,
       customMetadata: {
         backupSessionId: reservation.backupSessionId
       }
     });
+    assertUploadAccount();
     await completeBackupUpload({
+      privateDownload: true,
       backupSessionId: reservation.backupSessionId
     });
+    assertUploadAccount();
 
     return {
-      downloadURL: await getDownloadURL(fileRef),
+      downloadURL: privateStorageUrl(uploadStoragePath),
       fileSize: blob.size,
       backupSessionId: reservation.backupSessionId,
       storagePath: uploadStoragePath
@@ -773,6 +788,9 @@ export const backupCurrentWorkspace = async ({
   if (!user) {
     throw new Error("로그인 후 백업할 수 있습니다.");
   }
+
+  if (firebaseAuth?.currentUser?.uid !== user.uid) throw new Error("계정이 변경되었습니다. 다시 시도해 주세요。");
+  await assertLocalLibraryOwner(user.uid);
 
   if (!firestore || !firebaseStorage) {
     throw new Error("Firebase 연결 정보가 아직 설정되지 않았습니다.");
@@ -1255,6 +1273,9 @@ export const backupPhoto = async ({
     return null;
   }
 
+  if (firebaseAuth?.currentUser?.uid !== user.uid) throw new Error("계정이 변경되었습니다. 다시 시도해 주세요。");
+  await assertLocalLibraryOwner(user.uid);
+
   if (!firestore || !firebaseStorage) {
     throw new Error("Firebase 연결 정보가 아직 설정되지 않았습니다.");
   }
@@ -1443,6 +1464,9 @@ export const backupImageBundleWork = async ({
     return null;
   }
 
+  if (firebaseAuth?.currentUser?.uid !== user.uid) throw new Error("계정이 변경되었습니다. 다시 시도해 주세요。");
+  await assertLocalLibraryOwner(user.uid);
+
   if (!firestore || !firebaseStorage) {
     throw new Error("Firebase 연결 정보가 아직 설정되지 않았습니다.");
   }
@@ -1605,6 +1629,9 @@ export const backupMadeVideo = async ({
   if (!enabled || !user) {
     return null;
   }
+
+  if (firebaseAuth?.currentUser?.uid !== user.uid) throw new Error("계정이 변경되었습니다. 다시 시도해 주세요。");
+  await assertLocalLibraryOwner(user.uid);
 
   if (!firestore || !firebaseStorage) {
     throw new Error("Firebase 연결 정보가 아직 설정되지 않았습니다.");
@@ -1812,6 +1839,9 @@ export const restoreCloudBackupToLocal = async ({ user }: { user: User | null })
     throw new Error("로그인이 필요합니다.");
   }
 
+  if (firebaseAuth?.currentUser?.uid !== user.uid) throw new Error("계정이 변경되었습니다. 다시 시도해 주세요。");
+  await assertLocalLibraryOwner(user.uid);
+
   if (!firestore) {
     throw new Error("Firebase 연결 정보가 아직 설정되지 않았습니다.");
   }
@@ -1851,6 +1881,9 @@ export const restoreCloudBackupToLocal = async ({ user }: { user: User | null })
   const missingVideos = videos.filter(
     (item) => !existingVideoIds.has(item.id) && !deletedVideoIds.has(item.id)
   );
+
+  if (firebaseAuth?.currentUser?.uid !== user.uid) throw new Error("계정이 변경되어 복원을 중단했습니다.");
+  await assertLocalLibraryOwner(user.uid);
 
   const projects = projectSnapshot.docs.map(item => ({ ...item.data(), id: item.id }) as BodyProject);
   await mergeBodyProjectsFromBackup(recoverMissingBodyProjects(projects, [...localPhotos, ...missingPhotos]));

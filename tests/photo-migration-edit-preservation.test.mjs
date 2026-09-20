@@ -45,6 +45,7 @@ test("overwriting an edited photo keeps its project and backup identity", async 
   };
   const store = new Map([["travel-frame.photos.v1", JSON.stringify([previous])]]);
   const library = loadModule("lib/legacy-photo-library.ts", {
+    "@/lib/private-storage": { downloadPrivateFile: async () => { throw new Error("unexpected remote download"); } },
     "expo-file-system/legacy": {
       documentDirectory: "file:///documents/", makeDirectoryAsync: async () => {},
       copyAsync: async () => {}, deleteAsync: async () => {}

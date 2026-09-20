@@ -1,4 +1,4 @@
-import { Image } from "expo-image";
+import { Image } from "@/components/private-media-image";
 import { Text, View } from "react-native";
 
 import { Section, SmallButton, TimelineDurationControl } from "@/features/trip-clip/trip-clip-screen.components";

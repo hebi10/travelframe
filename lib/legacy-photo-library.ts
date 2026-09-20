@@ -1,4 +1,5 @@
 import * as FileSystem from "expo-file-system/legacy";
+import { downloadPrivateFile } from "@/lib/private-storage";
 import { manipulateAsync, SaveFormat, type Action } from "expo-image-manipulator";
 
 import { localStorageAdapter } from "@/lib/local-storage";
@@ -356,7 +357,7 @@ const isRemoteUri = (uri?: string | null) =>
   typeof uri === "string" && /^https?:\/\//i.test(uri);
 
 export const restorePhotoOriginalIfNeeded = async (photo: PhotoItem) => {
-  if (photo.localFileStatus !== "cloud_only") {
+  if (photo.localFileStatus !== "cloud_only" && !isRemoteUri(photo.uri)) {
     return photo;
   }
 
@@ -367,7 +368,7 @@ export const restorePhotoOriginalIfNeeded = async (photo: PhotoItem) => {
 
   const directory = await ensurePhotoDirectory();
   const destinationUri = `${directory}${photo.id}-restored.jpg`;
-  const result = await FileSystem.downloadAsync(sourceUri, destinationUri);
+  const result = await downloadPrivateFile(sourceUri, destinationUri);
   const photos = await getPhotos();
   const restoredPhoto: PhotoItem = {
     ...photo,

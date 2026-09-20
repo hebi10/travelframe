@@ -16,9 +16,13 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode
 } from "react";
+import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { checkLocalLibraryAccess, claimLocalLibrary, type LocalLibraryAccess } from "@/lib/local-library-owner";
+import { signInWithGoogleAuthSession } from "@/lib/google-auth";
 
 import { firebaseAuth, firestore, isFirebaseConfigured } from "@/lib/firebase";
 import {
@@ -107,17 +111,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [subscriptionStatus, setSubscriptionStatus] =
     useState<SubscriptionCheckStatus>("loading");
   const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [libraryAccess, setLibraryAccess] = useState<LocalLibraryAccess | "checking" | "error">("checking");
+  const authGeneration = useRef(0);
+  const [gateEmail, setGateEmail] = useState("");
+  const [gatePassword, setGatePassword] = useState("");
+  const [gateError, setGateError] = useState("");
+  const [gateBusy, setGateBusy] = useState(false);
 
   useEffect(() => {
-    if (!firebaseAuth) {
-      setIsAuthLoading(false);
-      setSubscriptionStatus("failed");
-      return;
-    }
-
-    return onAuthStateChanged(firebaseAuth, async (nextUser) => {
+    const handleAuthChange = async (nextUser: User | null) => {
+      const generation = ++authGeneration.current;
+      const current = () => generation === authGeneration.current;
+      setLibraryAccess("checking");
+      setIsAuthLoading(true);
       setUser(nextUser);
-      setIsAuthLoading(false);
+      setGatePassword("");
+      setGateError("");
+      setVerifiedSubscription(freeSubscription);
+      setCachedSubscription(freeSubscription);
+      try {
+        const access = await checkLocalLibraryAccess(nextUser?.uid ?? null);
+        if (!current()) return;
+        setLibraryAccess(access);
+        setIsAuthLoading(false);
+      } catch {
+        if (!current()) return;
+        setLibraryAccess("error");
+        setIsAuthLoading(false);
+      }
 
       if (nextUser) {
         setSubscriptionStatus("loading");
@@ -127,17 +148,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } catch {
           // User profile sync should not block local app usage.
         }
-
-        const nextSubscriptionState = await getUserSubscriptionState(nextUser);
-        setVerifiedSubscription(nextSubscriptionState.verifiedSubscription);
-        setCachedSubscription(nextSubscriptionState.cachedSubscription);
-        setSubscriptionStatus(nextSubscriptionState.subscriptionStatus);
+        if (!current()) return;
+        try {
+          const nextSubscriptionState = await getUserSubscriptionState(nextUser);
+          if (!current()) return;
+          setVerifiedSubscription(nextSubscriptionState.verifiedSubscription);
+          setCachedSubscription(nextSubscriptionState.cachedSubscription);
+          setSubscriptionStatus(nextSubscriptionState.subscriptionStatus);
+        } catch {
+          if (current()) setSubscriptionStatus("failed");
+        }
       } else {
         setVerifiedSubscription(freeSubscription);
         setCachedSubscription(freeSubscription);
         setSubscriptionStatus("verified");
       }
-    });
+    };
+    if (!firebaseAuth) {
+      void handleAuthChange(null);
+      return () => { authGeneration.current += 1; };
+    }
+    const unsubscribe = onAuthStateChanged(firebaseAuth, handleAuthChange);
+    return () => { authGeneration.current += 1; unsubscribe(); };
   }, []);
 
   const signIn = useCallback(async (email: string, password: string) => {
@@ -177,10 +209,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refreshUser = useCallback(async () => {
     const currentUser = ensureCurrentUser();
+    const generation = authGeneration.current;
+    const current = () => generation === authGeneration.current && firebaseAuth?.currentUser?.uid === currentUser.uid;
     await currentUser.reload();
+    if (!current()) return;
     await ensureUserDocument(currentUser);
+    if (!current()) return;
     setSubscriptionStatus("loading");
     const nextSubscriptionState = await getUserSubscriptionState(currentUser);
+    if (!current()) return;
     setVerifiedSubscription(nextSubscriptionState.verifiedSubscription);
     setCachedSubscription(nextSubscriptionState.cachedSubscription);
     setSubscriptionStatus(nextSubscriptionState.subscriptionStatus);
@@ -225,7 +262,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     ]
   );
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  const runGateAction = async (action: () => Promise<void>) => {
+    setGateBusy(true);
+    setGateError("");
+    try { await action(); }
+    catch { setGateError("처리하지 못했습니다. 로그인 정보와 연결 상태를 확인해 주세요."); }
+    finally { setGateBusy(false); }
+  };
+  const gateButton = (label: string, action: () => Promise<void>) => (
+    <Pressable accessibilityRole="button" disabled={gateBusy} onPress={() => void runGateAction(action)}
+      style={{ padding: 16, borderRadius: 8, backgroundColor: "#e8e8e8", marginTop: 12, opacity: gateBusy ? 0.5 : 1 }}>
+      <Text style={{ color: "#111", textAlign: "center", fontWeight: "600" }}>{label}</Text>
+    </Pressable>
+  );
+  return <AuthContext.Provider value={value}>
+    {libraryAccess === "allowed" ? <View key={user?.uid ?? "guest"} style={{ flex: 1 }}>{children}</View> :
+      <ScrollView style={{ flex: 1, backgroundColor: "#111" }} contentContainerStyle={{ padding: 24, paddingTop: 80 }} keyboardShouldPersistTaps="handled">
+        <Text style={{ color: "#fff", fontSize: 22, fontWeight: "700", marginBottom: 16 }}>기기 기록 보호</Text>
+        {libraryAccess === "checking" ? <ActivityIndicator color="#fff" /> : <>
+          <Text style={{ color: "#ddd", lineHeight: 24 }}>{libraryAccess === "claim-required"
+            ? "이 기기에 기존 사진과 기록이 있습니다. 본인의 기록이 맞는지 확인한 뒤 현재 계정에 연결해 주세요. 연결 후에는 이 계정으로 로그인해야 기록을 사용할 수 있습니다."
+            : libraryAccess === "error" ? "기록의 계정 정보를 확인하지 못했습니다. 앱을 다시 실행해 주세요. 기록은 보존되어 있습니다."
+            : "이 기기의 기록은 이전에 연결한 계정으로만 사용할 수 있습니다. 해당 계정으로 로그인해 주세요. 사진과 기록은 삭제되지 않았습니다."}</Text>
+          {user && <Text style={{ color: "#ddd", marginTop: 12 }}>{user.email ?? "현재 로그인된 계정"}</Text>}
+          {libraryAccess === "claim-required" && user && gateButton("내 기록이 맞습니다 · 이 계정에 연결", async () => {
+            const uid = user.uid;
+            const generation = authGeneration.current;
+            if (firebaseAuth?.currentUser?.uid !== uid) return;
+            await claimLocalLibrary(uid);
+            if (generation === authGeneration.current && firebaseAuth?.currentUser?.uid === uid) setLibraryAccess("allowed");
+          })}
+          {user ? gateButton("로그아웃", logOut) : libraryAccess === "locked" && <>
+            <TextInput accessibilityLabel="이메일" placeholder="이메일" placeholderTextColor="#999" autoCapitalize="none" keyboardType="email-address" value={gateEmail} onChangeText={setGateEmail} style={{ color: "#fff", borderColor: "#666", borderWidth: 1, padding: 14, marginTop: 20 }} />
+            <TextInput accessibilityLabel="비밀번호" placeholder="비밀번호" placeholderTextColor="#999" secureTextEntry value={gatePassword} onChangeText={setGatePassword} style={{ color: "#fff", borderColor: "#666", borderWidth: 1, padding: 14, marginTop: 10 }} />
+            {gateButton("이메일로 로그인", () => signIn(gateEmail, gatePassword))}
+            {gateButton("Google로 로그인", async () => { await signInWithGoogleAuthSession({ androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID, signInWithGoogleIdToken }); })}
+            {gateButton("비밀번호 재설정 메일 받기", () => resetPassword(gateEmail))}
+          </>}
+          {gateError ? <Text accessibilityRole="alert" style={{ color: "#ffb4b4", marginTop: 16 }}>{gateError}</Text> : null}
+        </>}
+      </ScrollView>}
+  </AuthContext.Provider>;
 }
 
 export const useAuth = () => {

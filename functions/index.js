@@ -15,6 +15,7 @@ const {
   collectOwnedCloudBackupStoragePaths,
   isOwnedCloudBackupStoragePath
 } = require("./backup-delete-safety");
+const { ensurePrivateStorageDownload, buildStorageDownloadUrl } = require("./private-storage");
 const {
   reserveWeeklyVideoExportUsage,
   completeWeeklyVideoExportReservation,
@@ -655,16 +656,7 @@ const deleteStoragePath = async (storagePath) => {
 };
 
 const getDownloadUrlFromStorageMetadata = ({ storagePath, metadata }) => {
-  const tokens = metadata?.metadata?.firebaseStorageDownloadTokens;
-  const token = typeof tokens === "string"
-    ? tokens.split(",").map((value) => value.trim()).find(Boolean)
-    : null;
-
-  if (!token || typeof storagePath !== "string" || !storagePath) {
-    return null;
-  }
-
-  return `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(storagePath)}?alt=media&token=${encodeURIComponent(token)}`;
+  return buildStorageDownloadUrl({ bucketName: bucket.name, storagePath, metadata });
 };
 
 const deleteOwnedCloudBackupStoragePath = async (uid, storagePath) => {
@@ -838,7 +830,7 @@ exports.reserveBackupUpload = secureOnCall(async (request) => {
 exports.completeBackupUpload = secureOnCall(async (request) => {
   try {
     const uid = requireUid(request);
-    const { backupSessionId } = request.data ?? {};
+    const { backupSessionId, privateDownload } = request.data ?? {};
     if (typeof backupSessionId !== "string" || !backupSessionId) {
       throw new HttpsError("invalid-argument", "backupSessionId is required.");
     }
@@ -851,6 +843,9 @@ exports.completeBackupUpload = secureOnCall(async (request) => {
 
     const session = sessionSnapshot.data();
     if (session.status === "completed") {
+      if (session.privateDownload === true) {
+        await ensurePrivateStorageDownload({ bucket, uid, session, sessionId: backupSessionId, sessionField: "backupSessionId" });
+      }
       return { usage: normalizeBackupUsage((await getUsageRef(uid).get()).data()) };
     }
 
@@ -897,6 +892,10 @@ exports.completeBackupUpload = secureOnCall(async (request) => {
       throw new HttpsError("failed-precondition", "Uploaded backup object does not match the reserved session.");
     }
 
+    if (privateDownload === true) {
+      metadata = await ensurePrivateStorageDownload({ bucket, uid, session, sessionId: backupSessionId, sessionField: "backupSessionId", metadata });
+    }
+
     let nextUsage;
     try {
       nextUsage = await db.runTransaction(async (transaction) => {
@@ -928,7 +927,8 @@ exports.completeBackupUpload = secureOnCall(async (request) => {
         transaction.update(sessionRef, {
           status: "completed",
           completedAt: FieldValue.serverTimestamp(),
-          objectGeneration: metadata.generation ?? null
+          objectGeneration: metadata.generation ?? null,
+          ...(privateDownload === true ? { privateDownload: true } : {})
         });
 
         return updatedUsage;
@@ -1289,7 +1289,7 @@ exports.reserveMusicUpload = secureOnCall(async (request) => {
 exports.completeMusicUpload = secureOnCall(async (request) => {
   try {
     const uid = requireUid(request);
-    const { musicSessionId, trackId, name, createdAt } = request.data ?? {};
+    const { musicSessionId, trackId, name, createdAt, privateDownload } = request.data ?? {};
     if (typeof musicSessionId !== "string" || !musicSessionId) {
       throw new HttpsError("invalid-argument", "musicSessionId is required.");
     }
@@ -1302,6 +1302,9 @@ exports.completeMusicUpload = secureOnCall(async (request) => {
 
     const session = sessionSnapshot.data();
     if (session.status === "completed") {
+      if (session.privateDownload === true) {
+        await ensurePrivateStorageDownload({ bucket, uid, session, sessionId: musicSessionId, sessionField: "musicSessionId" });
+      }
       return { trackId: session.trackId };
     }
 
@@ -1351,6 +1354,10 @@ exports.completeMusicUpload = secureOnCall(async (request) => {
       throw new HttpsError("failed-precondition", "Uploaded music object does not match the reserved session.");
     }
 
+    if (privateDownload === true) {
+      metadata = await ensurePrivateStorageDownload({ bucket, uid, session, sessionId: musicSessionId, sessionField: "musicSessionId", metadata });
+    }
+
     const safeDownloadUrl = getDownloadUrlFromStorageMetadata({
       storagePath: session.storagePath,
       metadata
@@ -1398,7 +1405,8 @@ exports.completeMusicUpload = secureOnCall(async (request) => {
       transaction.update(sessionRef, {
         status: "completed",
         completedAt: FieldValue.serverTimestamp(),
-        objectGeneration: metadata.generation ?? null
+        objectGeneration: metadata.generation ?? null,
+        ...(privateDownload === true ? { privateDownload: true } : {})
       });
     });
 

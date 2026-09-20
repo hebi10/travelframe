@@ -17,6 +17,7 @@ const setup = (failQuality, onEncode = async () => {}) => {
     files.set(to, { ...files.get(from) });
   };
   const mocks = {
+    "@/lib/private-storage": { resolvePrivateMediaUri: async (uri) => uri, downloadPrivateFile: async () => { throw new Error("unexpected remote download"); } },
     "expo-file-system/legacy": {
       documentDirectory: "file:///documents/",
       makeDirectoryAsync: async () => {},

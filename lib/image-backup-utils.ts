@@ -1,5 +1,6 @@
 import * as FileSystem from "expo-file-system/legacy";
 import { manipulateAsync, SaveFormat } from "expo-image-manipulator";
+import { resolvePrivateMediaUri } from "@/lib/private-storage";
 import { Image } from "react-native";
 
 import { BODY_FRAME_MEDIA_POLICY } from "@/constants/body-frame";
@@ -65,6 +66,7 @@ export const resolveImageDimensions = async ({
   if (width && height && width > 0 && height > 0) {
     return { width, height };
   }
+  uri = await resolvePrivateMediaUri(uri);
 
   return new Promise<{ width: number; height: number } | null>((resolve) => {
     Image.getSize(
@@ -112,6 +114,7 @@ export const optimizeImageForStorage = async ({
 }): Promise<OptimizedBackupImage> => {
   try {
     const option = getImageQualityOption(imageQuality);
+    uri = await resolvePrivateMediaUri(uri);
     const originalSize = await getLocalFileSize(uri);
     const dimensions = await resolveImageDimensions({ uri, width, height });
     const resizeAction = getImageResizeAction({
@@ -170,6 +173,7 @@ export const optimizeBodyFramePhotoForStorage = async ({
   height?: number | null;
 }): Promise<OptimizedBackupImage> => {
   try {
+    uri = await resolvePrivateMediaUri(uri);
     const originalSize = await getLocalFileSize(uri);
     const dimensions = await resolveImageDimensions({ uri, width, height });
     const resizeAction = getImageResizeAction({

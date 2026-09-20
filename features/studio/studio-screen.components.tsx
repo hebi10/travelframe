@@ -1,6 +1,7 @@
-import { Image } from "expo-image";
+import { Image } from "@/components/private-media-image";
 import { type Href, useRouter } from "expo-router";
-import { ActivityIndicator, FlatList, Image as NativeImage, Pressable, Text, View } from "react-native";
+import { ActivityIndicator, FlatList, Pressable, Text, View } from "react-native";
+import { PrivateNativeImage as NativeImage } from "@/components/private-media-image";
 
 import { SectionBlock } from "@/components/section-block";
 import { colors } from "@/constants/app-theme";

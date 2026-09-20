@@ -4,7 +4,8 @@ import ts from "typescript";
 
 const constantsSource = fs.readFileSync("constants/image.ts", "utf8");
 const bodyFrameSource = fs.readFileSync("constants/body-frame.ts", "utf8");
-const utilsSource = fs.readFileSync("lib/image-backup-utils.ts", "utf8");
+const utilsSource = fs.readFileSync("lib/image-backup-utils.ts", "utf8")
+  .replace('import { resolvePrivateMediaUri } from "@/lib/private-storage";', 'const resolvePrivateMediaUri = async (uri) => uri;');
 const transpile = (source) =>
   ts.transpileModule(source, {
     compilerOptions: {

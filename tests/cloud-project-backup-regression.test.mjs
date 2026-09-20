@@ -8,6 +8,8 @@ const project = { id: "project-a", name: "Training", createdAt: "2026-09-01T00:0
 const photo = { id: "photo-a", projectId: project.id, sequence: 1, uri: "file:///photo.jpg", createdAt: project.createdAt, width: 900, height: 1600, ratioLabel: "9:16", kind: "original", edited: false, addedToVideo: false };
 
 function harness() {
+  const auth = { currentUser: user };
+  let owner = user.uid;
   const remote = new Map();
   let localPhotos = [photo];
   let localProjects = [project];
@@ -44,7 +46,9 @@ function harness() {
       return { data: { released: true } };
     } },
     "firebase/storage": { ref: (_, key) => key, uploadBytes: async () => { if (uploads === failUploadNumber) throw new Error("upload failed"); }, getDownloadURL: async key => `https://storage.test/${key}` },
-    "@/lib/firebase": { firestore: {}, firebaseStorage: {}, firebaseFunctions: {} },
+    "@/lib/firebase": { firebaseAuth: auth, firestore: {}, firebaseStorage: {}, firebaseFunctions: {} },
+    "@/lib/local-library-owner": { assertLocalLibraryOwner: async uid => { if (uid !== owner) throw new Error("library owner mismatch"); } },
+    "@/lib/private-storage": { privateStorageUrl: path => `https://storage.test/${path}` },
     "@/lib/app-settings": { getAppSettings: async () => settings, isCloudBackupTargetEnabled: () => true },
     "@/constants/image": {},
     "@/lib/cloud-backup-limits": { getCloudBackupStorageLimitBytes: () => 1e9, getCloudBackupVideoLimit: () => 100, canBackupMoreVideos: () => true },
@@ -69,9 +73,22 @@ function harness() {
     return exports;
   }
   return { api: load("lib/cloud-backup.ts"), remote, released, uploads: () => uploads, projects: () => localProjects,
+    changeUser: next => { auth.currentUser = next; }, setOwner: next => { owner = next; },
     setWorks: values => { localWorks=values; }, failUpload: n => { failUploadNumber=n; },
     failFirstRelease: () => { releaseFailures=1; },
     emptyLocal: () => { localPhotos=[]; localProjects=[]; }, rejectWrites: () => { rejectPhotoWrite=true; } };
+}
+
+// Stale callers and unclaimed/foreign libraries must fail before cloud writes.
+{
+  const h = harness();
+  h.changeUser({ uid: "other" });
+  await assert.rejects(h.api.backupPhoto({ user, photo, enabled: true }));
+  assert.equal(h.uploads(), 0);
+  assert.equal(h.remote.size, 0);
+  h.changeUser(user); h.setOwner("other");
+  await assert.rejects(h.api.backupCurrentWorkspace({ user, subscription: {} }), /owner mismatch/);
+  await assert.rejects(h.api.restoreCloudBackupToLocal({ user }), /owner mismatch/);
 }
 
 // Regression: an already backed-up ID must not hide a newer edit.

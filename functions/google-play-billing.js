@@ -2,6 +2,7 @@
 
 const crypto = require("crypto");
 const { GoogleAuth } = require("google-auth-library");
+const { createBillingVerificationGate } = require("./billing-verification-gate");
 const {
   getEffectiveSubscription,
   isActiveSubscriptionDocument,
@@ -58,6 +59,7 @@ const createGooglePlayBillingService = ({
   HttpsError
 }) => {
   const auth = new GoogleAuth({ scopes: [ANDROID_PUBLISHER_SCOPE] });
+  const verificationGate = createBillingVerificationGate({ db, HttpsError });
   let authClientPromise = null;
 
   const getAuthClient = () => {
@@ -174,7 +176,7 @@ const createGooglePlayBillingService = ({
     updatedAt: FieldValue.serverTimestamp()
   });
 
-  const syncGooglePlayPurchase = async ({
+  const verifyAndSyncGooglePlayPurchase = async ({
     uid,
     productId,
     purchaseToken,
@@ -368,6 +370,7 @@ const createGooglePlayBillingService = ({
           linkedPurchaseTokenHash: linkedHash,
           acknowledgementState,
           source,
+          verifiedAtMs: Date.now(),
           updatedAt: FieldValue.serverTimestamp(),
           createdAt:
             purchaseSnapshot.exists
@@ -418,6 +421,31 @@ const createGooglePlayBillingService = ({
       expiresAt: result.expiresAt,
       acknowledgementState
     };
+  };
+
+  const syncGooglePlayPurchase = async (request) => {
+    const { uid, productId, purchaseToken, source = "client" } = request;
+    if (typeof uid !== "string" || !uid) {
+      throw new HttpsError("unauthenticated", "Login is required.");
+    }
+    getProductMeta(productId);
+    assertPurchaseToken(purchaseToken);
+    // Notifications must always refresh Google state; only client verification
+    // is rate-limited/cached. The inner transaction still validates ownership.
+    if (source !== "client") return verifyAndSyncGooglePlayPurchase(request);
+    const tokenHash = hashPurchaseToken(purchaseToken);
+    const reservation = await verificationGate.reserve({
+      uid, productId, tokenHash,
+      purchaseRef: db.doc(`googlePlayPurchases/${tokenHash}`)
+    });
+    if (reservation.cached) return reservation.cached;
+    try {
+      return await verifyAndSyncGooglePlayPurchase(request);
+    } finally {
+      // A transient cleanup failure must not turn a committed purchase into an
+      // apparent failure. Abandoned leases expire without a cleanup scheduler.
+      await verificationGate.release(reservation).catch(() => {});
+    }
   };
 
   const parseRtdnPayload = (payload) => {

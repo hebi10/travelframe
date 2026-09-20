@@ -1,4 +1,5 @@
 import * as FileSystem from "expo-file-system/legacy";
+import { downloadPrivateFile } from "@/lib/private-storage";
 
 import { localStorageAdapter } from "@/lib/local-storage";
 import { assertLocalLibraryCapacity } from "@/lib/local-library-limit";
@@ -308,6 +309,9 @@ export const updateMadeVideo = async (
 };
 
 export const restoreMadeVideoIfNeeded = async (video: MadeVideoItem): Promise<MadeVideoItem> => {
+  if (isRemoteUri(video.uri) && video.localFileStatus !== "cloud_only") {
+    return restoreMadeVideoIfNeeded({ ...video, localFileStatus: "cloud_only" });
+  }
   if (video.localFileStatus !== "cloud_only") {
     if (!(await isLocalVideoAvailable(video.uri))) {
       if (!video.downloadURL) {
@@ -343,7 +347,7 @@ export const restoreMadeVideoIfNeeded = async (video: MadeVideoItem): Promise<Ma
 
   const directory = await ensureVideoDirectory();
   const destinationUri = `${directory}${video.id}-restored.mp4`;
-  const result = await FileSystem.downloadAsync(sourceUri, destinationUri);
+  const result = await downloadPrivateFile(sourceUri, destinationUri);
   const videos = await getMadeVideos();
   const restoredVideo: MadeVideoItem = {
     ...video,

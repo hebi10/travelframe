@@ -1,9 +1,9 @@
 import { router, type Href, useFocusEffect, useLocalSearchParams } from "expo-router";
+import { PrivateNativeImage as NativeImage } from "@/components/private-media-image";
 import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Image as NativeImage,
   Pressable,
   ScrollView,
   StyleSheet,

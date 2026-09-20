@@ -10,6 +10,7 @@ const fileSystem = { documentDirectory: "file:///documents/", getInfoAsync: asyn
 const exports = {};
 const code = ts.transpileModule(fs.readFileSync("lib/video-library.ts", "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
 vm.runInNewContext(code, { exports, require: (id) => {
+  if (id === "@/lib/private-storage") return { downloadPrivateFile: async () => { throw new Error("unexpected remote download"); } };
   if (id === "expo-file-system/legacy") return fileSystem;
   if (id.endsWith("local-storage")) return { localStorageAdapter: { getItem: async (k) => storage.get(k), setItem: async (k,v) => storage.set(k,v) } };
   if (id.endsWith("local-library-limit")) return { assertLocalLibraryCapacity: () => {} };

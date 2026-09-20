@@ -24,7 +24,7 @@ if (fs.existsSync(localSigningEnvPath)) {
     .readFileSync(localSigningEnvPath, "utf8")
     .split(/\r?\n/)
     .map((line) => line.trim())
-    .filter((line) => line && !line.startsWith("#") && line.includes("="))
+    .filter((line) => /^(ANDROID_KEYSTORE_PASSWORD|ANDROID_KEY_PASSWORD)\s*=/.test(line))
     .map((line) => line.slice(line.indexOf("=") + 1).trim())
     .filter(Boolean);
 

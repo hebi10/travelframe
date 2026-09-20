@@ -1,3 +1,4 @@
+import { downloadPrivateFile, privateStorageUrl, resolvePrivateMediaUri } from "@/lib/private-storage";
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system/legacy";
 import { type User } from "firebase/auth";
@@ -6,7 +7,7 @@ import {
   getDocs
 } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
-import { deleteObject, getDownloadURL, ref, uploadBytes } from "firebase/storage";
+import { deleteObject, ref, uploadBytes } from "firebase/storage";
 
 import { firestore, firebaseFunctions, firebaseStorage } from "@/lib/firebase";
 import { getAppSettings } from "@/lib/app-settings";
@@ -142,6 +143,7 @@ const reserveMusicUpload = (data: {
 
 const completeMusicUpload = (data: {
   musicSessionId: string;
+  privateDownload?: boolean;
   trackId: string;
   name: string;
   createdAt: string;
@@ -211,8 +213,9 @@ const uploadLocalAudioFile = async ({
         musicSessionId: reservation.musicSessionId
       }
     });
-    const downloadUrl = await getDownloadURL(fileRef);
+    const downloadUrl = privateStorageUrl(storagePath);
     await completeMusicUpload({
+      privateDownload: true,
       musicSessionId: reservation.musicSessionId,
       trackId,
       name,
@@ -255,7 +258,7 @@ export const syncUserMusicTracks = async (user: User | null) => {
     const remoteDownloadUrl =
       data.downloadUrl ??
       (data.storagePath && firebaseStorage
-        ? await getDownloadURL(ref(firebaseStorage, data.storagePath)).catch(() => undefined)
+        ? privateStorageUrl(data.storagePath)
         : undefined);
 
     if (localUri) {
@@ -270,10 +273,10 @@ export const syncUserMusicTracks = async (user: User | null) => {
       const fileName = `${item.id}-${sanitizeFileName(data.name)}.${extension}`;
       const destination = `${directory}${fileName}`;
       try {
-        const result = await FileSystem.downloadAsync(remoteDownloadUrl, destination);
+        const result = await downloadPrivateFile(remoteDownloadUrl, destination);
         localUri = result.uri;
       } catch {
-        localUri = remoteDownloadUrl;
+        localUri = undefined;
       }
     }
 
@@ -298,7 +301,10 @@ export const syncUserMusicTracks = async (user: User | null) => {
     b.createdAt.localeCompare(a.createdAt)
   );
   await saveTracksToCache(user.uid, sortedTracks);
-  return sortedTracks;
+  return Promise.all(sortedTracks.map(async track => ({
+    ...track,
+    uri: await resolvePrivateMediaUri(track.uri).catch(() => "")
+  })));
 };
 
 export const deleteLocalMusicFile = async (track: UserMusicTrack) => {
@@ -318,7 +324,7 @@ export const restoreUserMusicTrackIfNeeded = async (
   const directory = await ensureMusicDirectory(user.uid);
   const extension = getExtension(track.name, track.mimeType);
   const destination = `${directory}${track.id}-${sanitizeFileName(track.name)}.${extension}`;
-  const result = await FileSystem.downloadAsync(track.downloadUrl, destination);
+  const result = await downloadPrivateFile(track.downloadUrl, destination);
   const nextTrack = {
     ...track,
     uri: result.uri

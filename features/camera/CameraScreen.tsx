@@ -1,4 +1,5 @@
 import { Feather } from "@expo/vector-icons";
+import { PrivateNativeImage as NativeImage } from "@/components/private-media-image";
 import { CAMERA_CAPTURE_TIMEOUT_MESSAGE, CameraCaptureTimeoutError, waitForCameraCapture } from "@/lib/camera-capture-timeout";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
@@ -9,7 +10,6 @@ import {
   Alert,
   AppState,
   type AppStateStatus,
-  Image as NativeImage,
   Linking,
   type LayoutChangeEvent,
   Modal,

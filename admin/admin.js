@@ -878,13 +878,16 @@ const loadBackupItems = async (tab = activeBackupTab) => {
 };
 
 const openBackupItem = (item) => {
+  const privateFile = item.url && item.url.startsWith("https://firebasestorage.googleapis.com/") &&
+    !new URL(item.url).searchParams.has("token");
   const lines = [
     `종류: ${backupTabLabels[item.tab]}`,
     `ID: ${item.id}`,
-    `Storage: ${item.storagePath}`,
-    `URL: ${item.url ?? "-"}`
+    `Storage: ${item.storagePath}`
   ];
-  if (item.url) {
+  if (privateFile) {
+    lines.push("비공개 파일: 소유 계정의 앱에서 확인할 수 있습니다. 관리자 페이지에서는 미리보기를 제공하지 않습니다.");
+  } else if (item.url) {
     window.open(item.url, "_blank", "noreferrer");
   }
   setMessage("backupItemsMessage", lines.join(" / "));
