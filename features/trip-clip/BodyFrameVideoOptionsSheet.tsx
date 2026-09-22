@@ -1,6 +1,14 @@
 import { Image } from "@/components/private-media-image";
 import { useState } from "react";
-import { FlatList, Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  FlatList,
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { bodyFrameDesign } from "@/constants/app-theme";
@@ -10,12 +18,35 @@ import {
   BODY_FRAME_VIDEO_QUALITIES,
   BODY_FRAME_VIDEO_RATIOS,
   getBodyFrameVideoDuration,
-  type BodyFrameVideoOptions
+  type BodyFrameVideoOptions,
+  type BodyFrameVideoOverlayPosition
 } from "@/lib/body-frame-video";
 import type { PhotoItem } from "@/types/photo";
 
-export type VideoOptionKind = "photos" | "interval" | "quality" | "ratio";
-const titles = { photos: "사진 선택", interval: "사진 간격", quality: "영상 화질", ratio: "화면 비율" };
+export type VideoOptionKind =
+  | "photos"
+  | "interval"
+  | "quality"
+  | "ratio"
+  | "overlay";
+
+const titles = {
+  photos: "사진 선택",
+  interval: "사진 간격",
+  quality: "영상 화질",
+  ratio: "화면 비율",
+  overlay: "텍스트 오버레이"
+};
+
+const overlayPositions: Array<{
+  value: BodyFrameVideoOverlayPosition;
+  label: string;
+}> = [
+  { value: "top-left", label: "좌측 상단" },
+  { value: "top-right", label: "우측 상단" },
+  { value: "bottom-left", label: "좌측 하단" },
+  { value: "bottom-right", label: "우측 하단" }
+];
 
 export function BodyFrameVideoOptionsSheet({
   kind, options, photos, selectedIds, onCancel, onApply
@@ -33,8 +64,14 @@ export function BodyFrameVideoOptionsSheet({
   const [draftIds, setDraftIds] = useState<string[] | null>(selectedIds);
   const selected = new Set(draftIds ?? photos.map(photo => photo.id));
   const selectedCount = photos.filter(photo => selected.has(photo.id)).length;
-  const choices = kind === "interval" ? BODY_FRAME_VIDEO_INTERVALS
-    : kind === "quality" ? BODY_FRAME_VIDEO_QUALITIES : BODY_FRAME_VIDEO_RATIOS;
+  const choices =
+    kind === "interval"
+      ? BODY_FRAME_VIDEO_INTERVALS
+      : kind === "quality"
+        ? BODY_FRAME_VIDEO_QUALITIES
+        : kind === "ratio"
+          ? BODY_FRAME_VIDEO_RATIOS
+          : [];
 
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onCancel}>
@@ -85,6 +122,132 @@ export function BodyFrameVideoOptionsSheet({
                 ListEmptyComponent={<Text style={{ color: palette.muted }}>선택할 사진이 없습니다.</Text>}
               />
             </>
+          ) : kind === "overlay" ? (
+            <View style={styles.overlaySection}>
+              <Text style={[styles.orderNotice, { color: palette.muted }]}>
+                기본은 표시 없음입니다. 선택한 항목 중 해당 사진에 값이 있는 정보만 영상에 표시됩니다.
+              </Text>
+
+              <Text style={[styles.groupLabel, { color: palette.muted }]}>표시 항목</Text>
+              <View style={styles.overlayChoiceGrid}>
+                {[
+                  ["showDate", "날짜"],
+                  ["showWeight", "몸무게"],
+                  ["showBodyFat", "체지방률"]
+                ].map(([key, label]) => {
+                  const active =
+                    draftOptions.overlay[
+                      key as "showDate" | "showWeight" | "showBodyFat"
+                    ];
+
+                  return (
+                    <Pressable
+                      key={key}
+                      accessibilityRole="checkbox"
+                      accessibilityState={{ checked: active }}
+                      style={[
+                        styles.overlayChoice,
+                        {
+                          borderColor: active ? palette.text : palette.line,
+                          backgroundColor: active
+                            ? palette.text
+                            : palette.background
+                        }
+                      ]}
+                      onPress={() =>
+                        setDraftOptions((current) => ({
+                          ...current,
+                          overlay: {
+                            ...current.overlay,
+                            [key]: !active
+                          }
+                        }))
+                      }
+                    >
+                      <Text
+                        style={{
+                          color: active ? palette.inverse : palette.text
+                        }}
+                      >
+                        {label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+
+              <Text style={[styles.groupLabel, { color: palette.muted }]}>
+                자유 텍스트
+              </Text>
+              <TextInput
+                value={draftOptions.overlay.customText}
+                onChangeText={(customText) =>
+                  setDraftOptions((current) => ({
+                    ...current,
+                    overlay: {
+                      ...current.overlay,
+                      customText
+                    }
+                  }))
+                }
+                maxLength={40}
+                placeholder="예: 12주차"
+                placeholderTextColor={palette.faint}
+                style={[
+                  styles.overlayInput,
+                  {
+                    borderColor: palette.line,
+                    color: palette.text,
+                    backgroundColor: palette.background
+                  }
+                ]}
+              />
+
+              <Text style={[styles.groupLabel, { color: palette.muted }]}>위치</Text>
+              <View style={styles.overlayChoiceGrid}>
+                {overlayPositions.map((position) => {
+                  const active =
+                    draftOptions.overlay.position === position.value;
+                  return (
+                    <Pressable
+                      key={position.value}
+                      accessibilityRole="radio"
+                      accessibilityState={{ selected: active }}
+                      style={[
+                        styles.overlayChoice,
+                        {
+                          borderColor: active ? palette.text : palette.line,
+                          backgroundColor: active
+                            ? palette.text
+                            : palette.background
+                        }
+                      ]}
+                      onPress={() =>
+                        setDraftOptions((current) => ({
+                          ...current,
+                          overlay: {
+                            ...current.overlay,
+                            position: position.value
+                          }
+                        }))
+                      }
+                    >
+                      <Text
+                        style={{
+                          color: active ? palette.inverse : palette.text
+                        }}
+                      >
+                        {position.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+
+              <Text style={[styles.example, { color: palette.faint }]}>
+                예시: 26.09.22 · 72.4kg · 18.2%
+              </Text>
+            </View>
           ) : (
             <View style={styles.choices}>
               {choices.map(choice => {
@@ -128,6 +291,27 @@ const styles = StyleSheet.create({
   sheet: { maxHeight: "90%", padding: 16, gap: 16, borderTopLeftRadius: 12, borderTopRightRadius: 12 },
   title: { fontSize: 20, fontWeight: "600" },
   orderNotice: { fontSize: 12, lineHeight: 18 },
+  overlaySection: { gap: 10 },
+  groupLabel: { marginTop: 4, fontSize: 12, fontWeight: "600" },
+  overlayChoiceGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  overlayChoice: {
+    minWidth: "47%",
+    minHeight: bodyFrameDesign.minTouchSize,
+    flexGrow: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 10
+  },
+  overlayInput: {
+    minHeight: bodyFrameDesign.primaryButtonHeight,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    fontSize: 14
+  },
+  example: { fontSize: 12, lineHeight: 18 },
   actions: { flexDirection: "row", gap: 12 },
   action: { minHeight: bodyFrameDesign.minTouchSize, paddingHorizontal: 12, justifyContent: "center" },
   photoList: { flexGrow: 0, flexShrink: 1 },
