@@ -111,6 +111,8 @@ const sortProjectPhotos = (photos: PhotoItem[]) =>
 const PROJECT_PHOTO_GRID_COLUMNS = 3;
 const PROJECT_PHOTO_GRID_GAP = 8;
 const PROJECT_PHOTO_LONG_PRESS_MS = 320;
+const PROJECT_PHOTO_TAP_DISTANCE = 12;
+const PROJECT_PHOTO_PRE_DRAG_DISTANCE = 24;
 
 const moveProjectPhoto = <T,>(items: T[], fromIndex: number, toIndex: number) => {
   if (fromIndex === toIndex) return items;
@@ -149,97 +151,184 @@ function SortableProjectPhotoTile({
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
   const dragging = useSharedValue(false);
+  const dragActivated = useSharedValue(false);
   const hoverIndex = useSharedValue(index);
+  const pressStartedAt = useSharedValue(0);
+  const pressStartX = useSharedValue(0);
+  const pressStartY = useSharedValue(0);
+  const lastTouchX = useSharedValue(0);
+  const lastTouchY = useSharedValue(0);
   const tileHeight = tileWidth * (4 / 3);
   const cellWidth = tileWidth + PROJECT_PHOTO_GRID_GAP;
   const cellHeight = tileHeight + PROJECT_PHOTO_GRID_GAP;
 
-  const dragGesture = useMemo(
-    () =>
-      Gesture.Pan()
-        .enabled(!disabled)
-        .activateAfterLongPress(PROJECT_PHOTO_LONG_PRESS_MS)
-        .onStart(() => {
-          dragging.value = true;
-          hoverIndex.value = index;
-          runOnJS(onDragStart)();
-          runOnJS(onDragHover)(index);
-        })
-        .onUpdate((event) => {
-          translateX.value = event.translationX;
-          translateY.value = event.translationY;
+  const updateDragPosition = useCallback(
+    (translationX: number, translationY: number) => {
+      "worklet";
 
-          const startRow = Math.floor(index / PROJECT_PHOTO_GRID_COLUMNS);
-          const startColumn = index % PROJECT_PHOTO_GRID_COLUMNS;
-          const rowDelta = Math.round(event.translationY / cellHeight);
-          const columnDelta = Math.round(event.translationX / cellWidth);
-          const maxRow = Math.max(
-            0,
-            Math.ceil(count / PROJECT_PHOTO_GRID_COLUMNS) - 1
-          );
-          const targetRow = Math.max(0, Math.min(maxRow, startRow + rowDelta));
-          const targetColumn = Math.max(
-            0,
-            Math.min(
-              PROJECT_PHOTO_GRID_COLUMNS - 1,
-              startColumn + columnDelta
-            )
-          );
-          const targetIndex = Math.max(
-            0,
-            Math.min(
-              count - 1,
-              targetRow * PROJECT_PHOTO_GRID_COLUMNS + targetColumn
-            )
-          );
+      translateX.value = translationX;
+      translateY.value = translationY;
 
-          if (targetIndex !== hoverIndex.value) {
-            hoverIndex.value = targetIndex;
-            runOnJS(onDragHover)(targetIndex);
-          }
-        })
-        .onEnd(() => {
-          runOnJS(onDrop)(index, hoverIndex.value);
-        })
-        .onFinalize(() => {
-          dragging.value = false;
-          translateX.value = withTiming(0, { duration: 120 });
-          translateY.value = withTiming(0, { duration: 120 });
-          runOnJS(onDragFinish)();
-        }),
+      const startRow = Math.floor(index / PROJECT_PHOTO_GRID_COLUMNS);
+      const startColumn = index % PROJECT_PHOTO_GRID_COLUMNS;
+      const rowDelta = Math.round(translationY / cellHeight);
+      const columnDelta = Math.round(translationX / cellWidth);
+      const maxRow = Math.max(
+        0,
+        Math.ceil(count / PROJECT_PHOTO_GRID_COLUMNS) - 1
+      );
+      const targetRow = Math.max(0, Math.min(maxRow, startRow + rowDelta));
+      const targetColumn = Math.max(
+        0,
+        Math.min(
+          PROJECT_PHOTO_GRID_COLUMNS - 1,
+          startColumn + columnDelta
+        )
+      );
+      const targetIndex = Math.max(
+        0,
+        Math.min(
+          count - 1,
+          targetRow * PROJECT_PHOTO_GRID_COLUMNS + targetColumn
+        )
+      );
+
+      if (targetIndex !== hoverIndex.value) {
+        hoverIndex.value = targetIndex;
+        runOnJS(onDragHover)(targetIndex);
+      }
+    },
     [
       cellHeight,
       cellWidth,
       count,
-      disabled,
-      dragging,
       hoverIndex,
       index,
-      onDragFinish,
       onDragHover,
-      onDragStart,
-      onDrop,
       translateX,
       translateY
     ]
   );
 
-  const tapGesture = useMemo(
+  const gesture = useMemo(
     () =>
-      Gesture.Tap()
+      Gesture.Manual()
         .enabled(!disabled)
-        .maxDuration(250)
-        .onEnd((_event, success) => {
-          if (success) {
+        .shouldCancelWhenOutside(false)
+        .onTouchesDown((event, manager) => {
+          if (event.numberOfTouches !== 1 || event.changedTouches.length === 0) {
+            manager.fail();
+            return;
+          }
+
+          const touch = event.changedTouches[0];
+          pressStartedAt.value = Date.now();
+          pressStartX.value = touch.absoluteX;
+          pressStartY.value = touch.absoluteY;
+          lastTouchX.value = touch.absoluteX;
+          lastTouchY.value = touch.absoluteY;
+          hoverIndex.value = index;
+          dragActivated.value = false;
+        })
+        .onTouchesMove((event, manager) => {
+          if (event.changedTouches.length === 0) return;
+
+          const touch = event.changedTouches[0];
+          lastTouchX.value = touch.absoluteX;
+          lastTouchY.value = touch.absoluteY;
+
+          const translationX = touch.absoluteX - pressStartX.value;
+          const translationY = touch.absoluteY - pressStartY.value;
+          const distanceSquared =
+            translationX * translationX + translationY * translationY;
+
+          if (!dragActivated.value) {
+            const elapsed = Date.now() - pressStartedAt.value;
+
+            if (elapsed < PROJECT_PHOTO_LONG_PRESS_MS) {
+              if (
+                distanceSquared >
+                PROJECT_PHOTO_PRE_DRAG_DISTANCE * PROJECT_PHOTO_PRE_DRAG_DISTANCE
+              ) {
+                manager.fail();
+              }
+              return;
+            }
+
+            dragActivated.value = true;
+            dragging.value = true;
+            hoverIndex.value = index;
+            manager.activate();
+            runOnJS(onDragStart)();
+            runOnJS(onDragHover)(index);
+          }
+
+          updateDragPosition(translationX, translationY);
+        })
+        .onTouchesUp((event, manager) => {
+          const touch = event.changedTouches[0];
+          const touchX = touch?.absoluteX ?? lastTouchX.value;
+          const touchY = touch?.absoluteY ?? lastTouchY.value;
+          const translationX = touchX - pressStartX.value;
+          const translationY = touchY - pressStartY.value;
+          const distanceSquared =
+            translationX * translationX + translationY * translationY;
+          const elapsed = Date.now() - pressStartedAt.value;
+
+          if (dragActivated.value) {
+            manager.end();
+            return;
+          }
+
+          manager.fail();
+
+          if (
+            elapsed < PROJECT_PHOTO_LONG_PRESS_MS &&
+            distanceSquared <=
+              PROJECT_PHOTO_TAP_DISTANCE * PROJECT_PHOTO_TAP_DISTANCE
+          ) {
             runOnJS(onOpen)();
           }
-        }),
-    [disabled, onOpen]
-  );
+        })
+        .onTouchesCancelled((_event, manager) => {
+          manager.fail();
+        })
+        .onEnd(() => {
+          if (dragActivated.value) {
+            runOnJS(onDrop)(index, hoverIndex.value);
+          }
+        })
+        .onFinalize(() => {
+          const wasDragging = dragActivated.value;
+          dragActivated.value = false;
+          dragging.value = false;
+          translateX.value = withTiming(0, { duration: 120 });
+          translateY.value = withTiming(0, { duration: 120 });
 
-  const gesture = useMemo(
-    () => Gesture.Exclusive(dragGesture, tapGesture),
-    [dragGesture, tapGesture]
+          if (wasDragging) {
+            runOnJS(onDragFinish)();
+          }
+        }),
+    [
+      disabled,
+      dragActivated,
+      dragging,
+      hoverIndex,
+      index,
+      lastTouchX,
+      lastTouchY,
+      onDragFinish,
+      onDragHover,
+      onDragStart,
+      onDrop,
+      onOpen,
+      pressStartedAt,
+      pressStartX,
+      pressStartY,
+      translateX,
+      translateY,
+      updateDragPosition
+    ]
   );
 
   const animatedStyle = useAnimatedStyle(() => ({

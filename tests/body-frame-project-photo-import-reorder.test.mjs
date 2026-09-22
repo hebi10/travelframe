@@ -5,6 +5,10 @@ const detail = fs.readFileSync(
   "features/records/BodyFrameProjectDetailScreen.tsx",
   "utf8"
 );
+const records = fs.readFileSync(
+  "features/records/BodyFrameRecordsScreen.tsx",
+  "utf8"
+);
 const legacyPhotoLibrary = fs.readFileSync(
   "lib/legacy-photo-library.ts",
   "utf8"
@@ -30,9 +34,16 @@ for (const token of [
 
 for (const token of [
   "SortableProjectPhotoTile",
-  "Gesture.Pan()",
-  "activateAfterLongPress(PROJECT_PHOTO_LONG_PRESS_MS)",
-  "Gesture.Exclusive(dragGesture, tapGesture)",
+  "Gesture.Manual()",
+  "PROJECT_PHOTO_PRE_DRAG_DISTANCE",
+  "PROJECT_PHOTO_TAP_DISTANCE",
+  ".onTouchesDown((event, manager) =>",
+  ".onTouchesMove((event, manager) =>",
+  ".onTouchesUp((event, manager) =>",
+  "manager.activate()",
+  "manager.end()",
+  "manager.fail()",
+  "dragActivated.value",
   "runOnJS(onDragHover)",
   "runOnJS(onDrop)",
   "scrollEnabled={!isPhotoDragging}",
@@ -47,6 +58,17 @@ for (const token of [
   assert.ok(detail.includes(token), `inline project drag reorder missing: ${token}`);
 }
 
+for (const removedGesture of [
+  "activateAfterLongPress(PROJECT_PHOTO_LONG_PRESS_MS)",
+  "Gesture.Exclusive(dragGesture, tapGesture)",
+  "Gesture.Tap()"
+]) {
+  assert.ok(
+    !detail.includes(removedGesture),
+    `project reorder should not use the fragile long-press/tap race: ${removedGesture}`
+  );
+}
+
 for (const removed of [
   "BodyFramePhotoOrderModal",
   "setOrderModalOpen",
@@ -57,6 +79,13 @@ for (const removed of [
     `project reorder should not open a separate reorder screen: ${removed}`
   );
 }
+
+assert.ok(
+  detail.includes('justifyContent: "flex-start"') &&
+    records.includes('projectGrid: {') &&
+    records.includes('justifyContent: "flex-start"'),
+  "partial photo/project rows should fill from the left instead of spreading to both edges"
+);
 
 assert.ok(
   legacyPhotoLibrary.includes("reorderProjectPhotos") &&
