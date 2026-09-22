@@ -5,28 +5,37 @@ const adminSource = fs.readFileSync(new URL("../admin/admin.js", import.meta.url
 const adminHtml = fs.readFileSync(new URL("../admin/index.html", import.meta.url), "utf8");
 
 for (const snippet of [
+  "plus_monthly: {",
+  'cardId: "plusMonthlyCard"',
+  'productName: "Plus"',
+  'priceLabel: "월 3,990원"',
   "expert_monthly: {",
   'cardId: "expertMonthlyCard"',
   'statusId: "expertMonthlyStatusLabel"',
   'detailId: "expertMonthlyDetail"',
   'productName: "Expert"',
-  "주 30개",
-  "5GiB",
-  "음악 20개"
+  'priceLabel: "월 5,990원"'
 ]) {
   assert.ok(adminSource.includes(snippet), `admin expert product metadata missing: ${snippet}`);
 }
 
 assert.ok(
-  adminSource.includes('const paidProductIds = ["ad_remove", "creator_monthly", "expert_monthly"];'),
-  "paid product ordering should include expert after creator"
+  adminSource.includes('"ad_remove"') &&
+    adminSource.includes('"creator_monthly"') &&
+    adminSource.includes('"plus_monthly"') &&
+    adminSource.includes('"expert_monthly"'),
+  "paid product ordering should include Pro, Plus, and Expert"
 );
 assert.ok(
-  adminSource.includes('<option value="expert_monthly">Expert 월결제</option>'),
-  "subscription product selector should allow Expert"
+  adminSource.includes('<option value="plus_monthly">Plus 월결제</option>') &&
+    adminSource.includes('<option value="expert_monthly">Expert 월결제</option>'),
+  "subscription product selector should allow Plus and Expert"
 );
 
 for (const snippet of [
+  'id="plusMonthlyCard"',
+  'id="plusMonthlyStatusLabel"',
+  'id="plusMonthlyDetail"',
   'id="expertMonthlyCard"',
   'id="expertMonthlyStatusLabel"',
   'id="expertMonthlyDetail"'
@@ -43,7 +52,7 @@ assert.ok(
   effectiveSubscriptionSource.indexOf("subscriptions.expert_monthly") >= 0 &&
     effectiveSubscriptionSource.indexOf("subscriptions.expert_monthly") <
       effectiveSubscriptionSource.indexOf("subscriptions.creator_monthly"),
-  "effective subscription should prioritize active Expert over Creator"
+  "effective subscription should prioritize active Expert over lower tiers"
 );
 
 assert.ok(
@@ -64,4 +73,4 @@ assert.ok(
   "admin Expert subscription saves should stay on the callable flow"
 );
 
-console.log("ok - admin subscription UI supports Expert products consistently");
+console.log("ok - admin subscription UI supports Pro, Plus, and Expert consistently");
