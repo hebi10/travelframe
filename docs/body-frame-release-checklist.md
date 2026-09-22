@@ -14,6 +14,7 @@
 - [x] Pose alignment privacy disclosure states on-device temporary processing with no server upload.
 - [x] Gitleaks full-history scan uses exact legacy fingerprint suppressions only.
 - [x] Stage 8 final merged after green CI.
+- [x] Firebase Functions runtime upgraded to Node.js 22 with deploy-time dependency install.
 
 ## Stage 8 CI
 - [x] `npm run android:prebuild:ci` PASS.
