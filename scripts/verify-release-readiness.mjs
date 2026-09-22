@@ -19,6 +19,8 @@ const requireFile = (relativePath) => {
 const app = readJson("app.json");
 const eas = readJson("eas.json");
 const packageJson = readJson("package.json");
+const firebaseConfig = readJson("firebase.json");
+const functionsPackageJson = readJson("functions/package.json");
 const appExpo = app.expo ?? {};
 
 if (appExpo.name !== "바디 프레임") fail("app display name must be 바디 프레임");
@@ -64,6 +66,21 @@ if (packageJson.scripts?.["android:prebuild:ci"] !== "node scripts/prebuild-andr
 }
 if (packageJson.scripts?.["release:verify"] !== "node scripts/verify-release-readiness.mjs") {
   fail("release:verify script is missing");
+}
+if (packageJson.scripts?.["firebase:prepare-functions"] !== "npm ci --prefix functions") {
+  fail("Firebase Functions dependency preparation script is missing");
+}
+if (functionsPackageJson.engines?.node !== "22") {
+  fail("Firebase Functions package runtime must be Node 22");
+}
+if (firebaseConfig.functions?.runtime !== "nodejs22") {
+  fail("Firebase Functions runtime must be nodejs22");
+}
+const functionsPredeploy = Array.isArray(firebaseConfig.functions?.predeploy)
+  ? firebaseConfig.functions.predeploy
+  : [firebaseConfig.functions?.predeploy].filter(Boolean);
+if (!functionsPredeploy.includes("npm ci --prefix functions")) {
+  fail("Firebase Functions predeploy must install functions dependencies");
 }
 
 if (packageJson.dependencies?.["react-native-health-connect"] !== "4.1.3") {
