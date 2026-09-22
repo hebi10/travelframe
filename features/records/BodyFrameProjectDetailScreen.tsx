@@ -1,3 +1,4 @@
+import { Feather } from "@expo/vector-icons";
 import { Image } from "@/components/private-media-image";
 import { BodyMeasurementSummaryCard } from "@/components/body-measurement-summary-card";
 import { router, type Href, useFocusEffect, useLocalSearchParams } from "expo-router";
@@ -354,7 +355,7 @@ export default function BodyFrameProjectDetailScreen() {
             style={[styles.iconButton, { borderColor: palette.line }]}
             onPress={() => router.back()}
           >
-            <Text style={[styles.backButtonText, { color: palette.text }]}>‹</Text>
+            <Feather name="chevron-left" size={24} color={palette.text} />
           </Pressable>
           <Text style={[styles.pageTitle, { color: palette.text }]}>프로젝트</Text>
           <Pressable
@@ -535,11 +536,14 @@ export default function BodyFrameProjectDetailScreen() {
         visible={settingsOpen}
         onRequestClose={() => setSettingsOpen(false)}
       >
-        <Pressable
-          style={styles.modalBackdrop}
-          onPress={() => setSettingsOpen(false)}
-        >
+        <View style={styles.modalBackdrop}>
           <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="프로젝트 설정 닫기"
+            style={StyleSheet.absoluteFill}
+            onPress={() => setSettingsOpen(false)}
+          />
+          <View
             style={[
               styles.settingsSheet,
               {
@@ -548,7 +552,6 @@ export default function BodyFrameProjectDetailScreen() {
                 paddingBottom: Math.max(insets.bottom, 16)
               }
             ]}
-            onPress={() => undefined}
           >
             <View style={styles.sheetHandle} />
             <View style={styles.sheetHeader}>
@@ -583,8 +586,15 @@ export default function BodyFrameProjectDetailScreen() {
             </View>
 
             <ScrollView
+              style={styles.settingsScroll}
+              nestedScrollEnabled
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
               showsVerticalScrollIndicator={false}
-              contentContainerStyle={styles.settingsContent}
+              contentContainerStyle={[
+                styles.settingsContent,
+                { paddingBottom: Math.max(insets.bottom + 24, 40) }
+              ]}
             >
               <Text style={[styles.label, { color: palette.muted }]}>이름</Text>
               <TextInput
@@ -954,8 +964,8 @@ export default function BodyFrameProjectDetailScreen() {
                 </Text>
               </Pressable>
             </ScrollView>
-          </Pressable>
-        </Pressable>
+          </View>
+        </View>
       </Modal>
     </View>
   );
@@ -989,11 +999,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderWidth: bodyFrameDesign.borderWidth,
     borderRadius: bodyFrameDesign.buttonRadius
-  },
-  backButtonText: {
-    marginTop: -2,
-    fontSize: 28,
-    fontWeight: "400"
   },
   pageTitle: {
     fontSize: bodyFrameTypography.sectionTitle,
@@ -1194,9 +1199,11 @@ const styles = StyleSheet.create({
     fontSize: bodyFrameTypography.caption,
     fontWeight: "600"
   },
+  settingsScroll: {
+    flexShrink: 1
+  },
   settingsContent: {
-    gap: 10,
-    paddingBottom: 16
+    gap: 10
   },
   labelRow: {
     marginTop: 2,
