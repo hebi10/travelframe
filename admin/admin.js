@@ -54,6 +54,7 @@ let currentSubscription = null;
 let currentProductSubscriptions = {
   ad_remove: null,
   creator_monthly: null,
+  plus_monthly: null,
   expert_monthly: null
 };
 let currentBackup = null;
