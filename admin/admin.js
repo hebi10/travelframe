@@ -302,7 +302,6 @@ const setupSubscriptionPanel = () => {
 };
 
 setupSubscriptionPanel();
-renderSelectedPlanEntitlements("ad_remove");
 
 const setAuthTab = (target) => {
   const isAdminTab = target === "admin";
