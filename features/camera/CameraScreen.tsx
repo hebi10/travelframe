@@ -3356,7 +3356,7 @@ export default function CameraScreen({
                             onPress={resetCameraColorSettings}
                           >
                             <Feather
-                              name="rotate-ccw"
+                              name="refresh-ccw"
                               size={16}
                               color={bodyFrameDarkColors.text}
                             />
