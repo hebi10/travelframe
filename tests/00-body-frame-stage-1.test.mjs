@@ -125,12 +125,24 @@ assert.equal(entitlements.PLAN_ENTITLEMENTS.free.maxProgressPhotos, 100);
 assert.equal(entitlements.PLAN_ENTITLEMENTS.free.maxProgressVideoSeconds, 10);
 assert.equal(entitlements.PLAN_ENTITLEMENTS.ad_remove.maxProgressPhotos, 100);
 assert.equal(entitlements.PLAN_ENTITLEMENTS.ad_remove.maxProgressVideoSeconds, 10);
-assert.equal(entitlements.PLAN_ENTITLEMENTS.pro.maxProgressPhotos, 365);
+assert.equal(entitlements.PLAN_ENTITLEMENTS.pro.maxProgressPhotos, null);
 assert.equal(entitlements.PLAN_ENTITLEMENTS.pro.maxProgressVideoSeconds, 36.5);
+assert.equal(entitlements.PLAN_ENTITLEMENTS.plus.maxProgressPhotos, null);
+assert.equal(entitlements.PLAN_ENTITLEMENTS.plus.maxProgressVideoSeconds, 36.5);
 assert.equal(entitlements.PLAN_ENTITLEMENTS.expert.maxProgressPhotos, null);
-assert.equal(entitlements.PLAN_ENTITLEMENTS.expert.maxProgressVideoSeconds, null);
-for (const tier of ["guest", "free", "ad_remove", "pro", "expert"]) {
-  assert.equal(entitlements.PLAN_ENTITLEMENTS[tier].maxProjectCount, null);
+assert.equal(entitlements.PLAN_ENTITLEMENTS.expert.maxProgressVideoSeconds, 36.5);
+for (const tier of ["guest", "free", "ad_remove"]) {
+  assert.equal(entitlements.PLAN_ENTITLEMENTS[tier].maxProjectCount, 1);
 }
+for (const tier of ["pro", "plus", "expert"]) {
+  assert.equal(entitlements.PLAN_ENTITLEMENTS[tier].maxProjectCount, null);
+  assert.equal(entitlements.PLAN_ENTITLEMENTS[tier].localImageLimit, undefined);
+}
+assert.equal(entitlements.PLAN_ENTITLEMENTS.pro.maxCloudBackupProjects, 1);
+assert.equal(entitlements.PLAN_ENTITLEMENTS.plus.maxCloudBackupProjects, 3);
+assert.equal(entitlements.PLAN_ENTITLEMENTS.expert.maxCloudBackupProjects, 5);
+assert.equal(entitlements.PLAN_ENTITLEMENTS.pro.maxCloudPhotosPerProject, 365);
+assert.equal(entitlements.PLAN_ENTITLEMENTS.plus.maxCloudPhotosPerProject, 365);
+assert.equal(entitlements.PLAN_ENTITLEMENTS.expert.maxCloudPhotosPerProject, 365);
 
 console.log("ok - Body Frame stage 1 data and policy contracts are enforced");
