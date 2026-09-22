@@ -47,11 +47,14 @@ assert.equal(retry.state.error, null);
 assert.equal(retry.state.products[0].id, "ad_remove");
 assert.equal(retry.state.subscriptions[0].id, "creator_monthly");
 // A shared deferred promise lets both product types finish after logout.
-const pendingResult = Promise.withResolvers();
-const staleBoth = setup({ uid: "a" }, () => pendingResult.promise);
+let resolvePendingResult;
+const pendingResult = new Promise((resolve) => {
+  resolvePendingResult = resolve;
+});
+const staleBoth = setup({ uid: "a" }, () => pendingResult);
 const pending = staleBoth.reload();
 staleBoth.version.current++;
-pendingResult.resolve([{ id: "old" }]);
+resolvePendingResult([{ id: "old" }]);
 await pending;
 assert.deepEqual(staleBoth.state.products, []);
 const account = fs.readFileSync("features/account/AccountScreen.tsx", "utf8");
