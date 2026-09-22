@@ -35,7 +35,7 @@ for (const token of [
 for (const token of [
   "BodyFramePhotoOrderModal",
   "onLongPress={() => setOrderModalOpen(true)}",
-  '"순서 조정"',
+  "순서 조정",
   "reorderBodyProjectPhotos"
 ]) {
   assert.ok(detail.includes(token), `project reorder entry missing: ${token}`);
