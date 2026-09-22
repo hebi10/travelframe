@@ -9,9 +9,9 @@ for (const snippet of [
   "openCameraToolFromSettings(openLineGuideSettings)",
   "openCameraToolFromSettings(openPhotoGuideSettings)",
   'accessibilityLabel="라인 가이드 설정 열기"',
-  'accessibilityLabel="기준 사진 설정 열기"',
+  'accessibilityLabel="사진 설정 열기"',
   "<Text selectable={false} style={styles.cameraToolText}>라인</Text>",
-  "<Text selectable={false} style={styles.cameraToolText}>기준 사진</Text>",
+  "<Text selectable={false} style={styles.cameraToolText}>사진</Text>",
   "setGuideSettingsOpen(true)",
   "reopenOverlaySetup();"
 ]) {
