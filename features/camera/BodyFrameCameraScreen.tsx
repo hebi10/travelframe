@@ -310,27 +310,30 @@ export default function BodyFrameCameraScreen() {
       <CameraScreen
         projectReferenceMode={activeProject?.referenceMode}
         onProjectReferenceModeChange={activeProject ? handleChangeReferenceMode : undefined}
+        headerCenter={
+          <BodyFrameProjectSwitcher
+            compact
+            projects={projects}
+            photos={photos}
+            activeProject={activeProject}
+            disabled={session.pendingSaveCount > 0}
+            maxProgressPhotos={planEntitlements.maxProgressPhotos}
+            upgradePlanLabel={upgradePlanLabel}
+            onSelectProject={handleSelectProject}
+            onCreateProject={handleCreateProject}
+            onUpgrade={() => router.push("/account")}
+            onManageProjects={() => router.push("/studio")}
+          />
+        }
       />
 
       <View
         pointerEvents="box-none"
         style={[
-          styles.projectSwitcherWrap,
+          styles.captureHintWrap,
           { top: Math.max(insets.top + 64, 76) }
         ]}
       >
-        <BodyFrameProjectSwitcher
-          projects={projects}
-          photos={photos}
-          activeProject={activeProject}
-          disabled={session.pendingSaveCount > 0}
-          maxProgressPhotos={planEntitlements.maxProgressPhotos}
-          upgradePlanLabel={upgradePlanLabel}
-          onSelectProject={handleSelectProject}
-          onCreateProject={handleCreateProject}
-          onUpgrade={() => router.push("/account")}
-          onManageProjects={() => router.push("/studio")}
-        />
         <Text style={styles.captureHint}>{firstPhotoHint}</Text>
         {captureBlockedReason && upgradePlanLabel ? (
           <Pressable
@@ -371,7 +374,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#0B0B0C"
   },
-  projectSwitcherWrap: {
+  captureHintWrap: {
     position: "absolute",
     left: bodyFrameDesign.horizontalPadding,
     right: bodyFrameDesign.horizontalPadding,
