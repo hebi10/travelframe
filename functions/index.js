@@ -324,21 +324,35 @@ const assertBackupProjectSlotAllowed = async ({
 
 const assertProjectPhotoBackupCapacity = async ({
   uid,
-  projectId
+  projectId,
+  itemId
 }) => {
-  const [photoSnapshot, sessionSnapshot] = await Promise.all([
-    db
-      .collection(`users/${uid}/photoBackups`)
-      .where("projectId", "==", projectId)
-      .get(),
-    db
-      .collection(`users/${uid}/backupUploadSessions`)
-      .where("projectId", "==", projectId)
-      .get()
-  ]);
+  const [photoSnapshot, sessionSnapshot, existingItemSnapshot] =
+    await Promise.all([
+      db
+        .collection(`users/${uid}/photoBackups`)
+        .where("projectId", "==", projectId)
+        .get(),
+      db
+        .collection(`users/${uid}/backupUploadSessions`)
+        .where("projectId", "==", projectId)
+        .get(),
+      typeof itemId === "string" && itemId
+        ? db.doc(`users/${uid}/photoBackups/${itemId}`).get()
+        : Promise.resolve(null)
+    ]);
+
+  if (existingItemSnapshot?.exists) {
+    return;
+  }
+
   const pendingPhotoCount = sessionSnapshot.docs.filter((item) => {
     const data = item.data();
-    return data.status === "reserved" && data.itemType === "photo";
+    return (
+      data.status === "reserved" &&
+      data.itemType === "photo" &&
+      data.itemId !== itemId
+    );
   }).length;
 
   if (
@@ -1112,7 +1126,8 @@ exports.reserveBackupUpload = secureOnCall(async (request) => {
       contentType,
       storagePath,
       projectId: rawProjectId,
-      itemType
+      itemType,
+      itemId
     } = request.data ?? {};
     const subscription = await getBackupSubscription(uid);
     const projectId = normalizeBackupProjectId(rawProjectId);
@@ -1125,7 +1140,8 @@ exports.reserveBackupUpload = secureOnCall(async (request) => {
       });
       await assertProjectPhotoBackupCapacity({
         uid,
-        projectId
+        projectId,
+        itemId
       });
     } else if (itemType === "video" && projectId) {
       await assertBackupProjectSlotAllowed({
@@ -1165,6 +1181,7 @@ exports.reserveBackupUpload = secureOnCall(async (request) => {
         userId: uid,
         mediaKind,
         itemType: typeof itemType === "string" ? itemType : null,
+        itemId: typeof itemId === "string" ? itemId : null,
         projectId,
         fileSize,
         contentType,
