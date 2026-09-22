@@ -178,10 +178,6 @@ export const getBodyFrameVideoOverlayText = ({
   const parts: string[] = [];
   const customText = overlay.customText.trim();
 
-  if (customText) {
-    parts.push(customText);
-  }
-
   if (overlay.showDate) {
     const date = formatBodyFrameVideoOverlayDate(photo?.createdAt);
     if (date) {
@@ -194,7 +190,7 @@ export const getBodyFrameVideoOverlayText = ({
     typeof measurement?.weightKg === "number" &&
     Number.isFinite(measurement.weightKg)
   ) {
-    parts.push(`${Number(measurement.weightKg.toFixed(1))}kg`);
+    parts.push(`${measurement.weightKg.toFixed(1)}kg`);
   }
 
   if (
@@ -202,7 +198,11 @@ export const getBodyFrameVideoOverlayText = ({
     typeof measurement?.bodyFatPercent === "number" &&
     Number.isFinite(measurement.bodyFatPercent)
   ) {
-    parts.push(`${Number(measurement.bodyFatPercent.toFixed(1))}%`);
+    parts.push(`${measurement.bodyFatPercent.toFixed(1)}%`);
+  }
+
+  if (customText) {
+    parts.push(customText);
   }
 
   return parts.join(" · ");
