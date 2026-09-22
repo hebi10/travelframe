@@ -34,8 +34,8 @@ type ImageExportOptions = {
   frameHeight?: number | null;
 };
 let androidDownloadDirectoryUri: string | null = null;
-const TRIP_CLIP_ANDROID_DOWNLOAD_FOLDER = "TravelFrame";
-const TRIP_CLIP_MEDIA_ALBUM = "바디 프레임";
+const TRIP_CLIP_ANDROID_DOWNLOAD_FOLDER = "Body Frame";
+const TRIP_CLIP_MEDIA_ALBUM = "Body Frame";
 
 const getMediaLibrary = async (): Promise<MediaLibraryModule> =>
   import("expo-media-library");
@@ -177,11 +177,8 @@ const saveImageToAndroidDownload = async (
 ) => {
   const saveUri = await prepareImageForLibrarySave(uri, format, options);
   const mimeType = getImageSaveMimeType(saveUri, format);
-  return saveFileToAndroidDownload(saveUri, mimeType, "travel-frame");
+  return saveFileToAndroidDownload(saveUri, mimeType, "body-frame");
 };
-
-const saveVideoToAndroidDownload = async (uri: string) =>
-  saveFileToAndroidDownload(uri, "video/mp4", "travel-frame-video");
 
 const saveFileToAndroidDownload = async (
   uri: string,
@@ -226,6 +223,21 @@ const saveImageToAndroidAlbum = async (
   }
 
   return saveUri;
+};
+
+const saveVideoToAndroidAlbum = async (uri: string) => {
+  const MediaLibrary = await requestSavePermission("video");
+  assertCanSaveToMediaLibrary(MediaLibrary);
+
+  const album = await MediaLibrary.getAlbumAsync(TRIP_CLIP_MEDIA_ALBUM);
+
+  if (album) {
+    await MediaLibrary.createAssetAsync(uri, album);
+  } else {
+    await MediaLibrary.createAlbumAsync(TRIP_CLIP_MEDIA_ALBUM, undefined, true, uri);
+  }
+
+  return uri;
 };
 
 export const prepareImageForLibrarySave = async (
@@ -278,13 +290,15 @@ export const prepareImageForLibrarySave = async (
 export const saveVideoToLibrary = async (uri: string) => {
   try {
     uri = await resolvePrivateMediaUri(uri);
+
     if (Platform.OS === "android") {
-      return await saveVideoToAndroidDownload(uri);
+      return await saveVideoToAndroidAlbum(uri);
     }
 
     const MediaLibrary = await requestSavePermission("video");
     assertCanSaveToMediaLibrary(MediaLibrary);
     await MediaLibrary.saveToLibraryAsync(uri);
+    return uri;
   } catch (error) {
     throw normalizeMediaSaveError(error, "영상을 핸드폰 앨범에 저장하지 못했습니다.");
   }

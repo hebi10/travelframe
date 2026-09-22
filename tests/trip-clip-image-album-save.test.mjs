@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 const source = readFileSync("lib/trip-clip-export.ts", "utf8");
 
 assert.ok(
-  source.includes('const TRIP_CLIP_MEDIA_ALBUM = "바디 프레임"'),
+  source.includes('const TRIP_CLIP_MEDIA_ALBUM = "Body Frame"'),
   "image export should target the Body Frame media album"
 );
 assert.ok(
