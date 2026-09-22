@@ -21,7 +21,7 @@ for (const token of [
   "maxCloudBackupProjects: 5",
   "CLOUD_BACKUP_PHOTOS_PER_PROJECT = 365",
   "localImageLimit: undefined",
-  "maxProgressPhotos: null"
+  "maxProgressPhotos: CLOUD_BACKUP_PHOTOS_PER_PROJECT"
 ]) {
   assert.ok(entitlements.includes(token), `plan policy missing: ${token}`);
 }
@@ -72,8 +72,8 @@ assert.ok(
 for (const token of [
   '"광고만 제거할까요?"',
   "광고 제거는 2,000원 1회 구매",
-  "Pro는 월 1,990원 자동 갱신 구독",
-  "클라우드에 프로젝트 1개"
+  "월 Pro(2,000원)부터",
+  "선택한 프로젝트 1개를 클라우드에 백업"
 ]) {
   assert.ok(account.includes(token), `ad-removal comparison missing: ${token}`);
 }

@@ -26,7 +26,7 @@ const activeSubscription = (productId) => ({
   startedAt: "2026-05-20T00:00:00.000Z",
   expiresAt: "2999-01-01T00:00:00.000Z",
   lastPaymentAt: "2026-05-20T00:00:00.000Z",
-  priceLabel: "1,990원",
+  priceLabel: "2,000원",
   productName: productId
 });
 
@@ -83,6 +83,7 @@ assert.equal(PLAN_ENTITLEMENTS.ad_remove.showWatermark, true);
 assert.equal(PLAN_ENTITLEMENTS.ad_remove.canBackupToCloud, false);
 assert.equal(PLAN_ENTITLEMENTS.ad_remove.maxProgressPhotos, 100);
 assert.equal(PLAN_ENTITLEMENTS.ad_remove.maxProgressVideoSeconds, 10);
+assert.equal(PLAN_ENTITLEMENTS.ad_remove.maxProjectCount, 2);
 
 assert.equal(PLAN_ENTITLEMENTS.pro.weeklyVideoExportLimit, 15);
 assert.equal(PLAN_ENTITLEMENTS.pro.canExportVideo, true);
@@ -92,7 +93,7 @@ assert.equal(PLAN_ENTITLEMENTS.pro.localImageLimit, undefined);
 assert.equal(PLAN_ENTITLEMENTS.pro.localVideoLimit, 50);
 assert.equal(PLAN_ENTITLEMENTS.pro.musicTrackLimit, 10);
 assert.equal(PLAN_ENTITLEMENTS.pro.backupStorageBytes, 2 * 1024 * 1024 * 1024);
-assert.equal(PLAN_ENTITLEMENTS.pro.maxProgressPhotos, null);
+assert.equal(PLAN_ENTITLEMENTS.pro.maxProgressPhotos, 365);
 assert.equal(PLAN_ENTITLEMENTS.pro.maxProgressVideoSeconds, 36.5);
 assert.equal(PLAN_ENTITLEMENTS.pro.maxProjectCount, null);
 assert.equal(PLAN_ENTITLEMENTS.pro.maxCloudBackupProjects, 1);
@@ -101,7 +102,7 @@ assert.equal(PLAN_ENTITLEMENTS.pro.maxCloudPhotosPerProject, 365);
 assert.equal(PLAN_ENTITLEMENTS.plus.weeklyVideoExportLimit, 15);
 assert.equal(PLAN_ENTITLEMENTS.plus.localImageLimit, undefined);
 assert.equal(PLAN_ENTITLEMENTS.plus.backupStorageBytes, 6 * 1024 * 1024 * 1024);
-assert.equal(PLAN_ENTITLEMENTS.plus.maxProgressPhotos, null);
+assert.equal(PLAN_ENTITLEMENTS.plus.maxProgressPhotos, 365);
 assert.equal(PLAN_ENTITLEMENTS.plus.maxProgressVideoSeconds, 36.5);
 assert.equal(PLAN_ENTITLEMENTS.plus.maxCloudBackupProjects, 3);
 assert.equal(PLAN_ENTITLEMENTS.plus.maxCloudPhotosPerProject, 365);
@@ -112,7 +113,7 @@ assert.equal(PLAN_ENTITLEMENTS.expert.localImageLimit, undefined);
 assert.equal(PLAN_ENTITLEMENTS.expert.localVideoLimit, 50);
 assert.equal(PLAN_ENTITLEMENTS.expert.musicTrackLimit, 10);
 assert.equal(PLAN_ENTITLEMENTS.expert.backupStorageBytes, 10 * 1024 * 1024 * 1024);
-assert.equal(PLAN_ENTITLEMENTS.expert.maxProgressPhotos, null);
+assert.equal(PLAN_ENTITLEMENTS.expert.maxProgressPhotos, 365);
 assert.equal(PLAN_ENTITLEMENTS.expert.maxProgressVideoSeconds, 36.5);
 assert.equal(PLAN_ENTITLEMENTS.expert.maxProjectCount, null);
 assert.equal(PLAN_ENTITLEMENTS.expert.maxCloudBackupProjects, 5);

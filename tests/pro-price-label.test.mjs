@@ -14,9 +14,9 @@ const adminSource = fs.readFileSync("admin/admin.js", "utf8");
 const functionsSource = fs.readFileSync("functions/index.js", "utf8");
 
 for (const [id, title, fallback] of [
-  ["creator", "Pro", "1,990원"],
-  ["plus", "Plus", "3,990원"],
-  ["expert", "Expert", "5,990원"]
+  ["creator", "Pro", "2,000원"],
+  ["plus", "Plus", "4,000원"],
+  ["expert", "Expert", "6,000원"]
 ]) {
   assert.match(
     accountConstants,
@@ -37,9 +37,9 @@ for (const [name, source] of [
   ["functions product metadata", functionsSource]
 ]) {
   for (const [productId, price] of [
-    ["creator_monthly", "월 1,990원"],
-    ["plus_monthly", "월 3,990원"],
-    ["expert_monthly", "월 5,990원"]
+    ["creator_monthly", "월 2,000원"],
+    ["plus_monthly", "월 4,000원"],
+    ["expert_monthly", "월 6,000원"]
   ]) {
     assert.match(
       source,

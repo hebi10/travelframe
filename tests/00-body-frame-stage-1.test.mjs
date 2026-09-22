@@ -125,15 +125,16 @@ assert.equal(entitlements.PLAN_ENTITLEMENTS.free.maxProgressPhotos, 100);
 assert.equal(entitlements.PLAN_ENTITLEMENTS.free.maxProgressVideoSeconds, 10);
 assert.equal(entitlements.PLAN_ENTITLEMENTS.ad_remove.maxProgressPhotos, 100);
 assert.equal(entitlements.PLAN_ENTITLEMENTS.ad_remove.maxProgressVideoSeconds, 10);
-assert.equal(entitlements.PLAN_ENTITLEMENTS.pro.maxProgressPhotos, null);
+assert.equal(entitlements.PLAN_ENTITLEMENTS.pro.maxProgressPhotos, 365);
 assert.equal(entitlements.PLAN_ENTITLEMENTS.pro.maxProgressVideoSeconds, 36.5);
-assert.equal(entitlements.PLAN_ENTITLEMENTS.plus.maxProgressPhotos, null);
+assert.equal(entitlements.PLAN_ENTITLEMENTS.plus.maxProgressPhotos, 365);
 assert.equal(entitlements.PLAN_ENTITLEMENTS.plus.maxProgressVideoSeconds, 36.5);
-assert.equal(entitlements.PLAN_ENTITLEMENTS.expert.maxProgressPhotos, null);
+assert.equal(entitlements.PLAN_ENTITLEMENTS.expert.maxProgressPhotos, 365);
 assert.equal(entitlements.PLAN_ENTITLEMENTS.expert.maxProgressVideoSeconds, 36.5);
-for (const tier of ["guest", "free", "ad_remove"]) {
+for (const tier of ["guest", "free"]) {
   assert.equal(entitlements.PLAN_ENTITLEMENTS[tier].maxProjectCount, 1);
 }
+assert.equal(entitlements.PLAN_ENTITLEMENTS.ad_remove.maxProjectCount, 2);
 for (const tier of ["pro", "plus", "expert"]) {
   assert.equal(entitlements.PLAN_ENTITLEMENTS[tier].maxProjectCount, null);
   assert.equal(entitlements.PLAN_ENTITLEMENTS[tier].localImageLimit, undefined);
