@@ -4,7 +4,7 @@ import { Pressable, Text, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { runOnJS, useDerivedValue, useSharedValue } from "react-native-reanimated";
 
-import { colors } from "@/constants/app-theme";
+import { bodyFrameDarkColors, colors } from "@/constants/app-theme";
 import {
   EXPOSURE_CONTROL_GAP,
   EXPOSURE_SUN_ICON_SIZE,
@@ -79,6 +79,7 @@ export type CameraSettingToggleRowProps = {
   valueLabel: string;
   disabled?: boolean;
   selected?: boolean;
+  dark?: boolean;
   onPress: () => void;
 };
 
@@ -88,68 +89,147 @@ export function CameraSettingToggleRow({
   valueLabel,
   disabled = false,
   selected = false,
+  dark = false,
   onPress
 }: CameraSettingToggleRowProps) {
   return (
     <Pressable
       disabled={disabled}
-      style={[styles.settingToggleRow, disabled && styles.settingToggleRowDisabled]}
+      style={[
+        styles.settingToggleRow,
+        dark && styles.cameraSettingsToggleRow,
+        disabled && styles.settingToggleRowDisabled
+      ]}
       onPress={onPress}
       accessibilityRole="switch"
       accessibilityState={{ disabled, checked: selected }}
     >
       <View style={styles.settingToggleCopy}>
-        <Text selectable={false} style={styles.settingToggleTitle}>{title}</Text>
-        <Text selectable={false} style={styles.settingToggleDetail}>{detail}</Text>
+        <Text
+          selectable={false}
+          style={[
+            styles.settingToggleTitle,
+            dark && styles.cameraSettingsToggleTitle
+          ]}
+        >
+          {title}
+        </Text>
+        <Text
+          selectable={false}
+          style={[
+            styles.settingToggleDetail,
+            dark && styles.cameraSettingsToggleDetail
+          ]}
+        >
+          {detail}
+        </Text>
       </View>
-      <Text selectable={false} style={styles.settingToggleValue}>{valueLabel}</Text>
+      <Text
+        selectable={false}
+        style={[
+          styles.settingToggleValue,
+          dark && styles.cameraSettingsToggleValue
+        ]}
+      >
+        {valueLabel}
+      </Text>
     </Pressable>
   );
 }
 
 export type CameraShutterSoundChoiceProps = {
   mode: CameraShutterSoundMode;
+  dark?: boolean;
   onChange: (mode: CameraShutterSoundMode) => void;
 };
 
 export function CameraShutterSoundChoice({
   mode,
+  dark = false,
   onChange
 }: CameraShutterSoundChoiceProps) {
   return (
-    <View style={styles.shutterSoundPanel}>
+    <View
+      style={[
+        styles.shutterSoundPanel,
+        dark && styles.cameraSettingsShutterPanel
+      ]}
+    >
       <View style={styles.shutterSoundHeader}>
-        <View style={styles.shutterSoundIcon}>
-          <Feather name={mode === "silent" ? "volume-x" : "volume-2"} size={18} color={colors.text} />
+        <View
+          style={[
+            styles.shutterSoundIcon,
+            dark && styles.cameraSettingsShutterIcon
+          ]}
+        >
+          <Feather
+            name={mode === "silent" ? "volume-x" : "volume-2"}
+            size={18}
+            color={dark ? bodyFrameDarkColors.text : colors.text}
+          />
         </View>
         <View style={styles.shutterSoundCopy}>
-          <Text selectable={false} style={styles.settingToggleTitle}>촬영 소리</Text>
-          <Text selectable={false} style={styles.shutterSoundDetail}>
+          <Text
+            selectable={false}
+            style={[
+              styles.settingToggleTitle,
+              dark && styles.cameraSettingsToggleTitle
+            ]}
+          >
+            촬영 소리
+          </Text>
+          <Text
+            selectable={false}
+            style={[
+              styles.shutterSoundDetail,
+              dark && styles.cameraSettingsToggleDetail
+            ]}
+          >
             기본은 무음입니다. 필요한 경우 셔터음을 켤 수 있습니다.
           </Text>
         </View>
       </View>
       <View style={styles.shutterSoundOptions}>
         <Pressable
-          style={[styles.optionButton, mode === "silent" ? styles.optionButtonActive : null]}
+          style={[
+            styles.optionButton,
+            dark && styles.cameraSettingsOptionButton,
+            mode === "silent" ? styles.optionButtonActive : null,
+            dark && mode === "silent" && styles.cameraSettingsOptionButtonActive
+          ]}
           onPress={() => onChange("silent")}
           accessibilityState={{ selected: mode === "silent" }}
         >
           <Text
             selectable={false}
-            style={[styles.optionButtonText, mode === "silent" ? styles.optionButtonTextActive : null]}
+            style={[
+              styles.optionButtonText,
+              dark && styles.cameraSettingsOptionButtonText,
+              mode === "silent" ? styles.optionButtonTextActive : null,
+              dark && mode === "silent" && styles.cameraSettingsOptionButtonTextActive
+            ]}
           >
             무음
           </Text>
         </Pressable>
         <Pressable
-          style={[styles.optionButton, mode === "sound" && styles.optionButtonActive]}
+          style={[
+            styles.optionButton,
+            dark && styles.cameraSettingsOptionButton,
+            mode === "sound" && styles.optionButtonActive,
+            dark && mode === "sound" && styles.cameraSettingsOptionButtonActive
+          ]}
           onPress={() => onChange("sound")}
           accessibilityState={{ selected: mode === "sound" }}
         >
           <Text
             selectable={false}
-            style={[styles.optionButtonText, mode === "sound" && styles.optionButtonTextActive]}
+            style={[
+              styles.optionButtonText,
+              dark && styles.cameraSettingsOptionButtonText,
+              mode === "sound" && styles.optionButtonTextActive,
+              dark && mode === "sound" && styles.cameraSettingsOptionButtonTextActive
+            ]}
           >
             소리
           </Text>
