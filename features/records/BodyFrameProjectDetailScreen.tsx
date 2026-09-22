@@ -2257,6 +2257,29 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontVariant: ["tabular-nums"]
   },
+  reminderRepeatBlock: {
+    gap: 10
+  },
+  reminderRepeatHeader: {
+    gap: 4
+  },
+  reminderWeekdayRow: {
+    flexDirection: "row",
+    gap: 6
+  },
+  reminderWeekdayButton: {
+    minWidth: bodyFrameDesign.minTouchSize,
+    minHeight: bodyFrameDesign.minTouchSize,
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderRadius: bodyFrameDesign.buttonRadius
+  },
+  reminderWeekdayText: {
+    fontSize: bodyFrameTypography.caption,
+    fontWeight: "700"
+  },
   sheetHandle: {
     alignSelf: "center",
     width: 36,
