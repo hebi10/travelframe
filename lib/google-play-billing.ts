@@ -11,6 +11,7 @@ export type GooglePlayProductId = Exclude<SubscriptionProductId, "free">;
 export const GOOGLE_PLAY_ONE_TIME_PRODUCT_IDS = ["ad_remove"] as const;
 export const GOOGLE_PLAY_SUBSCRIPTION_IDS = [
   "creator_monthly",
+  "plus_monthly",
   "expert_monthly"
 ] as const;
 export const GOOGLE_PLAY_PRODUCT_IDS: GooglePlayProductId[] = [
