@@ -20,7 +20,7 @@ for (const token of [
   "AndroidProjectReminderPackage",
   "AndroidProjectReminderModule",
   "ProjectReminderReceiver",
-  "AlarmManager.setAndAllowWhileIdle",
+  "alarmManager.setAndAllowWhileIdle",
   "NotificationChannel",
   "Intent.ACTION_BOOT_COMPLETED",
   "Intent.ACTION_MY_PACKAGE_REPLACED",
