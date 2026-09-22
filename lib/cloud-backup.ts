@@ -29,6 +29,9 @@ import {
   getCloudBackupVideoLimit,
   type CloudBackupLimitTier
 } from "@/lib/cloud-backup-limits";
+import {
+  getSelectedCloudBackupProjectIds
+} from "@/lib/cloud-backup-project-slots";
 import { firebaseAuth, firebaseFunctions, firestore, firebaseStorage } from "@/lib/firebase";
 import { getBodyProjects, mergeBodyProjectsFromBackup } from "@/lib/body-project-library";
 import { isPhotoBackupCurrent, recoverMissingBodyProjects } from "@/lib/body-project-backup";
@@ -276,6 +279,8 @@ const reserveBackupUpload = (data: {
   fileSize: number;
   contentType: string;
   storagePath: string;
+  itemType?: "photo" | "imageWork" | "video";
+  projectId?: string;
 }) =>
   callBackupFunction<typeof data, ReserveBackupUploadResponse>(
     "reserveBackupUpload",
@@ -381,11 +386,15 @@ const backupBodyProjects = async (userId: string, projectId?: string) => {
 const uploadLocalFile = async ({
   uri,
   storagePath,
-  mediaKind
+  mediaKind,
+  itemType,
+  projectId
 }: {
   uri: string;
   storagePath: string;
   mediaKind: BackupMediaKind;
+  itemType?: "photo" | "imageWork" | "video";
+  projectId?: string;
 }): Promise<UploadedBackupFile> => {
   if (!firebaseStorage) {
     throw new Error("클라우드 백업을 지금 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.");
@@ -407,7 +416,9 @@ const uploadLocalFile = async ({
     mediaKind,
     fileSize: blob.size,
     contentType,
-    storagePath
+    storagePath,
+    itemType,
+    projectId
   });
   const uploadStoragePath = reservation.storagePath;
   const fileRef = ref(firebaseStorage, uploadStoragePath);
@@ -800,23 +811,34 @@ export const backupCurrentWorkspace = async ({
   const backupLimitTier = getBackupLimitTier(subscription);
   emitBackupProgress(onProgress, 3, "백업할 데이터를 준비하고 있습니다.");
 
-  const [settings, photos, imageBundles, videos] = await Promise.all([
-    getAppSettings(),
-    getPhotos(),
-    getImageBundleWorks(),
-    getMadeVideos()
-  ]);
+  const [settings, photos, imageBundles, videos, selectedProjectIds] =
+    await Promise.all([
+      getAppSettings(),
+      getPhotos(),
+      getImageBundleWorks(),
+      getMadeVideos(),
+      getSelectedCloudBackupProjectIds(user)
+    ]);
   const selectedPhotoBackups = isCloudBackupTargetEnabled(settings, "photos")
-    ? photos
+    ? photos.filter(
+        (photo) =>
+          Boolean(photo.projectId) &&
+          selectedProjectIds.has(photo.projectId as string)
+      )
     : [];
   const selectedImageBundleBackups = isCloudBackupTargetEnabled(settings, "imageBundles")
     ? imageBundles
     : [];
   const selectedVideoBackups = isCloudBackupTargetEnabled(settings, "videos")
-    ? videos
+    ? videos.filter(
+        (video) =>
+          !video.projectId || selectedProjectIds.has(video.projectId)
+      )
     : [];
   if (isCloudBackupTargetEnabled(settings, "photos")) {
-    await backupBodyProjects(user.uid);
+    for (const projectId of selectedProjectIds) {
+      await backupBodyProjects(user.uid, projectId);
+    }
   }
   const existingPhotoSnapshot = await getDocs(collection(firestore, "users", user.uid, "photoBackups"));
   const existingPhotoBackups = new Map(
@@ -976,7 +998,9 @@ export const backupCurrentWorkspace = async ({
     const photoUpload = await uploadLocalFile({
       uri: optimized.uri,
       storagePath: photoPath,
-      mediaKind: "image"
+      mediaKind: "image",
+      itemType: "photo",
+      projectId: photo.projectId
     });
     const photoDownloadUrl = photoUpload.downloadURL;
 
@@ -1070,7 +1094,8 @@ export const backupCurrentWorkspace = async ({
       const upload = await uploadLocalFile({
         uri: optimized.uri,
         storagePath,
-        mediaKind: "image"
+        mediaKind: "image",
+        itemType: "imageWork"
       });
       storagePaths.push(upload.storagePath);
       backupSessionIds.push(upload.backupSessionId);
@@ -1167,7 +1192,9 @@ export const backupCurrentWorkspace = async ({
     const upload = await uploadLocalFile({
       uri: video.uri,
       storagePath,
-      mediaKind: "video"
+      mediaKind: "video",
+      itemType: "video",
+      projectId: video.projectId
     });
     const downloadUrl = upload.downloadURL;
 
