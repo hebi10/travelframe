@@ -8,11 +8,16 @@ const BACKUP_QUOTA_LIMITS = {
   audioFileBytes: 50 * 1024 * 1024
 };
 
+const PLUS_BACKUP_QUOTA_LIMITS = {
+  ...BACKUP_QUOTA_LIMITS,
+  totalBytes: 6 * 1024 * 1024 * 1024,
+  imageTotalBytes: 6 * 1024 * 1024 * 1024
+};
+
 const EXPERT_BACKUP_QUOTA_LIMITS = {
   ...BACKUP_QUOTA_LIMITS,
-  totalBytes: 5 * 1024 * 1024 * 1024,
-  imageTotalBytes: 5 * 1024 * 1024 * 1024,
-  videoCount: 100
+  totalBytes: 10 * 1024 * 1024 * 1024,
+  imageTotalBytes: 10 * 1024 * 1024 * 1024
 };
 
 const VALID_MEDIA_KINDS = new Set(["image", "video", "audio"]);
@@ -35,7 +40,7 @@ const isBackupSubscriptionActive = (subscription, now = Date.now()) => {
     !subscription ||
     subscription.plan !== "premium" ||
     subscription.status !== "active" ||
-    !["creator_monthly", "expert_monthly"].includes(subscription.productId)
+    !["creator_monthly", "plus_monthly", "expert_monthly"].includes(subscription.productId)
   ) {
     return false;
   }
@@ -48,8 +53,16 @@ const isBackupSubscriptionActive = (subscription, now = Date.now()) => {
 };
 
 const getBackupQuotaLimits = (subscription) => {
-  if (isBackupSubscriptionActive(subscription) && subscription.productId === "expert_monthly") {
+  if (!isBackupSubscriptionActive(subscription)) {
+    return BACKUP_QUOTA_LIMITS;
+  }
+
+  if (subscription.productId === "expert_monthly") {
     return EXPERT_BACKUP_QUOTA_LIMITS;
+  }
+
+  if (subscription.productId === "plus_monthly") {
+    return PLUS_BACKUP_QUOTA_LIMITS;
   }
 
   return BACKUP_QUOTA_LIMITS;
