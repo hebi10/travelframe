@@ -1115,6 +1115,10 @@ const renderBackupTabs = () => {
   $("backupUploadInput").accept = backupUploadAccept[activeBackupTab] ?? "";
   const needsProject = activeBackupTab === "image" || activeBackupTab === "video";
   $("backupUploadProjectField")?.classList.toggle("hidden", !needsProject);
+  $("backupProjectFilterField")?.classList.toggle("hidden", !needsProject);
+  if (!needsProject && $("backupProjectFilterSelect")) {
+    $("backupProjectFilterSelect").value = "all";
+  }
   if ($("backupUploadButton")) {
     $("backupUploadButton").disabled =
       needsProject && getUsableBackupProjectSlots().length === 0;
