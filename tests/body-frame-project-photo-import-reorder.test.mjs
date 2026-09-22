@@ -5,10 +5,6 @@ const detail = fs.readFileSync(
   "features/records/BodyFrameProjectDetailScreen.tsx",
   "utf8"
 );
-const orderModal = fs.readFileSync(
-  "features/records/BodyFramePhotoOrderModal.tsx",
-  "utf8"
-);
 const legacyPhotoLibrary = fs.readFileSync(
   "lib/legacy-photo-library.ts",
   "utf8"
@@ -33,23 +29,33 @@ for (const token of [
 }
 
 for (const token of [
-  "BodyFramePhotoOrderModal",
-  "onLongPress={() => setOrderModalOpen(true)}",
-  "순서 조정",
-  "reorderBodyProjectPhotos"
+  "SortableProjectPhotoTile",
+  "Gesture.Pan()",
+  "activateAfterLongPress(PROJECT_PHOTO_LONG_PRESS_MS)",
+  "Gesture.Exclusive(dragGesture, tapGesture)",
+  "runOnJS(onDragHover)",
+  "runOnJS(onDrop)",
+  "scrollEnabled={!isPhotoDragging}",
+  "setPhotoOrderMode(true)",
+  "setPhotoDropTargetIndex",
+  "moveProjectPhoto(",
+  "orderedPhotoIds = [...nextDisplayedPhotos]",
+  ".reverse()",
+  "reorderBodyProjectPhotos",
+  "사진을 길게 누른 채 원하는 위치로 끌어 놓으세요."
 ]) {
-  assert.ok(detail.includes(token), `project reorder entry missing: ${token}`);
+  assert.ok(detail.includes(token), `inline project drag reorder missing: ${token}`);
 }
 
-for (const token of [
-  "activateAfterLongPress",
-  "Gesture.Pan()",
-  "runOnJS(onDrop)",
-  "gridWidth >= 520 ? 7 : gridWidth >= 420 ? 6 : 5",
-  "왼쪽 위가 첫 번째 기록",
-  "순서 저장"
+for (const removed of [
+  "BodyFramePhotoOrderModal",
+  "setOrderModalOpen",
+  "onLongPress={() => setOrderModalOpen(true)}"
 ]) {
-  assert.ok(orderModal.includes(token), `compact drag reorder missing: ${token}`);
+  assert.ok(
+    !detail.includes(removed),
+    `project reorder should not open a separate reorder screen: ${removed}`
+  );
 }
 
 assert.ok(
@@ -71,4 +77,4 @@ assert.ok(
   "measurement sequence should follow reordered project photos"
 );
 
-console.log("ok - project photo import and compact long-press drag reorder are wired");
+console.log("ok - project photo import and inline long-press drag reorder are wired");
