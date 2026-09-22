@@ -2,7 +2,6 @@ import { Feather } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { Image } from "@/components/private-media-image";
 import { BodyMeasurementSummaryCard } from "@/components/body-measurement-summary-card";
-import { BodyFramePhotoOrderModal } from "@/features/records/BodyFramePhotoOrderModal";
 import { router, type Href, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
 import {
@@ -16,6 +15,13 @@ import {
   TextInput,
   View
 } from "react-native";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import Animated, {
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming
+} from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { bodyFrameDesign, bodyFrameTypography } from "@/constants/app-theme";
@@ -101,6 +107,185 @@ const sortProjectPhotos = (photos: PhotoItem[]) =>
     return new Date(second.createdAt).getTime() - new Date(first.createdAt).getTime();
   });
 
+
+const PROJECT_PHOTO_GRID_COLUMNS = 3;
+const PROJECT_PHOTO_GRID_GAP = 8;
+const PROJECT_PHOTO_LONG_PRESS_MS = 320;
+
+const moveProjectPhoto = <T,>(items: T[], fromIndex: number, toIndex: number) => {
+  if (fromIndex === toIndex) return items;
+  const next = [...items];
+  const [moved] = next.splice(fromIndex, 1);
+  next.splice(toIndex, 0, moved);
+  return next;
+};
+
+function SortableProjectPhotoTile({
+  photo,
+  index,
+  count,
+  tileWidth,
+  disabled,
+  dropTarget,
+  onDragStart,
+  onDragHover,
+  onDrop,
+  onDragFinish,
+  onOpen
+}: {
+  photo: PhotoItem;
+  index: number;
+  count: number;
+  tileWidth: number;
+  disabled: boolean;
+  dropTarget: boolean;
+  onDragStart: () => void;
+  onDragHover: (index: number) => void;
+  onDrop: (fromIndex: number, toIndex: number) => void;
+  onDragFinish: () => void;
+  onOpen: () => void;
+}) {
+  const { palette } = useAppAppearance();
+  const translateX = useSharedValue(0);
+  const translateY = useSharedValue(0);
+  const dragging = useSharedValue(false);
+  const hoverIndex = useSharedValue(index);
+  const tileHeight = tileWidth * (4 / 3);
+  const cellWidth = tileWidth + PROJECT_PHOTO_GRID_GAP;
+  const cellHeight = tileHeight + PROJECT_PHOTO_GRID_GAP;
+
+  const dragGesture = useMemo(
+    () =>
+      Gesture.Pan()
+        .enabled(!disabled)
+        .activateAfterLongPress(PROJECT_PHOTO_LONG_PRESS_MS)
+        .onStart(() => {
+          dragging.value = true;
+          hoverIndex.value = index;
+          runOnJS(onDragStart)();
+          runOnJS(onDragHover)(index);
+        })
+        .onUpdate((event) => {
+          translateX.value = event.translationX;
+          translateY.value = event.translationY;
+
+          const startRow = Math.floor(index / PROJECT_PHOTO_GRID_COLUMNS);
+          const startColumn = index % PROJECT_PHOTO_GRID_COLUMNS;
+          const rowDelta = Math.round(event.translationY / cellHeight);
+          const columnDelta = Math.round(event.translationX / cellWidth);
+          const maxRow = Math.max(
+            0,
+            Math.ceil(count / PROJECT_PHOTO_GRID_COLUMNS) - 1
+          );
+          const targetRow = Math.max(0, Math.min(maxRow, startRow + rowDelta));
+          const targetColumn = Math.max(
+            0,
+            Math.min(
+              PROJECT_PHOTO_GRID_COLUMNS - 1,
+              startColumn + columnDelta
+            )
+          );
+          const targetIndex = Math.max(
+            0,
+            Math.min(
+              count - 1,
+              targetRow * PROJECT_PHOTO_GRID_COLUMNS + targetColumn
+            )
+          );
+
+          if (targetIndex !== hoverIndex.value) {
+            hoverIndex.value = targetIndex;
+            runOnJS(onDragHover)(targetIndex);
+          }
+        })
+        .onEnd(() => {
+          runOnJS(onDrop)(index, hoverIndex.value);
+        })
+        .onFinalize(() => {
+          dragging.value = false;
+          translateX.value = withTiming(0, { duration: 120 });
+          translateY.value = withTiming(0, { duration: 120 });
+          runOnJS(onDragFinish)();
+        }),
+    [
+      cellHeight,
+      cellWidth,
+      count,
+      disabled,
+      dragging,
+      hoverIndex,
+      index,
+      onDragFinish,
+      onDragHover,
+      onDragStart,
+      onDrop,
+      translateX,
+      translateY
+    ]
+  );
+
+  const tapGesture = useMemo(
+    () =>
+      Gesture.Tap()
+        .enabled(!disabled)
+        .maxDuration(250)
+        .onEnd((_event, success) => {
+          if (success) {
+            runOnJS(onOpen)();
+          }
+        }),
+    [disabled, onOpen]
+  );
+
+  const gesture = useMemo(
+    () => Gesture.Exclusive(dragGesture, tapGesture),
+    [dragGesture, tapGesture]
+  );
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    zIndex: dragging.value ? 50 : 1,
+    elevation: dragging.value ? 12 : 0,
+    opacity: dragging.value ? 0.94 : 1,
+    transform: [
+      { translateX: translateX.value },
+      { translateY: translateY.value },
+      { scale: withTiming(dragging.value ? 1.05 : 1, { duration: 100 }) }
+    ]
+  }));
+
+  return (
+    <GestureDetector gesture={gesture}>
+      <Animated.View
+        accessibilityRole="adjustable"
+        accessibilityLabel={`${index + 1}번째 기록. 길게 눌러 순서 이동`}
+        style={[
+          styles.photoTile,
+          {
+            width: tileWidth,
+            height: tileHeight,
+            borderColor: dropTarget ? palette.text : palette.line,
+            borderWidth: dropTarget ? 2 : bodyFrameDesign.borderWidth,
+            backgroundColor: palette.surfaceStrong
+          },
+          animatedStyle
+        ]}
+      >
+        <Image
+          source={{ uri: photo.previewUri ?? photo.uri }}
+          style={styles.photoImage}
+          contentFit="cover"
+          cachePolicy="memory-disk"
+        />
+        <View style={styles.photoMetaOverlay}>
+          <Text style={styles.photoMetaText}>
+            {photo.sequence ? `#${photo.sequence}` : "기록"}
+          </Text>
+        </View>
+      </Animated.View>
+    </GestureDetector>
+  );
+}
+
 export default function BodyFrameProjectDetailScreen() {
   const { id } = useLocalSearchParams<{ id?: string | string[] }>();
   const projectId = Array.isArray(id) ? id[0] : id;
@@ -129,7 +314,11 @@ export default function BodyFrameProjectDetailScreen() {
   const [poseAlignmentEnabled, setPoseAlignmentEnabled] = useState(false);
   const [poseAlignmentDraft, setPoseAlignmentDraft] = useState(false);
   const [isImportingPhotos, setIsImportingPhotos] = useState(false);
-  const [orderModalOpen, setOrderModalOpen] = useState(false);
+  const [photoGridWidth, setPhotoGridWidth] = useState(0);
+  const [photoOrderMode, setPhotoOrderMode] = useState(false);
+  const [isPhotoDragging, setIsPhotoDragging] = useState(false);
+  const [photoDropTargetIndex, setPhotoDropTargetIndex] = useState<number | null>(null);
+  const [photoOrderSaving, setPhotoOrderSaving] = useState(false);
 
   const reload = useCallback(async () => {
     if (!projectId) {
@@ -188,9 +377,14 @@ export default function BodyFrameProjectDetailScreen() {
     [photos, project]
   );
 
-  const projectPhotosForOrder = useMemo(
-    () => [...projectPhotos].reverse(),
-    [projectPhotos]
+  const projectPhotoTileWidth = useMemo(
+    () =>
+      photoGridWidth > 0
+        ? (photoGridWidth -
+            PROJECT_PHOTO_GRID_GAP * (PROJECT_PHOTO_GRID_COLUMNS - 1)) /
+          PROJECT_PHOTO_GRID_COLUMNS
+        : 0,
+    [photoGridWidth]
   );
 
   const measurementSeries = useMemo(
@@ -441,16 +635,62 @@ export default function BodyFrameProjectDetailScreen() {
     user
   ]);
 
-  const savePhotoOrder = useCallback(
-    async (orderedPhotoIds: string[]) => {
-      if (!project) return;
-      await reorderBodyProjectPhotos({
-        projectId: project.id,
-        orderedPhotoIds
-      });
-      await reload();
+  const handleProjectPhotoDrop = useCallback(
+    async (fromIndex: number, toIndex: number) => {
+      if (
+        !project ||
+        photoOrderSaving ||
+        fromIndex === toIndex ||
+        fromIndex < 0 ||
+        toIndex < 0 ||
+        fromIndex >= projectPhotos.length ||
+        toIndex >= projectPhotos.length
+      ) {
+        return;
+      }
+
+      const nextDisplayedPhotos = moveProjectPhoto(
+        projectPhotos,
+        fromIndex,
+        toIndex
+      );
+      const orderedPhotoIds = [...nextDisplayedPhotos]
+        .reverse()
+        .map((photo) => photo.id);
+      const sequenceById = new Map(
+        orderedPhotoIds.map((id, index) => [id, index + 1])
+      );
+
+      setPhotos((current) =>
+        current.map((photo) => {
+          if (photo.projectId !== project.id) return photo;
+          const sequence = sequenceById.get(photo.id);
+          return sequence ? { ...photo, sequence } : photo;
+        })
+      );
+      setPhotoDropTargetIndex(null);
+      setPhotoOrderSaving(true);
+
+      try {
+        await reorderBodyProjectPhotos({
+          projectId: project.id,
+          orderedPhotoIds
+        });
+        await reload();
+      } catch (error) {
+        await reload();
+        Alert.alert(
+          "순서 조정 실패",
+          getUserFacingErrorMessage(
+            error,
+            "사진 순서를 저장하지 못했습니다. 다시 시도해 주세요."
+          )
+        );
+      } finally {
+        setPhotoOrderSaving(false);
+      }
     },
-    [project, reload]
+    [photoOrderSaving, project, projectPhotos, reload]
   );
 
   const openVideo = useCallback(async () => {
@@ -495,6 +735,7 @@ export default function BodyFrameProjectDetailScreen() {
   return (
     <View style={[styles.screen, { backgroundColor: palette.background }]}>
       <ScrollView
+        scrollEnabled={!isPhotoDragging}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.content,
@@ -643,12 +884,27 @@ export default function BodyFrameProjectDetailScreen() {
               {projectPhotos.length > 1 ? (
                 <Pressable
                   accessibilityRole="button"
-                  style={[styles.sectionAction, { borderColor: palette.line }]}
-                  onPress={() => setOrderModalOpen(true)}
+                  accessibilityState={{ selected: photoOrderMode }}
+                  style={[
+                    styles.sectionAction,
+                    {
+                      borderColor: photoOrderMode ? palette.text : palette.line,
+                      opacity: photoOrderSaving ? 0.5 : 1
+                    }
+                  ]}
+                  disabled={photoOrderSaving}
+                  onPress={() => {
+                    setPhotoOrderMode((current) => !current);
+                    setPhotoDropTargetIndex(null);
+                  }}
                 >
-                  <Feather name="move" size={15} color={palette.text} />
+                  <Feather
+                    name={photoOrderMode ? "check" : "move"}
+                    size={15}
+                    color={palette.text}
+                  />
                   <Text style={[styles.sectionActionText, { color: palette.text }]}>
-                    순서 조정
+                    {photoOrderMode ? "완료" : "순서 조정"}
                   </Text>
                 </Pressable>
               ) : null}
@@ -657,41 +913,51 @@ export default function BodyFrameProjectDetailScreen() {
 
           {projectPhotos.length > 1 ? (
             <Text style={[styles.recordsHint, { color: palette.faint }]}>
-              사진을 길게 눌러도 순서 조정 화면을 열 수 있습니다.
+              {photoOrderSaving
+                ? "변경한 순서를 저장하는 중입니다."
+                : photoOrderMode
+                  ? "사진을 길게 누른 채 원하는 위치로 끌어 놓으세요."
+                  : "사진을 길게 누르면 이 화면에서 바로 순서를 바꿀 수 있습니다."}
             </Text>
           ) : null}
 
           {projectPhotos.length > 0 ? (
-            <View style={styles.photoGrid}>
-              {projectPhotos.map((photo) => (
-                <Pressable
-                  key={photo.id}
-                  accessibilityRole="button"
-                  accessibilityLabel={`${photo.sequence ?? ""}번째 기록 ${formatDate(photo.createdAt)}`}
-                  style={[
-                    styles.photoTile,
-                    {
-                      borderColor: palette.line,
-                      backgroundColor: palette.surfaceStrong
-                    }
-                  ]}
-                  delayLongPress={320}
-                  onLongPress={() => setOrderModalOpen(true)}
-                  onPress={() => router.push(`/photo/${photo.id}` as Href)}
-                >
-                  <Image
-                    source={{ uri: photo.previewUri ?? photo.uri }}
-                    style={styles.photoImage}
-                    contentFit="cover"
-                    cachePolicy="memory-disk"
-                  />
-                  <View style={styles.photoMetaOverlay}>
-                    <Text style={styles.photoMetaText}>
-                      {photo.sequence ? `#${photo.sequence}` : "기록"}
-                    </Text>
-                  </View>
-                </Pressable>
-              ))}
+            <View
+              style={styles.photoGrid}
+              onLayout={(event) => setPhotoGridWidth(event.nativeEvent.layout.width)}
+            >
+              {projectPhotoTileWidth > 0
+                ? projectPhotos.map((photo, index) => (
+                    <SortableProjectPhotoTile
+                      key={photo.id}
+                      photo={photo}
+                      index={index}
+                      count={projectPhotos.length}
+                      tileWidth={projectPhotoTileWidth}
+                      disabled={photoOrderSaving}
+                      dropTarget={
+                        isPhotoDragging && photoDropTargetIndex === index
+                      }
+                      onDragStart={() => {
+                        setPhotoOrderMode(true);
+                        setIsPhotoDragging(true);
+                      }}
+                      onDragHover={setPhotoDropTargetIndex}
+                      onDrop={(fromIndex, toIndex) => {
+                        void handleProjectPhotoDrop(fromIndex, toIndex);
+                      }}
+                      onDragFinish={() => {
+                        setIsPhotoDragging(false);
+                        setPhotoDropTargetIndex(null);
+                      }}
+                      onOpen={() => {
+                        if (!photoOrderMode) {
+                          router.push(`/photo/${photo.id}` as Href);
+                        }
+                      }}
+                    />
+                  ))
+                : null}
             </View>
           ) : (
             <View
@@ -720,13 +986,6 @@ export default function BodyFrameProjectDetailScreen() {
           </Text>
         </Pressable>
       </ScrollView>
-
-      <BodyFramePhotoOrderModal
-        visible={orderModalOpen}
-        photos={projectPhotosForOrder}
-        onClose={() => setOrderModalOpen(false)}
-        onSave={savePhotoOrder}
-      />
 
       <Modal
         transparent
@@ -1319,14 +1578,13 @@ const styles = StyleSheet.create({
     fontSize: bodyFrameTypography.caption
   },
   photoGrid: {
+    width: "100%",
     flexDirection: "row",
     flexWrap: "wrap",
-    justifyContent: "space-between",
-    gap: 8
+    justifyContent: "flex-start",
+    gap: PROJECT_PHOTO_GRID_GAP
   },
   photoTile: {
-    width: "31%",
-    aspectRatio: 3 / 4,
     overflow: "hidden",
     position: "relative",
     borderWidth: bodyFrameDesign.borderWidth,
