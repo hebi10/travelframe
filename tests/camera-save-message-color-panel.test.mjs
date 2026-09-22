@@ -18,11 +18,11 @@ const styles = fs.readFileSync(
 const saveEffectStart = bodyCamera.indexOf(
   "session.lastSavedAt <= 0"
 );
-const saveEffectEnd = bodyCamera.indexOf(
-  "const handleSelectProject",
+const timeoutEffectStart = bodyCamera.indexOf(
+  "if (!saveMessage) {",
   saveEffectStart
 );
-const saveEffect = bodyCamera.slice(saveEffectStart, saveEffectEnd);
+const saveEffect = bodyCamera.slice(saveEffectStart, timeoutEffectStart);
 
 assert.ok(
   bodyCamera.includes('setSaveMessage(`${session.lastSavedSequence}번째 사진을 저장했습니다.`);'),
