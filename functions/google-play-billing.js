@@ -29,6 +29,11 @@ const PRODUCT_META = {
     productName: "Pro",
     priceLabel: "Google Play 월 구독"
   },
+  plus_monthly: {
+    kind: "subs",
+    productName: "Plus",
+    priceLabel: "Google Play 월 구독"
+  },
   expert_monthly: {
     kind: "subs",
     productName: "Expert",
@@ -226,7 +231,12 @@ const createGooglePlayBillingService = ({
       acknowledgementState = "ACKNOWLEDGEMENT_STATE_ACKNOWLEDGED";
     }
 
-    const productIds = ["ad_remove", "creator_monthly", "expert_monthly"];
+    const productIds = [
+      "ad_remove",
+      "creator_monthly",
+      "plus_monthly",
+      "expert_monthly"
+    ];
     const productRefs = Object.fromEntries(
       productIds.map((id) => [
         id,

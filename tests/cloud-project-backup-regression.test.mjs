@@ -54,7 +54,15 @@ function harness() {
     "@/lib/cloud-backup-limits": { getCloudBackupStorageLimitBytes: () => 1e9, getCloudBackupVideoLimit: () => 100, canBackupMoreVideos: () => true },
     "@/lib/image-backup-utils": { calculateCombinedImageBackupSize: (a,b) => a+b.reduce((x,y)=>x+y,0), isImageBackupSizeExceeded: () => false, optimizeImageForBackup: async input => ({ ...input, uri: input.uri, size: 100, quality: .8, imageQuality: "normal", originalSize: 100 }) },
     "@/lib/local-storage": { localStorageAdapter: { getItem: async () => "device-a", setItem: async () => {} } },
-    "@/lib/plan-entitlements": { getPlanTier: () => "pro" },
+    "@/lib/plan-entitlements": {
+      getPlanTier: () => "pro",
+      getPlanEntitlements: () => ({
+        maxCloudBackupProjects: 1
+      })
+    },
+    "@/lib/cloud-backup-project-slots": {
+      getSelectedCloudBackupProjectIds: async () => new Set([project.id])
+    },
     "@/lib/photo-library": { getPhotos: async () => localPhotos, getDeletedPhotoIds: async () => new Set(), wasPhotoDeletedLocally: async () => false, replacePhotosFromBackup: async values => { localPhotos = values; } },
     "@/lib/body-project-library": { getBodyProjects: async () => localProjects, getBodyProjectById: async id => localProjects.find(p=>p.id===id), mergeBodyProjectsFromBackup: async values => { localProjects = [...localProjects, ...values.filter(p=>!localProjects.some(x=>x.id===p.id))]; }, replaceBodyProjects: async values => { localProjects = values; } },
     "@/lib/subscription": { isCreatorSubscriptionActive: () => true },

@@ -1,6 +1,12 @@
 import type { UserSubscription } from "@/lib/subscription";
 
-export type PlanTier = "guest" | "free" | "ad_remove" | "pro" | "expert";
+export type PlanTier =
+  | "guest"
+  | "free"
+  | "ad_remove"
+  | "pro"
+  | "plus"
+  | "expert";
 
 export type PlanEntitlements = {
   tier: PlanTier;
@@ -11,21 +17,53 @@ export type PlanEntitlements = {
   showWatermark: boolean;
   canUseAdvancedOutput: boolean;
   canBackupToCloud: boolean;
-  localImageLimit: number;
+  localImageLimit?: number;
   localVideoLimit: number;
   musicTrackLimit: number;
   backupStorageBytes: number;
   maxProgressPhotos: number | null;
   maxProgressVideoSeconds: number | null;
   maxProjectCount: number | null;
+  maxCloudBackupProjects: number;
+  maxCloudPhotosPerProject: number;
 };
 
 export const GIB = 1024 * 1024 * 1024;
 
 const FREE_PROGRESS_PHOTO_LIMIT = 100;
 const FREE_PROGRESS_VIDEO_SECONDS = 10;
-const PRO_PROGRESS_PHOTO_MINIMUM = 365;
-const PRO_PROGRESS_VIDEO_SECONDS_MINIMUM = 36.5;
+const PAID_PROGRESS_VIDEO_SECONDS = 36.5;
+export const CLOUD_BACKUP_PHOTOS_PER_PROJECT = 365;
+
+const paidPlan = ({
+  tier,
+  label,
+  maxCloudBackupProjects,
+  backupStorageBytes
+}: {
+  tier: "pro" | "plus" | "expert";
+  label: string;
+  maxCloudBackupProjects: number;
+  backupStorageBytes: number;
+}): PlanEntitlements => ({
+  tier,
+  label,
+  canExportVideo: true,
+  weeklyVideoExportLimit: 15,
+  showAds: false,
+  showWatermark: false,
+  canUseAdvancedOutput: true,
+  canBackupToCloud: true,
+  localImageLimit: undefined,
+  localVideoLimit: 50,
+  musicTrackLimit: 10,
+  backupStorageBytes,
+  maxProgressPhotos: null,
+  maxProgressVideoSeconds: PAID_PROGRESS_VIDEO_SECONDS,
+  maxProjectCount: null,
+  maxCloudBackupProjects,
+  maxCloudPhotosPerProject: CLOUD_BACKUP_PHOTOS_PER_PROJECT
+});
 
 export const PLAN_ENTITLEMENTS: Record<PlanTier, PlanEntitlements> = {
   guest: {
@@ -43,7 +81,9 @@ export const PLAN_ENTITLEMENTS: Record<PlanTier, PlanEntitlements> = {
     backupStorageBytes: 0,
     maxProgressPhotos: FREE_PROGRESS_PHOTO_LIMIT,
     maxProgressVideoSeconds: FREE_PROGRESS_VIDEO_SECONDS,
-    maxProjectCount: null
+    maxProjectCount: 1,
+    maxCloudBackupProjects: 0,
+    maxCloudPhotosPerProject: 0
   },
   free: {
     tier: "free",
@@ -60,7 +100,9 @@ export const PLAN_ENTITLEMENTS: Record<PlanTier, PlanEntitlements> = {
     backupStorageBytes: 0,
     maxProgressPhotos: FREE_PROGRESS_PHOTO_LIMIT,
     maxProgressVideoSeconds: FREE_PROGRESS_VIDEO_SECONDS,
-    maxProjectCount: null
+    maxProjectCount: 1,
+    maxCloudBackupProjects: 0,
+    maxCloudPhotosPerProject: 0
   },
   ad_remove: {
     tier: "ad_remove",
@@ -77,42 +119,28 @@ export const PLAN_ENTITLEMENTS: Record<PlanTier, PlanEntitlements> = {
     backupStorageBytes: 0,
     maxProgressPhotos: FREE_PROGRESS_PHOTO_LIMIT,
     maxProgressVideoSeconds: FREE_PROGRESS_VIDEO_SECONDS,
-    maxProjectCount: null
+    maxProjectCount: 1,
+    maxCloudBackupProjects: 0,
+    maxCloudPhotosPerProject: 0
   },
-  pro: {
+  pro: paidPlan({
     tier: "pro",
     label: "Pro",
-    canExportVideo: true,
-    weeklyVideoExportLimit: 15,
-    showAds: false,
-    showWatermark: false,
-    canUseAdvancedOutput: true,
-    canBackupToCloud: true,
-    localImageLimit: 200,
-    localVideoLimit: 50,
-    musicTrackLimit: 10,
-    backupStorageBytes: 2 * GIB,
-    maxProgressPhotos: PRO_PROGRESS_PHOTO_MINIMUM,
-    maxProgressVideoSeconds: PRO_PROGRESS_VIDEO_SECONDS_MINIMUM,
-    maxProjectCount: null
-  },
-  expert: {
+    maxCloudBackupProjects: 1,
+    backupStorageBytes: 2 * GIB
+  }),
+  plus: paidPlan({
+    tier: "plus",
+    label: "Plus",
+    maxCloudBackupProjects: 3,
+    backupStorageBytes: 6 * GIB
+  }),
+  expert: paidPlan({
     tier: "expert",
-    label: "전문가",
-    canExportVideo: true,
-    weeklyVideoExportLimit: 30,
-    showAds: false,
-    showWatermark: false,
-    canUseAdvancedOutput: true,
-    canBackupToCloud: true,
-    localImageLimit: 300,
-    localVideoLimit: 100,
-    musicTrackLimit: 20,
-    backupStorageBytes: 5 * GIB,
-    maxProgressPhotos: null,
-    maxProgressVideoSeconds: null,
-    maxProjectCount: null
-  }
+    label: "Expert",
+    maxCloudBackupProjects: 5,
+    backupStorageBytes: 10 * GIB
+  })
 };
 
 const isActivePremiumProduct = (
@@ -123,6 +151,7 @@ const isActivePremiumProduct = (
   const normalizedProductId =
     rawProductId === "ad_remove" ||
     rawProductId === "creator_monthly" ||
+    rawProductId === "plus_monthly" ||
     rawProductId === "expert_monthly"
       ? rawProductId
       : rawProductId === "premium" ||
@@ -159,6 +188,10 @@ export const getPlanTier = ({
 
   if (isActivePremiumProduct(subscription, "expert_monthly")) {
     return "expert";
+  }
+
+  if (isActivePremiumProduct(subscription, "plus_monthly")) {
+    return "plus";
   }
 
   if (isActivePremiumProduct(subscription, "creator_monthly")) {

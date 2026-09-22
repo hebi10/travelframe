@@ -65,7 +65,12 @@ if (!serverBilling.includes('const GOOGLE_PLAY_TOPIC = "body-frame-play-billing"
 if (serverBilling.includes('const GOOGLE_PLAY_TOPIC = "google-play-billing"')) {
   fail("Google Play RTDN Pub/Sub topic must not start with reserved goog prefix");
 }
-for (const productId of ["ad_remove", "creator_monthly", "expert_monthly"]) {
+for (const productId of [
+  "ad_remove",
+  "creator_monthly",
+  "plus_monthly",
+  "expert_monthly"
+]) {
   if (!billing.includes(productId)) {
     fail(`Google Play product mapping missing: ${productId}`);
   }
@@ -190,6 +195,8 @@ for (const token of [
   "Google Play",
   "1회성 구매",
   "월 단위 정기 결제",
+  "Pro / Plus / Expert",
+  "최대 365장",
   "자동으로 갱신",
   "정기 결제 관리 화면",
   "앱을 삭제하는 것만으로는 정기 결제가 취소되지 않습니다",

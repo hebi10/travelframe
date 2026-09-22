@@ -36,6 +36,7 @@ const adProducts = getSubscriptionProductsFromSubscription({
 });
 assert.equal(adProducts.adRemove?.productId, "ad_remove");
 assert.equal(adProducts.creatorMonthly, null);
+assert.equal(adProducts.plusMonthly, null);
 assert.equal(adProducts.expertMonthly, null);
 
 const creatorProducts = getSubscriptionProductsFromSubscription({
@@ -46,6 +47,7 @@ const creatorProducts = getSubscriptionProductsFromSubscription({
 });
 assert.equal(creatorProducts.adRemove, null);
 assert.equal(creatorProducts.creatorMonthly?.productId, "creator_monthly");
+assert.equal(creatorProducts.plusMonthly, null);
 assert.equal(creatorProducts.expertMonthly, null);
 
 const legacyCreatorProducts = getSubscriptionProductsFromSubscription({
@@ -70,6 +72,17 @@ assert.equal(missingProductCreatorProducts.adRemove, null);
 assert.equal(missingProductCreatorProducts.creatorMonthly?.productName, "Pro");
 assert.equal(missingProductCreatorProducts.expertMonthly, null);
 
+const plusProducts = getSubscriptionProductsFromSubscription({
+  ...baseSubscription,
+  productId: "plus_monthly",
+  expiresAt: "2999-01-01T00:00:00.000Z",
+  priceLabel: "3,990원",
+  productName: "Plus"
+});
+assert.equal(plusProducts.creatorMonthly, null);
+assert.equal(plusProducts.plusMonthly?.productId, "plus_monthly");
+assert.equal(plusProducts.expertMonthly, null);
+
 const expertProducts = getSubscriptionProductsFromSubscription({
   ...baseSubscription,
   productId: "expert_monthly",
@@ -79,6 +92,7 @@ const expertProducts = getSubscriptionProductsFromSubscription({
 });
 assert.equal(expertProducts.adRemove, null);
 assert.equal(expertProducts.creatorMonthly, null);
+assert.equal(expertProducts.plusMonthly, null);
 assert.equal(expertProducts.expertMonthly?.productId, "expert_monthly");
 
 const expiredCreatorProducts = getSubscriptionProductsFromSubscription({
@@ -89,6 +103,7 @@ const expiredCreatorProducts = getSubscriptionProductsFromSubscription({
 });
 assert.equal(expiredCreatorProducts.adRemove, null);
 assert.equal(expiredCreatorProducts.creatorMonthly, null);
+assert.equal(expiredCreatorProducts.plusMonthly, null);
 assert.equal(expiredCreatorProducts.expertMonthly, null);
 
 assert.ok(

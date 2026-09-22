@@ -137,6 +137,7 @@ for (const token of [
   "com.haebi.photoguide",
   "ad_remove",
   "creator_monthly",
+  "plus_monthly",
   "expert_monthly",
   "app-icon.png",
   "adaptive-icon.png",

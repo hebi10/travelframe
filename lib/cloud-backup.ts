@@ -29,6 +29,9 @@ import {
   getCloudBackupVideoLimit,
   type CloudBackupLimitTier
 } from "@/lib/cloud-backup-limits";
+import {
+  getSelectedCloudBackupProjectIds
+} from "@/lib/cloud-backup-project-slots";
 import { firebaseAuth, firebaseFunctions, firestore, firebaseStorage } from "@/lib/firebase";
 import { getBodyProjects, mergeBodyProjectsFromBackup } from "@/lib/body-project-library";
 import { isPhotoBackupCurrent, recoverMissingBodyProjects } from "@/lib/body-project-backup";
@@ -40,7 +43,7 @@ import {
   type OptimizedBackupImage
 } from "@/lib/image-backup-utils";
 import { localStorageAdapter } from "@/lib/local-storage";
-import { getPlanTier } from "@/lib/plan-entitlements";
+import { getPlanEntitlements, getPlanTier } from "@/lib/plan-entitlements";
 import {
   getDeletedPhotoIds,
   getPhotos,
@@ -276,6 +279,9 @@ const reserveBackupUpload = (data: {
   fileSize: number;
   contentType: string;
   storagePath: string;
+  itemType?: "photo" | "imageWork" | "video";
+  projectId?: string;
+  itemId?: string;
 }) =>
   callBackupFunction<typeof data, ReserveBackupUploadResponse>(
     "reserveBackupUpload",
@@ -381,11 +387,17 @@ const backupBodyProjects = async (userId: string, projectId?: string) => {
 const uploadLocalFile = async ({
   uri,
   storagePath,
-  mediaKind
+  mediaKind,
+  itemType,
+  projectId,
+  itemId
 }: {
   uri: string;
   storagePath: string;
   mediaKind: BackupMediaKind;
+  itemType?: "photo" | "imageWork" | "video";
+  projectId?: string;
+  itemId?: string;
 }): Promise<UploadedBackupFile> => {
   if (!firebaseStorage) {
     throw new Error("클라우드 백업을 지금 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.");
@@ -407,7 +419,10 @@ const uploadLocalFile = async ({
     mediaKind,
     fileSize: blob.size,
     contentType,
-    storagePath
+    storagePath,
+    itemType,
+    projectId,
+    itemId
   });
   const uploadStoragePath = reservation.storagePath;
   const fileRef = ref(firebaseStorage, uploadStoragePath);
@@ -800,23 +815,50 @@ export const backupCurrentWorkspace = async ({
   const backupLimitTier = getBackupLimitTier(subscription);
   emitBackupProgress(onProgress, 3, "백업할 데이터를 준비하고 있습니다.");
 
-  const [settings, photos, imageBundles, videos] = await Promise.all([
-    getAppSettings(),
-    getPhotos(),
-    getImageBundleWorks(),
-    getMadeVideos()
-  ]);
+  const [settings, photos, imageBundles, videos, selectedProjectIds] =
+    await Promise.all([
+      getAppSettings(),
+      getPhotos(),
+      getImageBundleWorks(),
+      getMadeVideos(),
+      getSelectedCloudBackupProjectIds(
+        user,
+        getPlanEntitlements({
+          isLoggedIn: Boolean(user),
+          subscription
+        }).maxCloudBackupProjects
+      )
+    ]);
+  if (
+    isCloudBackupTargetEnabled(settings, "photos") &&
+    selectedProjectIds.size === 0 &&
+    photos.some((photo) => Boolean(photo.projectId))
+  ) {
+    throw new Error(
+      "클라우드에 백업할 프로젝트를 먼저 선택해 주세요. 계정 화면에서 백업 프로젝트를 선택할 수 있습니다."
+    );
+  }
+
   const selectedPhotoBackups = isCloudBackupTargetEnabled(settings, "photos")
-    ? photos
+    ? photos.filter(
+        (photo) =>
+          Boolean(photo.projectId) &&
+          selectedProjectIds.has(photo.projectId as string)
+      )
     : [];
   const selectedImageBundleBackups = isCloudBackupTargetEnabled(settings, "imageBundles")
     ? imageBundles
     : [];
   const selectedVideoBackups = isCloudBackupTargetEnabled(settings, "videos")
-    ? videos
+    ? videos.filter(
+        (video) =>
+          !video.projectId || selectedProjectIds.has(video.projectId)
+      )
     : [];
   if (isCloudBackupTargetEnabled(settings, "photos")) {
-    await backupBodyProjects(user.uid);
+    for (const projectId of selectedProjectIds) {
+      await backupBodyProjects(user.uid, projectId);
+    }
   }
   const existingPhotoSnapshot = await getDocs(collection(firestore, "users", user.uid, "photoBackups"));
   const existingPhotoBackups = new Map(
@@ -976,7 +1018,10 @@ export const backupCurrentWorkspace = async ({
     const photoUpload = await uploadLocalFile({
       uri: optimized.uri,
       storagePath: photoPath,
-      mediaKind: "image"
+      mediaKind: "image",
+      itemType: "photo",
+      projectId: photo.projectId,
+      itemId: photo.id
     });
     const photoDownloadUrl = photoUpload.downloadURL;
 
@@ -1070,7 +1115,9 @@ export const backupCurrentWorkspace = async ({
       const upload = await uploadLocalFile({
         uri: optimized.uri,
         storagePath,
-        mediaKind: "image"
+        mediaKind: "image",
+        itemType: "imageWork",
+        itemId: work.id
       });
       storagePaths.push(upload.storagePath);
       backupSessionIds.push(upload.backupSessionId);
@@ -1167,7 +1214,10 @@ export const backupCurrentWorkspace = async ({
     const upload = await uploadLocalFile({
       uri: video.uri,
       storagePath,
-      mediaKind: "video"
+      mediaKind: "video",
+      itemType: "video",
+      projectId: video.projectId,
+      itemId: video.id
     });
     const downloadUrl = upload.downloadURL;
 
@@ -1280,6 +1330,20 @@ export const backupPhoto = async ({
     throw new Error("Firebase 연결 정보가 아직 설정되지 않았습니다.");
   }
 
+  if (!photo.projectId) {
+    return null;
+  }
+  const selectedProjectIds = await getSelectedCloudBackupProjectIds(
+    user,
+    getPlanEntitlements({
+      isLoggedIn: Boolean(user),
+      subscription: subscription ?? null
+    }).maxCloudBackupProjects
+  );
+  if (!selectedProjectIds.has(photo.projectId)) {
+    return null;
+  }
+
   if (!(await isPhotoStillBackupEligible(photo.id))) {
     await removeBackupIfPhotoWasDeleted({ user, photo });
     return null;
@@ -1329,7 +1393,10 @@ export const backupPhoto = async ({
   const upload = await uploadLocalFile({
     uri: optimized.uri,
     storagePath,
-    mediaKind: "image"
+    mediaKind: "image",
+    itemType: "photo",
+    projectId: photo.projectId,
+    itemId: photo.id
   });
 
   if (!(await isPhotoStillBackupEligible(photo.id))) {
@@ -1433,8 +1500,21 @@ export const backupPhotoIfEnabled = async ({
       settings.storageMode,
       isCreatorSubscriptionActive(subscription)
     ) ||
-    !isCloudBackupTargetEnabled(settings, "photos")
+    !isCloudBackupTargetEnabled(settings, "photos") ||
+    !user ||
+    !photo.projectId
   ) {
+    return null;
+  }
+
+  const selectedProjectIds = await getSelectedCloudBackupProjectIds(
+    user,
+    getPlanEntitlements({
+      isLoggedIn: Boolean(user),
+      subscription
+    }).maxCloudBackupProjects
+  );
+  if (!selectedProjectIds.has(photo.projectId)) {
     return null;
   }
 

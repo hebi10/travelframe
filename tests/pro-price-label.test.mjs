@@ -13,42 +13,40 @@ const billingSource = fs.readFileSync("lib/google-play-billing.ts", "utf8");
 const adminSource = fs.readFileSync("admin/admin.js", "utf8");
 const functionsSource = fs.readFileSync("functions/index.js", "utf8");
 
-assert.match(
-  accountConstants,
-  /id:\s*"creator"[\s\S]*?title:\s*"Pro"[\s\S]*?price:\s*"Google Play 가격"/,
-  "Pro plan card fallback should defer to Google Play pricing"
-);
-assert.match(
-  accountConstants,
-  /id:\s*"expert"[\s\S]*?price:\s*"Google Play 가격"/,
-  "Expert plan card fallback should defer to Google Play pricing"
-);
+for (const [id, title, fallback] of [
+  ["creator", "Pro", "1,990원"],
+  ["plus", "Plus", "3,990원"],
+  ["expert", "Expert", "5,990원"]
+]) {
+  assert.match(
+    accountConstants,
+    new RegExp(`id:\\s*"${id}"[\\s\\S]*?title:\\s*"${title}"[\\s\\S]*?price:\\s*"${fallback}"`),
+    `${title} fallback price should match the configured Play price`
+  );
+}
+
 assert.ok(
   billingHookSource.includes("getGooglePlayStorePrice") &&
     billingHookSource.includes("getStorePrice") &&
     billingSource.includes("displayPrice"),
   "account pricing should prefer the store-provided Google Play display price"
 );
-assert.doesNotMatch(
-  accountConstants,
-  /id:\s*"creator"[\s\S]*?price:\s*"월 (?:990|2,900)원"/,
-  "client plan cards should not hard-code a monthly Pro price"
-);
 
 for (const [name, source] of [
   ["admin product metadata", adminSource],
   ["functions product metadata", functionsSource]
 ]) {
-  assert.match(
-    source,
-    /creator_monthly:\s*\{[\s\S]*?priceLabel:\s*"월 990원"/,
-    `${name} should retain the existing internal product metadata label`
-  );
-  assert.doesNotMatch(
-    source,
-    /creator_monthly:\s*\{[\s\S]*?priceLabel:\s*"월 2,900원"/,
-    `${name} should not restore the old monthly 2,900 won metadata`
-  );
+  for (const [productId, price] of [
+    ["creator_monthly", "월 1,990원"],
+    ["plus_monthly", "월 3,990원"],
+    ["expert_monthly", "월 5,990원"]
+  ]) {
+    assert.match(
+      source,
+      new RegExp(`${productId}:\\s*\\{[\\s\\S]*?priceLabel:\\s*"${price}"`),
+      `${name} should use the new ${productId} price`
+    );
+  }
 }
 
-console.log("ok - client plan pricing uses Google Play while internal metadata stays compatible");
+console.log("ok - project-slot plan pricing is consistent while Google Play remains authoritative");

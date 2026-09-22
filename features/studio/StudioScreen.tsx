@@ -28,7 +28,6 @@ import {
 } from "@/lib/cloud-backup";
 import {
   CLOUD_BACKUP_IMAGE_WORK_LIMIT,
-  CLOUD_BACKUP_PHOTO_LIMIT,
   getCloudBackupVideoLimit
 } from "@/lib/cloud-backup-limits";
 import { deletePhoto, getPhotos, saveCapturedPhoto } from "@/lib/photo-library";
@@ -366,7 +365,13 @@ export default function StudioScreen() {
     Boolean(user) && cloudBackupEnabled && isCreatorSubscriptionActive(subscription);
   const videoBackupLimit = getCloudBackupVideoLimit(planEntitlements.tier);
   const photoUsage = shouldShowBackupUsage
-    ? { label: "클라우드 백업", count: backupOverview.photoCount, limit: CLOUD_BACKUP_PHOTO_LIMIT }
+    ? {
+        label: "클라우드 백업",
+        count: backupOverview.photoCount,
+        limit:
+          planEntitlements.maxCloudBackupProjects *
+          planEntitlements.maxCloudPhotosPerProject
+      }
     : { label: "이미지 보관함", count: photoLibraryItems.length, limit: planEntitlements.localImageLimit };
   const imageBundleUsage = shouldShowBackupUsage
     ? {

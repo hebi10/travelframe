@@ -121,22 +121,37 @@ exports.handleGooglePlayBillingNotification = onMessagePublished(
 );
 
 const getBackupSubscription = async (uid) => {
-  const [currentSnapshot, creatorSnapshot, expertSnapshot] = await Promise.all([
+  const [currentSnapshot, creatorSnapshot, plusSnapshot, expertSnapshot] = await Promise.all([
     db.doc(`users/${uid}/subscriptions/current`).get(),
     db.doc(`users/${uid}/subscriptions/creator_monthly`).get(),
+    db.doc(`users/${uid}/subscriptions/plus_monthly`).get(),
     db.doc(`users/${uid}/subscriptions/expert_monthly`).get()
   ]);
 
   const current = currentSnapshot.exists ? currentSnapshot.data() : null;
   const creator = creatorSnapshot.exists ? creatorSnapshot.data() : null;
+  const plus = plusSnapshot.exists ? plusSnapshot.data() : null;
   const expert = expertSnapshot.exists ? expertSnapshot.data() : null;
   const activeExpert = isPremiumSubscriptionActive(expert, ["expert_monthly"]) ? expert : null;
+  const activePlus = isPremiumSubscriptionActive(plus, ["plus_monthly"]) ? plus : null;
   const activeCreator = isPremiumSubscriptionActive(creator, ["creator_monthly"]) ? creator : null;
-  const activeCurrent = isPremiumSubscriptionActive(current, ["creator_monthly", "expert_monthly"])
+  const activeCurrent = isPremiumSubscriptionActive(
+    current,
+    ["creator_monthly", "plus_monthly", "expert_monthly"]
+  )
     ? current
     : null;
 
-  return activeExpert ?? activeCreator ?? activeCurrent ?? expert ?? creator ?? current;
+  return (
+    activeExpert ??
+    activePlus ??
+    activeCreator ??
+    activeCurrent ??
+    expert ??
+    plus ??
+    creator ??
+    current
+  );
 };
 
 const getUsageRef = (uid) => db.doc(`users/${uid}/backupUsage/current`);
@@ -190,8 +205,8 @@ const MAX_PENDING_MUSIC_UPLOAD_SESSIONS = 3;
 const MAX_PENDING_MUSIC_UPLOAD_BYTES = 150 * 1024 * 1024;
 const MUSIC_UPLOAD_SESSION_TTL_MS = 15 * 60 * 1000;
 const FREE_WEEKLY_VIDEO_EXPORT_LIMIT = 1;
-const PRO_WEEKLY_VIDEO_EXPORT_LIMIT = 15;
-const EXPERT_WEEKLY_VIDEO_EXPORT_LIMIT = 30;
+const PAID_WEEKLY_VIDEO_EXPORT_LIMIT = 15;
+const CLOUD_BACKUP_PHOTOS_PER_PROJECT = 365;
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -212,29 +227,349 @@ const isPremiumSubscriptionActive = (subscription, productIds, now = Date.now())
   return new Date(subscription.expiresAt).getTime() > now;
 };
 
-const getMusicTrackLimit = (subscription) => {
-  if (isPremiumSubscriptionActive(subscription, ["expert_monthly"])) {
-    return 20;
-  }
+const getMusicTrackLimit = (subscription) =>
+  isPremiumSubscriptionActive(
+    subscription,
+    ["creator_monthly", "plus_monthly", "expert_monthly"]
+  )
+    ? 10
+    : 0;
 
-  if (isPremiumSubscriptionActive(subscription, ["creator_monthly"])) {
-    return 10;
-  }
+const getWeeklyVideoExportLimit = (subscription) =>
+  isPremiumSubscriptionActive(
+    subscription,
+    ["creator_monthly", "plus_monthly", "expert_monthly"]
+  )
+    ? PAID_WEEKLY_VIDEO_EXPORT_LIMIT
+    : FREE_WEEKLY_VIDEO_EXPORT_LIMIT;
 
+const getCloudBackupProjectSlotLimit = (subscription) => {
+  if (isPremiumSubscriptionActive(subscription, ["expert_monthly"])) return 5;
+  if (isPremiumSubscriptionActive(subscription, ["plus_monthly"])) return 3;
+  if (isPremiumSubscriptionActive(subscription, ["creator_monthly"])) return 1;
   return 0;
 };
 
-const getWeeklyVideoExportLimit = (subscription) => {
-  if (isPremiumSubscriptionActive(subscription, ["expert_monthly"])) {
-    return EXPERT_WEEKLY_VIDEO_EXPORT_LIMIT;
+const normalizeBackupProjectId = (value) => {
+  if (typeof value !== "string") return null;
+  const projectId = value.trim();
+  if (!projectId || projectId.length > 160 || projectId.includes("/")) {
+    return null;
   }
-
-  if (isPremiumSubscriptionActive(subscription, ["creator_monthly"])) {
-    return PRO_WEEKLY_VIDEO_EXPORT_LIMIT;
-  }
-
-  return FREE_WEEKLY_VIDEO_EXPORT_LIMIT;
+  return projectId;
 };
+
+const getBackupProjectSlotNumber = (slotId) => {
+  const match = /^slot-(\d+)$/.exec(String(slotId ?? ""));
+  return match ? Number(match[1]) : 0;
+};
+
+const getBackupProjectSlotByProject = async (uid, projectId) => {
+  const snapshot = await db
+    .collection(`users/${uid}/backupProjectSlots`)
+    .where("projectId", "==", projectId)
+    .limit(1)
+    .get();
+  return snapshot.empty ? null : snapshot.docs[0];
+};
+
+const assertBackupProjectSlotAllowed = async ({
+  uid,
+  subscription,
+  projectId
+}) => {
+  const normalizedProjectId = normalizeBackupProjectId(projectId);
+  if (!normalizedProjectId) {
+    throw new HttpsError(
+      "failed-precondition",
+      "클라우드 백업 프로젝트를 먼저 선택해 주세요."
+    );
+  }
+
+  const slotLimit = getCloudBackupProjectSlotLimit(subscription);
+  if (slotLimit <= 0) {
+    throw new HttpsError(
+      "failed-precondition",
+      "현재 플랜에서는 클라우드 프로젝트 백업을 사용할 수 없습니다."
+    );
+  }
+
+  const slotSnapshot = await getBackupProjectSlotByProject(
+    uid,
+    normalizedProjectId
+  );
+  if (!slotSnapshot) {
+    throw new HttpsError(
+      "failed-precondition",
+      "선택한 클라우드 백업 프로젝트만 업로드할 수 있습니다."
+    );
+  }
+
+  const slotNumber =
+    Number(slotSnapshot.data()?.slotNumber) ||
+    getBackupProjectSlotNumber(slotSnapshot.id);
+  if (slotNumber < 1 || slotNumber > slotLimit) {
+    throw new HttpsError(
+      "failed-precondition",
+      "현재 플랜의 클라우드 프로젝트 슬롯 한도를 초과했습니다."
+    );
+  }
+
+  return {
+    slotId: slotSnapshot.id,
+    slotNumber,
+    projectId: normalizedProjectId
+  };
+};
+
+const assertProjectPhotoBackupCapacity = async ({
+  uid,
+  projectId,
+  itemId
+}) => {
+  const [photoSnapshot, sessionSnapshot, existingItemSnapshot] =
+    await Promise.all([
+      db
+        .collection(`users/${uid}/photoBackups`)
+        .where("projectId", "==", projectId)
+        .get(),
+      db
+        .collection(`users/${uid}/backupUploadSessions`)
+        .where("projectId", "==", projectId)
+        .get(),
+      typeof itemId === "string" && itemId
+        ? db.doc(`users/${uid}/photoBackups/${itemId}`).get()
+        : Promise.resolve(null)
+    ]);
+
+  if (existingItemSnapshot?.exists) {
+    return;
+  }
+
+  const pendingPhotoCount = sessionSnapshot.docs.filter((item) => {
+    const data = item.data();
+    return (
+      data.status === "reserved" &&
+      data.itemType === "photo" &&
+      data.itemId !== itemId
+    );
+  }).length;
+
+  if (
+    photoSnapshot.size + pendingPhotoCount >=
+    CLOUD_BACKUP_PHOTOS_PER_PROJECT
+  ) {
+    throw new HttpsError(
+      "resource-exhausted",
+      `프로젝트당 클라우드 사진은 최대 ${CLOUD_BACKUP_PHOTOS_PER_PROJECT}장까지 백업할 수 있습니다.`
+    );
+  }
+};
+
+const serializeBackupProjectSlot = (snapshot) => {
+  const data = snapshot.data();
+  return {
+    id: snapshot.id,
+    slotNumber:
+      Number(data.slotNumber) || getBackupProjectSlotNumber(snapshot.id),
+    projectId: data.projectId,
+    status: data.status === "over_limit" ? "over_limit" : "active",
+    selectedAt: data.selectedAt ?? null,
+    updatedAt: data.updatedAt ?? null
+  };
+};
+
+exports.selectCloudBackupProject = secureOnCall(async (request) => {
+  try {
+    const uid = requireUid(request);
+    const projectId = normalizeBackupProjectId(request.data?.projectId);
+    if (!projectId) {
+      throw new HttpsError("invalid-argument", "projectId is required.");
+    }
+
+    const subscription = await getBackupSubscription(uid);
+    const slotLimit = getCloudBackupProjectSlotLimit(subscription);
+    if (slotLimit <= 0) {
+      throw new HttpsError(
+        "failed-precondition",
+        "클라우드 백업을 지원하는 구독이 필요합니다."
+      );
+    }
+
+    const slotsRef = db.collection(`users/${uid}/backupProjectSlots`);
+    const existingProjectSlot = await getBackupProjectSlotByProject(
+      uid,
+      projectId
+    );
+    if (existingProjectSlot) {
+      return { slot: serializeBackupProjectSlot(existingProjectSlot) };
+    }
+
+    const slots = await slotsRef.get();
+    const occupied = new Set(
+      slots.docs.map((item) => Number(item.data()?.slotNumber) || getBackupProjectSlotNumber(item.id))
+    );
+    const slotNumber = Array.from(
+      { length: slotLimit },
+      (_, index) => index + 1
+    ).find((number) => !occupied.has(number));
+
+    if (!slotNumber) {
+      throw new HttpsError(
+        "resource-exhausted",
+        `현재 플랜에서는 클라우드 백업 프로젝트를 최대 ${slotLimit}개 선택할 수 있습니다.`
+      );
+    }
+
+    const slotRef = slotsRef.doc(`slot-${slotNumber}`);
+    const nowIso = new Date().toISOString();
+    await slotRef.set({
+      userId: uid,
+      slotNumber,
+      projectId,
+      status: "active",
+      selectedAt: nowIso,
+      updatedAt: nowIso
+    });
+
+    return { slot: serializeBackupProjectSlot(await slotRef.get()) };
+  } catch (error) {
+    throw toHttpsError(error);
+  }
+});
+
+const deleteBackupProjectCloudData = async ({ uid, projectId }) => {
+  const userRef = db.doc(`users/${uid}`);
+  const [photoSnapshot, videoSnapshot] = await Promise.all([
+    userRef
+      .collection("photoBackups")
+      .where("projectId", "==", projectId)
+      .get(),
+    userRef
+      .collection("videos")
+      .where("projectId", "==", projectId)
+      .get()
+  ]);
+
+  const backupDocs = [...photoSnapshot.docs, ...videoSnapshot.docs];
+  const storagePaths = backupDocs.flatMap((item) => {
+    const data = item.data();
+    return [
+      data.storagePath,
+      data.previewStoragePath,
+      ...(Array.isArray(data.storagePaths) ? data.storagePaths : [])
+    ].filter(Boolean);
+  });
+  await Promise.all(
+    [...new Set(storagePaths)].map((storagePath) =>
+      deleteOwnedCloudBackupStoragePath(uid, storagePath)
+    )
+  );
+
+  const sessionIds = new Set(
+    backupDocs.flatMap((item) => {
+      const data = item.data();
+      return [
+        data.backupSessionId,
+        ...(Array.isArray(data.backupSessionIds)
+          ? data.backupSessionIds
+          : [])
+      ].filter(Boolean);
+    })
+  );
+  const refs = [
+    ...backupDocs.map((item) => item.ref),
+    ...[...sessionIds].map((sessionId) =>
+      userRef.collection("backupUploadSessions").doc(sessionId)
+    ),
+    userRef.collection("bodyProjects").doc(projectId)
+  ];
+  await commitDeleteBatch(refs);
+  await refreshAdminBackupOverview(uid);
+
+  return {
+    deletedPhotoCount: photoSnapshot.size,
+    deletedVideoCount: videoSnapshot.size
+  };
+};
+
+exports.replaceCloudBackupProject = secureOnCall(async (request) => {
+  try {
+    const uid = requireUid(request);
+    const slotId = String(request.data?.slotId ?? "");
+    const projectId = normalizeBackupProjectId(request.data?.projectId);
+    const slotNumber = getBackupProjectSlotNumber(slotId);
+    if (!projectId || slotNumber <= 0) {
+      throw new HttpsError(
+        "invalid-argument",
+        "slotId and projectId are required."
+      );
+    }
+
+    const subscription = await getBackupSubscription(uid);
+    const slotLimit = getCloudBackupProjectSlotLimit(subscription);
+    if (slotNumber > slotLimit || slotLimit <= 0) {
+      throw new HttpsError(
+        "failed-precondition",
+        "현재 플랜에서 사용할 수 없는 클라우드 백업 슬롯입니다."
+      );
+    }
+
+    const slotsRef = db.collection(`users/${uid}/backupProjectSlots`);
+    const slotRef = slotsRef.doc(slotId);
+    const [slotSnapshot, duplicateSnapshot] = await Promise.all([
+      slotRef.get(),
+      getBackupProjectSlotByProject(uid, projectId)
+    ]);
+    if (!slotSnapshot.exists) {
+      throw new HttpsError("not-found", "백업 프로젝트 슬롯을 찾을 수 없습니다.");
+    }
+    if (duplicateSnapshot && duplicateSnapshot.id !== slotId) {
+      throw new HttpsError(
+        "already-exists",
+        "이미 다른 클라우드 백업 슬롯에서 선택한 프로젝트입니다."
+      );
+    }
+
+    const previousProjectId = normalizeBackupProjectId(
+      slotSnapshot.data()?.projectId
+    );
+    if (previousProjectId === projectId) {
+      return {
+        slot: serializeBackupProjectSlot(slotSnapshot),
+        deletedPhotoCount: 0,
+        deletedVideoCount: 0
+      };
+    }
+
+    const deleted = previousProjectId
+      ? await deleteBackupProjectCloudData({
+          uid,
+          projectId: previousProjectId
+        })
+      : { deletedPhotoCount: 0, deletedVideoCount: 0 };
+    const nowIso = new Date().toISOString();
+    await slotRef.set(
+      {
+        userId: uid,
+        slotNumber,
+        projectId,
+        status: "active",
+        selectedAt: nowIso,
+        updatedAt: nowIso,
+        previousProjectId: previousProjectId ?? null
+      },
+      { merge: false }
+    );
+
+    return {
+      slot: serializeBackupProjectSlot(await slotRef.get()),
+      ...deleted
+    };
+  } catch (error) {
+    throw toHttpsError(error);
+  }
+});
 
 const getKstWeekStart = (date = new Date()) => {
   const kstDate = new Date(date.getTime() + KST_OFFSET_MS);
@@ -287,15 +622,19 @@ const buildWeeklyVideoExportResponse = ({ weekId, weekLabel, count, limit, reser
 const ADMIN_PRODUCT_META = {
   ad_remove: {
     productName: "광고 제거",
-    priceLabel: "1,990원"
+    priceLabel: "2,000원"
   },
   creator_monthly: {
-    productName: "영상 내보내기",
-    priceLabel: "월 990원"
+    productName: "Pro",
+    priceLabel: "월 1,990원"
+  },
+  plus_monthly: {
+    productName: "Plus",
+    priceLabel: "월 3,990원"
   },
   expert_monthly: {
-    productName: "전문가",
-    priceLabel: "월 9,900원"
+    productName: "Expert",
+    priceLabel: "월 5,990원"
   }
 };
 const ADMIN_PRODUCT_IDS = Object.keys(ADMIN_PRODUCT_META);
@@ -316,17 +655,32 @@ const createAdminFreeSubscription = (adminUid) => ({
 });
 
 const getEffectiveAdminSubscription = (subscriptions) => {
-  const activeExpert = isPremiumSubscriptionActive(subscriptions.expert_monthly, ["expert_monthly"])
+  const activeExpert = isPremiumSubscriptionActive(
+    subscriptions.expert_monthly,
+    ["expert_monthly"]
+  )
     ? subscriptions.expert_monthly
     : null;
-  const activeCreator = isPremiumSubscriptionActive(subscriptions.creator_monthly, ["creator_monthly"])
+  const activePlus = isPremiumSubscriptionActive(
+    subscriptions.plus_monthly,
+    ["plus_monthly"]
+  )
+    ? subscriptions.plus_monthly
+    : null;
+  const activeCreator = isPremiumSubscriptionActive(
+    subscriptions.creator_monthly,
+    ["creator_monthly"]
+  )
     ? subscriptions.creator_monthly
     : null;
-  const activeAdRemove = isPremiumSubscriptionActive(subscriptions.ad_remove, ["ad_remove"])
+  const activeAdRemove = isPremiumSubscriptionActive(
+    subscriptions.ad_remove,
+    ["ad_remove"]
+  )
     ? subscriptions.ad_remove
     : null;
 
-  return activeExpert ?? activeCreator ?? activeAdRemove;
+  return activeExpert ?? activePlus ?? activeCreator ?? activeAdRemove;
 };
 
 const assertMusicUploadAllowed = ({ uid, trackId, name, fileSize, contentType, storagePath }) => {
@@ -766,8 +1120,37 @@ const cleanupExpiredBackupUploadSessions = async (uid, limit = 25) => {
 exports.reserveBackupUpload = secureOnCall(async (request) => {
   try {
     const uid = requireUid(request);
-    const { mediaKind, fileSize, contentType, storagePath } = request.data ?? {};
+    const {
+      mediaKind,
+      fileSize,
+      contentType,
+      storagePath,
+      projectId: rawProjectId,
+      itemType,
+      itemId
+    } = request.data ?? {};
     const subscription = await getBackupSubscription(uid);
+    const projectId = normalizeBackupProjectId(rawProjectId);
+
+    if (itemType === "photo") {
+      await assertBackupProjectSlotAllowed({
+        uid,
+        subscription,
+        projectId
+      });
+      await assertProjectPhotoBackupCapacity({
+        uid,
+        projectId,
+        itemId
+      });
+    } else if (itemType === "video" && projectId) {
+      await assertBackupProjectSlotAllowed({
+        uid,
+        subscription,
+        projectId
+      });
+    }
+
     await cleanupExpiredBackupUploadSessions(uid);
     const usageRef = getUsageRef(uid);
     const sessionRef = db.collection(`users/${uid}/backupUploadSessions`).doc();
@@ -797,6 +1180,9 @@ exports.reserveBackupUpload = secureOnCall(async (request) => {
       transaction.set(sessionRef, {
         userId: uid,
         mediaKind,
+        itemType: typeof itemType === "string" ? itemType : null,
+        itemId: typeof itemId === "string" ? itemId : null,
+        projectId,
         fileSize,
         contentType,
         storagePath: reservedStoragePath,
@@ -1502,7 +1888,7 @@ exports.setAdminProductSubscription = secureOnCall(async (request) => {
     }
 
     const safeExpiresAt =
-      (productId === "creator_monthly" || productId === "expert_monthly") &&
+      ["creator_monthly", "plus_monthly", "expert_monthly"].includes(productId) &&
       typeof expiresAt === "string" &&
       !Number.isNaN(new Date(expiresAt).getTime())
         ? expiresAt
@@ -2004,17 +2390,30 @@ exports.deleteCloudBackupData = secureOnCall(async (request) => {
   try {
     const uid = requireUid(request);
     const userRef = db.doc(`users/${uid}`);
-    const [photoSnapshot, imageWorkSnapshot, videoSnapshot, musicSnapshot, projectSnapshot, sessionSnapshot] = await Promise.all([
+    const [
+      photoSnapshot,
+      imageWorkSnapshot,
+      videoSnapshot,
+      musicSnapshot,
+      projectSnapshot,
+      sessionSnapshot,
+      projectSlotSnapshot
+    ] = await Promise.all([
       userRef.collection("photoBackups").get(),
       userRef.collection("imageWorks").get(),
       userRef.collection("videos").get(),
       userRef.collection("musicTracks").get(),
       userRef.collection("bodyProjects").get(),
-      userRef.collection("backupUploadSessions").get()
+      userRef.collection("backupUploadSessions").get(),
+      userRef.collection("backupProjectSlots").get()
     ]);
 
     let imageBackupBytes = 0;
-    const documentDeletes = [...projectSnapshot.docs, ...sessionSnapshot.docs].map((item) => item.ref);
+    const documentDeletes = [
+      ...projectSnapshot.docs,
+      ...sessionSnapshot.docs,
+      ...projectSlotSnapshot.docs
+    ].map((item) => item.ref);
     const storageDeletes = collectOwnedCloudBackupStoragePaths({
       uid,
       photoBackups: photoSnapshot.docs.map((item) => item.data()),

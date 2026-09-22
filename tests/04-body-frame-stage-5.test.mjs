@@ -137,11 +137,28 @@ assert.equal(
 assert.equal(limits.getBodyFrameUpgradePlan("guest"), "pro");
 assert.equal(limits.getBodyFrameUpgradePlan("free"), "pro");
 assert.equal(limits.getBodyFrameUpgradePlan("ad_remove"), "pro");
-assert.equal(limits.getBodyFrameUpgradePlan("pro"), "expert");
+assert.equal(limits.getBodyFrameUpgradePlan("pro"), "plus");
+assert.equal(limits.getBodyFrameUpgradePlan("plus"), "expert");
 assert.equal(limits.getBodyFrameUpgradePlan("expert"), null);
 assert.equal(limits.getBodyFrameUpgradeLabel("free"), "Pro");
-assert.equal(limits.getBodyFrameUpgradeLabel("pro"), "Expert");
+assert.equal(limits.getBodyFrameUpgradeLabel("pro"), "Plus");
+assert.equal(limits.getBodyFrameUpgradeLabel("plus"), "Expert");
 assert.equal(limits.getBodyFrameUpgradeLabel("expert"), null);
+
+assert.deepEqual(
+  limits.getBodyFrameProjectCreationLimitState({
+    activeProjectCount: 1,
+    maxProjectCount: 1
+  }),
+  { allowed: false, limit: 1, remaining: 0, reached: true }
+);
+assert.equal(
+  limits.getBodyFrameProjectCreationLimitState({
+    activeProjectCount: 999,
+    maxProjectCount: null
+  }).allowed,
+  true
+);
 
 const cameraSession = await importTsModule("lib/body-frame-camera-session.ts");
 

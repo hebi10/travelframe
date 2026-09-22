@@ -56,4 +56,4 @@ After source or artwork changes run:
 ## Compatibility
 - Android package remains `com.haebi.photoguide`
 - existing EAS project remains unchanged
-- billing product IDs remain `ad_remove`, `creator_monthly`, `expert_monthly`
+- billing product IDs are `ad_remove`, `creator_monthly`, `plus_monthly`, `expert_monthly`

@@ -51,6 +51,10 @@ assert.equal(
   "pro"
 );
 assert.equal(
+  getPlanTier({ isLoggedIn: true, subscription: activeSubscription("plus_monthly") }),
+  "plus"
+);
+assert.equal(
   getPlanTier({ isLoggedIn: true, subscription: activeSubscription("expert_monthly") }),
   "expert"
 );
@@ -60,7 +64,7 @@ assert.equal(PLAN_ENTITLEMENTS.guest.localImageLimit, 100);
 assert.equal(PLAN_ENTITLEMENTS.guest.localVideoLimit, 30);
 assert.equal(PLAN_ENTITLEMENTS.guest.maxProgressPhotos, 100);
 assert.equal(PLAN_ENTITLEMENTS.guest.maxProgressVideoSeconds, 10);
-assert.equal(PLAN_ENTITLEMENTS.guest.maxProjectCount, null);
+assert.equal(PLAN_ENTITLEMENTS.guest.maxProjectCount, 1);
 
 assert.equal(PLAN_ENTITLEMENTS.free.canExportVideo, true);
 assert.equal(PLAN_ENTITLEMENTS.free.weeklyVideoExportLimit, 1);
@@ -70,7 +74,7 @@ assert.equal(PLAN_ENTITLEMENTS.free.localImageLimit, 100);
 assert.equal(PLAN_ENTITLEMENTS.free.localVideoLimit, 30);
 assert.equal(PLAN_ENTITLEMENTS.free.maxProgressPhotos, 100);
 assert.equal(PLAN_ENTITLEMENTS.free.maxProgressVideoSeconds, 10);
-assert.equal(PLAN_ENTITLEMENTS.free.maxProjectCount, null);
+assert.equal(PLAN_ENTITLEMENTS.free.maxProjectCount, 1);
 
 assert.equal(PLAN_ENTITLEMENTS.ad_remove.canExportVideo, true);
 assert.equal(PLAN_ENTITLEMENTS.ad_remove.weeklyVideoExportLimit, 1);
@@ -84,23 +88,35 @@ assert.equal(PLAN_ENTITLEMENTS.pro.weeklyVideoExportLimit, 15);
 assert.equal(PLAN_ENTITLEMENTS.pro.canExportVideo, true);
 assert.equal(PLAN_ENTITLEMENTS.pro.showAds, false);
 assert.equal(PLAN_ENTITLEMENTS.pro.showWatermark, false);
-assert.equal(PLAN_ENTITLEMENTS.pro.localImageLimit, 200);
+assert.equal(PLAN_ENTITLEMENTS.pro.localImageLimit, undefined);
 assert.equal(PLAN_ENTITLEMENTS.pro.localVideoLimit, 50);
 assert.equal(PLAN_ENTITLEMENTS.pro.musicTrackLimit, 10);
 assert.equal(PLAN_ENTITLEMENTS.pro.backupStorageBytes, 2 * 1024 * 1024 * 1024);
-assert.equal(PLAN_ENTITLEMENTS.pro.maxProgressPhotos, 365);
+assert.equal(PLAN_ENTITLEMENTS.pro.maxProgressPhotos, null);
 assert.equal(PLAN_ENTITLEMENTS.pro.maxProgressVideoSeconds, 36.5);
 assert.equal(PLAN_ENTITLEMENTS.pro.maxProjectCount, null);
+assert.equal(PLAN_ENTITLEMENTS.pro.maxCloudBackupProjects, 1);
+assert.equal(PLAN_ENTITLEMENTS.pro.maxCloudPhotosPerProject, 365);
 
-assert.equal(PLAN_ENTITLEMENTS.expert.weeklyVideoExportLimit, 30);
+assert.equal(PLAN_ENTITLEMENTS.plus.weeklyVideoExportLimit, 15);
+assert.equal(PLAN_ENTITLEMENTS.plus.localImageLimit, undefined);
+assert.equal(PLAN_ENTITLEMENTS.plus.backupStorageBytes, 6 * 1024 * 1024 * 1024);
+assert.equal(PLAN_ENTITLEMENTS.plus.maxProgressPhotos, null);
+assert.equal(PLAN_ENTITLEMENTS.plus.maxProgressVideoSeconds, 36.5);
+assert.equal(PLAN_ENTITLEMENTS.plus.maxCloudBackupProjects, 3);
+assert.equal(PLAN_ENTITLEMENTS.plus.maxCloudPhotosPerProject, 365);
+
+assert.equal(PLAN_ENTITLEMENTS.expert.weeklyVideoExportLimit, 15);
 assert.equal(PLAN_ENTITLEMENTS.expert.canExportVideo, true);
-assert.equal(PLAN_ENTITLEMENTS.expert.localImageLimit, 300);
-assert.equal(PLAN_ENTITLEMENTS.expert.localVideoLimit, 100);
-assert.equal(PLAN_ENTITLEMENTS.expert.musicTrackLimit, 20);
-assert.equal(PLAN_ENTITLEMENTS.expert.backupStorageBytes, 5 * 1024 * 1024 * 1024);
+assert.equal(PLAN_ENTITLEMENTS.expert.localImageLimit, undefined);
+assert.equal(PLAN_ENTITLEMENTS.expert.localVideoLimit, 50);
+assert.equal(PLAN_ENTITLEMENTS.expert.musicTrackLimit, 10);
+assert.equal(PLAN_ENTITLEMENTS.expert.backupStorageBytes, 10 * 1024 * 1024 * 1024);
 assert.equal(PLAN_ENTITLEMENTS.expert.maxProgressPhotos, null);
-assert.equal(PLAN_ENTITLEMENTS.expert.maxProgressVideoSeconds, null);
+assert.equal(PLAN_ENTITLEMENTS.expert.maxProgressVideoSeconds, 36.5);
 assert.equal(PLAN_ENTITLEMENTS.expert.maxProjectCount, null);
+assert.equal(PLAN_ENTITLEMENTS.expert.maxCloudBackupProjects, 5);
+assert.equal(PLAN_ENTITLEMENTS.expert.maxCloudPhotosPerProject, 365);
 
 const proEntitlements = getPlanEntitlements({
   isLoggedIn: true,
@@ -109,4 +125,4 @@ const proEntitlements = getPlanEntitlements({
 assert.equal(proEntitlements.label, "Pro");
 assert.equal(getWeeklyVideoExportLimit(proEntitlements), 15);
 
-console.log("ok - plan entitlements describe guest, free, ad removal, pro, and expert tiers");
+console.log("ok - plan entitlements describe free, ad removal, Pro, Plus, and Expert project-slot tiers");

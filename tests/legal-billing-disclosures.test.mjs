@@ -53,9 +53,9 @@ for (const token of [
 
 for (const token of [
   "1회성 구매",
-  "정기 결제나 자동 갱신이 발생하지 않",
+  "정기 결제나 자동 갱신은 없습니다",
   "월 구독",
-  "자동으로 갱신",
+  "자동 갱신됩니다",
   "Google Play 정기 결제",
   "앱을 삭제해도 구독이 자동 취소되지는 않습니다",
   "실제 결제 금액은 Google Play 구매 화면"
@@ -70,12 +70,14 @@ for (const source of [termsSource, termsPublic]) {
   for (const token of [
     "Google Play",
     "광고 제거",
-    "Pro / Expert",
+    "Pro / Plus / Expert",
     "자동으로 갱신",
     "구독 관리",
     "취소",
     "환불",
-    "앱을 삭제"
+    "앱을 삭제",
+    "365",
+    "백업 프로젝트"
   ]) {
     assert.ok(source.includes(token), `terms disclosure missing: ${token}`);
   }

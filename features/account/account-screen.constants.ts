@@ -2,7 +2,7 @@ import type { CloudBackupOverview } from "@/lib/cloud-backup";
 import type { UserSubscriptionProducts } from "@/lib/subscription";
 
 export type AuthMode = "signIn" | "signUp" | "recover";
-export type PaymentPlanId = "adRemove" | "creator" | "expert";
+export type PaymentPlanId = "adRemove" | "creator" | "plus" | "expert";
 
 export type PaymentPlan = {
   id: PaymentPlanId;
@@ -42,57 +42,81 @@ export const initialBackupOverview: CloudBackupOverview = {
 export const initialSubscriptionProducts: UserSubscriptionProducts = {
   adRemove: null,
   creatorMonthly: null,
+  plusMonthly: null,
   expertMonthly: null
 };
 
 export const signedInBenefits = [
-  "무료 플랜: 프로젝트당 최대 100장 기록",
+  "무료 플랜: 프로젝트 1개 · 사진 최대 100장",
   "변화 영상 최대 10초",
   "워터마크 포함, 광고 표시",
-  "클라우드 백업은 Pro부터 사용 가능"
+  "Pro 이상: 로컬 프로젝트·사진 무제한 + 선택 프로젝트 클라우드 백업"
 ];
 
 export const paymentPlans: PaymentPlan[] = [
   {
     id: "adRemove",
     title: "광고 제거",
-    price: "1,990원",
+    price: "2,000원",
     billing: "1회 결제",
-    summary: "한 번 결제하면 광고를 영구 제거합니다. 무료 플랜 기능은 그대로 유지됩니다.",
-    purchaseNotice: "Google Play를 통한 1회성 구매입니다. 정기 결제나 자동 갱신이 발생하지 않으며, 동일한 Google Play 계정에서는 구매 복원을 통해 기존 구매를 다시 확인할 수 있습니다.",
+    summary: "한 번 결제하면 광고를 영구 제거합니다. 무료 플랜의 프로젝트·사진 한도는 그대로 유지됩니다.",
+    purchaseNotice:
+      "Google Play를 통한 1회성 구매입니다. 정기 결제나 자동 갱신은 없습니다. Pro 월 구독은 광고·워터마크 제거와 로컬 프로젝트·사진 무제한, 클라우드 프로젝트 1개 백업을 함께 제공합니다.",
     benefits: [
       "앱 전반의 광고 영구 제거",
-      "무료 플랜 기능 유지",
-      "Pro 기능 미포함"
+      "무료 플랜의 프로젝트 1개 · 프로젝트당 100장 유지",
+      "클라우드 백업 미포함"
     ]
   },
   {
     id: "creator",
     title: "Pro",
-    price: "Google Play 가격",
+    price: "1,990원",
     billing: "월 구독",
-    summary: "Pro는 바디 프레임 365장 기록과 36.5초 변화 영상, 광고·워터마크 제거, 클라우드 백업을 제공합니다.",
-    purchaseNotice: "Google Play를 통한 월 구독입니다. 취소하지 않는 한 각 결제 주기에 자동으로 갱신됩니다. 구독은 Google Play 정기 결제에서 관리하거나 취소할 수 있으며 앱을 삭제해도 구독이 자동 취소되지는 않습니다. 실제 결제 금액은 Google Play 구매 화면에 표시되는 가격을 기준으로 합니다.",
+    summary:
+      "로컬 프로젝트와 사진을 제한 없이 사용하고, 선택한 프로젝트 1개를 클라우드에 백업할 수 있습니다.",
+    purchaseNotice:
+      "Google Play 월 구독으로 취소 전까지 자동 갱신됩니다. 구독은 Google Play 정기 결제에서 관리하거나 취소할 수 있으며 앱을 삭제해도 구독이 자동 취소되지는 않습니다. 실제 결제 금액은 Google Play 구매 화면에 표시되는 가격을 기준으로 합니다. 클라우드 백업 프로젝트는 구독 후 직접 선택하며, 선택한 프로젝트를 변경하려면 해당 프로젝트의 기존 클라우드 백업을 삭제하고 새 프로젝트를 처음부터 다시 업로드해야 합니다. 로컬 원본은 삭제되지 않습니다.",
     benefits: [
-      "프로젝트당 최대 365장 기록",
-      "최대 36.5초 변화 영상",
-      "구독 기간 동안 앱 전반의 광고 제거",
-      "워터마크/브랜딩 제거",
-      "클라우드 백업과 상위 기록 한도"
+      "로컬 프로젝트·사진 무제한",
+      "클라우드 백업 프로젝트 1개",
+      "선택 프로젝트당 사진 최대 365장 백업",
+      "광고 및 워터마크 제거",
+      "고급 영상 옵션"
+    ]
+  },
+  {
+    id: "plus",
+    title: "Plus",
+    price: "3,990원",
+    billing: "월 구독",
+    summary:
+      "로컬 프로젝트와 사진을 제한 없이 사용하고, 최대 3개 프로젝트를 클라우드에 백업할 수 있습니다.",
+    purchaseNotice:
+      "Google Play 월 구독으로 취소 전까지 자동 갱신됩니다. 구독은 Google Play 정기 결제에서 관리하거나 취소할 수 있으며 앱을 삭제해도 구독이 자동 취소되지는 않습니다. 실제 결제 금액은 Google Play 구매 화면에 표시되는 가격을 기준으로 합니다. 클라우드 백업 프로젝트는 구독 후 직접 선택하며, 선택한 프로젝트를 변경하려면 해당 프로젝트의 기존 클라우드 백업을 삭제하고 새 프로젝트를 처음부터 다시 업로드해야 합니다. 로컬 원본은 삭제되지 않습니다.",
+    benefits: [
+      "로컬 프로젝트·사진 무제한",
+      "클라우드 백업 프로젝트 최대 3개",
+      "각 프로젝트당 사진 최대 365장 백업",
+      "광고 및 워터마크 제거",
+      "고급 영상 옵션"
     ]
   },
   {
     id: "expert",
     title: "Expert",
-    price: "Google Play 가격",
+    price: "5,990원",
     billing: "월 구독",
-    summary: "Expert는 현재 바디 프레임 기록·변화 영상 길이 제한을 해제하고 상위 저장·백업 한도를 제공합니다.",
-    purchaseNotice: "Google Play를 통한 월 구독입니다. 취소하지 않는 한 각 결제 주기에 자동으로 갱신됩니다. 구독은 Google Play 정기 결제에서 관리하거나 취소할 수 있으며 앱을 삭제해도 구독이 자동 취소되지는 않습니다. 실제 결제 금액은 Google Play 구매 화면에 표시되는 가격을 기준으로 합니다.",
+    summary:
+      "로컬 프로젝트와 사진을 제한 없이 사용하고, 최대 5개 프로젝트를 클라우드에 백업할 수 있습니다.",
+    purchaseNotice:
+      "Google Play 월 구독으로 취소 전까지 자동 갱신됩니다. 구독은 Google Play 정기 결제에서 관리하거나 취소할 수 있으며 앱을 삭제해도 구독이 자동 취소되지는 않습니다. 실제 결제 금액은 Google Play 구매 화면에 표시되는 가격을 기준으로 합니다. 클라우드 백업 프로젝트는 구독 후 직접 선택하며, 선택한 프로젝트를 변경하려면 해당 프로젝트의 기존 클라우드 백업을 삭제하고 새 프로젝트를 처음부터 다시 업로드해야 합니다. 로컬 원본은 삭제되지 않습니다.",
     benefits: [
-      "바디 프레임 기록 수 제한 해제",
-      "변화 영상 길이 제한 해제",
+      "로컬 프로젝트·사진 무제한",
+      "클라우드 백업 프로젝트 최대 5개",
+      "각 프로젝트당 사진 최대 365장 백업",
       "광고 및 워터마크 제거",
-      "상위 로컬 저장·클라우드 백업 한도"
+      "고급 영상 옵션"
     ]
   }
 ];

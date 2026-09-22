@@ -105,8 +105,7 @@ import { emptyBackupOverview, emptyUsageStats, type UsageStats } from "@/feature
 import {
   clampSettingsGuideSizeInRange,
   formatBackupDateTime,
-  formatQuotaValue,
-  formatStorageQuotaValue
+  formatQuotaValue
 } from "@/features/settings/settings-screen.helpers";
 import { createThemedStyles, styles } from "@/features/settings/settings-screen.styles";
 import { backupTargetOptions, cameraRatioOptions, cameraSaveScopeOptions, fontSizeLabel, fontSizeOptions, getBackupTargetsSummary, getCameraSaveScopeLabel, guideColorOptions, guideLineOpacityOptions, guideSizeOptions, guideStrokeWidthOptions, imageQualityLabel, imageSaveFormatLabel, imageSaveFormatOptions, storageModeLegend, themeLabel, themeOptions, tripClipExportFormatLabel, tripClipExportFormatOptions, videoQualityLabel, type SettingKey } from "@/features/settings/settings-screen.model";
@@ -425,7 +424,7 @@ export default function SettingsScreen() {
       const latestSubscription = await getUserSubscription(user);
 
       if (targetStorageMode !== "local_only" && !canSelectCloudSaveTarget) {
-        setAuthMessage("Pro 결제 후 클라우드 백업을 사용할 수 있습니다. 현재는 앱 보관함에만 저장됩니다.");
+        setAuthMessage("Pro 이상 구독 후 클라우드 백업 프로젝트를 선택할 수 있습니다. 현재는 앱 보관함에만 저장됩니다.");
         setActiveSetting(null);
         return;
       }
@@ -433,7 +432,7 @@ export default function SettingsScreen() {
       if (!isCreatorSubscriptionActive(latestSubscription)) {
         if (targetStorageMode === "local_backup") {
           setAuthMessage(
-            "저장 방식은 클라우드 백업으로 설정했습니다. 클라우드 업로드는 Pro 이상에서 자동으로 실행됩니다."
+            "저장 방식은 클라우드 백업으로 설정했습니다. Pro 이상 구독 후 백업 프로젝트를 선택하면 업로드가 실행됩니다."
           );
           setActiveSetting(null);
           return;
@@ -855,7 +854,7 @@ export default function SettingsScreen() {
                 <Text selectable style={[styles.accountDetail, themed.mutedText]}>
                   {isLoggedIn
                     ? planEntitlements.canBackupToCloud
-                      ? `${user?.email ?? "계정"}으로 Pro 기능과 클라우드 백업을 사용할 수 있습니다.`
+                      ? `${user?.email ?? "계정"}으로 ${planEntitlements.label} 기능과 클라우드 백업을 사용할 수 있습니다.`
                       : `${user?.email ?? "계정"}으로 로그인하면 무료 플랜에서 프로젝트당 100장과 최대 10초 변화 영상을 사용할 수 있습니다.`
                     : "비로그인 상태에서는 기본 촬영과 로컬 기록을 사용할 수 있습니다."}
                 </Text>
@@ -1070,10 +1069,9 @@ export default function SettingsScreen() {
             </Text>
             <Text selectable style={[styles.backupStatusDetail, themed.mutedText]}>
               클라우드 백업:{" "}
-              {formatStorageQuotaValue(
-                backupOverview.imageBackupBytes,
-                planEntitlements.backupStorageBytes
-              )}
+              {planEntitlements.canBackupToCloud
+                ? `프로젝트 최대 ${planEntitlements.maxCloudBackupProjects}개 · 프로젝트당 사진 ${planEntitlements.maxCloudPhotosPerProject}장`
+                : "사용 불가"}
             </Text>
           </View>
         </SectionBlock>
@@ -1775,7 +1773,7 @@ export default function SettingsScreen() {
                     </Text>
                     <Text selectable style={[styles.backupStatusDetail, themed.mutedText]}>
                       현재 플랜: {planEntitlements.label} · 클라우드 백업{" "}
-                      {planEntitlements.canBackupToCloud ? "사용 가능" : "Pro 전용"}
+                      {planEntitlements.canBackupToCloud ? "사용 가능" : "유료 구독 전용"}
                     </Text>
                     <Text selectable style={[styles.backupStatusDetail, themed.mutedText]}>
                       {getStorageModeLabel(effectiveStorageMode)}

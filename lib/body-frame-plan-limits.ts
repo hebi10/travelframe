@@ -3,6 +3,7 @@ export type BodyFrameProgressPlanTier =
   | "free"
   | "ad_remove"
   | "pro"
+  | "plus"
   | "expert";
 
 const normalizePhotoLimit = (value: number | null | undefined) =>
@@ -96,15 +97,47 @@ export const isBodyFrameProjectTargetAllowed = ({
   return target > 0 && (limit === null || target <= limit);
 };
 
+export const getBodyFrameProjectCreationLimitState = ({
+  activeProjectCount,
+  maxProjectCount
+}: {
+  activeProjectCount: number;
+  maxProjectCount: number | null | undefined;
+}) => {
+  const count = Math.max(0, Math.floor(Number(activeProjectCount) || 0));
+  const limit = normalizePhotoLimit(maxProjectCount);
+
+  if (limit === null) {
+    return {
+      allowed: true,
+      limit: null,
+      remaining: null,
+      reached: false
+    };
+  }
+
+  const remaining = Math.max(0, limit - count);
+  return {
+    allowed: count < limit,
+    limit,
+    remaining,
+    reached: count >= limit
+  };
+};
+
 export const getBodyFrameUpgradePlan = (
   tier: BodyFrameProgressPlanTier
-): "pro" | "expert" | null => {
+): "pro" | "plus" | "expert" | null => {
   if (tier === "expert") {
     return null;
   }
 
-  if (tier === "pro") {
+  if (tier === "plus") {
     return "expert";
+  }
+
+  if (tier === "pro") {
+    return "plus";
   }
 
   return "pro";
@@ -112,10 +145,13 @@ export const getBodyFrameUpgradePlan = (
 
 export const getBodyFrameUpgradeLabel = (
   tier: BodyFrameProgressPlanTier
-): "Pro" | "Expert" | null => {
+): "Pro" | "Plus" | "Expert" | null => {
   const nextPlan = getBodyFrameUpgradePlan(tier);
   if (nextPlan === "pro") {
     return "Pro";
+  }
+  if (nextPlan === "plus") {
+    return "Plus";
   }
   if (nextPlan === "expert") {
     return "Expert";
