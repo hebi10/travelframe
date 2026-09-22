@@ -1863,6 +1863,37 @@ const styles = StyleSheet.create({
     gap: 12,
     marginBottom: 20
   },
+  reminderCard: {
+    minHeight: 72,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 16,
+    padding: 12,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderRadius: bodyFrameDesign.cardRadius
+  },
+  reminderIcon: {
+    width: bodyFrameDesign.minTouchSize,
+    height: bodyFrameDesign.minTouchSize,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderRadius: bodyFrameDesign.buttonRadius
+  },
+  reminderCopy: {
+    flex: 1,
+    minWidth: 0,
+    gap: 4
+  },
+  reminderTitle: {
+    fontSize: bodyFrameTypography.body,
+    fontWeight: "600"
+  },
+  reminderDetail: {
+    fontSize: bodyFrameTypography.caption,
+    lineHeight: 18
+  },
   projectName: {
     fontSize: bodyFrameTypography.projectTitle,
     lineHeight: 31,
@@ -2027,6 +2058,41 @@ const styles = StyleSheet.create({
     borderWidth: bodyFrameDesign.borderWidth,
     borderTopLeftRadius: bodyFrameDesign.bottomSheetRadius,
     borderTopRightRadius: bodyFrameDesign.bottomSheetRadius
+  },
+  reminderSheet: {
+    width: "100%",
+    gap: 16,
+    paddingHorizontal: bodyFrameDesign.horizontalPadding,
+    paddingTop: 10,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderTopLeftRadius: bodyFrameDesign.bottomSheetRadius,
+    borderTopRightRadius: bodyFrameDesign.bottomSheetRadius
+  },
+  reminderSheetTitleWrap: {
+    flex: 1,
+    minWidth: 0,
+    gap: 4
+  },
+  reminderTimeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12
+  },
+  reminderTimeCopy: {
+    flex: 1,
+    minWidth: 0,
+    gap: 4
+  },
+  reminderTimeInput: {
+    width: 92,
+    minHeight: bodyFrameDesign.minTouchSize,
+    paddingHorizontal: 10,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderRadius: bodyFrameDesign.buttonRadius,
+    fontSize: 18,
+    fontWeight: "600",
+    textAlign: "center",
+    fontVariant: ["tabular-nums"]
   },
   sheetHandle: {
     alignSelf: "center",
