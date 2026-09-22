@@ -11,7 +11,7 @@ for (const snippet of [
   "무료 플랜은 프로젝트당 100장과 최대 10초 변화 영상을 지원합니다.",
   "무료 플랜: 프로젝트 1개 · 사진 최대 100장",
   "변화 영상 최대 10초",
-  "Pro 이상: 로컬 프로젝트·사진 무제한 + 선택 프로젝트 클라우드 백업"
+  "Pro 이상: 프로젝트 수 무제한 · 프로젝트당 사진 최대 365장 + 선택 프로젝트 클라우드 백업"
 ]) {
   assert.ok(accountSource.includes(snippet), `account copy should include ${snippet}`);
 }
