@@ -34,6 +34,7 @@ type BodyFrameProjectSwitcherProps = {
   onCreateProject: (input: CreateProjectInput) => Promise<void> | void;
   onUpgrade?: () => void;
   onManageProjects?: () => void;
+  compact?: boolean;
 };
 
 const formatDuration = (seconds: number) =>
@@ -49,7 +50,8 @@ export function BodyFrameProjectSwitcher({
   onSelectProject,
   onCreateProject,
   onUpgrade,
-  onManageProjects
+  onManageProjects,
+  compact = false
 }: BodyFrameProjectSwitcherProps) {
   const insets = useSafeAreaInsets();
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -132,18 +134,25 @@ export function BodyFrameProjectSwitcher({
         accessibilityLabel="프로젝트 선택"
         style={({ pressed }) => [
           styles.headerButton,
+          compact && styles.headerButtonCompact,
           disabled && styles.disabled,
           pressed && !disabled && styles.pressed
         ]}
       >
-        <View style={styles.headerMainRow}>
-          <Feather name="folder" size={16} color="#F5F5F5" />
-          <Text numberOfLines={1} style={styles.headerTitle}>
+        <View style={[styles.headerMainRow, compact && styles.headerMainRowCompact]}>
+          {!compact ? <Feather name="folder" size={16} color="#F5F5F5" /> : null}
+          <Text
+            numberOfLines={1}
+            style={[styles.headerTitle, compact && styles.headerTitleCompact]}
+          >
             {activeProject?.name ?? "프로젝트 선택"}
           </Text>
-          <Feather name="chevron-down" size={16} color="#A0A0A6" />
+          <Feather name="chevron-down" size={compact ? 14 : 16} color="#A0A0A6" />
         </View>
-        <Text style={styles.headerStatus}>
+        <Text
+          numberOfLines={1}
+          style={[styles.headerStatus, compact && styles.headerStatusCompact]}
+        >
           {activeSummary
             ? `${activeSummary.photoCount} / ${activeSummary.targetPhotoCount} · ${formatDuration(activeSummary.durationSeconds)}초`
             : "첫 프로젝트를 만들어주세요"}
@@ -374,10 +383,18 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     justifyContent: "center"
   },
+  headerButtonCompact: {
+    minHeight: bodyFrameDesign.minTouchSize,
+    paddingHorizontal: 10,
+    paddingVertical: 5
+  },
   headerMainRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8
+  },
+  headerMainRowCompact: {
+    gap: 5
   },
   headerTitle: {
     flex: 1,
@@ -385,10 +402,17 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "600"
   },
+  headerTitleCompact: {
+    fontSize: 13
+  },
   headerStatus: {
     marginTop: 3,
     color: "#A0A0A6",
     fontSize: 12
+  },
+  headerStatusCompact: {
+    marginTop: 1,
+    fontSize: 10
   },
   disabled: { opacity: 0.5 },
   pressed: { opacity: 0.78 },
