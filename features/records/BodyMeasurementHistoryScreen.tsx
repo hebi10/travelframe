@@ -1,3 +1,4 @@
+import { Feather } from "@expo/vector-icons";
 import { router, type Href, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useMemo, useRef, useState } from "react";
 import {
@@ -236,7 +237,7 @@ export default function BodyMeasurementHistoryScreen() {
             style={[styles.iconButton, { borderColor: palette.line }]}
             onPress={() => router.back()}
           >
-            <Text style={[styles.backButtonText, { color: palette.text }]}>‹</Text>
+            <Feather name="chevron-left" size={24} color={palette.text} />
           </Pressable>
           <Text style={[styles.pageTitle, { color: palette.text }]}>
             수치 기록
@@ -535,11 +536,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderWidth: bodyFrameDesign.borderWidth,
     borderRadius: bodyFrameDesign.buttonRadius
-  },
-  backButtonText: {
-    marginTop: -2,
-    fontSize: 28,
-    fontWeight: "400"
   },
   pageTitle: {
     fontSize: bodyFrameTypography.sectionTitle,
