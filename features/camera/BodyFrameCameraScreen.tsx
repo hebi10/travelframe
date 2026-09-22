@@ -29,6 +29,7 @@ import {
 } from "@/lib/body-frame-camera-session";
 import {
   getBodyFrameCaptureLimitState,
+  getBodyFrameProjectCreationLimitState,
   getBodyFrameUpgradeLabel
 } from "@/lib/body-frame-plan-limits";
 import {
@@ -275,6 +276,19 @@ export default function BodyFrameCameraScreen() {
       targetPhotoCount,
       referenceMode
     }: CreateProjectInput) => {
+      const activeProjectCount = projects.filter(
+        (project) => !project.archived
+      ).length;
+      const projectLimitState = getBodyFrameProjectCreationLimitState({
+        activeProjectCount,
+        maxProjectCount: planEntitlements.maxProjectCount
+      });
+      if (!projectLimitState.allowed) {
+        throw new Error(
+          `현재 플랜에서는 프로젝트를 최대 ${projectLimitState.limit ?? activeProjectCount}개까지 만들 수 있습니다.`
+        );
+      }
+
       const project = await createBodyProject({
         name,
         targetPhotoCount,
@@ -287,7 +301,7 @@ export default function BodyFrameCameraScreen() {
       setActiveProjectId(project.id);
       await setLastActiveProjectId(project.id);
     },
-    []
+    [planEntitlements.maxProjectCount, projects]
   );
 
   const handleChangeReferenceMode = useCallback(async (projectId: string, referenceMode: ReferencePhotoMode) => {
@@ -318,6 +332,7 @@ export default function BodyFrameCameraScreen() {
             activeProject={activeProject}
             disabled={session.pendingSaveCount > 0}
             maxProgressPhotos={planEntitlements.maxProgressPhotos}
+            maxProjectCount={planEntitlements.maxProjectCount}
             upgradePlanLabel={upgradePlanLabel}
             onSelectProject={handleSelectProject}
             onCreateProject={handleCreateProject}
