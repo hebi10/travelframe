@@ -644,8 +644,21 @@ export default function BodyFrameProjectDetailScreen() {
   const openReminderSettings = useCallback(() => {
     setReminderEnabledDraft(reminderSettings.enabled);
     setReminderTimeDraft(formatProjectReminderTime(reminderSettings));
+    setReminderRepeatModeDraft(reminderSettings.repeatMode);
+    setReminderWeekdaysDraft(reminderSettings.weekdays);
     setReminderModalOpen(true);
   }, [reminderSettings]);
+
+  const toggleReminderWeekday = useCallback(
+    (weekday: ProjectReminderWeekday) => {
+      setReminderWeekdaysDraft((current) =>
+        current.includes(weekday)
+          ? current.filter((item) => item !== weekday)
+          : [...current, weekday].sort((a, b) => a - b)
+      );
+    },
+    []
+  );
 
   const saveReminderSettings = useCallback(async () => {
     if (!project || reminderSaving) return;
@@ -656,12 +669,23 @@ export default function BodyFrameProjectDetailScreen() {
       return;
     }
 
+    if (
+      reminderEnabledDraft &&
+      reminderRepeatModeDraft === "selected" &&
+      reminderWeekdaysDraft.length === 0
+    ) {
+      Alert.alert("촬영 알림", "알림을 받을 요일을 하나 이상 선택해 주세요.");
+      return;
+    }
+
     try {
       setReminderSaving(true);
       const nextSettings = await updateProjectReminderSettings({
         projectId: project.id,
         projectName: project.name,
         enabled: reminderEnabledDraft,
+        repeatMode: reminderRepeatModeDraft,
+        weekdays: reminderWeekdaysDraft,
         ...parsedTime
       });
       setReminderSettings(nextSettings);
@@ -680,8 +704,10 @@ export default function BodyFrameProjectDetailScreen() {
   }, [
     project,
     reminderEnabledDraft,
+    reminderRepeatModeDraft,
     reminderSaving,
-    reminderTimeDraft
+    reminderTimeDraft,
+    reminderWeekdaysDraft
   ]);
 
   const changeReferenceMode = useCallback(
