@@ -3270,12 +3270,7 @@ export default function CameraScreen({
                                 >
                                   {index + 1}
                                 </Text>
-                                {slot ? (
-                                  <View
-                                    pointerEvents="none"
-                                    style={styles.cameraColorSlotSavedDot}
-                                  />
-                                ) : null}
+                                {slot ? <View pointerEvents="none" style={styles.cameraColorSlotSavedDot} /> : null}
                               </Pressable>
                             ))}
                           </View>
