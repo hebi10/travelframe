@@ -37,9 +37,9 @@ for (const [name, source] of [
   ["functions product metadata", functionsSource]
 ]) {
   for (const [productId, price] of [
-    ["creator_monthly", "월 1,990원"],
-    ["plus_monthly", "월 3,990원"],
-    ["expert_monthly", "월 5,990원"]
+    ["creator_monthly", "월 2,000원"],
+    ["plus_monthly", "월 4,000원"],
+    ["expert_monthly", "월 6,000원"]
   ]) {
     assert.match(
       source,
