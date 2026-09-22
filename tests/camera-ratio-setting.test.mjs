@@ -138,30 +138,24 @@ for (const snippet of [
 
 for (const snippet of [
   "cameraSettingsScrollShell",
-  "cameraSettingsScrollHint",
-  "스크롤",
-  "showsVerticalScrollIndicator",
-  "persistentScrollbar",
-  "cameraSettingsScrollHintIcon",
-  "↓"
+  "cameraSettingsScroll",
+  "cameraSettingsHandle",
+  "cameraToolIntro",
+  "showsVerticalScrollIndicator={false}"
 ]) {
   assert.ok(cameraSource.includes(snippet), `camera settings scroll affordance missing: ${snippet}`);
 }
 
 for (const forbidden of [
   "cameraSettingsBottomHint",
-  "cameraSettingsGrabber"
+  "cameraSettingsGrabber",
+  "cameraSettingsScrollHint",
+  "persistentScrollbar",
+  "아래로 스크롤"
 ]) {
   assert.ok(
     !cameraSource.includes(forbidden),
-    `camera settings should not keep the bottom white affordance: ${forbidden}`
-  );
-}
-
-for (const forbidden of ["아래로 스크롤"]) {
-  assert.ok(
-    !cameraSource.includes(forbidden),
-    `camera settings scroll label should only say scroll: ${forbidden}`
+    `camera settings should not keep the old bright scroll affordance: ${forbidden}`
   );
 }
 
