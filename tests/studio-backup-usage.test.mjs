@@ -17,7 +17,8 @@ const backupUsageBadgeStyle = source.slice(backupUsageBadgeStart, backupUsageBad
 for (const snippet of [
   "subscribeCloudBackupOverview",
   "UsageBadge",
-  "CLOUD_BACKUP_PHOTO_LIMIT",
+  "planEntitlements.maxCloudBackupProjects",
+  "planEntitlements.maxCloudPhotosPerProject",
   "CLOUD_BACKUP_IMAGE_WORK_LIMIT",
   "getCloudBackupVideoLimit",
   "videoBackupLimit",
