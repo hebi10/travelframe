@@ -278,11 +278,19 @@ export function PaginatedPhotoGrid({
   );
 }
 
-export function UsageBadge({ label, count, limit }: { label: string; count: number; limit: number }) {
+export function UsageBadge({
+  label,
+  count,
+  limit
+}: {
+  label: string;
+  count: number;
+  limit?: number;
+}) {
   return (
     <View style={styles.backupUsageBadge}>
       <Text selectable={false} style={styles.backupUsageText}>
-        {label} {count}/{limit}
+        {label} {limit === undefined ? `${count} · 무제한` : `${count}/${limit}`}
       </Text>
     </View>
   );
@@ -315,7 +323,7 @@ export function WorkSection({
   onRequireLoginForEdit: () => void;
   onRequireLoginForVideo: () => void;
   onPageChange: (page: number) => void;
-  usage?: { label: string; count: number; limit: number } | null;
+  usage?: { label: string; count: number; limit?: number } | null;
 }) {
   const result = getPaginatedItems(items, page, pageSize);
 
