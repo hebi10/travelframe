@@ -44,7 +44,6 @@ for (const token of [
   "cameraColorFloatingOverlay:",
   'position: "absolute"',
   "zIndex: 60",
-  "elevation: 60",
   "cameraColorFloatingCard:",
   "cameraColorFloatingScroll:"
 ]) {
