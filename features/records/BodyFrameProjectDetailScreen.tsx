@@ -129,6 +129,8 @@ function SortableProjectPhotoTile({
   tileWidth,
   disabled,
   dropTarget,
+  dragSourceIndex,
+  dragTargetIndex,
   onDragStart,
   onDragHover,
   onDrop,
@@ -141,7 +143,9 @@ function SortableProjectPhotoTile({
   tileWidth: number;
   disabled: boolean;
   dropTarget: boolean;
-  onDragStart: () => void;
+  dragSourceIndex: number | null;
+  dragTargetIndex: number | null;
+  onDragStart: (index: number) => void;
   onDragHover: (index: number) => void;
   onDrop: (fromIndex: number, toIndex: number) => void;
   onDragFinish: () => void;
@@ -259,7 +263,7 @@ function SortableProjectPhotoTile({
             dragging.value = true;
             hoverIndex.value = index;
             manager.activate();
-            runOnJS(onDragStart)();
+            runOnJS(onDragStart)(index);
             runOnJS(onDragHover)(index);
           }
 
@@ -331,15 +335,64 @@ function SortableProjectPhotoTile({
     ]
   );
 
-  const animatedStyle = useAnimatedStyle(() => ({
-    zIndex: dragging.value ? 50 : 1,
-    opacity: dragging.value ? 0.94 : 1,
-    transform: [
-      { translateX: translateX.value },
-      { translateY: translateY.value },
-      { scale: withTiming(dragging.value ? 1.05 : 1, { duration: 100 }) }
-    ]
-  }));
+  const animatedStyle = useAnimatedStyle(() => {
+    let shiftedIndex = index;
+
+    if (
+      !dragging.value &&
+      dragSourceIndex !== null &&
+      dragTargetIndex !== null
+    ) {
+      if (
+        dragSourceIndex < dragTargetIndex &&
+        index > dragSourceIndex &&
+        index <= dragTargetIndex
+      ) {
+        shiftedIndex = index - 1;
+      } else if (
+        dragSourceIndex > dragTargetIndex &&
+        index >= dragTargetIndex &&
+        index < dragSourceIndex
+      ) {
+        shiftedIndex = index + 1;
+      }
+    }
+
+    const sourceRow = Math.floor(index / PROJECT_PHOTO_GRID_COLUMNS);
+    const sourceColumn = index % PROJECT_PHOTO_GRID_COLUMNS;
+    const targetRow = Math.floor(shiftedIndex / PROJECT_PHOTO_GRID_COLUMNS);
+    const targetColumn = shiftedIndex % PROJECT_PHOTO_GRID_COLUMNS;
+    const siblingTranslateX =
+      (targetColumn - sourceColumn) * cellWidth;
+    const siblingTranslateY =
+      (targetRow - sourceRow) * cellHeight;
+
+    return {
+      zIndex: dragging.value ? 50 : 1,
+      opacity: dragging.value ? 0.94 : 1,
+      transform: [
+        {
+          translateX: dragging.value
+            ? translateX.value
+            : withTiming(siblingTranslateX, { duration: 140 })
+        },
+        {
+          translateY: dragging.value
+            ? translateY.value
+            : withTiming(siblingTranslateY, { duration: 140 })
+        },
+        {
+          scale: withTiming(dragging.value ? 1.05 : 1, { duration: 100 })
+        }
+      ]
+    };
+  }, [
+    cellHeight,
+    cellWidth,
+    dragSourceIndex,
+    dragTargetIndex,
+    index
+  ]);
 
   return (
     <GestureDetector gesture={gesture}>
