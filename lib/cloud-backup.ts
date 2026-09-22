@@ -1460,8 +1460,15 @@ export const backupPhotoIfEnabled = async ({
       settings.storageMode,
       isCreatorSubscriptionActive(subscription)
     ) ||
-    !isCloudBackupTargetEnabled(settings, "photos")
+    !isCloudBackupTargetEnabled(settings, "photos") ||
+    !user ||
+    !photo.projectId
   ) {
+    return null;
+  }
+
+  const selectedProjectIds = await getSelectedCloudBackupProjectIds(user);
+  if (!selectedProjectIds.has(photo.projectId)) {
     return null;
   }
 
