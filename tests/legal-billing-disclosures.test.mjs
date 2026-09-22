@@ -53,7 +53,7 @@ for (const token of [
 
 for (const token of [
   "1회성 구매",
-  "정기 결제나 자동 갱신이 발생하지 않",
+  "정기 결제나 자동 갱신은 없습니다",
   "월 구독",
   "자동으로 갱신",
   "Google Play 정기 결제",
