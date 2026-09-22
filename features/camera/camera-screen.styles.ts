@@ -182,6 +182,11 @@ export const styles = StyleSheet.create({
     borderColor: "rgba(255, 255, 255, 0.42)",
     backgroundColor: "rgba(0, 0, 0, 0.34)"
   },
+  cameraHeaderCenter: {
+    flex: 1,
+    minWidth: 0,
+    marginHorizontal: 10
+  },
   countdownOverlay: {
     position: "absolute",
     left: 0,
