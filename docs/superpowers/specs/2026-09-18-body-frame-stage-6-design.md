@@ -91,7 +91,7 @@ Admin-granted subscriptions continue to work. Google Play refresh must not revok
 Add a Pub/Sub-triggered Firebase Function for Google Play Real-time Developer Notifications.
 
 Topic contract:
-- expected topic name: `google-play-billing`
+- expected topic name: `body-frame-play-billing`
 
 The RTDN handler:
 1. validates package name,
@@ -149,7 +149,7 @@ Code completion is separate from Play Console configuration. Before a live purch
 - create/activate the three matching Play Console products,
 - configure subscription base plans/offers,
 - enable Android Publisher API access for the Firebase Functions runtime identity,
-- configure Google Play RTDN to publish to `google-play-billing`,
+- configure Google Play RTDN to publish to `body-frame-play-billing`,
 - deploy Functions/rules,
 - test through a Play internal/closed test build on a physical Android device.
 
