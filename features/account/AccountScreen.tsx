@@ -13,6 +13,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ScreenShell } from "@/components/screen-shell";
+import { CloudBackupProjectSlotsSection } from "@/features/account/CloudBackupProjectSlotsSection";
 import { SectionBlock } from "@/components/section-block";
 import {
   DELETE_ACCOUNT_REQUEST_URL,
@@ -192,6 +193,8 @@ export default function AccountScreen() {
       adRemove: subscriptionProducts.adRemove ?? derivedSubscriptionProducts.adRemove,
       creatorMonthly:
         subscriptionProducts.creatorMonthly ?? derivedSubscriptionProducts.creatorMonthly,
+      plusMonthly:
+        subscriptionProducts.plusMonthly ?? derivedSubscriptionProducts.plusMonthly,
       expertMonthly: subscriptionProducts.expertMonthly ?? derivedSubscriptionProducts.expertMonthly
     }),
     [derivedSubscriptionProducts, subscriptionProducts]
@@ -351,7 +354,9 @@ export default function AccountScreen() {
       ? "ad_remove"
       : plan.id === "expert"
         ? "expert_monthly"
-        : "creator_monthly";
+        : plan.id === "plus"
+          ? "plus_monthly"
+          : "creator_monthly";
 
   const getPaymentActionLabel = (plan: PaymentPlan) =>
     getPaymentPlanStatus(plan).active
@@ -362,22 +367,58 @@ export default function AccountScreen() {
           ? "구매하기"
           : "구독하기";
 
-  const handlePaymentPurchase = async () => {
-    if (isSubmitting || !selectedPaymentPlan) {
-      return;
-    }
+  const runPaymentPurchase = async (plan: PaymentPlan) => {
+    if (isSubmitting) return;
 
     try {
       setIsSubmitting(true);
       setMessage(null);
-      await purchaseProduct(getPaymentProductId(selectedPaymentPlan));
-      setMessage(`${selectedPaymentPlan.title} 결제가 완료되었습니다.`);
+      await purchaseProduct(getPaymentProductId(plan));
+      setMessage(
+        plan.id === "adRemove"
+          ? "광고 제거 구매를 확인했습니다."
+          : `${plan.title} 구독이 활성화되었습니다. 아래 클라우드 프로젝트 백업에서 백업할 프로젝트를 선택할 수 있습니다.`
+      );
       setSelectedPaymentPlan(null);
     } catch (error) {
       setMessage(getUserFacingErrorMessage(error, "결제를 완료하지 못했습니다."));
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handlePaymentPurchase = () => {
+    if (isSubmitting || !selectedPaymentPlan) {
+      return;
+    }
+
+    if (selectedPaymentPlan.id !== "adRemove") {
+      void runPaymentPurchase(selectedPaymentPlan);
+      return;
+    }
+
+    const proPlan = paymentPlans.find((plan) => plan.id === "creator");
+    Alert.alert(
+      "광고만 제거할까요?",
+      "광고 제거는 2,000원 1회 구매입니다. Pro는 월 1,990원 자동 갱신 구독으로 광고·워터마크가 제거되고, 로컬 프로젝트와 사진을 제한 없이 이용하며 클라우드에 프로젝트 1개를 선택해 사진 최대 365장까지 백업할 수 있습니다.",
+      [
+        { text: "취소", style: "cancel" },
+        ...(proPlan
+          ? [
+              {
+                text: "Pro 보기",
+                onPress: () => setSelectedPaymentPlan(proPlan)
+              }
+            ]
+          : []),
+        {
+          text: "광고 제거 구매",
+          onPress: () => {
+            void runPaymentPurchase(selectedPaymentPlan);
+          }
+        }
+      ]
+    );
   };
 
   const handleRestorePurchases = async () => {
@@ -407,15 +448,18 @@ export default function AccountScreen() {
     }
 
     if (plan.id === "adRemove") {
+      const includedBySubscription = Boolean(
+        effectiveSubscriptionProducts.creatorMonthly ||
+          effectiveSubscriptionProducts.plusMonthly ||
+          effectiveSubscriptionProducts.expertMonthly
+      );
       return {
         active: Boolean(
-          effectiveSubscriptionProducts.adRemove ||
-          effectiveSubscriptionProducts.creatorMonthly ||
-          effectiveSubscriptionProducts.expertMonthly
+          effectiveSubscriptionProducts.adRemove || includedBySubscription
         ),
         label: effectiveSubscriptionProducts.adRemove
           ? "구매 완료"
-          : effectiveSubscriptionProducts.creatorMonthly || effectiveSubscriptionProducts.expertMonthly
+          : includedBySubscription
             ? "구독 포함"
             : "미구매"
       };
@@ -428,16 +472,25 @@ export default function AccountScreen() {
       };
     }
 
-    return {
-      active: Boolean(
-        effectiveSubscriptionProducts.creatorMonthly ||
+    if (plan.id === "plus") {
+      const active = Boolean(
+        effectiveSubscriptionProducts.plusMonthly ||
           effectiveSubscriptionProducts.expertMonthly
-      ),
-      label:
-        effectiveSubscriptionProducts.creatorMonthly ||
+      );
+      return {
+        active,
+        label: active ? "구독 중" : "미구독"
+      };
+    }
+
+    const active = Boolean(
+      effectiveSubscriptionProducts.creatorMonthly ||
+        effectiveSubscriptionProducts.plusMonthly ||
         effectiveSubscriptionProducts.expertMonthly
-          ? "구독 중"
-          : "미구독"
+    );
+    return {
+      active,
+      label: active ? "구독 중" : "미구독"
     };
   };
 
@@ -592,7 +645,7 @@ export default function AccountScreen() {
               {!hasFullAccess ? (
                 <View style={styles.verifyPanel}>
                   <Text selectable style={[styles.helpText, themed.mutedText]}>
-                    이메일 인증과 Pro 활성화가 완료되면 워터마크 제거와 클라우드 백업을 사용할 수 있습니다.
+                    이메일 인증과 유료 구독이 완료되면 워터마크 제거와 클라우드 백업을 사용할 수 있습니다.
                   </Text>
                   <View style={styles.inlineActions}>
                     <Pressable
@@ -867,6 +920,11 @@ export default function AccountScreen() {
             </Text>
           </SectionBlock>
 
+          <CloudBackupProjectSlotsSection
+            user={user}
+            maxSlots={planEntitlements.maxCloudBackupProjects}
+            maxPhotosPerProject={planEntitlements.maxCloudPhotosPerProject}
+          />
 
         </>
       ) : null}
