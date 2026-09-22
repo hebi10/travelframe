@@ -31,14 +31,15 @@
     "security:secrets:history": "node scripts/run-gitleaks.mjs --history",
     "typecheck": "tsc --noEmit",
     "firebase:deploy-rules": "firebase deploy --only firestore:rules,storage --project travelframe-4e1fb",
-    "firebase:deploy-functions": "firebase deploy --only functions --project travelframe-4e1fb",
+    "firebase:deploy-functions": "npm run firebase:prepare-functions && firebase deploy --only functions --project travelframe-4e1fb",
     "firebase:deploy-hosting": "firebase deploy --only hosting --project travelframe-4e1fb",
-    "firebase:deploy-all": "firebase deploy --only hosting,firestore:rules,storage,functions --project travelframe-4e1fb",
-    "deploy:firebase": "firebase deploy --only hosting,firestore:rules,storage,functions --project travelframe-4e1fb",
+    "firebase:deploy-all": "npm run firebase:prepare-functions && firebase deploy --only hosting,firestore:rules,storage,functions --project travelframe-4e1fb",
+    "deploy:firebase": "npm run firebase:deploy-all",
     "install:media": "npx expo install expo-media-library expo-image-manipulator expo-image-picker expo-audio expo-video expo-document-picker expo-file-system expo-sharing expo-haptics expo-image react-native-reanimated react-native-worklets react-native-gesture-handler @react-native-async-storage/async-storage && npm install react-native-vision-camera react-native-nitro-modules react-native-nitro-image",
     "install:ads": "npx expo install react-native-google-mobile-ads",
     "android:prebuild:ci": "node scripts/prebuild-android-ci.mjs",
-    "release:verify": "node scripts/verify-release-readiness.mjs"
+    "release:verify": "node scripts/verify-release-readiness.mjs",
+    "firebase:prepare-functions": "npm ci --prefix functions"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",
