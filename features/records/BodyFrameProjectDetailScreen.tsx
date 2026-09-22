@@ -72,13 +72,18 @@ import { useAppAppearance } from "@/lib/app-appearance";
 import { useAuth } from "@/lib/auth-context";
 import { getPlanEntitlements } from "@/lib/plan-entitlements";
 import {
+  PROJECT_REMINDER_WEEKDAY_OPTIONS,
   cancelProjectReminder,
   defaultProjectReminderSettings,
+  formatProjectReminderSchedule,
   formatProjectReminderTime,
   getProjectReminderSettings,
   parseProjectReminderTime,
+  syncProjectReminderProjectName,
   updateProjectReminderSettings,
-  type ProjectReminderSettings
+  type ProjectReminderRepeatMode,
+  type ProjectReminderSettings,
+  type ProjectReminderWeekday
 } from "@/lib/project-reminder";
 import type { BodyProject, ReferencePhotoMode } from "@/types/body-project";
 import {
@@ -478,6 +483,10 @@ export default function BodyFrameProjectDetailScreen() {
   const [reminderModalOpen, setReminderModalOpen] = useState(false);
   const [reminderEnabledDraft, setReminderEnabledDraft] = useState(false);
   const [reminderTimeDraft, setReminderTimeDraft] = useState("20:00");
+  const [reminderRepeatModeDraft, setReminderRepeatModeDraft] =
+    useState<ProjectReminderRepeatMode>("daily");
+  const [reminderWeekdaysDraft, setReminderWeekdaysDraft] =
+    useState<ProjectReminderWeekday[]>([0, 1, 2, 3, 4, 5, 6]);
   const [reminderSaving, setReminderSaving] = useState(false);
 
   const reload = useCallback(async () => {
@@ -600,11 +609,13 @@ export default function BodyFrameProjectDetailScreen() {
       return;
     }
 
+    const nextProjectName = nameDraft.trim();
+
     setSaving(true);
     try {
       await Promise.all([
         updateBodyProject(project.id, {
-          name: nameDraft.trim(),
+          name: nextProjectName,
           targetPhotoCount: target
         }),
         updateBodyMeasurementSettings(project.id, measurementDraft),
@@ -614,6 +625,19 @@ export default function BodyFrameProjectDetailScreen() {
         ),
         updateBodyPoseAlignmentSettings(project.id, poseAlignmentDraft)
       ]);
+
+      if (reminderSettings.enabled && nextProjectName !== project.name) {
+        try {
+          await syncProjectReminderProjectName({
+            projectId: project.id,
+            projectName: nextProjectName,
+            settings: reminderSettings
+          });
+        } catch (error) {
+          console.error("프로젝트 알림 이름 동기화에 실패했습니다.", error);
+        }
+      }
+
       await reload();
       setSettingsOpen(false);
     } finally {
@@ -628,6 +652,7 @@ export default function BodyFrameProjectDetailScreen() {
     poseAlignmentDraft,
     project,
     reload,
+    reminderSettings,
     saving,
     targetDraft
   ]);
@@ -635,8 +660,21 @@ export default function BodyFrameProjectDetailScreen() {
   const openReminderSettings = useCallback(() => {
     setReminderEnabledDraft(reminderSettings.enabled);
     setReminderTimeDraft(formatProjectReminderTime(reminderSettings));
+    setReminderRepeatModeDraft(reminderSettings.repeatMode);
+    setReminderWeekdaysDraft(reminderSettings.weekdays);
     setReminderModalOpen(true);
   }, [reminderSettings]);
+
+  const toggleReminderWeekday = useCallback(
+    (weekday: ProjectReminderWeekday) => {
+      setReminderWeekdaysDraft((current) =>
+        current.includes(weekday)
+          ? current.filter((item) => item !== weekday)
+          : [...current, weekday].sort((a, b) => a - b)
+      );
+    },
+    []
+  );
 
   const saveReminderSettings = useCallback(async () => {
     if (!project || reminderSaving) return;
@@ -647,12 +685,23 @@ export default function BodyFrameProjectDetailScreen() {
       return;
     }
 
+    if (
+      reminderEnabledDraft &&
+      reminderRepeatModeDraft === "selected" &&
+      reminderWeekdaysDraft.length === 0
+    ) {
+      Alert.alert("촬영 알림", "알림을 받을 요일을 하나 이상 선택해 주세요.");
+      return;
+    }
+
     try {
       setReminderSaving(true);
       const nextSettings = await updateProjectReminderSettings({
         projectId: project.id,
         projectName: project.name,
         enabled: reminderEnabledDraft,
+        repeatMode: reminderRepeatModeDraft,
+        weekdays: reminderWeekdaysDraft,
         ...parsedTime
       });
       setReminderSettings(nextSettings);
@@ -671,8 +720,10 @@ export default function BodyFrameProjectDetailScreen() {
   }, [
     project,
     reminderEnabledDraft,
+    reminderRepeatModeDraft,
     reminderSaving,
-    reminderTimeDraft
+    reminderTimeDraft,
+    reminderWeekdaysDraft
   ]);
 
   const changeReferenceMode = useCallback(
@@ -1039,8 +1090,8 @@ export default function BodyFrameProjectDetailScreen() {
             </Text>
             <Text style={[styles.reminderDetail, { color: palette.muted }]}>
               {reminderSettings.enabled
-                ? `매일 ${formatProjectReminderTime(reminderSettings)} · 이 기기에서 알림`
-                : "원하는 시간에 매일 촬영 알림을 받을 수 있습니다."}
+                ? `${formatProjectReminderSchedule(reminderSettings)} · 이 기기에서 알림`
+                : "프로젝트별 시간과 요일을 정해 촬영 알림을 받을 수 있습니다."}
             </Text>
           </View>
           <Feather name="chevron-right" size={18} color={palette.muted} />
@@ -1276,7 +1327,7 @@ export default function BodyFrameProjectDetailScreen() {
                     촬영 알림
                   </Text>
                   <Text style={[styles.settingDetail, { color: palette.muted }]}>
-                    매일 같은 시간에 이 기기에서 촬영 알림을 표시합니다.
+                    “{project.name}” 프로젝트의 촬영 시간과 요일을 설정합니다.
                   </Text>
                 </View>
                 <Pressable
@@ -1359,6 +1410,91 @@ export default function BodyFrameProjectDetailScreen() {
                       }
                     ]}
                   />
+                </View>
+
+                <View style={styles.reminderRepeatBlock}>
+                  <View style={styles.reminderRepeatHeader}>
+                    <Text style={[styles.settingTitle, { color: palette.text }]}>
+                      반복
+                    </Text>
+                    <Text style={[styles.settingDetail, { color: palette.muted }]}>
+                      매일 또는 원하는 요일만 선택할 수 있습니다.
+                    </Text>
+                  </View>
+
+                  <View style={styles.choiceRow}>
+                    {([
+                      ["daily", "매일"],
+                      ["selected", "요일 선택"]
+                    ] as const).map(([mode, label]) => {
+                      const active = reminderRepeatModeDraft === mode;
+                      return (
+                        <Pressable
+                          key={mode}
+                          disabled={!reminderEnabledDraft || reminderSaving}
+                          accessibilityRole="button"
+                          accessibilityState={{ selected: active }}
+                          style={[
+                            styles.choiceButton,
+                            {
+                              borderColor: active ? palette.text : palette.line,
+                              backgroundColor: active
+                                ? palette.text
+                                : palette.background,
+                              opacity: reminderEnabledDraft ? 1 : 0.45
+                            }
+                          ]}
+                          onPress={() => setReminderRepeatModeDraft(mode)}
+                        >
+                          <Text
+                            style={[
+                              styles.choiceText,
+                              { color: active ? palette.inverse : palette.text }
+                            ]}
+                          >
+                            {label}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+
+                  {reminderRepeatModeDraft === "selected" ? (
+                    <View style={styles.reminderWeekdayRow}>
+                      {PROJECT_REMINDER_WEEKDAY_OPTIONS.map(({ label, value }) => {
+                        const active = reminderWeekdaysDraft.includes(value);
+                        return (
+                          <Pressable
+                            key={value}
+                            disabled={!reminderEnabledDraft || reminderSaving}
+                            accessibilityRole="button"
+                            accessibilityLabel={`${label}요일 알림`}
+                            accessibilityState={{ selected: active }}
+                            style={[
+                              styles.reminderWeekdayButton,
+                              {
+                                borderColor: active ? palette.text : palette.line,
+                                backgroundColor: active
+                                  ? palette.text
+                                  : palette.background,
+                                opacity: reminderEnabledDraft ? 1 : 0.45
+                              }
+                            ]}
+                            onPress={() => toggleReminderWeekday(value)}
+                          >
+                            <Text
+                              style={[
+                                styles.reminderWeekdayText,
+                                { color: active ? palette.inverse : palette.text }
+                              ]}
+                            >
+                              {label}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  ) : null}
                 </View>
 
                 <Text style={[styles.settingHint, { color: palette.faint }]}>
@@ -2120,6 +2256,29 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     textAlign: "center",
     fontVariant: ["tabular-nums"]
+  },
+  reminderRepeatBlock: {
+    gap: 10
+  },
+  reminderRepeatHeader: {
+    gap: 4
+  },
+  reminderWeekdayRow: {
+    flexDirection: "row",
+    gap: 6
+  },
+  reminderWeekdayButton: {
+    minWidth: bodyFrameDesign.minTouchSize,
+    minHeight: bodyFrameDesign.minTouchSize,
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderRadius: bodyFrameDesign.buttonRadius
+  },
+  reminderWeekdayText: {
+    fontSize: bodyFrameTypography.caption,
+    fontWeight: "700"
   },
   sheetHandle: {
     alignSelf: "center",

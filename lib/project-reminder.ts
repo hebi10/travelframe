@@ -9,18 +9,36 @@ import { localStorageAdapter } from "@/lib/local-storage";
 const PROJECT_REMINDER_STORAGE_KEY = "body-frame.project-reminders.v1";
 const DEFAULT_PROJECT_REMINDER_HOUR = 20;
 const DEFAULT_PROJECT_REMINDER_MINUTE = 0;
+const ALL_PROJECT_REMINDER_WEEKDAYS = [0, 1, 2, 3, 4, 5, 6] as const;
 const POST_NOTIFICATIONS_PERMISSION =
   "android.permission.POST_NOTIFICATIONS" as Parameters<
     typeof PermissionsAndroid.request
   >[0];
 
+export type ProjectReminderRepeatMode = "daily" | "selected";
+export type ProjectReminderWeekday = 0 | 1 | 2 | 3 | 4 | 5 | 6;
+
+export const PROJECT_REMINDER_WEEKDAY_OPTIONS: Array<{
+  label: string;
+  value: ProjectReminderWeekday;
+}> = [
+  { label: "월", value: 1 },
+  { label: "화", value: 2 },
+  { label: "수", value: 3 },
+  { label: "목", value: 4 },
+  { label: "금", value: 5 },
+  { label: "토", value: 6 },
+  { label: "일", value: 0 }
+];
+
 type AndroidProjectReminderModule = {
   prepare: () => Promise<boolean>;
-  scheduleDailyReminder: (
+  scheduleReminder: (
     projectId: string,
     projectName: string,
     hour: number,
-    minute: number
+    minute: number,
+    weekdaysCsv: string
   ) => Promise<boolean>;
   cancelReminder: (projectId: string) => Promise<boolean>;
 };
@@ -29,6 +47,8 @@ export type ProjectReminderSettings = {
   enabled: boolean;
   hour: number;
   minute: number;
+  repeatMode: ProjectReminderRepeatMode;
+  weekdays: ProjectReminderWeekday[];
 };
 
 const nativeReminder = NativeModules.AndroidProjectReminder as
@@ -38,7 +58,9 @@ const nativeReminder = NativeModules.AndroidProjectReminder as
 export const defaultProjectReminderSettings: ProjectReminderSettings = {
   enabled: false,
   hour: DEFAULT_PROJECT_REMINDER_HOUR,
-  minute: DEFAULT_PROJECT_REMINDER_MINUTE
+  minute: DEFAULT_PROJECT_REMINDER_MINUTE,
+  repeatMode: "daily",
+  weekdays: [...ALL_PROJECT_REMINDER_WEEKDAYS]
 };
 
 const clampReminderTime = (
@@ -57,6 +79,34 @@ const clampReminderTime = (
       ? minute
       : DEFAULT_PROJECT_REMINDER_MINUTE
 });
+
+const normalizeWeekdays = (value: unknown): ProjectReminderWeekday[] => {
+  if (!Array.isArray(value)) {
+    return [...ALL_PROJECT_REMINDER_WEEKDAYS];
+  }
+
+  const weekdays = [...new Set(
+    value.filter(
+      (item): item is ProjectReminderWeekday =>
+        typeof item === "number" &&
+        Number.isInteger(item) &&
+        item >= 0 &&
+        item <= 6
+    )
+  )].sort((a, b) => a - b);
+
+  return weekdays.length > 0
+    ? weekdays
+    : [...ALL_PROJECT_REMINDER_WEEKDAYS];
+};
+
+const getScheduledWeekdays = ({
+  repeatMode,
+  weekdays
+}: Pick<ProjectReminderSettings, "repeatMode" | "weekdays">) =>
+  repeatMode === "daily"
+    ? [...ALL_PROJECT_REMINDER_WEEKDAYS]
+    : normalizeWeekdays(weekdays);
 
 const parseReminderMap = (
   value: string | null
@@ -78,11 +128,20 @@ const parseReminderMap = (
               ? (raw as Record<string, unknown>)
               : {};
           const time = clampReminderTime(record.hour, record.minute);
+          const repeatMode: ProjectReminderRepeatMode =
+            record.repeatMode === "selected" ? "selected" : "daily";
+          const weekdays = normalizeWeekdays(record.weekdays);
+
           return [
             projectId,
             {
               enabled: record.enabled === true,
-              ...time
+              ...time,
+              repeatMode,
+              weekdays:
+                repeatMode === "daily"
+                  ? [...ALL_PROJECT_REMINDER_WEEKDAYS]
+                  : weekdays
             }
           ];
         })
@@ -138,33 +197,65 @@ const ensureAndroidNotificationPermission = async () => {
   }
 };
 
+const scheduleNativeProjectReminder = async ({
+  projectId,
+  projectName,
+  settings
+}: {
+  projectId: string;
+  projectName: string;
+  settings: ProjectReminderSettings;
+}) => {
+  if (Platform.OS !== "android" || !nativeReminder || !settings.enabled) {
+    return;
+  }
+
+  const weekdays = getScheduledWeekdays(settings);
+  await nativeReminder.scheduleReminder(
+    projectId,
+    projectName,
+    settings.hour,
+    settings.minute,
+    weekdays.join(",")
+  );
+};
+
 export const updateProjectReminderSettings = async ({
   projectId,
   projectName,
   enabled,
   hour,
-  minute
+  minute,
+  repeatMode,
+  weekdays
 }: {
   projectId: string;
   projectName: string;
   enabled: boolean;
   hour: number;
   minute: number;
+  repeatMode: ProjectReminderRepeatMode;
+  weekdays: ProjectReminderWeekday[];
 }) => {
   const time = clampReminderTime(hour, minute);
+  const normalizedWeekdays = normalizeWeekdays(weekdays);
   const settings: ProjectReminderSettings = {
     enabled,
-    ...time
+    ...time,
+    repeatMode,
+    weekdays:
+      repeatMode === "daily"
+        ? [...ALL_PROJECT_REMINDER_WEEKDAYS]
+        : normalizedWeekdays
   };
 
   if (enabled) {
     await ensureAndroidNotificationPermission();
-    await nativeReminder!.scheduleDailyReminder(
+    await scheduleNativeProjectReminder({
       projectId,
       projectName,
-      settings.hour,
-      settings.minute
-    );
+      settings
+    });
   } else if (Platform.OS === "android" && nativeReminder) {
     await nativeReminder.cancelReminder(projectId);
   }
@@ -176,6 +267,22 @@ export const updateProjectReminderSettings = async ({
   await writeReminderMap(reminders);
 
   return settings;
+};
+
+export const syncProjectReminderProjectName = async ({
+  projectId,
+  projectName,
+  settings
+}: {
+  projectId: string;
+  projectName: string;
+  settings: ProjectReminderSettings;
+}) => {
+  await scheduleNativeProjectReminder({
+    projectId,
+    projectName,
+    settings
+  });
 };
 
 export const cancelProjectReminder = async (projectId: string) => {
@@ -195,6 +302,26 @@ export const formatProjectReminderTime = ({
   minute
 }: Pick<ProjectReminderSettings, "hour" | "minute">) =>
   `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+
+export const formatProjectReminderDays = ({
+  repeatMode,
+  weekdays
+}: Pick<ProjectReminderSettings, "repeatMode" | "weekdays">) => {
+  if (repeatMode === "daily") {
+    return "매일";
+  }
+
+  const selected = new Set(weekdays);
+  return PROJECT_REMINDER_WEEKDAY_OPTIONS
+    .filter(({ value }) => selected.has(value))
+    .map(({ label }) => label)
+    .join("·");
+};
+
+export const formatProjectReminderSchedule = (
+  settings: ProjectReminderSettings
+) =>
+  `${formatProjectReminderDays(settings)} ${formatProjectReminderTime(settings)}`;
 
 export const parseProjectReminderTime = (
   value: string

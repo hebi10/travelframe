@@ -24,7 +24,12 @@ for (const token of [
   "NotificationChannel",
   "Intent.ACTION_BOOT_COMPLETED",
   "Intent.ACTION_MY_PACKAGE_REPLACED",
-  'setContentText("오늘의 사진을 기록할 시간입니다.")'
+  'setContentTitle("$projectName 촬영 시간")',
+  'setContentText("$projectName 프로젝트의 오늘 사진을 기록할 시간입니다.")',
+  '"weekdays_$projectId"',
+  "findNextTrigger",
+  "candidate.get(Calendar.DAY_OF_WEEK)",
+  "weekdays.contains(weekday)"
 ]) {
   assert.ok(plugin.includes(token), `project reminder native plugin missing: ${token}`);
 }
@@ -35,6 +40,13 @@ for (const token of [
   "cancelProjectReminder",
   "PermissionsAndroid.request",
   "formatProjectReminderTime",
+  "formatProjectReminderSchedule",
+  "formatProjectReminderDays",
+  "PROJECT_REMINDER_WEEKDAY_OPTIONS",
+  'repeatMode: "daily"',
+  'repeatMode === "selected"',
+  "weekdays.join(\",\")",
+  "syncProjectReminderProjectName",
   "parseProjectReminderTime",
   '"body-frame.project-reminders.v1"'
 ]) {
@@ -43,11 +55,19 @@ for (const token of [
 
 for (const token of [
   "촬영 알림",
-  "원하는 시간에 매일 촬영 알림을 받을 수 있습니다.",
+  "프로젝트별 시간과 요일을 정해 촬영 알림을 받을 수 있습니다.",
   "reminderModalOpen",
   "reminderTimeDraft",
+  "reminderRepeatModeDraft",
+  "reminderWeekdaysDraft",
+  "PROJECT_REMINDER_WEEKDAY_OPTIONS",
+  "매일",
+  "요일 선택",
+  "toggleReminderWeekday",
   "saveReminderSettings",
   "cancelProjectReminder(project.id)",
+  "syncProjectReminderProjectName",
+  "projectName: nextProjectName",
   "KeyboardAvoidingView",
   'behavior={Platform.OS === "ios" ? "padding" : "height"}',
   "styles.reminderScroll",

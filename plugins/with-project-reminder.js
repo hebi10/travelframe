@@ -100,11 +100,12 @@ class AndroidProjectReminderModule(
   }
 
   @ReactMethod
-  fun scheduleDailyReminder(
+  fun scheduleReminder(
     projectId: String,
     projectName: String,
     hour: Int,
     minute: Int,
+    weekdaysCsv: String,
     promise: Promise
   ) {
     try {
@@ -113,7 +114,8 @@ class AndroidProjectReminderModule(
         projectId,
         projectName,
         hour,
-        minute
+        minute,
+        weekdaysCsv
       )
       promise.resolve(true)
     } catch (error: Exception) {
@@ -160,6 +162,7 @@ private const val PREFS_NAME = "body_frame_project_reminders"
 private const val PROJECT_IDS_KEY = "project_ids"
 private const val EXTRA_PROJECT_ID = "project_id"
 private const val EXTRA_PROJECT_NAME = "project_name"
+private const val DEFAULT_WEEKDAYS = "0,1,2,3,4,5,6"
 
 object ProjectReminderScheduler {
   fun ensureNotificationChannel(context: Context) {
@@ -169,7 +172,7 @@ object ProjectReminderScheduler {
       CHANNEL_NAME,
       NotificationManager.IMPORTANCE_HIGH
     ).apply {
-      description = "프로젝트별 매일 촬영 시간을 알려줍니다."
+      description = "프로젝트별 촬영 시간을 알려줍니다."
       enableVibration(true)
     }
     manager.createNotificationChannel(channel)
@@ -180,11 +183,15 @@ object ProjectReminderScheduler {
     projectId: String,
     projectName: String,
     hour: Int,
-    minute: Int
+    minute: Int,
+    weekdaysCsv: String
   ) {
     require(projectId.isNotBlank()) { "projectId is required" }
     require(hour in 0..23) { "hour must be between 0 and 23" }
     require(minute in 0..59) { "minute must be between 0 and 59" }
+
+    val weekdays = parseWeekdays(weekdaysCsv)
+    require(weekdays.isNotEmpty()) { "weekdays are required" }
 
     ensureNotificationChannel(context)
 
@@ -196,9 +203,10 @@ object ProjectReminderScheduler {
       .putString("name_$projectId", projectName.ifBlank { "바디 프레임" })
       .putInt("hour_$projectId", hour)
       .putInt("minute_$projectId", minute)
+      .putString("weekdays_$projectId", weekdays.joinToString(","))
       .apply()
 
-    schedule(context, projectId, projectName, hour, minute)
+    schedule(context, projectId, projectName, hour, minute, weekdays)
   }
 
   fun schedule(
@@ -206,18 +214,11 @@ object ProjectReminderScheduler {
     projectId: String,
     projectName: String,
     hour: Int,
-    minute: Int
+    minute: Int,
+    weekdays: Set<Int>
   ) {
     val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-    val trigger = Calendar.getInstance().apply {
-      set(Calendar.HOUR_OF_DAY, hour)
-      set(Calendar.MINUTE, minute)
-      set(Calendar.SECOND, 0)
-      set(Calendar.MILLISECOND, 0)
-      if (timeInMillis <= System.currentTimeMillis()) {
-        add(Calendar.DAY_OF_YEAR, 1)
-      }
-    }
+    val trigger = findNextTrigger(hour, minute, weekdays)
 
     alarmManager.setAndAllowWhileIdle(
       AlarmManager.RTC_WAKEUP,
@@ -239,6 +240,7 @@ object ProjectReminderScheduler {
         .remove("name_$projectId")
         .remove("hour_$projectId")
         .remove("minute_$projectId")
+        .remove("weekdays_$projectId")
         .apply()
     }
   }
@@ -246,11 +248,64 @@ object ProjectReminderScheduler {
   fun restoreAll(context: Context) {
     val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     val ids = prefs.getStringSet(PROJECT_IDS_KEY, emptySet()) ?: emptySet()
+
     ids.forEach { projectId ->
       val projectName = prefs.getString("name_$projectId", "바디 프레임") ?: "바디 프레임"
       val hour = prefs.getInt("hour_$projectId", 20)
       val minute = prefs.getInt("minute_$projectId", 0)
-      schedule(context, projectId, projectName, hour, minute)
+      val weekdays = parseWeekdays(
+        prefs.getString("weekdays_$projectId", DEFAULT_WEEKDAYS) ?: DEFAULT_WEEKDAYS
+      )
+      schedule(context, projectId, projectName, hour, minute, weekdays)
+    }
+  }
+
+  fun getStoredWeekdays(context: Context, projectId: String): Set<Int> {
+    val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    return parseWeekdays(
+      prefs.getString("weekdays_$projectId", DEFAULT_WEEKDAYS) ?: DEFAULT_WEEKDAYS
+    )
+  }
+
+  private fun parseWeekdays(value: String): Set<Int> =
+    value.split(",")
+      .mapNotNull { token -> token.trim().toIntOrNull() }
+      .filter { day -> day in 0..6 }
+      .toSet()
+      .ifEmpty { (0..6).toSet() }
+
+  private fun findNextTrigger(
+    hour: Int,
+    minute: Int,
+    weekdays: Set<Int>
+  ): Calendar {
+    val now = Calendar.getInstance()
+
+    for (dayOffset in 0..7) {
+      val candidate = Calendar.getInstance().apply {
+        add(Calendar.DAY_OF_YEAR, dayOffset)
+        set(Calendar.HOUR_OF_DAY, hour)
+        set(Calendar.MINUTE, minute)
+        set(Calendar.SECOND, 0)
+        set(Calendar.MILLISECOND, 0)
+      }
+
+      if (candidate.timeInMillis <= now.timeInMillis) {
+        continue
+      }
+
+      val weekday = (candidate.get(Calendar.DAY_OF_WEEK) + 6) % 7
+      if (weekdays.contains(weekday)) {
+        return candidate
+      }
+    }
+
+    return Calendar.getInstance().apply {
+      add(Calendar.DAY_OF_YEAR, 1)
+      set(Calendar.HOUR_OF_DAY, hour)
+      set(Calendar.MINUTE, minute)
+      set(Calendar.SECOND, 0)
+      set(Calendar.MILLISECOND, 0)
     }
   }
 
@@ -290,6 +345,7 @@ class ProjectReminderReceiver : BroadcastReceiver() {
         ?: "바디 프레임"
     val hour = prefs.getInt("hour_$projectId", 20)
     val minute = prefs.getInt("minute_$projectId", 0)
+    val weekdays = ProjectReminderScheduler.getStoredWeekdays(context, projectId)
 
     ProjectReminderScheduler.ensureNotificationChannel(context)
 
@@ -306,7 +362,7 @@ class ProjectReminderReceiver : BroadcastReceiver() {
     val notification = Notification.Builder(context, CHANNEL_ID)
       .setSmallIcon(android.R.drawable.ic_menu_camera)
       .setContentTitle("$projectName 촬영 시간")
-      .setContentText("오늘의 사진을 기록할 시간입니다.")
+      .setContentText("$projectName 프로젝트의 오늘 사진을 기록할 시간입니다.")
       .setAutoCancel(true)
       .setContentIntent(contentIntent)
       .build()
@@ -320,7 +376,14 @@ class ProjectReminderReceiver : BroadcastReceiver() {
       manager.notify(projectId.hashCode(), notification)
     }
 
-    ProjectReminderScheduler.schedule(context, projectId, projectName, hour, minute)
+    ProjectReminderScheduler.schedule(
+      context,
+      projectId,
+      projectName,
+      hour,
+      minute,
+      weekdays
+    )
   }
 }
 `;
