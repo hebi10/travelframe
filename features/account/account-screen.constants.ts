@@ -10,6 +10,7 @@ export type PaymentPlan = {
   price: string;
   billing: string;
   summary: string;
+  purchaseNotice: string;
   benefits: string[];
 };
 
@@ -58,6 +59,7 @@ export const paymentPlans: PaymentPlan[] = [
     price: "1,990원",
     billing: "1회 결제",
     summary: "한 번 결제하면 광고를 영구 제거합니다. 무료 플랜 기능은 그대로 유지됩니다.",
+    purchaseNotice: "Google Play를 통한 1회성 구매입니다. 정기 결제나 자동 갱신이 발생하지 않으며, 동일한 Google Play 계정에서는 구매 복원을 통해 기존 구매를 다시 확인할 수 있습니다.",
     benefits: [
       "앱 전반의 광고 영구 제거",
       "무료 플랜 기능 유지",
@@ -70,6 +72,7 @@ export const paymentPlans: PaymentPlan[] = [
     price: "Google Play 가격",
     billing: "월 구독",
     summary: "Pro는 바디 프레임 365장 기록과 36.5초 변화 영상, 광고·워터마크 제거, 클라우드 백업을 제공합니다.",
+    purchaseNotice: "Google Play를 통한 월 구독입니다. 취소하지 않는 한 각 결제 주기에 자동으로 갱신됩니다. 구독은 Google Play 정기 결제에서 관리하거나 취소할 수 있으며 앱을 삭제해도 구독이 자동 취소되지는 않습니다. 실제 결제 금액은 Google Play 구매 화면에 표시되는 가격을 기준으로 합니다.",
     benefits: [
       "프로젝트당 최대 365장 기록",
       "최대 36.5초 변화 영상",
@@ -84,6 +87,7 @@ export const paymentPlans: PaymentPlan[] = [
     price: "Google Play 가격",
     billing: "월 구독",
     summary: "Expert는 현재 바디 프레임 기록·변화 영상 길이 제한을 해제하고 상위 저장·백업 한도를 제공합니다.",
+    purchaseNotice: "Google Play를 통한 월 구독입니다. 취소하지 않는 한 각 결제 주기에 자동으로 갱신됩니다. 구독은 Google Play 정기 결제에서 관리하거나 취소할 수 있으며 앱을 삭제해도 구독이 자동 취소되지는 않습니다. 실제 결제 금액은 Google Play 구매 화면에 표시되는 가격을 기준으로 합니다.",
     benefits: [
       "바디 프레임 기록 수 제한 해제",
       "변화 영상 길이 제한 해제",

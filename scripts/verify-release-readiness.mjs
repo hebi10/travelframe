@@ -42,7 +42,9 @@ for (const assetPath of [
 
 for (const file of [
   "privacy/privacy-policy.md",
+  "privacy/terms-of-service.md",
   "privacy/photo-guide-delete-account.html",
+  "admin/terms/index.html",
   "docs/release-assets/README.md",
   "docs/body-frame-release-checklist.md",
   ".gitleaksignore"
@@ -149,6 +151,25 @@ for (const token of [
 ]) {
   if (!privacyPolicy.includes(token)) {
     fail(`privacy policy Health Connect disclosure missing: ${token}`);
+  }
+}
+
+
+const termsOfService = fs.readFileSync(
+  path.join(root, "privacy/terms-of-service.md"),
+  "utf8"
+);
+for (const token of [
+  "Google Play",
+  "1회성 구매",
+  "월 단위 정기 결제",
+  "자동으로 갱신",
+  "정기 결제 관리 화면",
+  "앱을 삭제하는 것만으로는 정기 결제가 취소되지 않습니다",
+  "환불"
+]) {
+  if (!termsOfService.includes(token)) {
+    fail(`terms of service billing disclosure missing: ${token}`);
   }
 }
 
