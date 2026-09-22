@@ -65,11 +65,16 @@ export const selectCloudBackupProject = async ({
 }: {
   user: User;
   projectId: string;
-}) =>
-  callSlotFunction<{ projectId: string }, SlotResponse>(
+}) => {
+  if (!user.uid) {
+    throw new Error("로그인 후 백업 프로젝트를 선택할 수 있습니다.");
+  }
+
+  return callSlotFunction<{ projectId: string }, SlotResponse>(
     "selectCloudBackupProject",
     { projectId }
   );
+};
 
 export const replaceCloudBackupProject = async ({
   user,
@@ -79,11 +84,16 @@ export const replaceCloudBackupProject = async ({
   user: User;
   slotId: string;
   projectId: string;
-}) =>
-  callSlotFunction<
+}) => {
+  if (!user.uid) {
+    throw new Error("로그인 후 백업 프로젝트를 변경할 수 있습니다.");
+  }
+
+  return callSlotFunction<
     { slotId: string; projectId: string },
     SlotResponse & { deletedPhotoCount: number; deletedVideoCount: number }
   >("replaceCloudBackupProject", { slotId, projectId });
+};
 
 export const getSelectedCloudBackupProjectIds = async (user: User | null) =>
   new Set((await getCloudBackupProjectSlots(user)).map((slot) => slot.projectId));
