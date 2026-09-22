@@ -55,6 +55,16 @@ for (const file of [
 }
 
 const billing = fs.readFileSync(path.join(root, "lib/google-play-billing.ts"), "utf8");
+const serverBilling = fs.readFileSync(
+  path.join(root, "functions/google-play-billing.js"),
+  "utf8"
+);
+if (!serverBilling.includes('const GOOGLE_PLAY_TOPIC = "body-frame-play-billing"')) {
+  fail("Google Play RTDN Pub/Sub topic must be body-frame-play-billing");
+}
+if (serverBilling.includes('const GOOGLE_PLAY_TOPIC = "google-play-billing"')) {
+  fail("Google Play RTDN Pub/Sub topic must not start with reserved goog prefix");
+}
 for (const productId of ["ad_remove", "creator_monthly", "expert_monthly"]) {
   if (!billing.includes(productId)) {
     fail(`Google Play product mapping missing: ${productId}`);
