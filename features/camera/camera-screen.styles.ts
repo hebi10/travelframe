@@ -966,6 +966,23 @@ export const styles = StyleSheet.create({
     zIndex: 22,
     marginBottom: 10
   },
+  cameraColorFloatingOverlay: {
+    position: "absolute",
+    left: 12,
+    right: 12,
+    zIndex: 60
+  },
+  cameraColorFloatingCard: {
+    flex: 1,
+    minHeight: 0
+  },
+  cameraColorFloatingScroll: {
+    flex: 1
+  },
+  cameraColorFloatingScrollContent: {
+    flexGrow: 1,
+    justifyContent: "flex-start"
+  },
   cameraControlPanelViewport: {
     width: "100%",
     minHeight: 42,
