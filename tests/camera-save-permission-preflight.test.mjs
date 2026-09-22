@@ -73,8 +73,14 @@ function harness({
     subscription: null,
     getCurrentBodyCaptureContext: () => ({}),
     getUserFacingErrorMessage: (error) => error.message,
-    isDeviceAlbumPermissionError: (error) =>
-      error instanceof Error && error.message.includes("권한"),
+    isDeviceAlbumPermissionError: (error) => {
+      const message = error instanceof Error ? error.message : "";
+      return (
+        message.includes("앨범 저장 권한") ||
+        message.includes("사진 접근 권한") ||
+        message.includes("선택한 사진만")
+      );
+    },
     showDeviceAlbumPermissionPrompt: () => events.push("permission-help"),
     finishBodyFrameCameraCapture: () => events.push("release"),
     deleteLocalFile: async () => events.push("cleanup")
