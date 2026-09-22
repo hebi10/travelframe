@@ -435,6 +435,10 @@ export default function BodyFrameVideoScreen() {
           <SummaryRow label="화면 비율" value={videoOptions.ratio} disabled={isExporting} onPress={() => setOptionKind("ratio")} />
         </View>
 
+        <Text style={[styles.orderHint, { color: palette.muted }]}>
+          영상은 프로젝트의 사진 순서(#1 → #2 → #3 …)대로 만들어집니다. 순서를 바꾸려면 프로젝트 상세의 순서 조정에서 변경해 주세요.
+        </Text>
+
         {!videoLimitState.allowed ? (
           <View
             style={[
@@ -656,6 +660,11 @@ const styles = StyleSheet.create({
   summaryValue: {
     fontSize: 14,
     fontWeight: "500"
+  },
+  orderHint: {
+    marginTop: 10,
+    fontSize: bodyFrameTypography.caption,
+    lineHeight: 17
   },
   limitNotice: {
     marginTop: 16,
