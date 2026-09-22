@@ -180,6 +180,9 @@ type CameraScreenProps = {
   headerCenter?: ReactNode;
 };
 
+const CAMERA_PERMISSION_RECOVERY_TIMEOUT_MS = 3_000;
+const CAMERA_PERMISSION_RECOVERY_POLL_MS = 50;
+
 export default function CameraScreen({
   projectReferenceMode = "latest",
   onProjectReferenceModeChange,
@@ -501,6 +504,30 @@ export default function CameraScreen({
       !isBodyFrameCameraCaptureBlocked(),
     []
   );
+  const waitForCameraSessionReadyForCapture = useCallback(async () => {
+    const startedAt = Date.now();
+
+    while (Date.now() - startedAt < CAMERA_PERMISSION_RECOVERY_TIMEOUT_MS) {
+      if (isBodyFrameCameraCaptureBlocked()) {
+        const reason =
+          getBodyFrameCameraSessionSnapshot().captureBlockedReason ??
+          "현재 플랜의 프로젝트 사진 한도에 도달했습니다.";
+        throw new Error(reason);
+      }
+
+      if (isCameraReadyRef.current && isCameraSessionActiveRef.current) {
+        return;
+      }
+
+      await sleep(CAMERA_PERMISSION_RECOVERY_POLL_MS);
+    }
+
+    if (!isCameraReadyRef.current || !isCameraSessionActiveRef.current) {
+      throw new Error(
+        "앨범 권한 확인 후 카메라가 다시 준비되지 않았습니다. 잠시 후 다시 촬영해 주세요."
+      );
+    }
+  }, []);
   const selectedCameraRatioAspect = cameraRatioAspect[cameraRatio] ?? undefined;
   const cameraPreviewTopOffset =
     cameraTopBarHeight > 0
@@ -2168,7 +2195,7 @@ export default function CameraScreen({
       // Resolve the system dialog before a photo or a pending save exists.
       if (getCameraSaveScopeTargets(captureSaveScope).device) {
         await requestPhotoSavePermission();
-        if (!canCaptureWithCurrentSession()) return;
+        await waitForCameraSessionReadyForCapture();
       }
       const captureStartedAt = Date.now();
       const logCaptureStage = (stage: string) => {
@@ -2180,7 +2207,7 @@ export default function CameraScreen({
       if (pendingPoseSnapshot) {
         logCaptureStage("waiting-pose-snapshot");
         await pendingPoseSnapshot;
-        if (!canCaptureWithCurrentSession()) return;
+        await waitForCameraSessionReadyForCapture();
         logCaptureStage("pose-snapshot-idle");
       }
 

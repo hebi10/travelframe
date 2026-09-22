@@ -10,9 +10,10 @@ assert.ok(
 );
 
 assert.ok(
-  exportSource.includes("const state = getMediaLibraryAccessState(permission)") &&
-    exportSource.includes('if (state !== "full")'),
-  "media library saving should require full album permission before writing to the phone album"
+  exportSource.includes("let state = getMediaLibraryAccessState(permission)") &&
+    exportSource.includes('if (permission.granted && state === "full")') &&
+    exportSource.includes('if (!permission.granted || state !== "full")'),
+  "media library saving should reuse full access and still reject non-full album permission"
 );
 
 assert.ok(

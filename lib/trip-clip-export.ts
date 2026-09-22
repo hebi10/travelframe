@@ -54,24 +54,42 @@ const getMimeType = (uri: string) => {
   return "image/jpeg";
 };
 
+const getMediaSavePermission = async (
+  MediaLibrary: MediaLibraryModule,
+  kind: MediaPermissionKind
+) =>
+  Platform.OS === "android"
+    ? MediaLibrary.getPermissionsAsync(false, [kind])
+    : MediaLibrary.getPermissionsAsync(false);
+
+const requestMediaSavePermission = async (
+  MediaLibrary: MediaLibraryModule,
+  kind: MediaPermissionKind
+) =>
+  Platform.OS === "android"
+    ? MediaLibrary.requestPermissionsAsync(false, [kind])
+    : MediaLibrary.requestPermissionsAsync(false);
+
 const requestSavePermission = async (kind: MediaPermissionKind) => {
   const MediaLibrary = await getMediaLibrary();
-  const permission =
-    Platform.OS === "android"
-      ? await MediaLibrary.requestPermissionsAsync(false, [kind])
-      : await MediaLibrary.requestPermissionsAsync(false);
-  const state = getMediaLibraryAccessState(permission);
+  let permission = await getMediaSavePermission(MediaLibrary, kind);
+  let state = getMediaLibraryAccessState(permission);
+
+  if (permission.granted && state === "full") {
+    return MediaLibrary;
+  }
+
+  if (permission.canAskAgain !== false) {
+    permission = await requestMediaSavePermission(MediaLibrary, kind);
+    state = getMediaLibraryAccessState(permission);
+  }
 
   const permissionMessage = getMediaLibraryPermissionMessage(
     state,
     "핸드폰 앨범 저장 권한이 필요합니다."
   );
 
-  if (!permission.granted) {
-    throw new Error(permissionMessage);
-  }
-
-  if (state !== "full") {
+  if (!permission.granted || state !== "full") {
     throw new Error(permissionMessage);
   }
 

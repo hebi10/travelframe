@@ -114,12 +114,37 @@ for (const snippet of [
 
 for (const snippet of [
   "requestSavePermission",
+  "MediaLibrary.getPermissionsAsync",
   "MediaLibrary.requestPermissionsAsync",
-  "if (!permission.granted)",
+  'if (permission.granted && state === "full")',
+  "permission.canAskAgain !== false",
+  "if (!permission.granted || state !== \"full\")",
   "핸드폰 앨범 저장 권한이 필요합니다."
 ]) {
   assert.ok(tripClipExportSource.includes(snippet), `media save permission request missing: ${snippet}`);
 }
+
+const mediaPermissionStart = tripClipExportSource.indexOf(
+  "const requestSavePermission = async"
+);
+const mediaPermissionEnd = tripClipExportSource.indexOf(
+  "export const requestPhotoSavePermission",
+  mediaPermissionStart
+);
+const mediaPermissionSource = tripClipExportSource.slice(
+  mediaPermissionStart,
+  mediaPermissionEnd
+);
+assert.ok(
+  mediaPermissionSource.indexOf("getMediaSavePermission") <
+    mediaPermissionSource.indexOf("requestMediaSavePermission"),
+  "camera album save should check the existing permission before asking again"
+);
+assert.ok(
+  mediaPermissionSource.indexOf('permission.granted && state === "full"') <
+    mediaPermissionSource.indexOf("requestMediaSavePermission"),
+  "an already-granted media permission should skip another system permission request"
+);
 
 for (const snippet of [
   "gallerySavingOverlay",
