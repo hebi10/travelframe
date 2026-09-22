@@ -723,6 +723,20 @@ body.admin-page {
 .admin-page .brand {
   gap: 5px;
 }
+.admin-page .brand-lockup {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.admin-page .admin-logo {
+  width: 48px;
+  height: 48px;
+  flex: 0 0 auto;
+  object-fit: cover;
+}
+
 
 .admin-page .brand h1 {
   font-size: clamp(28px, 3vw, 34px);
