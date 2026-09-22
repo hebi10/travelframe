@@ -40,7 +40,7 @@ import {
 import { AppGuideOverlay } from "@/components/app-guide-overlay";
 import { CameraGuideOverlay } from "@/components/camera-guide-overlay";
 import { PhotoReferenceOverlay, type PhotoReferenceOverlayHandle } from "@/components/photo-reference-overlay";
-import { colors } from "@/constants/app-theme";
+import { bodyFrameDarkColors, colors } from "@/constants/app-theme";
 import { GUIDE_LABELS, GUIDE_TYPES, type GuideType } from "@/constants/camera-guides";
 import {
   CameraSettingToggleRow,
@@ -2603,33 +2603,37 @@ export default function CameraScreen({
       >
         <View style={[styles.navModalBackdrop, modalSafeStyle]}>
           <View style={[styles.navModal, { paddingBottom: bottomModalPadding }]}>
-            <View style={styles.modalHeader}>
+            <View style={styles.cameraSettingsHandle} />
+            <View style={styles.cameraSettingsHeader}>
               <View style={styles.modalTitleGroup}>
-                <Text selectable={false} style={styles.modalEyebrow}>CAMERA</Text>
-                <Text selectable={false} style={styles.modalTitle}>촬영 도구</Text>
+                <Text selectable={false} style={styles.cameraSettingsEyebrow}>CAMERA</Text>
+                <Text selectable={false} style={styles.cameraSettingsTitle}>촬영</Text>
               </View>
-              <Pressable style={styles.modalCloseButton} onPress={() => setCameraSettingsOpen(false)}>
-                <Text selectable={false} style={styles.modalCloseText}>닫기</Text>
+              <Pressable style={styles.cameraSettingsCloseButton} onPress={() => setCameraSettingsOpen(false)}>
+                <Text selectable={false} style={styles.cameraSettingsCloseText}>닫기</Text>
               </Pressable>
             </View>
 
             <View style={styles.cameraSettingsScrollShell}>
-              <View pointerEvents="none" style={styles.cameraSettingsScrollHint}>
-                <Text selectable={false} style={styles.cameraSettingsScrollHintText}>스크롤</Text>
-                <Text selectable={false} style={styles.cameraSettingsScrollHintIcon}>↓</Text>
-              </View>
-
               <ScrollView
                 style={styles.cameraSettingsScroll}
                 contentContainerStyle={styles.cameraSettingsContent}
-                showsVerticalScrollIndicator
-                persistentScrollbar
+                showsVerticalScrollIndicator={false}
               >
                 <View style={styles.cameraSettingBlock}>
-                  <Text selectable={false} style={styles.modalSectionTitle}>촬영 도구</Text>
-                  <Text selectable={false} style={styles.modalSectionDetail}>
-                    자주 쓰지 않는 기능은 촬영 화면을 가리지 않도록 이곳에서 엽니다.
-                  </Text>
+                  <View style={styles.cameraToolIntro}>
+                    <View style={styles.cameraToolIntroCopy}>
+                      <Text selectable={false} style={styles.cameraSettingsSectionTitle}>촬영 도구</Text>
+                      <Text selectable={false} style={styles.cameraSettingsSectionDetail}>
+                        자주 쓰지 않는 기능은 촬영 화면을 가리지 않도록 이곳에서 엽니다.
+                      </Text>
+                    </View>
+                    <Feather
+                      name="chevron-down"
+                      size={24}
+                      color={bodyFrameDarkColors.text}
+                    />
+                  </View>
                   <View style={styles.cameraToolGrid}>
                     <Pressable
                       style={[
@@ -2640,7 +2644,7 @@ export default function CameraScreen({
                       accessibilityRole="button"
                       accessibilityLabel="라인 가이드 설정 열기"
                     >
-                      <Feather name="crosshair" size={18} color={colors.text} />
+                      <Feather name="crosshair" size={24} color={bodyFrameDarkColors.text} />
                       <Text selectable={false} style={styles.cameraToolText}>라인</Text>
                     </Pressable>
                     <Pressable
@@ -2650,10 +2654,10 @@ export default function CameraScreen({
                       ]}
                       onPress={() => openCameraToolFromSettings(openPhotoGuideSettings)}
                       accessibilityRole="button"
-                      accessibilityLabel="기준 사진 설정 열기"
+                      accessibilityLabel="사진 설정 열기"
                     >
-                      <Feather name="image" size={18} color={colors.text} />
-                      <Text selectable={false} style={styles.cameraToolText}>기준 사진</Text>
+                      <Feather name="image" size={24} color={bodyFrameDarkColors.text} />
+                      <Text selectable={false} style={styles.cameraToolText}>사진</Text>
                     </Pressable>
                     <Pressable
                       style={[
@@ -2664,7 +2668,7 @@ export default function CameraScreen({
                       accessibilityRole="button"
                       accessibilityLabel="색감 설정 열기"
                     >
-                      <Feather name="sliders" size={18} color={colors.text} />
+                      <Feather name="sliders" size={24} color={bodyFrameDarkColors.text} />
                       <Text selectable={false} style={styles.cameraToolText}>색감</Text>
                     </Pressable>
                     <Pressable
@@ -2676,7 +2680,7 @@ export default function CameraScreen({
                       accessibilityRole="button"
                       accessibilityLabel="확대 설정 열기"
                     >
-                      <Feather name="zoom-in" size={18} color={colors.text} />
+                      <Feather name="zoom-in" size={24} color={bodyFrameDarkColors.text} />
                       <Text selectable={false} style={styles.cameraToolText}>확대</Text>
                     </Pressable>
                     <Pressable
@@ -2689,7 +2693,7 @@ export default function CameraScreen({
                       accessibilityRole="button"
                       accessibilityLabel="라이트 설정 열기"
                     >
-                      <Feather name="zap" size={18} color={colors.text} />
+                      <Feather name="zap" size={24} color={bodyFrameDarkColors.text} />
                       <Text selectable={false} style={styles.cameraToolText}>라이트</Text>
                     </Pressable>
                     <Pressable
@@ -2700,7 +2704,7 @@ export default function CameraScreen({
                         cameraFacing === "front" ? "후면 카메라로 전환" : "전면 카메라로 전환"
                       }
                     >
-                      <Feather name="refresh-cw" size={18} color={colors.text} />
+                      <Feather name="refresh-cw" size={24} color={bodyFrameDarkColors.text} />
                       <Text selectable={false} style={styles.cameraToolText}>
                         {cameraFacing === "front" ? "후면" : "전면"}
                       </Text>
@@ -2708,24 +2712,31 @@ export default function CameraScreen({
                   </View>
                 </View>
 
+                <View style={styles.cameraSettingsDivider} />
+
                 <View style={styles.cameraSettingBlock}>
-                  <Text selectable={false} style={styles.modalSectionTitle}>카메라 방향</Text>
-                  <View style={styles.optionRow}>
+                  <Text selectable={false} style={styles.cameraSettingsSectionTitle}>카메라 방향</Text>
+                  <View style={styles.cameraSettingsOptionRow}>
                     {CAMERA_FACING_OPTIONS.map((option) => (
                       <Pressable
                         key={option.value}
                         style={[
-                          styles.optionButton,
-                          cameraFacing === option.value && styles.optionButtonActive
+                          styles.cameraSettingsOptionButton,
+                          cameraFacing === option.value && styles.cameraSettingsOptionButtonActive
                         ]}
                         onPress={() => changeCameraFacing(option.value)}
                         accessibilityState={{ selected: cameraFacing === option.value }}
                       >
+                        <Feather
+                          name={option.value === "back" ? "camera" : "user"}
+                          size={18}
+                          color={bodyFrameDarkColors.text}
+                        />
                         <Text
                           selectable={false}
                           style={[
-                            styles.optionButtonText,
-                            cameraFacing === option.value && styles.optionButtonTextActive
+                            styles.cameraSettingsOptionButtonText,
+                            cameraFacing === option.value && styles.cameraSettingsOptionButtonTextActive
                           ]}
                         >
                           {option.label}
@@ -2736,23 +2747,28 @@ export default function CameraScreen({
                 </View>
 
                 <View style={styles.cameraSettingBlock}>
-                  <Text selectable={false} style={styles.modalSectionTitle}>촬영 타이머</Text>
-                  <View style={styles.optionRow}>
+                  <Text selectable={false} style={styles.cameraSettingsSectionTitle}>촬영 타이머</Text>
+                  <View style={styles.cameraSettingsOptionRow}>
                     {CAMERA_TIMER_OPTIONS.map((option) => (
                       <Pressable
                         key={option.value}
                         style={[
-                          styles.optionButton,
-                          shutterTimer === option.value && styles.optionButtonActive
+                          styles.cameraSettingsOptionButton,
+                          shutterTimer === option.value && styles.cameraSettingsOptionButtonActive
                         ]}
                         onPress={() => setShutterTimer(option.value)}
                         accessibilityState={{ selected: shutterTimer === option.value }}
                       >
+                        <Feather
+                          name={option.value === 0 ? "slash" : "clock"}
+                          size={18}
+                          color={bodyFrameDarkColors.text}
+                        />
                         <Text
                           selectable={false}
                           style={[
-                            styles.optionButtonText,
-                            shutterTimer === option.value && styles.optionButtonTextActive
+                            styles.cameraSettingsOptionButtonText,
+                            shutterTimer === option.value && styles.cameraSettingsOptionButtonTextActive
                           ]}
                         >
                           {option.label}
@@ -2763,23 +2779,28 @@ export default function CameraScreen({
                 </View>
 
                 <View style={styles.cameraSettingBlock}>
-                  <Text selectable={false} style={styles.modalSectionTitle}>플래시</Text>
-                  <View style={styles.optionRow}>
+                  <Text selectable={false} style={styles.cameraSettingsSectionTitle}>플래시</Text>
+                  <View style={styles.cameraSettingsOptionRow}>
                     {CAMERA_FLASH_OPTIONS.map((option) => (
                       <Pressable
                         key={option.value}
                         style={[
-                          styles.optionButton,
-                          flashMode === option.value && styles.optionButtonActive
+                          styles.cameraSettingsOptionButton,
+                          flashMode === option.value && styles.cameraSettingsOptionButtonActive
                         ]}
                         onPress={() => setFlashMode(option.value)}
                         accessibilityState={{ selected: flashMode === option.value }}
                       >
+                        <Feather
+                          name={option.value === "off" ? "zap-off" : "zap"}
+                          size={18}
+                          color={bodyFrameDarkColors.text}
+                        />
                         <Text
                           selectable={false}
                           style={[
-                            styles.optionButtonText,
-                            flashMode === option.value && styles.optionButtonTextActive
+                            styles.cameraSettingsOptionButtonText,
+                            flashMode === option.value && styles.cameraSettingsOptionButtonTextActive
                           ]}
                         >
                           {option.label}
@@ -2788,6 +2809,7 @@ export default function CameraScreen({
                     ))}
                   </View>
                   <CameraSettingToggleRow
+                    dark
                     title="손전등"
                     detail="어두운 곳에서 계속 켜지는 보조 조명입니다."
                     valueLabel={visibleTorchEnabled ? "켜짐" : "꺼짐"}
@@ -2798,14 +2820,14 @@ export default function CameraScreen({
                 </View>
 
                 <View style={styles.cameraSettingBlock}>
-                  <Text selectable={false} style={styles.modalSectionTitle}>촬영 품질</Text>
-                  <View style={styles.optionRow}>
+                  <Text selectable={false} style={styles.cameraSettingsSectionTitle}>촬영 품질</Text>
+                  <View style={styles.cameraSettingsOptionRow}>
                     {CAMERA_QUALITY_OPTIONS.map((option) => (
                       <Pressable
                         key={option.value}
                         style={[
-                          styles.optionButton,
-                          photoQuality === option.value && styles.optionButtonActive
+                          styles.cameraSettingsOptionButton,
+                          photoQuality === option.value && styles.cameraSettingsOptionButtonActive
                         ]}
                         onPress={() => setPhotoQuality(option.value)}
                         accessibilityState={{ selected: photoQuality === option.value }}
@@ -2813,8 +2835,8 @@ export default function CameraScreen({
                         <Text
                           selectable={false}
                           style={[
-                            styles.optionButtonText,
-                            photoQuality === option.value && styles.optionButtonTextActive
+                            styles.cameraSettingsOptionButtonText,
+                            photoQuality === option.value && styles.cameraSettingsOptionButtonTextActive
                           ]}
                         >
                           {option.label}
@@ -2825,14 +2847,14 @@ export default function CameraScreen({
                 </View>
 
                 <View style={styles.cameraSettingBlock}>
-                  <Text selectable={false} style={styles.modalSectionTitle}>카메라 비율</Text>
-                  <View style={styles.optionRow}>
+                  <Text selectable={false} style={styles.cameraSettingsSectionTitle}>카메라 비율</Text>
+                  <View style={styles.cameraSettingsOptionRow}>
                     {CAMERA_RATIO_OPTIONS.map((option) => (
                       <Pressable
                         key={option.value}
                         style={[
-                          styles.optionButton,
-                          cameraRatio === option.value && styles.optionButtonActive
+                          styles.cameraSettingsOptionButton,
+                          cameraRatio === option.value && styles.cameraSettingsOptionButtonActive
                         ]}
                         onPress={() => updateCameraRatio(option.value)}
                         accessibilityState={{ selected: cameraRatio === option.value }}
@@ -2840,8 +2862,8 @@ export default function CameraScreen({
                         <Text
                           selectable={false}
                           style={[
-                            styles.optionButtonText,
-                            cameraRatio === option.value && styles.optionButtonTextActive
+                            styles.cameraSettingsOptionButtonText,
+                            cameraRatio === option.value && styles.cameraSettingsOptionButtonTextActive
                           ]}
                         >
                           {option.label}
@@ -2852,7 +2874,7 @@ export default function CameraScreen({
                 </View>
 
                 <View style={styles.cameraSettingBlock}>
-                  <Text selectable={false} style={styles.modalSectionTitle}>저장 범위</Text>
+                  <Text selectable={false} style={styles.cameraSettingsSectionTitle}>저장 범위</Text>
                   <View style={styles.optionGrid}>
                     {CAMERA_SAVE_SCOPE_OPTIONS.map((option) => {
                       const isCloudSaveTargetDisabled =
@@ -2866,8 +2888,8 @@ export default function CameraScreen({
                           key={option.value}
                           disabled={isCloudSaveTargetDisabled}
                           style={[
-                            styles.optionButton,
-                            isSelected && styles.optionButtonActive,
+                            styles.cameraSettingsOptionButton,
+                            isSelected && styles.cameraSettingsOptionButtonActive,
                             isCloudSaveTargetDisabled && { opacity: 0.38 }
                           ]}
                           onPress={() => toggleCameraSaveTarget(option.value)}
@@ -2876,8 +2898,8 @@ export default function CameraScreen({
                           <Text
                             selectable={false}
                             style={[
-                              styles.optionButtonText,
-                              isSelected && styles.optionButtonTextActive
+                              styles.cameraSettingsOptionButtonText,
+                              isSelected && styles.cameraSettingsOptionButtonTextActive
                             ]}
                           >
                             {option.label}
@@ -2886,18 +2908,20 @@ export default function CameraScreen({
                       );
                     })}
                   </View>
-                  <Text selectable={false} style={styles.modalSectionDetail}>
+                  <Text selectable={false} style={styles.cameraSettingsSectionDetail}>
                     선택한 위치에 각각 저장합니다. 클라우드는 로그인 및 백업 설정이 가능한 경우에만 사용됩니다.
                   </Text>
                 </View>
 
                 <View style={styles.cameraSettingBlock}>
-                  <Text selectable={false} style={styles.modalSectionTitle}>촬영 보조</Text>
+                  <Text selectable={false} style={styles.cameraSettingsSectionTitle}>촬영 보조</Text>
                   <CameraShutterSoundChoice
+                    dark
                     mode={cameraShutterSoundMode}
                     onChange={updateCameraShutterSoundMode}
                   />
                   <CameraSettingToggleRow
+                    dark
                     title="가이드 표시"
                     detail="현재 선택한 구도 가이드를 카메라 위에 표시합니다."
                     valueLabel={guideVisible ? "켜짐" : "꺼짐"}
@@ -2905,6 +2929,7 @@ export default function CameraScreen({
                     onPress={() => updateGuideVisibility(!guideVisible)}
                   />
                   <CameraSettingToggleRow
+                    dark
                     title="햅틱 피드백"
                     detail="촬영과 주요 조작 시 짧은 진동 피드백을 사용합니다."
                     valueLabel={hapticEnabled ? "켜짐" : "꺼짐"}
