@@ -30,12 +30,16 @@ const requiredCopy = [
     file: "features/account/account-screen.constants.ts",
     snippets: [
       'title: "Pro"',
-      'price: "Google Play 가격"',
-      "Pro는 바디 프레임 365장 기록과 36.5초 변화 영상",
-      "프로젝트당 최대 365장 기록",
-      "최대 36.5초 변화 영상",
-      "구독 기간 동안 앱 전반의 광고 제거",
-      "클라우드 백업과 상위 기록 한도"
+      'price: "1,990원"',
+      'title: "Plus"',
+      'price: "3,990원"',
+      'title: "Expert"',
+      'price: "5,990원"',
+      "로컬 프로젝트·사진 무제한",
+      "클라우드 백업 프로젝트 1개",
+      "클라우드 백업 프로젝트 최대 3개",
+      "클라우드 백업 프로젝트 최대 5개",
+      "각 프로젝트당 사진 최대 365장 백업"
     ]
   },
   {
