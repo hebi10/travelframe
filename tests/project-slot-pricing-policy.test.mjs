@@ -73,7 +73,7 @@ for (const token of [
   '"광고만 제거할까요?"',
   "광고 제거는 2,000원 1회 구매",
   "월 Pro(2,000원)부터",
-  "클라우드에 프로젝트 1개"
+  "선택한 프로젝트 1개를 클라우드에 백업"
 ]) {
   assert.ok(account.includes(token), `ad-removal comparison missing: ${token}`);
 }
