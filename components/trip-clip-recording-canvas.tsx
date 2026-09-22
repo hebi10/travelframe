@@ -12,6 +12,7 @@ import {
   type TripClipPhotoAdjustmentMap
 } from "@/lib/trip-clip-photo-adjustment";
 import type { RecordingFrame } from "@/lib/trip-clip-playback";
+import type { BodyFrameVideoOverlayPosition } from "@/lib/body-frame-video";
 import type { PhotoItem } from "@/types/photo";
 
 const getPreviewUri = (photo: PhotoItem) => photo.previewUri ?? photo.uri;
@@ -73,7 +74,9 @@ export function TripClipRecordingCanvas({
   guideOffsetFrameHeight,
   gridGuideLinePositions,
   guideShapePoints,
-  photoAdjustments
+  photoAdjustments,
+  bodyFrameOverlayText = null,
+  bodyFrameOverlayPosition = "bottom-right"
 }: {
   frame: RecordingFrame;
   template: TripClipTemplate;
@@ -93,6 +96,8 @@ export function TripClipRecordingCanvas({
   gridGuideLinePositions: GridGuideLinePositions;
   guideShapePoints: GuideShapePoints;
   photoAdjustments: TripClipPhotoAdjustmentMap;
+  bodyFrameOverlayText?: string | null;
+  bodyFrameOverlayPosition?: BodyFrameVideoOverlayPosition;
 }) {
   const isFilm = template === "film-log";
   const isCenter = template === "center-cut";
@@ -112,6 +117,15 @@ export function TripClipRecordingCanvas({
       : transition === "zoom"
         ? { opacity: progress > 0 ? 1 : 0, transform: [{ scale: 1.08 - progress * 0.08 }] }
         : { opacity: transition === "fade" ? progress : progress > 0 ? 1 : 0 };
+
+  const overlayPositionStyle =
+    bodyFrameOverlayPosition === "top-left"
+      ? styles.recordingOverlayTopLeft
+      : bodyFrameOverlayPosition === "top-right"
+        ? styles.recordingOverlayTopRight
+        : bodyFrameOverlayPosition === "bottom-left"
+          ? styles.recordingOverlayBottomLeft
+          : styles.recordingOverlayBottomRight;
 
   return (
     <View style={[styles.recordingCanvasInner, isFilm && styles.recordingCanvasFilm]}>
@@ -172,6 +186,21 @@ export function TripClipRecordingCanvas({
         gridLinePositions={gridGuideLinePositions}
         shapePoints={guideShapePoints}
       />
+      {bodyFrameOverlayText ? (
+        <Text
+          selectable={false}
+          numberOfLines={2}
+          style={[
+            styles.recordingOverlayText,
+            overlayPositionStyle,
+            showWatermark &&
+              bodyFrameOverlayPosition === "bottom-right" &&
+              styles.recordingOverlayAboveWatermark
+          ]}
+        >
+          {bodyFrameOverlayText}
+        </Text>
+      ) : null}
       {showWatermark ? (
         <View style={styles.recordingWatermark}>
           <Text selectable={false} style={styles.recordingWatermarkText}>
@@ -230,6 +259,42 @@ const styles = StyleSheet.create({
     width: 1,
     backgroundColor: "rgba(255, 255, 255, 0.42)",
     pointerEvents: "none"
+  },
+  recordingOverlayText: {
+    position: "absolute",
+    zIndex: 8,
+    maxWidth: "72%",
+    color: "rgba(255, 255, 255, 0.72)",
+    fontSize: 11,
+    lineHeight: 15,
+    fontWeight: "600",
+    letterSpacing: 0,
+    textShadowColor: "rgba(0, 0, 0, 0.72)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2
+  },
+  recordingOverlayTopLeft: {
+    top: 18,
+    left: 18,
+    textAlign: "left"
+  },
+  recordingOverlayTopRight: {
+    top: 18,
+    right: 18,
+    textAlign: "right"
+  },
+  recordingOverlayBottomLeft: {
+    bottom: 18,
+    left: 18,
+    textAlign: "left"
+  },
+  recordingOverlayBottomRight: {
+    right: 18,
+    bottom: 18,
+    textAlign: "right"
+  },
+  recordingOverlayAboveWatermark: {
+    bottom: 58
   },
   recordingWatermark: {
     position: "absolute",

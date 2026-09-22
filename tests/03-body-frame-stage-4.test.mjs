@@ -32,7 +32,18 @@ assert.equal(video.BODY_FRAME_VIDEO_RATIO, "3:4");
 assert.equal(video.BODY_FRAME_VIDEO_TEMPLATE, "minimal");
 assert.equal(video.BODY_FRAME_VIDEO_TRANSITION, "none");
 assert.equal(video.BODY_FRAME_VIDEO_TRANSITION_DURATION, 0);
-assert.deepEqual(video.DEFAULT_BODY_FRAME_VIDEO_OPTIONS, { interval: 0.1, quality: 1080, ratio: "3:4" });
+assert.deepEqual(video.DEFAULT_BODY_FRAME_VIDEO_OPTIONS, {
+  interval: 0.1,
+  quality: 1080,
+  ratio: "3:4",
+  overlay: {
+    showDate: false,
+    showWeight: false,
+    showBodyFat: false,
+    customText: "",
+    position: "bottom-right"
+  }
+});
 assert.deepEqual(video.BODY_FRAME_VIDEO_MAX_OUTPUT_SIZE, {
   width: 1080,
   height: 1440
@@ -57,6 +68,33 @@ assert.deepEqual(video.getBodyFrameVideoOutputSize("3:4", 1080), { width: 1080, 
 assert.deepEqual(video.getBodyFrameVideoOutputSize("1:1", 1080), { width: 1080, height: 1080 });
 assert.deepEqual(video.getBodyFrameVideoOutputSize("16:9", 1080), { width: 1920, height: 1080 });
 assert.equal(video.getBodyFrameVideoDuration(0, 1), 0);
+assert.equal(
+  video.formatBodyFrameVideoOverlayDate("2026-09-22T12:00:00+09:00"),
+  "26.09.22"
+);
+assert.equal(
+  video.getBodyFrameVideoOverlayText({
+    photo: { createdAt: "2026-09-22T12:00:00+09:00" },
+    measurement: { weightKg: 72.4, bodyFatPercent: 18.2 },
+    overlay: {
+      showDate: true,
+      showWeight: true,
+      showBodyFat: true,
+      customText: "",
+      position: "bottom-right"
+    }
+  }),
+  "26.09.22 · 72.4kg · 18.2%"
+);
+assert.equal(
+  video.getBodyFrameVideoOverlayText({
+    photo: { createdAt: "2026-09-22T12:00:00+09:00" },
+    measurement: null,
+    overlay: video.DEFAULT_BODY_FRAME_VIDEO_OVERLAY
+  }),
+  "",
+  "metadata overlay must be off by default"
+);
 
 const photos = [
   {

@@ -15,15 +15,44 @@ export const BODY_FRAME_VIDEO_TRANSITION_DURATION = 0;
 export const BODY_FRAME_VIDEO_INTERVALS = [0.1, 0.2, 0.5, 1] as const;
 export const BODY_FRAME_VIDEO_QUALITIES = [720, 1080] as const;
 export const BODY_FRAME_VIDEO_RATIOS = ["3:4", "9:16", "1:1", "16:9"] as const;
+export const BODY_FRAME_VIDEO_OVERLAY_POSITIONS = [
+  "top-left",
+  "top-right",
+  "bottom-left",
+  "bottom-right"
+] as const;
+
+export type BodyFrameVideoOverlayPosition =
+  (typeof BODY_FRAME_VIDEO_OVERLAY_POSITIONS)[number];
+
+export type BodyFrameVideoOverlayOptions = {
+  showDate: boolean;
+  showWeight: boolean;
+  showBodyFat: boolean;
+  customText: string;
+  position: BodyFrameVideoOverlayPosition;
+};
+
 export type BodyFrameVideoOptions = {
   interval: (typeof BODY_FRAME_VIDEO_INTERVALS)[number];
   quality: (typeof BODY_FRAME_VIDEO_QUALITIES)[number];
   ratio: (typeof BODY_FRAME_VIDEO_RATIOS)[number];
+  overlay: BodyFrameVideoOverlayOptions;
 };
+
+export const DEFAULT_BODY_FRAME_VIDEO_OVERLAY: BodyFrameVideoOverlayOptions = {
+  showDate: false,
+  showWeight: false,
+  showBodyFat: false,
+  customText: "",
+  position: "bottom-right"
+};
+
 export const DEFAULT_BODY_FRAME_VIDEO_OPTIONS: BodyFrameVideoOptions = {
   interval: BODY_FRAME_VIDEO_SECONDS_PER_PHOTO,
   quality: 1080,
-  ratio: BODY_FRAME_VIDEO_RATIO
+  ratio: BODY_FRAME_VIDEO_RATIO,
+  overlay: DEFAULT_BODY_FRAME_VIDEO_OVERLAY
 };
 export const getBodyFrameVideoOutputSize = (
   ratio: BodyFrameVideoOptions["ratio"],
@@ -118,3 +147,76 @@ export const getBodyFrameVideoDuration = (photoCount: number, interval = BODY_FR
 
 export const getBodyFrameVideoTotalFrames = (photoCount: number, interval = BODY_FRAME_VIDEO_SECONDS_PER_PHOTO) =>
   toSafePhotoCount(photoCount) * Math.round(interval * BODY_FRAME_VIDEO_FPS);
+
+
+export const formatBodyFrameVideoOverlayDate = (value?: string | null) => {
+  if (!value) {
+    return null;
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return [
+    String(date.getFullYear()).slice(-2),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0")
+  ].join(".");
+};
+
+export const getBodyFrameVideoOverlayText = ({
+  photo,
+  measurement,
+  overlay
+}: {
+  photo?: { createdAt?: string } | null;
+  measurement?: { weightKg?: number; bodyFatPercent?: number } | null;
+  overlay: BodyFrameVideoOverlayOptions;
+}) => {
+  const parts: string[] = [];
+  const customText = overlay.customText.trim();
+
+  if (overlay.showDate) {
+    const date = formatBodyFrameVideoOverlayDate(photo?.createdAt);
+    if (date) {
+      parts.push(date);
+    }
+  }
+
+  if (
+    overlay.showWeight &&
+    typeof measurement?.weightKg === "number" &&
+    Number.isFinite(measurement.weightKg)
+  ) {
+    parts.push(`${measurement.weightKg.toFixed(1)}kg`);
+  }
+
+  if (
+    overlay.showBodyFat &&
+    typeof measurement?.bodyFatPercent === "number" &&
+    Number.isFinite(measurement.bodyFatPercent)
+  ) {
+    parts.push(`${measurement.bodyFatPercent.toFixed(1)}%`);
+  }
+
+  if (customText) {
+    parts.push(customText);
+  }
+
+  return parts.join(" · ");
+};
+
+export const getBodyFrameVideoOverlaySummary = (
+  overlay: BodyFrameVideoOverlayOptions
+) => {
+  const parts = [
+    overlay.showDate ? "날짜" : null,
+    overlay.showWeight ? "몸무게" : null,
+    overlay.showBodyFat ? "체지방" : null,
+    overlay.customText.trim() ? "텍스트" : null
+  ].filter((item): item is string => Boolean(item));
+
+  return parts.length > 0 ? parts.join(" · ") : "없음";
+};
