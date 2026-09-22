@@ -1090,8 +1090,8 @@ export default function BodyFrameProjectDetailScreen() {
             </Text>
             <Text style={[styles.reminderDetail, { color: palette.muted }]}>
               {reminderSettings.enabled
-                ? `매일 ${formatProjectReminderTime(reminderSettings)} · 이 기기에서 알림`
-                : "원하는 시간에 매일 촬영 알림을 받을 수 있습니다."}
+                ? `${formatProjectReminderSchedule(reminderSettings)} · 이 기기에서 알림`
+                : "프로젝트별 시간과 요일을 정해 촬영 알림을 받을 수 있습니다."}
             </Text>
           </View>
           <Feather name="chevron-right" size={18} color={palette.muted} />
@@ -1327,7 +1327,7 @@ export default function BodyFrameProjectDetailScreen() {
                     촬영 알림
                   </Text>
                   <Text style={[styles.settingDetail, { color: palette.muted }]}>
-                    매일 같은 시간에 이 기기에서 촬영 알림을 표시합니다.
+                    “{project.name}” 프로젝트의 촬영 시간과 요일을 설정합니다.
                   </Text>
                 </View>
                 <Pressable
