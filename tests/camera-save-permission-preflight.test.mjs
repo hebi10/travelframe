@@ -10,7 +10,13 @@ const code = ts.transpileModule(source.slice(start, end), {
 }).outputText;
 
 class CaptureTimeout extends Error {}
-function harness({ device = true, permission = async () => {}, canCapture = () => true, timeout = false } = {}) {
+function harness({
+  device = true,
+  permission = async () => {},
+  canCapture = () => true,
+  waitForReady = null,
+  timeout = false
+} = {}) {
   const events = [];
   const lock = { current: false };
   let capturing = false;
@@ -31,6 +37,12 @@ function harness({ device = true, permission = async () => {}, canCapture = () =
     getCameraSaveScopeTargets: (scope) => ({ app: true, device: scope === "app_device", cloud: false }),
     createCameraSaveScope: () => "app",
     requestPhotoSavePermission: async () => { events.push("permission"); await permission(); },
+    waitForCameraSessionReadyAfterPermission: async () => {
+      if (waitForReady) {
+        events.push("wait-ready");
+        await waitForReady();
+      }
+    },
     reserveBodyFrameCameraCapture: () => { events.push("reserve"); return { reservationId: "1" }; },
     photoOutput: { capturePhotoToFile: async () => { events.push("capture"); return { filePath: "/photo.jpg" }; } },
     flashMode: "off",
@@ -43,7 +55,8 @@ function harness({ device = true, permission = async () => {}, canCapture = () =
     subscription: null,
     getCurrentBodyCaptureContext: () => ({}),
     getUserFacingErrorMessage: (error) => error.message,
-    isDeviceAlbumPermissionError: () => true,
+    isDeviceAlbumPermissionError: (error) =>
+      error instanceof Error && error.message.includes("권한"),
     showDeviceAlbumPermissionPrompt: () => events.push("permission-help"),
     finishBodyFrameCameraCapture: () => events.push("release"),
     deleteLocalFile: async () => events.push("cleanup")
@@ -72,14 +85,36 @@ assert.equal(denied.lock.current, false);
 assert.equal(denied.isCapturing(), false);
 
 let cameraActive = true;
-const leftScreen = harness({
+const recoveredSession = harness({
   permission: async () => { cameraActive = false; },
-  canCapture: () => cameraActive
+  canCapture: () => cameraActive,
+  waitForReady: async () => { cameraActive = true; }
 });
-await leftScreen.capture();
-assert.deepEqual(leftScreen.events, ["permission"], "leaving the camera while requesting permission must not capture");
-assert.equal(leftScreen.isCapturing(), false);
-assert.equal(leftScreen.lock.current, false);
+await recoveredSession.capture();
+assert.deepEqual(
+  recoveredSession.events,
+  ["permission", "wait-ready", "reserve", "capture", "queue"],
+  "a permission-triggered camera restart should resume capture after the session is ready"
+);
+assert.equal(recoveredSession.isCapturing(), false);
+assert.equal(recoveredSession.lock.current, false);
+
+cameraActive = true;
+const unrecoveredSession = harness({
+  permission: async () => { cameraActive = false; },
+  canCapture: () => cameraActive,
+  waitForReady: async () => {
+    throw new Error("앨범 권한 확인 후 카메라가 다시 준비되지 않았습니다.");
+  }
+});
+await unrecoveredSession.capture();
+assert.deepEqual(
+  unrecoveredSession.events,
+  ["permission", "wait-ready", "error"],
+  "camera recovery failure should be visible instead of silently returning"
+);
+assert.equal(unrecoveredSession.isCapturing(), false);
+assert.equal(unrecoveredSession.lock.current, false);
 
 const localOnly = harness({ device: false });
 await localOnly.capture();
