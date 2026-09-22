@@ -206,3 +206,32 @@ export const detachBodyMeasurementsFromPhoto = async (photoId: string) =>
       await writeEntries(next);
     }
   });
+
+export const syncBodyMeasurementPhotoSequences = async (
+  projectId: string,
+  sequenceByPhotoId: Map<string, number>
+) =>
+  runMutation(async () => {
+    const entries = await readEntries();
+    let changed = false;
+    const next = entries.map((entry) => {
+      if (entry.projectId !== projectId || !entry.photoId) {
+        return entry;
+      }
+
+      const sequence = sequenceByPhotoId.get(entry.photoId);
+      if (!sequence || entry.sequence === sequence) {
+        return entry;
+      }
+
+      changed = true;
+      return {
+        ...entry,
+        sequence
+      };
+    });
+
+    if (changed) {
+      await writeEntries(next);
+    }
+  });
