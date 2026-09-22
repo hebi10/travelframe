@@ -32,15 +32,18 @@ export const createAccountThemedStyles = (palette: AppPalette, fontFamily?: stri
     },
     text: {
       color: palette.text,
+      backgroundColor: "transparent",
       ...fontTextStyle
     },
     mutedText: {
       color: palette.muted,
+      backgroundColor: "transparent",
       fontWeight: "700",
       ...fontTextStyle
     },
     inverseText: {
       color: isDark ? palette.text : palette.inverse,
+      backgroundColor: "transparent",
       ...fontTextStyle
     },
     rowBorder: {
@@ -138,6 +141,7 @@ export const styles = StyleSheet.create({
   },
   helpText: {
     color: colors.muted,
+    backgroundColor: "transparent",
     fontSize: typography.small,
     lineHeight: 18,
     letterSpacing: 0
@@ -285,6 +289,7 @@ export const styles = StyleSheet.create({
   },
   planPrice: {
     color: colors.text,
+    backgroundColor: "transparent",
     fontSize: typography.section,
     fontWeight: "900",
     letterSpacing: 0
@@ -294,6 +299,7 @@ export const styles = StyleSheet.create({
   },
   benefitText: {
     color: colors.muted,
+    backgroundColor: "transparent",
     fontSize: typography.small,
     lineHeight: 18,
     letterSpacing: 0
