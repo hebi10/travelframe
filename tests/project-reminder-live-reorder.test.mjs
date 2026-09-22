@@ -47,7 +47,13 @@ for (const token of [
   "reminderModalOpen",
   "reminderTimeDraft",
   "saveReminderSettings",
-  "cancelProjectReminder(project.id)"
+  "cancelProjectReminder(project.id)",
+  "KeyboardAvoidingView",
+  'behavior={Platform.OS === "ios" ? "padding" : "height"}',
+  "styles.reminderScroll",
+  'keyboardShouldPersistTaps="handled"',
+  'keyboardDismissMode="on-drag"',
+  'maxHeight: "88%"'
 ]) {
   assert.ok(projectDetail.includes(token), `project reminder UI missing: ${token}`);
 }
