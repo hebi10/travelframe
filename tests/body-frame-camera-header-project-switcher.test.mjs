@@ -47,7 +47,7 @@ assert.ok(
   camera.indexOf('accessibilityLabel={user ? "마이페이지로 이동" : "로그인으로 이동"}') <
     camera.indexOf("{headerCenter}") &&
     camera.indexOf("{headerCenter}") <
-    camera.indexOf('accessibilityLabel="촬영 도구 열기"'),
+    camera.indexOf('accessibilityLabel="촬영 설정 열기"'),
   "project selector must sit between account and camera settings actions"
 );
 
