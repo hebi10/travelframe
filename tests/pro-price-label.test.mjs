@@ -14,9 +14,9 @@ const adminSource = fs.readFileSync("admin/admin.js", "utf8");
 const functionsSource = fs.readFileSync("functions/index.js", "utf8");
 
 for (const [id, title, fallback] of [
-  ["creator", "Pro", "1,990원"],
-  ["plus", "Plus", "3,990원"],
-  ["expert", "Expert", "5,990원"]
+  ["creator", "Pro", "2,000원"],
+  ["plus", "Plus", "4,000원"],
+  ["expert", "Expert", "6,000원"]
 ]) {
   assert.match(
     accountConstants,
