@@ -3207,9 +3207,18 @@ export default function CameraScreen({
                       <View style={styles.cameraColorPanel}>
                         <View style={styles.cameraColorHeaderRow}>
                           <View style={styles.cameraColorHeader}>
-                            <Text selectable={false} style={styles.cameraColorTitle}>색감</Text>
+                            <View style={styles.cameraColorTitleRow}>
+                              <Feather
+                                name="sliders"
+                                size={18}
+                                color={bodyFrameDarkColors.text}
+                              />
+                              <Text selectable={false} style={styles.cameraColorTitle}>
+                                색감
+                              </Text>
+                            </View>
                             <Text selectable={false} style={styles.cameraColorHint}>
-                              노출은 카메라에 바로 적용되고 온도/틴트는 화면에서 확인합니다.
+                              촬영 전에 원하는 색감을 조정하고 자주 쓰는 값은 슬롯에 저장할 수 있습니다.
                             </Text>
                           </View>
                           <Pressable
@@ -3218,39 +3227,59 @@ export default function CameraScreen({
                             accessibilityRole="button"
                             accessibilityLabel="색감 설정 닫기"
                           >
-                            <Feather name="x" size={18} color={colors.text} />
+                            <Feather
+                              name="x"
+                              size={20}
+                              color={bodyFrameDarkColors.text}
+                            />
                           </Pressable>
                         </View>
-                        <View style={styles.cameraColorSlotRow}>
-                          {cameraColorSlots.map((slot, index) => (
-                            <Pressable
-                              key={`camera-color-slot-${index}`}
-                              style={[
-                                styles.cameraColorSlotButton,
-                                selectedCameraColorSlot === index && styles.cameraColorSlotButtonActive,
-                                slot && styles.cameraColorSlotButtonSaved
-                              ]}
-                              onPress={() => applyCameraColorSlot(slot, index)}
-                              accessibilityRole="button"
-                              accessibilityState={{ selected: selectedCameraColorSlot === index }}
-                              accessibilityLabel={`색감 슬롯 ${index + 1}`}
-                            >
-                              <Text
-                                selectable={false}
+
+                        <View style={styles.cameraColorPresetSection}>
+                          <View style={styles.cameraColorPresetHeader}>
+                            <Text selectable={false} style={styles.cameraColorPresetTitle}>
+                              저장 슬롯
+                            </Text>
+                            <Text selectable={false} style={styles.cameraColorPresetHint}>
+                              탭하여 적용
+                            </Text>
+                          </View>
+                          <View style={styles.cameraColorSlotRow}>
+                            {cameraColorSlots.map((slot, index) => (
+                              <Pressable
+                                key={`camera-color-slot-${index}`}
                                 style={[
-                                  styles.cameraColorSlotText,
-                                  !slot && styles.cameraColorSlotTextMuted
+                                  styles.cameraColorSlotButton,
+                                  selectedCameraColorSlot === index &&
+                                    styles.cameraColorSlotButtonActive,
+                                  slot && styles.cameraColorSlotButtonSaved
                                 ]}
+                                onPress={() => applyCameraColorSlot(slot, index)}
+                                accessibilityRole="button"
+                                accessibilityState={{
+                                  selected: selectedCameraColorSlot === index
+                                }}
+                                accessibilityLabel={`색감 슬롯 ${index + 1}`}
                               >
-                                {index + 1}
-                              </Text>
-                              {slot ? <View pointerEvents="none" style={styles.cameraColorSlotSavedDot} /> : null}
-                            </Pressable>
-                          ))}
+                                <Text
+                                  selectable={false}
+                                  style={[
+                                    styles.cameraColorSlotText,
+                                    !slot && styles.cameraColorSlotTextMuted
+                                  ]}
+                                >
+                                  {index + 1}
+                                </Text>
+                                {slot ? <View pointerEvents="none" style={styles.cameraColorSlotSavedDot} /> : null}
+                              </Pressable>
+                            ))}
+                          </View>
                         </View>
+
                         <View style={styles.cameraColorSliderList}>
                           <SmoothValueSlider
                             compact
+                            dark
                             value={cameraExposureBias}
                             min={cameraExposureMin}
                             max={cameraExposureMax}
@@ -3261,6 +3290,7 @@ export default function CameraScreen({
                           />
                           <SmoothValueSlider
                             compact
+                            dark
                             value={cameraColorTemperature}
                             min={CAMERA_COLOR_ADJUST_MIN}
                             max={CAMERA_COLOR_ADJUST_MAX}
@@ -3271,6 +3301,7 @@ export default function CameraScreen({
                           />
                           <SmoothValueSlider
                             compact
+                            dark
                             value={cameraColorTint}
                             min={CAMERA_COLOR_ADJUST_MIN}
                             max={CAMERA_COLOR_ADJUST_MAX}
@@ -3281,6 +3312,7 @@ export default function CameraScreen({
                           />
                           <SmoothValueSlider
                             compact
+                            dark
                             value={cameraBrightness}
                             min={CAMERA_COLOR_ADJUST_MIN}
                             max={CAMERA_COLOR_ADJUST_MAX}
@@ -3291,6 +3323,7 @@ export default function CameraScreen({
                           />
                           <SmoothValueSlider
                             compact
+                            dark
                             value={cameraContrast}
                             min={CAMERA_COLOR_ADJUST_MIN}
                             max={CAMERA_COLOR_ADJUST_MAX}
@@ -3301,6 +3334,7 @@ export default function CameraScreen({
                           />
                           <SmoothValueSlider
                             compact
+                            dark
                             value={cameraSaturation}
                             min={CAMERA_COLOR_ADJUST_MIN}
                             max={CAMERA_COLOR_ADJUST_MAX}
@@ -3310,17 +3344,36 @@ export default function CameraScreen({
                             onCommit={applyCameraSaturation}
                           />
                         </View>
+
                         <View style={styles.cameraColorActions}>
-                          <Pressable style={styles.optionButton} onPress={resetCameraColorSettings}>
-                            <Text selectable={false} style={styles.optionButtonText}>초기화</Text>
-                          </Pressable>
                           <Pressable
-                            style={[styles.optionButton, styles.optionButtonActive]}
-                            onPress={saveCameraColorSettings}
+                            style={styles.cameraColorSecondaryButton}
+                            onPress={resetCameraColorSettings}
                           >
+                            <Feather
+                              name="refresh-ccw"
+                              size={16}
+                              color={bodyFrameDarkColors.text}
+                            />
                             <Text
                               selectable={false}
-                              style={[styles.optionButtonText, styles.optionButtonTextActive]}
+                              style={styles.cameraColorSecondaryButtonText}
+                            >
+                              초기화
+                            </Text>
+                          </Pressable>
+                          <Pressable
+                            style={styles.cameraColorPrimaryButton}
+                            onPress={saveCameraColorSettings}
+                          >
+                            <Feather
+                              name="save"
+                              size={16}
+                              color="#111111"
+                            />
+                            <Text
+                              selectable={false}
+                              style={styles.cameraColorPrimaryButtonText}
                             >
                               설정 저장
                             </Text>

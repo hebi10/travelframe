@@ -59,6 +59,7 @@ export type SmoothValueSliderProps = {
   label: string;
   formatValue?: (value: number) => string;
   compact?: boolean;
+  dark?: boolean;
   onChange?: (value: number) => void;
   onCommit: (value: number) => void;
 };
@@ -391,6 +392,7 @@ export function SmoothValueSlider({
   label,
   formatValue,
   compact = false,
+  dark = false,
   onChange,
   onCommit
 }: SmoothValueSliderProps) {
@@ -450,9 +452,26 @@ export function SmoothValueSlider({
 
   if (compact) {
     return (
-      <View style={[styles.sizeSliderArea, styles.compactSliderArea]}>
-        <View style={styles.compactSliderRow}>
-          <Text selectable={false} style={styles.compactSliderLabel}>
+      <View
+        style={[
+          styles.sizeSliderArea,
+          styles.compactSliderArea,
+          dark && styles.cameraColorSliderArea
+        ]}
+      >
+        <View
+          style={[
+            styles.compactSliderRow,
+            dark && styles.cameraColorCompactSliderRow
+          ]}
+        >
+          <Text
+            selectable={false}
+            style={[
+              styles.compactSliderLabel,
+              dark && styles.cameraColorSliderLabel
+            ]}
+          >
             {label}
           </Text>
           <GestureDetector gesture={sliderGesture}>
@@ -461,17 +480,35 @@ export function SmoothValueSlider({
               style={[styles.sizeTrack, styles.compactSizeTrack]}
               onLayout={(event) => setTrackWidth(event.nativeEvent.layout.width)}
             >
-              <View style={styles.sizeTrackFillBase} />
-              <Animated.View style={[styles.sizeTrackFill, { width: thumbX }]} />
+              <View
+                style={[
+                  styles.sizeTrackFillBase,
+                  dark && styles.cameraColorTrackBase
+                ]}
+              />
+              <Animated.View
+                style={[
+                  styles.sizeTrackFill,
+                  dark && styles.cameraColorTrackFill,
+                  { width: thumbX }
+                ]}
+              />
               <Animated.View
                 style={[
                   styles.sizeThumb,
+                  dark && styles.cameraColorThumb,
                   { transform: [{ translateX: thumbTranslateX }] }
                 ]}
               />
             </Animated.View>
           </GestureDetector>
-          <Text selectable={false} style={styles.compactSliderValue}>
+          <Text
+            selectable={false}
+            style={[
+              styles.compactSliderValue,
+              dark && styles.cameraColorSliderValue
+            ]}
+          >
             {valueLabel}
           </Text>
         </View>
