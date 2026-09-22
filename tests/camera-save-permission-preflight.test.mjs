@@ -3,6 +3,24 @@ import fs from "node:fs";
 import ts from "typescript";
 
 const source = fs.readFileSync("features/camera/CameraScreen.tsx", "utf8");
+
+assert.ok(
+  source.includes("const CAMERA_PERMISSION_RECOVERY_TIMEOUT_MS = 3_000;"),
+  "camera capture should bound permission-triggered session recovery"
+);
+assert.ok(
+  source.includes("const waitForCameraSessionReadyForCapture = useCallback(async () =>"),
+  "camera capture should wait for the native session to become ready again"
+);
+assert.ok(
+  source.includes("await waitForCameraSessionReadyForCapture();"),
+  "camera capture should resume after permission or pose-related session interruptions"
+);
+assert.equal(
+  source.includes("await requestPhotoSavePermission();\n        if (!canCaptureWithCurrentSession()) return;"),
+  false,
+  "camera capture must not silently abort immediately after a media permission check"
+);
 const start = source.indexOf("  const capturePhoto = async () => {");
 const end = source.indexOf("  const takePhoto = async () => {", start);
 const code = ts.transpileModule(source.slice(start, end), {
@@ -37,7 +55,7 @@ function harness({
     getCameraSaveScopeTargets: (scope) => ({ app: true, device: scope === "app_device", cloud: false }),
     createCameraSaveScope: () => "app",
     requestPhotoSavePermission: async () => { events.push("permission"); await permission(); },
-    waitForCameraSessionReadyAfterPermission: async () => {
+    waitForCameraSessionReadyForCapture: async () => {
       if (waitForReady) {
         events.push("wait-ready");
         await waitForReady();
