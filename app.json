@@ -54,6 +54,7 @@
       "react-native-health-connect",
       "./plugins/with-body-pose-alignment",
       "./plugins/with-android-release-manifest",
+      "./plugins/with-project-reminder",
       [
         "expo-image-picker",
         {

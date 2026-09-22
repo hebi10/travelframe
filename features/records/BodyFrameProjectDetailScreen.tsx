@@ -69,6 +69,15 @@ import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 import { useAppAppearance } from "@/lib/app-appearance";
 import { useAuth } from "@/lib/auth-context";
 import { getPlanEntitlements } from "@/lib/plan-entitlements";
+import {
+  cancelProjectReminder,
+  defaultProjectReminderSettings,
+  formatProjectReminderTime,
+  getProjectReminderSettings,
+  parseProjectReminderTime,
+  updateProjectReminderSettings,
+  type ProjectReminderSettings
+} from "@/lib/project-reminder";
 import type { BodyProject, ReferencePhotoMode } from "@/types/body-project";
 import {
   bodyMeasurementMetricMeta,
@@ -129,6 +138,8 @@ function SortableProjectPhotoTile({
   tileWidth,
   disabled,
   dropTarget,
+  dragSourceIndex,
+  dragTargetIndex,
   onDragStart,
   onDragHover,
   onDrop,
@@ -141,7 +152,9 @@ function SortableProjectPhotoTile({
   tileWidth: number;
   disabled: boolean;
   dropTarget: boolean;
-  onDragStart: () => void;
+  dragSourceIndex: number | null;
+  dragTargetIndex: number | null;
+  onDragStart: (index: number) => void;
   onDragHover: (index: number) => void;
   onDrop: (fromIndex: number, toIndex: number) => void;
   onDragFinish: () => void;
@@ -259,7 +272,7 @@ function SortableProjectPhotoTile({
             dragging.value = true;
             hoverIndex.value = index;
             manager.activate();
-            runOnJS(onDragStart)();
+            runOnJS(onDragStart)(index);
             runOnJS(onDragHover)(index);
           }
 
@@ -331,15 +344,64 @@ function SortableProjectPhotoTile({
     ]
   );
 
-  const animatedStyle = useAnimatedStyle(() => ({
-    zIndex: dragging.value ? 50 : 1,
-    opacity: dragging.value ? 0.94 : 1,
-    transform: [
-      { translateX: translateX.value },
-      { translateY: translateY.value },
-      { scale: withTiming(dragging.value ? 1.05 : 1, { duration: 100 }) }
-    ]
-  }));
+  const animatedStyle = useAnimatedStyle(() => {
+    let shiftedIndex = index;
+
+    if (
+      !dragging.value &&
+      dragSourceIndex !== null &&
+      dragTargetIndex !== null
+    ) {
+      if (
+        dragSourceIndex < dragTargetIndex &&
+        index > dragSourceIndex &&
+        index <= dragTargetIndex
+      ) {
+        shiftedIndex = index - 1;
+      } else if (
+        dragSourceIndex > dragTargetIndex &&
+        index >= dragTargetIndex &&
+        index < dragSourceIndex
+      ) {
+        shiftedIndex = index + 1;
+      }
+    }
+
+    const sourceRow = Math.floor(index / PROJECT_PHOTO_GRID_COLUMNS);
+    const sourceColumn = index % PROJECT_PHOTO_GRID_COLUMNS;
+    const targetRow = Math.floor(shiftedIndex / PROJECT_PHOTO_GRID_COLUMNS);
+    const targetColumn = shiftedIndex % PROJECT_PHOTO_GRID_COLUMNS;
+    const siblingTranslateX =
+      (targetColumn - sourceColumn) * cellWidth;
+    const siblingTranslateY =
+      (targetRow - sourceRow) * cellHeight;
+
+    return {
+      zIndex: dragging.value ? 50 : 1,
+      opacity: dragging.value ? 0.94 : 1,
+      transform: [
+        {
+          translateX: dragging.value
+            ? translateX.value
+            : withTiming(siblingTranslateX, { duration: 140 })
+        },
+        {
+          translateY: dragging.value
+            ? translateY.value
+            : withTiming(siblingTranslateY, { duration: 140 })
+        },
+        {
+          scale: withTiming(dragging.value ? 1.05 : 1, { duration: 100 })
+        }
+      ]
+    };
+  }, [
+    cellHeight,
+    cellWidth,
+    dragSourceIndex,
+    dragTargetIndex,
+    index
+  ]);
 
   return (
     <GestureDetector gesture={gesture}>
@@ -406,8 +468,15 @@ export default function BodyFrameProjectDetailScreen() {
   const [photoGridWidth, setPhotoGridWidth] = useState(0);
   const [photoOrderMode, setPhotoOrderMode] = useState(false);
   const [isPhotoDragging, setIsPhotoDragging] = useState(false);
+  const [photoDragSourceIndex, setPhotoDragSourceIndex] = useState<number | null>(null);
   const [photoDropTargetIndex, setPhotoDropTargetIndex] = useState<number | null>(null);
   const [photoOrderSaving, setPhotoOrderSaving] = useState(false);
+  const [reminderSettings, setReminderSettings] =
+    useState<ProjectReminderSettings>(defaultProjectReminderSettings);
+  const [reminderModalOpen, setReminderModalOpen] = useState(false);
+  const [reminderEnabledDraft, setReminderEnabledDraft] = useState(false);
+  const [reminderTimeDraft, setReminderTimeDraft] = useState("20:00");
+  const [reminderSaving, setReminderSaving] = useState(false);
 
   const reload = useCallback(async () => {
     if (!projectId) {
@@ -421,14 +490,16 @@ export default function BodyFrameProjectDetailScreen() {
       storedMeasurementSettings,
       storedMeasurements,
       storedCaptureContextState,
-      storedPoseAlignmentSettings
+      storedPoseAlignmentSettings,
+      storedReminderSettings
     ] = await Promise.all([
       getBodyProjectById(projectId),
       getPhotos(),
       getBodyMeasurementSettings(projectId),
       getBodyMeasurements(projectId),
       getBodyCaptureContextState(projectId),
-      getBodyPoseAlignmentSettings(projectId)
+      getBodyPoseAlignmentSettings(projectId),
+      getProjectReminderSettings(projectId)
     ]);
 
     setProject(storedProject);
@@ -440,6 +511,7 @@ export default function BodyFrameProjectDetailScreen() {
     setRememberCaptureContextDraft(storedCaptureContextState.enabled);
     setPoseAlignmentEnabled(storedPoseAlignmentSettings.enabled);
     setPoseAlignmentDraft(storedPoseAlignmentSettings.enabled);
+    setReminderSettings(storedReminderSettings);
     if (storedProject) {
       setNameDraft(storedProject.name);
       setTargetDraft(String(storedProject.targetPhotoCount));
@@ -558,6 +630,49 @@ export default function BodyFrameProjectDetailScreen() {
     targetDraft
   ]);
 
+  const openReminderSettings = useCallback(() => {
+    setReminderEnabledDraft(reminderSettings.enabled);
+    setReminderTimeDraft(formatProjectReminderTime(reminderSettings));
+    setReminderModalOpen(true);
+  }, [reminderSettings]);
+
+  const saveReminderSettings = useCallback(async () => {
+    if (!project || reminderSaving) return;
+
+    const parsedTime = parseProjectReminderTime(reminderTimeDraft);
+    if (!parsedTime) {
+      Alert.alert("촬영 알림", "시간을 00:00~23:59 형식으로 입력해 주세요.");
+      return;
+    }
+
+    try {
+      setReminderSaving(true);
+      const nextSettings = await updateProjectReminderSettings({
+        projectId: project.id,
+        projectName: project.name,
+        enabled: reminderEnabledDraft,
+        ...parsedTime
+      });
+      setReminderSettings(nextSettings);
+      setReminderModalOpen(false);
+    } catch (error) {
+      Alert.alert(
+        "촬영 알림 설정 실패",
+        getUserFacingErrorMessage(
+          error,
+          "촬영 알림을 설정하지 못했습니다. 알림 권한을 확인해 주세요."
+        )
+      );
+    } finally {
+      setReminderSaving(false);
+    }
+  }, [
+    project,
+    reminderEnabledDraft,
+    reminderSaving,
+    reminderTimeDraft
+  ]);
+
   const changeReferenceMode = useCallback(
     async (referenceMode: ReferencePhotoMode) => {
       if (!project || saving || project.referenceMode === referenceMode) return;
@@ -585,7 +700,10 @@ export default function BodyFrameProjectDetailScreen() {
           style: "destructive",
           onPress: () => {
             void (async () => {
-              await archiveBodyProject(project.id, true);
+              await Promise.all([
+                archiveBodyProject(project.id, true),
+                cancelProjectReminder(project.id)
+              ]);
               setSettingsOpen(false);
               router.back();
             })();
@@ -886,6 +1004,46 @@ export default function BodyFrameProjectDetailScreen() {
           </View>
         </View>
 
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="프로젝트 촬영 알림 설정"
+          style={[
+            styles.reminderCard,
+            {
+              borderColor: palette.line,
+              backgroundColor: palette.surface
+            }
+          ]}
+          onPress={openReminderSettings}
+        >
+          <View
+            style={[
+              styles.reminderIcon,
+              {
+                borderColor: palette.line,
+                backgroundColor: palette.background
+              }
+            ]}
+          >
+            <Feather
+              name={reminderSettings.enabled ? "bell" : "bell-off"}
+              size={18}
+              color={palette.text}
+            />
+          </View>
+          <View style={styles.reminderCopy}>
+            <Text style={[styles.reminderTitle, { color: palette.text }]}>
+              촬영 알림
+            </Text>
+            <Text style={[styles.reminderDetail, { color: palette.muted }]}>
+              {reminderSettings.enabled
+                ? `매일 ${formatProjectReminderTime(reminderSettings)} · 이 기기에서 알림`
+                : "원하는 시간에 매일 촬영 알림을 받을 수 있습니다."}
+            </Text>
+          </View>
+          <Feather name="chevron-right" size={18} color={palette.muted} />
+        </Pressable>
+
         {measurementSettings.enabled ? (
           <BodyMeasurementSummaryCard
             metric={measurementSettings.primaryMetric}
@@ -984,6 +1142,7 @@ export default function BodyFrameProjectDetailScreen() {
                   disabled={photoOrderSaving}
                   onPress={() => {
                     setPhotoOrderMode((current) => !current);
+                    setPhotoDragSourceIndex(null);
                     setPhotoDropTargetIndex(null);
                   }}
                 >
@@ -1027,8 +1186,12 @@ export default function BodyFrameProjectDetailScreen() {
                       dropTarget={
                         isPhotoDragging && photoDropTargetIndex === index
                       }
-                      onDragStart={() => {
+                      dragSourceIndex={photoDragSourceIndex}
+                      dragTargetIndex={photoDropTargetIndex}
+                      onDragStart={(sourceIndex) => {
                         setPhotoOrderMode(true);
+                        setPhotoDragSourceIndex(sourceIndex);
+                        setPhotoDropTargetIndex(sourceIndex);
                         setIsPhotoDragging(true);
                       }}
                       onDragHover={setPhotoDropTargetIndex}
@@ -1037,6 +1200,7 @@ export default function BodyFrameProjectDetailScreen() {
                       }}
                       onDragFinish={() => {
                         setIsPhotoDragging(false);
+                        setPhotoDragSourceIndex(null);
                         setPhotoDropTargetIndex(null);
                       }}
                       onOpen={() => {
@@ -1075,6 +1239,138 @@ export default function BodyFrameProjectDetailScreen() {
           </Text>
         </Pressable>
       </ScrollView>
+
+      <Modal
+        transparent
+        animationType="fade"
+        visible={reminderModalOpen}
+        onRequestClose={() => setReminderModalOpen(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="촬영 알림 설정 닫기"
+            style={StyleSheet.absoluteFill}
+            onPress={() => setReminderModalOpen(false)}
+          />
+          <View
+            style={[
+              styles.reminderSheet,
+              {
+                backgroundColor: palette.surface,
+                borderColor: palette.line,
+                paddingBottom: Math.max(insets.bottom + 18, 28)
+              }
+            ]}
+          >
+            <View style={styles.sheetHandle} />
+            <View style={styles.sheetHeader}>
+              <View style={styles.reminderSheetTitleWrap}>
+                <Text style={[styles.sheetTitle, { color: palette.text }]}>
+                  촬영 알림
+                </Text>
+                <Text style={[styles.settingDetail, { color: palette.muted }]}>
+                  매일 같은 시간에 이 기기에서 촬영 알림을 표시합니다.
+                </Text>
+              </View>
+              <Pressable
+                accessibilityRole="button"
+                style={[styles.sheetCloseButton, { borderColor: palette.line }]}
+                onPress={() => setReminderModalOpen(false)}
+              >
+                <Text style={[styles.sheetCloseText, { color: palette.text }]}>
+                  닫기
+                </Text>
+              </Pressable>
+            </View>
+
+            <View style={styles.choiceRow}>
+              {([
+                [false, "알림 끄기"],
+                [true, "알림 켜기"]
+              ] as const).map(([enabled, label]) => {
+                const active = reminderEnabledDraft === enabled;
+                return (
+                  <Pressable
+                    key={label}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: active }}
+                    style={[
+                      styles.choiceButton,
+                      {
+                        borderColor: active ? palette.text : palette.line,
+                        backgroundColor: active
+                          ? palette.text
+                          : palette.background
+                      }
+                    ]}
+                    onPress={() => setReminderEnabledDraft(enabled)}
+                  >
+                    <Text
+                      style={[
+                        styles.choiceText,
+                        { color: active ? palette.inverse : palette.text }
+                      ]}
+                    >
+                      {label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <View style={styles.reminderTimeRow}>
+              <View style={styles.reminderTimeCopy}>
+                <Text style={[styles.settingTitle, { color: palette.text }]}>
+                  알림 시간
+                </Text>
+                <Text style={[styles.settingDetail, { color: palette.muted }]}>
+                  24시간 형식으로 입력해 주세요.
+                </Text>
+              </View>
+              <TextInput
+                value={reminderTimeDraft}
+                onChangeText={setReminderTimeDraft}
+                editable={reminderEnabledDraft && !reminderSaving}
+                keyboardType="numbers-and-punctuation"
+                maxLength={5}
+                placeholder="20:00"
+                placeholderTextColor={palette.faint}
+                style={[
+                  styles.reminderTimeInput,
+                  {
+                    color: palette.text,
+                    borderColor: palette.line,
+                    backgroundColor: palette.background,
+                    opacity: reminderEnabledDraft ? 1 : 0.45
+                  }
+                ]}
+              />
+            </View>
+
+            <Text style={[styles.settingHint, { color: palette.faint }]}>
+              Android 알림 권한이 꺼져 있으면 저장할 때 권한 요청이 표시됩니다. 기기 절전 정책에 따라 알림 시각이 약간 늦어질 수 있습니다.
+            </Text>
+
+            <Pressable
+              disabled={reminderSaving}
+              accessibilityRole="button"
+              style={[
+                styles.saveButton,
+                {
+                  backgroundColor: palette.text,
+                  opacity: reminderSaving ? 0.5 : 1
+                }
+              ]}
+              onPress={() => void saveReminderSettings()}
+            >
+              <Text style={[styles.saveButtonText, { color: palette.inverse }]}>
+                {reminderSaving ? "저장 중" : "알림 설정 저장"}
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
 
       <Modal
         transparent
@@ -1567,6 +1863,37 @@ const styles = StyleSheet.create({
     gap: 12,
     marginBottom: 20
   },
+  reminderCard: {
+    minHeight: 72,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 16,
+    padding: 12,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderRadius: bodyFrameDesign.cardRadius
+  },
+  reminderIcon: {
+    width: bodyFrameDesign.minTouchSize,
+    height: bodyFrameDesign.minTouchSize,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderRadius: bodyFrameDesign.buttonRadius
+  },
+  reminderCopy: {
+    flex: 1,
+    minWidth: 0,
+    gap: 4
+  },
+  reminderTitle: {
+    fontSize: bodyFrameTypography.body,
+    fontWeight: "600"
+  },
+  reminderDetail: {
+    fontSize: bodyFrameTypography.caption,
+    lineHeight: 18
+  },
   projectName: {
     fontSize: bodyFrameTypography.projectTitle,
     lineHeight: 31,
@@ -1731,6 +2058,41 @@ const styles = StyleSheet.create({
     borderWidth: bodyFrameDesign.borderWidth,
     borderTopLeftRadius: bodyFrameDesign.bottomSheetRadius,
     borderTopRightRadius: bodyFrameDesign.bottomSheetRadius
+  },
+  reminderSheet: {
+    width: "100%",
+    gap: 16,
+    paddingHorizontal: bodyFrameDesign.horizontalPadding,
+    paddingTop: 10,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderTopLeftRadius: bodyFrameDesign.bottomSheetRadius,
+    borderTopRightRadius: bodyFrameDesign.bottomSheetRadius
+  },
+  reminderSheetTitleWrap: {
+    flex: 1,
+    minWidth: 0,
+    gap: 4
+  },
+  reminderTimeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12
+  },
+  reminderTimeCopy: {
+    flex: 1,
+    minWidth: 0,
+    gap: 4
+  },
+  reminderTimeInput: {
+    width: 92,
+    minHeight: bodyFrameDesign.minTouchSize,
+    paddingHorizontal: 10,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderRadius: bodyFrameDesign.buttonRadius,
+    fontSize: 18,
+    fontWeight: "600",
+    textAlign: "center",
+    fontVariant: ["tabular-nums"]
   },
   sheetHandle: {
     alignSelf: "center",
