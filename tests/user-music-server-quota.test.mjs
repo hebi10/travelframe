@@ -25,8 +25,11 @@ for (const snippet of [
 
 for (const snippet of [
   "const activeExpert = isPremiumSubscriptionActive(expert, [\"expert_monthly\"])",
+  "const activePlus = isPremiumSubscriptionActive(plus, [\"plus_monthly\"])",
   "const activeCreator = isPremiumSubscriptionActive(creator, [\"creator_monthly\"])",
-  "return activeExpert ?? activeCreator ?? activeCurrent ?? expert ?? creator ?? current;"
+  "activeExpert ??",
+  "activePlus ??",
+  "activeCreator ??"
 ]) {
   assert.ok(functionsSource.includes(snippet), `Functions should prefer active product subscriptions: ${snippet}`);
 }
@@ -80,6 +83,11 @@ assert.ok(
   functionsSource.includes("CALLABLE_RUNTIME_OPTIONS") &&
     functionsSource.includes("enforceAppCheck"),
   "callable App Check enforcement should be centrally optioned for production without breaking local tests"
+);
+
+assert.ok(
+  functionsSource.includes('["creator_monthly", "plus_monthly", "expert_monthly"]'),
+  "all paid subscription tiers should share the paid music quota"
 );
 
 console.log("ok - user music uploads are anchored on server quota checks");
