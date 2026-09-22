@@ -95,5 +95,16 @@ export const replaceCloudBackupProject = async ({
   >("replaceCloudBackupProject", { slotId, projectId });
 };
 
-export const getSelectedCloudBackupProjectIds = async (user: User | null) =>
-  new Set((await getCloudBackupProjectSlots(user)).map((slot) => slot.projectId));
+export const getSelectedCloudBackupProjectIds = async (
+  user: User | null,
+  maxSlots?: number
+) =>
+  new Set(
+    (await getCloudBackupProjectSlots(user))
+      .filter(
+        (slot) =>
+          maxSlots === undefined ||
+          (slot.slotNumber >= 1 && slot.slotNumber <= maxSlots)
+      )
+      .map((slot) => slot.projectId)
+  );
