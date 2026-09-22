@@ -626,15 +626,15 @@ const ADMIN_PRODUCT_META = {
   },
   creator_monthly: {
     productName: "Pro",
-    priceLabel: "월 1,990원"
+    priceLabel: "월 2,000원"
   },
   plus_monthly: {
     productName: "Plus",
-    priceLabel: "월 3,990원"
+    priceLabel: "월 4,000원"
   },
   expert_monthly: {
     productName: "Expert",
-    priceLabel: "월 5,990원"
+    priceLabel: "월 6,000원"
   }
 };
 const ADMIN_PRODUCT_IDS = Object.keys(ADMIN_PRODUCT_META);
