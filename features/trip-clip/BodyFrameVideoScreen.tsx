@@ -19,6 +19,8 @@ import {
   BODY_FRAME_VIDEO_FPS,
   DEFAULT_BODY_FRAME_VIDEO_OPTIONS,
   getBodyFrameVideoOutputSize,
+  getBodyFrameVideoOverlaySummary,
+  getBodyFrameVideoOverlayText,
   getBodyFrameVideoPhotoIndex,
   selectBodyFrameVideoPhotos,
   BODY_FRAME_VIDEO_TEMPLATE,
@@ -39,6 +41,7 @@ import {
   setLastActiveProjectId
 } from "@/lib/body-project-preferences";
 import { getBodyProjects } from "@/lib/body-project-library";
+import { getBodyMeasurements } from "@/lib/body-measurement-library";
 import {
   DEFAULT_GUIDE_COLOR,
   defaultGridGuideLinePositions,
@@ -59,6 +62,7 @@ import {
 } from "@/lib/view-recorder";
 import { RECORDING_VIEW_WIDTH } from "@/features/trip-clip/trip-clip-screen.constants";
 import type { BodyProject } from "@/types/body-project";
+import type { BodyMeasurementEntry } from "@/types/body-measurement";
 import type { PhotoItem } from "@/types/photo";
 
 const BODY_FRAME_VIDEO_BITRATE = 5_000_000;
@@ -103,6 +107,7 @@ export default function BodyFrameVideoScreen() {
     undefined
   );
   const [availablePhotos, setAvailablePhotos] = useState<PhotoItem[]>([]);
+  const [measurements, setMeasurements] = useState<BodyMeasurementEntry[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[] | null>(null);
   const [videoOptions, setVideoOptions] = useState(DEFAULT_BODY_FRAME_VIDEO_OPTIONS);
   const [optionKind, setOptionKind] = useState<VideoOptionKind | null>(null);
@@ -114,6 +119,36 @@ export default function BodyFrameVideoScreen() {
   const recordingPhotos = useMemo(
     () => projectPhotos.map(photo => ({ ...photo, previewUri: photo.uri })),
     [projectPhotos]
+  );
+  const measurementByPhotoId = useMemo(() => {
+    const map = new Map<string, BodyMeasurementEntry>();
+    measurements.forEach((entry) => {
+      if (entry.photoId) {
+        map.set(entry.photoId, entry);
+      }
+    });
+    return map;
+  }, [measurements]);
+  const measurementBySequence = useMemo(() => {
+    const map = new Map<number, BodyMeasurementEntry>();
+    measurements.forEach((entry) => {
+      if (typeof entry.sequence === "number") {
+        map.set(entry.sequence, entry);
+      }
+    });
+    return map;
+  }, [measurements]);
+  const getMeasurementForPhoto = useCallback(
+    (photo?: PhotoItem | null) => {
+      if (!photo) return null;
+      return (
+        measurementByPhotoId.get(photo.id) ??
+        (typeof photo.sequence === "number"
+          ? measurementBySequence.get(photo.sequence) ?? null
+          : null)
+      );
+    },
+    [measurementByPhotoId, measurementBySequence]
   );
   const outputSize = getBodyFrameVideoOutputSize(videoOptions.ratio, videoOptions.quality);
   const frameAspectRatio = outputSize.width / outputSize.height;
@@ -147,15 +182,43 @@ export default function BodyFrameVideoScreen() {
     }),
     [recordingPhotos, recordingFrameIndex, videoOptions.interval]
   );
+  const recordingOverlayText = useMemo(
+    () =>
+      getBodyFrameVideoOverlayText({
+        photo: recordingFrame.currentPhoto,
+        measurement: getMeasurementForPhoto(recordingFrame.currentPhoto),
+        overlay: videoOptions.overlay
+      }),
+    [getMeasurementForPhoto, recordingFrame.currentPhoto, videoOptions.overlay]
+  );
+  const previewOverlayText = useMemo(
+    () =>
+      getBodyFrameVideoOverlayText({
+        photo: previewPhoto,
+        measurement: getMeasurementForPhoto(previewPhoto),
+        overlay: videoOptions.overlay
+      }),
+    [getMeasurementForPhoto, previewPhoto, videoOptions.overlay]
+  );
+  const previewOverlayPositionStyle =
+    videoOptions.overlay.position === "top-left"
+      ? styles.previewOverlayTopLeft
+      : videoOptions.overlay.position === "top-right"
+        ? styles.previewOverlayTopRight
+        : videoOptions.overlay.position === "bottom-left"
+          ? styles.previewOverlayBottomLeft
+          : styles.previewOverlayBottomRight;
 
   const loadActiveProject = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [projects, lastActiveProjectId, storedPhotos] = await Promise.all([
-        getBodyProjects(),
-        getLastActiveProjectId(),
-        getPhotos().then(ensurePhotoPreviews)
-      ]);
+      const [projects, lastActiveProjectId, storedPhotos, storedMeasurements] =
+        await Promise.all([
+          getBodyProjects(),
+          getLastActiveProjectId(),
+          getPhotos().then(ensurePhotoPreviews),
+          getBodyMeasurements()
+        ]);
       const selectedProject = selectActiveBodyProject(projects, lastActiveProjectId);
 
       setActiveProject(selectedProject);
@@ -169,6 +232,13 @@ export default function BodyFrameVideoScreen() {
           ? getBodyFrameVideoPhotos(storedPhotos, selectedProject.id)
           : []
       );
+      setMeasurements(
+        selectedProject
+          ? storedMeasurements.filter(
+              (entry) => entry.projectId === selectedProject.id
+            )
+          : []
+      );
 
       if (selectedProject && selectedProject.id !== lastActiveProjectId) {
         await setLastActiveProjectId(selectedProject.id);
@@ -176,6 +246,7 @@ export default function BodyFrameVideoScreen() {
     } catch (error) {
       setActiveProject(null);
       setAvailablePhotos([]);
+      setMeasurements([]);
       setMessage(
         getUserFacingErrorMessage(error, "프로젝트 사진을 불러오지 못했습니다.")
       );
@@ -404,12 +475,25 @@ export default function BodyFrameVideoScreen() {
           ]}
         >
           {previewPhoto ? (
-            <Image
-              source={{ uri: previewPhoto.previewUri ?? previewPhoto.uri }}
-              style={styles.previewImage}
-              contentFit="cover"
-              cachePolicy="memory-disk"
-            />
+            <>
+              <Image
+                source={{ uri: previewPhoto.previewUri ?? previewPhoto.uri }}
+                style={styles.previewImage}
+                contentFit="cover"
+                cachePolicy="memory-disk"
+              />
+              {previewOverlayText ? (
+                <Text
+                  numberOfLines={2}
+                  style={[
+                    styles.previewOverlayText,
+                    previewOverlayPositionStyle
+                  ]}
+                >
+                  {previewOverlayText}
+                </Text>
+              ) : null}
+            </>
           ) : (
             <View style={styles.previewEmpty}>
               <Text style={[styles.previewEmptyText, { color: palette.faint }]}>
@@ -433,6 +517,12 @@ export default function BodyFrameVideoScreen() {
           <SummaryRow label="영상 길이" value={formatDuration(totalDuration)} />
           <SummaryRow label="화질" value={`${videoOptions.quality}p`} disabled={isExporting} onPress={() => setOptionKind("quality")} />
           <SummaryRow label="화면 비율" value={videoOptions.ratio} disabled={isExporting} onPress={() => setOptionKind("ratio")} />
+          <SummaryRow
+            label="텍스트"
+            value={getBodyFrameVideoOverlaySummary(videoOptions.overlay)}
+            disabled={isExporting}
+            onPress={() => setOptionKind("overlay")}
+          />
         </View>
 
         <Text style={[styles.orderHint, { color: palette.muted }]}>
@@ -552,6 +642,8 @@ export default function BodyFrameVideoScreen() {
               gridGuideLinePositions={defaultGridGuideLinePositions}
               guideShapePoints={defaultGuideShapePoints}
               photoAdjustments={EMPTY_ADJUSTMENTS}
+              bodyFrameOverlayText={recordingOverlayText}
+              bodyFrameOverlayPosition={videoOptions.overlay.position}
             />
           </OptionalRecordingView>
         </View>
@@ -631,6 +723,38 @@ const styles = StyleSheet.create({
   previewImage: {
     width: "100%",
     height: "100%"
+  },
+  previewOverlayText: {
+    position: "absolute",
+    zIndex: 4,
+    maxWidth: "72%",
+    color: "rgba(255, 255, 255, 0.72)",
+    fontSize: 11,
+    lineHeight: 15,
+    fontWeight: "600",
+    textShadowColor: "rgba(0, 0, 0, 0.72)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2
+  },
+  previewOverlayTopLeft: {
+    top: 10,
+    left: 10,
+    textAlign: "left"
+  },
+  previewOverlayTopRight: {
+    top: 10,
+    right: 10,
+    textAlign: "right"
+  },
+  previewOverlayBottomLeft: {
+    bottom: 10,
+    left: 10,
+    textAlign: "left"
+  },
+  previewOverlayBottomRight: {
+    right: 10,
+    bottom: 10,
+    textAlign: "right"
   },
   previewEmpty: {
     flex: 1,
