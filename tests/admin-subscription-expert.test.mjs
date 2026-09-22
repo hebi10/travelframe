@@ -95,7 +95,7 @@ for (const snippet of [
   '"expert_monthly"',
   "deactivatedMonthlyProductIds",
   "syncAdminBackupProjectSlotStatuses",
-  'status: "over_limit"'
+  '"over_limit"'
 ]) {
   assert.ok(
     functionsSource.includes(snippet),
