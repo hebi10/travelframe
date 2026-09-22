@@ -244,7 +244,6 @@ function SortableProjectPhotoTile({
 
   const animatedStyle = useAnimatedStyle(() => ({
     zIndex: dragging.value ? 50 : 1,
-    elevation: dragging.value ? 12 : 0,
     opacity: dragging.value ? 0.94 : 1,
     transform: [
       { translateX: translateX.value },
