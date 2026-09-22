@@ -40,9 +40,7 @@ import {
   signInWithGoogleAuthSession
 } from "@/lib/google-auth";
 import { restoreCloudBackupToLocal } from "@/lib/cloud-backup";
-import {
-  formatImageBackupUsage
-} from "@/lib/image-backup-utils";
+import { formatImageBackupSize } from "@/lib/image-backup-utils";
 import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 import { InfoRow, StatusBadge } from "@/features/account/account-screen.components";
 import {
@@ -785,8 +783,8 @@ export default function AccountScreen() {
                   value={`사진 ${backupOverview.photoCount}장 / 영상 ${backupOverview.videoCount}개`}
                 />
                 <InfoRow
-                  label="이미지 용량"
-                  value={formatImageBackupUsage(backupOverview.imageBackupBytes)}
+                  label="현재 백업 이미지 용량"
+                  value={formatImageBackupSize(backupOverview.imageBackupBytes)}
                 />
                 <InfoRow
                   label="마지막 백업"
