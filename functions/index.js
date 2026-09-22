@@ -327,26 +327,37 @@ const assertProjectPhotoBackupCapacity = async ({
   projectId,
   itemId
 }) => {
-  const [photoSnapshot, sessionSnapshot, existingItemSnapshot] =
-    await Promise.all([
-      db
-        .collection(`users/${uid}/photoBackups`)
-        .where("projectId", "==", projectId)
-        .get(),
-      db
-        .collection(`users/${uid}/backupUploadSessions`)
-        .where("projectId", "==", projectId)
-        .get(),
-      typeof itemId === "string" && itemId
-        ? db.doc(`users/${uid}/photoBackups/${itemId}`).get()
-        : Promise.resolve(null)
-    ]);
+  const [
+    photoSnapshot,
+    sessionSnapshot,
+    adminSessionSnapshot,
+    existingItemSnapshot
+  ] = await Promise.all([
+    db
+      .collection(`users/${uid}/photoBackups`)
+      .where("projectId", "==", projectId)
+      .get(),
+    db
+      .collection(`users/${uid}/backupUploadSessions`)
+      .where("projectId", "==", projectId)
+      .get(),
+    db
+      .collection(`users/${uid}/adminBackupUploadSessions`)
+      .where("projectId", "==", projectId)
+      .get(),
+    typeof itemId === "string" && itemId
+      ? db.doc(`users/${uid}/photoBackups/${itemId}`).get()
+      : Promise.resolve(null)
+  ]);
 
   if (existingItemSnapshot?.exists) {
     return;
   }
 
-  const pendingPhotoCount = sessionSnapshot.docs.filter((item) => {
+  const pendingPhotoCount = [
+    ...sessionSnapshot.docs,
+    ...adminSessionSnapshot.docs
+  ].filter((item) => {
     const data = item.data();
     return (
       data.status === "reserved" &&
@@ -1865,6 +1876,131 @@ const requireAdminUid = async (request) => {
   return adminUid;
 };
 
+const syncAdminBackupProjectSlotStatuses = async ({ uid, subscription }) => {
+  const slotLimit = getCloudBackupProjectSlotLimit(subscription);
+  const snapshot = await db.collection(`users/${uid}/backupProjectSlots`).get();
+
+  if (snapshot.empty) {
+    return { slotLimit, totalSlots: 0, overLimitSlots: 0 };
+  }
+
+  const batch = db.batch();
+  let overLimitSlots = 0;
+  for (const slot of snapshot.docs) {
+    const slotNumber =
+      Number(slot.data()?.slotNumber) || getBackupProjectSlotNumber(slot.id);
+    const status =
+      slotNumber >= 1 && slotNumber <= slotLimit ? "active" : "over_limit";
+    if (status === "over_limit") {
+      overLimitSlots += 1;
+    }
+    batch.set(
+      slot.ref,
+      {
+        status,
+        updatedAt: new Date().toISOString()
+      },
+      { merge: true }
+    );
+  }
+  await batch.commit();
+
+  return {
+    slotLimit,
+    totalSlots: snapshot.size,
+    overLimitSlots
+  };
+};
+
+exports.replaceAdminCloudBackupProject = secureOnCall(async (request) => {
+  try {
+    await requireAdminUid(request);
+    const { targetUid } = request.data ?? {};
+    const slotId = String(request.data?.slotId ?? "");
+    const projectId = normalizeBackupProjectId(request.data?.projectId);
+    const slotNumber = getBackupProjectSlotNumber(slotId);
+
+    if (typeof targetUid !== "string" || !targetUid) {
+      throw new HttpsError("invalid-argument", "targetUid is required.");
+    }
+    if (!projectId || slotNumber <= 0) {
+      throw new HttpsError(
+        "invalid-argument",
+        "slotId and projectId are required."
+      );
+    }
+
+    const targetUserSnapshot = await db.doc(`users/${targetUid}`).get();
+    if (!targetUserSnapshot.exists) {
+      throw new HttpsError("not-found", "Target user was not found.");
+    }
+
+    const subscription = await getBackupSubscription(targetUid);
+    const slotLimit = getCloudBackupProjectSlotLimit(subscription);
+    if (slotLimit <= 0 || slotNumber > slotLimit) {
+      throw new HttpsError(
+        "failed-precondition",
+        "현재 플랜에서 사용할 수 없는 클라우드 백업 슬롯입니다."
+      );
+    }
+
+    const slotsRef = db.collection(`users/${targetUid}/backupProjectSlots`);
+    const slotRef = slotsRef.doc(slotId);
+    const [slotSnapshot, duplicateSnapshot] = await Promise.all([
+      slotRef.get(),
+      getBackupProjectSlotByProject(targetUid, projectId)
+    ]);
+    if (!slotSnapshot.exists) {
+      throw new HttpsError("not-found", "백업 프로젝트 슬롯을 찾을 수 없습니다.");
+    }
+    if (duplicateSnapshot && duplicateSnapshot.id !== slotId) {
+      throw new HttpsError(
+        "already-exists",
+        "이미 다른 클라우드 백업 슬롯에서 선택한 프로젝트입니다."
+      );
+    }
+
+    const previousProjectId = normalizeBackupProjectId(
+      slotSnapshot.data()?.projectId
+    );
+    if (previousProjectId === projectId) {
+      return {
+        slot: serializeBackupProjectSlot(slotSnapshot),
+        deletedPhotoCount: 0,
+        deletedVideoCount: 0
+      };
+    }
+
+    const deleted = previousProjectId
+      ? await deleteBackupProjectCloudData({
+          uid: targetUid,
+          projectId: previousProjectId
+        })
+      : { deletedPhotoCount: 0, deletedVideoCount: 0 };
+
+    const nowIso = new Date().toISOString();
+    await slotRef.set(
+      {
+        userId: targetUid,
+        slotNumber,
+        projectId,
+        status: "active",
+        selectedAt: nowIso,
+        updatedAt: nowIso,
+        previousProjectId: previousProjectId ?? null
+      },
+      { merge: false }
+    );
+
+    return {
+      slot: serializeBackupProjectSlot(await slotRef.get()),
+      ...deleted
+    };
+  } catch (error) {
+    throw toHttpsError(error);
+  }
+});
+
 exports.setAdminProductSubscription = secureOnCall(async (request) => {
   try {
     const adminUid = await requireAdminUid(request);
@@ -1932,10 +2068,40 @@ exports.setAdminProductSubscription = secureOnCall(async (request) => {
           : snapshot.exists ? snapshot.data() : null
       };
     }, {});
+    const monthlyProductIds = [
+      "creator_monthly",
+      "plus_monthly",
+      "expert_monthly"
+    ];
+    const deactivatedMonthlyProductIds =
+      status === "active" && monthlyProductIds.includes(productId)
+        ? monthlyProductIds.filter((id) => id !== productId)
+        : [];
+
+    for (const id of deactivatedMonthlyProductIds) {
+      if (nextSubscriptions[id]) {
+        nextSubscriptions[id] = {
+          ...nextSubscriptions[id],
+          status: "inactive"
+        };
+      }
+    }
+
     const effectiveSubscription = getEffectiveAdminSubscription(nextSubscriptions);
     const batch = db.batch();
 
     batch.set(productRef, subscription, { merge: true });
+    for (const id of deactivatedMonthlyProductIds) {
+      batch.set(
+        subscriptionRefs[id],
+        {
+          status: "inactive",
+          updatedBy: adminUid,
+          updatedAt: FieldValue.serverTimestamp()
+        },
+        { merge: true }
+      );
+    }
     batch.set(
       db.doc(`users/${targetUid}/subscriptions/current`),
       {
@@ -1959,8 +2125,12 @@ exports.setAdminProductSubscription = secureOnCall(async (request) => {
     });
 
     await batch.commit();
+    const slotStatus = await syncAdminBackupProjectSlotStatuses({
+      uid: targetUid,
+      subscription: effectiveSubscription
+    });
 
-    return { saved: true };
+    return { saved: true, slotStatus };
   } catch (error) {
     throw toHttpsError(error);
   }
@@ -2001,7 +2171,14 @@ const getAdminUploadConfig = ({ targetUid, itemKind, fileName }) => {
   throw new HttpsError("invalid-argument", "Unsupported admin backup item kind.");
 };
 
-const validateAdminUploadRequest = ({ targetUid, itemKind, fileName, fileSize, contentType }) => {
+const validateAdminUploadRequest = ({
+  targetUid,
+  itemKind,
+  fileName,
+  fileSize,
+  contentType,
+  subscription
+}) => {
   if (typeof targetUid !== "string" || !targetUid) {
     throw new HttpsError("invalid-argument", "targetUid is required.");
   }
@@ -2009,11 +2186,7 @@ const validateAdminUploadRequest = ({ targetUid, itemKind, fileName, fileSize, c
   const config = getAdminUploadConfig({ targetUid, itemKind, fileName });
   assertBackupUploadAllowed({
     uid: targetUid,
-    subscription: {
-      plan: "premium",
-      productId: "creator_monthly",
-      status: "active"
-    },
+    subscription,
     usage: {},
     mediaKind: config.mediaKind,
     fileSize,
@@ -2117,24 +2290,58 @@ const refreshAdminBackupOverview = async (uid) => {
 exports.reserveAdminBackupUpload = secureOnCall(async (request) => {
   try {
     const adminUid = await requireAdminUid(request);
-    const { targetUid, itemKind, fileName, fileSize, contentType } = request.data ?? {};
+    const {
+      targetUid,
+      projectId: rawProjectId,
+      itemKind,
+      fileName,
+      fileSize,
+      contentType
+    } = request.data ?? {};
+    const targetUserSnapshot = await db.doc(`users/${targetUid}`).get();
+    if (!targetUserSnapshot.exists) {
+      throw new HttpsError("not-found", "Target user was not found.");
+    }
+
+    const subscription = await getBackupSubscription(targetUid);
     const config = validateAdminUploadRequest({
       targetUid,
       itemKind,
       fileName,
       fileSize,
-      contentType
+      contentType,
+      subscription
     });
-    const targetUserSnapshot = await db.doc(`users/${targetUid}`).get();
-    if (!targetUserSnapshot.exists) {
-      throw new HttpsError("not-found", "Target user was not found.");
+    const projectId =
+      itemKind === "music" ? null : normalizeBackupProjectId(rawProjectId);
+
+    if (itemKind !== "music") {
+      if (!projectId) {
+        throw new HttpsError(
+          "invalid-argument",
+          "사진과 동영상 관리자 업로드에는 projectId가 필요합니다."
+        );
+      }
+      await assertBackupProjectSlotAllowed({
+        uid: targetUid,
+        subscription,
+        projectId
+      });
+      if (itemKind === "image") {
+        await assertProjectPhotoBackupCapacity({
+          uid: targetUid,
+          projectId
+        });
+      }
     }
+
     const sessionRef = db.collection(`users/${targetUid}/adminBackupUploadSessions`).doc();
     const storagePath = config.storagePath(sessionRef.id);
 
     await sessionRef.set({
       adminUid,
       targetUid,
+      projectId,
       itemKind,
       itemType: config.itemType,
       mediaKind: config.mediaKind,
@@ -2218,6 +2425,7 @@ exports.completeAdminBackupUpload = secureOnCall(async (request) => {
         lastBackedUpAt: now,
         backedUpAt: now,
         sourceDeviceId: "admin",
+        projectId: session.projectId,
         updatedAt: FieldValue.serverTimestamp()
       });
     } else if (session.itemType === "video") {
@@ -2236,6 +2444,7 @@ exports.completeAdminBackupUpload = secureOnCall(async (request) => {
         lastBackedUpAt: now,
         backedUpAt: now,
         sourceDeviceId: "admin",
+        projectId: session.projectId,
         updatedAt: FieldValue.serverTimestamp()
       });
     } else {
@@ -2386,107 +2595,146 @@ exports.setAdminBackupStatus = secureOnCall(async (request) => {
   }
 });
 
-exports.deleteCloudBackupData = secureOnCall(async (request) => {
-  try {
-    const uid = requireUid(request);
-    const userRef = db.doc(`users/${uid}`);
-    const [
-      photoSnapshot,
-      imageWorkSnapshot,
-      videoSnapshot,
-      musicSnapshot,
-      projectSnapshot,
-      sessionSnapshot,
-      projectSlotSnapshot
-    ] = await Promise.all([
-      userRef.collection("photoBackups").get(),
-      userRef.collection("imageWorks").get(),
-      userRef.collection("videos").get(),
-      userRef.collection("musicTracks").get(),
-      userRef.collection("bodyProjects").get(),
-      userRef.collection("backupUploadSessions").get(),
-      userRef.collection("backupProjectSlots").get()
-    ]);
+const deleteCloudBackupDataForUser = async (uid) => {
+  const userRef = db.doc(`users/${uid}`);
+  const [
+    photoSnapshot,
+    imageWorkSnapshot,
+    videoSnapshot,
+    musicSnapshot,
+    projectSnapshot,
+    sessionSnapshot,
+    adminSessionSnapshot,
+    projectSlotSnapshot
+  ] = await Promise.all([
+    userRef.collection("photoBackups").get(),
+    userRef.collection("imageWorks").get(),
+    userRef.collection("videos").get(),
+    userRef.collection("musicTracks").get(),
+    userRef.collection("bodyProjects").get(),
+    userRef.collection("backupUploadSessions").get(),
+    userRef.collection("adminBackupUploadSessions").get(),
+    userRef.collection("backupProjectSlots").get()
+  ]);
 
-    let imageBackupBytes = 0;
-    const documentDeletes = [
-      ...projectSnapshot.docs,
-      ...sessionSnapshot.docs,
-      ...projectSlotSnapshot.docs
-    ].map((item) => item.ref);
-    const storageDeletes = collectOwnedCloudBackupStoragePaths({
-      uid,
-      photoBackups: photoSnapshot.docs.map((item) => item.data()),
-      imageWorks: imageWorkSnapshot.docs.map((item) => item.data()),
-      videos: videoSnapshot.docs.map((item) => item.data()),
-      musicTracks: musicSnapshot.docs.map((item) => item.data())
-    }).map(deleteStoragePath);
-    storageDeletes.push(...sessionSnapshot.docs.map((item) => deleteOwnedCloudBackupStoragePath(uid, item.data().storagePath)));
+  let imageBackupBytes = 0;
+  const documentDeletes = [
+    ...projectSnapshot.docs,
+    ...sessionSnapshot.docs,
+    ...adminSessionSnapshot.docs,
+    ...projectSlotSnapshot.docs
+  ].map((item) => item.ref);
+  const storageDeletes = collectOwnedCloudBackupStoragePaths({
+    uid,
+    photoBackups: photoSnapshot.docs.map((item) => item.data()),
+    imageWorks: imageWorkSnapshot.docs.map((item) => item.data()),
+    videos: videoSnapshot.docs.map((item) => item.data()),
+    musicTracks: musicSnapshot.docs.map((item) => item.data())
+  }).map(deleteStoragePath);
+  storageDeletes.push(
+    ...sessionSnapshot.docs.map((item) =>
+      deleteOwnedCloudBackupStoragePath(uid, item.data().storagePath)
+    ),
+    ...adminSessionSnapshot.docs.map((item) =>
+      deleteOwnedCloudBackupStoragePath(uid, item.data().storagePath)
+    )
+  );
 
-    for (const item of photoSnapshot.docs) {
-      const data = item.data();
-      imageBackupBytes += Number(data.imageBackupSize ?? data.optimizedSize ?? data.fileSize ?? 0);
-      documentDeletes.push(item.ref);
-    }
+  for (const item of photoSnapshot.docs) {
+    const data = item.data();
+    imageBackupBytes += Number(
+      data.imageBackupSize ?? data.optimizedSize ?? data.fileSize ?? 0
+    );
+    documentDeletes.push(item.ref);
+  }
 
-    for (const item of imageWorkSnapshot.docs) {
-      const data = item.data();
-      imageBackupBytes += Number(data.imageBackupSize ?? 0);
-      documentDeletes.push(item.ref);
-    }
+  for (const item of imageWorkSnapshot.docs) {
+    const data = item.data();
+    imageBackupBytes += Number(data.imageBackupSize ?? 0);
+    documentDeletes.push(item.ref);
+  }
 
-    for (const item of videoSnapshot.docs) {
-      documentDeletes.push(item.ref);
-    }
+  for (const item of videoSnapshot.docs) {
+    documentDeletes.push(item.ref);
+  }
 
-    for (const item of musicSnapshot.docs) {
-      documentDeletes.push(item.ref);
-    }
+  for (const item of musicSnapshot.docs) {
+    documentDeletes.push(item.ref);
+  }
 
-    await Promise.all(storageDeletes);
-    await commitDeleteBatch(documentDeletes);
+  await Promise.all(storageDeletes);
+  await commitDeleteBatch(documentDeletes);
 
-    await Promise.all([
-      userRef.collection("backups").doc("current").set(
-        {
-          userId: uid,
-          status: "deleted",
-          photoCount: 0,
-          imageBundleCount: 0,
-          videoCount: 0,
-          musicCount: 0,
-          imageBackupBytes: 0,
-          settings: FieldValue.delete(),
-          imageBundles: FieldValue.delete(),
-          videos: FieldValue.delete(),
-          backedUpAt: null,
-          deleteAfter: null,
-          deletedAt: new Date().toISOString(),
-          updatedAt: FieldValue.serverTimestamp()
-        },
-        { merge: true }
-      ),
-      getUsageRef(uid).set(
-        {
+  await Promise.all([
+    userRef.collection("backups").doc("current").set(
+      {
+        userId: uid,
+        status: "deleted",
+        photoCount: 0,
+        imageBundleCount: 0,
+        videoCount: 0,
+        musicCount: 0,
+        imageBackupBytes: 0,
+        settings: FieldValue.delete(),
+        imageBundles: FieldValue.delete(),
+        videos: FieldValue.delete(),
+        backedUpAt: null,
+        deleteAfter: null,
+        deletedAt: new Date().toISOString(),
+        updatedAt: FieldValue.serverTimestamp()
+      },
+      { merge: true }
+    ),
+    getUsageRef(uid).set(
+      {
+        imageTotalBytes: 0,
+        videoCount: 0,
+        videoTotalBytes: 0,
+        audioTotalBytes: 0,
+        pendingUsage: {
           imageTotalBytes: 0,
           videoCount: 0,
           videoTotalBytes: 0,
-          audioTotalBytes: 0,
-          pendingUsage: { imageTotalBytes: 0, videoCount: 0, videoTotalBytes: 0, audioTotalBytes: 0 },
-          updatedAt: FieldValue.serverTimestamp()
+          audioTotalBytes: 0
         },
-        { merge: true }
-      )
-    ]);
+        updatedAt: FieldValue.serverTimestamp()
+      },
+      { merge: true }
+    )
+  ]);
 
-    return {
-      photoCount: photoSnapshot.size,
-      imageBundleCount: imageWorkSnapshot.size,
-      videoCount: videoSnapshot.size,
-      musicCount: musicSnapshot.size,
-      imageBackupBytes,
-      deleteAfter: null
-    };
+  return {
+    photoCount: photoSnapshot.size,
+    imageBundleCount: imageWorkSnapshot.size,
+    videoCount: videoSnapshot.size,
+    musicCount: musicSnapshot.size,
+    imageBackupBytes,
+    deleteAfter: null
+  };
+};
+
+exports.deleteCloudBackupData = secureOnCall(async (request) => {
+  try {
+    return await deleteCloudBackupDataForUser(requireUid(request));
+  } catch (error) {
+    throw toHttpsError(error);
+  }
+});
+
+exports.deleteAdminCloudBackupData = secureOnCall(async (request) => {
+  try {
+    await requireAdminUid(request);
+    const { targetUid } = request.data ?? {};
+    if (typeof targetUid !== "string" || !targetUid) {
+      throw new HttpsError("invalid-argument", "targetUid is required.");
+    }
+
+    const targetUserSnapshot = await db.doc(`users/${targetUid}`).get();
+    if (!targetUserSnapshot.exists) {
+      throw new HttpsError("not-found", "Target user was not found.");
+    }
+
+    return await deleteCloudBackupDataForUser(targetUid);
   } catch (error) {
     throw toHttpsError(error);
   }
