@@ -22,7 +22,7 @@ const measurementLibrary = fs.readFileSync(
 for (const token of [
   "launchImageLibraryAsync",
   "allowsMultipleSelection: true",
-  'label="프로젝트 가져온 사진"',
+  'label: "프로젝트 가져온 사진"',
   "saveCapturedPhoto",
   "projectId: project.id",
   "selectionLimit: Math.min(20, remaining)",
