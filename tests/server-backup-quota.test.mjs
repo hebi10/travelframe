@@ -51,14 +51,14 @@ assert.doesNotThrow(() => {
     subscription: activeExpertSubscription,
     usage: {
       imageTotalBytes: 2 * 1024 * 1024 * 1024 + 100,
-      videoCount: 50,
+      videoCount: 49,
       videoTotalBytes: 0,
       audioTotalBytes: 0
     },
     mediaKind: "video",
     fileSize: 1024,
     contentType: "video/mp4",
-    storagePath: "users/user-1/backups/videos/expert-video-51.mp4"
+    storagePath: "users/user-1/backups/videos/expert-video-50.mp4"
   });
 });
 
