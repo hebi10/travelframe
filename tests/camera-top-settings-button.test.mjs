@@ -37,7 +37,7 @@ for (const requiredSnippet of [
   "openZoomControls",
   "openLightControls",
   'accessibilityLabel="라인 가이드 설정 열기"',
-  'accessibilityLabel="기준 사진 설정 열기"',
+  'accessibilityLabel="사진 설정 열기"',
   'accessibilityLabel="색감 설정 열기"',
   'accessibilityLabel="확대 설정 열기"',
   'accessibilityLabel="라이트 설정 열기"',

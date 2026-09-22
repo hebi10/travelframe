@@ -1,6 +1,6 @@
 import { StyleSheet } from "react-native";
 
-import { bodyFrameDesign, bodyFrameTypography, colors, controls, typography } from "@/constants/app-theme";
+import { bodyFrameDarkColors, bodyFrameDesign, bodyFrameTypography, colors, controls, typography } from "@/constants/app-theme";
 import {
   CAMERA_CONTROL_TRAY_HORIZONTAL_PADDING,
   CAMERA_FOCUS_INDICATOR_RADIUS,
@@ -363,7 +363,7 @@ export const styles = StyleSheet.create({
     justifyContent: "flex-end",
     paddingHorizontal: 14,
     paddingTop: 14,
-    backgroundColor: "transparent"
+    backgroundColor: "rgba(0, 0, 0, 0.16)"
   },
   guideModal: {
     gap: 16,
@@ -380,41 +380,66 @@ export const styles = StyleSheet.create({
     gap: 18,
     flexGrow: 0,
     maxHeight: "88%",
-    padding: 18,
+    paddingHorizontal: 16,
+    paddingTop: 12,
     paddingBottom: 22,
     borderWidth: 1,
-    borderColor: colors.darkLine,
-    backgroundColor: colors.background,
+    borderColor: bodyFrameDarkColors.line,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    backgroundColor: "#101012",
     overflow: "hidden"
+  },
+  cameraSettingsHandle: {
+    alignSelf: "center",
+    width: 44,
+    height: 4,
+    marginBottom: 2,
+    borderRadius: 2,
+    backgroundColor: "#55555B"
+  },
+  cameraSettingsHeader: {
+    minHeight: 92,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 16,
+    paddingTop: 6
+  },
+  cameraSettingsEyebrow: {
+    color: bodyFrameDarkColors.muted,
+    fontSize: bodyFrameTypography.caption,
+    fontWeight: "700",
+    letterSpacing: 0.4
+  },
+  cameraSettingsTitle: {
+    color: bodyFrameDarkColors.text,
+    fontSize: 30,
+    lineHeight: 36,
+    fontWeight: "800",
+    letterSpacing: -0.4
+  },
+  cameraSettingsCloseButton: {
+    minWidth: 64,
+    minHeight: 52,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 14,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderColor: "#3A3A40",
+    borderRadius: bodyFrameDesign.modalRadius,
+    backgroundColor: "#171719"
+  },
+  cameraSettingsCloseText: {
+    color: bodyFrameDarkColors.text,
+    fontSize: bodyFrameTypography.button,
+    fontWeight: "700",
+    letterSpacing: 0
   },
   cameraSettingsScrollShell: {
     position: "relative",
     flexShrink: 1,
-    minHeight: 0,
-    gap: 10
-  },
-  cameraSettingsScrollHint: {
-    minHeight: 34,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.surface
-  },
-  cameraSettingsScrollHintText: {
-    color: colors.muted,
-    fontSize: typography.button,
-    fontWeight: "800",
-    letterSpacing: 0
-  },
-  cameraSettingsScrollHintIcon: {
-    color: colors.text,
-    fontSize: 16,
-    fontWeight: "900",
-    lineHeight: 18,
-    letterSpacing: 0
+    minHeight: 0
   },
   cameraSettingsScroll: {
     flexGrow: 0,
@@ -422,8 +447,70 @@ export const styles = StyleSheet.create({
     maxHeight: 560
   },
   cameraSettingsContent: {
-    gap: 18,
+    gap: 22,
     paddingBottom: 28
+  },
+  cameraToolIntro: {
+    minHeight: 82,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderColor: "#35353A",
+    borderRadius: bodyFrameDesign.modalRadius,
+    backgroundColor: "#151517"
+  },
+  cameraToolIntroCopy: {
+    flex: 1,
+    gap: 5
+  },
+  cameraSettingsSectionTitle: {
+    color: bodyFrameDarkColors.text,
+    fontSize: bodyFrameTypography.sectionTitle,
+    fontWeight: "700",
+    letterSpacing: -0.2
+  },
+  cameraSettingsSectionDetail: {
+    color: bodyFrameDarkColors.muted,
+    fontSize: bodyFrameTypography.caption,
+    lineHeight: 18,
+    letterSpacing: 0
+  },
+  cameraSettingsDivider: {
+    height: bodyFrameDesign.borderWidth,
+    backgroundColor: bodyFrameDarkColors.line
+  },
+  cameraSettingsOptionRow: {
+    flexDirection: "row",
+    gap: 8
+  },
+  cameraSettingsOptionButton: {
+    minHeight: 52,
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderColor: "#35353A",
+    borderRadius: bodyFrameDesign.buttonRadius,
+    backgroundColor: "#18181B"
+  },
+  cameraSettingsOptionButtonActive: {
+    borderColor: "#505058",
+    backgroundColor: "#050506"
+  },
+  cameraSettingsOptionButtonText: {
+    color: bodyFrameDarkColors.text,
+    fontSize: bodyFrameTypography.button,
+    fontWeight: "700",
+    letterSpacing: 0
+  },
+  cameraSettingsOptionButtonTextActive: {
+    color: bodyFrameDarkColors.text
   },
   guideSettingsScroll: {
     flexGrow: 0
@@ -440,25 +527,25 @@ export const styles = StyleSheet.create({
   cameraToolButton: {
     width: "31%",
     minWidth: 88,
-    minHeight: bodyFrameDesign.minTouchSize,
+    minHeight: 96,
     flexGrow: 1,
-    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 7,
+    gap: 9,
     paddingHorizontal: 10,
     borderWidth: bodyFrameDesign.borderWidth,
-    borderColor: colors.line,
-    backgroundColor: colors.surface
+    borderColor: "#35353A",
+    borderRadius: bodyFrameDesign.buttonRadius,
+    backgroundColor: "#18181B"
   },
   cameraToolButtonActive: {
-    borderColor: colors.text,
-    backgroundColor: colors.surfaceStrong
+    borderColor: "#5A5A62",
+    backgroundColor: "#0A0A0C"
   },
   cameraToolText: {
-    color: colors.text,
-    fontSize: typography.button,
-    fontWeight: "800",
+    color: bodyFrameDarkColors.text,
+    fontSize: bodyFrameTypography.button,
+    fontWeight: "700",
     letterSpacing: 0
   },
   cameraSettingBlock: {
@@ -476,6 +563,20 @@ export const styles = StyleSheet.create({
   },
   settingToggleRowDisabled: {
     opacity: 0.45
+  },
+  cameraSettingsToggleRow: {
+    borderColor: "#35353A",
+    borderRadius: bodyFrameDesign.buttonRadius,
+    backgroundColor: "#18181B"
+  },
+  cameraSettingsToggleTitle: {
+    color: bodyFrameDarkColors.text
+  },
+  cameraSettingsToggleDetail: {
+    color: bodyFrameDarkColors.muted
+  },
+  cameraSettingsToggleValue: {
+    color: bodyFrameDarkColors.text
   },
   settingToggleCopy: {
     flex: 1,
@@ -508,6 +609,11 @@ export const styles = StyleSheet.create({
     borderColor: colors.line,
     backgroundColor: colors.background
   },
+  cameraSettingsShutterPanel: {
+    borderColor: "#35353A",
+    borderRadius: bodyFrameDesign.buttonRadius,
+    backgroundColor: "#18181B"
+  },
   shutterSoundHeader: {
     minHeight: 34,
     flexDirection: "row",
@@ -522,6 +628,10 @@ export const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.line,
     backgroundColor: colors.surface
+  },
+  cameraSettingsShutterIcon: {
+    borderColor: "#35353A",
+    backgroundColor: "#111113"
   },
   shutterSoundCopy: {
     flex: 1,
