@@ -8,13 +8,13 @@ for (const snippet of [
   "plus_monthly: {",
   'cardId: "plusMonthlyCard"',
   'productName: "Plus"',
-  'priceLabel: "월 3,990원"',
+  'priceLabel: "월 4,000원"',
   "expert_monthly: {",
   'cardId: "expertMonthlyCard"',
   'statusId: "expertMonthlyStatusLabel"',
   'detailId: "expertMonthlyDetail"',
   'productName: "Expert"',
-  'priceLabel: "월 5,990원"'
+  'priceLabel: "월 6,000원"'
 ]) {
   assert.ok(adminSource.includes(snippet), `admin expert product metadata missing: ${snippet}`);
 }
