@@ -24,7 +24,11 @@ export const getGuideSizeFromTrackX = (
   return clampSettingsGuideSizeInRange(min + ratio * (max - min), min, max);
 };
 
-export const formatQuotaValue = (used: number, limit: number) => {
+export const formatQuotaValue = (used: number, limit?: number) => {
+  if (limit === undefined) {
+    return `${Math.max(0, used)} · 무제한`;
+  }
+
   if (limit <= 0) {
     return "사용 불가";
   }
