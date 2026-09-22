@@ -1,4 +1,5 @@
 import * as ImagePicker from "expo-image-picker";
+import { Feather } from "@expo/vector-icons";
 import { router, type Href, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -11,9 +12,8 @@ import {
   View
 } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import Animated, {
+import {
   runOnJS,
-  useDerivedValue,
   useSharedValue
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -22,8 +22,15 @@ import {
   EditablePhotoCanvas,
   type EditablePhotoCanvasHandle
 } from "@/components/editable-photo-canvas";
-import { colors, controls, typography } from "@/constants/app-theme";
-import { GUIDE_LABELS, GUIDE_TYPES, type GuideType } from "@/constants/camera-guides";
+import {
+  bodyFrameDarkColors,
+  bodyFrameDesign,
+  bodyFrameTypography,
+  colors,
+  controls,
+  typography
+} from "@/constants/app-theme";
+import type { GuideType } from "@/constants/camera-guides";
 import {
   clearEditDraft,
   getEditDraft,
@@ -32,11 +39,6 @@ import {
   type PhotoEditDraft
 } from "@/lib/photo-edit-draft";
 import {
-  DEFAULT_GUIDE_COLOR,
-  GUIDE_SIZE_MAX,
-  GUIDE_SIZE_MIN,
-  GUIDE_STROKE_WIDTH_MAX,
-  GUIDE_STROKE_WIDTH_MIN,
   defaultAppSettings,
   getAppSettings,
   updateAppSettings,
@@ -66,44 +68,8 @@ type EditableSource = {
 };
 
 type SaveEditMode = "new" | "overwrite";
-type EditPanelTab = "image" | "guide";
 
 const ratios: PhotoRatioLabel[] = ["Original", "1:1", "3:4", "4:3", "4:5", "9:16", "16:9"];
-const EDIT_PANEL_TABS: { label: string; value: EditPanelTab }[] = [
-  { label: "이미지 편집", value: "image" },
-  { label: "가이드라인 편집", value: "guide" }
-];
-const GUIDE_SIZE_OPTIONS = [
-  { label: "작게", value: 34 },
-  { label: "기본", value: 44 },
-  { label: "크게", value: 56 }
-] as const;
-const GUIDE_STROKE_WIDTH_OPTIONS = [1, 2, 3, 4, 5] as const;
-const GUIDE_COLOR_OPTIONS = [
-  { label: "흰색", value: DEFAULT_GUIDE_COLOR },
-  { label: "노랑", value: "#F5D76E" },
-  { label: "민트", value: "#8CECC1" },
-  { label: "파랑", value: "#A9D7FF" },
-  { label: "빨강", value: "#FF5A5F" },
-  { label: "검정", value: "rgba(17, 17, 17, 0.78)" }
-] as const;
-
-const clampEditGuideSize = (value: number) => {
-  "worklet";
-
-  return Math.round(Math.max(GUIDE_SIZE_MIN, Math.min(GUIDE_SIZE_MAX, value)));
-};
-
-const getGuideSizeFromTrackX = (trackX: number, trackWidth: number) => {
-  "worklet";
-
-  if (!Number.isFinite(trackX) || trackWidth <= 0) {
-    return GUIDE_SIZE_MIN;
-  }
-
-  const ratio = Math.max(0, Math.min(1, trackX / trackWidth));
-  return clampEditGuideSize(GUIDE_SIZE_MIN + ratio * (GUIDE_SIZE_MAX - GUIDE_SIZE_MIN));
-};
 
 const ratioDisplayLabel = (value: PhotoRatioLabel) =>
   value === "Original" ? "원본" : value;
@@ -169,8 +135,6 @@ export default function EditScreen() {
     useState<GridGuideLinePositions>(defaultAppSettings.gridGuideLinePositions);
   const [guideShapePoints, setGuideShapePoints] =
     useState<GuideShapePoints>(defaultAppSettings.guideShapePoints);
-  const [guidePanelOpen, setGuidePanelOpen] = useState(false);
-  const [activeEditPanelTab, setActiveEditPanelTab] = useState<EditPanelTab>("image");
   const [isCanvasExpanded, setIsCanvasExpanded] = useState(false);
   const [isGuidePositionAdjusting, setIsGuidePositionAdjusting] = useState(false);
   const [guideMoveFrame, setGuideMoveFrame] = useState<CameraGuideFrame>({
