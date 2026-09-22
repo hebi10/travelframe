@@ -373,63 +373,6 @@ export default function EditScreen() {
     }
   };
 
-  const updateGuideType = (nextGuide: GuideType) => {
-    setGuide(nextGuide);
-    setGuideVisible(true);
-    void updateAppSettings({
-      defaultGuide: nextGuide,
-      guideVisible: true
-    });
-  };
-
-  const updateGuideVisibility = (nextVisible: boolean) => {
-    setGuideVisible(nextVisible);
-    void updateAppSettings({ guideVisible: nextVisible });
-  };
-
-  const updateGuideSize = (nextSize: number) => {
-    const clampedSize = clampEditGuideSize(nextSize);
-    setGuideSize(clampedSize);
-    setGuideVisible(true);
-    void updateAppSettings({
-      guideSize: clampedSize,
-      guideVisible: true
-    });
-  };
-
-  const previewGuideSize = (nextSize: number) => {
-    setGuideSize(clampEditGuideSize(nextSize));
-    setGuideVisible(true);
-  };
-
-  const commitGuideSize = (nextSize: number) => {
-    updateGuideSize(nextSize);
-  };
-
-  const updateGuideStrokeWidth = (nextStrokeWidth: number) => {
-    const clampedStrokeWidth = Math.round(
-      Math.max(
-        GUIDE_STROKE_WIDTH_MIN,
-        Math.min(GUIDE_STROKE_WIDTH_MAX, nextStrokeWidth)
-      )
-    );
-    setGuideStrokeWidth(clampedStrokeWidth);
-    setGuideVisible(true);
-    void updateAppSettings({
-      guideStrokeWidth: clampedStrokeWidth,
-      guideVisible: true
-    });
-  };
-
-  const updateGuideColor = (nextColor: string) => {
-    setGuideColor(nextColor);
-    setGuideVisible(true);
-    void updateAppSettings({
-      guideColor: nextColor,
-      guideVisible: true
-    });
-  };
-
   const getClampedGuideOffset = useCallback(
     (nextX: number, nextY: number) =>
       clampGuidePositionOffset({ x: nextX, y: nextY }, guideMoveFrame),
@@ -456,8 +399,6 @@ export default function EditScreen() {
       setGuideOffsetFrameHeight(guideMoveFrame.height);
       setGuideVisible(true);
       setIsGuidePositionAdjusting(false);
-      setActiveEditPanelTab("guide");
-      setGuidePanelOpen(true);
       void updateAppSettings({
         guideOffsetX: clampedOffset.x,
         guideOffsetY: clampedOffset.y,
@@ -477,7 +418,6 @@ export default function EditScreen() {
 
   const startGuidePositionAdjustment = () => {
     setGuideVisible(true);
-    setGuidePanelOpen(false);
     guideOffsetXValue.value = guideOffsetX;
     guideOffsetYValue.value = guideOffsetY;
     setIsGuidePositionAdjusting(true);
