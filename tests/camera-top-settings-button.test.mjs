@@ -27,7 +27,8 @@ for (const removedSnippet of [
 for (const requiredSnippet of [
   "styles.cameraHeaderButton",
   "onPress={openCameraSettingsMenu}",
-  'accessibilityLabel="촬영 도구 열기"',
+  'accessibilityLabel="촬영 설정 열기"',
+  'name="settings"',
   "openCameraToolFromSettings",
   "styles.cameraToolGrid",
   "styles.cameraToolButton",
