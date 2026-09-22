@@ -441,29 +441,6 @@ export const styles = StyleSheet.create({
     flexShrink: 1,
     minHeight: 0
   },
-  cameraSettingsScrollHint: {
-    minHeight: 34,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.surface
-  },
-  cameraSettingsScrollHintText: {
-    color: colors.muted,
-    fontSize: typography.button,
-    fontWeight: "800",
-    letterSpacing: 0
-  },
-  cameraSettingsScrollHintIcon: {
-    color: colors.text,
-    fontSize: 16,
-    fontWeight: "900",
-    lineHeight: 18,
-    letterSpacing: 0
-  },
   cameraSettingsScroll: {
     flexGrow: 0,
     flexShrink: 1,
