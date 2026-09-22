@@ -978,33 +978,39 @@ export const styles = StyleSheet.create({
   },
   cameraColorPanel: {
     width: "100%",
-    gap: 12,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.background
+    gap: 14,
+    padding: 14,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderColor: "#303035",
+    borderRadius: bodyFrameDesign.modalRadius,
+    backgroundColor: "#101012"
   },
   cameraColorHeaderRow: {
-    minHeight: 42,
+    minHeight: bodyFrameDesign.minTouchSize,
     flexDirection: "row",
     alignItems: "flex-start",
     justifyContent: "space-between",
-    gap: 10
+    gap: 12
   },
   cameraColorHeader: {
     flex: 1,
-    gap: 3
+    gap: 5
+  },
+  cameraColorTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8
   },
   cameraColorTitle: {
-    color: colors.text,
-    fontSize: typography.body,
-    fontWeight: "900",
-    letterSpacing: 0
+    color: bodyFrameDarkColors.text,
+    fontSize: bodyFrameTypography.sectionTitle,
+    fontWeight: "700",
+    letterSpacing: -0.2
   },
   cameraColorHint: {
-    color: colors.muted,
+    color: bodyFrameDarkColors.muted,
     fontSize: bodyFrameTypography.caption,
-    lineHeight: 16,
+    lineHeight: 18,
     letterSpacing: 0
   },
   cameraColorCloseButton: {
@@ -1012,9 +1018,29 @@ export const styles = StyleSheet.create({
     height: bodyFrameDesign.minTouchSize,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.surface
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderColor: "#35353A",
+    borderRadius: bodyFrameDesign.buttonRadius,
+    backgroundColor: "#18181B"
+  },
+  cameraColorPresetSection: {
+    gap: 8
+  },
+  cameraColorPresetHeader: {
+    minHeight: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12
+  },
+  cameraColorPresetTitle: {
+    color: bodyFrameDarkColors.text,
+    fontSize: bodyFrameTypography.caption,
+    fontWeight: "700"
+  },
+  cameraColorPresetHint: {
+    color: bodyFrameDarkColors.faint,
+    fontSize: bodyFrameTypography.caption
   },
   cameraColorSlotRow: {
     minHeight: bodyFrameDesign.minTouchSize,
@@ -1028,16 +1054,17 @@ export const styles = StyleSheet.create({
     position: "relative",
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.surface
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderColor: "#35353A",
+    borderRadius: bodyFrameDesign.buttonRadius,
+    backgroundColor: "#18181B"
   },
   cameraColorSlotButtonActive: {
-    borderColor: colors.text,
-    backgroundColor: colors.background
+    borderColor: "#F5F5F5",
+    backgroundColor: "#050506"
   },
   cameraColorSlotButtonSaved: {
-    borderColor: colors.text
+    borderColor: "#5A5A62"
   },
   cameraColorSlotSavedDot: {
     position: "absolute",
@@ -1046,26 +1073,97 @@ export const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: colors.text
+    backgroundColor: "#F5F5F5"
   },
   cameraColorSlotText: {
-    color: colors.text,
-    fontSize: typography.button,
-    fontWeight: "900",
+    color: bodyFrameDarkColors.text,
+    fontSize: bodyFrameTypography.button,
+    fontWeight: "700",
     letterSpacing: 0,
     fontVariant: ["tabular-nums"]
   },
   cameraColorSlotTextMuted: {
-    color: colors.muted
+    color: bodyFrameDarkColors.faint
   },
   cameraColorSliderList: {
-    gap: 10
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderColor: "#303035",
+    borderRadius: bodyFrameDesign.buttonRadius,
+    backgroundColor: "#151517"
+  },
+  cameraColorSliderArea: {
+    minHeight: 44,
+    justifyContent: "center"
+  },
+  cameraColorCompactSliderRow: {
+    minHeight: 44,
+    gap: 12
+  },
+  cameraColorSliderLabel: {
+    minWidth: 44,
+    color: bodyFrameDarkColors.muted,
+    fontWeight: "700"
+  },
+  cameraColorSliderValue: {
+    minWidth: 38,
+    color: bodyFrameDarkColors.text,
+    fontWeight: "700"
+  },
+  cameraColorTrackBase: {
+    backgroundColor: "#3A3A40"
+  },
+  cameraColorTrackFill: {
+    backgroundColor: "#F5F5F5"
+  },
+  cameraColorThumb: {
+    borderColor: "#F5F5F5",
+    backgroundColor: "#101012"
   },
   cameraColorActions: {
+    minHeight: bodyFrameDesign.minTouchSize,
     flexDirection: "row",
-    justifyContent: "flex-end",
     gap: 8
   },
+  cameraColorSecondaryButton: {
+    minHeight: bodyFrameDesign.minTouchSize,
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+    paddingHorizontal: 12,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderColor: "#35353A",
+    borderRadius: bodyFrameDesign.buttonRadius,
+    backgroundColor: "#18181B"
+  },
+  cameraColorSecondaryButtonText: {
+    color: bodyFrameDarkColors.text,
+    fontSize: bodyFrameTypography.button,
+    fontWeight: "700"
+  },
+  cameraColorPrimaryButton: {
+    minHeight: bodyFrameDesign.minTouchSize,
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+    paddingHorizontal: 12,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderColor: "#F5F5F5",
+    borderRadius: bodyFrameDesign.buttonRadius,
+    backgroundColor: "#F5F5F5"
+  },
+  cameraColorPrimaryButtonText: {
+    color: "#111111",
+    fontSize: bodyFrameTypography.button,
+    fontWeight: "700"
+  },
+
   quickButtonRow: {
     minHeight: bodyFrameDesign.minTouchSize,
     flexDirection: "row",
