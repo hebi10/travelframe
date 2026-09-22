@@ -167,7 +167,7 @@ object ProjectReminderScheduler {
     val channel = NotificationChannel(
       CHANNEL_ID,
       CHANNEL_NAME,
-      NotificationManager.IMPORTANCE_DEFAULT
+      NotificationManager.IMPORTANCE_HIGH
     ).apply {
       description = "프로젝트별 매일 촬영 시간을 알려줍니다."
       enableVibration(true)
