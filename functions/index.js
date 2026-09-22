@@ -250,6 +250,313 @@ const getCloudBackupProjectSlotLimit = (subscription) => {
   return 0;
 };
 
+const normalizeBackupProjectId = (value) => {
+  if (typeof value !== "string") return null;
+  const projectId = value.trim();
+  if (!projectId || projectId.length > 160 || projectId.includes("/")) {
+    return null;
+  }
+  return projectId;
+};
+
+const getBackupProjectSlotNumber = (slotId) => {
+  const match = /^slot-(\d+)$/.exec(String(slotId ?? ""));
+  return match ? Number(match[1]) : 0;
+};
+
+const getBackupProjectSlotByProject = async (uid, projectId) => {
+  const snapshot = await db
+    .collection(`users/${uid}/backupProjectSlots`)
+    .where("projectId", "==", projectId)
+    .limit(1)
+    .get();
+  return snapshot.empty ? null : snapshot.docs[0];
+};
+
+const assertBackupProjectSlotAllowed = async ({
+  uid,
+  subscription,
+  projectId
+}) => {
+  const normalizedProjectId = normalizeBackupProjectId(projectId);
+  if (!normalizedProjectId) {
+    throw new HttpsError(
+      "failed-precondition",
+      "클라우드 백업 프로젝트를 먼저 선택해 주세요."
+    );
+  }
+
+  const slotLimit = getCloudBackupProjectSlotLimit(subscription);
+  if (slotLimit <= 0) {
+    throw new HttpsError(
+      "failed-precondition",
+      "현재 플랜에서는 클라우드 프로젝트 백업을 사용할 수 없습니다."
+    );
+  }
+
+  const slotSnapshot = await getBackupProjectSlotByProject(
+    uid,
+    normalizedProjectId
+  );
+  if (!slotSnapshot) {
+    throw new HttpsError(
+      "failed-precondition",
+      "선택한 클라우드 백업 프로젝트만 업로드할 수 있습니다."
+    );
+  }
+
+  const slotNumber =
+    Number(slotSnapshot.data()?.slotNumber) ||
+    getBackupProjectSlotNumber(slotSnapshot.id);
+  if (slotNumber < 1 || slotNumber > slotLimit) {
+    throw new HttpsError(
+      "failed-precondition",
+      "현재 플랜의 클라우드 프로젝트 슬롯 한도를 초과했습니다."
+    );
+  }
+
+  return {
+    slotId: slotSnapshot.id,
+    slotNumber,
+    projectId: normalizedProjectId
+  };
+};
+
+const assertProjectPhotoBackupCapacity = async ({
+  uid,
+  projectId
+}) => {
+  const [photoSnapshot, sessionSnapshot] = await Promise.all([
+    db
+      .collection(`users/${uid}/photoBackups`)
+      .where("projectId", "==", projectId)
+      .get(),
+    db
+      .collection(`users/${uid}/backupUploadSessions`)
+      .where("projectId", "==", projectId)
+      .get()
+  ]);
+  const pendingPhotoCount = sessionSnapshot.docs.filter((item) => {
+    const data = item.data();
+    return data.status === "reserved" && data.itemType === "photo";
+  }).length;
+
+  if (
+    photoSnapshot.size + pendingPhotoCount >=
+    CLOUD_BACKUP_PHOTOS_PER_PROJECT
+  ) {
+    throw new HttpsError(
+      "resource-exhausted",
+      `프로젝트당 클라우드 사진은 최대 ${CLOUD_BACKUP_PHOTOS_PER_PROJECT}장까지 백업할 수 있습니다.`
+    );
+  }
+};
+
+const serializeBackupProjectSlot = (snapshot) => {
+  const data = snapshot.data();
+  return {
+    id: snapshot.id,
+    slotNumber:
+      Number(data.slotNumber) || getBackupProjectSlotNumber(snapshot.id),
+    projectId: data.projectId,
+    status: data.status === "over_limit" ? "over_limit" : "active",
+    selectedAt: data.selectedAt ?? null,
+    updatedAt: data.updatedAt ?? null
+  };
+};
+
+exports.selectCloudBackupProject = secureOnCall(async (request) => {
+  try {
+    const uid = requireUid(request);
+    const projectId = normalizeBackupProjectId(request.data?.projectId);
+    if (!projectId) {
+      throw new HttpsError("invalid-argument", "projectId is required.");
+    }
+
+    const subscription = await getBackupSubscription(uid);
+    const slotLimit = getCloudBackupProjectSlotLimit(subscription);
+    if (slotLimit <= 0) {
+      throw new HttpsError(
+        "failed-precondition",
+        "클라우드 백업을 지원하는 구독이 필요합니다."
+      );
+    }
+
+    const slotsRef = db.collection(`users/${uid}/backupProjectSlots`);
+    const existingProjectSlot = await getBackupProjectSlotByProject(
+      uid,
+      projectId
+    );
+    if (existingProjectSlot) {
+      return { slot: serializeBackupProjectSlot(existingProjectSlot) };
+    }
+
+    const slots = await slotsRef.get();
+    const occupied = new Set(
+      slots.docs.map((item) => Number(item.data()?.slotNumber) || getBackupProjectSlotNumber(item.id))
+    );
+    const slotNumber = Array.from(
+      { length: slotLimit },
+      (_, index) => index + 1
+    ).find((number) => !occupied.has(number));
+
+    if (!slotNumber) {
+      throw new HttpsError(
+        "resource-exhausted",
+        `현재 플랜에서는 클라우드 백업 프로젝트를 최대 ${slotLimit}개 선택할 수 있습니다.`
+      );
+    }
+
+    const slotRef = slotsRef.doc(`slot-${slotNumber}`);
+    const nowIso = new Date().toISOString();
+    await slotRef.set({
+      userId: uid,
+      slotNumber,
+      projectId,
+      status: "active",
+      selectedAt: nowIso,
+      updatedAt: nowIso
+    });
+
+    return { slot: serializeBackupProjectSlot(await slotRef.get()) };
+  } catch (error) {
+    throw toHttpsError(error);
+  }
+});
+
+const deleteBackupProjectCloudData = async ({ uid, projectId }) => {
+  const userRef = db.doc(`users/${uid}`);
+  const [photoSnapshot, videoSnapshot] = await Promise.all([
+    userRef
+      .collection("photoBackups")
+      .where("projectId", "==", projectId)
+      .get(),
+    userRef
+      .collection("videos")
+      .where("projectId", "==", projectId)
+      .get()
+  ]);
+
+  const backupDocs = [...photoSnapshot.docs, ...videoSnapshot.docs];
+  const storagePaths = backupDocs.flatMap((item) => {
+    const data = item.data();
+    return [
+      data.storagePath,
+      data.previewStoragePath,
+      ...(Array.isArray(data.storagePaths) ? data.storagePaths : [])
+    ].filter(Boolean);
+  });
+  await Promise.all(
+    [...new Set(storagePaths)].map((storagePath) =>
+      deleteOwnedCloudBackupStoragePath(uid, storagePath)
+    )
+  );
+
+  const sessionIds = new Set(
+    backupDocs.flatMap((item) => {
+      const data = item.data();
+      return [
+        data.backupSessionId,
+        ...(Array.isArray(data.backupSessionIds)
+          ? data.backupSessionIds
+          : [])
+      ].filter(Boolean);
+    })
+  );
+  const refs = [
+    ...backupDocs.map((item) => item.ref),
+    ...[...sessionIds].map((sessionId) =>
+      userRef.collection("backupUploadSessions").doc(sessionId)
+    ),
+    userRef.collection("bodyProjects").doc(projectId)
+  ];
+  await commitDeleteBatch(refs);
+  await refreshAdminBackupOverview(uid);
+
+  return {
+    deletedPhotoCount: photoSnapshot.size,
+    deletedVideoCount: videoSnapshot.size
+  };
+};
+
+exports.replaceCloudBackupProject = secureOnCall(async (request) => {
+  try {
+    const uid = requireUid(request);
+    const slotId = String(request.data?.slotId ?? "");
+    const projectId = normalizeBackupProjectId(request.data?.projectId);
+    const slotNumber = getBackupProjectSlotNumber(slotId);
+    if (!projectId || slotNumber <= 0) {
+      throw new HttpsError(
+        "invalid-argument",
+        "slotId and projectId are required."
+      );
+    }
+
+    const subscription = await getBackupSubscription(uid);
+    const slotLimit = getCloudBackupProjectSlotLimit(subscription);
+    if (slotNumber > slotLimit || slotLimit <= 0) {
+      throw new HttpsError(
+        "failed-precondition",
+        "현재 플랜에서 사용할 수 없는 클라우드 백업 슬롯입니다."
+      );
+    }
+
+    const slotsRef = db.collection(`users/${uid}/backupProjectSlots`);
+    const slotRef = slotsRef.doc(slotId);
+    const [slotSnapshot, duplicateSnapshot] = await Promise.all([
+      slotRef.get(),
+      getBackupProjectSlotByProject(uid, projectId)
+    ]);
+    if (!slotSnapshot.exists) {
+      throw new HttpsError("not-found", "백업 프로젝트 슬롯을 찾을 수 없습니다.");
+    }
+    if (duplicateSnapshot && duplicateSnapshot.id !== slotId) {
+      throw new HttpsError(
+        "already-exists",
+        "이미 다른 클라우드 백업 슬롯에서 선택한 프로젝트입니다."
+      );
+    }
+
+    const previousProjectId = normalizeBackupProjectId(
+      slotSnapshot.data()?.projectId
+    );
+    if (previousProjectId === projectId) {
+      return {
+        slot: serializeBackupProjectSlot(slotSnapshot),
+        deletedPhotoCount: 0,
+        deletedVideoCount: 0
+      };
+    }
+
+    const deleted = previousProjectId
+      ? await deleteBackupProjectCloudData({
+          uid,
+          projectId: previousProjectId
+        })
+      : { deletedPhotoCount: 0, deletedVideoCount: 0 };
+    const nowIso = new Date().toISOString();
+    await slotRef.set(
+      {
+        userId: uid,
+        slotNumber,
+        projectId,
+        status: "active",
+        selectedAt: nowIso,
+        updatedAt: nowIso,
+        previousProjectId: previousProjectId ?? null
+      },
+      { merge: false }
+    );
+
+    return {
+      slot: serializeBackupProjectSlot(await slotRef.get()),
+      ...deleted
+    };
+  } catch (error) {
+    throw toHttpsError(error);
+  }
+});
+
 const getKstWeekStart = (date = new Date()) => {
   const kstDate = new Date(date.getTime() + KST_OFFSET_MS);
   const kstDay = kstDate.getUTCDay();
