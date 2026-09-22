@@ -256,7 +256,8 @@ function SortableProjectPhotoTile({
     <GestureDetector gesture={gesture}>
       <Animated.View
         accessibilityRole="adjustable"
-        accessibilityLabel={`${index + 1}번째 기록. 길게 눌러 순서 이동`}
+        accessibilityLabel={`${photo.sequence ?? ""}번째 기록 ${formatDate(photo.createdAt)}`}
+        accessibilityHint="길게 누른 뒤 원하는 위치로 드래그하여 순서를 변경합니다."
         style={[
           styles.photoTile,
           {
