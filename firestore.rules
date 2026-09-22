@@ -334,10 +334,10 @@ service cloud.firestore {
 
     function weeklyVideoExportLimitForUser(userId) {
       return isActiveSubscription(userId, "expert_monthly")
-        ? 30
-        : isActiveSubscription(userId, "creator_monthly")
-          ? 15
-          : 1;
+          || isActiveSubscription(userId, "plus_monthly")
+          || isActiveSubscription(userId, "creator_monthly")
+        ? 15
+        : 1;
     }
 
     function hasValidBackupOwner(userId) {
@@ -600,6 +600,11 @@ service cloud.firestore {
       }
 
       match /backupUploadSessions/{sessionId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow create, update, delete: if false;
+      }
+
+      match /backupProjectSlots/{slotId} {
         allow read: if isOwner(userId) || isAdmin();
         allow create, update, delete: if false;
       }
