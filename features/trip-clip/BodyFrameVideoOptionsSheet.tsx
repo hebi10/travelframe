@@ -46,6 +46,9 @@ export function BodyFrameVideoOptionsSheet({
           <Text style={[styles.title, { color: palette.text }]}>{titles[kind]}</Text>
           {kind === "photos" ? (
             <>
+              <Text style={[styles.orderNotice, { color: palette.muted }]}>
+                사진 선택에서는 포함할 사진만 고를 수 있습니다. 영상 순서는 프로젝트의 사진 순서를 따르며, 순서 변경은 프로젝트 상세의 순서 조정에서 해 주세요.
+              </Text>
               <View style={styles.actions}>
                 <Pressable accessibilityRole="button" style={styles.action} onPress={() => setDraftIds(null)}>
                   <Text style={{ color: palette.text }}>전체 선택</Text>
@@ -124,6 +127,7 @@ const styles = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" },
   sheet: { maxHeight: "90%", padding: 16, gap: 16, borderTopLeftRadius: 12, borderTopRightRadius: 12 },
   title: { fontSize: 20, fontWeight: "600" },
+  orderNotice: { fontSize: 12, lineHeight: 18 },
   actions: { flexDirection: "row", gap: 12 },
   action: { minHeight: bodyFrameDesign.minTouchSize, paddingHorizontal: 12, justifyContent: "center" },
   photoList: { flexGrow: 0, flexShrink: 1 },
