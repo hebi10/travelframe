@@ -504,7 +504,7 @@ export default function CameraScreen({
       !isBodyFrameCameraCaptureBlocked(),
     []
   );
-  const waitForCameraSessionReadyAfterPermission = useCallback(async () => {
+  const waitForCameraSessionReadyForCapture = useCallback(async () => {
     const startedAt = Date.now();
 
     while (Date.now() - startedAt < CAMERA_PERMISSION_RECOVERY_TIMEOUT_MS) {
@@ -2195,7 +2195,7 @@ export default function CameraScreen({
       // Resolve the system dialog before a photo or a pending save exists.
       if (getCameraSaveScopeTargets(captureSaveScope).device) {
         await requestPhotoSavePermission();
-        await waitForCameraSessionReadyAfterPermission();
+        await waitForCameraSessionReadyForCapture();
       }
       const captureStartedAt = Date.now();
       const logCaptureStage = (stage: string) => {
@@ -2207,7 +2207,7 @@ export default function CameraScreen({
       if (pendingPoseSnapshot) {
         logCaptureStage("waiting-pose-snapshot");
         await pendingPoseSnapshot;
-        await waitForCameraSessionReadyAfterPermission();
+        await waitForCameraSessionReadyForCapture();
         logCaptureStage("pose-snapshot-idle");
       }
 
