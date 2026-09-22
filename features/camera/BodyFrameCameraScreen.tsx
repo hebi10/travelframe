@@ -246,17 +246,25 @@ export default function BodyFrameCameraScreen() {
       await reloadProjectState();
     })();
 
-    const timeout = setTimeout(() => {
-      setSaveMessage(null);
-      setMeasurementPromptPhotoId(null);
-    }, 4200);
-    return () => clearTimeout(timeout);
   }, [
     reloadProjectState,
     session.lastSavedAt,
     session.lastSavedSequence,
     session.projectId
   ]);
+
+  useEffect(() => {
+    if (!saveMessage) {
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      setSaveMessage(null);
+      setMeasurementPromptPhotoId(null);
+    }, 4200);
+
+    return () => clearTimeout(timeout);
+  }, [saveMessage]);
 
   const handleSelectProject = useCallback(
     (project: BodyProject) => {
