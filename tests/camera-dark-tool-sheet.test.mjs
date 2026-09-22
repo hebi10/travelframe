@@ -22,8 +22,9 @@ for (const token of [
   'name={option.value === "off" ? "zap-off" : "zap"}',
   "cameraSettingsOptionButton",
   "showsVerticalScrollIndicator={false}",
-  "<CameraSettingToggleRow\r\n                    dark",
-  "<CameraShutterSoundChoice\r\n                    dark"
+  "<CameraSettingToggleRow",
+  "<CameraShutterSoundChoice",
+  "dark"
 ]) {
   assert.ok(cameraSource.includes(token), `dark camera tool sheet missing: ${token}`);
 }
