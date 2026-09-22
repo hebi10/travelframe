@@ -193,9 +193,9 @@ object ProjectReminderScheduler {
     ids.add(projectId)
     prefs.edit()
       .putStringSet(PROJECT_IDS_KEY, ids)
-      .putString("name_\$projectId", projectName.ifBlank { "바디 프레임" })
-      .putInt("hour_\$projectId", hour)
-      .putInt("minute_\$projectId", minute)
+      .putString("name_$projectId", projectName.ifBlank { "바디 프레임" })
+      .putInt("hour_$projectId", hour)
+      .putInt("minute_$projectId", minute)
       .apply()
 
     schedule(context, projectId, projectName, hour, minute)
@@ -236,9 +236,9 @@ object ProjectReminderScheduler {
       ids.remove(projectId)
       prefs.edit()
         .putStringSet(PROJECT_IDS_KEY, ids)
-        .remove("name_\$projectId")
-        .remove("hour_\$projectId")
-        .remove("minute_\$projectId")
+        .remove("name_$projectId")
+        .remove("hour_$projectId")
+        .remove("minute_$projectId")
         .apply()
     }
   }
@@ -247,9 +247,9 @@ object ProjectReminderScheduler {
     val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     val ids = prefs.getStringSet(PROJECT_IDS_KEY, emptySet()) ?: emptySet()
     ids.forEach { projectId ->
-      val projectName = prefs.getString("name_\$projectId", "바디 프레임") ?: "바디 프레임"
-      val hour = prefs.getInt("hour_\$projectId", 20)
-      val minute = prefs.getInt("minute_\$projectId", 0)
+      val projectName = prefs.getString("name_$projectId", "바디 프레임") ?: "바디 프레임"
+      val hour = prefs.getInt("hour_$projectId", 20)
+      val minute = prefs.getInt("minute_$projectId", 0)
       schedule(context, projectId, projectName, hour, minute)
     }
   }
@@ -260,7 +260,7 @@ object ProjectReminderScheduler {
     projectName: String
   ): PendingIntent {
     val intent = Intent(context, ProjectReminderReceiver::class.java).apply {
-      action = "bodyframe.project.reminder.\$projectId"
+      action = "bodyframe.project.reminder.$projectId"
       putExtra(EXTRA_PROJECT_ID, projectId)
       putExtra(EXTRA_PROJECT_NAME, projectName)
     }
@@ -286,10 +286,10 @@ class ProjectReminderReceiver : BroadcastReceiver() {
     val projectId = intent.getStringExtra(EXTRA_PROJECT_ID) ?: return
     val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     val projectName =
-      prefs.getString("name_\$projectId", intent.getStringExtra(EXTRA_PROJECT_NAME))
+      prefs.getString("name_$projectId", intent.getStringExtra(EXTRA_PROJECT_NAME))
         ?: "바디 프레임"
-    val hour = prefs.getInt("hour_\$projectId", 20)
-    val minute = prefs.getInt("minute_\$projectId", 0)
+    val hour = prefs.getInt("hour_$projectId", 20)
+    val minute = prefs.getInt("minute_$projectId", 0)
 
     ProjectReminderScheduler.ensureNotificationChannel(context)
 
@@ -305,7 +305,7 @@ class ProjectReminderReceiver : BroadcastReceiver() {
 
     val notification = Notification.Builder(context, CHANNEL_ID)
       .setSmallIcon(android.R.drawable.ic_menu_camera)
-      .setContentTitle("\$projectName 촬영 시간")
+      .setContentTitle("$projectName 촬영 시간")
       .setContentText("오늘의 사진을 기록할 시간입니다.")
       .setAutoCancel(true)
       .setContentIntent(contentIntent)
