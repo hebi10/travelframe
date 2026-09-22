@@ -815,6 +815,11 @@ export default function AccountScreen() {
                       <Text selectable style={[styles.planPrice, themed.text]}>
                         {getStorePrice(getPaymentProductId(plan)) ?? plan.price}
                       </Text>
+                      <Text selectable style={[styles.helpText, themed.mutedText]}>
+                        {plan.id === "adRemove"
+                          ? "1회 결제 · 자동 갱신 없음"
+                          : "월 구독 · 취소 전까지 자동 갱신"}
+                      </Text>
                     </View>
                     <StatusBadge
                       label={getPaymentPlanStatus(plan).label}
@@ -993,15 +998,21 @@ export default function AccountScreen() {
             </Pressable>
 
             {selectedPaymentPlan?.id !== "adRemove" ? (
-              <Pressable
-                accessibilityRole="link"
-                style={[styles.secondaryButton, themed.secondaryButton]}
-                onPress={() => void Linking.openURL(GOOGLE_PLAY_SUBSCRIPTIONS_URL)}
-              >
-                <Text selectable={false} style={[styles.secondaryButtonText, themed.text]}>
-                  Google Play에서 구독 관리
+              <>
+                <Pressable
+                  accessibilityRole="link"
+                  style={[styles.secondaryButton, themed.secondaryButton]}
+                  onPress={() => void Linking.openURL(GOOGLE_PLAY_SUBSCRIPTIONS_URL)}
+                >
+                  <Text selectable={false} style={[styles.secondaryButtonText, themed.text]}>
+                    Google Play에서 구독 관리
+                  </Text>
+                </Pressable>
+                <Text selectable style={[styles.helpText, themed.mutedText]}>
+                  구독을 취소하면 다음 갱신 결제가 중단됩니다. 일반적으로 이미 결제한 기간이 끝날 때까지
+                  혜택을 이용할 수 있으며, 환불 여부는 Google Play 정책과 적용 법령에 따라 달라질 수 있습니다.
                 </Text>
-              </Pressable>
+              </>
             ) : null}
 
             <View style={styles.form}>
