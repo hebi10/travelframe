@@ -30,14 +30,15 @@
 
 ## Google Play Billing / external configuration
 - [ ] Create/activate `ad_remove`.
-- [ ] Create/activate `creator_monthly` subscription/base plan/offer.
-- [ ] Create/activate `expert_monthly` subscription/base plan/offer.
+- [x] Create/activate `creator_monthly` Pro subscription/base plan.
+- [x] Create/activate `plus_monthly` Plus subscription/base plan.
+- [x] Create/activate `expert_monthly` Expert subscription/base plan.
 - [ ] Grant Firebase Functions runtime identity Android Publisher API / Play Console access.
 - [ ] Configure RTDN Pub/Sub topic `body-frame-play-billing`.
 - [ ] Deploy Functions and Firestore Rules.
 - [ ] Verify new purchase.
 - [ ] Verify purchase restore.
-- [ ] Verify Pro → Expert replacement.
+- [ ] Verify Pro ↔ Plus ↔ Expert replacement.
 - [ ] Verify renewal.
 - [ ] Verify cancellation then access until expiry.
 - [ ] Verify expiry.
@@ -72,11 +73,14 @@ Use `docs/manual-device-qa.md`.
 - [ ] Second photo reference overlay.
 - [ ] first/latest reference modes.
 - [ ] Project switching.
-- [ ] Free 100th photo allowed / 101st blocked.
-- [ ] Pro 365-photo behavior.
+- [ ] Free/Ad Remove: project 1 only, 100th photo allowed / 101st blocked.
+- [ ] Pro/Plus/Expert: local projects and local photos are unlimited.
+- [ ] Cloud project slots: Pro 1 / Plus 3 / Expert 5.
+- [ ] Each selected cloud project accepts 365 photos and blocks the 366th.
+- [ ] Backup project replacement deletes old cloud project data but keeps local originals.
 - [ ] Archive and restore project.
 - [ ] 0.1s/photo progress video.
-- [ ] Free 10-second and Pro 36.5-second limits.
+- [ ] Free 10-second and paid 36.5-second limits.
 - [ ] Cloud backup/restore on eligible plan.
 - [ ] Google Play purchase/restore/upgrade/refund.
 - [ ] Small-screen / large-font / Safe Area / foldable checks.
