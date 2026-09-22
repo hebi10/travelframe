@@ -11,7 +11,7 @@ for (const snippet of [
   "styles.shutterSoundCopy",
   "styles.shutterSoundDetail",
   "styles.shutterSoundOptions",
-  'Feather name={mode === "silent" ? "volume-x" : "volume-2"}'
+  'name={mode === "silent" ? "volume-x" : "volume-2"}'
 ]) {
   assert.ok(
     componentSource.includes(snippet),
