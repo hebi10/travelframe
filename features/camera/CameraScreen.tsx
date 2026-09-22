@@ -179,8 +179,6 @@ type CameraScreenProps = {
   onProjectReferenceModeChange?: (projectId: string, mode: "first" | "latest") => Promise<void>;
 };
 
-const CAMERA_PHOTO_TARGET_RESOLUTION = { width: 1920, height: 2560 };
-
 export default function CameraScreen({
   projectReferenceMode = "latest",
   onProjectReferenceModeChange
@@ -311,6 +309,7 @@ export default function CameraScreen({
   const cameraNativeCaptureInProgressRef = useRef(false);
   const captureSaveQueueTailRef = useRef<Promise<void>>(Promise.resolve());
   const poseAnalysisBusyRef = useRef(false);
+  const poseSnapshotPromiseRef = useRef<Promise<void> | null>(null);
   const poseAlignmentWasAlignedRef = useRef(false);
   const insets = useSafeAreaInsets();
   const bottomSafePadding = Math.max(insets.bottom + 10, 24);
@@ -407,8 +406,7 @@ export default function CameraScreen({
   const photoOutputQuality =
     CAMERA_QUALITY_OPTIONS.find((option) => option.value === photoQuality)?.quality ?? 0.92;
   const photoOutput = usePhotoOutput({
-    quality: photoOutputQuality,
-    targetResolution: CAMERA_PHOTO_TARGET_RESOLUTION
+    quality: photoOutputQuality
   });
   const cameraOutputs = useMemo(() => [photoOutput], [photoOutput]);
   const cameraSupportsExposureBias = cameraDevice ? cameraDevice.supportsExposureBias : false;
@@ -656,10 +654,27 @@ export default function CameraScreen({
           return;
         }
 
-        const previewSnapshot = await cameraRef.current?.takeSnapshot();
-        if (!previewSnapshot) {
+        if (cameraNativeCaptureInProgressRef.current) {
+          schedule();
           return;
         }
+
+        const snapshotRequest = cameraRef.current?.takeSnapshot();
+        if (!snapshotRequest) {
+          return;
+        }
+
+        const snapshotCompletion = snapshotRequest.then(
+          () => undefined,
+          () => undefined
+        );
+        poseSnapshotPromiseRef.current = snapshotCompletion;
+
+        const previewSnapshot = await snapshotRequest.finally(() => {
+          if (poseSnapshotPromiseRef.current === snapshotCompletion) {
+            poseSnapshotPromiseRef.current = null;
+          }
+        });
 
         try {
           snapshotPath = await previewSnapshot.saveToTemporaryFileAsync("jpg", 70);
@@ -2153,12 +2168,21 @@ export default function CameraScreen({
         await requestPhotoSavePermission();
         if (!canCaptureWithCurrentSession()) return;
       }
-      captureReservation = reserveBodyFrameCameraCapture();
       const captureStartedAt = Date.now();
       const logCaptureStage = (stage: string) => {
         if (__DEV__) console.info("[camera:capture]", stage, Date.now() - captureStartedAt);
       };
       logCaptureStage("requested");
+
+      const pendingPoseSnapshot = poseSnapshotPromiseRef.current;
+      if (pendingPoseSnapshot) {
+        logCaptureStage("waiting-pose-snapshot");
+        await pendingPoseSnapshot;
+        if (!canCaptureWithCurrentSession()) return;
+        logCaptureStage("pose-snapshot-idle");
+      }
+
+      captureReservation = reserveBodyFrameCameraCapture();
       const photo = await waitForCameraCapture(photoOutput.capturePhotoToFile({
         flashMode: cameraDevice.hasFlash ? flashMode : "off",
         enableShutterSound: cameraShutterSoundMode === "sound"
@@ -2188,6 +2212,9 @@ export default function CameraScreen({
       captureReservation = null;
       photoUri = null;
     } catch (error) {
+      if (__DEV__) {
+        console.error("[camera:capture] failed", error);
+      }
       if (error instanceof CameraCaptureTimeoutError) {
         handleCameraSessionError(error);
       }

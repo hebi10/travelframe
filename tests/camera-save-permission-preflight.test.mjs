@@ -23,6 +23,7 @@ function harness({ device = true, permission = async () => {}, canCapture = () =
     canCaptureWithCurrentSession: canCapture,
     isCapturing: false,
     cameraNativeCaptureInProgressRef: lock,
+    poseSnapshotPromiseRef: { current: null },
     setIsCapturing: (value) => { capturing = value; },
     setErrorMessage: (value) => { if (value) events.push("error"); },
     canSelectCloudSaveTarget: true,
