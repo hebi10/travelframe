@@ -630,6 +630,49 @@ export default function BodyFrameProjectDetailScreen() {
     targetDraft
   ]);
 
+  const openReminderSettings = useCallback(() => {
+    setReminderEnabledDraft(reminderSettings.enabled);
+    setReminderTimeDraft(formatProjectReminderTime(reminderSettings));
+    setReminderModalOpen(true);
+  }, [reminderSettings]);
+
+  const saveReminderSettings = useCallback(async () => {
+    if (!project || reminderSaving) return;
+
+    const parsedTime = parseProjectReminderTime(reminderTimeDraft);
+    if (!parsedTime) {
+      Alert.alert("촬영 알림", "시간을 00:00~23:59 형식으로 입력해 주세요.");
+      return;
+    }
+
+    try {
+      setReminderSaving(true);
+      const nextSettings = await updateProjectReminderSettings({
+        projectId: project.id,
+        projectName: project.name,
+        enabled: reminderEnabledDraft,
+        ...parsedTime
+      });
+      setReminderSettings(nextSettings);
+      setReminderModalOpen(false);
+    } catch (error) {
+      Alert.alert(
+        "촬영 알림 설정 실패",
+        getUserFacingErrorMessage(
+          error,
+          "촬영 알림을 설정하지 못했습니다. 알림 권한을 확인해 주세요."
+        )
+      );
+    } finally {
+      setReminderSaving(false);
+    }
+  }, [
+    project,
+    reminderEnabledDraft,
+    reminderSaving,
+    reminderTimeDraft
+  ]);
+
   const changeReferenceMode = useCallback(
     async (referenceMode: ReferencePhotoMode) => {
       if (!project || saving || project.referenceMode === referenceMode) return;
