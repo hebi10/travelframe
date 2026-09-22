@@ -530,12 +530,20 @@ await expectDenied(
     data: weeklyVideoUsage({ count: 16, limit: 15 })
   })
 );
-await seedDoc(`users/${ownerUid}/subscriptions/expert_monthly`, validSubscription("expert_monthly"));
+await seedDoc(`users/${ownerUid}/subscriptions/plus_monthly`, validSubscription("plus_monthly"));
 await expectDenied(
-  "active expert subscriptions still cannot write weekly video export usage directly",
+  "active Plus subscriptions still cannot write weekly video export usage directly",
   firestoreRequest("PATCH", `users/${ownerUid}/usage/videoExports/weeks/2026-05-18`, {
     uid: ownerUid,
-    data: weeklyVideoUsage({ count: 30, limit: 30 })
+    data: weeklyVideoUsage({ count: 15, limit: 15 })
+  })
+);
+await seedDoc(`users/${ownerUid}/subscriptions/expert_monthly`, validSubscription("expert_monthly"));
+await expectDenied(
+  "active Expert subscriptions still cannot write weekly video export usage directly",
+  firestoreRequest("PATCH", `users/${ownerUid}/usage/videoExports/weeks/2026-05-18`, {
+    uid: ownerUid,
+    data: weeklyVideoUsage({ count: 15, limit: 15 })
   })
 );
 
