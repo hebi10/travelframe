@@ -970,8 +970,7 @@ export const styles = StyleSheet.create({
     position: "absolute",
     left: 12,
     right: 12,
-    zIndex: 60,
-    elevation: 60
+    zIndex: 60
   },
   cameraColorFloatingCard: {
     flex: 1,
