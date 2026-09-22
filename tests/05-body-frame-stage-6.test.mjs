@@ -113,13 +113,21 @@ for (const token of [
 for (const token of [
   "verifyGooglePlayPurchase",
   "handleGooglePlayBillingNotification",
-  "google-play-billing",
   "syncGooglePlayPurchase"
 ]) {
   assert.ok(functionsSource.includes(token), `Functions entry should contain ${token}`);
 }
 
 const serverBillingSource = fs.readFileSync("functions/google-play-billing.js", "utf8");
+assert.ok(
+  serverBillingSource.includes('"body-frame-play-billing"'),
+  "RTDN Pub/Sub topic must use a valid non-reserved topic name"
+);
+assert.equal(
+  serverBillingSource.includes('"google-play-billing"'),
+  false,
+  "Pub/Sub topic names must not start with the reserved goog prefix"
+);
 for (const token of [
   "androidpublisher",
   "purchases/subscriptionsv2/tokens",

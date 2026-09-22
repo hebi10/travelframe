@@ -62,7 +62,7 @@
 - [x] Retire linked/replaced Google Play subscription documents to prevent stale entitlement resurrection.
 
 ## Task 7 — Add RTDN synchronization
-- [x] Add Pub/Sub handler for `google-play-billing`.
+- [x] Add Pub/Sub handler for `body-frame-play-billing`.
 - [x] Resolve owner/product from purchase-token map.
 - [x] Follow current subscription RTDN token-only schema.
 - [x] Handle one-time product and `voidedPurchaseNotification` events.
@@ -120,7 +120,7 @@ Source implementation is complete, but a real transaction cannot be proven from 
 1. Create and activate Play products named exactly `ad_remove`, `creator_monthly`, `expert_monthly`.
 2. Configure active base plans/offers for the two subscriptions.
 3. Enable Android Publisher API access for the deployed Firebase Functions runtime identity and grant the required Play Console permissions.
-4. Configure Google Play RTDN to publish to Pub/Sub topic `google-play-billing`.
+4. Configure Google Play RTDN to publish to Pub/Sub topic `body-frame-play-billing`.
 5. Deploy Functions and Firestore rules.
 6. Run a Play internal/closed-test Android build on a physical device and verify purchase, restore, Pro→Expert replacement, renewal, cancellation, expiry and refund/revocation flows.
 

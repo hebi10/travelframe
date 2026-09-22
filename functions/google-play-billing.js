@@ -12,7 +12,7 @@ const {
 } = require("./google-play-billing-policy");
 
 const GOOGLE_PLAY_PACKAGE_NAME = "com.haebi.photoguide";
-const GOOGLE_PLAY_TOPIC = "google-play-billing";
+const GOOGLE_PLAY_TOPIC = "body-frame-play-billing";
 const ANDROID_PUBLISHER_SCOPE =
   "https://www.googleapis.com/auth/androidpublisher";
 const ANDROID_PUBLISHER_BASE =
