@@ -806,17 +806,17 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     gap: 12,
-    paddingHorizontal: 16,
+    paddingHorizontal: bodyFrameDesign.horizontalPadding,
     paddingBottom: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "rgba(255, 255, 255, 0.16)",
-    backgroundColor: colors.ink
+    borderBottomWidth: bodyFrameDesign.borderWidth,
+    borderBottomColor: bodyFrameDarkColors.line,
+    backgroundColor: bodyFrameDarkColors.background
   },
   title: {
-    color: colors.inverse,
-    fontSize: 16,
-    fontWeight: "800",
-    letterSpacing: 0
+    color: bodyFrameDarkColors.text,
+    fontSize: bodyFrameTypography.sectionTitle,
+    fontWeight: "700",
+    letterSpacing: -0.2
   },
   ghostButton: {
     minWidth: 68,
@@ -824,24 +824,26 @@ const styles = StyleSheet.create({
     justifyContent: "center"
   },
   ghostButtonText: {
-    color: colors.inverse,
-    fontSize: typography.button,
-    fontWeight: "800",
+    color: bodyFrameDarkColors.text,
+    fontSize: bodyFrameTypography.button,
+    fontWeight: "600",
     letterSpacing: 0
   },
   saveButton: {
     minWidth: 68,
-    minHeight: controls.compactHeight,
+    minHeight: bodyFrameDesign.minTouchSize,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1,
-    borderColor: colors.inverse,
-    backgroundColor: "transparent"
+    paddingHorizontal: 14,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderColor: bodyFrameDarkColors.text,
+    borderRadius: bodyFrameDesign.buttonRadius,
+    backgroundColor: bodyFrameDarkColors.text
   },
   saveButtonText: {
-    color: colors.inverse,
-    fontSize: typography.button,
-    fontWeight: "800",
+    color: bodyFrameDarkColors.inverse,
+    fontSize: bodyFrameTypography.button,
+    fontWeight: "700",
     letterSpacing: 0
   },
   disabledButton: {
@@ -860,24 +862,26 @@ const styles = StyleSheet.create({
     zIndex: 10,
     right: 14,
     bottom: 14,
-    minHeight: 38,
+    minHeight: bodyFrameDesign.minTouchSize,
     justifyContent: "center",
     paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.78)",
-    backgroundColor: "rgba(0, 0, 0, 0.72)"
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderColor: "rgba(245, 245, 245, 0.72)",
+    borderRadius: bodyFrameDesign.buttonRadius,
+    backgroundColor: "rgba(11, 11, 12, 0.88)"
   },
   guideMoveButton: {
     position: "absolute",
     zIndex: 10,
-    right: 112,
+    right: 126,
     bottom: 14,
-    minHeight: 38,
+    minHeight: bodyFrameDesign.minTouchSize,
     justifyContent: "center",
     paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.78)",
-    backgroundColor: "rgba(0, 0, 0, 0.72)"
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderColor: "rgba(245, 245, 245, 0.72)",
+    borderRadius: bodyFrameDesign.buttonRadius,
+    backgroundColor: "rgba(11, 11, 12, 0.88)"
   },
   expandCanvasButtonActive: {
     borderColor: colors.inverse,
@@ -913,49 +917,47 @@ const styles = StyleSheet.create({
     justifyContent: "center"
   },
   bottomPanel: {
-    maxHeight: "48%",
+    maxHeight: "52%",
     minHeight: 0,
     flexShrink: 1,
-    gap: 12,
-    paddingHorizontal: 16,
-    paddingTop: 14,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: "rgba(255, 255, 255, 0.16)",
-    backgroundColor: colors.background
+    gap: 14,
+    paddingHorizontal: bodyFrameDesign.horizontalPadding,
+    paddingTop: 16,
+    borderTopWidth: bodyFrameDesign.borderWidth,
+    borderTopColor: bodyFrameDarkColors.line,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    backgroundColor: bodyFrameDarkColors.background
   },
-  editPanelTabs: {
+  editPanelHeader: {
+    minHeight: bodyFrameDesign.minTouchSize,
     flexDirection: "row",
-    gap: 8
-  },
-  editPanelTab: {
-    flex: 1,
-    minHeight: controls.compactHeight,
     alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 10,
-    borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.background
+    gap: 12
   },
-  editPanelTabActive: {
-    borderColor: colors.text,
-    backgroundColor: colors.text
+  editPanelHeaderCopy: {
+    flex: 1,
+    minWidth: 0,
+    gap: 3
   },
-  editPanelTabText: {
-    color: colors.text,
-    fontSize: typography.button,
-    fontWeight: "800",
-    letterSpacing: 0
+  editPanelTitle: {
+    color: bodyFrameDarkColors.text,
+    fontSize: bodyFrameTypography.sectionTitle,
+    fontWeight: "700",
+    letterSpacing: -0.2
   },
-  editPanelTabTextActive: {
-    color: colors.inverse
+  editPanelDetail: {
+    color: bodyFrameDarkColors.muted,
+    fontSize: bodyFrameTypography.caption,
+    lineHeight: 18
   },
   editPanelScroll: {
     flexShrink: 1,
     minHeight: 0
   },
   editPanelScrollContent: {
-    gap: 12
+    gap: 16,
+    paddingBottom: 4
   },
   draftPanel: {
     gap: 12,
