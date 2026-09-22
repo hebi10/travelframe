@@ -398,7 +398,7 @@ export default function AccountScreen() {
     const proPlan = paymentPlans.find((plan) => plan.id === "creator");
     Alert.alert(
       "광고만 제거할까요?",
-      "광고 제거는 2,000원 1회 구매이며 광고만 제거됩니다. 프로젝트는 최대 2개까지 만들 수 있고 각 프로젝트에는 사진을 최대 100장까지 기록할 수 있으며 클라우드 백업은 포함되지 않습니다. 월 Pro(1,990원)부터는 프로젝트 수를 제한 없이 만들 수 있고 프로젝트당 사진을 최대 365장까지 기록할 수 있으며, Pro는 선택한 프로젝트 1개를 클라우드에 백업할 수 있습니다.",
+      "광고 제거는 2,000원 1회 구매이며 광고만 제거됩니다. 프로젝트는 최대 2개까지 만들 수 있고 각 프로젝트에는 사진을 최대 100장까지 기록할 수 있으며 클라우드 백업은 포함되지 않습니다. 월 Pro(2,000원)부터는 프로젝트 수를 제한 없이 만들 수 있고 프로젝트당 사진을 최대 365장까지 기록할 수 있으며, Pro는 선택한 프로젝트 1개를 클라우드에 백업할 수 있습니다.",
       [
         { text: "취소", style: "cancel" },
         ...(proPlan
@@ -501,10 +501,10 @@ export default function AccountScreen() {
       {!isFirebaseReady ? (
         <SectionBlock title="연결 필요">
           <View style={[styles.noticePanel, themed.panel]}>
-            <Text selectable style={[styles.noticeTitle, themed.text]}>
+            <Text selectable={false} style={[styles.noticeTitle, themed.text]}>
               로그인 기능을 사용할 수 없습니다.
             </Text>
-            <Text selectable style={[styles.noticeText, themed.mutedText]}>
+            <Text selectable={false} style={[styles.noticeText, themed.mutedText]}>
               잠시 후 다시 시도해 주세요. 문제가 계속되면 고객센터로 문의해 주세요.
             </Text>
           </View>
@@ -572,7 +572,7 @@ export default function AccountScreen() {
                 onChangeText={setPassword}
               />
             ) : (
-              <Text selectable style={[styles.helpText, themed.mutedText]}>
+              <Text selectable={false} style={[styles.helpText, themed.mutedText]}>
                 바디 프레임의 아이디는 이메일입니다. 보안상 가입 여부는 직접 표시하지 않고,
                 입력한 이메일로 비밀번호 재설정 메일을 보냅니다.
               </Text>
@@ -622,10 +622,10 @@ export default function AccountScreen() {
                   </Text>
                 </View>
                 <View style={styles.profileCopy}>
-                  <Text selectable style={[styles.profileName, themed.text]}>
+                  <Text selectable={false} style={[styles.profileName, themed.text]}>
                     {user?.displayName || "이름 없음"}
                   </Text>
-                  <Text selectable style={[styles.profileEmail, themed.mutedText]}>
+                  <Text selectable={false} style={[styles.profileEmail, themed.mutedText]}>
                     {accountEmail}
                   </Text>
                 </View>
@@ -636,7 +636,7 @@ export default function AccountScreen() {
               </View>
               {!hasFullAccess ? (
                 <View style={styles.verifyPanel}>
-                  <Text selectable style={[styles.helpText, themed.mutedText]}>
+                  <Text selectable={false} style={[styles.helpText, themed.mutedText]}>
                     이메일 인증과 유료 구독이 완료되면 워터마크 제거와 클라우드 백업을 사용할 수 있습니다.
                   </Text>
                   <View style={styles.inlineActions}>
@@ -789,7 +789,7 @@ export default function AccountScreen() {
                   value="설정에서 직접 요청"
                 />
               </View>
-              <Text selectable style={[styles.helpText, themed.mutedText]}>
+              <Text selectable={false} style={[styles.helpText, themed.mutedText]}>
                 설정의 클라우드 백업에서 켜거나 끌 수 있습니다. 구독 기간이 끝나면 새 백업은 중단됩니다. 기존 백업 데이터 삭제는 설정에서 직접 요청할 수 있습니다.
               </Text>
               <Pressable
@@ -812,10 +812,10 @@ export default function AccountScreen() {
             <View style={[styles.planCard, themed.panelStrong]}>
               <View style={styles.planHeader}>
                 <View style={styles.planCopy}>
-                  <Text selectable style={[styles.planTitle, themed.text]}>
+                  <Text selectable={false} style={[styles.planTitle, themed.text]}>
                     로그인 혜택
                   </Text>
-                  <Text selectable style={[styles.planPrice, themed.text]}>
+                  <Text selectable={false} style={[styles.planPrice, themed.text]}>
                     무료
                   </Text>
                 </View>
@@ -831,7 +831,7 @@ export default function AccountScreen() {
             </View>
 
             {isLoggedIn && (productLoadError || billingMessage) ? (
-              <Text selectable style={[styles.helpText, themed.mutedText]}>
+              <Text selectable={false} style={[styles.helpText, themed.mutedText]}>
                 {productLoadError || billingMessage}
               </Text>
             ) : null}
@@ -854,13 +854,13 @@ export default function AccountScreen() {
                 >
                   <View style={styles.planHeader}>
                     <View style={styles.planCopy}>
-                      <Text selectable style={[styles.planTitle, themed.text]}>
+                      <Text selectable={false} style={[styles.planTitle, themed.text]}>
                         {plan.title}
                       </Text>
-                      <Text selectable style={[styles.planPrice, themed.text]}>
+                      <Text selectable={false} style={[styles.planPrice, themed.text]}>
                         {getStorePrice(getPaymentProductId(plan)) ?? plan.price}
                       </Text>
-                      <Text selectable style={[styles.helpText, themed.mutedText]}>
+                      <Text selectable={false} style={[styles.helpText, themed.mutedText]}>
                         {plan.id === "adRemove"
                           ? "1회 결제 · 자동 갱신 없음"
                           : "월 구독 · 취소 전까지 자동 갱신"}
@@ -871,7 +871,7 @@ export default function AccountScreen() {
                       active={getPaymentPlanStatus(plan).active}
                     />
                   </View>
-                  <Text selectable style={[styles.benefitText, themed.mutedText]}>
+                  <Text selectable={false} style={[styles.benefitText, themed.mutedText]}>
                     {plan.summary}
                   </Text>
                   <View style={[styles.paymentOpenButton, themed.activeFill]}>
@@ -906,7 +906,7 @@ export default function AccountScreen() {
                 Google Play 구독 관리
               </Text>
             </Pressable>
-            <Text selectable style={[styles.helpText, themed.mutedText]}>
+            <Text selectable={false} style={[styles.helpText, themed.mutedText]}>
               같은 Google Play 계정으로 구매한 광고 제거와 활성 구독을 다시 확인합니다.
               월 구독의 변경·취소는 Google Play 정기 결제 화면에서 관리할 수 있습니다.
             </Text>
@@ -924,7 +924,7 @@ export default function AccountScreen() {
       {message ? (
         <View style={[styles.messagePanel, themed.panel]}>
           {isSubmitting ? <ActivityIndicator color={palette.text} /> : null}
-          <Text selectable style={[styles.messageText, themed.text]}>
+          <Text selectable={false} style={[styles.messageText, themed.text]}>
             {message}
           </Text>
         </View>
@@ -941,10 +941,10 @@ export default function AccountScreen() {
           <View style={[styles.paymentModalPanel, themed.panelStrong]}>
             <View style={styles.modalHeader}>
               <View style={styles.planCopy}>
-                <Text selectable style={[styles.planTitle, themed.text]}>
+                <Text selectable={false} style={[styles.planTitle, themed.text]}>
                   계정 및 데이터 삭제 요청
                 </Text>
-                <Text selectable style={[styles.benefitText, themed.mutedText]}>
+                <Text selectable={false} style={[styles.benefitText, themed.mutedText]}>
                   관련 안내 페이지로 이동하시겠습니까?
                 </Text>
               </View>
@@ -958,10 +958,10 @@ export default function AccountScreen() {
               </Pressable>
             </View>
 
-            <Text selectable style={[styles.helpText, themed.mutedText]}>
+            <Text selectable={false} style={[styles.helpText, themed.mutedText]}>
               백업 데이터는 설정 화면의 클라우드 백업에서 백업 데이터 삭제를 누르면 계정에서 제거됩니다.
             </Text>
-            <Text selectable style={[styles.helpText, themed.mutedText]}>
+            <Text selectable={false} style={[styles.helpText, themed.mutedText]}>
               계정 삭제 요청과 추가 데이터 삭제 안내는 별도 안내 페이지에서 확인하실 수 있습니다.
             </Text>
 
