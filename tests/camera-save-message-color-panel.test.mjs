@@ -46,7 +46,7 @@ for (const token of [
   "cameraColorSecondaryButton",
   "cameraColorPrimaryButton",
   'name="sliders"',
-  'name="rotate-ccw"',
+  'name="refresh-ccw"',
   'name="save"',
   "저장 슬롯",
   "탭하여 적용"
