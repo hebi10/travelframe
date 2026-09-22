@@ -273,6 +273,7 @@ const assertBackupUploadAllowed = ({
 };
 
 exports.BACKUP_QUOTA_LIMITS = BACKUP_QUOTA_LIMITS;
+exports.PLUS_BACKUP_QUOTA_LIMITS = PLUS_BACKUP_QUOTA_LIMITS;
 exports.EXPERT_BACKUP_QUOTA_LIMITS = EXPERT_BACKUP_QUOTA_LIMITS;
 exports.normalizeBackupUsage = normalizeBackupUsage;
 exports.normalizePendingBackupUsage = normalizePendingBackupUsage;
