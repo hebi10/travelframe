@@ -4,7 +4,7 @@ import { CAMERA_CAPTURE_TIMEOUT_MESSAGE, CameraCaptureTimeoutError, waitForCamer
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -177,11 +177,13 @@ import type { PhotoItem, PhotoRatioLabel, SaveCapturedPhotoInput } from "@/types
 type CameraScreenProps = {
   projectReferenceMode?: "first" | "latest";
   onProjectReferenceModeChange?: (projectId: string, mode: "first" | "latest") => Promise<void>;
+  headerCenter?: ReactNode;
 };
 
 export default function CameraScreen({
   projectReferenceMode = "latest",
-  onProjectReferenceModeChange
+  onProjectReferenceModeChange,
+  headerCenter
 }: CameraScreenProps = {}) {
   const [isReferenceModeChanging, setIsReferenceModeChanging] = useState(false);
   const referenceModeChangeInProgressRef = useRef(false);
@@ -2548,6 +2550,13 @@ export default function CameraScreen({
           >
             <Feather name="user" size={20} color={colors.inverse} />
           </Pressable>
+          {headerCenter ? (
+            <View style={styles.cameraHeaderCenter}>
+              {headerCenter}
+            </View>
+          ) : (
+            <View style={styles.cameraHeaderCenter} />
+          )}
           <Pressable
             style={styles.cameraHeaderButton}
             onPress={openCameraSettingsMenu}
