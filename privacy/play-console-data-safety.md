@@ -38,9 +38,11 @@
 - 자세 맞춤 도움 추가 권한: 없음. 기존 카메라 권한만 사용
 - 사진/미디어 접근 목적: 사용자가 선택한 사진, 영상, 음악을 편집, 저장, 백업하기 위함
 - Health Connect 사용 여부: 선택 기능 / 사용자 직접 연결 시에만 사용
+- Play Console 건강 앱 분류: `Health and fitness → Activity and fitness` (체성분 및 몸무게 기록)
 - Health Connect 읽기 권한: `android.permission.health.READ_WEIGHT`, `android.permission.health.READ_BODY_FAT`
 - Health Connect 쓰기 권한: 요청하지 않음
 - Health Connect 백그라운드 읽기 / 30일 초과 과거 데이터 권한: 요청하지 않음
 - Health Connect 데이터 목적: 몸무게 및 체지방률을 사용자의 로컬 수치 기록으로 가져와 변화 추이를 표시하기 위함
 - Health Connect 데이터 서버 전송: 현재 빌드에서 Firebase 및 사진 클라우드 백업으로 자동 업로드하지 않음
 - Play Console Health apps / Health Connect 권한 선언은 실제 릴리스 빌드의 권한과 동일하게 제출 전 확인
+- 상세 입력 기준과 권한별 사유 문구: `docs/google-play-health-declaration.md`

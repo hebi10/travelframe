@@ -47,8 +47,10 @@
 - [x] No background access or extended-history permission in Stage 9-7.
 - [x] Health Connect import remains user-initiated and Local Only after import.
 - [ ] Deploy the updated public privacy policy before submitting the Health Connect build.
-- [ ] Complete the Google Play Health apps / Health Connect declaration for Weight and Body Fat.
+- [ ] Complete and submit the Google Play Health apps declaration as `Health and fitness → Activity and fitness`.
+- [ ] Declare Health Connect `READ_WEIGHT` and `READ_BODY_FAT` using the purpose text in `docs/google-play-health-declaration.md`.
 - [ ] Update Play Data Safety answers for health and fitness data based on the production build.
+- [ ] Ensure the public store listing mentions optional Health Connect Weight / Body Fat import.
 - [ ] Confirm generated release manifest contains READ_WEIGHT / READ_BODY_FAT only.
 - [ ] Verify permission denial, revoke, provider-update-required, and no-data states on a physical Android device.
 - [ ] Verify duplicate Health Connect records are not imported twice.
