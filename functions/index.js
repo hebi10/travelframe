@@ -121,22 +121,37 @@ exports.handleGooglePlayBillingNotification = onMessagePublished(
 );
 
 const getBackupSubscription = async (uid) => {
-  const [currentSnapshot, creatorSnapshot, expertSnapshot] = await Promise.all([
+  const [currentSnapshot, creatorSnapshot, plusSnapshot, expertSnapshot] = await Promise.all([
     db.doc(`users/${uid}/subscriptions/current`).get(),
     db.doc(`users/${uid}/subscriptions/creator_monthly`).get(),
+    db.doc(`users/${uid}/subscriptions/plus_monthly`).get(),
     db.doc(`users/${uid}/subscriptions/expert_monthly`).get()
   ]);
 
   const current = currentSnapshot.exists ? currentSnapshot.data() : null;
   const creator = creatorSnapshot.exists ? creatorSnapshot.data() : null;
+  const plus = plusSnapshot.exists ? plusSnapshot.data() : null;
   const expert = expertSnapshot.exists ? expertSnapshot.data() : null;
   const activeExpert = isPremiumSubscriptionActive(expert, ["expert_monthly"]) ? expert : null;
+  const activePlus = isPremiumSubscriptionActive(plus, ["plus_monthly"]) ? plus : null;
   const activeCreator = isPremiumSubscriptionActive(creator, ["creator_monthly"]) ? creator : null;
-  const activeCurrent = isPremiumSubscriptionActive(current, ["creator_monthly", "expert_monthly"])
+  const activeCurrent = isPremiumSubscriptionActive(
+    current,
+    ["creator_monthly", "plus_monthly", "expert_monthly"]
+  )
     ? current
     : null;
 
-  return activeExpert ?? activeCreator ?? activeCurrent ?? expert ?? creator ?? current;
+  return (
+    activeExpert ??
+    activePlus ??
+    activeCreator ??
+    activeCurrent ??
+    expert ??
+    plus ??
+    creator ??
+    current
+  );
 };
 
 const getUsageRef = (uid) => db.doc(`users/${uid}/backupUsage/current`);
@@ -190,8 +205,8 @@ const MAX_PENDING_MUSIC_UPLOAD_SESSIONS = 3;
 const MAX_PENDING_MUSIC_UPLOAD_BYTES = 150 * 1024 * 1024;
 const MUSIC_UPLOAD_SESSION_TTL_MS = 15 * 60 * 1000;
 const FREE_WEEKLY_VIDEO_EXPORT_LIMIT = 1;
-const PRO_WEEKLY_VIDEO_EXPORT_LIMIT = 15;
-const EXPERT_WEEKLY_VIDEO_EXPORT_LIMIT = 30;
+const PAID_WEEKLY_VIDEO_EXPORT_LIMIT = 15;
+const CLOUD_BACKUP_PHOTOS_PER_PROJECT = 365;
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -212,28 +227,27 @@ const isPremiumSubscriptionActive = (subscription, productIds, now = Date.now())
   return new Date(subscription.expiresAt).getTime() > now;
 };
 
-const getMusicTrackLimit = (subscription) => {
-  if (isPremiumSubscriptionActive(subscription, ["expert_monthly"])) {
-    return 20;
-  }
+const getMusicTrackLimit = (subscription) =>
+  isPremiumSubscriptionActive(
+    subscription,
+    ["creator_monthly", "plus_monthly", "expert_monthly"]
+  )
+    ? 10
+    : 0;
 
-  if (isPremiumSubscriptionActive(subscription, ["creator_monthly"])) {
-    return 10;
-  }
+const getWeeklyVideoExportLimit = (subscription) =>
+  isPremiumSubscriptionActive(
+    subscription,
+    ["creator_monthly", "plus_monthly", "expert_monthly"]
+  )
+    ? PAID_WEEKLY_VIDEO_EXPORT_LIMIT
+    : FREE_WEEKLY_VIDEO_EXPORT_LIMIT;
 
+const getCloudBackupProjectSlotLimit = (subscription) => {
+  if (isPremiumSubscriptionActive(subscription, ["expert_monthly"])) return 5;
+  if (isPremiumSubscriptionActive(subscription, ["plus_monthly"])) return 3;
+  if (isPremiumSubscriptionActive(subscription, ["creator_monthly"])) return 1;
   return 0;
-};
-
-const getWeeklyVideoExportLimit = (subscription) => {
-  if (isPremiumSubscriptionActive(subscription, ["expert_monthly"])) {
-    return EXPERT_WEEKLY_VIDEO_EXPORT_LIMIT;
-  }
-
-  if (isPremiumSubscriptionActive(subscription, ["creator_monthly"])) {
-    return PRO_WEEKLY_VIDEO_EXPORT_LIMIT;
-  }
-
-  return FREE_WEEKLY_VIDEO_EXPORT_LIMIT;
 };
 
 const getKstWeekStart = (date = new Date()) => {
