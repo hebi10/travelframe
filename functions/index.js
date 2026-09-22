@@ -608,15 +608,19 @@ const buildWeeklyVideoExportResponse = ({ weekId, weekLabel, count, limit, reser
 const ADMIN_PRODUCT_META = {
   ad_remove: {
     productName: "광고 제거",
-    priceLabel: "1,990원"
+    priceLabel: "2,000원"
   },
   creator_monthly: {
-    productName: "영상 내보내기",
-    priceLabel: "월 990원"
+    productName: "Pro",
+    priceLabel: "월 1,990원"
+  },
+  plus_monthly: {
+    productName: "Plus",
+    priceLabel: "월 3,990원"
   },
   expert_monthly: {
-    productName: "전문가",
-    priceLabel: "월 9,900원"
+    productName: "Expert",
+    priceLabel: "월 5,990원"
   }
 };
 const ADMIN_PRODUCT_IDS = Object.keys(ADMIN_PRODUCT_META);
@@ -637,17 +641,32 @@ const createAdminFreeSubscription = (adminUid) => ({
 });
 
 const getEffectiveAdminSubscription = (subscriptions) => {
-  const activeExpert = isPremiumSubscriptionActive(subscriptions.expert_monthly, ["expert_monthly"])
+  const activeExpert = isPremiumSubscriptionActive(
+    subscriptions.expert_monthly,
+    ["expert_monthly"]
+  )
     ? subscriptions.expert_monthly
     : null;
-  const activeCreator = isPremiumSubscriptionActive(subscriptions.creator_monthly, ["creator_monthly"])
+  const activePlus = isPremiumSubscriptionActive(
+    subscriptions.plus_monthly,
+    ["plus_monthly"]
+  )
+    ? subscriptions.plus_monthly
+    : null;
+  const activeCreator = isPremiumSubscriptionActive(
+    subscriptions.creator_monthly,
+    ["creator_monthly"]
+  )
     ? subscriptions.creator_monthly
     : null;
-  const activeAdRemove = isPremiumSubscriptionActive(subscriptions.ad_remove, ["ad_remove"])
+  const activeAdRemove = isPremiumSubscriptionActive(
+    subscriptions.ad_remove,
+    ["ad_remove"]
+  )
     ? subscriptions.ad_remove
     : null;
 
-  return activeExpert ?? activeCreator ?? activeAdRemove;
+  return activeExpert ?? activePlus ?? activeCreator ?? activeAdRemove;
 };
 
 const assertMusicUploadAllowed = ({ uid, trackId, name, fileSize, contentType, storagePath }) => {
@@ -1852,7 +1871,7 @@ exports.setAdminProductSubscription = secureOnCall(async (request) => {
     }
 
     const safeExpiresAt =
-      (productId === "creator_monthly" || productId === "expert_monthly") &&
+      ["creator_monthly", "plus_monthly", "expert_monthly"].includes(productId) &&
       typeof expiresAt === "string" &&
       !Number.isNaN(new Date(expiresAt).getTime())
         ? expiresAt
