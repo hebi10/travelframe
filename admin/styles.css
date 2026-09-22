@@ -1054,7 +1054,8 @@ body.admin-page {
   background: var(--surface-soft);
 }
 
-.admin-page .backup-item-copy strong {
+.admin-page .backup-item-copy strong,
+.admin-page .backup-item-title {
   overflow: hidden;
   color: var(--ink);
   text-overflow: ellipsis;
@@ -1072,6 +1073,7 @@ body.admin-page {
 }
 
 .admin-page .backup-item-actions button:not(.secondary),
+.admin-page button.danger,
 .admin-page #deleteBackupButton {
   border-color: var(--danger);
   background: transparent;
