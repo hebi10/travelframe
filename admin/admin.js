@@ -101,28 +101,41 @@ const productMeta = {
     statusId: "adRemoveStatusLabel",
     detailId: "adRemoveDetail",
     productName: "광고 제거",
-    priceLabel: "1,990원",
-    description: "1회 결제 상품입니다. 활성 상태면 광고 제거 혜택이 적용됩니다."
+    priceLabel: "2,000원",
+    description: "1회 결제 상품입니다. 무료 플랜 한도는 유지하고 광고만 제거합니다."
   },
   creator_monthly: {
     cardId: "creatorMonthlyCard",
     statusId: "creatorMonthlyStatusLabel",
     detailId: "creatorMonthlyDetail",
-    productName: "영상 내보내기",
-    priceLabel: "월 990원",
-    description: "월결제 상품입니다. 활성 상태면 영상 내보내기와 백업 혜택이 적용됩니다."
+    productName: "Pro",
+    priceLabel: "월 1,990원",
+    description: "로컬 무제한과 클라우드 백업 프로젝트 1개를 제공합니다."
+  },
+  plus_monthly: {
+    cardId: "plusMonthlyCard",
+    statusId: "plusMonthlyStatusLabel",
+    detailId: "plusMonthlyDetail",
+    productName: "Plus",
+    priceLabel: "월 3,990원",
+    description: "로컬 무제한과 클라우드 백업 프로젝트 최대 3개를 제공합니다."
   },
   expert_monthly: {
     cardId: "expertMonthlyCard",
     statusId: "expertMonthlyStatusLabel",
     detailId: "expertMonthlyDetail",
     productName: "Expert",
-    priceLabel: "월 9,900원",
-    description: "월결제 상품입니다. 활성 상태면 주 30개 영상 출력, 5GiB 백업, 음악 20개 혜택이 적용됩니다."
+    priceLabel: "월 5,990원",
+    description: "로컬 무제한과 클라우드 백업 프로젝트 최대 5개를 제공합니다."
   }
 };
 
-const paidProductIds = ["ad_remove", "creator_monthly", "expert_monthly"];
+const paidProductIds = [
+  "ad_remove",
+  "creator_monthly",
+  "plus_monthly",
+  "expert_monthly"
+];
 
 const statusLabels = {
   inactive: "비활성",
@@ -134,13 +147,15 @@ const weeklyVideoExportLimits = {
   free: 1,
   ad_remove: 1,
   pro: 15,
-  expert: 30
+  plus: 15,
+  expert: 15
 };
 
 const adminPlanLabels = {
   free: "무료",
   ad_remove: "광고 제거",
   pro: "Pro",
+  plus: "Plus",
   expert: "Expert"
 };
 
@@ -170,7 +185,8 @@ const setupSubscriptionPanel = () => {
         관리할 상품
         <select id="productSelect">
           <option value="ad_remove">광고 제거 1회 결제</option>
-          <option value="creator_monthly">영상 내보내기 월결제</option>
+          <option value="creator_monthly">Pro 월결제</option>
+          <option value="plus_monthly">Plus 월결제</option>
           <option value="expert_monthly">Expert 월결제</option>
         </select>
       </label>
@@ -375,6 +391,13 @@ const getAdminPlanTier = () => {
   }
 
   if (
+    isActiveProduct(currentProductSubscriptions.plus_monthly, "plus_monthly") ||
+    isActiveProduct(currentSubscription, "plus_monthly")
+  ) {
+    return "plus";
+  }
+
+  if (
     isActiveProduct(currentProductSubscriptions.creator_monthly, "creator_monthly") ||
     isActiveProduct(currentSubscription, "creator_monthly")
   ) {
@@ -423,6 +446,10 @@ const getActiveProductIds = (subscriptions = currentProductSubscriptions) =>
 const getEffectiveSubscription = (subscriptions = currentProductSubscriptions) => {
   if (isSubscriptionActive(subscriptions.expert_monthly)) {
     return subscriptions.expert_monthly;
+  }
+
+  if (isSubscriptionActive(subscriptions.plus_monthly)) {
+    return subscriptions.plus_monthly;
   }
 
   if (isSubscriptionActive(subscriptions.creator_monthly)) {
@@ -573,6 +600,7 @@ const resetUserPanels = () => {
   currentProductSubscriptions = {
     ad_remove: null,
     creator_monthly: null,
+    plus_monthly: null,
     expert_monthly: null
   };
   currentBackup = null;
@@ -1158,6 +1186,7 @@ const loadUserDetail = async ({ preserveBackupItems = false } = {}) => {
     subscriptionSnap,
     adRemoveSnap,
     creatorMonthlySnap,
+    plusMonthlySnap,
     expertMonthlySnap,
     backupSnap,
     photoBackups,
@@ -1166,6 +1195,7 @@ const loadUserDetail = async ({ preserveBackupItems = false } = {}) => {
     getDoc(doc(db, "users", uid, "subscriptions", "current")),
     getDoc(doc(db, "users", uid, "subscriptions", "ad_remove")),
     getDoc(doc(db, "users", uid, "subscriptions", "creator_monthly")),
+    getDoc(doc(db, "users", uid, "subscriptions", "plus_monthly")),
     getDoc(doc(db, "users", uid, "subscriptions", "expert_monthly")),
     getDoc(doc(db, "users", uid, "backups", "current")),
     getDocs(collection(db, "users", uid, "photoBackups")),
@@ -1178,6 +1208,11 @@ const loadUserDetail = async ({ preserveBackupItems = false } = {}) => {
     creator_monthly: resolveProductSubscription(
       "creator_monthly",
       creatorMonthlySnap,
+      currentSubscription
+    ),
+    plus_monthly: resolveProductSubscription(
+      "plus_monthly",
+      plusMonthlySnap,
       currentSubscription
     ),
     expert_monthly: resolveProductSubscription(
