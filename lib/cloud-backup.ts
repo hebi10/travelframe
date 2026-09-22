@@ -43,7 +43,7 @@ import {
   type OptimizedBackupImage
 } from "@/lib/image-backup-utils";
 import { localStorageAdapter } from "@/lib/local-storage";
-import { getPlanTier } from "@/lib/plan-entitlements";
+import { getPlanEntitlements, getPlanTier } from "@/lib/plan-entitlements";
 import {
   getDeletedPhotoIds,
   getPhotos,
@@ -821,7 +821,13 @@ export const backupCurrentWorkspace = async ({
       getPhotos(),
       getImageBundleWorks(),
       getMadeVideos(),
-      getSelectedCloudBackupProjectIds(user)
+      getSelectedCloudBackupProjectIds(
+        user,
+        getPlanEntitlements({
+          isLoggedIn: Boolean(user),
+          subscription
+        }).maxCloudBackupProjects
+      )
     ]);
   if (
     isCloudBackupTargetEnabled(settings, "photos") &&
@@ -1327,7 +1333,13 @@ export const backupPhoto = async ({
   if (!photo.projectId) {
     return null;
   }
-  const selectedProjectIds = await getSelectedCloudBackupProjectIds(user);
+  const selectedProjectIds = await getSelectedCloudBackupProjectIds(
+    user,
+    getPlanEntitlements({
+      isLoggedIn: Boolean(user),
+      subscription: subscription ?? null
+    }).maxCloudBackupProjects
+  );
   if (!selectedProjectIds.has(photo.projectId)) {
     return null;
   }
@@ -1495,7 +1507,13 @@ export const backupPhotoIfEnabled = async ({
     return null;
   }
 
-  const selectedProjectIds = await getSelectedCloudBackupProjectIds(user);
+  const selectedProjectIds = await getSelectedCloudBackupProjectIds(
+    user,
+    getPlanEntitlements({
+      isLoggedIn: Boolean(user),
+      subscription
+    }).maxCloudBackupProjects
+  );
   if (!selectedProjectIds.has(photo.projectId)) {
     return null;
   }
