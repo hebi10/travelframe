@@ -69,6 +69,15 @@ import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 import { useAppAppearance } from "@/lib/app-appearance";
 import { useAuth } from "@/lib/auth-context";
 import { getPlanEntitlements } from "@/lib/plan-entitlements";
+import {
+  cancelProjectReminder,
+  defaultProjectReminderSettings,
+  formatProjectReminderTime,
+  getProjectReminderSettings,
+  parseProjectReminderTime,
+  updateProjectReminderSettings,
+  type ProjectReminderSettings
+} from "@/lib/project-reminder";
 import type { BodyProject, ReferencePhotoMode } from "@/types/body-project";
 import {
   bodyMeasurementMetricMeta,
@@ -462,6 +471,12 @@ export default function BodyFrameProjectDetailScreen() {
   const [photoDragSourceIndex, setPhotoDragSourceIndex] = useState<number | null>(null);
   const [photoDropTargetIndex, setPhotoDropTargetIndex] = useState<number | null>(null);
   const [photoOrderSaving, setPhotoOrderSaving] = useState(false);
+  const [reminderSettings, setReminderSettings] =
+    useState<ProjectReminderSettings>(defaultProjectReminderSettings);
+  const [reminderModalOpen, setReminderModalOpen] = useState(false);
+  const [reminderEnabledDraft, setReminderEnabledDraft] = useState(false);
+  const [reminderTimeDraft, setReminderTimeDraft] = useState("20:00");
+  const [reminderSaving, setReminderSaving] = useState(false);
 
   const reload = useCallback(async () => {
     if (!projectId) {
@@ -475,14 +490,16 @@ export default function BodyFrameProjectDetailScreen() {
       storedMeasurementSettings,
       storedMeasurements,
       storedCaptureContextState,
-      storedPoseAlignmentSettings
+      storedPoseAlignmentSettings,
+      storedReminderSettings
     ] = await Promise.all([
       getBodyProjectById(projectId),
       getPhotos(),
       getBodyMeasurementSettings(projectId),
       getBodyMeasurements(projectId),
       getBodyCaptureContextState(projectId),
-      getBodyPoseAlignmentSettings(projectId)
+      getBodyPoseAlignmentSettings(projectId),
+      getProjectReminderSettings(projectId)
     ]);
 
     setProject(storedProject);
@@ -494,6 +511,7 @@ export default function BodyFrameProjectDetailScreen() {
     setRememberCaptureContextDraft(storedCaptureContextState.enabled);
     setPoseAlignmentEnabled(storedPoseAlignmentSettings.enabled);
     setPoseAlignmentDraft(storedPoseAlignmentSettings.enabled);
+    setReminderSettings(storedReminderSettings);
     if (storedProject) {
       setNameDraft(storedProject.name);
       setTargetDraft(String(storedProject.targetPhotoCount));
