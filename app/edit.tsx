@@ -640,7 +640,7 @@ export default function EditScreen() {
           }}
         >
           <Text selectable={false} style={styles.expandCanvasButtonText}>
-            {isCanvasExpanded ? "설정 열기" : "이미지만 보기"}
+            {isCanvasExpanded ? "편집 열기" : "이미지만 보기"}
           </Text>
         </Pressable>
       </View>
