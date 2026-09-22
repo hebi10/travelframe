@@ -29,9 +29,10 @@ assert.ok(
   "guide move gesture layer should only cover the image-only canvas"
 );
 
-assert.ok(
+assert.equal(
   source.includes("setGuidePanelOpen(true)"),
-  "finishing guide move should return to the settings controls"
+  false,
+  "finishing guide move should not reopen a removed guide editor panel"
 );
 
 console.log("ok - edit image-only view can move shared guide line");
