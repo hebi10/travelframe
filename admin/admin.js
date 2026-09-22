@@ -103,7 +103,7 @@ const productMeta = {
     detailId: "adRemoveDetail",
     productName: "광고 제거",
     priceLabel: "2,000원",
-    description: "1회 결제 상품입니다. 무료 플랜 한도는 유지하고 광고만 제거합니다."
+    description: "2,000원 1회 결제 상품입니다. 광고만 제거하며 프로젝트 최대 2개, 프로젝트당 사진 최대 100장, 클라우드 백업은 제공하지 않습니다."
   },
   creator_monthly: {
     cardId: "creatorMonthlyCard",
@@ -111,7 +111,7 @@ const productMeta = {
     detailId: "creatorMonthlyDetail",
     productName: "Pro",
     priceLabel: "월 1,990원",
-    description: "로컬 무제한과 클라우드 백업 프로젝트 1개를 제공합니다."
+    description: "프로젝트 수 무제한, 프로젝트당 사진 최대 365장, 클라우드 백업 프로젝트 1개를 제공합니다."
   },
   plus_monthly: {
     cardId: "plusMonthlyCard",
@@ -119,7 +119,7 @@ const productMeta = {
     detailId: "plusMonthlyDetail",
     productName: "Plus",
     priceLabel: "월 3,990원",
-    description: "로컬 무제한과 클라우드 백업 프로젝트 최대 3개를 제공합니다."
+    description: "프로젝트 수 무제한, 프로젝트당 사진 최대 365장, 클라우드 백업 프로젝트 최대 3개를 제공합니다."
   },
   expert_monthly: {
     cardId: "expertMonthlyCard",
@@ -127,7 +127,7 @@ const productMeta = {
     detailId: "expertMonthlyDetail",
     productName: "Expert",
     priceLabel: "월 5,990원",
-    description: "로컬 무제한과 클라우드 백업 프로젝트 최대 5개를 제공합니다."
+    description: "프로젝트 수 무제한, 프로젝트당 사진 최대 365장, 클라우드 백업 프로젝트 최대 5개를 제공합니다."
   }
 };
 
