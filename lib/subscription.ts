@@ -10,7 +10,12 @@ import { emptySubscriptionProducts } from "@/lib/subscription-products";
 
 export type SubscriptionPlan = "free" | "premium";
 export type SubscriptionStatus = "inactive" | "active" | "expired";
-export type SubscriptionProductId = "free" | "ad_remove" | "creator_monthly" | "expert_monthly";
+export type SubscriptionProductId =
+  | "free"
+  | "ad_remove"
+  | "creator_monthly"
+  | "plus_monthly"
+  | "expert_monthly";
 
 export type UserSubscription = {
   plan: SubscriptionPlan;
@@ -27,6 +32,7 @@ export type UserSubscription = {
 export type UserSubscriptionProducts = {
   adRemove: UserSubscription | null;
   creatorMonthly: UserSubscription | null;
+  plusMonthly: UserSubscription | null;
   expertMonthly: UserSubscription | null;
 };
 
@@ -48,6 +54,7 @@ const normalizeSubscriptionProductId = (
   if (
     productId === "ad_remove" ||
     productId === "creator_monthly" ||
+    productId === "plus_monthly" ||
     productId === "expert_monthly"
   ) {
     return productId;
@@ -99,7 +106,11 @@ export const isCreatorSubscriptionActive = (subscription: UserSubscription | nul
     subscription?.plan
   );
 
-  return productId === "creator_monthly" || productId === "expert_monthly";
+  return (
+    productId === "creator_monthly" ||
+    productId === "plus_monthly" ||
+    productId === "expert_monthly"
+  );
 };
 
 export const isAdFreeSubscription = (subscription: UserSubscription | null) => {
@@ -115,6 +126,7 @@ export const isAdFreeSubscription = (subscription: UserSubscription | null) => {
   return (
     productId === "ad_remove" ||
     productId === "creator_monthly" ||
+    productId === "plus_monthly" ||
     productId === "expert_monthly"
   );
 };
@@ -162,10 +174,17 @@ const getVerifiedSubscriptionFromFirestore = async (user: User) => {
     throw new Error("Firestore is not configured.");
   }
 
-  const [currentSnapshot, adRemoveSnapshot, creatorSnapshot, expertSnapshot] = await Promise.all([
+  const [
+    currentSnapshot,
+    adRemoveSnapshot,
+    creatorSnapshot,
+    plusSnapshot,
+    expertSnapshot
+  ] = await Promise.all([
     getDoc(doc(firestore, "users", user.uid, "subscriptions", "current")),
     getDoc(doc(firestore, "users", user.uid, "subscriptions", "ad_remove")),
     getDoc(doc(firestore, "users", user.uid, "subscriptions", "creator_monthly")),
+    getDoc(doc(firestore, "users", user.uid, "subscriptions", "plus_monthly")),
     getDoc(doc(firestore, "users", user.uid, "subscriptions", "expert_monthly"))
   ]);
   const currentSubscription = currentSnapshot.exists()
@@ -177,12 +196,19 @@ const getVerifiedSubscriptionFromFirestore = async (user: User) => {
   const creatorSubscription = creatorSnapshot.exists()
     ? parseSubscription(JSON.stringify(creatorSnapshot.data()))
     : null;
+  const plusSubscription = plusSnapshot.exists()
+    ? parseSubscription(JSON.stringify(plusSnapshot.data()))
+    : null;
   const expertSubscription = expertSnapshot.exists()
     ? parseSubscription(JSON.stringify(expertSnapshot.data()))
     : null;
 
   if (expertSubscription && isSubscriptionProductActive(expertSubscription, "expert_monthly")) {
     return expertSubscription;
+  }
+
+  if (plusSubscription && isSubscriptionProductActive(plusSubscription, "plus_monthly")) {
+    return plusSubscription;
   }
 
   if (creatorSubscription && isSubscriptionProductActive(creatorSubscription, "creator_monthly")) {
@@ -244,16 +270,21 @@ export const getUserSubscriptionProducts = async (
   }
 
   try {
-    const [adRemoveSnapshot, creatorSnapshot, expertSnapshot] = await Promise.all([
-      getDoc(doc(firestore, "users", user.uid, "subscriptions", "ad_remove")),
-      getDoc(doc(firestore, "users", user.uid, "subscriptions", "creator_monthly")),
-      getDoc(doc(firestore, "users", user.uid, "subscriptions", "expert_monthly"))
-    ]);
+    const [adRemoveSnapshot, creatorSnapshot, plusSnapshot, expertSnapshot] =
+      await Promise.all([
+        getDoc(doc(firestore, "users", user.uid, "subscriptions", "ad_remove")),
+        getDoc(doc(firestore, "users", user.uid, "subscriptions", "creator_monthly")),
+        getDoc(doc(firestore, "users", user.uid, "subscriptions", "plus_monthly")),
+        getDoc(doc(firestore, "users", user.uid, "subscriptions", "expert_monthly"))
+      ]);
     const adRemove = adRemoveSnapshot.exists()
       ? parseSubscription(JSON.stringify(adRemoveSnapshot.data()))
       : null;
     const creatorMonthly = creatorSnapshot.exists()
       ? parseSubscription(JSON.stringify(creatorSnapshot.data()))
+      : null;
+    const plusMonthly = plusSnapshot.exists()
+      ? parseSubscription(JSON.stringify(plusSnapshot.data()))
       : null;
     const expertMonthly = expertSnapshot.exists()
       ? parseSubscription(JSON.stringify(expertSnapshot.data()))
@@ -263,6 +294,9 @@ export const getUserSubscriptionProducts = async (
       adRemove: isSubscriptionProductActive(adRemove, "ad_remove") ? adRemove : null,
       creatorMonthly: isSubscriptionProductActive(creatorMonthly, "creator_monthly")
         ? creatorMonthly
+        : null,
+      plusMonthly: isSubscriptionProductActive(plusMonthly, "plus_monthly")
+        ? plusMonthly
         : null,
       expertMonthly: isSubscriptionProductActive(expertMonthly, "expert_monthly")
         ? expertMonthly
