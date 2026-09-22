@@ -628,8 +628,10 @@ const renderUserList = () => {
   pageUsers.forEach((user) => {
     const button = document.createElement("button");
     button.type = "button";
-    button.className = `user-row ${currentUserDoc?.id === user.id ? "active" : ""}`;
+    const selected = currentUserDoc?.id === user.id;
+    button.className = `user-row ${selected ? "active" : ""}`;
     button.dataset.userId = user.id;
+    button.setAttribute("aria-pressed", String(selected));
 
     const title = document.createElement("strong");
     title.textContent = user.email || user.displayName || "이메일 없음";
@@ -806,13 +808,16 @@ const renderBackupItems = () => {
     const copy = document.createElement("div");
     copy.className = "backup-item-copy";
     const title = document.createElement("strong");
+    title.className = "backup-item-title";
     title.textContent = item.title;
+    title.title = item.title;
     const detail = document.createElement("span");
     detail.className = "meta";
     detail.textContent = item.detail;
     const path = document.createElement("span");
     path.className = "uid";
     path.textContent = item.storagePath;
+    path.title = item.storagePath;
     copy.append(title, detail, path);
 
     const actions = document.createElement("div");
@@ -825,6 +830,7 @@ const renderBackupItems = () => {
 
     const deleteButton = document.createElement("button");
     deleteButton.type = "button";
+    deleteButton.className = "danger";
     deleteButton.textContent = "제거";
     deleteButton.addEventListener("click", () => removeBackupItem(item));
     actions.append(openButton, deleteButton);
