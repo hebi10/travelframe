@@ -1,6 +1,8 @@
 import { Feather } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
 import { Image } from "@/components/private-media-image";
 import { BodyMeasurementSummaryCard } from "@/components/body-measurement-summary-card";
+import { BodyFramePhotoOrderModal } from "@/features/records/BodyFramePhotoOrderModal";
 import { router, type Href, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
 import {
@@ -19,7 +21,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { bodyFrameDesign, bodyFrameTypography } from "@/constants/app-theme";
 import {
   getBodyProjectPhotos,
-  getBodyProjectProgressSummary
+  getBodyProjectProgressSummary,
+  getNextBodyProjectSequence
 } from "@/lib/body-frame-camera-project";
 import {
   archiveBodyProject,
@@ -45,7 +48,18 @@ import {
   getBodyFrameUpgradeLabel,
   isBodyFrameProjectTargetAllowed
 } from "@/lib/body-frame-plan-limits";
-import { getPhotos } from "@/lib/photo-library";
+import { backupPhotoIfEnabled } from "@/lib/cloud-backup";
+import { recordBackupFailure } from "@/lib/backup-failure-queue";
+import {
+  getPhotos,
+  reorderBodyProjectPhotos,
+  saveCapturedPhoto
+} from "@/lib/photo-library";
+import {
+  isMediaLibraryAccessGranted,
+  requestMediaLibraryAccess
+} from "@/lib/request-media-library-access";
+import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 import { useAppAppearance } from "@/lib/app-appearance";
 import { useAuth } from "@/lib/auth-context";
 import { getPlanEntitlements } from "@/lib/plan-entitlements";
@@ -92,7 +106,7 @@ export default function BodyFrameProjectDetailScreen() {
   const projectId = Array.isArray(id) ? id[0] : id;
   const insets = useSafeAreaInsets();
   const { palette } = useAppAppearance();
-  const { isLoggedIn, subscription } = useAuth();
+  const { isLoggedIn, subscription, user } = useAuth();
   const planEntitlements = useMemo(
     () => getPlanEntitlements({ isLoggedIn, subscription }),
     [isLoggedIn, subscription]
@@ -114,6 +128,8 @@ export default function BodyFrameProjectDetailScreen() {
     useState(true);
   const [poseAlignmentEnabled, setPoseAlignmentEnabled] = useState(false);
   const [poseAlignmentDraft, setPoseAlignmentDraft] = useState(false);
+  const [isImportingPhotos, setIsImportingPhotos] = useState(false);
+  const [orderModalOpen, setOrderModalOpen] = useState(false);
 
   const reload = useCallback(async () => {
     if (!projectId) {
@@ -170,6 +186,11 @@ export default function BodyFrameProjectDetailScreen() {
         ? sortProjectPhotos(getBodyProjectPhotos(photos, project.id))
         : [],
     [photos, project]
+  );
+
+  const projectPhotosForOrder = useMemo(
+    () => [...projectPhotos].reverse(),
+    [projectPhotos]
   );
 
   const measurementSeries = useMemo(
@@ -296,6 +317,141 @@ export default function BodyFrameProjectDetailScreen() {
     await setLastActiveProjectId(project.id);
     router.push("/camera");
   }, [project]);
+
+  const importProjectPhotos = useCallback(async () => {
+    if (!project || isImportingPhotos) return;
+
+    const remaining =
+      planEntitlements.maxProgressPhotos === null
+        ? 20
+        : Math.max(
+            0,
+            planEntitlements.maxProgressPhotos - projectPhotos.length
+          );
+
+    if (remaining <= 0) {
+      Alert.alert(
+        "현재 플랜 한도",
+        `${planEntitlements.label} 플랜의 프로젝트 사진 한도에 도달했습니다.`
+      );
+      return;
+    }
+
+    try {
+      setIsImportingPhotos(true);
+      const mediaAccessState = await requestMediaLibraryAccess({
+        fallbackMessage: "프로젝트에 사진을 추가하려면 앨범 접근 권한이 필요합니다."
+      });
+      if (!isMediaLibraryAccessGranted(mediaAccessState)) {
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        allowsMultipleSelection: true,
+        selectionLimit: Math.min(20, remaining),
+        allowsEditing: false,
+        quality: 1
+      });
+
+      if (result.canceled) {
+        return;
+      }
+
+      const assets = result.assets
+        .filter((asset) => Boolean(asset.uri))
+        .slice(0, remaining);
+      if (assets.length === 0) {
+        return;
+      }
+
+      let nextSequence = getNextBodyProjectSequence(photos, project.id);
+      let importedCount = 0;
+      let failedCount = 0;
+      let backupFailureCount = 0;
+
+      for (const asset of assets) {
+        try {
+          const savedPhoto = await saveCapturedPhoto({
+            uri: asset.uri,
+            width: asset.width,
+            height: asset.height,
+            localImageLimit: planEntitlements.localImageLimit,
+            projectId: project.id,
+            sequence: nextSequence
+          });
+          importedCount += 1;
+          nextSequence = (savedPhoto.sequence ?? nextSequence) + 1;
+
+          try {
+            await backupPhotoIfEnabled({
+              user,
+              subscription,
+              photo: savedPhoto
+            });
+          } catch (backupError) {
+            backupFailureCount += 1;
+            await recordBackupFailure({
+              id: savedPhoto.id,
+              kind: "photo",
+              label: "프로젝트 가져온 사진",
+              message: getUserFacingErrorMessage(
+                backupError,
+                "클라우드 백업은 완료하지 못했습니다."
+              )
+            });
+          }
+        } catch (error) {
+          failedCount += 1;
+          console.error("프로젝트 사진 가져오기에 실패했습니다.", error);
+        }
+      }
+
+      await reload();
+
+      const details = [
+        importedCount > 0 ? `${importedCount}장을 프로젝트에 추가했습니다.` : "",
+        failedCount > 0 ? `${failedCount}장은 저장하지 못했습니다.` : "",
+        backupFailureCount > 0
+          ? "일부 사진의 클라우드 백업은 완료하지 못했습니다."
+          : ""
+      ]
+        .filter(Boolean)
+        .join(" ");
+
+      Alert.alert(importedCount > 0 ? "사진 추가 완료" : "사진 추가 실패", details);
+    } catch (error) {
+      Alert.alert(
+        "사진 추가 실패",
+        getUserFacingErrorMessage(error, "프로젝트에 사진을 추가하지 못했습니다.")
+      );
+    } finally {
+      setIsImportingPhotos(false);
+    }
+  }, [
+    isImportingPhotos,
+    photos,
+    planEntitlements.label,
+    planEntitlements.localImageLimit,
+    planEntitlements.maxProgressPhotos,
+    project,
+    projectPhotos.length,
+    reload,
+    subscription,
+    user
+  ]);
+
+  const savePhotoOrder = useCallback(
+    async (orderedPhotoIds: string[]) => {
+      if (!project) return;
+      await reorderBodyProjectPhotos({
+        projectId: project.id,
+        orderedPhotoIds
+      });
+      await reload();
+    },
+    [project, reload]
+  );
 
   const openVideo = useCallback(async () => {
     if (!project) return;
@@ -466,11 +622,44 @@ export default function BodyFrameProjectDetailScreen() {
 
         <View style={styles.recordsSection}>
           <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: palette.text }]}>기록</Text>
-            <Text style={[styles.sectionCount, { color: palette.muted }]}>
-              {projectPhotos.length}장
-            </Text>
+            <View>
+              <Text style={[styles.sectionTitle, { color: palette.text }]}>기록</Text>
+              <Text style={[styles.sectionCount, { color: palette.muted }]}>
+                {projectPhotos.length}장
+              </Text>
+            </View>
+            <View style={styles.sectionActions}>
+              <Pressable
+                disabled={isImportingPhotos}
+                accessibilityRole="button"
+                style={[styles.sectionAction, { borderColor: palette.line }]}
+                onPress={() => void importProjectPhotos()}
+              >
+                <Feather name="upload" size={15} color={palette.text} />
+                <Text style={[styles.sectionActionText, { color: palette.text }]}>
+                  {isImportingPhotos ? "추가 중" : "사진 추가"}
+                </Text>
+              </Pressable>
+              {projectPhotos.length > 1 ? (
+                <Pressable
+                  accessibilityRole="button"
+                  style={[styles.sectionAction, { borderColor: palette.line }]}
+                  onPress={() => setOrderModalOpen(true)}
+                >
+                  <Feather name="move" size={15} color={palette.text} />
+                  <Text style={[styles.sectionActionText, { color: palette.text }]}>
+                    순서 조정
+                  </Text>
+                </Pressable>
+              ) : null}
+            </View>
           </View>
+
+          {projectPhotos.length > 1 ? (
+            <Text style={[styles.recordsHint, { color: palette.faint }]}>
+              사진을 길게 눌러도 순서 조정 화면을 열 수 있습니다.
+            </Text>
+          ) : null}
 
           {projectPhotos.length > 0 ? (
             <View style={styles.photoGrid}>
@@ -486,6 +675,8 @@ export default function BodyFrameProjectDetailScreen() {
                       backgroundColor: palette.surfaceStrong
                     }
                   ]}
+                  delayLongPress={320}
+                  onLongPress={() => setOrderModalOpen(true)}
                   onPress={() => router.push(`/photo/${photo.id}` as Href)}
                 >
                   <Image
@@ -529,6 +720,13 @@ export default function BodyFrameProjectDetailScreen() {
           </Text>
         </Pressable>
       </ScrollView>
+
+      <BodyFramePhotoOrderModal
+        visible={orderModalOpen}
+        photos={projectPhotosForOrder}
+        onClose={() => setOrderModalOpen(false)}
+        onSave={savePhotoOrder}
+      />
 
       <Modal
         transparent
@@ -1087,7 +1285,31 @@ const styles = StyleSheet.create({
   sectionHeader: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between"
+    justifyContent: "space-between",
+    gap: 10
+  },
+  sectionActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "flex-end",
+    gap: 6
+  },
+  sectionAction: {
+    minHeight: bodyFrameDesign.minTouchSize,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 5,
+    paddingHorizontal: 10,
+    borderWidth: bodyFrameDesign.borderWidth
+  },
+  sectionActionText: {
+    fontSize: bodyFrameTypography.caption,
+    fontWeight: "600"
+  },
+  recordsHint: {
+    fontSize: bodyFrameTypography.caption,
+    lineHeight: 17
   },
   sectionTitle: {
     fontSize: bodyFrameTypography.sectionTitle,

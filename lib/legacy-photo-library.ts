@@ -327,6 +327,51 @@ export const replacePhotosFromBackup = async (photos: PhotoItem[]) => {
   return getPhotos();
 };
 
+export const reorderProjectPhotos = async ({
+  projectId,
+  orderedPhotoIds
+}: {
+  projectId: string;
+  orderedPhotoIds: string[];
+}) =>
+  runPhotoLibraryMutation(async () => {
+    const photos = await getPhotos();
+    const projectPhotos = photos.filter((photo) => photo.projectId === projectId);
+    const projectPhotoIds = new Set(projectPhotos.map((photo) => photo.id));
+    const orderedIds = orderedPhotoIds.filter((id) => projectPhotoIds.has(id));
+
+    if (
+      orderedIds.length !== projectPhotos.length ||
+      new Set(orderedIds).size !== projectPhotos.length
+    ) {
+      throw new Error("프로젝트 사진 순서를 저장할 수 없습니다. 사진 목록을 새로고침한 뒤 다시 시도해 주세요.");
+    }
+
+    const sequenceById = new Map(
+      orderedIds.map((id, index) => [id, index + 1])
+    );
+    const updatedAt = new Date().toISOString();
+    const nextPhotos = photos.map((photo) => {
+      if (photo.projectId !== projectId) {
+        return photo;
+      }
+
+      const sequence = sequenceById.get(photo.id);
+      if (!sequence) {
+        return photo;
+      }
+
+      return {
+        ...photo,
+        sequence,
+        updatedAt
+      };
+    });
+
+    await writePhotos(nextPhotos);
+    return nextPhotos.filter((photo) => photo.projectId === projectId);
+  });
+
 export const createCaptureDraft = async (sourceUri: string) => {
   const id = createPhotoId();
   const extension = getFileExtension(sourceUri);

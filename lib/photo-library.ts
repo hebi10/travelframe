@@ -5,12 +5,16 @@ import {
   type ReservedBodyFrameCapture
 } from "@/lib/body-frame-camera-session";
 import { updateBodyProject } from "@/lib/body-project-library";
-import { detachBodyMeasurementsFromPhoto } from "@/lib/body-measurement-library";
+import {
+  detachBodyMeasurementsFromPhoto,
+  syncBodyMeasurementPhotoSequences
+} from "@/lib/body-measurement-library";
 import {
   deleteLocalFile,
   deletePhoto as deleteLegacyPhoto,
   getPhotos,
   replacePhotosFromBackup,
+  reorderProjectPhotos as reorderLegacyProjectPhotos,
   saveCapturedPhoto as saveLegacyCapturedPhoto
 } from "@/lib/legacy-photo-library";
 import type { PhotoItem, SaveCapturedPhotoInput } from "@/types/photo";
@@ -20,6 +24,29 @@ export * from "@/lib/legacy-photo-library";
 export const deletePhoto = async (id: string) => {
   await detachBodyMeasurementsFromPhoto(id);
   return deleteLegacyPhoto(id);
+};
+
+export const reorderBodyProjectPhotos = async ({
+  projectId,
+  orderedPhotoIds
+}: {
+  projectId: string;
+  orderedPhotoIds: string[];
+}) => {
+  const reordered = await reorderLegacyProjectPhotos({
+    projectId,
+    orderedPhotoIds
+  });
+  const sequenceByPhotoId = new Map(
+    orderedPhotoIds.map((id, index) => [id, index + 1])
+  );
+
+  await syncBodyMeasurementPhotoSequences(projectId, sequenceByPhotoId);
+  await updateBodyProject(projectId, {
+    coverPhotoId: orderedPhotoIds[orderedPhotoIds.length - 1]
+  }).catch(() => null);
+
+  return reordered;
 };
 
 const cleanupOrphanProjectFiles = async (photo?: PhotoItem | null) => {
