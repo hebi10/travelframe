@@ -1242,6 +1242,138 @@ export default function BodyFrameProjectDetailScreen() {
 
       <Modal
         transparent
+        animationType="fade"
+        visible={reminderModalOpen}
+        onRequestClose={() => setReminderModalOpen(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="촬영 알림 설정 닫기"
+            style={StyleSheet.absoluteFill}
+            onPress={() => setReminderModalOpen(false)}
+          />
+          <View
+            style={[
+              styles.reminderSheet,
+              {
+                backgroundColor: palette.surface,
+                borderColor: palette.line,
+                paddingBottom: Math.max(insets.bottom + 18, 28)
+              }
+            ]}
+          >
+            <View style={styles.sheetHandle} />
+            <View style={styles.sheetHeader}>
+              <View style={styles.reminderSheetTitleWrap}>
+                <Text style={[styles.sheetTitle, { color: palette.text }]}>
+                  촬영 알림
+                </Text>
+                <Text style={[styles.settingDetail, { color: palette.muted }]}>
+                  매일 같은 시간에 이 기기에서 촬영 알림을 표시합니다.
+                </Text>
+              </View>
+              <Pressable
+                accessibilityRole="button"
+                style={[styles.sheetCloseButton, { borderColor: palette.line }]}
+                onPress={() => setReminderModalOpen(false)}
+              >
+                <Text style={[styles.sheetCloseText, { color: palette.text }]}>
+                  닫기
+                </Text>
+              </Pressable>
+            </View>
+
+            <View style={styles.choiceRow}>
+              {([
+                [false, "알림 끄기"],
+                [true, "알림 켜기"]
+              ] as const).map(([enabled, label]) => {
+                const active = reminderEnabledDraft === enabled;
+                return (
+                  <Pressable
+                    key={label}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: active }}
+                    style={[
+                      styles.choiceButton,
+                      {
+                        borderColor: active ? palette.text : palette.line,
+                        backgroundColor: active
+                          ? palette.text
+                          : palette.background
+                      }
+                    ]}
+                    onPress={() => setReminderEnabledDraft(enabled)}
+                  >
+                    <Text
+                      style={[
+                        styles.choiceText,
+                        { color: active ? palette.inverse : palette.text }
+                      ]}
+                    >
+                      {label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <View style={styles.reminderTimeRow}>
+              <View style={styles.reminderTimeCopy}>
+                <Text style={[styles.settingTitle, { color: palette.text }]}>
+                  알림 시간
+                </Text>
+                <Text style={[styles.settingDetail, { color: palette.muted }]}>
+                  24시간 형식으로 입력해 주세요.
+                </Text>
+              </View>
+              <TextInput
+                value={reminderTimeDraft}
+                onChangeText={setReminderTimeDraft}
+                editable={reminderEnabledDraft && !reminderSaving}
+                keyboardType="numbers-and-punctuation"
+                maxLength={5}
+                placeholder="20:00"
+                placeholderTextColor={palette.faint}
+                style={[
+                  styles.reminderTimeInput,
+                  {
+                    color: palette.text,
+                    borderColor: palette.line,
+                    backgroundColor: palette.background,
+                    opacity: reminderEnabledDraft ? 1 : 0.45
+                  }
+                ]}
+              />
+            </View>
+
+            <Text style={[styles.settingHint, { color: palette.faint }]}>
+              Android 알림 권한이 꺼져 있으면 저장할 때 권한 요청이 표시됩니다. 기기 절전 정책에 따라 알림 시각이 약간 늦어질 수 있습니다.
+            </Text>
+
+            <Pressable
+              disabled={reminderSaving}
+              accessibilityRole="button"
+              style={[
+                styles.saveButton,
+                {
+                  backgroundColor: palette.text,
+                  opacity: reminderSaving ? 0.5 : 1
+                }
+              ]}
+              onPress={() => void saveReminderSettings()}
+            >
+              <Text style={[styles.saveButtonText, { color: palette.inverse }]}>
+                {reminderSaving ? "저장 중" : "알림 설정 저장"}
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        transparent
         animationType="slide"
         visible={settingsOpen}
         onRequestClose={() => setSettingsOpen(false)}
