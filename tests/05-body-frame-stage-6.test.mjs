@@ -45,6 +45,7 @@ const billingSource = fs.readFileSync("lib/google-play-billing.ts", "utf8");
 for (const token of [
   "ad_remove",
   "creator_monthly",
+  "plus_monthly",
   "expert_monthly",
   "verifyGooglePlayPurchase",
   "purchaseToken"
@@ -255,8 +256,9 @@ assert.ok(
 );
 assert.ok(
   serverBillingSource.includes("SUBSCRIPTION_STATE_REPLACED") &&
-    serverBillingSource.includes("replacedByProductId"),
-  "linked subscription replacement must retire the previous Google Play entitlement"
+    serverBillingSource.includes("replacedByProductId") &&
+    serverBillingSource.includes('"plus_monthly"'),
+  "linked Pro/Plus/Expert replacement must retire the previous Google Play entitlement"
 );
 assert.ok(
   functionsSource.includes('source: "client"') &&
