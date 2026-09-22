@@ -20,8 +20,10 @@ for (const snippet of [
 }
 
 assert.ok(
-  source.includes("function UsageBadge({ label, count, limit }"),
-  "studio should render a generic usage badge for local and cloud counts"
+  source.includes("export function UsageBadge({") &&
+    source.includes("limit?: number") &&
+    source.includes("무제한"),
+  "studio should render a generic usage badge that supports unlimited local counts"
 );
 
 assert.ok(
