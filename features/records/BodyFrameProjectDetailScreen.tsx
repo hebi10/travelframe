@@ -1004,6 +1004,46 @@ export default function BodyFrameProjectDetailScreen() {
           </View>
         </View>
 
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="프로젝트 촬영 알림 설정"
+          style={[
+            styles.reminderCard,
+            {
+              borderColor: palette.line,
+              backgroundColor: palette.surface
+            }
+          ]}
+          onPress={openReminderSettings}
+        >
+          <View
+            style={[
+              styles.reminderIcon,
+              {
+                borderColor: palette.line,
+                backgroundColor: palette.background
+              }
+            ]}
+          >
+            <Feather
+              name={reminderSettings.enabled ? "bell" : "bell-off"}
+              size={18}
+              color={palette.text}
+            />
+          </View>
+          <View style={styles.reminderCopy}>
+            <Text style={[styles.reminderTitle, { color: palette.text }]}>
+              촬영 알림
+            </Text>
+            <Text style={[styles.reminderDetail, { color: palette.muted }]}>
+              {reminderSettings.enabled
+                ? `매일 ${formatProjectReminderTime(reminderSettings)} · 이 기기에서 알림`
+                : "원하는 시간에 매일 촬영 알림을 받을 수 있습니다."}
+            </Text>
+          </View>
+          <Feather name="chevron-right" size={18} color={palette.muted} />
+        </Pressable>
+
         {measurementSettings.enabled ? (
           <BodyMeasurementSummaryCard
             metric={measurementSettings.primaryMetric}
