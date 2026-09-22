@@ -464,28 +464,22 @@ export default function AccountScreen() {
     }
 
     if (plan.id === "expert") {
-      return {
-        active: Boolean(effectiveSubscriptionProducts.expertMonthly),
-        label: effectiveSubscriptionProducts.expertMonthly ? "구독 중" : "미구독"
-      };
-    }
-
-    if (plan.id === "plus") {
-      const active = Boolean(
-        effectiveSubscriptionProducts.plusMonthly ||
-          effectiveSubscriptionProducts.expertMonthly
-      );
+      const active = Boolean(effectiveSubscriptionProducts.expertMonthly);
       return {
         active,
         label: active ? "구독 중" : "미구독"
       };
     }
 
-    const active = Boolean(
-      effectiveSubscriptionProducts.creatorMonthly ||
-        effectiveSubscriptionProducts.plusMonthly ||
-        effectiveSubscriptionProducts.expertMonthly
-    );
+    if (plan.id === "plus") {
+      const active = Boolean(effectiveSubscriptionProducts.plusMonthly);
+      return {
+        active,
+        label: active ? "구독 중" : "미구독"
+      };
+    }
+
+    const active = Boolean(effectiveSubscriptionProducts.creatorMonthly);
     return {
       active,
       label: active ? "구독 중" : "미구독"
