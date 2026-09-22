@@ -609,11 +609,13 @@ export default function BodyFrameProjectDetailScreen() {
       return;
     }
 
+    const nextProjectName = nameDraft.trim();
+
     setSaving(true);
     try {
       await Promise.all([
         updateBodyProject(project.id, {
-          name: nameDraft.trim(),
+          name: nextProjectName,
           targetPhotoCount: target
         }),
         updateBodyMeasurementSettings(project.id, measurementDraft),
@@ -623,6 +625,19 @@ export default function BodyFrameProjectDetailScreen() {
         ),
         updateBodyPoseAlignmentSettings(project.id, poseAlignmentDraft)
       ]);
+
+      if (reminderSettings.enabled && nextProjectName !== project.name) {
+        try {
+          await syncProjectReminderProjectName({
+            projectId: project.id,
+            projectName: nextProjectName,
+            settings: reminderSettings
+          });
+        } catch (error) {
+          console.error("프로젝트 알림 이름 동기화에 실패했습니다.", error);
+        }
+      }
+
       await reload();
       setSettingsOpen(false);
     } finally {
@@ -637,6 +652,7 @@ export default function BodyFrameProjectDetailScreen() {
     poseAlignmentDraft,
     project,
     reload,
+    reminderSettings,
     saving,
     targetDraft
   ]);
