@@ -2373,17 +2373,30 @@ exports.deleteCloudBackupData = secureOnCall(async (request) => {
   try {
     const uid = requireUid(request);
     const userRef = db.doc(`users/${uid}`);
-    const [photoSnapshot, imageWorkSnapshot, videoSnapshot, musicSnapshot, projectSnapshot, sessionSnapshot] = await Promise.all([
+    const [
+      photoSnapshot,
+      imageWorkSnapshot,
+      videoSnapshot,
+      musicSnapshot,
+      projectSnapshot,
+      sessionSnapshot,
+      projectSlotSnapshot
+    ] = await Promise.all([
       userRef.collection("photoBackups").get(),
       userRef.collection("imageWorks").get(),
       userRef.collection("videos").get(),
       userRef.collection("musicTracks").get(),
       userRef.collection("bodyProjects").get(),
-      userRef.collection("backupUploadSessions").get()
+      userRef.collection("backupUploadSessions").get(),
+      userRef.collection("backupProjectSlots").get()
     ]);
 
     let imageBackupBytes = 0;
-    const documentDeletes = [...projectSnapshot.docs, ...sessionSnapshot.docs].map((item) => item.ref);
+    const documentDeletes = [
+      ...projectSnapshot.docs,
+      ...sessionSnapshot.docs,
+      ...projectSlotSnapshot.docs
+    ].map((item) => item.ref);
     const storageDeletes = collectOwnedCloudBackupStoragePaths({
       uid,
       photoBackups: photoSnapshot.docs.map((item) => item.data()),
