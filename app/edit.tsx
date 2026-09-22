@@ -962,23 +962,24 @@ const styles = StyleSheet.create({
   draftPanel: {
     gap: 12,
     padding: 12,
-    borderWidth: 1,
-    borderColor: colors.text,
-    backgroundColor: colors.surface
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderColor: bodyFrameDarkColors.line,
+    borderRadius: bodyFrameDesign.cardRadius,
+    backgroundColor: bodyFrameDarkColors.surface
   },
   draftCopy: {
     gap: 4
   },
   draftTitle: {
-    color: colors.text,
-    fontSize: typography.body,
-    fontWeight: "800",
+    color: bodyFrameDarkColors.text,
+    fontSize: bodyFrameTypography.body,
+    fontWeight: "700",
     letterSpacing: 0
   },
   draftDetail: {
-    color: colors.muted,
-    fontSize: typography.small,
-    lineHeight: 17,
+    color: bodyFrameDarkColors.muted,
+    fontSize: bodyFrameTypography.caption,
+    lineHeight: 18,
     letterSpacing: 0
   },
   draftActions: {
@@ -987,92 +988,116 @@ const styles = StyleSheet.create({
   },
   draftButton: {
     flex: 1,
-    minHeight: controls.compactHeight,
+    minHeight: bodyFrameDesign.minTouchSize,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.text
+    borderRadius: bodyFrameDesign.buttonRadius,
+    backgroundColor: bodyFrameDarkColors.text
   },
   draftButtonText: {
-    color: colors.inverse,
-    fontSize: typography.button,
-    fontWeight: "800",
+    color: bodyFrameDarkColors.inverse,
+    fontSize: bodyFrameTypography.button,
+    fontWeight: "700",
     letterSpacing: 0
   },
   draftGhostButton: {
     minWidth: 72,
-    minHeight: controls.compactHeight,
+    minHeight: bodyFrameDesign.minTouchSize,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.background
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderColor: bodyFrameDarkColors.line,
+    borderRadius: bodyFrameDesign.buttonRadius,
+    backgroundColor: bodyFrameDarkColors.surfaceStrong
   },
   draftGhostButtonText: {
-    color: colors.text,
-    fontSize: typography.button,
-    fontWeight: "800",
+    color: bodyFrameDarkColors.text,
+    fontSize: bodyFrameTypography.button,
+    fontWeight: "700",
     letterSpacing: 0
   },
   sourceRow: {
+    minHeight: 64,
     flexDirection: "row",
     alignItems: "center",
-    gap: 12
+    gap: 12,
+    padding: 12,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderColor: bodyFrameDarkColors.line,
+    borderRadius: bodyFrameDesign.cardRadius,
+    backgroundColor: bodyFrameDarkColors.surface
   },
   sourceCopy: {
     flex: 1,
     gap: 4
   },
   sourceTitle: {
-    color: colors.text,
-    fontSize: typography.body,
-    fontWeight: "800",
+    color: bodyFrameDarkColors.text,
+    fontSize: bodyFrameTypography.body,
+    fontWeight: "700",
     letterSpacing: 0
   },
   sourceDetail: {
-    color: colors.muted,
-    fontSize: typography.small,
-    lineHeight: 17,
+    color: bodyFrameDarkColors.muted,
+    fontSize: bodyFrameTypography.caption,
+    lineHeight: 18,
     letterSpacing: 0
   },
   loadButton: {
-    minHeight: controls.compactHeight,
+    minHeight: bodyFrameDesign.minTouchSize,
+    flexDirection: "row",
+    alignItems: "center",
     justifyContent: "center",
+    gap: 7,
     paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: colors.text
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderColor: bodyFrameDarkColors.line,
+    borderRadius: bodyFrameDesign.buttonRadius,
+    backgroundColor: bodyFrameDarkColors.surfaceStrong
   },
   loadButtonText: {
-    color: colors.text,
-    fontSize: typography.button,
-    fontWeight: "800",
+    color: bodyFrameDarkColors.text,
+    fontSize: bodyFrameTypography.button,
+    fontWeight: "700",
     letterSpacing: 0
+  },
+  sectionLabelRow: {
+    minHeight: 22,
+    justifyContent: "center"
+  },
+  sectionLabel: {
+    color: bodyFrameDarkColors.muted,
+    fontSize: bodyFrameTypography.caption,
+    fontWeight: "700"
   },
   ratioRow: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8
+    gap: 8,
+    paddingRight: 4
   },
   ratioChip: {
-    minHeight: controls.compactHeight,
-    minWidth: 56,
+    minHeight: bodyFrameDesign.minTouchSize,
+    minWidth: 64,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 10,
-    borderWidth: 1,
-    borderColor: colors.line
+    paddingHorizontal: 12,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderColor: bodyFrameDarkColors.line,
+    borderRadius: bodyFrameDesign.buttonRadius,
+    backgroundColor: bodyFrameDarkColors.surfaceStrong
   },
   ratioChipActive: {
-    borderColor: colors.text,
-    backgroundColor: colors.text
+    borderColor: bodyFrameDarkColors.text,
+    backgroundColor: bodyFrameDarkColors.text
   },
   ratioText: {
-    color: colors.text,
-    fontSize: typography.button,
-    fontWeight: "800",
+    color: bodyFrameDarkColors.text,
+    fontSize: bodyFrameTypography.button,
+    fontWeight: "700",
     letterSpacing: 0
   },
   ratioTextActive: {
-    color: colors.inverse
+    color: bodyFrameDarkColors.inverse
   },
   guidePanel: {
     gap: 10,
@@ -1255,25 +1280,30 @@ const styles = StyleSheet.create({
   toolButton: {
     flexGrow: 1,
     flexBasis: "47%",
-    minHeight: controls.height,
+    minHeight: 54,
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1,
-    borderColor: colors.line
+    gap: 8,
+    paddingHorizontal: 10,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderColor: bodyFrameDarkColors.line,
+    borderRadius: bodyFrameDesign.buttonRadius,
+    backgroundColor: bodyFrameDarkColors.surfaceStrong
   },
   toolButtonActive: {
     borderColor: colors.text
   },
   toolButtonText: {
-    color: colors.text,
-    fontSize: typography.button,
-    fontWeight: "800",
+    color: bodyFrameDarkColors.text,
+    fontSize: bodyFrameTypography.button,
+    fontWeight: "700",
     letterSpacing: 0
   },
   message: {
-    color: colors.muted,
-    fontSize: typography.small,
-    lineHeight: 17,
+    color: bodyFrameDarkColors.muted,
+    fontSize: bodyFrameTypography.caption,
+    lineHeight: 18,
     letterSpacing: 0
   }
 });
