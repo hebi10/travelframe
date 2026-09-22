@@ -398,7 +398,7 @@ export default function AccountScreen() {
     const proPlan = paymentPlans.find((plan) => plan.id === "creator");
     Alert.alert(
       "광고만 제거할까요?",
-      "광고 제거는 2,000원 1회 구매입니다. Pro는 월 1,990원 자동 갱신 구독으로 광고·워터마크가 제거되고, 로컬 프로젝트와 사진을 제한 없이 이용하며 클라우드에 프로젝트 1개를 선택해 사진 최대 365장까지 백업할 수 있습니다.",
+      "광고 제거는 2,000원 1회 구매이며 광고만 제거됩니다. 프로젝트는 최대 2개까지 만들 수 있고 각 프로젝트에는 사진을 최대 100장까지 기록할 수 있으며 클라우드 백업은 포함되지 않습니다. 월 Pro(1,990원)부터는 프로젝트 수를 제한 없이 만들 수 있고 프로젝트당 사진을 최대 365장까지 기록할 수 있으며, Pro는 선택한 프로젝트 1개를 클라우드에 백업할 수 있습니다.",
       [
         { text: "취소", style: "cancel" },
         ...(proPlan
@@ -987,16 +987,16 @@ export default function AccountScreen() {
           <View style={[styles.paymentModalPanel, themed.panelStrong]}>
             <View style={styles.modalHeader}>
               <View style={styles.planCopy}>
-                <Text selectable style={[styles.planTitle, themed.text]}>
+                <Text selectable={false} style={[styles.planTitle, themed.text]}>
                   {selectedPaymentPlan?.title}
                 </Text>
-                <Text selectable style={[styles.planPrice, themed.text]}>
+                <Text selectable={false} style={[styles.planPrice, themed.text]}>
                   {selectedPaymentPlan
                     ? getStorePrice(getPaymentProductId(selectedPaymentPlan)) ??
                       selectedPaymentPlan.price
                     : ""}
                 </Text>
-                <Text selectable style={[styles.benefitText, themed.mutedText]}>
+                <Text selectable={false} style={[styles.benefitText, themed.mutedText]}>
                   {selectedPaymentPlan?.billing}
                 </Text>
               </View>
@@ -1010,16 +1010,16 @@ export default function AccountScreen() {
               </Pressable>
             </View>
 
-            <Text selectable style={[styles.helpText, themed.mutedText]}>
+            <Text selectable={false} style={[styles.helpText, themed.mutedText]}>
               {selectedPaymentPlan?.summary}
             </Text>
-            <Text selectable style={[styles.helpText, themed.mutedText]}>
+            <Text selectable={false} style={[styles.helpText, themed.mutedText]}>
               {selectedPaymentPlan?.purchaseNotice}
             </Text>
 
             <View style={styles.benefitList}>
               {selectedPaymentPlan?.benefits.map((benefit) => (
-                <Text key={benefit} selectable style={[styles.benefitText, themed.text]}>
+                <Text key={benefit} selectable={false} style={[styles.benefitText, themed.text]}>
                   {benefit}
                 </Text>
               ))}
@@ -1058,7 +1058,7 @@ export default function AccountScreen() {
                     Google Play에서 구독 관리
                   </Text>
                 </Pressable>
-                <Text selectable style={[styles.helpText, themed.mutedText]}>
+                <Text selectable={false} style={[styles.helpText, themed.mutedText]}>
                   구독을 취소하면 다음 갱신 결제가 중단됩니다. 일반적으로 이미 결제한 기간이 끝날 때까지
                   혜택을 이용할 수 있으며, 환불 여부는 Google Play 정책과 적용 법령에 따라 달라질 수 있습니다.
                 </Text>
