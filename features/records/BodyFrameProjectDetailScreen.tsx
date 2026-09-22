@@ -1412,6 +1412,91 @@ export default function BodyFrameProjectDetailScreen() {
                   />
                 </View>
 
+                <View style={styles.reminderRepeatBlock}>
+                  <View style={styles.reminderRepeatHeader}>
+                    <Text style={[styles.settingTitle, { color: palette.text }]}>
+                      반복
+                    </Text>
+                    <Text style={[styles.settingDetail, { color: palette.muted }]}>
+                      매일 또는 원하는 요일만 선택할 수 있습니다.
+                    </Text>
+                  </View>
+
+                  <View style={styles.choiceRow}>
+                    {([
+                      ["daily", "매일"],
+                      ["selected", "요일 선택"]
+                    ] as const).map(([mode, label]) => {
+                      const active = reminderRepeatModeDraft === mode;
+                      return (
+                        <Pressable
+                          key={mode}
+                          disabled={!reminderEnabledDraft || reminderSaving}
+                          accessibilityRole="button"
+                          accessibilityState={{ selected: active }}
+                          style={[
+                            styles.choiceButton,
+                            {
+                              borderColor: active ? palette.text : palette.line,
+                              backgroundColor: active
+                                ? palette.text
+                                : palette.background,
+                              opacity: reminderEnabledDraft ? 1 : 0.45
+                            }
+                          ]}
+                          onPress={() => setReminderRepeatModeDraft(mode)}
+                        >
+                          <Text
+                            style={[
+                              styles.choiceText,
+                              { color: active ? palette.inverse : palette.text }
+                            ]}
+                          >
+                            {label}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+
+                  {reminderRepeatModeDraft === "selected" ? (
+                    <View style={styles.reminderWeekdayRow}>
+                      {PROJECT_REMINDER_WEEKDAY_OPTIONS.map(({ label, value }) => {
+                        const active = reminderWeekdaysDraft.includes(value);
+                        return (
+                          <Pressable
+                            key={value}
+                            disabled={!reminderEnabledDraft || reminderSaving}
+                            accessibilityRole="button"
+                            accessibilityLabel={`${label}요일 알림`}
+                            accessibilityState={{ selected: active }}
+                            style={[
+                              styles.reminderWeekdayButton,
+                              {
+                                borderColor: active ? palette.text : palette.line,
+                                backgroundColor: active
+                                  ? palette.text
+                                  : palette.background,
+                                opacity: reminderEnabledDraft ? 1 : 0.45
+                              }
+                            ]}
+                            onPress={() => toggleReminderWeekday(value)}
+                          >
+                            <Text
+                              style={[
+                                styles.reminderWeekdayText,
+                                { color: active ? palette.inverse : palette.text }
+                              ]}
+                            >
+                              {label}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  ) : null}
+                </View>
+
                 <Text style={[styles.settingHint, { color: palette.faint }]}>
                   Android 알림 권한이 꺼져 있으면 저장할 때 권한 요청이 표시됩니다. 기기 절전 정책에 따라 알림 시각이 약간 늦어질 수 있습니다.
                 </Text>
