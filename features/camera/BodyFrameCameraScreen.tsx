@@ -380,13 +380,10 @@ const styles = StyleSheet.create({
   captureHint: {
     alignSelf: "center",
     marginTop: 7,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: bodyFrameDesign.buttonRadius,
-    overflow: "hidden",
     color: "#D7D7DB",
-    backgroundColor: "rgba(11,11,12,0.72)",
-    fontSize: bodyFrameTypography.caption
+    fontSize: bodyFrameTypography.caption,
+    lineHeight: 17,
+    textAlign: "center"
   },
   planButton: {
     alignSelf: "center",
