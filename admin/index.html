@@ -299,6 +299,33 @@
                   <strong id="userLastSignIn">-</strong>
                 </div>
               </div>
+              <h3 class="subsection-title">현재 플랜 권한</h3>
+              <div id="currentPlanEntitlements" class="plan-entitlement-grid" aria-label="현재 플랜 권한">
+                <div class="entitlement-item">
+                  <span class="meta">유효 플랜</span>
+                  <strong id="effectivePlanLabel">-</strong>
+                </div>
+                <div class="entitlement-item">
+                  <span class="meta">로컬 프로젝트·사진</span>
+                  <strong id="localUsagePolicy">-</strong>
+                </div>
+                <div class="entitlement-item">
+                  <span class="meta">클라우드 프로젝트</span>
+                  <strong id="cloudProjectPolicy">-</strong>
+                </div>
+                <div class="entitlement-item">
+                  <span class="meta">프로젝트당 사진</span>
+                  <strong id="cloudPhotoPolicy">-</strong>
+                </div>
+                <div class="entitlement-item">
+                  <span class="meta">주간 영상 출력</span>
+                  <strong id="videoExportPolicy">-</strong>
+                </div>
+                <div class="entitlement-item">
+                  <span class="meta">광고 · 워터마크</span>
+                  <strong id="visualPolicy">-</strong>
+                </div>
+              </div>
               <h3 class="subsection-title">구독 내역</h3>
               <div id="userSubscriptionSummary" class="subscription-summary" aria-label="상품별 구독 내역">
                 <div id="adRemoveCard" class="subscription-product-card">
@@ -394,6 +421,17 @@
               </section>
             <section id="backupPanel" class="panel hidden">
               <h2>백업 관리</h2>
+              <section class="cloud-policy-card" aria-labelledby="cloudProjectHeading">
+                <div class="section-heading">
+                  <div>
+                    <p class="eyebrow">PROJECT SLOTS</p>
+                    <h3 id="cloudProjectHeading">클라우드 프로젝트 백업</h3>
+                  </div>
+                  <strong id="cloudSlotUsage" class="pill">-</strong>
+                </div>
+                <p id="cloudPlanPolicy" class="meta">현재 플랜의 프로젝트 슬롯 정책을 불러오면 표시됩니다.</p>
+                <div id="backupProjectSlotList" class="backup-project-slot-list" aria-live="polite"></div>
+              </section>
               <div class="list compact">
                 <div class="item">
                   <span class="meta">백업 상태</span>
@@ -410,10 +448,10 @@
               </div>
               <div class="row">
                 <button id="markBackupExpiredButton" class="secondary" type="button">만료 표시</button>
-                <button id="deleteBackupButton" type="button">백업 문서 삭제 처리</button>
+                <button id="deleteBackupButton" class="danger" type="button">전체 클라우드 데이터 삭제</button>
               </div>
               <p class="meta">
-                Storage 원본 파일의 완전 자동 삭제는 추후 Cloud Functions 또는 Scheduler로 분리하는 것이 안전합니다.
+                전체 삭제는 사진·영상·음악·프로젝트 메타데이터·백업 프로젝트 슬롯과 연결된 Storage 파일까지 함께 제거합니다. 로컬 기기 원본은 삭제되지 않습니다.
               </p>
               <p id="backupMessage" class="message"></p>
               <div class="backup-manager">
@@ -429,6 +467,18 @@
                   </button>
                 </div>
                 <div class="backup-toolbar">
+                  <label id="backupProjectFilterField" class="backup-filter-field">
+                    프로젝트 필터
+                    <select id="backupProjectFilterSelect">
+                      <option value="all">전체 프로젝트</option>
+                    </select>
+                  </label>
+                  <label id="backupUploadProjectField" class="backup-filter-field">
+                    업로드 프로젝트
+                    <select id="backupUploadProjectSelect">
+                      <option value="">프로젝트 선택</option>
+                    </select>
+                  </label>
                   <button id="backupUploadButton" class="secondary" type="button">업로드</button>
                   <input id="backupUploadInput" class="hidden" type="file" />
                 </div>

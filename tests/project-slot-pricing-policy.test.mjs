@@ -11,6 +11,9 @@ const slotUi = fs.readFileSync(
 const cloudBackup = fs.readFileSync("lib/cloud-backup.ts", "utf8");
 const functions = fs.readFileSync("functions/index.js", "utf8");
 const billing = fs.readFileSync("lib/google-play-billing.ts", "utf8");
+const admin = fs.readFileSync("admin/admin.js", "utf8");
+const adminHtml = fs.readFileSync("admin/index.html", "utf8");
+const firestoreRules = fs.readFileSync("firestore.rules", "utf8");
 
 for (const token of [
   'tier: "pro"',
@@ -78,6 +81,43 @@ for (const token of [
   assert.ok(account.includes(token), `ad-removal comparison missing: ${token}`);
 }
 
+for (const token of [
+  "renderBackupProjectSlots",
+  "backupProjectFilterSelect",
+  "backupUploadProjectSelect",
+  "replaceAdminCloudBackupProject",
+  "deleteAdminCloudBackupData",
+  "adminPlanPolicies"
+]) {
+  assert.ok(admin.includes(token), `admin project-slot policy missing: ${token}`);
+}
+
+for (const token of [
+  'id="backupProjectSlotList"',
+  'id="currentPlanEntitlements"',
+  'id="backupProjectFilterSelect"',
+  'id="backupUploadProjectSelect"'
+]) {
+  assert.ok(adminHtml.includes(token), `admin project-slot UI missing: ${token}`);
+}
+
+for (const token of [
+  "exports.replaceAdminCloudBackupProject = secureOnCall",
+  "exports.deleteAdminCloudBackupData = secureOnCall",
+  "syncAdminBackupProjectSlotStatuses",
+  "adminBackupUploadSessions",
+  "projectId: session.projectId",
+  '.collection("backupUploadSessions")',
+  '.collection("adminBackupUploadSessions")'
+]) {
+  assert.ok(functions.includes(token), `admin server project-slot guard missing: ${token}`);
+}
+
+assert.ok(
+  firestoreRules.includes("allow read: if isOwner(userId) || isAdmin();"),
+  "admins should be able to read backed-up project metadata for project labels"
+);
+
 console.log(
-  "ok - project-slot pricing, fixed backup selection, and ad-removal comparison are guarded"
+  "ok - project-slot pricing, fixed backup selection, admin management, and ad-removal comparison are guarded"
 );

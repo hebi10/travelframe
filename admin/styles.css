@@ -572,6 +572,88 @@ textarea {
   background: var(--surface-raised);
 }
 
+.plan-entitlement-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.entitlement-item,
+.cloud-policy-card,
+.backup-project-slot {
+  border: 1px solid var(--line);
+  background: var(--surface-raised);
+}
+
+.entitlement-item {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+}
+
+.entitlement-item strong {
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.cloud-policy-card {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 16px;
+}
+
+.cloud-policy-card .section-heading {
+  margin: 0;
+}
+
+.backup-project-slot-list {
+  display: grid;
+  gap: 8px;
+}
+
+.backup-project-slot {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+}
+
+.backup-project-slot-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.backup-project-slot-copy strong,
+.backup-project-slot-copy .uid {
+  overflow-wrap: anywhere;
+}
+
+.backup-project-slot-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.slot-status {
+  font-weight: 700;
+}
+
+.slot-status.over-limit,
+.slot-status.full {
+  color: var(--danger);
+}
+
+.backup-filter-field {
+  display: grid;
+  gap: 6px;
+  min-width: 150px;
+  font-size: 12px;
+}
+
 .backup-manager {
   display: grid;
   gap: 14px;
@@ -585,8 +667,10 @@ textarea {
 }
 
 .backup-toolbar {
-  display: flex;
-  justify-content: flex-end;
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) minmax(150px, 1fr) auto;
+  gap: 8px;
+  align-items: end;
 }
 
 .backup-item-list {
@@ -662,8 +746,18 @@ textarea {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .subscription-summary {
+  .subscription-summary,
+  .plan-entitlement-grid {
     grid-template-columns: 1fr;
+  }
+
+  .backup-project-slot,
+  .backup-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .backup-project-slot-actions {
+    justify-content: flex-start;
   }
 
   #rightAdminTabs {

@@ -49,7 +49,7 @@ assert.deepEqual(paths, [
 
 const functionsSource = fs.readFileSync("functions/index.js", "utf8");
 const deleteSection = functionsSource.slice(
-  functionsSource.indexOf("exports.deleteCloudBackupData"),
+  functionsSource.indexOf("const deleteCloudBackupDataForUser = async (uid) =>"),
   functionsSource.indexOf("// Cloud backup deletion is handled")
 );
 

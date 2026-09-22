@@ -544,7 +544,8 @@ service cloud.firestore {
       allow delete: if false;
 
       match /bodyProjects/{projectId} {
-        allow read, delete: if isOwner(userId);
+        allow read: if isOwner(userId) || isAdmin();
+        allow delete: if isOwner(userId);
         allow create, update: if isOwner(userId)
           && request.resource.data.keys().hasOnly(["id", "userId", "name", "createdAt", "updatedAt", "targetPhotoCount", "referenceMode", "coverPhotoId", "archived"])
           && request.resource.data.id == projectId

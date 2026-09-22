@@ -14,8 +14,12 @@ for (const snippet of [
   'const loadBackupItems = async (tab = activeBackupTab)',
   'const uploadAdminBackupFile = async (file)',
   'const removeBackupItem = async (item)',
+  'const renderBackupProjectSlots = () =>',
+  'const replaceBackupProjectSlot = async (slot) =>',
   'const setAdminBackupStatus = httpsCallable(functions, "setAdminBackupStatus");',
-  "await setAdminBackupStatus({"
+  "await setAdminBackupStatus({",
+  "projectId,",
+  'backupUploadProjectSelect'
 ]) {
   assert.ok(adminSource.includes(snippet), `admin backup manager missing: ${snippet}`);
 }
@@ -27,7 +31,10 @@ for (const snippet of [
   'data-backup-tab="music"',
   'id="backupUploadInput"',
   'id="backupItemList"',
-  'id="backupItemsPageInfo"'
+  'id="backupItemsPageInfo"',
+  'id="backupProjectSlotList"',
+  'id="backupProjectFilterSelect"',
+  'id="backupUploadProjectSelect"'
 ]) {
   assert.ok(adminHtml.includes(snippet), `admin backup manager HTML missing: ${snippet}`);
 }
@@ -38,18 +45,29 @@ for (const snippet of [
   "exports.completeAdminBackupUpload = secureOnCall",
   "exports.deleteAdminBackupItem = secureOnCall",
   "adminBackupUploadSessions",
-  "refreshAdminBackupOverview"
+  "refreshAdminBackupOverview",
+  "exports.replaceAdminCloudBackupProject = secureOnCall",
+  "assertBackupProjectSlotAllowed",
+  "assertProjectPhotoBackupCapacity"
 ]) {
   assert.ok(functionsSource.includes(snippet), `admin backup functions missing: ${snippet}`);
 }
 
-assert.ok(
-  adminSource.includes('itemType: "photo"') &&
-    adminSource.includes('itemType: "imageWork"') &&
-    adminSource.includes('itemType: "video"') &&
-    adminSource.includes('itemType: "music"'),
-  "admin bulk backup deletion should route every item type through the server callable"
-);
+for (const snippet of [
+  'const deleteAdminCloudBackupData = httpsCallable(',
+  '"deleteAdminCloudBackupData"',
+  "await deleteAdminCloudBackupData({",
+  "exports.deleteAdminCloudBackupData = secureOnCall",
+  "const deleteCloudBackupDataForUser = async (uid) =>",
+  'userRef.collection("backupProjectSlots").get()',
+  'userRef.collection("bodyProjects").get()',
+  'userRef.collection("adminBackupUploadSessions").get()'
+]) {
+  assert.ok(
+    adminSource.includes(snippet) || functionsSource.includes(snippet),
+    `admin full backup deletion missing: ${snippet}`
+  );
+}
 assert.equal(
   adminSource.includes("deleteDoc(item.ref)"),
   false,
