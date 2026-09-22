@@ -451,7 +451,12 @@ exports.selectCloudBackupProject = secureOnCall(async (request) => {
 
 const deleteBackupProjectCloudData = async ({ uid, projectId }) => {
   const userRef = db.doc(`users/${uid}`);
-  const [photoSnapshot, videoSnapshot] = await Promise.all([
+  const [
+    photoSnapshot,
+    videoSnapshot,
+    sessionSnapshot,
+    adminSessionSnapshot
+  ] = await Promise.all([
     userRef
       .collection("photoBackups")
       .where("projectId", "==", projectId)
@@ -459,40 +464,40 @@ const deleteBackupProjectCloudData = async ({ uid, projectId }) => {
     userRef
       .collection("videos")
       .where("projectId", "==", projectId)
+      .get(),
+    userRef
+      .collection("backupUploadSessions")
+      .where("projectId", "==", projectId)
+      .get(),
+    userRef
+      .collection("adminBackupUploadSessions")
+      .where("projectId", "==", projectId)
       .get()
   ]);
 
   const backupDocs = [...photoSnapshot.docs, ...videoSnapshot.docs];
-  const storagePaths = backupDocs.flatMap((item) => {
-    const data = item.data();
-    return [
-      data.storagePath,
-      data.previewStoragePath,
-      ...(Array.isArray(data.storagePaths) ? data.storagePaths : [])
-    ].filter(Boolean);
-  });
+  const storagePaths = [
+    ...backupDocs.flatMap((item) => {
+      const data = item.data();
+      return [
+        data.storagePath,
+        data.previewStoragePath,
+        ...(Array.isArray(data.storagePaths) ? data.storagePaths : [])
+      ].filter(Boolean);
+    }),
+    ...sessionSnapshot.docs.map((item) => item.data().storagePath).filter(Boolean),
+    ...adminSessionSnapshot.docs.map((item) => item.data().storagePath).filter(Boolean)
+  ];
   await Promise.all(
     [...new Set(storagePaths)].map((storagePath) =>
       deleteOwnedCloudBackupStoragePath(uid, storagePath)
     )
   );
 
-  const sessionIds = new Set(
-    backupDocs.flatMap((item) => {
-      const data = item.data();
-      return [
-        data.backupSessionId,
-        ...(Array.isArray(data.backupSessionIds)
-          ? data.backupSessionIds
-          : [])
-      ].filter(Boolean);
-    })
-  );
   const refs = [
     ...backupDocs.map((item) => item.ref),
-    ...[...sessionIds].map((sessionId) =>
-      userRef.collection("backupUploadSessions").doc(sessionId)
-    ),
+    ...sessionSnapshot.docs.map((item) => item.ref),
+    ...adminSessionSnapshot.docs.map((item) => item.ref),
     userRef.collection("bodyProjects").doc(projectId)
   ];
   await commitDeleteBatch(refs);
