@@ -201,11 +201,17 @@ export function useGooglePlayBilling({
               includeSuspendedAndroid: false
             })
           : [];
-      const creatorPurchase =
-        productId === "expert_monthly"
+      const subscriptionProductIds = new Set([
+        "creator_monthly",
+        "plus_monthly",
+        "expert_monthly"
+      ]);
+      const currentSubscriptionPurchase =
+        type === "subs"
           ? availablePurchases.find(
               (purchase) =>
-                purchase.productId === "creator_monthly" &&
+                purchase.productId !== productId &&
+                subscriptionProductIds.has(purchase.productId) &&
                 purchase.purchaseState === "purchased" &&
                 Boolean(purchase.purchaseToken)
             ) ?? null
@@ -246,11 +252,11 @@ export function useGooglePlayBilling({
               skus: [productId],
               subscriptionOffers: [{ sku: productId, offerToken }],
               obfuscatedAccountId: user.uid,
-              ...(creatorPurchase?.purchaseToken
+              ...(currentSubscriptionPurchase?.purchaseToken
                 ? {
-                    purchaseToken: creatorPurchase.purchaseToken,
+                    purchaseToken: currentSubscriptionPurchase.purchaseToken,
                     subscriptionProductReplacementParams: {
-                      oldProductId: "creator_monthly",
+                      oldProductId: currentSubscriptionPurchase.productId,
                       replacementMode: "charge-prorated-price" as const
                     }
                   }
