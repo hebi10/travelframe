@@ -110,7 +110,7 @@ const productMeta = {
     statusId: "creatorMonthlyStatusLabel",
     detailId: "creatorMonthlyDetail",
     productName: "Pro",
-    priceLabel: "월 1,990원",
+    priceLabel: "월 2,000원",
     description: "프로젝트 수 무제한, 프로젝트당 사진 최대 365장, 클라우드 백업 프로젝트 1개를 제공합니다."
   },
   plus_monthly: {
@@ -118,7 +118,7 @@ const productMeta = {
     statusId: "plusMonthlyStatusLabel",
     detailId: "plusMonthlyDetail",
     productName: "Plus",
-    priceLabel: "월 3,990원",
+    priceLabel: "월 4,000원",
     description: "프로젝트 수 무제한, 프로젝트당 사진 최대 365장, 클라우드 백업 프로젝트 최대 3개를 제공합니다."
   },
   expert_monthly: {
@@ -126,7 +126,7 @@ const productMeta = {
     statusId: "expertMonthlyStatusLabel",
     detailId: "expertMonthlyDetail",
     productName: "Expert",
-    priceLabel: "월 5,990원",
+    priceLabel: "월 6,000원",
     description: "프로젝트 수 무제한, 프로젝트당 사진 최대 365장, 클라우드 백업 프로젝트 최대 5개를 제공합니다."
   }
 };
