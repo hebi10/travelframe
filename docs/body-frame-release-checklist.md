@@ -33,7 +33,7 @@
 - [ ] Create/activate `creator_monthly` subscription/base plan/offer.
 - [ ] Create/activate `expert_monthly` subscription/base plan/offer.
 - [ ] Grant Firebase Functions runtime identity Android Publisher API / Play Console access.
-- [ ] Configure RTDN Pub/Sub topic `google-play-billing`.
+- [ ] Configure RTDN Pub/Sub topic `body-frame-play-billing`.
 - [ ] Deploy Functions and Firestore Rules.
 - [ ] Verify new purchase.
 - [ ] Verify purchase restore.
