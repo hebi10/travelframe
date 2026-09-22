@@ -17,7 +17,8 @@ assert.equal(
   "Body Frame camera should not keep six instant controls in the top bar"
 );
 assert.ok(
-  cameraSource.includes('accessibilityLabel="촬영 도구 열기"') &&
+  cameraSource.includes('accessibilityLabel="촬영 설정 열기"') &&
+    cameraSource.includes('<Feather name="settings" size={20} color={colors.inverse} />') &&
     cameraSource.includes("styles.cameraHeaderButton"),
   "camera top bar should expose one compact tools entry"
 );
