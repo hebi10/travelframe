@@ -58,7 +58,7 @@ const paidPlan = ({
   localVideoLimit: 50,
   musicTrackLimit: 10,
   backupStorageBytes,
-  maxProgressPhotos: null,
+  maxProgressPhotos: CLOUD_BACKUP_PHOTOS_PER_PROJECT,
   maxProgressVideoSeconds: PAID_PROGRESS_VIDEO_SECONDS,
   maxProjectCount: null,
   maxCloudBackupProjects,
@@ -119,7 +119,7 @@ export const PLAN_ENTITLEMENTS: Record<PlanTier, PlanEntitlements> = {
     backupStorageBytes: 0,
     maxProgressPhotos: FREE_PROGRESS_PHOTO_LIMIT,
     maxProgressVideoSeconds: FREE_PROGRESS_VIDEO_SECONDS,
-    maxProjectCount: 1,
+    maxProjectCount: 2,
     maxCloudBackupProjects: 0,
     maxCloudPhotosPerProject: 0
   },
