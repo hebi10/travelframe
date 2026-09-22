@@ -1087,8 +1087,35 @@ const cleanupExpiredBackupUploadSessions = async (uid, limit = 25) => {
 exports.reserveBackupUpload = secureOnCall(async (request) => {
   try {
     const uid = requireUid(request);
-    const { mediaKind, fileSize, contentType, storagePath } = request.data ?? {};
+    const {
+      mediaKind,
+      fileSize,
+      contentType,
+      storagePath,
+      projectId: rawProjectId,
+      itemType
+    } = request.data ?? {};
     const subscription = await getBackupSubscription(uid);
+    const projectId = normalizeBackupProjectId(rawProjectId);
+
+    if (itemType === "photo") {
+      await assertBackupProjectSlotAllowed({
+        uid,
+        subscription,
+        projectId
+      });
+      await assertProjectPhotoBackupCapacity({
+        uid,
+        projectId
+      });
+    } else if (itemType === "video" && projectId) {
+      await assertBackupProjectSlotAllowed({
+        uid,
+        subscription,
+        projectId
+      });
+    }
+
     await cleanupExpiredBackupUploadSessions(uid);
     const usageRef = getUsageRef(uid);
     const sessionRef = db.collection(`users/${uid}/backupUploadSessions`).doc();
@@ -1118,6 +1145,8 @@ exports.reserveBackupUpload = secureOnCall(async (request) => {
       transaction.set(sessionRef, {
         userId: uid,
         mediaKind,
+        itemType: typeof itemType === "string" ? itemType : null,
+        projectId,
         fileSize,
         contentType,
         storagePath: reservedStoragePath,
