@@ -2,40 +2,28 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 const source = readFileSync("app/edit.tsx", "utf8");
-const guidePanelStart = source.indexOf("{guidePanelOpen ? (");
-const guidePanelEnd = source.indexOf("<View style={styles.toolRow}>", guidePanelStart);
 
-assert.ok(guidePanelStart >= 0, "edit guide panel should exist");
-assert.ok(guidePanelEnd > guidePanelStart, "edit guide panel should render before tool buttons");
-
-const guidePanel = source.slice(guidePanelStart, guidePanelEnd);
-
-for (const snippet of [
+for (const removed of [
   "EditGuideSizeSlider",
   "previewGuideSize",
   "commitGuideSize",
-  "Gesture.Pan()",
-  "const clampEditGuideSize = (value: number) => {\n  \"worklet\";",
-  "const getGuideSizeFromTrackX = (trackX: number, trackWidth: number) => {\n  \"worklet\";",
-  "dragStartThumbX.value + event.translationX",
-  "GestureDetector gesture={sliderGesture}",
-  "runOnJS(onChange)",
-  "runOnJS(onCommit)"
+  "guidePanelOpen",
+  "GUIDE_SIZE_OPTIONS",
+  "GUIDE_STROKE_WIDTH_OPTIONS",
+  "GUIDE_COLOR_OPTIONS",
+  'label: "가이드라인 편집"'
 ]) {
-  assert.ok(source.includes(snippet), `edit guide size drag control missing: ${snippet}`);
+  assert.ok(
+    !source.includes(removed),
+    `photo editor should not keep dedicated guide editing controls: ${removed}`
+  );
 }
 
 assert.ok(
-  guidePanel.includes("<EditGuideSizeSlider"),
-  "photo edit guide panel should render the drag size slider"
+  source.includes("guidePositionGesture") &&
+    source.includes("라인 이동") &&
+    source.includes("이동 완료"),
+  "image-only guide position adjustment should remain available"
 );
 
-for (const forbidden of [
-  "onResponderMove",
-  "onResponderRelease",
-  "event.nativeEvent.locationX"
-]) {
-  assert.ok(!source.includes(forbidden), `edit guide size slider should not use unstable responder coordinates: ${forbidden}`);
-}
-
-console.log("ok - edit guide size can be adjusted by dragging");
+console.log("ok - dedicated guide editor controls are removed while line move remains");

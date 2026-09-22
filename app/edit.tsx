@@ -1,4 +1,5 @@
 import * as ImagePicker from "expo-image-picker";
+import { Feather } from "@expo/vector-icons";
 import { router, type Href, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -11,9 +12,8 @@ import {
   View
 } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import Animated, {
+import {
   runOnJS,
-  useDerivedValue,
   useSharedValue
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -22,8 +22,15 @@ import {
   EditablePhotoCanvas,
   type EditablePhotoCanvasHandle
 } from "@/components/editable-photo-canvas";
-import { colors, controls, typography } from "@/constants/app-theme";
-import { GUIDE_LABELS, GUIDE_TYPES, type GuideType } from "@/constants/camera-guides";
+import {
+  bodyFrameDarkColors,
+  bodyFrameDesign,
+  bodyFrameTypography,
+  colors,
+  controls,
+  typography
+} from "@/constants/app-theme";
+import type { GuideType } from "@/constants/camera-guides";
 import {
   clearEditDraft,
   getEditDraft,
@@ -32,11 +39,6 @@ import {
   type PhotoEditDraft
 } from "@/lib/photo-edit-draft";
 import {
-  DEFAULT_GUIDE_COLOR,
-  GUIDE_SIZE_MAX,
-  GUIDE_SIZE_MIN,
-  GUIDE_STROKE_WIDTH_MAX,
-  GUIDE_STROKE_WIDTH_MIN,
   defaultAppSettings,
   getAppSettings,
   updateAppSettings,
@@ -66,44 +68,8 @@ type EditableSource = {
 };
 
 type SaveEditMode = "new" | "overwrite";
-type EditPanelTab = "image" | "guide";
 
 const ratios: PhotoRatioLabel[] = ["Original", "1:1", "3:4", "4:3", "4:5", "9:16", "16:9"];
-const EDIT_PANEL_TABS: { label: string; value: EditPanelTab }[] = [
-  { label: "이미지 편집", value: "image" },
-  { label: "가이드라인 편집", value: "guide" }
-];
-const GUIDE_SIZE_OPTIONS = [
-  { label: "작게", value: 34 },
-  { label: "기본", value: 44 },
-  { label: "크게", value: 56 }
-] as const;
-const GUIDE_STROKE_WIDTH_OPTIONS = [1, 2, 3, 4, 5] as const;
-const GUIDE_COLOR_OPTIONS = [
-  { label: "흰색", value: DEFAULT_GUIDE_COLOR },
-  { label: "노랑", value: "#F5D76E" },
-  { label: "민트", value: "#8CECC1" },
-  { label: "파랑", value: "#A9D7FF" },
-  { label: "빨강", value: "#FF5A5F" },
-  { label: "검정", value: "rgba(17, 17, 17, 0.78)" }
-] as const;
-
-const clampEditGuideSize = (value: number) => {
-  "worklet";
-
-  return Math.round(Math.max(GUIDE_SIZE_MIN, Math.min(GUIDE_SIZE_MAX, value)));
-};
-
-const getGuideSizeFromTrackX = (trackX: number, trackWidth: number) => {
-  "worklet";
-
-  if (!Number.isFinite(trackX) || trackWidth <= 0) {
-    return GUIDE_SIZE_MIN;
-  }
-
-  const ratio = Math.max(0, Math.min(1, trackX / trackWidth));
-  return clampEditGuideSize(GUIDE_SIZE_MIN + ratio * (GUIDE_SIZE_MAX - GUIDE_SIZE_MIN));
-};
 
 const ratioDisplayLabel = (value: PhotoRatioLabel) =>
   value === "Original" ? "원본" : value;
@@ -169,8 +135,6 @@ export default function EditScreen() {
     useState<GridGuideLinePositions>(defaultAppSettings.gridGuideLinePositions);
   const [guideShapePoints, setGuideShapePoints] =
     useState<GuideShapePoints>(defaultAppSettings.guideShapePoints);
-  const [guidePanelOpen, setGuidePanelOpen] = useState(false);
-  const [activeEditPanelTab, setActiveEditPanelTab] = useState<EditPanelTab>("image");
   const [isCanvasExpanded, setIsCanvasExpanded] = useState(false);
   const [isGuidePositionAdjusting, setIsGuidePositionAdjusting] = useState(false);
   const [guideMoveFrame, setGuideMoveFrame] = useState<CameraGuideFrame>({
@@ -409,63 +373,6 @@ export default function EditScreen() {
     }
   };
 
-  const updateGuideType = (nextGuide: GuideType) => {
-    setGuide(nextGuide);
-    setGuideVisible(true);
-    void updateAppSettings({
-      defaultGuide: nextGuide,
-      guideVisible: true
-    });
-  };
-
-  const updateGuideVisibility = (nextVisible: boolean) => {
-    setGuideVisible(nextVisible);
-    void updateAppSettings({ guideVisible: nextVisible });
-  };
-
-  const updateGuideSize = (nextSize: number) => {
-    const clampedSize = clampEditGuideSize(nextSize);
-    setGuideSize(clampedSize);
-    setGuideVisible(true);
-    void updateAppSettings({
-      guideSize: clampedSize,
-      guideVisible: true
-    });
-  };
-
-  const previewGuideSize = (nextSize: number) => {
-    setGuideSize(clampEditGuideSize(nextSize));
-    setGuideVisible(true);
-  };
-
-  const commitGuideSize = (nextSize: number) => {
-    updateGuideSize(nextSize);
-  };
-
-  const updateGuideStrokeWidth = (nextStrokeWidth: number) => {
-    const clampedStrokeWidth = Math.round(
-      Math.max(
-        GUIDE_STROKE_WIDTH_MIN,
-        Math.min(GUIDE_STROKE_WIDTH_MAX, nextStrokeWidth)
-      )
-    );
-    setGuideStrokeWidth(clampedStrokeWidth);
-    setGuideVisible(true);
-    void updateAppSettings({
-      guideStrokeWidth: clampedStrokeWidth,
-      guideVisible: true
-    });
-  };
-
-  const updateGuideColor = (nextColor: string) => {
-    setGuideColor(nextColor);
-    setGuideVisible(true);
-    void updateAppSettings({
-      guideColor: nextColor,
-      guideVisible: true
-    });
-  };
-
   const getClampedGuideOffset = useCallback(
     (nextX: number, nextY: number) =>
       clampGuidePositionOffset({ x: nextX, y: nextY }, guideMoveFrame),
@@ -492,8 +399,6 @@ export default function EditScreen() {
       setGuideOffsetFrameHeight(guideMoveFrame.height);
       setGuideVisible(true);
       setIsGuidePositionAdjusting(false);
-      setActiveEditPanelTab("guide");
-      setGuidePanelOpen(true);
       void updateAppSettings({
         guideOffsetX: clampedOffset.x,
         guideOffsetY: clampedOffset.y,
@@ -513,7 +418,6 @@ export default function EditScreen() {
 
   const startGuidePositionAdjustment = () => {
     setGuideVisible(true);
-    setGuidePanelOpen(false);
     guideOffsetXValue.value = guideOffsetX;
     guideOffsetYValue.value = guideOffsetY;
     setIsGuidePositionAdjusting(true);
@@ -736,43 +640,23 @@ export default function EditScreen() {
           }}
         >
           <Text selectable={false} style={styles.expandCanvasButtonText}>
-            {isCanvasExpanded ? "설정 열기" : "이미지만 보기"}
+            {isCanvasExpanded ? "편집 열기" : "이미지만 보기"}
           </Text>
         </Pressable>
       </View>
 
       {!isCanvasExpanded ? (
       <View style={[styles.bottomPanel, { paddingBottom: bottomSafePadding }]}>
-        <View style={styles.editPanelTabs}>
-          {EDIT_PANEL_TABS.map((tab) => {
-            const isActive = activeEditPanelTab === tab.value;
-
-            return (
-              <Pressable
-                key={tab.value}
-                style={[
-                  styles.editPanelTab,
-                  isActive && styles.editPanelTabActive
-                ]}
-                onPress={() => {
-                  setActiveEditPanelTab(tab.value);
-                  if (tab.value === "guide") {
-                    setGuidePanelOpen(true);
-                  }
-                }}
-              >
-                <Text
-                  selectable={false}
-                  style={[
-                    styles.editPanelTabText,
-                    isActive && styles.editPanelTabTextActive
-                  ]}
-                >
-                  {tab.label}
-                </Text>
-              </Pressable>
-            );
-          })}
+        <View style={styles.editPanelHeader}>
+          <View style={styles.editPanelHeaderCopy}>
+            <Text selectable={false} style={styles.editPanelTitle}>
+              이미지 편집
+            </Text>
+            <Text selectable={false} style={styles.editPanelDetail}>
+              비율과 구도를 조정한 뒤 저장하세요.
+            </Text>
+          </View>
+          <Feather name="edit-3" size={18} color={bodyFrameDarkColors.muted} />
         </View>
 
         <ScrollView
@@ -780,345 +664,133 @@ export default function EditScreen() {
           contentContainerStyle={styles.editPanelScrollContent}
           showsVerticalScrollIndicator={false}
         >
-        {availableDraft && showDraftPrompt ? (
-          <View style={styles.draftPanel}>
-            <View style={styles.draftCopy}>
-              <Text selectable style={styles.draftTitle}>
-                임시 저장된 편집이 있습니다
-              </Text>
-              <Text selectable style={styles.draftDetail}>
-                {formatDraftTime(availableDraft.updatedAt)} 작업 상태에서 이어갈 수 있습니다.
-              </Text>
-            </View>
-            <View style={styles.draftActions}>
-              <Pressable style={styles.draftButton} onPress={resumeDraft}>
-                <Text selectable={false} style={styles.draftButtonText}>
-                  이어 작업하기
+          {availableDraft && showDraftPrompt ? (
+            <View style={styles.draftPanel}>
+              <View style={styles.draftCopy}>
+                <Text selectable style={styles.draftTitle}>
+                  임시 저장된 편집이 있습니다
                 </Text>
-              </Pressable>
-              <Pressable style={styles.draftGhostButton} onPress={removeDraft}>
-                <Text selectable={false} style={styles.draftGhostButtonText}>
-                  삭제
+                <Text selectable style={styles.draftDetail}>
+                  {formatDraftTime(availableDraft.updatedAt)} 작업 상태에서 이어갈 수 있습니다.
                 </Text>
-              </Pressable>
-            </View>
-          </View>
-        ) : null}
-
-        {activeEditPanelTab === "image" ? (
-          <>
-        <View style={styles.sourceRow}>
-          <View style={styles.sourceCopy}>
-            <Text selectable style={styles.sourceTitle}>
-              {sourcePhoto ? "저장된 사진을 불러왔습니다" : source ? "앨범 사진을 불러왔습니다" : "선택된 사진이 없습니다"}
-            </Text>
-            <Text selectable style={styles.sourceDetail}>
-              {source
-                ? `${source.width ?? 0} x ${source.height ?? 0} / ${ratio}`
-                : "촬영한 사진이나 앨범 사진을 불러와 시작하세요."}
-            </Text>
-          </View>
-          <Pressable style={styles.loadButton} onPress={pickPhoto}>
-            <Text selectable={false} style={styles.loadButtonText}>
-              사진 불러오기
-            </Text>
-          </Pressable>
-        </View>
-
-        <View style={styles.ratioRow}>
-          {ratios.map((item) => {
-            const isActive = ratio === item;
-
-            return (
-              <Pressable
-                key={item}
-                style={[styles.ratioChip, isActive && styles.ratioChipActive]}
-                onPress={() => setRatio(item)}
-              >
-                <Text
-                  selectable={false}
-                  style={[styles.ratioText, isActive && styles.ratioTextActive]}
-                >
-                  {ratioDisplayLabel(item)}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-          </>
-        ) : null}
-
-        {activeEditPanelTab === "guide" ? (
-        <View style={styles.guidePanel}>
-          <Pressable
-            style={styles.guidePanelHeader}
-            onPress={() => setGuidePanelOpen((value) => !value)}
-          >
-            <View style={styles.guidePanelCopy}>
-              <Text selectable={false} style={styles.guidePanelTitle}>
-                가이드라인
-              </Text>
-              <Text selectable={false} style={styles.guidePanelDetail}>
-                {guideVisible ? "표시 중" : "숨김"} / {GUIDE_LABELS[guide]} / {guideSize}
-              </Text>
-            </View>
-            <Text selectable={false} style={styles.guidePanelAction}>
-              {guidePanelOpen ? "닫기" : "설정"}
-            </Text>
-          </Pressable>
-
-          {guidePanelOpen ? (
-            <View style={styles.guideControls}>
-              <View style={styles.guideOptionRow}>
-                {GUIDE_TYPES.map((type) => (
-                  <Pressable
-                    key={type}
-                    style={[styles.guideChip, guide === type && styles.guideChipActive]}
-                    onPress={() => updateGuideType(type)}
-                  >
-                    <Text
-                      selectable={false}
-                      style={[
-                        styles.guideChipText,
-                        guide === type && styles.guideChipTextActive
-                      ]}
-                    >
-                      {GUIDE_LABELS[type]}
-                    </Text>
-                  </Pressable>
-                ))}
               </View>
-              <View style={styles.guideOptionRow}>
-                {GUIDE_SIZE_OPTIONS.map((option) => (
-                  <Pressable
-                    key={option.value}
-                    style={[
-                      styles.guideChip,
-                      guideSize === option.value && styles.guideChipActive
-                    ]}
-                    onPress={() => updateGuideSize(option.value)}
-                  >
-                    <Text
-                      selectable={false}
-                      style={[
-                        styles.guideChipText,
-                        guideSize === option.value && styles.guideChipTextActive
-                      ]}
-                    >
-                      {option.label}
-                    </Text>
-                  </Pressable>
-                ))}
+              <View style={styles.draftActions}>
+                <Pressable style={styles.draftButton} onPress={resumeDraft}>
+                  <Text selectable={false} style={styles.draftButtonText}>
+                    이어 작업하기
+                  </Text>
+                </Pressable>
+                <Pressable style={styles.draftGhostButton} onPress={removeDraft}>
+                  <Text selectable={false} style={styles.draftGhostButtonText}>
+                    삭제
+                  </Text>
+                </Pressable>
               </View>
-              <EditGuideSizeSlider
-                value={guideSize}
-                onChange={previewGuideSize}
-                onCommit={commitGuideSize}
-              />
-              <View style={styles.guideOptionRow}>
-                {GUIDE_STROKE_WIDTH_OPTIONS.map((strokeWidth) => {
-                  const isActive = guideStrokeWidth === strokeWidth;
-
-                  return (
-                    <Pressable
-                      key={strokeWidth}
-                      style={[
-                        styles.guideChip,
-                        isActive && styles.guideChipActive
-                      ]}
-                      onPress={() => updateGuideStrokeWidth(strokeWidth)}
-                    >
-                      <Text
-                        selectable={false}
-                        style={[
-                          styles.guideChipText,
-                          isActive && styles.guideChipTextActive
-                        ]}
-                      >
-                        {strokeWidth}px
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-              <View style={styles.guideColorRow}>
-                {GUIDE_COLOR_OPTIONS.map(({ label, value: swatchColor }) => (
-                  <Pressable
-                    key={label}
-                    style={[
-                      styles.guideColorOption,
-                      guideColor === swatchColor && styles.guideColorOptionActive
-                    ]}
-                    onPress={() => updateGuideColor(swatchColor)}
-                  >
-                    <View
-                      style={[
-                        styles.guideColorSwatch,
-                        { backgroundColor: swatchColor }
-                      ]}
-                    />
-                    <Text selectable={false} style={styles.guideColorLabel}>
-                      {label}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-              <Pressable
-                style={[
-                  styles.guideVisibilityButton,
-                  guideVisible && styles.guideVisibilityButtonActive
-                ]}
-                onPress={() => updateGuideVisibility(!guideVisible)}
-              >
-                <Text
-                  selectable={false}
-                  style={[
-                    styles.guideVisibilityText,
-                    guideVisible && styles.guideVisibilityTextActive
-                  ]}
-                >
-                  가이드 {guideVisible ? "숨기기" : "보이기"}
-                </Text>
-              </Pressable>
             </View>
           ) : null}
-        </View>
-        ) : null}
 
-        {activeEditPanelTab === "image" ? (
-        <View style={styles.toolRow}>
-          <Pressable
-            style={styles.toolButton}
-            onPress={() => canvasRef.current?.straighten()}
-          >
-            <Text selectable={false} style={styles.toolButtonText}>
-              수평 맞추기
-            </Text>
-          </Pressable>
-          <Pressable
-            style={styles.toolButton}
-            onPress={() => canvasRef.current?.fillFrame()}
-          >
-            <Text selectable={false} style={styles.toolButtonText}>
-              가득 채우기
-            </Text>
-          </Pressable>
-          <Pressable
-            style={styles.toolButton}
-            onPress={() => canvasRef.current?.rotateRight()}
-          >
-            <Text selectable={false} style={styles.toolButtonText}>
-              90도 회전
-            </Text>
-          </Pressable>
-          <Pressable style={styles.toolButton} onPress={() => canvasRef.current?.reset()}>
-            <Text selectable={false} style={styles.toolButtonText}>
-              초기화
-            </Text>
-          </Pressable>
-        </View>
-        ) : null}
+          <View style={styles.sourceRow}>
+            <View style={styles.sourceCopy}>
+              <Text selectable style={styles.sourceTitle}>
+                {sourcePhoto
+                  ? "저장된 사진을 불러왔습니다"
+                  : source
+                    ? "앨범 사진을 불러왔습니다"
+                    : "선택된 사진이 없습니다"}
+              </Text>
+              <Text selectable style={styles.sourceDetail}>
+                {source
+                  ? `${source.width ?? 0} × ${source.height ?? 0} · ${ratioDisplayLabel(ratio)}`
+                  : "촬영한 사진이나 앨범 사진을 불러와 시작하세요."}
+              </Text>
+            </View>
+            <Pressable style={styles.loadButton} onPress={pickPhoto}>
+              <Feather name="image" size={16} color={bodyFrameDarkColors.text} />
+              <Text selectable={false} style={styles.loadButtonText}>
+                사진 불러오기
+              </Text>
+            </Pressable>
+          </View>
 
-        {message ? (
-          <Text selectable style={styles.message}>
-            {message}
-          </Text>
-        ) : null}
+          <View style={styles.sectionLabelRow}>
+            <Text selectable={false} style={styles.sectionLabel}>
+              화면 비율
+            </Text>
+          </View>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.ratioRow}
+          >
+            {ratios.map((item) => {
+              const isActive = ratio === item;
+
+              return (
+                <Pressable
+                  key={item}
+                  style={[styles.ratioChip, isActive && styles.ratioChipActive]}
+                  onPress={() => setRatio(item)}
+                >
+                  <Text
+                    selectable={false}
+                    style={[styles.ratioText, isActive && styles.ratioTextActive]}
+                  >
+                    {ratioDisplayLabel(item)}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+
+          <View style={styles.sectionLabelRow}>
+            <Text selectable={false} style={styles.sectionLabel}>
+              빠른 편집
+            </Text>
+          </View>
+          <View style={styles.toolRow}>
+            <Pressable
+              style={styles.toolButton}
+              onPress={() => canvasRef.current?.straighten()}
+            >
+              <Feather name="minus" size={17} color={bodyFrameDarkColors.text} />
+              <Text selectable={false} style={styles.toolButtonText}>
+                수평 맞추기
+              </Text>
+            </Pressable>
+            <Pressable
+              style={styles.toolButton}
+              onPress={() => canvasRef.current?.fillFrame()}
+            >
+              <Feather name="maximize" size={17} color={bodyFrameDarkColors.text} />
+              <Text selectable={false} style={styles.toolButtonText}>
+                가득 채우기
+              </Text>
+            </Pressable>
+            <Pressable
+              style={styles.toolButton}
+              onPress={() => canvasRef.current?.rotateRight()}
+            >
+              <Feather name="rotate-cw" size={17} color={bodyFrameDarkColors.text} />
+              <Text selectable={false} style={styles.toolButtonText}>
+                90도 회전
+              </Text>
+            </Pressable>
+            <Pressable style={styles.toolButton} onPress={() => canvasRef.current?.reset()}>
+              <Feather name="refresh-ccw" size={17} color={bodyFrameDarkColors.text} />
+              <Text selectable={false} style={styles.toolButtonText}>
+                초기화
+              </Text>
+            </Pressable>
+          </View>
+
+          {message ? (
+            <Text selectable style={styles.message}>
+              {message}
+            </Text>
+          ) : null}
         </ScrollView>
       </View>
       ) : null}
-    </View>
-  );
-}
-
-function EditGuideSizeSlider({
-  value,
-  onChange,
-  onCommit
-}: {
-  value: number;
-  onChange: (value: number) => void;
-  onCommit: (value: number) => void;
-}) {
-  const [trackWidth, setTrackWidth] = useState(0);
-  const thumbX = useSharedValue(0);
-  const dragStartThumbX = useSharedValue(0);
-  const isDragging = useSharedValue(false);
-  const thumbTranslateX = useDerivedValue(() => thumbX.value - 9);
-
-  useEffect(() => {
-    if (trackWidth <= 0) {
-      return;
-    }
-
-    const ratio =
-      (clampEditGuideSize(value) - GUIDE_SIZE_MIN) / (GUIDE_SIZE_MAX - GUIDE_SIZE_MIN);
-    const nextX = Math.max(0, Math.min(1, ratio)) * trackWidth;
-    if (!isDragging.value) {
-      thumbX.value = nextX;
-    }
-  }, [isDragging, thumbX, trackWidth, value]);
-
-  const sliderGesture = useMemo(
-    () =>
-      Gesture.Pan()
-        .enabled(trackWidth > 0)
-        .hitSlop({ top: 10, bottom: 10, left: 10, right: 10 })
-        .onBegin((event) => {
-          isDragging.value = true;
-          dragStartThumbX.value = Math.max(0, Math.min(trackWidth, event.x));
-          thumbX.value = dragStartThumbX.value;
-          runOnJS(onChange)(getGuideSizeFromTrackX(dragStartThumbX.value, trackWidth));
-        })
-        .onUpdate((event) => {
-          const nextX = Math.max(
-            0,
-            Math.min(trackWidth, dragStartThumbX.value + event.translationX)
-          );
-          thumbX.value = nextX;
-          runOnJS(onChange)(getGuideSizeFromTrackX(nextX, trackWidth));
-        })
-        .onFinalize(() => {
-          isDragging.value = false;
-          runOnJS(onCommit)(getGuideSizeFromTrackX(thumbX.value, trackWidth));
-        }),
-    [dragStartThumbX, isDragging, onChange, onCommit, thumbX, trackWidth]
-  );
-
-  return (
-    <View style={styles.guideSizeSlider}>
-      <View style={styles.guideSizeSliderHeader}>
-        <Text selectable={false} style={styles.guideSizeSliderLabel}>
-          드래그로 크기 조절
-        </Text>
-        <Text selectable={false} style={styles.guideSizeSliderValue}>
-          {Math.round(value)}
-        </Text>
-      </View>
-      <GestureDetector gesture={sliderGesture}>
-        <Animated.View
-          collapsable={false}
-          style={styles.guideSizeTrack}
-          onLayout={(event) => setTrackWidth(event.nativeEvent.layout.width)}
-        >
-          <View style={styles.guideSizeTrackBase} />
-          <Animated.View style={[styles.guideSizeTrackFill, { width: thumbX }]} />
-          <Animated.View
-            style={[
-              styles.guideSizeThumb,
-              { transform: [{ translateX: thumbTranslateX }] }
-            ]}
-          />
-        </Animated.View>
-      </GestureDetector>
-      <View style={styles.guideSizeSliderRange}>
-        <Text selectable={false} style={styles.guideSizeSliderRangeText}>
-          {GUIDE_SIZE_MIN}
-        </Text>
-        <Text selectable={false} style={styles.guideSizeSliderRangeText}>
-          {GUIDE_SIZE_MAX}
-        </Text>
-      </View>
     </View>
   );
 }
@@ -1134,17 +806,17 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     gap: 12,
-    paddingHorizontal: 16,
+    paddingHorizontal: bodyFrameDesign.horizontalPadding,
     paddingBottom: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "rgba(255, 255, 255, 0.16)",
-    backgroundColor: colors.ink
+    borderBottomWidth: bodyFrameDesign.borderWidth,
+    borderBottomColor: bodyFrameDarkColors.line,
+    backgroundColor: bodyFrameDarkColors.background
   },
   title: {
-    color: colors.inverse,
-    fontSize: 16,
-    fontWeight: "800",
-    letterSpacing: 0
+    color: bodyFrameDarkColors.text,
+    fontSize: bodyFrameTypography.sectionTitle,
+    fontWeight: "700",
+    letterSpacing: -0.2
   },
   ghostButton: {
     minWidth: 68,
@@ -1152,24 +824,26 @@ const styles = StyleSheet.create({
     justifyContent: "center"
   },
   ghostButtonText: {
-    color: colors.inverse,
-    fontSize: typography.button,
-    fontWeight: "800",
+    color: bodyFrameDarkColors.text,
+    fontSize: bodyFrameTypography.button,
+    fontWeight: "600",
     letterSpacing: 0
   },
   saveButton: {
     minWidth: 68,
-    minHeight: controls.compactHeight,
+    minHeight: bodyFrameDesign.minTouchSize,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1,
-    borderColor: colors.inverse,
-    backgroundColor: "transparent"
+    paddingHorizontal: 14,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderColor: bodyFrameDarkColors.text,
+    borderRadius: bodyFrameDesign.buttonRadius,
+    backgroundColor: bodyFrameDarkColors.text
   },
   saveButtonText: {
-    color: colors.inverse,
-    fontSize: typography.button,
-    fontWeight: "800",
+    color: bodyFrameDarkColors.inverse,
+    fontSize: bodyFrameTypography.button,
+    fontWeight: "700",
     letterSpacing: 0
   },
   disabledButton: {
@@ -1188,24 +862,26 @@ const styles = StyleSheet.create({
     zIndex: 10,
     right: 14,
     bottom: 14,
-    minHeight: 38,
+    minHeight: bodyFrameDesign.minTouchSize,
     justifyContent: "center",
     paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.78)",
-    backgroundColor: "rgba(0, 0, 0, 0.72)"
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderColor: "rgba(245, 245, 245, 0.72)",
+    borderRadius: bodyFrameDesign.buttonRadius,
+    backgroundColor: "rgba(11, 11, 12, 0.88)"
   },
   guideMoveButton: {
     position: "absolute",
     zIndex: 10,
-    right: 112,
+    right: 126,
     bottom: 14,
-    minHeight: 38,
+    minHeight: bodyFrameDesign.minTouchSize,
     justifyContent: "center",
     paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.78)",
-    backgroundColor: "rgba(0, 0, 0, 0.72)"
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderColor: "rgba(245, 245, 245, 0.72)",
+    borderRadius: bodyFrameDesign.buttonRadius,
+    backgroundColor: "rgba(11, 11, 12, 0.88)"
   },
   expandCanvasButtonActive: {
     borderColor: colors.inverse,
@@ -1241,70 +917,69 @@ const styles = StyleSheet.create({
     justifyContent: "center"
   },
   bottomPanel: {
-    maxHeight: "48%",
+    maxHeight: "52%",
     minHeight: 0,
     flexShrink: 1,
-    gap: 12,
-    paddingHorizontal: 16,
-    paddingTop: 14,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: "rgba(255, 255, 255, 0.16)",
-    backgroundColor: colors.background
+    gap: 14,
+    paddingHorizontal: bodyFrameDesign.horizontalPadding,
+    paddingTop: 16,
+    borderTopWidth: bodyFrameDesign.borderWidth,
+    borderTopColor: bodyFrameDarkColors.line,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    backgroundColor: bodyFrameDarkColors.background
   },
-  editPanelTabs: {
+  editPanelHeader: {
+    minHeight: bodyFrameDesign.minTouchSize,
     flexDirection: "row",
-    gap: 8
-  },
-  editPanelTab: {
-    flex: 1,
-    minHeight: controls.compactHeight,
     alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 10,
-    borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.background
+    gap: 12
   },
-  editPanelTabActive: {
-    borderColor: colors.text,
-    backgroundColor: colors.text
+  editPanelHeaderCopy: {
+    flex: 1,
+    minWidth: 0,
+    gap: 3
   },
-  editPanelTabText: {
-    color: colors.text,
-    fontSize: typography.button,
-    fontWeight: "800",
-    letterSpacing: 0
+  editPanelTitle: {
+    color: bodyFrameDarkColors.text,
+    fontSize: bodyFrameTypography.sectionTitle,
+    fontWeight: "700",
+    letterSpacing: -0.2
   },
-  editPanelTabTextActive: {
-    color: colors.inverse
+  editPanelDetail: {
+    color: bodyFrameDarkColors.muted,
+    fontSize: bodyFrameTypography.caption,
+    lineHeight: 18
   },
   editPanelScroll: {
     flexShrink: 1,
     minHeight: 0
   },
   editPanelScrollContent: {
-    gap: 12
+    gap: 16,
+    paddingBottom: 4
   },
   draftPanel: {
     gap: 12,
     padding: 12,
-    borderWidth: 1,
-    borderColor: colors.text,
-    backgroundColor: colors.surface
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderColor: bodyFrameDarkColors.line,
+    borderRadius: bodyFrameDesign.cardRadius,
+    backgroundColor: bodyFrameDarkColors.surface
   },
   draftCopy: {
     gap: 4
   },
   draftTitle: {
-    color: colors.text,
-    fontSize: typography.body,
-    fontWeight: "800",
+    color: bodyFrameDarkColors.text,
+    fontSize: bodyFrameTypography.body,
+    fontWeight: "700",
     letterSpacing: 0
   },
   draftDetail: {
-    color: colors.muted,
-    fontSize: typography.small,
-    lineHeight: 17,
+    color: bodyFrameDarkColors.muted,
+    fontSize: bodyFrameTypography.caption,
+    lineHeight: 18,
     letterSpacing: 0
   },
   draftActions: {
@@ -1313,92 +988,116 @@ const styles = StyleSheet.create({
   },
   draftButton: {
     flex: 1,
-    minHeight: controls.compactHeight,
+    minHeight: bodyFrameDesign.minTouchSize,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.text
+    borderRadius: bodyFrameDesign.buttonRadius,
+    backgroundColor: bodyFrameDarkColors.text
   },
   draftButtonText: {
-    color: colors.inverse,
-    fontSize: typography.button,
-    fontWeight: "800",
+    color: bodyFrameDarkColors.inverse,
+    fontSize: bodyFrameTypography.button,
+    fontWeight: "700",
     letterSpacing: 0
   },
   draftGhostButton: {
     minWidth: 72,
-    minHeight: controls.compactHeight,
+    minHeight: bodyFrameDesign.minTouchSize,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.background
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderColor: bodyFrameDarkColors.line,
+    borderRadius: bodyFrameDesign.buttonRadius,
+    backgroundColor: bodyFrameDarkColors.surfaceStrong
   },
   draftGhostButtonText: {
-    color: colors.text,
-    fontSize: typography.button,
-    fontWeight: "800",
+    color: bodyFrameDarkColors.text,
+    fontSize: bodyFrameTypography.button,
+    fontWeight: "700",
     letterSpacing: 0
   },
   sourceRow: {
+    minHeight: 64,
     flexDirection: "row",
     alignItems: "center",
-    gap: 12
+    gap: 12,
+    padding: 12,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderColor: bodyFrameDarkColors.line,
+    borderRadius: bodyFrameDesign.cardRadius,
+    backgroundColor: bodyFrameDarkColors.surface
   },
   sourceCopy: {
     flex: 1,
     gap: 4
   },
   sourceTitle: {
-    color: colors.text,
-    fontSize: typography.body,
-    fontWeight: "800",
+    color: bodyFrameDarkColors.text,
+    fontSize: bodyFrameTypography.body,
+    fontWeight: "700",
     letterSpacing: 0
   },
   sourceDetail: {
-    color: colors.muted,
-    fontSize: typography.small,
-    lineHeight: 17,
+    color: bodyFrameDarkColors.muted,
+    fontSize: bodyFrameTypography.caption,
+    lineHeight: 18,
     letterSpacing: 0
   },
   loadButton: {
-    minHeight: controls.compactHeight,
+    minHeight: bodyFrameDesign.minTouchSize,
+    flexDirection: "row",
+    alignItems: "center",
     justifyContent: "center",
+    gap: 7,
     paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: colors.text
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderColor: bodyFrameDarkColors.line,
+    borderRadius: bodyFrameDesign.buttonRadius,
+    backgroundColor: bodyFrameDarkColors.surfaceStrong
   },
   loadButtonText: {
-    color: colors.text,
-    fontSize: typography.button,
-    fontWeight: "800",
+    color: bodyFrameDarkColors.text,
+    fontSize: bodyFrameTypography.button,
+    fontWeight: "700",
     letterSpacing: 0
+  },
+  sectionLabelRow: {
+    minHeight: 22,
+    justifyContent: "center"
+  },
+  sectionLabel: {
+    color: bodyFrameDarkColors.muted,
+    fontSize: bodyFrameTypography.caption,
+    fontWeight: "700"
   },
   ratioRow: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8
+    gap: 8,
+    paddingRight: 4
   },
   ratioChip: {
-    minHeight: controls.compactHeight,
-    minWidth: 56,
+    minHeight: bodyFrameDesign.minTouchSize,
+    minWidth: 64,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 10,
-    borderWidth: 1,
-    borderColor: colors.line
+    paddingHorizontal: 12,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderColor: bodyFrameDarkColors.line,
+    borderRadius: bodyFrameDesign.buttonRadius,
+    backgroundColor: bodyFrameDarkColors.surfaceStrong
   },
   ratioChipActive: {
-    borderColor: colors.text,
-    backgroundColor: colors.text
+    borderColor: bodyFrameDarkColors.text,
+    backgroundColor: bodyFrameDarkColors.text
   },
   ratioText: {
-    color: colors.text,
-    fontSize: typography.button,
-    fontWeight: "800",
+    color: bodyFrameDarkColors.text,
+    fontSize: bodyFrameTypography.button,
+    fontWeight: "700",
     letterSpacing: 0
   },
   ratioTextActive: {
-    color: colors.inverse
+    color: bodyFrameDarkColors.inverse
   },
   guidePanel: {
     gap: 10,
@@ -1581,25 +1280,30 @@ const styles = StyleSheet.create({
   toolButton: {
     flexGrow: 1,
     flexBasis: "47%",
-    minHeight: controls.height,
+    minHeight: 54,
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1,
-    borderColor: colors.line
+    gap: 8,
+    paddingHorizontal: 10,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderColor: bodyFrameDarkColors.line,
+    borderRadius: bodyFrameDesign.buttonRadius,
+    backgroundColor: bodyFrameDarkColors.surfaceStrong
   },
   toolButtonActive: {
     borderColor: colors.text
   },
   toolButtonText: {
-    color: colors.text,
-    fontSize: typography.button,
-    fontWeight: "800",
+    color: bodyFrameDarkColors.text,
+    fontSize: bodyFrameTypography.button,
+    fontWeight: "700",
     letterSpacing: 0
   },
   message: {
-    color: colors.muted,
-    fontSize: typography.small,
-    lineHeight: 17,
+    color: bodyFrameDarkColors.muted,
+    fontSize: bodyFrameTypography.caption,
+    lineHeight: 18,
     letterSpacing: 0
   }
 });
