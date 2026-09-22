@@ -8,6 +8,10 @@ const activeCreatorSubscription = {
   productId: "creator_monthly",
   expiresAt: new Date(Date.now() + 60_000).toISOString()
 };
+const activePlusSubscription = {
+  ...activeCreatorSubscription,
+  productId: "plus_monthly"
+};
 const activeExpertSubscription = {
   ...activeCreatorSubscription,
   productId: "expert_monthly"
@@ -16,9 +20,11 @@ const activeExpertSubscription = {
 assert.equal(quota.getBackupQuotaLimits(activeCreatorSubscription).imageTotalBytes, 2 * 1024 * 1024 * 1024);
 assert.equal(quota.getBackupQuotaLimits(activeCreatorSubscription).totalBytes, 2 * 1024 * 1024 * 1024);
 assert.equal(quota.getBackupQuotaLimits(activeCreatorSubscription).videoCount, 50);
-assert.equal(quota.getBackupQuotaLimits(activeExpertSubscription).imageTotalBytes, 5 * 1024 * 1024 * 1024);
-assert.equal(quota.getBackupQuotaLimits(activeExpertSubscription).totalBytes, 5 * 1024 * 1024 * 1024);
-assert.equal(quota.getBackupQuotaLimits(activeExpertSubscription).videoCount, 100);
+assert.equal(quota.getBackupQuotaLimits(activePlusSubscription).imageTotalBytes, 6 * 1024 * 1024 * 1024);
+assert.equal(quota.getBackupQuotaLimits(activePlusSubscription).totalBytes, 6 * 1024 * 1024 * 1024);
+assert.equal(quota.getBackupQuotaLimits(activeExpertSubscription).imageTotalBytes, 10 * 1024 * 1024 * 1024);
+assert.equal(quota.getBackupQuotaLimits(activeExpertSubscription).totalBytes, 10 * 1024 * 1024 * 1024);
+assert.equal(quota.getBackupQuotaLimits(activeExpertSubscription).videoCount, 50);
 
 assert.deepEqual(quota.normalizeBackupUsage(), {
   imageTotalBytes: 0,
@@ -139,7 +145,7 @@ assert.throws(
       uid: "user-1",
       subscription: activeExpertSubscription,
       usage: {
-        imageTotalBytes: 5 * 1024 * 1024 * 1024,
+        imageTotalBytes: 10 * 1024 * 1024 * 1024,
         videoCount: 0,
         videoTotalBytes: 0,
         audioTotalBytes: 0
