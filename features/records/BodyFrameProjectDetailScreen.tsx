@@ -72,13 +72,18 @@ import { useAppAppearance } from "@/lib/app-appearance";
 import { useAuth } from "@/lib/auth-context";
 import { getPlanEntitlements } from "@/lib/plan-entitlements";
 import {
+  PROJECT_REMINDER_WEEKDAY_OPTIONS,
   cancelProjectReminder,
   defaultProjectReminderSettings,
+  formatProjectReminderSchedule,
   formatProjectReminderTime,
   getProjectReminderSettings,
   parseProjectReminderTime,
+  syncProjectReminderProjectName,
   updateProjectReminderSettings,
-  type ProjectReminderSettings
+  type ProjectReminderRepeatMode,
+  type ProjectReminderSettings,
+  type ProjectReminderWeekday
 } from "@/lib/project-reminder";
 import type { BodyProject, ReferencePhotoMode } from "@/types/body-project";
 import {
@@ -478,6 +483,10 @@ export default function BodyFrameProjectDetailScreen() {
   const [reminderModalOpen, setReminderModalOpen] = useState(false);
   const [reminderEnabledDraft, setReminderEnabledDraft] = useState(false);
   const [reminderTimeDraft, setReminderTimeDraft] = useState("20:00");
+  const [reminderRepeatModeDraft, setReminderRepeatModeDraft] =
+    useState<ProjectReminderRepeatMode>("daily");
+  const [reminderWeekdaysDraft, setReminderWeekdaysDraft] =
+    useState<ProjectReminderWeekday[]>([0, 1, 2, 3, 4, 5, 6]);
   const [reminderSaving, setReminderSaving] = useState(false);
 
   const reload = useCallback(async () => {
