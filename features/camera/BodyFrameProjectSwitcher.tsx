@@ -13,7 +13,10 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { bodyFrameDesign, bodyFrameTypography } from "@/constants/app-theme";
 import { getBodyProjectProgressSummary } from "@/lib/body-frame-camera-project";
-import { isBodyFrameProjectTargetAllowed } from "@/lib/body-frame-plan-limits";
+import {
+  getBodyFrameProjectCreationLimitState,
+  isBodyFrameProjectTargetAllowed
+} from "@/lib/body-frame-plan-limits";
 import type { BodyProject, ReferencePhotoMode } from "@/types/body-project";
 import type { PhotoItem } from "@/types/photo";
 
@@ -29,6 +32,7 @@ type BodyFrameProjectSwitcherProps = {
   activeProject: BodyProject | null;
   disabled?: boolean;
   maxProgressPhotos?: number | null;
+  maxProjectCount?: number | null;
   upgradePlanLabel?: string | null;
   onSelectProject: (project: BodyProject) => void;
   onCreateProject: (input: CreateProjectInput) => Promise<void> | void;
@@ -46,6 +50,7 @@ export function BodyFrameProjectSwitcher({
   activeProject,
   disabled = false,
   maxProgressPhotos = null,
+  maxProjectCount = null,
   upgradePlanLabel = null,
   onSelectProject,
   onCreateProject,
@@ -75,6 +80,14 @@ export function BodyFrameProjectSwitcher({
     () => projects.filter((project) => !project.archived),
     [projects]
   );
+  const projectLimitState = useMemo(
+    () =>
+      getBodyFrameProjectCreationLimitState({
+        activeProjectCount: visibleProjects.length,
+        maxProjectCount
+      }),
+    [maxProjectCount, visibleProjects.length]
+  );
 
   const closeAll = () => {
     setPickerOpen(false);
@@ -83,6 +96,13 @@ export function BodyFrameProjectSwitcher({
 
   const submitProject = async () => {
     if (submitting) {
+      return;
+    }
+
+    if (!projectLimitState.allowed) {
+      setCreateError(
+        `현재 플랜에서는 프로젝트를 최대 ${projectLimitState.limit ?? visibleProjects.length}개까지 만들 수 있습니다.`
+      );
       return;
     }
 
@@ -207,6 +227,13 @@ export function BodyFrameProjectSwitcher({
                 onPress={() => {
                   setPickerOpen(false);
                   setCreateOpen(true);
+                  if (!projectLimitState.allowed) {
+                    setCreateError(
+                      `현재 플랜에서는 프로젝트를 최대 ${projectLimitState.limit ?? visibleProjects.length}개까지 만들 수 있습니다.`
+                    );
+                  } else {
+                    setCreateError(null);
+                  }
                 }}
               >
                 <Text style={styles.actionText}>+ 새 프로젝트</Text>
