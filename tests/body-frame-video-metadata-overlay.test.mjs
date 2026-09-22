@@ -32,13 +32,13 @@ for (const token of [
   '"날짜"',
   '"몸무게"',
   '"체지방률"',
-  '"자유 텍스트"',
+  "자유 텍스트",
   '"좌측 상단"',
   '"우측 상단"',
   '"좌측 하단"',
   '"우측 하단"',
   '"예: 12주차"',
-  '"예시: 26.09.22 · 72.4kg · 18.2%"'
+  "예시: 26.09.22 · 72.4kg · 18.2%"
 ]) {
   assert.ok(optionsSheet.includes(token), `overlay option UI missing: ${token}`);
 }
