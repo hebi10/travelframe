@@ -122,6 +122,9 @@ const getEffectiveSubscription = (subscriptions, now = Date.now()) => {
   const expert = isActiveSubscriptionDocument(subscriptions.expert_monthly, now)
     ? subscriptions.expert_monthly
     : null;
+  const plus = isActiveSubscriptionDocument(subscriptions.plus_monthly, now)
+    ? subscriptions.plus_monthly
+    : null;
   const creator = isActiveSubscriptionDocument(subscriptions.creator_monthly, now)
     ? subscriptions.creator_monthly
     : null;
@@ -129,7 +132,7 @@ const getEffectiveSubscription = (subscriptions, now = Date.now()) => {
     ? subscriptions.ad_remove
     : null;
 
-  return expert ?? creator ?? adRemove ?? null;
+  return expert ?? plus ?? creator ?? adRemove ?? null;
 };
 
 const shouldUpdateSubscriptionForPurchase = ({ purchase, existingProduct, tokenHash, active, source }) => {
