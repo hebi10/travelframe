@@ -390,7 +390,7 @@ export default function BodyFrameVideoScreen() {
 
       setExportProgress(100);
       setMessage(
-        `${projectPhotos.length}장 · ${formatDuration(totalDuration)} 변화 영상을 저장했습니다.`
+        `${projectPhotos.length}장 · ${formatDuration(totalDuration)} 변화 영상을 Body Frame 앨범에 저장했습니다.`
       );
     } catch (error) {
       setMessage(getUserFacingErrorMessage(error, "변화 영상을 만들지 못했습니다."));
