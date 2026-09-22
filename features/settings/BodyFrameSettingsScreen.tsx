@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppGuideOverlay } from "@/components/app-guide-overlay";
 import { SectionBlock } from "@/components/section-block";
 import { bodyFrameDesign, bodyFrameTypography } from "@/constants/app-theme";
-import { PRIVACY_POLICY_URL } from "@/constants/legal-links";
+import { PRIVACY_POLICY_URL, TERMS_OF_SERVICE_URL } from "@/constants/legal-links";
 import { useAppAppearance } from "@/lib/app-appearance";
 import { useAuth } from "@/lib/auth-context";
 import { getPlanEntitlements } from "@/lib/plan-entitlements";
@@ -213,6 +213,12 @@ export default function BodyFrameSettingsScreen() {
             detail="권한 사용과 데이터 처리 안내"
             mark="열기"
             onPress={() => void Linking.openURL(PRIVACY_POLICY_URL)}
+          />
+          <BodyFrameSettingRow
+            label="이용약관"
+            detail="서비스 이용과 Google Play 결제·구독 조건"
+            mark="열기"
+            onPress={() => void Linking.openURL(TERMS_OF_SERVICE_URL)}
           />
         </SectionBlock>
       </ScrollView>
