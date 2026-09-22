@@ -281,6 +281,7 @@ const reserveBackupUpload = (data: {
   storagePath: string;
   itemType?: "photo" | "imageWork" | "video";
   projectId?: string;
+  itemId?: string;
 }) =>
   callBackupFunction<typeof data, ReserveBackupUploadResponse>(
     "reserveBackupUpload",
@@ -388,13 +389,15 @@ const uploadLocalFile = async ({
   storagePath,
   mediaKind,
   itemType,
-  projectId
+  projectId,
+  itemId
 }: {
   uri: string;
   storagePath: string;
   mediaKind: BackupMediaKind;
   itemType?: "photo" | "imageWork" | "video";
   projectId?: string;
+  itemId?: string;
 }): Promise<UploadedBackupFile> => {
   if (!firebaseStorage) {
     throw new Error("클라우드 백업을 지금 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.");
@@ -418,7 +421,8 @@ const uploadLocalFile = async ({
     contentType,
     storagePath,
     itemType,
-    projectId
+    projectId,
+    itemId
   });
   const uploadStoragePath = reservation.storagePath;
   const fileRef = ref(firebaseStorage, uploadStoragePath);
@@ -1010,7 +1014,8 @@ export const backupCurrentWorkspace = async ({
       storagePath: photoPath,
       mediaKind: "image",
       itemType: "photo",
-      projectId: photo.projectId
+      projectId: photo.projectId,
+      itemId: photo.id
     });
     const photoDownloadUrl = photoUpload.downloadURL;
 
@@ -1105,7 +1110,8 @@ export const backupCurrentWorkspace = async ({
         uri: optimized.uri,
         storagePath,
         mediaKind: "image",
-        itemType: "imageWork"
+        itemType: "imageWork",
+        itemId: work.id
       });
       storagePaths.push(upload.storagePath);
       backupSessionIds.push(upload.backupSessionId);
@@ -1204,7 +1210,8 @@ export const backupCurrentWorkspace = async ({
       storagePath,
       mediaKind: "video",
       itemType: "video",
-      projectId: video.projectId
+      projectId: video.projectId,
+      itemId: video.id
     });
     const downloadUrl = upload.downloadURL;
 
@@ -1376,7 +1383,8 @@ export const backupPhoto = async ({
     storagePath,
     mediaKind: "image",
     itemType: "photo",
-    projectId: photo.projectId
+    projectId: photo.projectId,
+    itemId: photo.id
   });
 
   if (!(await isPhotoStillBackupEligible(photo.id))) {
