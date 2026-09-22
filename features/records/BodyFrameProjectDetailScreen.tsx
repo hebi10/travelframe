@@ -700,7 +700,10 @@ export default function BodyFrameProjectDetailScreen() {
           style: "destructive",
           onPress: () => {
             void (async () => {
-              await archiveBodyProject(project.id, true);
+              await Promise.all([
+                archiveBodyProject(project.id, true),
+                cancelProjectReminder(project.id)
+              ]);
               setSettingsOpen(false);
               router.back();
             })();
