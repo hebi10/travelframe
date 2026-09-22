@@ -106,7 +106,9 @@ for (const token of [
   "exports.deleteAdminCloudBackupData = secureOnCall",
   "syncAdminBackupProjectSlotStatuses",
   "adminBackupUploadSessions",
-  "projectId: session.projectId"
+  "projectId: session.projectId",
+  '.collection("backupUploadSessions")',
+  '.collection("adminBackupUploadSessions")'
 ]) {
   assert.ok(functions.includes(token), `admin server project-slot guard missing: ${token}`);
 }
