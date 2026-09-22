@@ -459,6 +459,7 @@ export default function BodyFrameProjectDetailScreen() {
   const [photoGridWidth, setPhotoGridWidth] = useState(0);
   const [photoOrderMode, setPhotoOrderMode] = useState(false);
   const [isPhotoDragging, setIsPhotoDragging] = useState(false);
+  const [photoDragSourceIndex, setPhotoDragSourceIndex] = useState<number | null>(null);
   const [photoDropTargetIndex, setPhotoDropTargetIndex] = useState<number | null>(null);
   const [photoOrderSaving, setPhotoOrderSaving] = useState(false);
 
@@ -1037,6 +1038,7 @@ export default function BodyFrameProjectDetailScreen() {
                   disabled={photoOrderSaving}
                   onPress={() => {
                     setPhotoOrderMode((current) => !current);
+                    setPhotoDragSourceIndex(null);
                     setPhotoDropTargetIndex(null);
                   }}
                 >
@@ -1080,8 +1082,12 @@ export default function BodyFrameProjectDetailScreen() {
                       dropTarget={
                         isPhotoDragging && photoDropTargetIndex === index
                       }
-                      onDragStart={() => {
+                      dragSourceIndex={photoDragSourceIndex}
+                      dragTargetIndex={photoDropTargetIndex}
+                      onDragStart={(sourceIndex) => {
                         setPhotoOrderMode(true);
+                        setPhotoDragSourceIndex(sourceIndex);
+                        setPhotoDropTargetIndex(sourceIndex);
                         setIsPhotoDragging(true);
                       }}
                       onDragHover={setPhotoDropTargetIndex}
@@ -1090,6 +1096,7 @@ export default function BodyFrameProjectDetailScreen() {
                       }}
                       onDragFinish={() => {
                         setIsPhotoDragging(false);
+                        setPhotoDragSourceIndex(null);
                         setPhotoDropTargetIndex(null);
                       }}
                       onOpen={() => {
