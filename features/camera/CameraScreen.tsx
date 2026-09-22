@@ -670,14 +670,11 @@ export default function CameraScreen({
         );
         poseSnapshotPromiseRef.current = snapshotCompletion;
 
-        let previewSnapshot;
-        try {
-          previewSnapshot = await snapshotRequest;
-        } finally {
+        const previewSnapshot = await snapshotRequest.finally(() => {
           if (poseSnapshotPromiseRef.current === snapshotCompletion) {
             poseSnapshotPromiseRef.current = null;
           }
-        }
+        });
 
         try {
           snapshotPath = await previewSnapshot.saveToTemporaryFileAsync("jpg", 70);
