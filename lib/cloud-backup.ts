@@ -819,6 +819,16 @@ export const backupCurrentWorkspace = async ({
       getMadeVideos(),
       getSelectedCloudBackupProjectIds(user)
     ]);
+  if (
+    isCloudBackupTargetEnabled(settings, "photos") &&
+    selectedProjectIds.size === 0 &&
+    photos.some((photo) => Boolean(photo.projectId))
+  ) {
+    throw new Error(
+      "클라우드에 백업할 프로젝트를 먼저 선택해 주세요. 계정 화면에서 백업 프로젝트를 선택할 수 있습니다."
+    );
+  }
+
   const selectedPhotoBackups = isCloudBackupTargetEnabled(settings, "photos")
     ? photos.filter(
         (photo) =>
@@ -1307,6 +1317,14 @@ export const backupPhoto = async ({
     throw new Error("Firebase 연결 정보가 아직 설정되지 않았습니다.");
   }
 
+  if (!photo.projectId) {
+    return null;
+  }
+  const selectedProjectIds = await getSelectedCloudBackupProjectIds(user);
+  if (!selectedProjectIds.has(photo.projectId)) {
+    return null;
+  }
+
   if (!(await isPhotoStillBackupEligible(photo.id))) {
     await removeBackupIfPhotoWasDeleted({ user, photo });
     return null;
@@ -1356,7 +1374,9 @@ export const backupPhoto = async ({
   const upload = await uploadLocalFile({
     uri: optimized.uri,
     storagePath,
-    mediaKind: "image"
+    mediaKind: "image",
+    itemType: "photo",
+    projectId: photo.projectId
   });
 
   if (!(await isPhotoStillBackupEligible(photo.id))) {
