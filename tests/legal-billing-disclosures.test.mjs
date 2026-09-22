@@ -70,12 +70,14 @@ for (const source of [termsSource, termsPublic]) {
   for (const token of [
     "Google Play",
     "광고 제거",
-    "Pro / Expert",
+    "Pro / Plus / Expert",
     "자동으로 갱신",
     "구독 관리",
     "취소",
     "환불",
-    "앱을 삭제"
+    "앱을 삭제",
+    "365",
+    "백업 프로젝트"
   ]) {
     assert.ok(source.includes(token), `terms disclosure missing: ${token}`);
   }
