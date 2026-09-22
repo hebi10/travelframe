@@ -1,3 +1,4 @@
+import { Feather } from "@expo/vector-icons";
 import { router, type Href, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { PrivateNativeImage as NativeImage } from "@/components/private-media-image";
 import { useCallback, useState } from "react";
@@ -246,7 +247,7 @@ export default function PhotoDetailScreen() {
             style={[styles.iconButton, { borderColor: palette.line }]}
             onPress={returnToRecord}
           >
-            <Text style={[styles.backButtonText, { color: palette.text }]}>‹</Text>
+            <Feather name="chevron-left" size={24} color={palette.text} />
           </Pressable>
           <Text style={[styles.pageTitle, { color: palette.text }]}>기록 상세</Text>
           <View style={styles.topBarSpacer} />
@@ -550,11 +551,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderWidth: bodyFrameDesign.borderWidth,
     borderRadius: bodyFrameDesign.buttonRadius
-  },
-  backButtonText: {
-    marginTop: -2,
-    fontSize: 28,
-    fontWeight: "400"
   },
   pageTitle: {
     fontSize: bodyFrameTypography.sectionTitle,
