@@ -647,36 +647,16 @@ export default function EditScreen() {
 
       {!isCanvasExpanded ? (
       <View style={[styles.bottomPanel, { paddingBottom: bottomSafePadding }]}>
-        <View style={styles.editPanelTabs}>
-          {EDIT_PANEL_TABS.map((tab) => {
-            const isActive = activeEditPanelTab === tab.value;
-
-            return (
-              <Pressable
-                key={tab.value}
-                style={[
-                  styles.editPanelTab,
-                  isActive && styles.editPanelTabActive
-                ]}
-                onPress={() => {
-                  setActiveEditPanelTab(tab.value);
-                  if (tab.value === "guide") {
-                    setGuidePanelOpen(true);
-                  }
-                }}
-              >
-                <Text
-                  selectable={false}
-                  style={[
-                    styles.editPanelTabText,
-                    isActive && styles.editPanelTabTextActive
-                  ]}
-                >
-                  {tab.label}
-                </Text>
-              </Pressable>
-            );
-          })}
+        <View style={styles.editPanelHeader}>
+          <View style={styles.editPanelHeaderCopy}>
+            <Text selectable={false} style={styles.editPanelTitle}>
+              이미지 편집
+            </Text>
+            <Text selectable={false} style={styles.editPanelDetail}>
+              비율과 구도를 조정한 뒤 저장하세요.
+            </Text>
+          </View>
+          <Feather name="edit-3" size={18} color={bodyFrameDarkColors.muted} />
         </View>
 
         <ScrollView
@@ -684,345 +664,133 @@ export default function EditScreen() {
           contentContainerStyle={styles.editPanelScrollContent}
           showsVerticalScrollIndicator={false}
         >
-        {availableDraft && showDraftPrompt ? (
-          <View style={styles.draftPanel}>
-            <View style={styles.draftCopy}>
-              <Text selectable style={styles.draftTitle}>
-                임시 저장된 편집이 있습니다
-              </Text>
-              <Text selectable style={styles.draftDetail}>
-                {formatDraftTime(availableDraft.updatedAt)} 작업 상태에서 이어갈 수 있습니다.
-              </Text>
-            </View>
-            <View style={styles.draftActions}>
-              <Pressable style={styles.draftButton} onPress={resumeDraft}>
-                <Text selectable={false} style={styles.draftButtonText}>
-                  이어 작업하기
+          {availableDraft && showDraftPrompt ? (
+            <View style={styles.draftPanel}>
+              <View style={styles.draftCopy}>
+                <Text selectable style={styles.draftTitle}>
+                  임시 저장된 편집이 있습니다
                 </Text>
-              </Pressable>
-              <Pressable style={styles.draftGhostButton} onPress={removeDraft}>
-                <Text selectable={false} style={styles.draftGhostButtonText}>
-                  삭제
+                <Text selectable style={styles.draftDetail}>
+                  {formatDraftTime(availableDraft.updatedAt)} 작업 상태에서 이어갈 수 있습니다.
                 </Text>
-              </Pressable>
-            </View>
-          </View>
-        ) : null}
-
-        {activeEditPanelTab === "image" ? (
-          <>
-        <View style={styles.sourceRow}>
-          <View style={styles.sourceCopy}>
-            <Text selectable style={styles.sourceTitle}>
-              {sourcePhoto ? "저장된 사진을 불러왔습니다" : source ? "앨범 사진을 불러왔습니다" : "선택된 사진이 없습니다"}
-            </Text>
-            <Text selectable style={styles.sourceDetail}>
-              {source
-                ? `${source.width ?? 0} x ${source.height ?? 0} / ${ratio}`
-                : "촬영한 사진이나 앨범 사진을 불러와 시작하세요."}
-            </Text>
-          </View>
-          <Pressable style={styles.loadButton} onPress={pickPhoto}>
-            <Text selectable={false} style={styles.loadButtonText}>
-              사진 불러오기
-            </Text>
-          </Pressable>
-        </View>
-
-        <View style={styles.ratioRow}>
-          {ratios.map((item) => {
-            const isActive = ratio === item;
-
-            return (
-              <Pressable
-                key={item}
-                style={[styles.ratioChip, isActive && styles.ratioChipActive]}
-                onPress={() => setRatio(item)}
-              >
-                <Text
-                  selectable={false}
-                  style={[styles.ratioText, isActive && styles.ratioTextActive]}
-                >
-                  {ratioDisplayLabel(item)}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-          </>
-        ) : null}
-
-        {activeEditPanelTab === "guide" ? (
-        <View style={styles.guidePanel}>
-          <Pressable
-            style={styles.guidePanelHeader}
-            onPress={() => setGuidePanelOpen((value) => !value)}
-          >
-            <View style={styles.guidePanelCopy}>
-              <Text selectable={false} style={styles.guidePanelTitle}>
-                가이드라인
-              </Text>
-              <Text selectable={false} style={styles.guidePanelDetail}>
-                {guideVisible ? "표시 중" : "숨김"} / {GUIDE_LABELS[guide]} / {guideSize}
-              </Text>
-            </View>
-            <Text selectable={false} style={styles.guidePanelAction}>
-              {guidePanelOpen ? "닫기" : "설정"}
-            </Text>
-          </Pressable>
-
-          {guidePanelOpen ? (
-            <View style={styles.guideControls}>
-              <View style={styles.guideOptionRow}>
-                {GUIDE_TYPES.map((type) => (
-                  <Pressable
-                    key={type}
-                    style={[styles.guideChip, guide === type && styles.guideChipActive]}
-                    onPress={() => updateGuideType(type)}
-                  >
-                    <Text
-                      selectable={false}
-                      style={[
-                        styles.guideChipText,
-                        guide === type && styles.guideChipTextActive
-                      ]}
-                    >
-                      {GUIDE_LABELS[type]}
-                    </Text>
-                  </Pressable>
-                ))}
               </View>
-              <View style={styles.guideOptionRow}>
-                {GUIDE_SIZE_OPTIONS.map((option) => (
-                  <Pressable
-                    key={option.value}
-                    style={[
-                      styles.guideChip,
-                      guideSize === option.value && styles.guideChipActive
-                    ]}
-                    onPress={() => updateGuideSize(option.value)}
-                  >
-                    <Text
-                      selectable={false}
-                      style={[
-                        styles.guideChipText,
-                        guideSize === option.value && styles.guideChipTextActive
-                      ]}
-                    >
-                      {option.label}
-                    </Text>
-                  </Pressable>
-                ))}
+              <View style={styles.draftActions}>
+                <Pressable style={styles.draftButton} onPress={resumeDraft}>
+                  <Text selectable={false} style={styles.draftButtonText}>
+                    이어 작업하기
+                  </Text>
+                </Pressable>
+                <Pressable style={styles.draftGhostButton} onPress={removeDraft}>
+                  <Text selectable={false} style={styles.draftGhostButtonText}>
+                    삭제
+                  </Text>
+                </Pressable>
               </View>
-              <EditGuideSizeSlider
-                value={guideSize}
-                onChange={previewGuideSize}
-                onCommit={commitGuideSize}
-              />
-              <View style={styles.guideOptionRow}>
-                {GUIDE_STROKE_WIDTH_OPTIONS.map((strokeWidth) => {
-                  const isActive = guideStrokeWidth === strokeWidth;
-
-                  return (
-                    <Pressable
-                      key={strokeWidth}
-                      style={[
-                        styles.guideChip,
-                        isActive && styles.guideChipActive
-                      ]}
-                      onPress={() => updateGuideStrokeWidth(strokeWidth)}
-                    >
-                      <Text
-                        selectable={false}
-                        style={[
-                          styles.guideChipText,
-                          isActive && styles.guideChipTextActive
-                        ]}
-                      >
-                        {strokeWidth}px
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-              <View style={styles.guideColorRow}>
-                {GUIDE_COLOR_OPTIONS.map(({ label, value: swatchColor }) => (
-                  <Pressable
-                    key={label}
-                    style={[
-                      styles.guideColorOption,
-                      guideColor === swatchColor && styles.guideColorOptionActive
-                    ]}
-                    onPress={() => updateGuideColor(swatchColor)}
-                  >
-                    <View
-                      style={[
-                        styles.guideColorSwatch,
-                        { backgroundColor: swatchColor }
-                      ]}
-                    />
-                    <Text selectable={false} style={styles.guideColorLabel}>
-                      {label}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-              <Pressable
-                style={[
-                  styles.guideVisibilityButton,
-                  guideVisible && styles.guideVisibilityButtonActive
-                ]}
-                onPress={() => updateGuideVisibility(!guideVisible)}
-              >
-                <Text
-                  selectable={false}
-                  style={[
-                    styles.guideVisibilityText,
-                    guideVisible && styles.guideVisibilityTextActive
-                  ]}
-                >
-                  가이드 {guideVisible ? "숨기기" : "보이기"}
-                </Text>
-              </Pressable>
             </View>
           ) : null}
-        </View>
-        ) : null}
 
-        {activeEditPanelTab === "image" ? (
-        <View style={styles.toolRow}>
-          <Pressable
-            style={styles.toolButton}
-            onPress={() => canvasRef.current?.straighten()}
-          >
-            <Text selectable={false} style={styles.toolButtonText}>
-              수평 맞추기
-            </Text>
-          </Pressable>
-          <Pressable
-            style={styles.toolButton}
-            onPress={() => canvasRef.current?.fillFrame()}
-          >
-            <Text selectable={false} style={styles.toolButtonText}>
-              가득 채우기
-            </Text>
-          </Pressable>
-          <Pressable
-            style={styles.toolButton}
-            onPress={() => canvasRef.current?.rotateRight()}
-          >
-            <Text selectable={false} style={styles.toolButtonText}>
-              90도 회전
-            </Text>
-          </Pressable>
-          <Pressable style={styles.toolButton} onPress={() => canvasRef.current?.reset()}>
-            <Text selectable={false} style={styles.toolButtonText}>
-              초기화
-            </Text>
-          </Pressable>
-        </View>
-        ) : null}
+          <View style={styles.sourceRow}>
+            <View style={styles.sourceCopy}>
+              <Text selectable style={styles.sourceTitle}>
+                {sourcePhoto
+                  ? "저장된 사진을 불러왔습니다"
+                  : source
+                    ? "앨범 사진을 불러왔습니다"
+                    : "선택된 사진이 없습니다"}
+              </Text>
+              <Text selectable style={styles.sourceDetail}>
+                {source
+                  ? `${source.width ?? 0} × ${source.height ?? 0} · ${ratioDisplayLabel(ratio)}`
+                  : "촬영한 사진이나 앨범 사진을 불러와 시작하세요."}
+              </Text>
+            </View>
+            <Pressable style={styles.loadButton} onPress={pickPhoto}>
+              <Feather name="image" size={16} color={bodyFrameDarkColors.text} />
+              <Text selectable={false} style={styles.loadButtonText}>
+                사진 불러오기
+              </Text>
+            </Pressable>
+          </View>
 
-        {message ? (
-          <Text selectable style={styles.message}>
-            {message}
-          </Text>
-        ) : null}
+          <View style={styles.sectionLabelRow}>
+            <Text selectable={false} style={styles.sectionLabel}>
+              화면 비율
+            </Text>
+          </View>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.ratioRow}
+          >
+            {ratios.map((item) => {
+              const isActive = ratio === item;
+
+              return (
+                <Pressable
+                  key={item}
+                  style={[styles.ratioChip, isActive && styles.ratioChipActive]}
+                  onPress={() => setRatio(item)}
+                >
+                  <Text
+                    selectable={false}
+                    style={[styles.ratioText, isActive && styles.ratioTextActive]}
+                  >
+                    {ratioDisplayLabel(item)}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+
+          <View style={styles.sectionLabelRow}>
+            <Text selectable={false} style={styles.sectionLabel}>
+              빠른 편집
+            </Text>
+          </View>
+          <View style={styles.toolRow}>
+            <Pressable
+              style={styles.toolButton}
+              onPress={() => canvasRef.current?.straighten()}
+            >
+              <Feather name="minus" size={17} color={bodyFrameDarkColors.text} />
+              <Text selectable={false} style={styles.toolButtonText}>
+                수평 맞추기
+              </Text>
+            </Pressable>
+            <Pressable
+              style={styles.toolButton}
+              onPress={() => canvasRef.current?.fillFrame()}
+            >
+              <Feather name="maximize" size={17} color={bodyFrameDarkColors.text} />
+              <Text selectable={false} style={styles.toolButtonText}>
+                가득 채우기
+              </Text>
+            </Pressable>
+            <Pressable
+              style={styles.toolButton}
+              onPress={() => canvasRef.current?.rotateRight()}
+            >
+              <Feather name="rotate-cw" size={17} color={bodyFrameDarkColors.text} />
+              <Text selectable={false} style={styles.toolButtonText}>
+                90도 회전
+              </Text>
+            </Pressable>
+            <Pressable style={styles.toolButton} onPress={() => canvasRef.current?.reset()}>
+              <Feather name="refresh-ccw" size={17} color={bodyFrameDarkColors.text} />
+              <Text selectable={false} style={styles.toolButtonText}>
+                초기화
+              </Text>
+            </Pressable>
+          </View>
+
+          {message ? (
+            <Text selectable style={styles.message}>
+              {message}
+            </Text>
+          ) : null}
         </ScrollView>
       </View>
       ) : null}
-    </View>
-  );
-}
-
-function EditGuideSizeSlider({
-  value,
-  onChange,
-  onCommit
-}: {
-  value: number;
-  onChange: (value: number) => void;
-  onCommit: (value: number) => void;
-}) {
-  const [trackWidth, setTrackWidth] = useState(0);
-  const thumbX = useSharedValue(0);
-  const dragStartThumbX = useSharedValue(0);
-  const isDragging = useSharedValue(false);
-  const thumbTranslateX = useDerivedValue(() => thumbX.value - 9);
-
-  useEffect(() => {
-    if (trackWidth <= 0) {
-      return;
-    }
-
-    const ratio =
-      (clampEditGuideSize(value) - GUIDE_SIZE_MIN) / (GUIDE_SIZE_MAX - GUIDE_SIZE_MIN);
-    const nextX = Math.max(0, Math.min(1, ratio)) * trackWidth;
-    if (!isDragging.value) {
-      thumbX.value = nextX;
-    }
-  }, [isDragging, thumbX, trackWidth, value]);
-
-  const sliderGesture = useMemo(
-    () =>
-      Gesture.Pan()
-        .enabled(trackWidth > 0)
-        .hitSlop({ top: 10, bottom: 10, left: 10, right: 10 })
-        .onBegin((event) => {
-          isDragging.value = true;
-          dragStartThumbX.value = Math.max(0, Math.min(trackWidth, event.x));
-          thumbX.value = dragStartThumbX.value;
-          runOnJS(onChange)(getGuideSizeFromTrackX(dragStartThumbX.value, trackWidth));
-        })
-        .onUpdate((event) => {
-          const nextX = Math.max(
-            0,
-            Math.min(trackWidth, dragStartThumbX.value + event.translationX)
-          );
-          thumbX.value = nextX;
-          runOnJS(onChange)(getGuideSizeFromTrackX(nextX, trackWidth));
-        })
-        .onFinalize(() => {
-          isDragging.value = false;
-          runOnJS(onCommit)(getGuideSizeFromTrackX(thumbX.value, trackWidth));
-        }),
-    [dragStartThumbX, isDragging, onChange, onCommit, thumbX, trackWidth]
-  );
-
-  return (
-    <View style={styles.guideSizeSlider}>
-      <View style={styles.guideSizeSliderHeader}>
-        <Text selectable={false} style={styles.guideSizeSliderLabel}>
-          드래그로 크기 조절
-        </Text>
-        <Text selectable={false} style={styles.guideSizeSliderValue}>
-          {Math.round(value)}
-        </Text>
-      </View>
-      <GestureDetector gesture={sliderGesture}>
-        <Animated.View
-          collapsable={false}
-          style={styles.guideSizeTrack}
-          onLayout={(event) => setTrackWidth(event.nativeEvent.layout.width)}
-        >
-          <View style={styles.guideSizeTrackBase} />
-          <Animated.View style={[styles.guideSizeTrackFill, { width: thumbX }]} />
-          <Animated.View
-            style={[
-              styles.guideSizeThumb,
-              { transform: [{ translateX: thumbTranslateX }] }
-            ]}
-          />
-        </Animated.View>
-      </GestureDetector>
-      <View style={styles.guideSizeSliderRange}>
-        <Text selectable={false} style={styles.guideSizeSliderRangeText}>
-          {GUIDE_SIZE_MIN}
-        </Text>
-        <Text selectable={false} style={styles.guideSizeSliderRangeText}>
-          {GUIDE_SIZE_MAX}
-        </Text>
-      </View>
     </View>
   );
 }
