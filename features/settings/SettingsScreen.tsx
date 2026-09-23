@@ -1,4 +1,4 @@
-import { useFocusEffect } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -54,7 +54,7 @@ import {
   isGoogleSignInConfigured,
   signInWithGoogleAuthSession
 } from "@/lib/google-auth";
-import { APP_FONT_OPTIONS, getFontOptionLabel } from "@/lib/app-fonts";
+import { APP_FONT_OPTIONS } from "@/lib/app-fonts";
 import { useAuth } from "@/lib/auth-context";
 import { getPlanEntitlements } from "@/lib/plan-entitlements";
 import {
@@ -108,7 +108,7 @@ import {
   formatQuotaValue
 } from "@/features/settings/settings-screen.helpers";
 import { createThemedStyles, styles } from "@/features/settings/settings-screen.styles";
-import { backupTargetOptions, cameraRatioOptions, cameraSaveScopeOptions, fontSizeLabel, fontSizeOptions, getBackupTargetsSummary, getCameraSaveScopeLabel, guideColorOptions, guideLineOpacityOptions, guideSizeOptions, guideStrokeWidthOptions, imageQualityLabel, imageSaveFormatLabel, imageSaveFormatOptions, storageModeLegend, themeLabel, themeOptions, tripClipExportFormatLabel, tripClipExportFormatOptions, videoQualityLabel, type SettingKey } from "@/features/settings/settings-screen.model";
+import { backupTargetOptions, cameraRatioOptions, cameraSaveScopeOptions, fontSizeOptions, getBackupTargetsSummary, getCameraSaveScopeLabel, guideColorOptions, guideLineOpacityOptions, guideSizeOptions, guideStrokeWidthOptions, imageQualityLabel, imageSaveFormatLabel, imageSaveFormatOptions, themeOptions, tripClipExportFormatLabel, tripClipExportFormatOptions, videoQualityLabel, type SettingKey } from "@/features/settings/settings-screen.model";
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
@@ -841,8 +841,10 @@ export default function SettingsScreen() {
       <ScreenShell
         eyebrow="설정"
         title="기본값 설정"
-        description="가이드, 오버레이, 저장 품질과 화면 스타일을 관리합니다."
+        description="가이드, 저장 품질과 세부 기본값을 관리합니다."
         safeTop
+        onBack={() => router.back()}
+        backLabel="설정"
       >
         <SectionBlock title="계정">
           <View style={[styles.accountPanel, themed.panelStrong]}>
@@ -954,12 +956,6 @@ export default function SettingsScreen() {
 
             {isFirebaseReady && isLoggedIn ? (
               <View style={styles.loggedInActions}>
-                <ActionRow
-                  label="저장 방식"
-                  detail={storageModeLegend}
-                  mark={getStorageModeLabel(effectiveStorageMode)}
-                  onPress={() => setActiveSetting("storageMode")}
-                />
                 <ActionRow
                   label="백업 대상"
                   detail="클라우드 백업에 포함할 데이터를 선택합니다."
@@ -1077,24 +1073,6 @@ export default function SettingsScreen() {
         </SectionBlock>
 
         <SectionBlock title="앱">
-          <ActionRow
-            label="화면 모드"
-            detail="라이트, 다크, 시스템 설정"
-            mark={themeLabel[settings.themeMode]}
-            onPress={() => setActiveSetting("themeMode")}
-          />
-          <ActionRow
-            label="폰트 스타일"
-            detail="앱에서 사용할 글꼴"
-            mark={getFontOptionLabel(settings.fontStyle)}
-            onPress={() => setActiveSetting("fontStyle")}
-          />
-          <ActionRow
-            label="폰트 크기"
-            detail="앱 화면의 글자 크기"
-            mark={fontSizeLabel[settings.fontSize]}
-            onPress={() => setActiveSetting("fontSize")}
-          />
           <View style={[styles.guidePopupPanel, themed.panel]}>
             <View style={styles.guidePopupCopy}>
               <Text selectable style={[styles.guidePopupTitle, themed.text]}>
@@ -1411,12 +1389,6 @@ export default function SettingsScreen() {
         </SectionBlock>
 
         <SectionBlock title="내보내기">
-          <ActionRow
-            label="카메라 비율"
-            detail="카메라 탭에서 촬영 후 저장할 기본 비율"
-            mark={settings.cameraRatio}
-            onPress={() => setActiveSetting("cameraRatio")}
-          />
           <ActionRow
             label="저장 범위"
             detail="카메라 촬영 사진을 앱 보관함, 핸드폰 앨범, 클라우드 중 어디에 저장할지 선택"
