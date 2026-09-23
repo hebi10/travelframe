@@ -51,6 +51,11 @@ import { useAppAppearance } from "@/lib/app-appearance";
 import { useAuth } from "@/lib/auth-context";
 import { ensurePhotoPreviews, getPhotos } from "@/lib/photo-library";
 import { getPlanEntitlements } from "@/lib/plan-entitlements";
+import {
+  getGuestWeeklyVideoExportUsage,
+  recordGuestWeeklyVideoExport,
+  type WeeklyVideoExportUsage
+} from "@/lib/video-export-quota";
 import { saveVideoToLibrary } from "@/lib/trip-clip-export";
 import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 import { getMadeVideos, saveMadeVideo } from "@/lib/video-library";
@@ -157,6 +162,7 @@ export default function BodyFrameVideoScreen() {
   const [exportProgress, setExportProgress] = useState(0);
   const [message, setMessage] = useState<string | null>(null);
   const [recordingFrameIndex, setRecordingFrameIndex] = useState(0);
+  const [guestUsage, setGuestUsage] = useState<WeeklyVideoExportUsage | null>(null);
 
   const durations = useMemo(
     () => createBodyFrameVideoDurations(projectPhotos, videoOptions.interval),
@@ -212,13 +218,21 @@ export default function BodyFrameVideoScreen() {
   const loadActiveProject = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [projects, lastActiveProjectId, storedPhotos, storedMeasurements] =
-        await Promise.all([
-          getBodyProjects(),
-          getLastActiveProjectId(),
-          getPhotos().then(ensurePhotoPreviews),
-          getBodyMeasurements()
-        ]);
+      const [
+        projects,
+        lastActiveProjectId,
+        storedPhotos,
+        storedMeasurements,
+        nextGuestUsage
+      ] = await Promise.all([
+        getBodyProjects(),
+        getLastActiveProjectId(),
+        getPhotos().then(ensurePhotoPreviews),
+        getBodyMeasurements(),
+        isLoggedIn
+          ? Promise.resolve(null)
+          : getGuestWeeklyVideoExportUsage(planEntitlements.weeklyVideoExportLimit)
+      ]);
       const selectedProject = selectActiveBodyProject(projects, lastActiveProjectId);
 
       setActiveProject(selectedProject);
@@ -239,6 +253,7 @@ export default function BodyFrameVideoScreen() {
             )
           : []
       );
+      setGuestUsage(nextGuestUsage);
 
       if (selectedProject && selectedProject.id !== lastActiveProjectId) {
         await setLastActiveProjectId(selectedProject.id);
@@ -253,7 +268,7 @@ export default function BodyFrameVideoScreen() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [isLoggedIn, planEntitlements.weeklyVideoExportLimit]);
 
   useFocusEffect(
     useCallback(() => {
@@ -338,7 +353,14 @@ export default function BodyFrameVideoScreen() {
     }
 
     if (!planEntitlements.canExportVideo) {
-      setMessage("현재 플랜에서는 영상을 만들 수 없습니다.");
+      setMessage("현재 상태에서는 영상을 만들 수 없습니다.");
+      return;
+    }
+
+    if (!isLoggedIn && guestUsage && guestUsage.remaining <= 0) {
+      setMessage(
+        `비로그인 상태에서는 주 1회만 영상을 만들 수 있습니다. 다음 주에 다시 만들거나 로그인해 주세요.`
+      );
       return;
     }
 
@@ -388,6 +410,13 @@ export default function BodyFrameVideoScreen() {
         }
       );
 
+      if (!isLoggedIn) {
+        const nextUsage = await recordGuestWeeklyVideoExport(
+          planEntitlements.weeklyVideoExportLimit
+        );
+        setGuestUsage(nextUsage);
+      }
+
       setExportProgress(100);
       setMessage(
         `${projectPhotos.length}장 · ${formatDuration(totalDuration)} 변화 영상을 Body Frame 앨범에 저장했습니다.`
@@ -400,7 +429,9 @@ export default function BodyFrameVideoScreen() {
   }, [
     activeProject,
     durations,
+    guestUsage,
     isExporting,
+    isLoggedIn,
     planEntitlements.canExportVideo,
     planEntitlements.localVideoLimit,
     planEntitlements.label,
@@ -449,20 +480,36 @@ export default function BodyFrameVideoScreen() {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={[styles.pageTitle, { color: palette.text }]}>변화 영상</Text>
-        <Pressable
-          accessibilityRole="button"
-          disabled={isExporting}
-          onPress={() => router.push("/legacy-studio")}
-          style={[styles.limitPlanButton, { borderColor: palette.line }]}
-        >
-          <Text style={[styles.limitPlanButtonText, { color: palette.text }]}>
-            저장한 영상 관리
-          </Text>
-        </Pressable>
+        <View style={styles.topBar}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="영상 화면으로 돌아가기"
+            disabled={isExporting}
+            onPress={() => router.back()}
+            style={[styles.backButton, { borderColor: palette.line }]}
+          >
+            <Text style={[styles.backButtonText, { color: palette.text }]}>‹</Text>
+          </Pressable>
+          <Text style={[styles.pageTitle, { color: palette.text }]}>변화 영상 만들기</Text>
+          <Pressable
+            accessibilityRole="button"
+            disabled={isExporting}
+            onPress={() => router.push("/video-library")}
+            style={styles.manageButton}
+          >
+            <Text style={[styles.manageButtonText, { color: palette.text }]}>
+              관리
+            </Text>
+          </Pressable>
+        </View>
         <Text style={[styles.projectName, { color: palette.muted }]}>
           {activeProject.name}
         </Text>
+        {!isLoggedIn ? (
+          <Text style={[styles.guestLimitText, { color: palette.muted }]}>
+            비로그인 영상 출력 · 이번 주 {guestUsage?.count ?? 0}/1회
+          </Text>
+        ) : null}
 
         <View
           style={[
@@ -563,7 +610,8 @@ export default function BodyFrameVideoScreen() {
           disabled={
             projectPhotos.length === 0 ||
             isExporting ||
-            !videoLimitState.allowed
+            !videoLimitState.allowed ||
+            (!isLoggedIn && Boolean(guestUsage && guestUsage.remaining <= 0))
           }
           onPress={() => void createVideo()}
           style={({ pressed }) => [
@@ -571,12 +619,14 @@ export default function BodyFrameVideoScreen() {
             { backgroundColor: palette.text },
             (projectPhotos.length === 0 ||
               isExporting ||
-              !videoLimitState.allowed) &&
+              !videoLimitState.allowed ||
+              (!isLoggedIn && Boolean(guestUsage && guestUsage.remaining <= 0))) &&
               styles.disabled,
             pressed &&
               projectPhotos.length > 0 &&
               !isExporting &&
               videoLimitState.allowed &&
+              (isLoggedIn || !guestUsage || guestUsage.remaining > 0) &&
               styles.pressed
           ]}
         >
@@ -687,14 +737,52 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingHorizontal: 24,
   },
+  topBar: {
+    minHeight: bodyFrameDesign.primaryButtonHeight,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10
+  },
+  backButton: {
+    width: bodyFrameDesign.minTouchSize,
+    height: bodyFrameDesign.minTouchSize,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderRadius: bodyFrameDesign.buttonRadius
+  },
+  backButtonText: {
+    fontSize: 30,
+    lineHeight: 30,
+    fontWeight: "500"
+  },
   pageTitle: {
-    fontSize: bodyFrameTypography.pageTitle,
+    flex: 1,
+    fontSize: bodyFrameTypography.sectionTitle,
+    fontWeight: "600",
+    textAlign: "center"
+  },
+  manageButton: {
+    minWidth: bodyFrameDesign.minTouchSize,
+    minHeight: bodyFrameDesign.minTouchSize,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 4
+  },
+  manageButtonText: {
+    fontSize: bodyFrameTypography.button,
     fontWeight: "600"
   },
   projectName: {
-    marginTop: 6,
-    marginBottom: 20,
+    marginTop: 14,
+    marginBottom: 4,
     fontSize: 14
+  },
+  guestLimitText: {
+    marginBottom: 16,
+    fontSize: bodyFrameTypography.caption,
+    lineHeight: 17
   },
   title: {
     fontSize: 18,
