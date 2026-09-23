@@ -38,7 +38,7 @@ function AppStack() {
         <Stack.Screen name="oauthredirect" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="edit" options={{ title: "사진 편집", headerShown: false }} />
-        <Stack.Screen name="photo/[id]" options={{ title: "사진" }} />
+        <Stack.Screen name="photo/[id]" options={{ headerShown: false }} />
         <Stack.Screen
           name="capture-preview"
           options={{ title: "미리보기", headerShown: false }}
