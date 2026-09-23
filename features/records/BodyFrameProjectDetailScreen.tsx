@@ -956,7 +956,7 @@ export default function BodyFrameProjectDetailScreen() {
   const openVideo = useCallback(async () => {
     if (!project) return;
     await setLastActiveProjectId(project.id);
-    router.push("/trip-clip");
+    router.push("/video-create");
   }, [project]);
 
   if (project === undefined) {
