@@ -1311,14 +1311,22 @@ export default function CameraScreen({
     setErrorMessage(getUserFacingErrorMessage(error, "카메라 초점을 맞추지 못했습니다."));
   }, []);
   const runCameraFocusAction = useCallback(
-    (action: () => Promise<void> | void) => {
+    (
+      action: () => Promise<void> | void,
+      options?: { onError?: () => void }
+    ) => {
+      const handleError = (error: unknown) => {
+        options?.onError?.();
+        handleCameraFocusError(error);
+      };
+
       try {
         const result = action();
         if (result) {
-          void result.catch(handleCameraFocusError);
+          void result.catch(handleError);
         }
       } catch (error) {
-        handleCameraFocusError(error);
+        handleError(error);
       }
     },
     [handleCameraFocusError]
@@ -1341,8 +1349,8 @@ export default function CameraScreen({
       showFocusControls();
       runCameraFocusAction(() => cameraRef.current?.focusTo(tap, {
         responsiveness: "snappy",
-        adaptiveness: cameraFocusLockedRef.current ? "locked" : "continuous",
-        autoResetAfter: cameraFocusLockedRef.current ? null : 5,
+        adaptiveness: "continuous",
+        autoResetAfter: 5,
         modes: getCameraFocusMeteringModes(cameraDevice)
       }));
       void triggerFeedback();
@@ -1362,12 +1370,21 @@ export default function CameraScreen({
 
     if (nextLocked) {
       cancelFocusControlsDismiss();
-      runCameraFocusAction(() => cameraRef.current?.focusTo(cameraFocusTap, {
-        responsiveness: "snappy",
-        adaptiveness: "locked",
-        autoResetAfter: null,
-        modes: getCameraFocusMeteringModes(cameraDevice)
-      }));
+      runCameraFocusAction(
+        () => cameraRef.current?.focusTo(cameraFocusTap, {
+          responsiveness: "snappy",
+          adaptiveness: "locked",
+          autoResetAfter: null,
+          modes: getCameraFocusMeteringModes(cameraDevice)
+        }),
+        {
+          onError: () => {
+            cameraFocusLockedRef.current = false;
+            setCameraFocusLocked(false);
+            scheduleFocusControlsDismiss();
+          }
+        }
+      );
     } else {
       runCameraFocusAction(() => cameraRef.current?.resetFocus());
       scheduleFocusControlsDismiss();
