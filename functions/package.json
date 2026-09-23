@@ -7,7 +7,8 @@
   "main": "index.js",
   "scripts": {
     "syntax": "node --check backup-delete-safety.js && node --check backup-quota.js && node --check billing-verification-gate.js && node --check private-storage.js && node --check google-play-billing-policy.js && node --check google-play-billing.js && node --check index.js && node --check video-export-quota.js",
-    "quality": "npm run syntax"
+    "quality": "npm run syntax && npm run runtime:deps",
+    "runtime:deps": "node -e \"require('@google-cloud/firestore'); require('google-gax/build/src/fallback'); console.log('Functions runtime dependencies load correctly')\""
   },
   "dependencies": {
     "firebase-admin": "^13.10.0",
