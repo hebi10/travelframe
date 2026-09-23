@@ -93,8 +93,8 @@ for (const snippet of [
   'CAMERA_FOCUS_METERING_MODES: MeteringMode[] = ["AF", "AE", "AWB"]',
   "getCameraFocusMeteringModes(cameraDevice)",
   'responsiveness: "snappy"',
-  'adaptiveness: cameraFocusLockedRef.current ? "locked" : "continuous"',
-  "autoResetAfter: cameraFocusLockedRef.current ? null : 5",
+  'adaptiveness: "continuous"',
+  "autoResetAfter: 5",
   "focusTo(cameraFocusTap,",
   'adaptiveness: "locked"',
   "resetFocus()",
@@ -167,9 +167,10 @@ assert.equal(
   "exposure control should not use a fixed bottom position"
 );
 
-assert.ok(
+assert.equal(
   packageJson.dependencies["react-native-vision-camera"],
-  "VisionCamera dependency should be installed"
+  "5.1.1",
+  "VisionCamera 5.1.1 is required because Android locked focus support was added in that release"
 );
 assert.ok(
   packageJson.dependencies["react-native-nitro-modules"],
