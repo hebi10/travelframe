@@ -21,12 +21,21 @@ assert.ok(
   "direct admin search should query Firestore displayName when the loaded list has no match"
 );
 assert.ok(
-  adminHtml.includes("이메일, 이름 또는 UID"),
-  "direct search label should tell admins that name search is supported"
+  adminHtml.includes("이름, 이메일 또는 UID 검색"),
+  "single user search should explain all supported fields"
 );
 assert.ok(
   adminHtml.includes('placeholder="이름, user@example.com 또는 uid"'),
-  "direct search placeholder should include name search"
+  "search placeholder should include name, email, and UID"
+);
+assert.equal(
+  adminHtml.includes("userFilterInput"),
+  false,
+  "admin user sidebar should expose only one search input"
+);
+assert.ok(
+  adminSource.includes('$("searchInput").addEventListener("input"'),
+  "the single search input should filter the loaded user list immediately"
 );
 
-console.log("ok - admin direct user search supports display names");
+console.log("ok - admin uses one name/email/UID user search");
