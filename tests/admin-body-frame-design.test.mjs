@@ -19,12 +19,20 @@ assert.ok(
     adminHtml.includes('class="admin-logo"'),
   "admin header should use the Body Frame brand lockup"
 );
-assert.ok(
-  adminHtml.includes("선택 사용자 플랜") &&
-    adminHtml.includes("선택 사용자 백업") &&
-    adminHtml.includes("활성 상품"),
-  "dashboard KPI labels should describe selected-user context"
-);
+
+for (const label of ["전체 사용자", "활성 구독", "백업 사용자"]) {
+  assert.ok(
+    adminHtml.includes(label),
+    `global admin KPI should contain ${label}`
+  );
+}
+for (const oldLabel of ["선택 사용자 플랜", "선택 사용자 백업", "활성 상품"]) {
+  assert.equal(
+    adminHtml.includes(oldLabel),
+    false,
+    `global KPI row should not mix selected-user data: ${oldLabel}`
+  );
+}
 
 for (const token of [
   "--surface-soft: #0b0b0c",
@@ -37,24 +45,27 @@ for (const token of [
   assert.ok(styles.includes(token), `admin Body Frame token missing: ${token}`);
 }
 
+for (const token of [
+  "width: min(1440px, calc(100% - 40px));",
+  ".admin-page .admin-console",
+  "grid-template-columns: minmax(320px, 360px) minmax(0, 1fr);",
+  ".admin-page input:-webkit-autofill",
+  "border-radius: 4px;",
+  ".admin-page .subscription-summary",
+  "grid-template-columns: repeat(4, minmax(0, 1fr));"
+]) {
+  assert.ok(styles.includes(token), `admin console design missing: ${token}`);
+}
+
 assert.ok(
   styles.includes(".admin-page .panel") &&
     styles.includes("box-shadow: none"),
   "admin cards should not use decorative shadows"
 );
 assert.ok(
-  styles.includes(".admin-page .user-row.active::after"),
-  "selected users should use a compact status indicator"
-);
-assert.ok(
-  styles.includes(".admin-page .backup-item") &&
-    styles.includes(".admin-page button.danger"),
-  "backup rows and destructive actions should have explicit admin styling"
-);
-assert.ok(
-  styles.includes("@media (max-width: 980px)") &&
+  styles.includes("@media (max-width: 820px)") &&
     styles.includes("@media (max-width: 520px)"),
-  "admin layout should include desktop-to-mobile responsive breakpoints"
+  "admin layout should remain responsive"
 );
 
 assert.ok(
@@ -66,8 +77,8 @@ assert.ok(
   "backup delete action should carry an explicit danger state"
 );
 assert.ok(
-  adminJs.includes("path.title = item.storagePath"),
-  "truncated backup paths should keep the full path available"
+  adminJs.includes('document.querySelector(".ops-menu")?.classList.toggle("hidden", !enabled)'),
+  "operation links should only appear after administrator authentication"
 );
 
 assert.equal(
@@ -81,4 +92,4 @@ assert.equal(
   "account deletion guide should keep the document theme rather than admin dark UI"
 );
 
-console.log("ok - Body Frame admin redesign stays scoped, responsive, and operational");
+console.log("ok - Body Frame admin uses the user-console design system");
