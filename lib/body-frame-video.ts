@@ -172,14 +172,20 @@ export const getBodyFrameVideoOverlayText = ({
   overlay
 }: {
   photo?: { createdAt?: string } | null;
-  measurement?: { weightKg?: number; bodyFatPercent?: number } | null;
+  measurement?: {
+    recordedAt?: string;
+    weightKg?: number;
+    bodyFatPercent?: number;
+  } | null;
   overlay: BodyFrameVideoOverlayOptions;
 }) => {
   const parts: string[] = [];
   const customText = overlay.customText.trim();
 
   if (overlay.showDate) {
-    const date = formatBodyFrameVideoOverlayDate(photo?.createdAt);
+    const date = formatBodyFrameVideoOverlayDate(
+      measurement?.recordedAt ?? photo?.createdAt
+    );
     if (date) {
       parts.push(date);
     }
