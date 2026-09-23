@@ -587,51 +587,10 @@ const resetBackupManager = () => {
   }
 };
 
-const resetWeeklyVideoUsageSummary = () => {
-  if (!$("weeklyVideoRemaining")) return;
-  $("weeklyVideoRemaining").textContent = "-";
-  $("weeklyVideoUsageDetail").textContent = "사용량을 불러오면 표시됩니다.";
-  $("weeklyVideoUsageMeta").textContent = "-";
-  $("weeklyVideoUsageFill").style.width = "0%";
-  $("weeklyVideoUsageCard")?.classList.remove("usage-warning");
-};
-
-const renderWeeklyVideoExportUsage = async () => {
-  if (!currentUserDoc) {
-    resetWeeklyVideoUsageSummary();
-    return;
-  }
-
-  const { weekId, weekLabel } = getCurrentVideoExportWeek();
-  const planTier = getAdminPlanTier();
-  const limit = getWeeklyVideoExportLimitForCurrentUser();
-
-  try {
-    const snapshot = await getDoc(
-      doc(db, "users", currentUserDoc.id, "usage", "videoExports", "weeks", weekId)
-    );
-    const count = snapshot.exists()
-      ? Math.max(0, Number(snapshot.data().count ?? 0))
-      : 0;
-    const remaining = Math.max(0, limit - count);
-    const usagePercent = limit > 0 ? Math.min(100, Math.round((count / limit) * 100)) : 0;
-
-    $("weeklyVideoRemaining").textContent = `${remaining}개 남음`;
-    $("weeklyVideoUsageDetail").textContent = `${count}개 사용 / 주 ${limit}개 한도`;
-    $("weeklyVideoUsageMeta").textContent = `${adminPlanLabels[planTier]} · ${weekLabel}`;
-    $("weeklyVideoUsageFill").style.width = `${usagePercent}%`;
-    $("weeklyVideoUsageCard")?.classList.toggle("usage-warning", limit > 0 && remaining <= 0);
-  } catch (error) {
-    $("weeklyVideoRemaining").textContent = "-";
-    $("weeklyVideoUsageDetail").textContent =
-      error?.message ?? "주간 영상 출력 사용량을 불러오지 못했습니다.";
-    $("weeklyVideoUsageMeta").textContent = `${adminPlanLabels[planTier]} · ${weekLabel}`;
-    $("weeklyVideoUsageFill").style.width = "0%";
-    $("weeklyVideoUsageCard")?.classList.remove("usage-warning");
-  }
-};
+const renderWeeklyVideoExportUsage = async () => null;
 
 const setSelectedUserPanelsVisible = (hasSelectedUser) => {
+  $("selectedUserHeader")?.classList.toggle("hidden", !hasSelectedUser);
   $("userEmptyPanel")?.classList.toggle("hidden", hasSelectedUser);
   $("subscriptionEmptyPanel")?.classList.toggle("hidden", hasSelectedUser);
   $("backupEmptyPanel")?.classList.toggle("hidden", hasSelectedUser);
@@ -652,9 +611,6 @@ const resetUserPanels = () => {
   currentBackup = null;
   setSelectedUserPanelsVisible(false);
   resetWeeklyVideoUsageSummary();
-  $("statPlan").textContent = "-";
-  $("statBackups").textContent = "-";
-  $("statStatus").textContent = "-";
   resetBackupManager();
 };
 
@@ -679,7 +635,7 @@ const findLoadedUserBySearchTerm = (term) => {
 };
 
 const renderUserList = () => {
-  const keyword = $("userFilterInput").value.trim().toLowerCase();
+  const keyword = $("searchInput").value.trim().toLowerCase();
   const filtered = allUsers.filter((user) => {
     return getUserSearchText(user).includes(keyword);
   });
@@ -693,6 +649,7 @@ const renderUserList = () => {
   if (!filtered.length) {
     userList.innerHTML = '<div class="empty">표시할 사용자가 없습니다.</div>';
     $("statUsers").textContent = String(allUsers.length);
+    $("userCountLabel").textContent = String(allUsers.length);
     $("usersPageInfo").textContent = "0 / 0";
     $("prevUsersPageButton").disabled = true;
     $("nextUsersPageButton").disabled = true;
@@ -707,18 +664,26 @@ const renderUserList = () => {
     button.dataset.userId = user.id;
     button.setAttribute("aria-pressed", String(selected));
 
+    const main = document.createElement("span");
+    main.className = "user-row-main";
+
     const title = document.createElement("strong");
-    title.textContent = user.email || user.displayName || "이메일 없음";
+    title.textContent = user.displayName || user.email || "이름 없음";
+
+    const email = document.createElement("span");
+    email.className = "meta";
+    email.textContent = user.email || "이메일 없음";
 
     const detail = document.createElement("span");
     detail.className = "meta";
-    detail.textContent = `${user.displayName || "이름 없음"} · ${formatDate(user.lastSignInAt || user.createdAt)}`;
+    detail.textContent = `마지막 로그인 · ${formatDate(user.lastSignInAt || user.createdAt)}`;
 
-    const uid = document.createElement("span");
-    uid.className = "uid";
-    uid.textContent = user.id;
+    const dot = document.createElement("span");
+    dot.className = "user-status-dot";
+    dot.setAttribute("aria-hidden", "true");
 
-    button.append(title, detail, uid);
+    main.append(title, email, detail);
+    button.append(main, dot);
     button.addEventListener("click", async () => {
       currentUserDoc = user;
       setMessage("userListMessage", "사용자 정보를 불러오는 중입니다.");
@@ -730,12 +695,61 @@ const renderUserList = () => {
   });
 
   $("statUsers").textContent = String(allUsers.length);
-  $("usersPageInfo").textContent = `${usersPage} / ${totalPages} · ${start + 1}-${Math.min(
+  $("userCountLabel").textContent = String(allUsers.length);
+  $("usersPageInfo").textContent = `${usersPage} / ${totalPages}`;
+  $("usersPageInfo").title = `${start + 1}-${Math.min(
     start + usersPageSize,
     filtered.length
   )}명 표시`;
   $("prevUsersPageButton").disabled = usersPage <= 1;
   $("nextUsersPageButton").disabled = usersPage >= totalPages;
+};
+
+const refreshGlobalStats = async () => {
+  if (!allUsers.length) {
+    $("statSubscriptions").textContent = "0";
+    $("statBackupUsers").textContent = "0";
+    return;
+  }
+
+  try {
+    const summaries = await Promise.all(
+      allUsers.map(async (user) => {
+        const [subscriptionSnapshot, backupSnapshot] = await Promise.all([
+          getDoc(doc(db, "users", user.id, "subscriptions", "current")),
+          getDoc(doc(db, "users", user.id, "backups", "current"))
+        ]);
+        const subscription = subscriptionSnapshot.exists()
+          ? subscriptionSnapshot.data()
+          : null;
+        const backup = backupSnapshot.exists() ? backupSnapshot.data() : null;
+        const backupCount =
+          Number(backup?.photoCount ?? 0) +
+          Number(backup?.imageBundleCount ?? 0) +
+          Number(backup?.videoCount ?? 0) +
+          Number(backup?.musicCount ?? 0);
+
+        return {
+          activeSubscription:
+            isSubscriptionActive(subscription) &&
+            ["creator_monthly", "plus_monthly", "expert_monthly"].includes(
+              subscription?.productId
+            ),
+          backupActive: backupCount > 0
+        };
+      })
+    );
+
+    $("statSubscriptions").textContent = String(
+      summaries.filter((item) => item.activeSubscription).length
+    );
+    $("statBackupUsers").textContent = String(
+      summaries.filter((item) => item.backupActive).length
+    );
+  } catch {
+    $("statSubscriptions").textContent = "-";
+    $("statBackupUsers").textContent = "-";
+  }
 };
 
 const loadUsers = async () => {
@@ -749,6 +763,7 @@ const loadUsers = async () => {
       }))
     );
     renderUserList();
+    await refreshGlobalStats();
     setMessage(
       "userListMessage",
       allUsers.length ? `${allUsers.length}명의 사용자를 불러왔습니다.` : "아직 가입한 사용자가 없습니다."
