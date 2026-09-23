@@ -58,8 +58,9 @@ for (const token of [
 ]) assert.ok(projectDetail.includes(token), `project measurement settings should contain ${token}`);
 
 for (const token of [
-  "BodyMeasurementEditorSheet", "getBodyMeasurementByPhotoId", "measurementSettings.enabled",
-  "measurementEntry", "수치 기록", "현재 기기에만 저장됩니다.", "measurement?: string"
+  "BodyMeasurementEditorSheet", "getBodyMeasurementByPhotoId", "measurementEntry",
+  "기록 정보", "변화 영상 텍스트", 'requiredMetrics={["weight", "bodyFat"]}',
+  "allowRecordedAtEdit", "formatRecordDate", "measurement?: string"
 ]) assert.ok(photoDetail.includes(token), `photo measurement UI should contain ${token}`);
 
 for (const token of [
@@ -69,7 +70,9 @@ for (const token of [
 
 for (const token of [
   "activeMetrics", 'keyboardType="decimal-pad"', "parseMeasurementInput",
-  "saveBodyMeasurement", "deleteBodyMeasurement", "입력한 값은 현재 기기에만 저장됩니다."
+  "saveBodyMeasurement", "deleteBodyMeasurement", "입력한 값은 현재 기기에만 저장됩니다.",
+  "requiredMetrics", "allowRecordedAtEdit", "recordedDateDraft", "parseRecordedDate",
+  "YYYY-MM-DD"
 ]) assert.ok(editor.includes(token), `measurement editor should contain ${token}`);
 
 const qa = fs.readFileSync("docs/manual-device-qa.md", "utf8");
