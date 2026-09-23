@@ -1,29 +1,51 @@
 import Constants from "expo-constants";
 import { router } from "expo-router";
-import { useState } from "react";
-import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useMemo, useState } from "react";
+import {
+  Linking,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppGuideOverlay } from "@/components/app-guide-overlay";
 import { SectionBlock } from "@/components/section-block";
 import { bodyFrameDesign, bodyFrameTypography } from "@/constants/app-theme";
 import { PRIVACY_POLICY_URL, TERMS_OF_SERVICE_URL } from "@/constants/legal-links";
+import {
+  saveAppSettings,
+  type AppSettings
+} from "@/lib/app-settings";
 import { useAppAppearance } from "@/lib/app-appearance";
+import { APP_FONT_OPTIONS, getFontOptionLabel } from "@/lib/app-fonts";
 import { useAuth } from "@/lib/auth-context";
 import { getPlanEntitlements } from "@/lib/plan-entitlements";
-import { getStorageModeLabel } from "@/lib/storage-mode";
+import {
+  getStorageModeLabel,
+  STORAGE_MODE_OPTIONS
+} from "@/lib/storage-mode";
+import {
+  cameraRatioOptions,
+  fontSizeLabel,
+  fontSizeOptions,
+  themeLabel,
+  themeOptions
+} from "@/features/settings/settings-screen.model";
 
-const themeLabel = {
-  light: "라이트",
-  dark: "다크",
-  system: "시스템"
-} as const;
+type InlineSettingKey =
+  | "overlayOpacity"
+  | "cameraRatio"
+  | "storageMode"
+  | "cloudBackup"
+  | "themeMode"
+  | "fontStyle"
+  | "fontSize";
 
-const fontSizeLabel = {
-  small: "작게",
-  medium: "보통",
-  large: "크게"
-} as const;
+const overlayOpacityOptions = [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8] as const;
 
 function BodyFrameSettingRow({
   label,
@@ -78,6 +100,46 @@ function BodyFrameSettingRow({
   );
 }
 
+function SettingOptionRow({
+  label,
+  detail,
+  active,
+  disabled = false,
+  onPress
+}: {
+  label: string;
+  detail: string;
+  active: boolean;
+  disabled?: boolean;
+  onPress: () => void;
+}) {
+  const { palette } = useAppAppearance();
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      disabled={disabled}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.optionRow,
+        {
+          borderColor: active ? palette.text : palette.line,
+          backgroundColor: palette.background,
+          opacity: disabled ? 0.45 : pressed ? 0.82 : 1
+        }
+      ]}
+    >
+      <View style={styles.optionCopy}>
+        <Text style={[styles.optionLabel, { color: palette.text }]}>{label}</Text>
+        <Text style={[styles.optionDetail, { color: palette.muted }]}>{detail}</Text>
+      </View>
+      <Text style={[styles.optionMark, { color: active ? palette.text : palette.faint }]}>
+        {active ? "●" : "○"}
+      </Text>
+    </Pressable>
+  );
+}
+
 export default function BodyFrameSettingsScreen() {
   const insets = useSafeAreaInsets();
   const { settings, palette } = useAppAppearance();
@@ -85,6 +147,61 @@ export default function BodyFrameSettingsScreen() {
   const planEntitlements = getPlanEntitlements({ isLoggedIn, subscription });
   const version = Constants.expoConfig?.version ?? "1.0.0";
   const [guideReplaySignal, setGuideReplaySignal] = useState(0);
+  const [activeSetting, setActiveSetting] = useState<InlineSettingKey | null>(null);
+  const [saving, setSaving] = useState(false);
+  const modalSafeStyle = useMemo(
+    () => ({
+      paddingTop: Math.max(insets.top + 14, 24),
+      paddingBottom: Math.max(insets.bottom + 14, 24)
+    }),
+    [insets.bottom, insets.top]
+  );
+
+  const modalTitle = useMemo(() => {
+    if (activeSetting === "overlayOpacity") return "기준 사진 투명도";
+    if (activeSetting === "cameraRatio") return "촬영 비율";
+    if (activeSetting === "storageMode") return "저장 방식";
+    if (activeSetting === "cloudBackup") return "클라우드 백업";
+    if (activeSetting === "themeMode") return "화면 모드";
+    if (activeSetting === "fontStyle") return "폰트 스타일";
+    if (activeSetting === "fontSize") return "글자 크기";
+    return "";
+  }, [activeSetting]);
+
+  const updateSetting = async (updates: Partial<AppSettings>) => {
+    if (saving) return;
+
+    setSaving(true);
+    try {
+      await saveAppSettings({
+        ...settings,
+        ...updates
+      });
+      setActiveSetting(null);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const enableCloudBackup = () => {
+    if (!planEntitlements.canBackupToCloud) {
+      setActiveSetting(null);
+      router.push("/account");
+      return;
+    }
+
+    void updateSetting({
+      storageMode: "local_backup",
+      cloudBackupEnabled: true
+    });
+  };
+
+  const disableCloudBackup = () => {
+    void updateSetting({
+      storageMode: "local_only",
+      cloudBackupEnabled: false
+    });
+  };
 
   return (
     <View style={[styles.screen, { backgroundColor: palette.background }]}>
@@ -110,13 +227,13 @@ export default function BodyFrameSettingsScreen() {
             label="기준 사진 투명도"
             detail="촬영 화면에 겹쳐 보이는 기준 사진의 투명도"
             mark={`${Math.round(settings.overlayOpacity * 100)}%`}
-            onPress={() => router.push("/advanced-settings")}
+            onPress={() => setActiveSetting("overlayOpacity")}
           />
           <BodyFrameSettingRow
             label="촬영 비율"
             detail="몸의 변화를 기록할 기본 카메라 비율"
             mark={settings.cameraRatio}
-            onPress={() => router.push("/advanced-settings")}
+            onPress={() => setActiveSetting("cameraRatio")}
           />
           <BodyFrameSettingRow
             label="촬영 세부 설정"
@@ -131,7 +248,7 @@ export default function BodyFrameSettingsScreen() {
             label="저장 방식"
             detail="앱 로컬 저장과 클라우드 백업 방식"
             mark={getStorageModeLabel(settings.storageMode)}
-            onPress={() => router.push("/advanced-settings")}
+            onPress={() => setActiveSetting("storageMode")}
           />
           <BodyFrameSettingRow
             label="클라우드 백업"
@@ -141,7 +258,7 @@ export default function BodyFrameSettingsScreen() {
                 : "Pro 이상에서 클라우드 백업을 사용할 수 있습니다."
             }
             mark={settings.cloudBackupEnabled ? "켜짐" : "꺼짐"}
-            onPress={() => router.push("/advanced-settings")}
+            onPress={() => setActiveSetting("cloudBackup")}
           />
           <BodyFrameSettingRow
             label="저장·백업 세부 설정"
@@ -171,13 +288,19 @@ export default function BodyFrameSettingsScreen() {
             label="화면 모드"
             detail="다크를 기본으로 라이트/시스템 모드도 지원합니다."
             mark={themeLabel[settings.themeMode]}
-            onPress={() => router.push("/advanced-settings")}
+            onPress={() => setActiveSetting("themeMode")}
+          />
+          <BodyFrameSettingRow
+            label="폰트 스타일"
+            detail="앱 전체에서 사용할 글꼴"
+            mark={getFontOptionLabel(settings.fontStyle)}
+            onPress={() => setActiveSetting("fontStyle")}
           />
           <BodyFrameSettingRow
             label="글자 크기"
             detail="앱 전체에서 사용할 기본 글자 크기"
             mark={fontSizeLabel[settings.fontSize]}
-            onPress={() => router.push("/advanced-settings")}
+            onPress={() => setActiveSetting("fontSize")}
           />
           <BodyFrameSettingRow
             label="사용 가이드"
@@ -222,6 +345,177 @@ export default function BodyFrameSettingsScreen() {
           />
         </SectionBlock>
       </ScrollView>
+
+      <Modal
+        transparent
+        animationType="slide"
+        visible={Boolean(activeSetting)}
+        onRequestClose={() => setActiveSetting(null)}
+      >
+        <Pressable
+          style={[styles.modalBackdrop, modalSafeStyle]}
+          onPress={() => setActiveSetting(null)}
+        >
+          <Pressable
+            style={[
+              styles.modalPanel,
+              {
+                borderColor: palette.line,
+                backgroundColor: palette.surface
+              }
+            ]}
+            onPress={() => undefined}
+          >
+            <View style={styles.modalHandle} />
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: palette.text }]}>
+                {modalTitle}
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                style={[styles.modalCloseButton, { borderColor: palette.line }]}
+                onPress={() => setActiveSetting(null)}
+              >
+                <Text style={[styles.modalCloseText, { color: palette.text }]}>닫기</Text>
+              </Pressable>
+            </View>
+
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={styles.optionList}
+            >
+              {activeSetting === "overlayOpacity"
+                ? overlayOpacityOptions.map((opacity) => (
+                    <SettingOptionRow
+                      key={opacity}
+                      label={`${Math.round(opacity * 100)}%`}
+                      detail="기준 사진이 촬영 화면에 보이는 투명도"
+                      active={settings.overlayOpacity === opacity}
+                      onPress={() => void updateSetting({ overlayOpacity: opacity })}
+                    />
+                  ))
+                : null}
+
+              {activeSetting === "cameraRatio"
+                ? cameraRatioOptions.map((ratio) => (
+                    <SettingOptionRow
+                      key={ratio}
+                      label={ratio}
+                      detail="카메라 촬영 사진의 기본 저장 비율"
+                      active={settings.cameraRatio === ratio}
+                      onPress={() => void updateSetting({ cameraRatio: ratio })}
+                    />
+                  ))
+                : null}
+
+              {activeSetting === "storageMode"
+                ? STORAGE_MODE_OPTIONS.map((option) => {
+                    const disabled =
+                      option.requiresBackupPlan && !planEntitlements.canBackupToCloud;
+                    return (
+                      <SettingOptionRow
+                        key={option.value}
+                        label={option.label}
+                        detail={
+                          disabled
+                            ? `${option.detail} Pro 이상에서 사용할 수 있습니다.`
+                            : option.detail
+                        }
+                        active={settings.storageMode === option.value}
+                        disabled={disabled}
+                        onPress={() =>
+                          void updateSetting({
+                            storageMode: option.value,
+                            cloudBackupEnabled: option.value !== "local_only"
+                          })
+                        }
+                      />
+                    );
+                  })
+                : null}
+
+              {activeSetting === "cloudBackup" ? (
+                <>
+                  <SettingOptionRow
+                    label="켜짐"
+                    detail={
+                      planEntitlements.canBackupToCloud
+                        ? "앱 보관함과 선택한 프로젝트를 클라우드에 백업합니다."
+                        : "Pro 이상 구독에서 사용할 수 있습니다."
+                    }
+                    active={settings.cloudBackupEnabled}
+                    disabled={!planEntitlements.canBackupToCloud}
+                    onPress={enableCloudBackup}
+                  />
+                  <SettingOptionRow
+                    label="꺼짐"
+                    detail="클라우드 신규 백업을 사용하지 않습니다."
+                    active={!settings.cloudBackupEnabled}
+                    onPress={disableCloudBackup}
+                  />
+                  {!planEntitlements.canBackupToCloud ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      style={[styles.planButton, { borderColor: palette.text }]}
+                      onPress={() => {
+                        setActiveSetting(null);
+                        router.push("/account");
+                      }}
+                    >
+                      <Text style={[styles.planButtonText, { color: palette.text }]}>
+                        플랜 보기
+                      </Text>
+                    </Pressable>
+                  ) : null}
+                </>
+              ) : null}
+
+              {activeSetting === "themeMode"
+                ? themeOptions.map((theme) => (
+                    <SettingOptionRow
+                      key={theme.value}
+                      label={theme.label}
+                      detail={theme.detail}
+                      active={settings.themeMode === theme.value}
+                      onPress={() => void updateSetting({ themeMode: theme.value })}
+                    />
+                  ))
+                : null}
+
+              {activeSetting === "fontStyle"
+                ? APP_FONT_OPTIONS.map((font) => (
+                    <SettingOptionRow
+                      key={font.value}
+                      label={font.label}
+                      detail={font.detail}
+                      active={settings.fontStyle === font.value}
+                      onPress={() => void updateSetting({ fontStyle: font.value })}
+                    />
+                  ))
+                : null}
+
+              {activeSetting === "fontSize"
+                ? fontSizeOptions.map((fontSize) => (
+                    <SettingOptionRow
+                      key={fontSize.value}
+                      label={fontSize.label}
+                      detail={fontSize.detail}
+                      active={settings.fontSize === fontSize.value}
+                      onPress={() => void updateSetting({ fontSize: fontSize.value })}
+                    />
+                  ))
+                : null}
+            </ScrollView>
+
+            {saving ? (
+              <Text style={[styles.savingText, { color: palette.muted }]}>
+                설정을 저장하는 중입니다.
+              </Text>
+            ) : null}
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       <AppGuideOverlay tabKey="settings" replaySignal={guideReplaySignal} />
     </View>
@@ -275,5 +569,96 @@ const styles = StyleSheet.create({
   pageDetail: {
     fontSize: bodyFrameTypography.body,
     lineHeight: 20
+  },
+  modalBackdrop: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0,0,0,0.62)"
+  },
+  modalPanel: {
+    width: "100%",
+    maxHeight: "82%",
+    paddingHorizontal: bodyFrameDesign.horizontalPadding,
+    paddingTop: 10,
+    paddingBottom: 8,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderTopLeftRadius: bodyFrameDesign.bottomSheetRadius,
+    borderTopRightRadius: bodyFrameDesign.bottomSheetRadius
+  },
+  modalHandle: {
+    alignSelf: "center",
+    width: 36,
+    height: 4,
+    marginBottom: 14,
+    backgroundColor: "#3A3A3E"
+  },
+  modalHeader: {
+    minHeight: bodyFrameDesign.minTouchSize,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    marginBottom: 12
+  },
+  modalTitle: {
+    flex: 1,
+    fontSize: bodyFrameTypography.sectionTitle,
+    fontWeight: "600"
+  },
+  modalCloseButton: {
+    minHeight: bodyFrameDesign.minTouchSize,
+    justifyContent: "center",
+    paddingHorizontal: 12,
+    borderWidth: bodyFrameDesign.borderWidth
+  },
+  modalCloseText: {
+    fontSize: bodyFrameTypography.button,
+    fontWeight: "600"
+  },
+  optionList: {
+    gap: 8,
+    paddingBottom: 8
+  },
+  optionRow: {
+    minHeight: 66,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderWidth: bodyFrameDesign.borderWidth
+  },
+  optionCopy: {
+    flex: 1,
+    gap: 3
+  },
+  optionLabel: {
+    fontSize: bodyFrameTypography.rowTitle,
+    fontWeight: "600"
+  },
+  optionDetail: {
+    fontSize: bodyFrameTypography.caption,
+    lineHeight: 17
+  },
+  optionMark: {
+    width: 22,
+    fontSize: 16,
+    textAlign: "center"
+  },
+  planButton: {
+    minHeight: bodyFrameDesign.minTouchSize,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 4,
+    borderWidth: bodyFrameDesign.borderWidth
+  },
+  planButtonText: {
+    fontSize: bodyFrameTypography.button,
+    fontWeight: "600"
+  },
+  savingText: {
+    paddingVertical: 8,
+    fontSize: bodyFrameTypography.caption,
+    textAlign: "center"
   }
 });
