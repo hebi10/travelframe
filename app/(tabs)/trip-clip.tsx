@@ -1,3 +1,3 @@
-import BodyFrameVideoScreen from "@/features/trip-clip/BodyFrameVideoScreen";
+import BodyFrameVideoHomeScreen from "@/features/trip-clip/BodyFrameVideoHomeScreen";
 
-export default BodyFrameVideoScreen;
+export default BodyFrameVideoHomeScreen;
