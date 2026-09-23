@@ -33,7 +33,7 @@ for (const token of [
   '"latest"',
   '"first"',
   'router.push("/camera")',
-  'router.push("/trip-clip")',
+  'router.push("/video-create")',
   "setLastActiveProjectId"
 ]) {
   assert.ok(
