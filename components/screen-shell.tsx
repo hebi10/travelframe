@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { ScrollView, StyleSheet, Text, View, type TextStyle } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View, type TextStyle } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { spacing, typography } from "@/constants/app-theme";
@@ -16,6 +16,8 @@ type ScreenShellProps = {
   title: string;
   description?: string;
   safeTop?: boolean;
+  onBack?: () => void;
+  backLabel?: string;
   children: ReactNode;
 };
 
@@ -24,6 +26,8 @@ export function ScreenShell({
   title,
   description,
   safeTop = false,
+  onBack,
+  backLabel = "뒤로가기",
   children
 }: ScreenShellProps) {
   const insets = useSafeAreaInsets();
@@ -48,6 +52,21 @@ export function ScreenShell({
       ]}
     >
       <View style={styles.header}>
+        {onBack ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={backLabel}
+            onPress={onBack}
+            style={styles.backButton}
+          >
+            <Text style={[styles.backButtonIcon, { color: palette.text, fontFamily }]}>
+              ‹
+            </Text>
+            <Text style={[styles.backButtonText, { color: palette.text, fontFamily }]}>
+              {backLabel}
+            </Text>
+          </Pressable>
+        ) : null}
         {eyebrow ? (
           <Text selectable style={[styles.eyebrow, { color: palette.muted, fontFamily }]}>
             {eyebrow}
@@ -98,6 +117,23 @@ const styles = StyleSheet.create({
   },
   header: {
     gap: 12
+  },
+  backButton: {
+    alignSelf: "flex-start",
+    minHeight: 44,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingRight: 12
+  },
+  backButtonIcon: {
+    fontSize: 28,
+    lineHeight: 30,
+    fontWeight: "700"
+  },
+  backButtonText: {
+    fontSize: typography.button,
+    fontWeight: "800"
   },
   eyebrow: {
     fontSize: typography.eyebrow,
