@@ -23,7 +23,7 @@ for (const snippet of [
 }
 
 for (const snippet of [
-  'label="카메라 비율"',
+  'label="촬영 비율"',
   'onPress={() => setActiveSetting("cameraRatio")}',
   'label="저장 범위"',
   'onPress={() => setActiveSetting("cameraSaveScope")}',
