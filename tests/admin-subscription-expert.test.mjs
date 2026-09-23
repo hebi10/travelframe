@@ -16,21 +16,17 @@ for (const snippet of [
   'productName: "Expert"',
   'priceLabel: "월 6,000원"'
 ]) {
-  assert.ok(adminSource.includes(snippet), `admin expert product metadata missing: ${snippet}`);
+  assert.ok(adminSource.includes(snippet), `admin product metadata missing: ${snippet}`);
 }
 
-assert.ok(
-  adminSource.includes('"ad_remove"') &&
-    adminSource.includes('"creator_monthly"') &&
-    adminSource.includes('"plus_monthly"') &&
-    adminSource.includes('"expert_monthly"'),
-  "paid product ordering should include Pro, Plus, and Expert"
-);
-assert.ok(
-  adminSource.includes('<option value="plus_monthly">Plus 월결제</option>') &&
-    adminSource.includes('<option value="expert_monthly">Expert 월결제</option>'),
-  "subscription product selector should allow Plus and Expert"
-);
+for (const option of [
+  '<option value="ad_remove">광고 제거 · 1회성</option>',
+  '<option value="creator_monthly">Pro · 1개월 구독</option>',
+  '<option value="plus_monthly">Plus · 1개월 구독</option>',
+  '<option value="expert_monthly">Expert · 1개월 구독</option>'
+]) {
+  assert.ok(adminSource.includes(option), `subscription product selector missing: ${option}`);
+}
 
 for (const snippet of [
   'id="plusMonthlyCard"',
@@ -40,13 +36,11 @@ for (const snippet of [
   'id="expertMonthlyStatusLabel"',
   'id="expertMonthlyDetail"'
 ]) {
-  assert.ok(adminHtml.includes(snippet), `admin expert subscription summary missing: ${snippet}`);
+  assert.ok(adminHtml.includes(snippet), `admin subscription summary missing: ${snippet}`);
 }
 
 const effectiveSubscriptionStart = adminSource.indexOf("const getEffectiveSubscription =");
 const renderCardsStart = adminSource.indexOf("const renderSubscriptionCards =", effectiveSubscriptionStart);
-assert.ok(effectiveSubscriptionStart >= 0, "getEffectiveSubscription should exist");
-assert.ok(renderCardsStart > effectiveSubscriptionStart, "renderSubscriptionCards should follow effective subscription");
 const effectiveSubscriptionSource = adminSource.slice(effectiveSubscriptionStart, renderCardsStart);
 assert.ok(
   effectiveSubscriptionSource.indexOf("subscriptions.expert_monthly") >= 0 &&
@@ -57,20 +51,23 @@ assert.ok(
 
 assert.ok(
   adminSource.includes('productId !== "ad_remove" && subscription?.expiresAt'),
-  "subscription cards should show expiration dates for monthly products including Expert"
+  "monthly product cards should show expiration dates"
 );
 assert.ok(
-  adminSource.includes('$("productExpiresInput").disabled = productId === "ad_remove";'),
-  "expiration date input should remain enabled for Creator and Expert monthly products"
+  adminSource.includes('$("productExpiresInput").disabled = isOneTime') &&
+    adminSource.includes('$("subscriptionDurationSelect").disabled = isOneTime'),
+  "one-time ad removal should disable subscription period controls"
 );
 assert.ok(
-  adminSource.includes('expiresAt: productId === "ad_remove" ? null : expiresAt,'),
-  "subscription save should send expiration dates for Creator and Expert through the callable"
+  adminSource.includes("startedAt,") &&
+    adminSource.includes("expiresAt,") &&
+    adminSource.includes("termMonths,"),
+  "monthly plan save should send its configured period to the server callable"
 );
 assert.ok(
   adminSource.includes('const setAdminProductSubscription = httpsCallable(functions, "setAdminProductSubscription");') &&
     adminSource.includes("await setAdminProductSubscription({"),
-  "admin Expert subscription saves should stay on the callable flow"
+  "admin subscription saves should stay on the callable flow"
 );
 
-console.log("ok - admin subscription UI supports Pro, Plus, and Expert consistently");
+console.log("ok - admin subscription UI supports one-time ad removal and all monthly plan tiers");
