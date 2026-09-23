@@ -8,7 +8,6 @@ import {
 import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-functions.js";
 import {
   collection,
-  deleteDoc,
   doc,
   getDoc,
   getDocs,
@@ -599,7 +598,6 @@ const resetUserPanels = () => {
   };
   currentBackup = null;
   setSelectedUserPanelsVisible(false);
-  resetWeeklyVideoUsageSummary();
   resetBackupManager();
 };
 
