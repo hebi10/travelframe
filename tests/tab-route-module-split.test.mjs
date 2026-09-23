@@ -6,7 +6,7 @@ const screens = [
   ["account", "AccountScreen", "features/account/AccountScreen.tsx"],
   ["settings", "BodyFrameSettingsScreen", "features/settings/BodyFrameSettingsScreen.tsx"],
   ["camera", "BodyFrameCameraScreen", "features/camera/BodyFrameCameraScreen.tsx"],
-  ["trip-clip", "BodyFrameVideoScreen", "features/trip-clip/BodyFrameVideoScreen.tsx"]
+  ["trip-clip", "BodyFrameVideoHomeScreen", "features/trip-clip/BodyFrameVideoHomeScreen.tsx"]
 ];
 
 for (const [route, screenName, screenPath] of screens) {
