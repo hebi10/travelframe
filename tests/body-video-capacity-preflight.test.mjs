@@ -32,7 +32,9 @@ const runExport = async (storedCount, overrides = {}) => {
     activeProject: { id: "a", name: "기록" },
     projectPhotos: [{ id: "photo", uri: "file:///photo.jpg" }],
     isExporting: false,
-    planEntitlements: { canExportVideo: true, localVideoLimit: 30 },
+    planEntitlements: { canExportVideo: true, localVideoLimit: 30, weeklyVideoExportLimit: 0 },
+    isLoggedIn: true,
+    guestUsage: null,
     videoLimitState: { allowed: true },
     setIsExporting: (value) => exporting.push(value),
     setExportProgress: () => {},
@@ -42,6 +44,8 @@ const runExport = async (storedCount, overrides = {}) => {
     recordProjectVideo: async () => { events.push("record"); return "file:///video.mp4"; },
     saveVideoToLibrary: async () => { events.push("external-save"); },
     saveMadeVideo: async (video) => { events.push("app-save"); savedVideos.push(video); },
+    recordGuestWeeklyVideoExport: async () => ({ count: 1, remaining: 0 }),
+    setGuestUsage: () => {},
     getUserFacingErrorMessage: (error) => error.message,
     previewPhoto: { uri: "file:///photo.jpg" },
     videoOptions: { ratio: "9:16", interval: 0.1, quality: 1080 },
@@ -103,5 +107,5 @@ for (const ratio of ["3:4", "9:16", "1:1", "16:9"]) {
     assert.equal(nativeOptions.fps, 30);
   }
 }
-assert.ok(source.includes('router.push("/legacy-studio")'), "provide an accessible video management route");
+assert.ok(source.includes('router.push("/video-library")'), "provide an accessible video management route");
 console.log("ok - real export handler blocks all native and external work at capacity");
