@@ -152,12 +152,8 @@ import { getPlanEntitlements } from "@/lib/plan-entitlements";
 import { isMediaLibraryAccessGranted } from "@/lib/media-library-permissions";
 import { requestMediaLibraryAccess } from "@/lib/request-media-library-access";
 import {
-  completeWeeklyVideoExport,
-  flushPendingWeeklyVideoExportCompletions,
-  getWeeklyVideoExportUsage,
-  recordPendingWeeklyVideoExportCompletion,
-  releaseWeeklyVideoExport,
-  reserveWeeklyVideoExport,
+  getGuestWeeklyVideoExportUsage,
+  recordGuestWeeklyVideoExport,
   type WeeklyVideoExportUsage
 } from "@/lib/video-export-quota";
 import {
@@ -856,14 +852,9 @@ export default function TripClipScreen() {
         getPhotos().then(ensurePhotoPreviews),
         getAppSettings(),
         user ? syncUserMusicTracks(user) : Promise.resolve([]),
-        user
-          ? flushPendingWeeklyVideoExportCompletions(user, weeklyVideoExportLimit)
-              .then(
-                (flushedUsage) =>
-                  flushedUsage ?? getWeeklyVideoExportUsage(user, weeklyVideoExportLimit)
-              )
-              .catch(() => getWeeklyVideoExportUsage(user, weeklyVideoExportLimit))
-          : getWeeklyVideoExportUsage(user, weeklyVideoExportLimit),
+        isLoggedIn
+          ? Promise.resolve(null)
+          : getGuestWeeklyVideoExportUsage(weeklyVideoExportLimit),
         getMadeVideos(),
         getImageBundleWorks()
       ]);
@@ -1838,56 +1829,49 @@ export default function TripClipScreen() {
       return;
     }
 
-    if (!isLoggedIn || !user) {
-      setExportMessage("로그인하면 무료로 주 1회 MP4 영상을 만들 수 있습니다.");
-      setExportProgress({
-        visible: true,
-        percent: 100,
-        title: "로그인이 필요합니다",
-        detail: "무료 MP4 저장은 로그인한 사용자에게 주 1회 제공됩니다.",
-        error: "마이페이지에서 로그인한 뒤 다시 시도해 주세요."
-      });
+    if (isLoggedIn) {
+      await executeSelectedExport({ returnToVideoWorks });
       return;
     }
 
     try {
-      const usage = await getWeeklyVideoExportUsage(user, weeklyVideoExportLimit);
+      const usage = await getGuestWeeklyVideoExportUsage(weeklyVideoExportLimit);
       setWeeklyVideoExportUsage(usage);
 
-      if (usage && usage.remaining <= 0) {
-        setExportMessage("이번 주 무료 MP4 저장 횟수를 모두 사용했습니다.");
+      if (usage.remaining <= 0) {
+        setExportMessage("비로그인 영상 출력은 주 1회까지 사용할 수 있습니다.");
         setExportProgress({
           visible: true,
           percent: 100,
-          title: "무료 저장 한도 초과",
-          detail: `${planEntitlements.label} 플랜은 MP4 영상을 주 ${weeklyVideoExportLimit}회까지 만들 수 있습니다.`,
-          error: `이번 주(${usage.weekLabel}) MP4 저장 ${weeklyVideoExportLimit}회를 이미 사용했습니다. 다음 주에 다시 만들거나 플랜을 확인해 주세요.`
+          title: "주간 출력 한도",
+          detail: "비로그인 상태에서는 MP4 영상을 주 1회 만들 수 있습니다.",
+          error: `이번 주(${usage.weekLabel}) 1회를 이미 사용했습니다. 로그인하면 출력 횟수 제한 없이 사용할 수 있습니다.`
         });
         return;
       }
 
-      await executeSelectedExport({ countWeeklyMp4: true, returnToVideoWorks });
+      await executeSelectedExport({ countGuestMp4: true, returnToVideoWorks });
     } catch (error) {
       const message = getUserFacingErrorMessage(
         error,
-        "무료 저장 가능 여부를 확인하지 못했습니다."
+        "영상 출력 가능 여부를 확인하지 못했습니다."
       );
       setExportMessage(message);
       setExportProgress({
         visible: true,
         percent: 100,
-        title: "저장 확인 실패",
-        detail: "무료 MP4 저장 가능 여부를 확인하지 못했습니다.",
+        title: "출력 확인 실패",
+        detail: "영상 출력 가능 여부를 확인하지 못했습니다.",
         error: message
       });
     }
   };
 
   const executeSelectedExport = async ({
-    countWeeklyMp4 = false,
+    countGuestMp4 = false,
     returnToVideoWorks = false
   }: {
-    countWeeklyMp4?: boolean;
+    countGuestMp4?: boolean;
     returnToVideoWorks?: boolean;
   } = {}) => {
     if (selectedPhotos.length === 0 || isExporting) {
@@ -1900,9 +1884,6 @@ export default function TripClipScreen() {
       return;
     }
 
-    let weeklyExportReservationId: string | null = null;
-    let weeklyExportSaveSucceeded = false;
-
     try {
       setIsExporting(true);
       setExportProgress({
@@ -1911,12 +1892,6 @@ export default function TripClipScreen() {
         title: "저장 준비 중",
         detail: "선택한 저장 형식을 확인하고 있습니다."
       });
-
-      if (countWeeklyMp4 && exportFormat === "mp4" && user) {
-        const reservation = await reserveWeeklyVideoExport(user, weeklyVideoExportLimit);
-        weeklyExportReservationId = reservation.reservationId;
-        setWeeklyVideoExportUsage(reservation);
-      }
 
       if (exportFormat === "images") {
         if (selectedPhotos.length === 0) {
@@ -2043,11 +2018,6 @@ export default function TripClipScreen() {
         });
       });
       if (!videoUri) {
-        if (weeklyExportReservationId && user) {
-          const releasedUsage = await releaseWeeklyVideoExport(user, weeklyExportReservationId);
-          setWeeklyVideoExportUsage(releasedUsage);
-          weeklyExportReservationId = null;
-        }
         setExportProgress({
           visible: true,
           percent: 100,
@@ -2100,20 +2070,10 @@ export default function TripClipScreen() {
           localVideoLimit: planEntitlements.localVideoLimit
         });
       }
-      weeklyExportSaveSucceeded = true;
-      if (weeklyExportReservationId && user) {
-        try {
-          const completedUsage = await completeWeeklyVideoExport(user, weeklyExportReservationId);
-          if (completedUsage) {
-            setWeeklyVideoExportUsage(completedUsage);
-          }
-        } catch {
-          await recordPendingWeeklyVideoExportCompletion({
-            user,
-            reservationId: weeklyExportReservationId,
-            limit: weeklyVideoExportLimit
-          });
-        }
+      if (countGuestMp4 && !isLoggedIn) {
+        setWeeklyVideoExportUsage(
+          await recordGuestWeeklyVideoExport(weeklyVideoExportLimit)
+        );
       }
       let backupWarning: string | null = null;
       const wantsVideoBackup =
@@ -2172,9 +2132,6 @@ export default function TripClipScreen() {
       setAvailableDraft(null);
       setShowDraftPrompt(false);
       resetNewTripClipProject();
-      if (weeklyExportReservationId && user) {
-        setWeeklyVideoExportUsage(await getWeeklyVideoExportUsage(user, weeklyVideoExportLimit));
-      }
       if (returnToVideoWorks) {
         router.replace("/studio?tab=works" as Href);
         return;
@@ -2183,14 +2140,6 @@ export default function TripClipScreen() {
         setIsPostSaveAdVisible(true);
       }
     } catch (error) {
-      if (weeklyExportReservationId && user && !weeklyExportSaveSucceeded) {
-        await releaseWeeklyVideoExport(user, weeklyExportReservationId).catch(() => null);
-      }
-      if (weeklyExportReservationId && user) {
-        setWeeklyVideoExportUsage(
-          await getWeeklyVideoExportUsage(user, weeklyVideoExportLimit).catch(() => null)
-        );
-      }
       const message = getUserFacingErrorMessage(error, "저장하지 못했습니다.");
       setExportMessage(message);
       setExportProgress({
