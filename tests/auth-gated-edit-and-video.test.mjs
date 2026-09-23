@@ -23,11 +23,6 @@ assert.ok(
   "studio photo cards should show login 안내 instead of opening edit while logged out"
 );
 assert.ok(
-  studioSource.includes("onRequireLoginForVideo={showLoginRequiredForVideoCreation}"),
-  "studio video creation should show login 안내 when video generation is unavailable"
-);
-
-assert.ok(
   editSource.includes("if (!user)"),
   "edit screen should guard direct access for logged-out users"
 );
@@ -49,12 +44,16 @@ assert.ok(
   "trip clip should derive video creation access from canExportVideo"
 );
 assert.ok(
-  tripClipSource.includes("if (!canUseVideoCreation)"),
-  "trip clip should block export when the plan cannot export video"
+  tripClipSource.includes("getGuestWeeklyVideoExportUsage"),
+  "logged-out video creation should use the guest weekly quota"
 );
 assert.ok(
-  tripClipSource.includes("showLoginRequiredForVideoCreation"),
-  "trip clip should explain that login is required for video creation"
+  tripClipSource.includes("recordGuestWeeklyVideoExport"),
+  "successful logged-out video creation should record the weekly quota"
+);
+assert.ok(
+  tripClipSource.includes("if (isLoggedIn)"),
+  "logged-in users should bypass the guest weekly quota"
 );
 
-console.log("ok - edit and video creation access are gated by auth and plan");
+console.log("ok - photo editing stays auth-gated while guest video output uses a weekly quota");
