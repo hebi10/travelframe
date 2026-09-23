@@ -36,6 +36,9 @@ for (const token of [
   '"Subscription expiresAt must be later than startedAt."',
   'provider: "admin"',
   "termMonths: productId === \"ad_remove\" ? null : safeTermMonths",
+  "const shouldSwitchMonthlyPlan = isMonthlyProduct && status === \"active\"",
+  "ADMIN_MONTHLY_PRODUCT_IDS",
+  'status: "inactive"',
   "startedAt: subscription.startedAt",
   "expiresAt: subscription.expiresAt"
 ]) {
@@ -51,4 +54,4 @@ assert.ok(
   "admin-configured expiration dates should participate in app entitlement checks"
 );
 
-console.log("ok - admin can assign one-time ad removal and configurable monthly plan periods");
+console.log("ok - admin can assign one-time ad removal and exclusive configurable monthly plan periods");
