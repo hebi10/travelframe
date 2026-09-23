@@ -57,10 +57,11 @@ assert.equal(
   false,
   "Body Frame settings should not expose font-family selection"
 );
-assert.equal(
-  settingsSource.includes("getFontOptionLabel"),
-  false,
-  "Body Frame settings should not depend on the legacy font selector"
+assert.ok(
+  settingsSource.includes('label="폰트 스타일"') &&
+    settingsSource.includes("getFontOptionLabel") &&
+    settingsSource.includes('setActiveSetting("fontStyle")'),
+  "Body Frame settings should expose font selection directly in the settings tab"
 );
 assert.ok(
   tabsSource.includes("minHeight: bodyFrameDesign.minTouchSize"),
