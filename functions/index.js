@@ -638,6 +638,11 @@ const ADMIN_PRODUCT_META = {
   }
 };
 const ADMIN_PRODUCT_IDS = Object.keys(ADMIN_PRODUCT_META);
+const ADMIN_MONTHLY_PRODUCT_IDS = [
+  "creator_monthly",
+  "plus_monthly",
+  "expert_monthly"
+];
 const ADMIN_SUBSCRIPTION_STATUSES = new Set(["inactive", "active", "expired"]);
 
 const createAdminFreeSubscription = (adminUid) => ({
@@ -1895,11 +1900,7 @@ exports.setAdminProductSubscription = secureOnCall(async (request) => {
       throw new HttpsError("not-found", "Target user was not found.");
     }
 
-    const isMonthlyProduct = [
-      "creator_monthly",
-      "plus_monthly",
-      "expert_monthly"
-    ].includes(productId);
+    const isMonthlyProduct = ADMIN_MONTHLY_PRODUCT_IDS.includes(productId);
     const safeStartedAt =
       isMonthlyProduct &&
       typeof startedAt === "string" &&
@@ -1969,19 +1970,47 @@ exports.setAdminProductSubscription = secureOnCall(async (request) => {
     const subscriptionSnapshots = await Promise.all(
       ADMIN_PRODUCT_IDS.map((id) => subscriptionRefs[id].get())
     );
+    const shouldSwitchMonthlyPlan = isMonthlyProduct && status === "active";
     const nextSubscriptions = ADMIN_PRODUCT_IDS.reduce((items, id, index) => {
       const snapshot = subscriptionSnapshots[index];
+      const storedSubscription = snapshot.exists ? snapshot.data() : null;
+      const nextSubscription =
+        id === productId
+          ? subscription
+          : shouldSwitchMonthlyPlan && ADMIN_MONTHLY_PRODUCT_IDS.includes(id)
+            ? storedSubscription
+              ? {
+                  ...storedSubscription,
+                  status: "inactive",
+                  updatedBy: adminUid
+                }
+              : null
+            : storedSubscription;
+
       return {
         ...items,
-        [id]: id === productId
-          ? subscription
-          : snapshot.exists ? snapshot.data() : null
+        [id]: nextSubscription
       };
     }, {});
     const effectiveSubscription = getEffectiveAdminSubscription(nextSubscriptions);
     const batch = db.batch();
 
     batch.set(productRef, subscription, { merge: true });
+    if (shouldSwitchMonthlyPlan) {
+      ADMIN_MONTHLY_PRODUCT_IDS
+        .filter((id) => id !== productId)
+        .forEach((id) => {
+          batch.set(
+            subscriptionRefs[id],
+            {
+              status: "inactive",
+              updatedBy: adminUid,
+              updatedAt: FieldValue.serverTimestamp()
+            },
+            { merge: true }
+          );
+        });
+    }
     batch.set(
       db.doc(`users/${targetUid}/subscriptions/current`),
       {
