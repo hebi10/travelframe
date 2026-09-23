@@ -11,441 +11,329 @@
     <main class="shell">
       <header class="topbar">
         <div class="brand-lockup">
-          <img class="admin-logo" src="/favicon.png" alt="" width="48" height="48" />
+          <img class="admin-logo" src="/favicon.png" alt="" width="44" height="44" />
           <div class="brand">
             <p class="eyebrow">Body Frame Admin</p>
             <h1>바디 프레임 관리자</h1>
-            <p>사용자, 구독, 백업과 운영 문서를 한곳에서 확인합니다.</p>
+            <p>사용자 관리</p>
           </div>
         </div>
-        <nav class="nav" aria-label="관리자 링크">
-          <a class="button secondary" href="/privacy/">개인정보처리방침</a>
-          <a class="button secondary" href="/terms/">이용약관</a>
-          <a class="button secondary" href="/privacy/photo-guide-delete-account">계정 삭제 안내</a>
+        <div class="admin-header-actions">
+          <details class="ops-menu">
+            <summary>운영 도구</summary>
+            <div class="ops-menu-panel">
+              <a href="/privacy/">개인정보처리방침</a>
+              <a href="/terms/">이용약관</a>
+              <a href="/privacy/photo-guide-delete-account">계정 삭제 안내</a>
+              <a href="https://console.firebase.google.com/" target="_blank" rel="noreferrer">Firebase Console</a>
+            </div>
+          </details>
+          <span id="adminIdentity" class="admin-identity hidden">관리자</span>
           <button id="signOutButton" class="secondary hidden" type="button">로그아웃</button>
-        </nav>
+        </div>
       </header>
 
       <section id="authLoadingPanel" class="panel strong loading-panel">
         <p class="eyebrow">CHECKING</p>
         <h2>권한 확인 중입니다</h2>
-        <p>로그인 상태와 관리자 권한을 확인하고 있습니다. 잠시만 기다려 주세요.</p>
+        <p>로그인 상태와 관리자 권한을 확인하고 있습니다.</p>
       </section>
 
-      <section id="loginPanel" class="auth-layout hidden">
-        <div class="panel strong auth-copy">
-          <p class="eyebrow">ACCOUNT</p>
-          <h2>계정 접근</h2>
-          <p>
-            관리자는 운영 페이지에 접근하고, 일반 사용자는 앱 이용을 위한 계정을 만들 수 있습니다.
-            관리자 권한은 회원가입만으로 부여되지 않습니다.
-          </p>
-          <div class="notice">
-            <strong>첫 관리자 등록</strong>
+      <section id="loginPanel" class="admin-login hidden">
+        <section class="panel strong auth-card">
+          <div class="login-brand">
+            <img class="admin-login-logo" src="/favicon.png" alt="" width="52" height="52" />
+            <p class="eyebrow">Body Frame Admin</p>
+            <h2>바디 프레임 관리자</h2>
+            <p>관리자 로그인</p>
+          </div>
+          <form id="loginForm" class="form login-form">
+            <label>
+              이메일
+              <input id="emailInput" type="email" autocomplete="email" placeholder="이메일을 입력하세요." required />
+            </label>
+            <label>
+              비밀번호
+              <input id="passwordInput" type="password" autocomplete="current-password" placeholder="비밀번호를 입력하세요." required />
+            </label>
+            <button type="submit">로그인</button>
+            <p id="loginMessage" class="message"></p>
+          </form>
+          <p class="login-help">관리자 권한이 있는 계정만 접근할 수 있습니다.</p>
+          <details class="admin-register-guide">
+            <summary>첫 관리자 등록 안내</summary>
             <p>
-              Firebase Console에서 직접 <code>admins/관리자UID</code> 문서를 만들고
-              <code>email</code>, <code>role</code> 값을 넣어 주세요.
+              Firebase Console의 Firestore에서 <code>admins/{uid}</code> 문서를 생성하면
+              해당 계정이 관리자 권한을 갖습니다.
             </p>
-          </div>
-        </div>
-
-        <section class="panel auth-card">
-          <div class="tabs" role="tablist" aria-label="로그인 유형">
-            <button
-              id="adminAuthTab"
-              class="tab active"
-              type="button"
-              role="tab"
-              aria-selected="true"
-              aria-controls="adminAuthPanel"
-            >
-              관리자 로그인
-            </button>
-            <button
-              id="signupAuthTab"
-              class="tab"
-              type="button"
-              role="tab"
-              aria-selected="false"
-              aria-controls="signupAuthPanel"
-            >
-              일반 회원가입
-            </button>
-          </div>
-
-          <div id="adminAuthPanel" class="auth-tab-panel" role="tabpanel" aria-labelledby="adminAuthTab">
-            <div>
-              <h2>관리자 로그인</h2>
-              <p>
-                Firebase Auth 계정으로 로그인합니다. Firestore의 <strong>admins/{uid}</strong>
-                문서가 있는 계정만 관리자 페이지에 접근할 수 있습니다.
-              </p>
-            </div>
-            <form id="loginForm" class="form">
-              <label>
-                이메일
-                <input id="emailInput" type="email" autocomplete="email" required />
-              </label>
-              <label>
-                비밀번호
-                <input id="passwordInput" type="password" autocomplete="current-password" required />
-              </label>
-              <button type="submit">로그인</button>
-              <p id="loginMessage" class="message"></p>
-            </form>
-          </div>
-
-          <div
-            id="signupAuthPanel"
-            class="auth-tab-panel hidden"
-            role="tabpanel"
-            aria-labelledby="signupAuthTab"
-          >
-            <div>
-              <h2>일반 회원가입</h2>
-              <p>
-                앱을 처음 사용하는 고객용 계정을 만듭니다. 가입 후 이메일 인증 메일이 발송되며,
-                관리자 페이지 접근 권한은 부여되지 않습니다.
-              </p>
-            </div>
-            <form id="signupForm" class="form">
-              <label>
-                이메일
-                <input id="signupEmailInput" type="email" autocomplete="email" required />
-              </label>
-              <label>
-                비밀번호
-                <input
-                  id="signupPasswordInput"
-                  type="password"
-                  autocomplete="new-password"
-                  minlength="6"
-                  placeholder="6자리 이상"
-                  required
-                />
-              </label>
-              <button class="secondary" type="submit">일반 회원가입</button>
-              <p id="signupMessage" class="message"></p>
-            </form>
-            <div class="notice compact-notice">
-              <strong>인증 메일이 오지 않을 때</strong>
-              <p>
-                이미 가입한 이메일이라면 위에 이메일과 비밀번호를 입력하고 인증 메일을 다시 보낼 수 있습니다.
-              </p>
-              <button id="resendVerificationButton" class="secondary" type="button">
-                인증 메일 다시 보내기
-              </button>
-            </div>
-          </div>
+          </details>
         </section>
+        <footer class="login-footer">
+          <nav aria-label="운영 문서">
+            <a href="/privacy/">개인정보처리방침</a>
+            <a href="/terms/">이용약관</a>
+            <a href="/privacy/photo-guide-delete-account">계정 삭제 안내</a>
+          </nav>
+          <p>© 2026 Body Frame.</p>
+        </footer>
       </section>
 
       <section id="adminPanel" class="admin-workspace hidden">
-        <div class="stats">
-          <div class="stat">
-            <span class="meta">전체 사용자</span>
-            <strong id="statUsers">0</strong>
-          </div>
-          <div class="stat">
-            <span class="meta">선택 사용자 플랜</span>
-            <strong id="statPlan">-</strong>
-          </div>
-          <div class="stat">
-            <span class="meta">선택 사용자 백업</span>
-            <strong id="statBackups">-</strong>
-          </div>
-          <div class="stat">
-            <span class="meta">활성 상품</span>
-            <strong id="statStatus">-</strong>
-          </div>
-        </div>
+        <section class="stats" aria-label="전체 운영 현황">
+          <article class="stat">
+            <span class="stat-icon" aria-hidden="true">◉</span>
+            <div>
+              <span class="meta">전체 사용자</span>
+              <strong><span id="statUsers">0</span>명</strong>
+            </div>
+          </article>
+          <article class="stat">
+            <span class="stat-icon" aria-hidden="true">◇</span>
+            <div>
+              <span class="meta">활성 구독</span>
+              <strong><span id="statSubscriptions">0</span>건</strong>
+            </div>
+          </article>
+          <article class="stat">
+            <span class="stat-icon" aria-hidden="true">▣</span>
+            <div>
+              <span class="meta">백업 사용자</span>
+              <strong><span id="statBackupUsers">0</span>명</strong>
+            </div>
+          </article>
+        </section>
 
-        <div class="grid">
-          <div class="stack">
-            <div id="leftAdminTabs" class="admin-tabs tabs" role="tablist" aria-label="좌측 관리 영역">
-              <button
-                class="tab active"
-                type="button"
-                data-admin-tab="userSearch"
-                role="tab"
-                aria-selected="true"
-                aria-controls="userSearchPanel"
-              >
-                사용자
-              </button>
-              <button
-                class="tab"
-                type="button"
-                data-admin-tab="operationLinks"
-                role="tab"
-                aria-selected="false"
-                aria-controls="operationLinksPanel"
-              >
-                운영 링크
+        <div class="admin-console">
+          <aside class="user-sidebar panel strong">
+            <div class="section-heading compact-heading">
+              <div>
+                <p class="eyebrow">USERS</p>
+                <h2>사용자</h2>
+              </div>
+              <button id="refreshUsersButton" class="icon-button secondary" type="button" aria-label="사용자 새로고침">
+                새로고침
               </button>
             </div>
 
-            <section id="userSearchPanel" class="panel strong admin-tab-panel" role="tabpanel">
-              <div class="section-heading">
-                <div>
-                  <h2>직접 검색</h2>
-                  <p>사용자를 빠르게 찾은 뒤 아래 목록에서 선택 상태를 확인합니다.</p>
-                </div>
-                <button id="refreshUsersButton" class="secondary" type="button">새로고침</button>
+            <form id="searchForm" class="search-form">
+              <label class="search-label" for="searchInput">이름, 이메일 또는 UID 검색</label>
+              <input id="searchInput" placeholder="이름, user@example.com 또는 uid" autocomplete="off" required />
+            </form>
+            <p id="searchMessage" class="message compact-message"></p>
+            <p class="sidebar-count">총 <strong id="userCountLabel">0</strong>명의 사용자가 있습니다.</p>
+            <div id="userList" class="user-list" aria-live="polite"></div>
+            <div class="sidebar-footer">
+              <div class="pagination" aria-label="사용자 목록 페이지 이동">
+                <button id="prevUsersPageButton" class="secondary pager-button" type="button" aria-label="이전 페이지">‹</button>
+                <span id="usersPageInfo" class="meta">-</span>
+                <button id="nextUsersPageButton" class="secondary pager-button" type="button" aria-label="다음 페이지">›</button>
               </div>
-              <form id="searchForm" class="form">
-                <label>
-                  이메일, 이름 또는 UID
-                  <input id="searchInput" placeholder="이름, user@example.com 또는 uid" required />
-                </label>
-                <button type="submit">검색</button>
-              </form>
-              <p id="searchMessage" class="message"></p>
-              <div class="subsection">
-                <h3>사용자 선택</h3>
-                <label>
-                  사용자 필터
-                  <input id="userFilterInput" placeholder="이메일, 이름, UID로 필터" />
-                </label>
-                <div id="userList" class="user-list" aria-live="polite"></div>
-                <div class="pagination" aria-label="사용자 목록 페이지 이동">
-                  <button id="prevUsersPageButton" class="secondary" type="button">이전</button>
-                  <span id="usersPageInfo" class="meta">-</span>
-                  <button id="nextUsersPageButton" class="secondary" type="button">다음</button>
-                </div>
-                <p id="userListMessage" class="message"></p>
-              </div>
-            </section>
+              <p id="userListMessage" class="message compact-message"></p>
+            </div>
+          </aside>
 
-            <section id="operationLinksPanel" class="panel admin-tab-panel hidden" role="tabpanel">
-              <h2>운영 링크</h2>
-              <div class="list">
-                <a class="item" href="/privacy/">
-                  <strong>개인정보처리방침</strong>
-                  <span class="meta">Play Console 개인정보처리방침 URL로 사용할 수 있습니다.</span>
-                </a>
-                <a class="item" href="/privacy/photo-guide-delete-account">
-                  <strong>계정 및 데이터 삭제 요청</strong>
-                  <span class="meta">Play Console 데이터 삭제 URL로 사용할 수 있습니다.</span>
-                </a>
-                <a class="item" href="/terms/">
-                  <strong>이용약관</strong>
-                  <span class="meta">Google Play 결제, 구독 갱신·취소·환불 조건을 안내합니다.</span>
-                </a>
-                <a class="item" href="https://console.firebase.google.com/" target="_blank" rel="noreferrer">
-                  <strong>Firebase Console</strong>
-                  <span class="meta">관리자 문서, 인증 사용자, 원본 데이터를 확인합니다.</span>
-                </a>
+          <section class="user-console">
+            <div id="selectedUserHeader" class="selected-user-header panel strong hidden">
+              <div class="selected-user-main">
+                <div id="selectedUserAvatar" class="selected-user-avatar" aria-hidden="true">U</div>
+                <div class="selected-user-copy">
+                  <h2 id="selectedUserName">사용자</h2>
+                  <p id="selectedUserEmail" class="meta">-</p>
+                </div>
               </div>
-            </section>
-          </div>
+              <div class="selected-user-badges" aria-label="선택 사용자 상태">
+                <span id="selectedAdBadge" class="status-badge">광고 제거 비활성</span>
+                <span id="selectedPlanBadge" class="status-badge">무료</span>
+                <span id="selectedBackupBadge" class="status-badge">백업 0개</span>
+              </div>
+            </div>
 
-          <div class="stack">
-            <div id="rightAdminTabs" class="admin-tabs tabs" role="tablist" aria-label="우측 관리 영역">
-              <button
-                class="tab active"
-                type="button"
-                data-admin-tab="userDetail"
-                role="tab"
-                aria-selected="true"
-                aria-controls="userDetailPanel"
-              >
-                사용자 상세
+            <div id="rightAdminTabs" class="admin-tabs tabs" role="tablist" aria-label="사용자 관리 영역">
+              <button class="tab active" type="button" data-admin-tab="userDetail" role="tab" aria-selected="true" aria-controls="userDetailPanel">
+                개요
               </button>
-              <button
-                class="tab"
-                type="button"
-                data-admin-tab="subscriptionManage"
-                role="tab"
-                aria-selected="false"
-                aria-controls="subscriptionManagePanel"
-              >
-                구독 관리
+              <button class="tab" type="button" data-admin-tab="subscriptionManage" role="tab" aria-selected="false" aria-controls="subscriptionManagePanel">
+                구독
               </button>
-              <button
-                class="tab"
-                type="button"
-                data-admin-tab="backupManage"
-                role="tab"
-                aria-selected="false"
-                aria-controls="backupManagePanel"
-              >
-                백업 관리
+              <button class="tab" type="button" data-admin-tab="backupManage" role="tab" aria-selected="false" aria-controls="backupManagePanel">
+                백업
               </button>
             </div>
 
             <div id="userDetailPanel" class="admin-tab-panel" role="tabpanel">
               <section id="userEmptyPanel" class="panel empty-state">
                 <h2>사용자를 선택해 주세요</h2>
-                <p>왼쪽의 직접 검색 또는 사용자 목록에서 관리할 사용자를 선택하면 상세 정보와 구독 내역이 표시됩니다.</p>
+                <p>왼쪽 사용자 목록에서 관리할 사용자를 선택하면 상세 정보를 확인할 수 있습니다.</p>
               </section>
-            <section id="userPanel" class="panel strong hidden">
-              <h2>사용자 상세</h2>
-              <div class="list compact">
-                <div class="item">
-                  <span class="meta">UID</span>
-                  <strong id="userUid">-</strong>
-                </div>
-                <div class="item">
-                  <span class="meta">이메일</span>
-                  <strong id="userEmail">-</strong>
-                </div>
-                <div class="item">
-                  <span class="meta">이름</span>
-                  <strong id="userName">-</strong>
-                </div>
-                <div class="item">
-                  <span class="meta">마지막 로그인</span>
-                  <strong id="userLastSignIn">-</strong>
-                </div>
-              </div>
-              <h3 class="subsection-title">구독 내역</h3>
-              <div id="userSubscriptionSummary" class="subscription-summary" aria-label="상품별 구독 내역">
-                <div id="adRemoveCard" class="subscription-product-card">
-                  <span class="meta">광고 제거</span>
-                  <strong id="adRemoveStatusLabel">-</strong>
-                  <span id="adRemoveDetail" class="meta">-</span>
-                </div>
-                <div id="creatorMonthlyCard" class="subscription-product-card">
-                  <span class="meta">Pro</span>
-                  <strong id="creatorMonthlyStatusLabel">-</strong>
-                  <span id="creatorMonthlyDetail" class="meta">-</span>
-                </div>
-                <div id="plusMonthlyCard" class="subscription-product-card">
-                  <span class="meta">Plus</span>
-                  <strong id="plusMonthlyStatusLabel">-</strong>
-                  <span id="plusMonthlyDetail" class="meta">-</span>
-                </div>
-                <div id="expertMonthlyCard" class="subscription-product-card">
-                  <span class="meta">Expert</span>
-                  <strong id="expertMonthlyStatusLabel">-</strong>
-                  <span id="expertMonthlyDetail" class="meta">-</span>
-                </div>
-              </div>
-            </section>
+
+              <section id="userPanel" class="overview-grid hidden">
+                <article class="panel overview-main">
+                  <div class="section-heading">
+                    <div>
+                      <p class="eyebrow">PROFILE</p>
+                      <h2>기본 정보</h2>
+                    </div>
+                  </div>
+                  <div class="detail-list">
+                    <div class="detail-row">
+                      <span class="meta">UID</span>
+                      <strong id="userUid">-</strong>
+                      <button class="copy-button secondary" type="button" data-copy-target="userUid">복사</button>
+                    </div>
+                    <div class="detail-row">
+                      <span class="meta">이메일</span>
+                      <strong id="userEmail">-</strong>
+                      <button class="copy-button secondary" type="button" data-copy-target="userEmail">복사</button>
+                    </div>
+                    <div class="detail-row">
+                      <span class="meta">이름</span>
+                      <strong id="userName">-</strong>
+                      <span></span>
+                    </div>
+                    <div class="detail-row">
+                      <span class="meta">마지막 로그인</span>
+                      <strong id="userLastSignIn">-</strong>
+                      <span></span>
+                    </div>
+                  </div>
+                </article>
+
+                <article class="panel overview-tools">
+                  <p class="eyebrow">TOOLS</p>
+                  <h2>운영 도구</h2>
+                  <p class="meta">선택한 사용자의 관리 화면으로 이동합니다.</p>
+                  <button class="secondary wide-button" type="button" data-open-admin-tab="subscriptionManage">구독 관리로 이동</button>
+                  <button class="secondary wide-button" type="button" data-open-admin-tab="backupManage">백업 관리로 이동</button>
+                </article>
+
+                <article class="panel overview-subscriptions">
+                  <div class="section-heading">
+                    <div>
+                      <p class="eyebrow">SUBSCRIPTIONS</p>
+                      <h2>구독 현황</h2>
+                    </div>
+                  </div>
+                  <div id="userSubscriptionSummary" class="subscription-summary" aria-label="상품별 구독 내역">
+                    <div id="adRemoveCard" class="subscription-product-card">
+                      <span class="meta">광고 제거</span>
+                      <strong id="adRemoveStatusLabel">-</strong>
+                      <span id="adRemoveDetail" class="meta">-</span>
+                    </div>
+                    <div id="creatorMonthlyCard" class="subscription-product-card">
+                      <span class="meta">Pro</span>
+                      <strong id="creatorMonthlyStatusLabel">-</strong>
+                      <span id="creatorMonthlyDetail" class="meta">-</span>
+                    </div>
+                    <div id="plusMonthlyCard" class="subscription-product-card">
+                      <span class="meta">Plus</span>
+                      <strong id="plusMonthlyStatusLabel">-</strong>
+                      <span id="plusMonthlyDetail" class="meta">-</span>
+                    </div>
+                    <div id="expertMonthlyCard" class="subscription-product-card">
+                      <span class="meta">Expert</span>
+                      <strong id="expertMonthlyStatusLabel">-</strong>
+                      <span id="expertMonthlyDetail" class="meta">-</span>
+                    </div>
+                  </div>
+                </article>
+              </section>
             </div>
 
             <div id="subscriptionManagePanel" class="admin-tab-panel hidden" role="tabpanel">
               <section id="subscriptionEmptyPanel" class="panel empty-state">
                 <h2>구독을 관리할 사용자를 선택해 주세요</h2>
-                <p>사용자를 선택하면 상품 상태 저장과 주간 영상 출력 초기화를 사용할 수 있습니다.</p>
+                <p>사용자를 선택하면 광고 제거와 Pro, Plus, Expert 플랜을 직접 설정할 수 있습니다.</p>
               </section>
-            <section id="subscriptionPanel" class="panel hidden">
-              <div class="panel-header">
-                <div>
-                  <p class="eyebrow">SUBSCRIPTION</p>
-                  <h2>구독 관리</h2>
-                </div>
-                <span id="weeklyVideoUsageMeta" class="pill">-</span>
-              </div>
-              <div id="weeklyVideoUsageCard" class="usage-strip">
-                <div>
-                  <span class="meta">이번 주 영상 출력</span>
-                  <strong id="weeklyVideoRemaining">-</strong>
-                </div>
-                <div class="usage-progress">
-                  <div class="usage-meter" aria-hidden="true">
-                    <span id="weeklyVideoUsageFill"></span>
-                  </div>
-                  <span id="weeklyVideoUsageDetail" class="meta">사용량을 불러오면 표시됩니다.</span>
-                </div>
-              </div>
-              <form id="subscriptionForm" class="form form-grid">
-                <label>
-                  플랜
-                  <select id="productSelect">
-                    <option value="ad_remove">광고 제거 1회 결제</option>
-                    <option value="creator_monthly">Pro 월결제</option>
-                    <option value="plus_monthly">Plus 월결제</option>
-                    <option value="expert_monthly">Expert 월결제</option>
-                  </select>
-                </label>
-                <label>
-                  상태
-                  <select id="productStatusSelect">
-                    <option value="inactive">비활성</option>
-                    <option value="active">활성</option>
-                    <option value="expired">만료</option>
-                  </select>
-                </label>
-                <label>
-                  만료일
-                  <input id="productExpiresInput" type="date" />
-                </label>
-                <label class="full">
-                  관리자 메모
-                  <textarea id="adminNoteInput" placeholder="처리 사유, 테스트 계정 메모 등을 남겨 주세요."></textarea>
-                </label>
-                <div class="row form-actions full">
-                  <button type="submit">구독 저장</button>
-                  <button id="resetWeeklyVideoExportButton" class="secondary" type="button">
-                    주간 영상 출력 초기화
-                  </button>
-                </div>
-              </form>
-              <p id="subscriptionMessage" class="message"></p>
-            </section>
+              <section id="subscriptionPanel" class="panel hidden"></section>
             </div>
 
             <div id="backupManagePanel" class="admin-tab-panel hidden" role="tabpanel">
               <section id="backupEmptyPanel" class="panel empty-state">
                 <h2>백업을 관리할 사용자를 선택해 주세요</h2>
-                <p>사용자를 선택하면 백업 상태와 사진, 작업, 동영상, 음악 백업 데이터를 확인할 수 있습니다.</p>
+                <p>사용자를 선택하면 백업 상태와 저장된 백업 파일을 확인할 수 있습니다.</p>
               </section>
-            <section id="backupPanel" class="panel hidden">
-              <h2>백업 관리</h2>
-              <div class="list compact">
-                <div class="item">
-                  <span class="meta">백업 상태</span>
-                  <strong id="backupStatus">-</strong>
-                </div>
-                <div class="item">
-                  <span class="meta">삭제 예정일</span>
-                  <strong id="backupDeleteAfter">-</strong>
-                </div>
-                <div class="item">
-                  <span class="meta">백업 수량</span>
-                  <strong id="backupCounts">-</strong>
-                </div>
-              </div>
-              <div class="row">
-                <button id="markBackupExpiredButton" class="secondary" type="button">만료 표시</button>
-                <button id="deleteBackupButton" type="button">백업 문서 삭제 처리</button>
-              </div>
-              <p class="meta">
-                Storage 원본 파일의 완전 자동 삭제는 추후 Cloud Functions 또는 Scheduler로 분리하는 것이 안전합니다.
-              </p>
-              <p id="backupMessage" class="message"></p>
-              <div class="backup-manager">
-                <div id="backupTabs" class="tabs" role="tablist" aria-label="백업 데이터 종류">
-                  <button class="tab active" type="button" data-backup-tab="image" role="tab" aria-selected="true">
-                    이미지
-                  </button>
-                  <button class="tab" type="button" data-backup-tab="video" role="tab" aria-selected="false">
-                    동영상
-                  </button>
-                  <button class="tab" type="button" data-backup-tab="music" role="tab" aria-selected="false">
-                    음악
-                  </button>
-                </div>
-                <div class="backup-toolbar">
-                  <button id="backupUploadButton" class="secondary" type="button">업로드</button>
-                  <input id="backupUploadInput" class="hidden" type="file" />
-                </div>
-                <div id="backupItemList" class="backup-item-list" aria-live="polite"></div>
-                <div class="pagination" aria-label="백업 데이터 페이지 이동">
-                  <button id="prevBackupItemsPageButton" class="secondary" type="button">이전</button>
-                  <span id="backupItemsPageInfo" class="meta">-</span>
-                  <button id="nextBackupItemsPageButton" class="secondary" type="button">다음</button>
-                </div>
-                <p id="backupItemsMessage" class="message"></p>
-              </div>
-            </section>
+              <section id="backupPanel" class="backup-layout hidden">
+                <article class="panel backup-summary-panel">
+                  <div class="section-heading">
+                    <div>
+                      <p class="eyebrow">BACKUP</p>
+                      <h2>백업 상태</h2>
+                    </div>
+                  </div>
+                  <div class="backup-summary-grid">
+                    <div>
+                      <span class="meta">상태</span>
+                      <strong id="backupStatus">-</strong>
+                    </div>
+                    <div>
+                      <span class="meta">삭제 예정일</span>
+                      <strong id="backupDeleteAfter">-</strong>
+                    </div>
+                    <div>
+                      <span class="meta">백업 수량</span>
+                      <strong id="backupCounts">-</strong>
+                    </div>
+                  </div>
+                </article>
+
+                <article class="panel backup-content-panel">
+                  <div class="section-heading">
+                    <div>
+                      <p class="eyebrow">CONTENTS</p>
+                      <h2>백업 콘텐츠 관리</h2>
+                    </div>
+                    <button id="backupUploadButton" class="secondary" type="button">파일 업로드</button>
+                    <input id="backupUploadInput" class="hidden" type="file" />
+                  </div>
+                  <div id="backupTabs" class="tabs backup-tabs" role="tablist" aria-label="백업 데이터 종류">
+                    <button class="tab active" type="button" data-backup-tab="image" role="tab" aria-selected="true">이미지</button>
+                    <button class="tab" type="button" data-backup-tab="video" role="tab" aria-selected="false">동영상</button>
+                    <button class="tab" type="button" data-backup-tab="music" role="tab" aria-selected="false">음악</button>
+                  </div>
+                  <div id="backupItemList" class="backup-item-list" aria-live="polite"></div>
+                  <div class="pagination" aria-label="백업 데이터 페이지 이동">
+                    <button id="prevBackupItemsPageButton" class="secondary pager-button" type="button">‹</button>
+                    <span id="backupItemsPageInfo" class="meta">-</span>
+                    <button id="nextBackupItemsPageButton" class="secondary pager-button" type="button">›</button>
+                  </div>
+                  <p id="backupItemsMessage" class="message"></p>
+                </article>
+
+                <article class="panel danger-zone">
+                  <div class="section-heading">
+                    <div>
+                      <p class="eyebrow">DANGER ZONE</p>
+                      <h2>위험 작업</h2>
+                    </div>
+                  </div>
+                  <div class="danger-actions">
+                    <div class="danger-action">
+                      <div>
+                        <strong>백업 만료 처리</strong>
+                        <p class="meta">선택한 사용자의 백업을 만료 상태로 변경합니다.</p>
+                      </div>
+                      <button id="markBackupExpiredButton" class="secondary" type="button">만료 처리</button>
+                    </div>
+                    <div class="danger-action">
+                      <div>
+                        <strong>백업 전체 삭제</strong>
+                        <p class="meta">선택한 사용자의 백업 데이터와 연결 정보를 삭제 처리합니다.</p>
+                      </div>
+                      <button id="deleteBackupButton" class="danger" type="button">백업 삭제</button>
+                    </div>
+                  </div>
+                  <p class="operation-note">
+                    Storage 원본 파일은 서버 삭제 작업과 함께 정리됩니다. 삭제 전 대상 사용자를 다시 확인해 주세요.
+                  </p>
+                  <p id="backupMessage" class="message"></p>
+                </article>
+              </section>
             </div>
-          </div>
+          </section>
         </div>
       </section>
     </main>
+
     <script type="module" src="/admin.js"></script>
   </body>
 </html>
