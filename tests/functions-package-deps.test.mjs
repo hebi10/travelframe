@@ -21,12 +21,18 @@ assert.equal(
 
 assert.equal(
   functionsPackage.scripts?.quality,
-  "npm run syntax",
-  "Functions package should expose one bounded quality command"
+  "npm run syntax && npm run runtime:deps",
+  "Functions quality should verify syntax and runtime dependency compatibility"
 );
 assert.ok(
   functionsPackage.scripts?.syntax,
   "Functions package should expose a syntax verification command"
+);
+assert.ok(
+  functionsPackage.scripts?.["runtime:deps"]?.includes(
+    "google-gax/build/src/fallback"
+  ),
+  "Functions package should smoke-test the Google Cloud fallback import"
 );
 
 for (const fileName of functionJsFiles) {
@@ -36,4 +42,4 @@ for (const fileName of functionJsFiles) {
   );
 }
 
-console.log("ok - functions package keeps runtime dependencies and exposes syntax verification");
+console.log("ok - functions package keeps runtime dependencies and verifies syntax plus runtime imports");
