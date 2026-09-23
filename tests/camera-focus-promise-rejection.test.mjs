@@ -21,9 +21,10 @@ assert.ok(
 );
 assert.ok(
   cameraSource.includes("try {") &&
-    cameraSource.includes("result.catch(handleCameraFocusError);") &&
-    cameraSource.includes("handleCameraFocusError(error);"),
-  "camera focus wrapper should catch both sync native throws and rejected promises"
+    cameraSource.includes("result.catch(handleError);") &&
+    cameraSource.includes("handleCameraFocusError(error);") &&
+    cameraSource.includes("options?.onError?.();"),
+  "camera focus wrapper should catch both sync native throws and rejected promises with optional rollback"
 );
 assert.ok(
   cameraSource.includes('getUserFacingErrorMessage(error, "카메라 초점을 맞추지 못했습니다.")'),
@@ -35,9 +36,16 @@ assert.ok(
   "tap focus should use the safe native focus wrapper"
 );
 assert.equal(
-  (toggleCameraFocusLockSource.match(/runCameraFocusAction\(\(\) =>/g) ?? []).length,
+  (toggleCameraFocusLockSource.match(/runCameraFocusAction\(/g) ?? []).length,
   2,
   "focus lock and focus reset should use the safe native focus wrapper"
+);
+assert.ok(
+  toggleCameraFocusLockSource.includes("options") === false &&
+    toggleCameraFocusLockSource.includes("onError: () => {") &&
+    toggleCameraFocusLockSource.includes("cameraFocusLockedRef.current = false;") &&
+    toggleCameraFocusLockSource.includes("setCameraFocusLocked(false);"),
+  "failed focus lock should roll UI state back to unlocked"
 );
 
 console.log("ok - camera focus native promise rejections are handled");
