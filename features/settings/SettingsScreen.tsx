@@ -90,6 +90,7 @@ import { getPhotos } from "@/lib/photo-library";
 import { getUserSubscription, isCreatorSubscriptionActive } from "@/lib/subscription";
 import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 import {
+  getGuestWeeklyVideoExportUsage,
   getWeeklyVideoExportUsage,
   type WeeklyVideoExportUsage
 } from "@/lib/video-export-quota";
@@ -210,7 +211,16 @@ export default function SettingsScreen() {
           getImageBundleWorks(),
           getMadeVideos(),
           user ? syncUserMusicTracks(user) : Promise.resolve([]),
-          getWeeklyVideoExportUsage(user, planEntitlements.weeklyVideoExportLimit)
+          user
+            ? planEntitlements.weeklyVideoExportLimit > 0
+              ? getWeeklyVideoExportUsage(
+                  user,
+                  planEntitlements.weeklyVideoExportLimit
+                )
+              : Promise.resolve(null)
+            : getGuestWeeklyVideoExportUsage(
+                planEntitlements.weeklyVideoExportLimit
+              )
         ]);
         await markBackupExpired({ user, subscription });
         if (isActive) {
@@ -1045,11 +1055,13 @@ export default function SettingsScreen() {
               현재 플랜: {planEntitlements.label}
             </Text>
             <Text selectable style={[styles.backupStatusDetail, themed.mutedText]}>
-              영상 출력 (주간 한도):{" "}
-              {formatQuotaValue(
-                weeklyVideoExportUsage?.count ?? 0,
-                planEntitlements.weeklyVideoExportLimit
-              )}
+              영상 출력:{" "}
+              {planEntitlements.weeklyVideoExportLimit > 0
+                ? formatQuotaValue(
+                    weeklyVideoExportUsage?.count ?? 0,
+                    planEntitlements.weeklyVideoExportLimit
+                  )
+                : "제한 없음"}
             </Text>
             <Text selectable style={[styles.backupStatusDetail, themed.mutedText]}>
               이미지 보관함:{" "}
