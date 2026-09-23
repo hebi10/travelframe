@@ -39,6 +39,7 @@ type BodyFrameProjectSwitcherProps = {
   onUpgrade?: () => void;
   onManageProjects?: () => void;
   compact?: boolean;
+  createOnly?: boolean;
 };
 
 const formatDuration = (seconds: number) =>
@@ -56,7 +57,8 @@ export function BodyFrameProjectSwitcher({
   onCreateProject,
   onUpgrade,
   onManageProjects,
-  compact = false
+  compact = false,
+  createOnly = false
 }: BodyFrameProjectSwitcherProps) {
   const insets = useSafeAreaInsets();
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -92,6 +94,18 @@ export function BodyFrameProjectSwitcher({
   const closeAll = () => {
     setPickerOpen(false);
     setCreateOpen(false);
+  };
+
+  const openCreateSheet = () => {
+    setPickerOpen(false);
+    setCreateOpen(true);
+    if (!projectLimitState.allowed) {
+      setCreateError(
+        `현재 플랜에서는 프로젝트를 최대 ${projectLimitState.limit ?? visibleProjects.length}개까지 만들 수 있습니다.`
+      );
+      return;
+    }
+    setCreateError(null);
   };
 
   const submitProject = async () => {
@@ -149,34 +163,50 @@ export function BodyFrameProjectSwitcher({
     <>
       <Pressable
         disabled={disabled}
-        onPress={() => setPickerOpen(true)}
+        onPress={() => {
+          if (createOnly) {
+            openCreateSheet();
+            return;
+          }
+          setPickerOpen(true);
+        }}
         accessibilityRole="button"
-        accessibilityLabel="프로젝트 선택"
+        accessibilityLabel={createOnly ? "새 프로젝트 만들기" : "프로젝트 선택"}
         style={({ pressed }) => [
           styles.headerButton,
           compact && styles.headerButtonCompact,
+          createOnly && styles.createOnlyButton,
           disabled && styles.disabled,
           pressed && !disabled && styles.pressed
         ]}
       >
-        <View style={[styles.headerMainRow, compact && styles.headerMainRowCompact]}>
-          {!compact ? <Feather name="folder" size={16} color="#F5F5F5" /> : null}
-          <Text
-            numberOfLines={1}
-            style={[styles.headerTitle, compact && styles.headerTitleCompact]}
-          >
-            {activeProject?.name ?? "프로젝트 선택"}
-          </Text>
-          <Feather name="chevron-down" size={compact ? 14 : 16} color="#A0A0A6" />
-        </View>
-        <Text
-          numberOfLines={1}
-          style={[styles.headerStatus, compact && styles.headerStatusCompact]}
-        >
-          {activeSummary
-            ? `${activeSummary.photoCount} / ${activeSummary.targetPhotoCount} · ${formatDuration(activeSummary.durationSeconds)}초`
-            : "첫 프로젝트를 만들어주세요"}
-        </Text>
+        {createOnly ? (
+          <View style={styles.createOnlyRow}>
+            <Feather name="plus" size={16} color="#F5F5F5" />
+            <Text style={styles.createOnlyText}>새 프로젝트 만들기</Text>
+          </View>
+        ) : (
+          <>
+            <View style={[styles.headerMainRow, compact && styles.headerMainRowCompact]}>
+              {!compact ? <Feather name="folder" size={16} color="#F5F5F5" /> : null}
+              <Text
+                numberOfLines={1}
+                style={[styles.headerTitle, compact && styles.headerTitleCompact]}
+              >
+                {activeProject?.name ?? "프로젝트 선택"}
+              </Text>
+              <Feather name="chevron-down" size={compact ? 14 : 16} color="#A0A0A6" />
+            </View>
+            <Text
+              numberOfLines={1}
+              style={[styles.headerStatus, compact && styles.headerStatusCompact]}
+            >
+              {activeSummary
+                ? `${activeSummary.photoCount} / ${activeSummary.targetPhotoCount} · ${formatDuration(activeSummary.durationSeconds)}초`
+                : "첫 프로젝트를 만들어주세요"}
+            </Text>
+          </>
+        )}
       </Pressable>
 
       <Modal
@@ -222,20 +252,7 @@ export function BodyFrameProjectSwitcher({
             </ScrollView>
 
             <View style={styles.sheetActions}>
-              <Pressable
-                style={styles.actionRow}
-                onPress={() => {
-                  setPickerOpen(false);
-                  setCreateOpen(true);
-                  if (!projectLimitState.allowed) {
-                    setCreateError(
-                      `현재 플랜에서는 프로젝트를 최대 ${projectLimitState.limit ?? visibleProjects.length}개까지 만들 수 있습니다.`
-                    );
-                  } else {
-                    setCreateError(null);
-                  }
-                }}
-              >
+              <Pressable style={styles.actionRow} onPress={openCreateSheet}>
                 <Text style={styles.actionText}>+ 새 프로젝트</Text>
               </Pressable>
               <Pressable
@@ -414,6 +431,22 @@ const styles = StyleSheet.create({
     minHeight: bodyFrameDesign.minTouchSize,
     paddingHorizontal: 10,
     paddingVertical: 5
+  },
+  createOnlyButton: {
+    minHeight: bodyFrameDesign.minTouchSize,
+    paddingHorizontal: 12,
+    paddingVertical: 0
+  },
+  createOnlyRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6
+  },
+  createOnlyText: {
+    color: "#F5F5F5",
+    fontSize: 13,
+    fontWeight: "600"
   },
   headerMainRow: {
     flexDirection: "row",
