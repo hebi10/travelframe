@@ -1,9 +1,10 @@
 import { readTripClipSource } from "./trip-clip-test-source.mjs";
+import { readSettingsSource } from "./settings-test-source.mjs";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const appSettingsSource = fs.readFileSync("lib/app-settings.ts", "utf8");
-const settingsSource = fs.readFileSync("features/settings/SettingsScreen.tsx", "utf8");
+const settingsSource = readSettingsSource();
 const cameraSource = fs.readFileSync("features/camera/CameraScreen.tsx", "utf8");
 const tripClipSource = readTripClipSource();
 
