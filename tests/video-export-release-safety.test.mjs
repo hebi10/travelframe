@@ -11,29 +11,33 @@ const tripClipSource = readTripClipSource();
 
 assert.ok(
   releaseSection.includes("releaseWeeklyVideoExport"),
-  "weekly video export release callable should exist for old clients"
+  "weekly video export release callable should remain for old clients"
 );
 assert.equal(
   releaseSection.includes("reservationId"),
   true,
-  "weekly video export release should only reclaim quota for a server-created reservation"
+  "legacy weekly quota release should remain reservation-bound"
 );
 assert.ok(
   releaseSection.includes('status === "reserved"'),
-  "weekly video export release should only decrement reserved exports"
-);
-assert.equal(
-  tripClipSource.includes("await releaseWeeklyVideoExport(user)"),
-  false,
-  "trip clip should not release weekly export quota without a reservation id"
-);
-assert.ok(
-  tripClipSource.includes("await releaseWeeklyVideoExport(user, weeklyExportReservationId)"),
-  "trip clip should release the exact reserved weekly export on MP4 failure"
-);
-assert.ok(
-  tripClipSource.includes("await completeWeeklyVideoExport(user, weeklyExportReservationId)"),
-  "trip clip should complete the exact reserved weekly export after MP4 save succeeds"
+  "legacy weekly quota release should only decrement reserved exports"
 );
 
-console.log("ok - weekly video export release is reservation-bound");
+for (const removedClientQuota of [
+  "releaseWeeklyVideoExport(user, weeklyExportReservationId)",
+  "completeWeeklyVideoExport(user, weeklyExportReservationId)",
+  "weeklyExportReservationId"
+]) {
+  assert.equal(
+    tripClipSource.includes(removedClientQuota),
+    false,
+    `current logged-in video export should not use server weekly reservations: ${removedClientQuota}`
+  );
+}
+
+assert.ok(
+  tripClipSource.includes("recordGuestWeeklyVideoExport"),
+  "the current client should only count successful logged-out exports"
+);
+
+console.log("ok - legacy server releases stay safe while current quota is guest-only");
