@@ -44,6 +44,8 @@ function AppStack() {
           options={{ title: "미리보기", headerShown: false }}
         />
         <Stack.Screen name="project/[id]" options={{ headerShown: false }} />
+        <Stack.Screen name="video-create" options={{ headerShown: false }} />
+        <Stack.Screen name="video-library" options={{ headerShown: false }} />
         <Stack.Screen name="advanced-settings" options={{ headerShown: false }} />
         <Stack.Screen name="legacy-studio" options={{ headerShown: false }} />
       </Stack>
