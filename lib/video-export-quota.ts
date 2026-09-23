@@ -36,6 +36,7 @@ const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const PENDING_WEEKLY_VIDEO_EXPORT_COMPLETIONS_KEY =
   "pendingWeeklyVideoExportCompletions";
+const GUEST_WEEKLY_VIDEO_EXPORT_USAGE_KEY = "guestWeeklyVideoExportUsage";
 
 const getKstWeekStart = (date = new Date()) => {
   const kstDate = new Date(date.getTime() + KST_OFFSET_MS);
@@ -62,6 +63,54 @@ export const getCurrentVideoExportWeek = (date = new Date()) => {
     weekId: weekStart.toISOString().slice(0, 10),
     weekLabel: `${format.format(weekStart)} - ${format.format(weekEnd)}`
   };
+};
+
+export const getGuestWeeklyVideoExportUsage = async (
+  limit = FREE_WEEKLY_VIDEO_EXPORT_LIMIT
+): Promise<WeeklyVideoExportUsage> => {
+  const { weekId, weekLabel } = getCurrentVideoExportWeek();
+  const raw = await localStorageAdapter.getItem(GUEST_WEEKLY_VIDEO_EXPORT_USAGE_KEY);
+  let count = 0;
+
+  if (raw) {
+    try {
+      const stored = JSON.parse(raw) as { weekId?: unknown; count?: unknown };
+      if (stored.weekId === weekId) {
+        count = Math.max(0, Number(stored.count ?? 0) || 0);
+      }
+    } catch {
+      count = 0;
+    }
+  }
+
+  return buildWeeklyVideoExportUsage({
+    weekId,
+    weekLabel,
+    count,
+    limit
+  });
+};
+
+export const recordGuestWeeklyVideoExport = async (
+  limit = FREE_WEEKLY_VIDEO_EXPORT_LIMIT
+): Promise<WeeklyVideoExportUsage> => {
+  const current = await getGuestWeeklyVideoExportUsage(limit);
+  if (current.remaining <= 0) {
+    throw new Error("비로그인 영상 출력은 주 1회까지 사용할 수 있습니다.");
+  }
+
+  const count = current.count + 1;
+  await localStorageAdapter.setItem(
+    GUEST_WEEKLY_VIDEO_EXPORT_USAGE_KEY,
+    JSON.stringify({ weekId: current.weekId, count })
+  );
+
+  return buildWeeklyVideoExportUsage({
+    weekId: current.weekId,
+    weekLabel: current.weekLabel,
+    count,
+    limit
+  });
 };
 
 const getWeeklyUsageRef = (user: User, weekId: string) => {
