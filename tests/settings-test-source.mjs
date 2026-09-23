@@ -1,6 +1,7 @@
 import fs from "node:fs";
 
 const settingsSourceFiles = [
+  "features/settings/BodyFrameSettingsScreen.tsx",
   "features/settings/SettingsScreen.tsx",
   "features/settings/settings-screen.components.tsx",
   "features/settings/settings-screen.constants.ts",
