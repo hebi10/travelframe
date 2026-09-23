@@ -27,7 +27,7 @@ const importTsModule = async (filePath) => {
 const policy = await importTsModule("constants/body-frame.ts");
 assert.deepEqual(policy.BODY_FRAME_FREE_LIMITS, {
   maxProgressPhotos: 100,
-  maxProgressVideoSeconds: 10
+  maxProgressVideoSeconds: null
 });
 assert.deepEqual(policy.BODY_FRAME_PROGRESS_POLICY, {
   secondsPerPhoto: 0.1,
@@ -120,17 +120,17 @@ for (const token of [
 
 const entitlements = await importTsModule("lib/plan-entitlements.ts");
 assert.equal(entitlements.PLAN_ENTITLEMENTS.guest.maxProgressPhotos, 100);
-assert.equal(entitlements.PLAN_ENTITLEMENTS.guest.maxProgressVideoSeconds, 10);
+assert.equal(entitlements.PLAN_ENTITLEMENTS.guest.maxProgressVideoSeconds, null);
 assert.equal(entitlements.PLAN_ENTITLEMENTS.free.maxProgressPhotos, 100);
-assert.equal(entitlements.PLAN_ENTITLEMENTS.free.maxProgressVideoSeconds, 10);
+assert.equal(entitlements.PLAN_ENTITLEMENTS.free.maxProgressVideoSeconds, null);
 assert.equal(entitlements.PLAN_ENTITLEMENTS.ad_remove.maxProgressPhotos, 100);
-assert.equal(entitlements.PLAN_ENTITLEMENTS.ad_remove.maxProgressVideoSeconds, 10);
+assert.equal(entitlements.PLAN_ENTITLEMENTS.ad_remove.maxProgressVideoSeconds, null);
 assert.equal(entitlements.PLAN_ENTITLEMENTS.pro.maxProgressPhotos, 365);
-assert.equal(entitlements.PLAN_ENTITLEMENTS.pro.maxProgressVideoSeconds, 36.5);
+assert.equal(entitlements.PLAN_ENTITLEMENTS.pro.maxProgressVideoSeconds, null);
 assert.equal(entitlements.PLAN_ENTITLEMENTS.plus.maxProgressPhotos, 365);
-assert.equal(entitlements.PLAN_ENTITLEMENTS.plus.maxProgressVideoSeconds, 36.5);
+assert.equal(entitlements.PLAN_ENTITLEMENTS.plus.maxProgressVideoSeconds, null);
 assert.equal(entitlements.PLAN_ENTITLEMENTS.expert.maxProgressPhotos, 365);
-assert.equal(entitlements.PLAN_ENTITLEMENTS.expert.maxProgressVideoSeconds, 36.5);
+assert.equal(entitlements.PLAN_ENTITLEMENTS.expert.maxProgressVideoSeconds, null);
 for (const tier of ["guest", "free"]) {
   assert.equal(entitlements.PLAN_ENTITLEMENTS[tier].maxProjectCount, 1);
 }
