@@ -13,11 +13,5 @@
     "firebase-admin": "^13.10.0",
     "firebase-functions": "^6.2.0",
     "google-auth-library": "9.15.1"
-  },
-  "overrides": {
-    "gaxios": "^7.1.5",
-    "google-gax": "^5.0.7",
-    "retry-request": "^8.0.3",
-    "teeny-request": "^10.1.3"
   }
 }
