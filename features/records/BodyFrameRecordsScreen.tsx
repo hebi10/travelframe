@@ -13,15 +13,26 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppGuideOverlay } from "@/components/app-guide-overlay";
 import { bodyFrameDesign, bodyFrameTypography } from "@/constants/app-theme";
+import { BodyFrameProjectSwitcher } from "@/features/camera/BodyFrameProjectSwitcher";
+import { useAuth } from "@/lib/auth-context";
 import {
   getBodyProjectPhotos,
   getBodyProjectProgressSummary
 } from "@/lib/body-frame-camera-project";
-import { archiveBodyProject, getBodyProjects } from "@/lib/body-project-library";
+import {
+  getBodyFrameProjectCreationLimitState,
+  getBodyFrameUpgradeLabel
+} from "@/lib/body-frame-plan-limits";
+import {
+  archiveBodyProject,
+  createBodyProject,
+  getBodyProjects
+} from "@/lib/body-project-library";
 import { setLastActiveProjectId } from "@/lib/body-project-preferences";
 import { getPhotos } from "@/lib/photo-library";
+import { getPlanEntitlements } from "@/lib/plan-entitlements";
 import { useAppAppearance } from "@/lib/app-appearance";
-import type { BodyProject } from "@/types/body-project";
+import type { BodyProject, ReferencePhotoMode } from "@/types/body-project";
 import type { PhotoItem } from "@/types/photo";
 
 const getProjectCover = (project: BodyProject, photos: PhotoItem[]) => {
@@ -46,9 +57,21 @@ const formatDuration = (seconds: number) =>
     ? `${seconds.toFixed(1)}초`
     : `${Math.floor(seconds / 60)}분 ${Math.round(seconds % 60)}초`;
 
+type CreateProjectInput = {
+  name: string;
+  targetPhotoCount: number;
+  referenceMode: ReferencePhotoMode;
+};
+
 export default function BodyFrameRecordsScreen() {
   const insets = useSafeAreaInsets();
   const { palette } = useAppAppearance();
+  const { isLoggedIn, subscription } = useAuth();
+  const planEntitlements = useMemo(
+    () => getPlanEntitlements({ isLoggedIn, subscription }),
+    [isLoggedIn, subscription]
+  );
+  const upgradePlanLabel = getBodyFrameUpgradeLabel(planEntitlements.tier);
   const [projects, setProjects] = useState<BodyProject[]>([]);
   const [archivedProjects, setArchivedProjects] = useState<BodyProject[]>([]);
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
@@ -102,6 +125,33 @@ export default function BodyFrameRecordsScreen() {
     [reload]
   );
 
+  const handleCreateProject = useCallback(
+    async ({ name, targetPhotoCount, referenceMode }: CreateProjectInput) => {
+      const activeProjectCount = projects.filter(
+        (project) => !project.archived
+      ).length;
+      const projectLimitState = getBodyFrameProjectCreationLimitState({
+        activeProjectCount,
+        maxProjectCount: planEntitlements.maxProjectCount
+      });
+
+      if (!projectLimitState.allowed) {
+        throw new Error(
+          `현재 플랜에서는 프로젝트를 최대 ${projectLimitState.limit ?? activeProjectCount}개까지 만들 수 있습니다.`
+        );
+      }
+
+      const project = await createBodyProject({
+        name,
+        targetPhotoCount,
+        referenceMode
+      });
+      await setLastActiveProjectId(project.id);
+      await reload();
+    },
+    [planEntitlements.maxProjectCount, projects, reload]
+  );
+
   if (loading) {
     return (
       <View style={[styles.centered, { backgroundColor: palette.background }]}>
@@ -132,15 +182,30 @@ export default function BodyFrameRecordsScreen() {
               프로젝트별 몸의 변화를 한눈에 확인합니다.
             </Text>
           </View>
-          <Pressable
-            accessibilityRole="button"
-            style={[styles.captureButton, { backgroundColor: palette.text }]}
-            onPress={() => router.push("/camera")}
-          >
-            <Text style={[styles.captureButtonText, { color: palette.inverse }]}>
-              촬영하기
-            </Text>
-          </Pressable>
+          <View style={styles.headerActions}>
+            <BodyFrameProjectSwitcher
+              createOnly
+              compact
+              projects={projects}
+              photos={photos}
+              activeProject={null}
+              maxProgressPhotos={planEntitlements.maxProgressPhotos}
+              maxProjectCount={planEntitlements.maxProjectCount}
+              upgradePlanLabel={upgradePlanLabel}
+              onSelectProject={() => undefined}
+              onCreateProject={handleCreateProject}
+              onUpgrade={() => router.push("/account")}
+            />
+            <Pressable
+              accessibilityRole="button"
+              style={[styles.captureButton, { backgroundColor: palette.text }]}
+              onPress={() => router.push("/camera")}
+            >
+              <Text style={[styles.captureButtonText, { color: palette.inverse }]}>
+                촬영하기
+              </Text>
+            </Pressable>
+          </View>
         </View>
 
         {cards.length === 0 ? (
@@ -334,6 +399,10 @@ const styles = StyleSheet.create({
   headerCopy: {
     flex: 1,
     gap: 6
+  },
+  headerActions: {
+    width: 132,
+    gap: 8
   },
   pageTitle: {
     fontSize: bodyFrameTypography.pageTitle,
