@@ -198,8 +198,13 @@ assert.deepEqual(
 
 const routeSource = fs.readFileSync("app/(tabs)/trip-clip.tsx", "utf8");
 assert.ok(
-  routeSource.includes("BodyFrameVideoScreen"),
-  "video tab should use BodyFrameVideoScreen"
+  routeSource.includes("BodyFrameVideoHomeScreen"),
+  "video tab should use the dedicated video home screen"
+);
+const createRouteSource = fs.readFileSync("app/video-create.tsx", "utf8");
+assert.ok(
+  createRouteSource.includes("BodyFrameVideoScreen"),
+  "video creation route should use BodyFrameVideoScreen"
 );
 
 const screenSource = fs.readFileSync(
