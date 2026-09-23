@@ -1,4 +1,4 @@
-import { getCameraDevice, type CameraDevice, type CameraPosition, type DeviceFilter, type FlashMode, type MeteringMode, type PhysicalDeviceType } from "react-native-vision-camera";
+import { type CameraDevice, type CameraPosition, type DeviceFilter, type FlashMode, type MeteringMode, type PhysicalDeviceType } from "react-native-vision-camera";
 
 import { DEFAULT_GUIDE_COLOR, type AppSettings, type CameraFacing, type CameraSaveTarget } from "@/lib/app-settings";
 import type { PhotoRatioLabel } from "@/types/photo";
@@ -208,17 +208,29 @@ export function getPreferredCameraDevice(
   cameraDevices: CameraDevice[],
   cameraFacing: CameraPosition
 ) {
+  const positionDevices = cameraDevices.filter(
+    (device) => device.position === cameraFacing
+  );
+
   if (cameraFacing === "back") {
-    const torchDevices = cameraDevices.filter((device) => device.position === "back" && device.hasTorch);
+    const torchDevices = positionDevices.filter((device) => device.hasTorch);
     const wideTorchDevice =
-      torchDevices.find((device) => cameraDeviceHasLens(device, CAMERA_LENS_WIDE)) ?? torchDevices[0];
+      torchDevices.find((device) => cameraDeviceHasLens(device, CAMERA_LENS_WIDE)) ??
+      torchDevices[0];
 
     if (wideTorchDevice) {
       return wideTorchDevice;
     }
+
+    const wideDevice = positionDevices.find((device) =>
+      cameraDeviceHasLens(device, CAMERA_LENS_WIDE)
+    );
+    if (wideDevice) {
+      return wideDevice;
+    }
   }
 
-  return getCameraDevice(cameraDevices, cameraFacing, getCameraDeviceFilter(cameraFacing));
+  return positionDevices[0];
 }
 
 export function getCameraDeviceLensTypes(cameraDevice: CameraDevice | undefined) {
