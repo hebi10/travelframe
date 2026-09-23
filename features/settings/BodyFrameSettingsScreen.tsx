@@ -273,13 +273,13 @@ export default function BodyFrameSettingsScreen() {
             label="사진 간격"
             detail="영상 화면에서 사진 간격을 조절합니다."
             mark="기본 0.1초"
-            onPress={() => router.push("/trip-clip")}
+            onPress={() => router.push("/video-create")}
           />
           <BodyFrameSettingRow
             label="출력 규격"
             detail="기본은 세로 1080p이며 영상 화면에서 변경합니다."
             mark="3:4 · 1080p"
-            onPress={() => router.push("/trip-clip")}
+            onPress={() => router.push("/video-create")}
           />
         </SectionBlock>
 
