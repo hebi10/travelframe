@@ -303,6 +303,7 @@ export default function CameraScreen({
   const selectedGridGuideLineRef = useRef<GridGuideLineKey | null>(null);
   const selectedGuideShapePointIndexRef = useRef<number | null>(null);
   const cameraFocusLockedRef = useRef(false);
+  const cameraFocusActionTokenRef = useRef(0);
   const cameraExposureBiasRef = useRef(defaultAppSettings.cameraExposureBias);
   const cameraTorchAppliedRef = useRef(false);
   const focusIndicatorTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -598,6 +599,7 @@ export default function CameraScreen({
       setIsCameraScreenFocused(true);
 
       return () => {
+        cameraFocusActionTokenRef.current += 1;
         isCameraSessionActiveRef.current = false;
         isCameraReadyRef.current = false;
         cancelPendingTimedCapture();
@@ -1315,7 +1317,12 @@ export default function CameraScreen({
       action: () => Promise<void> | void,
       options?: { onError?: () => void }
     ) => {
+      const actionToken = ++cameraFocusActionTokenRef.current;
       const handleError = (error: unknown) => {
+        if (actionToken !== cameraFocusActionTokenRef.current) {
+          return;
+        }
+
         options?.onError?.();
         handleCameraFocusError(error);
       };
@@ -1333,7 +1340,12 @@ export default function CameraScreen({
   );
   const handleCameraTap = useCallback(
     (x: number, y: number) => {
-      if (!cameraDevice || !cameraRef.current || cameraFocusLockedRef.current) {
+      if (
+        !cameraDevice ||
+        !cameraRef.current ||
+        !cameraNativeControlsReady ||
+        cameraFocusLockedRef.current
+      ) {
         return;
       }
 
@@ -1356,10 +1368,15 @@ export default function CameraScreen({
       void triggerFeedback();
       scheduleFocusControlsDismiss();
     },
-    [cameraDevice, cameraFrame, runCameraFocusAction, scheduleFocusControlsDismiss, showFocusControls, triggerFeedback]
+    [cameraDevice, cameraFrame, cameraNativeControlsReady, runCameraFocusAction, scheduleFocusControlsDismiss, showFocusControls, triggerFeedback]
   );
   const toggleCameraFocusLock = useCallback(() => {
-    if (!cameraDevice || !cameraRef.current || !cameraFocusTap) {
+    if (
+      !cameraDevice ||
+      !cameraRef.current ||
+      !cameraFocusTap ||
+      !cameraNativeControlsReady
+    ) {
       return;
     }
 
@@ -1391,8 +1408,9 @@ export default function CameraScreen({
     }
 
     void triggerFeedback();
-  }, [cameraDevice, cameraFocusTap, cancelFocusControlsDismiss, runCameraFocusAction, scheduleFocusControlsDismiss, triggerFeedback]);
+  }, [cameraDevice, cameraFocusTap, cameraNativeControlsReady, cancelFocusControlsDismiss, runCameraFocusAction, scheduleFocusControlsDismiss, triggerFeedback]);
   const changeCameraFacing = useCallback((value: CameraFacing) => {
+    cameraFocusActionTokenRef.current += 1;
     setCameraFacing(value);
     setIsCameraReady(false);
     setCameraFocusTap(null);
@@ -1460,6 +1478,7 @@ export default function CameraScreen({
   }, [cameraFacing, changeCameraFacing, triggerFeedback]);
 
   const handleCameraSessionError = useCallback((error: Error) => {
+    cameraFocusActionTokenRef.current += 1;
     if (__DEV__) {
       console.warn("[camera] VisionCamera session error", error);
     }
