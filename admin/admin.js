@@ -1,9 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-app.js";
 import {
-  createUserWithEmailAndPassword,
   getAuth,
   onAuthStateChanged,
-  sendEmailVerification,
   signInWithEmailAndPassword,
   signOut
 } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-auth.js";
@@ -17,8 +15,6 @@ import {
   getFirestore,
   limit,
   query,
-  serverTimestamp,
-  setDoc,
   where
 } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore.js";
 import { getDownloadURL, getStorage, ref, uploadBytesResumable } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-storage.js";
@@ -74,7 +70,6 @@ let loadedBackupTabs = {
   video: false,
   music: false
 };
-let isCreatingRegularAccount = false;
 let allUsers = [];
 let usersPage = 1;
 const usersPageSize = 10;
@@ -293,12 +288,6 @@ const getAuthErrorMessage = (error) => {
   }
 };
 
-const sendVerificationToCurrentUser = async (user) => {
-  await sendEmailVerification(user, {
-    url: window.location.origin,
-    handleCodeInApp: false
-  });
-};
 
 const parseDate = (value) => {
   if (!value) return null;
@@ -1069,10 +1058,6 @@ onAuthStateChanged(auth, async (user) => {
     return;
   }
 
-  if (isCreatingRegularAccount) {
-    return;
-  }
-
   const isAdmin = await requireAdmin(user);
   if (!isAdmin) {
     setMessage("loginMessage", "관리자 권한이 없습니다. Firestore의 admins/{uid} 문서를 확인해 주세요.");
@@ -1101,10 +1086,8 @@ $("loginForm").addEventListener("submit", async (event) => {
 });
 
 $("signOutButton").addEventListener("click", () => signOut(auth));
-$("adminAuthTab").addEventListener("click", () => setAuthTab("admin"));
-$("signupAuthTab").addEventListener("click", () => setAuthTab("signup"));
 $("refreshUsersButton").addEventListener("click", loadUsers);
-$("userFilterInput").addEventListener("input", () => {
+$("searchInput").addEventListener("input", () => {
   usersPage = 1;
   renderUserList();
 });
@@ -1115,75 +1098,6 @@ $("prevUsersPageButton").addEventListener("click", () => {
 $("nextUsersPageButton").addEventListener("click", () => {
   usersPage += 1;
   renderUserList();
-});
-
-$("signupForm").addEventListener("submit", async (event) => {
-  event.preventDefault();
-  setMessage("signupMessage", "회원가입을 처리하고 있습니다.");
-  isCreatingRegularAccount = true;
-
-  try {
-    const credential = await createUserWithEmailAndPassword(
-      auth,
-      $("signupEmailInput").value.trim(),
-      $("signupPasswordInput").value
-    );
-    const user = credential.user;
-
-    await sendVerificationToCurrentUser(user);
-    await setDoc(doc(db, "users", user.uid), {
-      uid: user.uid,
-      email: user.email,
-      displayName: user.displayName ?? null,
-      emailVerified: user.emailVerified,
-      providerIds: user.providerData.map((provider) => provider.providerId),
-      createdAt: new Date().toISOString(),
-      lastSignInAt: new Date().toISOString(),
-      updatedAt: serverTimestamp()
-    });
-
-    await signOut(auth);
-    $("signupForm").reset();
-    setMessage(
-      "signupMessage",
-      "일반 회원가입이 완료되었습니다. 입력한 이메일로 발송된 인증 메일을 확인해 주세요."
-    );
-  } catch (error) {
-    setMessage("signupMessage", getAuthErrorMessage(error));
-  } finally {
-    if (auth.currentUser && !currentAdmin) {
-      await signOut(auth);
-    }
-    isCreatingRegularAccount = false;
-  }
-});
-
-$("resendVerificationButton").addEventListener("click", async () => {
-  const email = $("signupEmailInput").value.trim();
-  const password = $("signupPasswordInput").value;
-
-  if (!email || !password) {
-    setMessage("signupMessage", "이메일과 비밀번호를 입력한 뒤 다시 시도해 주세요.");
-    return;
-  }
-
-  setMessage("signupMessage", "인증 메일을 다시 보내고 있습니다.");
-  isCreatingRegularAccount = true;
-
-  try {
-    const credential = await signInWithEmailAndPassword(auth, email, password);
-    if (credential.user.emailVerified) {
-      setMessage("signupMessage", "이미 이메일 인증이 완료된 계정입니다.");
-    } else {
-      await sendVerificationToCurrentUser(credential.user);
-      setMessage("signupMessage", "인증 메일을 다시 보냈습니다. 메일함과 스팸함을 확인해 주세요.");
-    }
-  } catch (error) {
-    setMessage("signupMessage", getAuthErrorMessage(error));
-  } finally {
-    await signOut(auth);
-    isCreatingRegularAccount = false;
-  }
 });
 
 $("searchForm").addEventListener("submit", async (event) => {
@@ -1290,16 +1204,27 @@ const loadUserDetail = async ({ preserveBackupItems = false } = {}) => {
   $("userLastSignIn").textContent = formatDate(currentUserDoc.lastSignInAt);
 
   const activeProductIds = getActiveProductIds();
-  $("statPlan").textContent = activeProductIds.length
-    ? activeProductIds.map((productId) => productMeta[productId]?.productName ?? productId).join(" + ")
-    : "무료";
   const imageBundleCount = currentBackup?.imageBundleCount ?? 0;
   const videoCount = currentBackup?.videoCount ?? 0;
   const musicCount = currentBackup?.musicCount ?? musicTracks.size;
-  $("statBackups").textContent = String(photoBackups.size + imageBundleCount + videoCount + musicCount);
-  $("statStatus").textContent = activeProductIds.length
-    ? `${activeProductIds.length}개 활성`
-    : "비활성";
+  const backupCount = photoBackups.size + imageBundleCount + videoCount + musicCount;
+  const planTier = getAdminPlanTier();
+  const adRemoveActive = isSubscriptionActive(currentProductSubscriptions.ad_remove);
+
+  $("selectedUserName").textContent =
+    currentUserDoc.displayName || currentUserDoc.email || "사용자";
+  $("selectedUserEmail").textContent = currentUserDoc.email ?? "-";
+  $("selectedUserAvatar").textContent = (
+    currentUserDoc.displayName ||
+    currentUserDoc.email ||
+    "U"
+  ).trim().slice(0, 1).toUpperCase();
+  $("selectedAdBadge").textContent = `광고 제거 ${adRemoveActive ? "활성" : "비활성"}`;
+  $("selectedAdBadge").classList.toggle("active", adRemoveActive);
+  $("selectedPlanBadge").textContent = adminPlanLabels[planTier] ?? "무료";
+  $("selectedPlanBadge").classList.toggle("active", planTier !== "free");
+  $("selectedBackupBadge").textContent = `백업 ${backupCount}개`;
+  $("selectedBackupBadge").classList.toggle("active", backupCount > 0);
 
   renderSubscriptionCards();
   fillSubscriptionForm($("productSelect").value || "ad_remove");
@@ -1308,7 +1233,6 @@ const loadUserDetail = async ({ preserveBackupItems = false } = {}) => {
   $("backupDeleteAfter").textContent = formatDate(currentBackup?.deleteAfter);
   $("backupCounts").textContent = `사진 ${photoBackups.size}개 / 작업 ${imageBundleCount}개 / 동영상 ${videoCount}개 / 음악 ${musicCount}개`;
 
-  await renderWeeklyVideoExportUsage();
   setSelectedUserPanelsVisible(true);
 };
 
@@ -1321,15 +1245,39 @@ const saveProductSubscription = async (event) => {
 
   const productId = $("productSelect").value;
   const selectedStatus = $("productStatusSelect").value;
+  const startValue = $("productStartInput").value;
   const expiresValue = $("productExpiresInput").value;
-  const expiresAt = expiresValue ? new Date(`${expiresValue}T23:59:59`).toISOString() : null;
+  const durationValue = $("subscriptionDurationSelect").value;
+  const startedAt =
+    productId === "ad_remove" || !startValue
+      ? null
+      : new Date(`${startValue}T00:00:00`).toISOString();
+  const expiresAt =
+    productId === "ad_remove" || !expiresValue
+      ? null
+      : new Date(`${expiresValue}T23:59:59`).toISOString();
+  const termMonths =
+    productId === "ad_remove" || durationValue === "custom"
+      ? null
+      : Number(durationValue);
+
+  if (
+    productId !== "ad_remove" &&
+    selectedStatus === "active" &&
+    (!startedAt || !expiresAt)
+  ) {
+    setMessage("subscriptionMessage", "활성 월 구독은 시작일과 만료일을 입력해 주세요.");
+    return;
+  }
 
   try {
     await setAdminProductSubscription({
       targetUid: currentUserDoc.id,
       productId,
       status: selectedStatus,
-      expiresAt: productId === "ad_remove" ? null : expiresAt,
+      startedAt,
+      expiresAt,
+      termMonths,
       adminNote: $("adminNoteInput").value.trim() || null
     });
 
@@ -1340,33 +1288,29 @@ const saveProductSubscription = async (event) => {
   }
 };
 
-const resetWeeklyVideoExport = async () => {
-  if (!currentUserDoc) {
-    setMessage("subscriptionMessage", "사용자를 먼저 선택해 주세요.");
-    return;
-  }
 
-  const { weekId, weekLabel } = getCurrentVideoExportWeek();
-  const confirmed = window.confirm(`${weekLabel} 주간 영상 출력 횟수를 초기화할까요?`);
-  if (!confirmed) return;
+const syncSubscriptionExpiry = () => {
+  const productId = $("productSelect").value;
+  const duration = $("subscriptionDurationSelect").value;
+  if (productId === "ad_remove" || duration === "custom") return;
 
-  setMessage("subscriptionMessage", "주간 영상 출력 횟수를 초기화하는 중입니다.");
-
-  try {
-    await deleteDoc(doc(db, "users", currentUserDoc.id, "usage", "videoExports", "weeks", weekId));
-    await renderWeeklyVideoExportUsage();
-    setMessage("subscriptionMessage", `${weekLabel} 주간 영상 출력 횟수를 초기화했습니다.`);
-  } catch (error) {
-    setMessage("subscriptionMessage", error?.message ?? "주간 영상 출력 초기화 중 문제가 발생했습니다.");
-  }
+  const startValue = $("productStartInput").value || toLocalDateValue();
+  $("productStartInput").value = startValue;
+  $("productExpiresInput").value = addCalendarMonths(startValue, Number(duration));
 };
 
 $("productSelect").addEventListener("change", (event) => {
   fillSubscriptionForm(event.target.value);
 });
-
+$("subscriptionDurationSelect").addEventListener("change", syncSubscriptionExpiry);
+$("productStartInput").addEventListener("change", syncSubscriptionExpiry);
+$("productExpiresInput").addEventListener("change", () => {
+  if ($("productSelect").value === "ad_remove") return;
+  $("subscriptionDurationSelect").value =
+    getMonthDistance($("productStartInput").value, $("productExpiresInput").value) ||
+    "custom";
+});
 $("subscriptionForm").addEventListener("submit", saveProductSubscription);
-$("resetWeeklyVideoExportButton").addEventListener("click", resetWeeklyVideoExport);
 
 $("markBackupExpiredButton").addEventListener("click", async () => {
   if (!currentUserDoc) return;
@@ -1472,4 +1416,30 @@ $("prevBackupItemsPageButton").addEventListener("click", () => {
 $("nextBackupItemsPageButton").addEventListener("click", () => {
   backupPagesByTab[activeBackupTab] += 1;
   renderBackupItems();
+});
+
+
+document.querySelectorAll("[data-copy-target]").forEach((button) => {
+  button.addEventListener("click", async () => {
+    const target = $(button.dataset.copyTarget);
+    const value = target?.textContent?.trim();
+    if (!value || value === "-") return;
+
+    try {
+      await navigator.clipboard.writeText(value);
+      const original = button.textContent;
+      button.textContent = "복사됨";
+      window.setTimeout(() => {
+        button.textContent = original;
+      }, 1200);
+    } catch {
+      window.prompt("복사할 값입니다.", value);
+    }
+  });
+});
+
+document.querySelectorAll("[data-open-admin-tab]").forEach((button) => {
+  button.addEventListener("click", () => {
+    setAdminSectionTab("rightAdminTabs", button.dataset.openAdminTab);
+  });
 });
