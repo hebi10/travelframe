@@ -95,6 +95,25 @@ assert.equal(
   "",
   "metadata overlay must be off by default"
 );
+assert.equal(
+  video.getBodyFrameVideoOverlayText({
+    photo: { createdAt: "2026-09-22T12:00:00+09:00" },
+    measurement: {
+      recordedAt: "2026-09-20T12:00:00+09:00",
+      weightKg: 72.4,
+      bodyFatPercent: 18.2
+    },
+    overlay: {
+      showDate: true,
+      showWeight: false,
+      showBodyFat: false,
+      customText: "",
+      position: "bottom-right"
+    }
+  }),
+  "26.09.20",
+  "editable record date should take precedence over the photo capture date"
+);
 
 const photos = [
   {
