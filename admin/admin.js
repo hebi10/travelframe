@@ -145,11 +145,11 @@ const statusLabels = {
 };
 
 const weeklyVideoExportLimits = {
-  free: 1,
-  ad_remove: 1,
-  pro: 15,
-  plus: 15,
-  expert: 15
+  free: 0,
+  ad_remove: 0,
+  pro: 0,
+  plus: 0,
+  expert: 0
 };
 
 const adminPlanLabels = {
@@ -162,61 +162,72 @@ const adminPlanLabels = {
 
 const setupSubscriptionPanel = () => {
   subscriptionPanel.innerHTML = `
-    <div class="panel-header">
+    <div class="section-heading">
       <div>
         <p class="eyebrow">SUBSCRIPTION</p>
-        <h2>구독 관리</h2>
+        <h2>구독 설정</h2>
+        <p class="meta">광고 제거는 1회성 상품이며 Pro, Plus, Expert는 1개월 단위 구독입니다.</p>
       </div>
-      <span id="weeklyVideoUsageMeta" class="pill">-</span>
     </div>
-    <div id="weeklyVideoUsageCard" class="usage-strip">
-      <div>
-        <span class="meta">이번 주 영상 출력</span>
-        <strong id="weeklyVideoRemaining">-</strong>
-      </div>
-      <div class="usage-progress">
-        <div class="usage-meter" aria-hidden="true">
-          <span id="weeklyVideoUsageFill"></span>
+    <div class="subscription-editor-layout">
+      <form id="subscriptionForm" class="form subscription-form">
+        <div class="form-grid">
+          <label>
+            플랜
+            <select id="productSelect">
+              <option value="ad_remove">광고 제거 · 1회성</option>
+              <option value="creator_monthly">Pro · 1개월 구독</option>
+              <option value="plus_monthly">Plus · 1개월 구독</option>
+              <option value="expert_monthly">Expert · 1개월 구독</option>
+            </select>
+          </label>
+          <label>
+            상태
+            <select id="productStatusSelect">
+              <option value="inactive">비활성</option>
+              <option value="active">활성</option>
+              <option value="expired">만료</option>
+            </select>
+          </label>
+          <label id="productStartLabel">
+            시작일
+            <input id="productStartInput" type="date" />
+          </label>
+          <label id="subscriptionDurationLabel">
+            기간
+            <select id="subscriptionDurationSelect">
+              <option value="1">1개월</option>
+              <option value="2">2개월</option>
+              <option value="3">3개월</option>
+              <option value="6">6개월</option>
+              <option value="12">12개월</option>
+              <option value="custom">직접 지정</option>
+            </select>
+          </label>
+          <label id="productExpiresLabel">
+            만료일
+            <input id="productExpiresInput" type="date" />
+          </label>
+          <label class="full">
+            관리자 메모
+            <textarea id="adminNoteInput" maxlength="200" placeholder="처리 사유, 테스트 계정 메모 등을 남겨 주세요."></textarea>
+          </label>
         </div>
-        <span id="weeklyVideoUsageDetail" class="meta">사용량을 불러오면 표시됩니다.</span>
-      </div>
+        <div class="subscription-form-footer">
+          <p id="subscriptionPeriodHelp" class="meta">월 구독은 시작일을 기준으로 선택한 기간만큼 만료일이 자동 계산됩니다.</p>
+          <button type="submit">구독 저장</button>
+        </div>
+      </form>
+      <aside class="subscription-policy-panel">
+        <h3>상품 정책</h3>
+        <div class="policy-list">
+          <div><span class="meta">광고 제거</span><strong>1회성 · 만료일 없음</strong></div>
+          <div><span class="meta">Pro / Plus / Expert</span><strong>1개월 단위 구독</strong></div>
+          <div><span class="meta">영상 출력</span><strong>로그인 사용자는 제한 없음</strong></div>
+        </div>
+        <p class="operation-note">관리자에서 저장한 값은 앱에 즉시 반영됩니다. Google Play 구독 정보가 이후 동기화되면 실제 결제 상태로 다시 갱신될 수 있습니다.</p>
+      </aside>
     </div>
-    <form id="subscriptionForm" class="form form-grid">
-      <label>
-        관리할 상품
-        <select id="productSelect">
-          <option value="ad_remove">광고 제거 1회 결제</option>
-          <option value="creator_monthly">Pro 월결제</option>
-          <option value="plus_monthly">Plus 월결제</option>
-          <option value="expert_monthly">Expert 월결제</option>
-        </select>
-      </label>
-      <label>
-        상태
-        <select id="productStatusSelect">
-          <option value="inactive">비활성</option>
-          <option value="active">활성</option>
-          <option value="expired">만료</option>
-        </select>
-      </label>
-      <label>
-        만료일
-        <input id="productExpiresInput" type="date" />
-      </label>
-      <label class="full">
-        관리자 메모
-        <textarea id="adminNoteInput" placeholder="처리 사유, 테스트 계정 메모 등을 남겨 주세요."></textarea>
-      </label>
-      <div class="row form-actions full">
-        <button type="submit">상품 상태 저장</button>
-        <button id="resetWeeklyVideoExportButton" class="secondary" type="button">
-          주간 영상 출력 초기화
-        </button>
-      </div>
-    </form>
-    <p class="meta">
-      두 상품은 별도로 저장됩니다. 앱 호환을 위해 현재 활성 상품 정보도 함께 갱신합니다.
-    </p>
     <p id="subscriptionMessage" class="message"></p>
   `;
 };
