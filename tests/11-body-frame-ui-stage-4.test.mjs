@@ -5,6 +5,15 @@ const detailSource = fs.readFileSync(
   "features/records/BodyFrameProjectDetailScreen.tsx",
   "utf8"
 );
+const recordsSource = fs.readFileSync(
+  "features/records/BodyFrameRecordsScreen.tsx",
+  "utf8"
+);
+const projectSwitcherSource = fs.readFileSync(
+  "features/camera/BodyFrameProjectSwitcher.tsx",
+  "utf8"
+);
+const rootLayoutSource = fs.readFileSync("app/_layout.tsx", "utf8");
 
 for (const token of [
   "오늘 사진 찍기",
@@ -52,4 +61,28 @@ assert.ok(
   "legacy project editing should remain available inside the project settings sheet"
 );
 
-console.log("Body Frame UI Stage 4 project-detail contract passed.");
+for (const token of [
+  "BodyFrameProjectSwitcher",
+  "createOnly",
+  "handleCreateProject",
+  "createBodyProject",
+  "getBodyFrameProjectCreationLimitState"
+]) {
+  assert.ok(recordsSource.includes(token), `records screen should contain ${token}`);
+}
+
+for (const token of ["createOnly", "openCreateSheet", "새 프로젝트 만들기"]) {
+  assert.ok(
+    projectSwitcherSource.includes(token),
+    `project switcher creation-only entry should contain ${token}`
+  );
+}
+
+assert.ok(
+  rootLayoutSource.includes(
+    '<Stack.Screen name="photo/[id]" options={{ headerShown: false }} />'
+  ),
+  "photo detail should hide the duplicate native stack header"
+);
+
+console.log("Body Frame UI Stage 4 project-detail and records-entry contracts passed.");
