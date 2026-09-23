@@ -1,6 +1,5 @@
 import { readTripClipSource } from "./trip-clip-test-source.mjs";
 import assert from "node:assert/strict";
-import fs from "node:fs";
 
 const source = readTripClipSource();
 
@@ -10,40 +9,39 @@ assert.ok(
 );
 assert.ok(
   source.includes("weeklyVideoExportLimit"),
-  "trip clip should use the current plan weekly video export limit"
+  "trip clip should retain the guest weekly video export limit value"
 );
 assert.ok(
   source.includes("planEntitlements.canExportVideo"),
   "trip clip should use the plan video export entitlement"
 );
 assert.ok(
-  source.includes("getWeeklyVideoExportUsage(user, weeklyVideoExportLimit)"),
-  "trip clip should load weekly usage with the plan limit"
+  source.includes("getGuestWeeklyVideoExportUsage(weeklyVideoExportLimit)"),
+  "trip clip should load guest weekly usage locally"
 );
 assert.ok(
-  source.includes("reserveWeeklyVideoExport(user, weeklyVideoExportLimit)"),
-  "trip clip should reserve weekly MP4 exports with the plan limit"
+  source.includes("recordGuestWeeklyVideoExport(weeklyVideoExportLimit)"),
+  "trip clip should record a successful guest MP4 export"
 );
 assert.ok(
-  source.includes("weeklyExportReservationId = reservation.reservationId"),
-  "trip clip should keep the reservation id returned by weekly MP4 export reserve"
+  source.includes("if (isLoggedIn)") &&
+    source.includes("await executeSelectedExport({ returnToVideoWorks })"),
+  "logged-in users should export without a weekly reservation"
 );
-assert.ok(
-  source.includes("completeWeeklyVideoExport(user, weeklyExportReservationId)"),
-  "trip clip should complete weekly MP4 export quota only after save succeeds"
-);
-assert.ok(
-  source.includes("releaseWeeklyVideoExport(user, weeklyExportReservationId)"),
-  "trip clip should release weekly MP4 export quota when save fails"
-);
+for (const removed of [
+  "reserveWeeklyVideoExport(user, weeklyVideoExportLimit)",
+  "completeWeeklyVideoExport(user, weeklyExportReservationId)",
+  "releaseWeeklyVideoExport(user, weeklyExportReservationId)"
+]) {
+  assert.equal(
+    source.includes(removed),
+    false,
+    `logged-in export should not use legacy weekly reservations: ${removed}`
+  );
+}
 assert.ok(
   source.includes("showWatermark={planEntitlements.showWatermark}"),
   "recording canvas watermark should follow plan entitlements"
 );
-assert.equal(
-  source.includes("제한 없이"),
-  false,
-  "trip clip copy should not promise unlimited Pro video exports"
-);
 
-console.log("ok - trip clip uses plan entitlements for video export access");
+console.log("ok - trip clip applies a weekly quota only to logged-out exports");
