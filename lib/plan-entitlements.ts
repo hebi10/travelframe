@@ -31,8 +31,6 @@ export type PlanEntitlements = {
 export const GIB = 1024 * 1024 * 1024;
 
 const FREE_PROGRESS_PHOTO_LIMIT = 100;
-const FREE_PROGRESS_VIDEO_SECONDS = 10;
-const PAID_PROGRESS_VIDEO_SECONDS = 36.5;
 export const CLOUD_BACKUP_PHOTOS_PER_PROJECT = 365;
 
 const paidPlan = ({
@@ -49,7 +47,7 @@ const paidPlan = ({
   tier,
   label,
   canExportVideo: true,
-  weeklyVideoExportLimit: 15,
+  weeklyVideoExportLimit: 0,
   showAds: false,
   showWatermark: false,
   canUseAdvancedOutput: true,
@@ -59,7 +57,7 @@ const paidPlan = ({
   musicTrackLimit: 10,
   backupStorageBytes,
   maxProgressPhotos: CLOUD_BACKUP_PHOTOS_PER_PROJECT,
-  maxProgressVideoSeconds: PAID_PROGRESS_VIDEO_SECONDS,
+  maxProgressVideoSeconds: null,
   maxProjectCount: null,
   maxCloudBackupProjects,
   maxCloudPhotosPerProject: CLOUD_BACKUP_PHOTOS_PER_PROJECT
@@ -69,7 +67,45 @@ export const PLAN_ENTITLEMENTS: Record<PlanTier, PlanEntitlements> = {
   guest: {
     tier: "guest",
     label: "비로그인",
-    canExportVideo: false,
+    canExportVideo: true,
+    weeklyVideoExportLimit: 1,
+    showAds: false,
+    showWatermark: true,
+    canUseAdvancedOutput: false,
+    canBackupToCloud: false,
+    localImageLimit: 100,
+    localVideoLimit: 30,
+    musicTrackLimit: 0,
+    backupStorageBytes: 0,
+    maxProgressPhotos: FREE_PROGRESS_PHOTO_LIMIT,
+    maxProgressVideoSeconds: null,
+    maxProjectCount: 1,
+    maxCloudBackupProjects: 0,
+    maxCloudPhotosPerProject: 0
+  },
+  free: {
+    tier: "free",
+    label: "무료",
+    canExportVideo: true,
+    weeklyVideoExportLimit: 0,
+    showAds: true,
+    showWatermark: true,
+    canUseAdvancedOutput: false,
+    canBackupToCloud: false,
+    localImageLimit: 100,
+    localVideoLimit: 30,
+    musicTrackLimit: 0,
+    backupStorageBytes: 0,
+    maxProgressPhotos: FREE_PROGRESS_PHOTO_LIMIT,
+    maxProgressVideoSeconds: null,
+    maxProjectCount: 1,
+    maxCloudBackupProjects: 0,
+    maxCloudPhotosPerProject: 0
+  },
+  ad_remove: {
+    tier: "ad_remove",
+    label: "광고 제거",
+    canExportVideo: true,
     weeklyVideoExportLimit: 0,
     showAds: false,
     showWatermark: true,
@@ -80,45 +116,7 @@ export const PLAN_ENTITLEMENTS: Record<PlanTier, PlanEntitlements> = {
     musicTrackLimit: 0,
     backupStorageBytes: 0,
     maxProgressPhotos: FREE_PROGRESS_PHOTO_LIMIT,
-    maxProgressVideoSeconds: FREE_PROGRESS_VIDEO_SECONDS,
-    maxProjectCount: 1,
-    maxCloudBackupProjects: 0,
-    maxCloudPhotosPerProject: 0
-  },
-  free: {
-    tier: "free",
-    label: "무료",
-    canExportVideo: true,
-    weeklyVideoExportLimit: 1,
-    showAds: true,
-    showWatermark: true,
-    canUseAdvancedOutput: false,
-    canBackupToCloud: false,
-    localImageLimit: 100,
-    localVideoLimit: 30,
-    musicTrackLimit: 0,
-    backupStorageBytes: 0,
-    maxProgressPhotos: FREE_PROGRESS_PHOTO_LIMIT,
-    maxProgressVideoSeconds: FREE_PROGRESS_VIDEO_SECONDS,
-    maxProjectCount: 1,
-    maxCloudBackupProjects: 0,
-    maxCloudPhotosPerProject: 0
-  },
-  ad_remove: {
-    tier: "ad_remove",
-    label: "광고 제거",
-    canExportVideo: true,
-    weeklyVideoExportLimit: 1,
-    showAds: false,
-    showWatermark: true,
-    canUseAdvancedOutput: false,
-    canBackupToCloud: false,
-    localImageLimit: 100,
-    localVideoLimit: 30,
-    musicTrackLimit: 0,
-    backupStorageBytes: 0,
-    maxProgressPhotos: FREE_PROGRESS_PHOTO_LIMIT,
-    maxProgressVideoSeconds: FREE_PROGRESS_VIDEO_SECONDS,
+    maxProgressVideoSeconds: null,
     maxProjectCount: 2,
     maxCloudBackupProjects: 0,
     maxCloudPhotosPerProject: 0
