@@ -234,19 +234,8 @@ const setupSubscriptionPanel = () => {
 
 setupSubscriptionPanel();
 
-const setAuthTab = (target) => {
-  const isAdminTab = target === "admin";
-  $("adminAuthTab").classList.toggle("active", isAdminTab);
-  $("signupAuthTab").classList.toggle("active", !isAdminTab);
-  $("adminAuthTab").setAttribute("aria-selected", String(isAdminTab));
-  $("signupAuthTab").setAttribute("aria-selected", String(!isAdminTab));
-  $("adminAuthPanel").classList.toggle("hidden", !isAdminTab);
-  $("signupAuthPanel").classList.toggle("hidden", isAdminTab);
-};
 
 const adminTabPanelIds = {
-  userSearch: "userSearchPanel",
-  operationLinks: "operationLinksPanel",
   userDetail: "userDetailPanel",
   subscriptionManage: "subscriptionManagePanel",
   backupManage: "backupManagePanel"
@@ -259,10 +248,7 @@ const setAdminSectionTab = (tabListId, target) => {
     button.setAttribute("aria-selected", String(isActive));
   });
 
-  const panelIds =
-    tabListId === "leftAdminTabs"
-      ? ["userSearchPanel", "operationLinksPanel"]
-      : ["userDetailPanel", "subscriptionManagePanel", "backupManagePanel"];
+  const panelIds = ["userDetailPanel", "subscriptionManagePanel", "backupManagePanel"];
 
   panelIds.forEach((panelId) => {
     $(panelId)?.classList.toggle("hidden", panelId !== adminTabPanelIds[target]);
@@ -271,12 +257,6 @@ const setAdminSectionTab = (tabListId, target) => {
 
 document.querySelectorAll("[data-admin-tab]").forEach((button) => {
   button.setAttribute("type", "button");
-});
-
-document.querySelectorAll("#leftAdminTabs [data-admin-tab]").forEach((button) => {
-  button.addEventListener("click", () => {
-    setAdminSectionTab("leftAdminTabs", button.dataset.adminTab);
-  });
 });
 
 document.querySelectorAll("#rightAdminTabs [data-admin-tab]").forEach((button) => {
@@ -354,6 +334,37 @@ const formatBytes = (value) => {
 const toDateInput = (value) => {
   const date = parseDate(value);
   return date ? date.toISOString().slice(0, 10) : "";
+};
+
+const toLocalDateValue = (date = new Date()) => {
+  const offset = date.getTimezoneOffset() * 60 * 1000;
+  return new Date(date.getTime() - offset).toISOString().slice(0, 10);
+};
+
+const addCalendarMonths = (dateValue, months) => {
+  if (!dateValue || !Number.isFinite(Number(months))) return "";
+  const [year, month, day] = dateValue.split("-").map(Number);
+  if (!year || !month || !day) return "";
+
+  const targetMonthIndex = month - 1 + Number(months);
+  const targetYear = year + Math.floor(targetMonthIndex / 12);
+  const normalizedMonthIndex = ((targetMonthIndex % 12) + 12) % 12;
+  const lastDay = new Date(targetYear, normalizedMonthIndex + 1, 0).getDate();
+  const targetDay = Math.min(day, lastDay);
+
+  return [
+    String(targetYear).padStart(4, "0"),
+    String(normalizedMonthIndex + 1).padStart(2, "0"),
+    String(targetDay).padStart(2, "0")
+  ].join("-");
+};
+
+const getMonthDistance = (startValue, endValue) => {
+  if (!startValue || !endValue) return null;
+  for (const months of [1, 2, 3, 6, 12]) {
+    if (addCalendarMonths(startValue, months) === endValue) return String(months);
+  }
+  return "custom";
 };
 
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
@@ -499,10 +510,29 @@ const renderSubscriptionCards = () => {
 
 const fillSubscriptionForm = (productId = $("productSelect").value) => {
   const subscription = currentProductSubscriptions[productId];
+  const isOneTime = productId === "ad_remove";
+  const startValue = toDateInput(subscription?.startedAt) || toLocalDateValue();
+  const expiresValue = toDateInput(subscription?.expiresAt);
+
   $("productSelect").value = productId;
   $("productStatusSelect").value = subscription?.status ?? "inactive";
-  $("productExpiresInput").value = toDateInput(subscription?.expiresAt);
-  $("productExpiresInput").disabled = productId === "ad_remove";
+  $("productStartInput").value = isOneTime ? "" : startValue;
+  $("productExpiresInput").value = isOneTime
+    ? ""
+    : expiresValue || addCalendarMonths(startValue, 1);
+  $("subscriptionDurationSelect").value = isOneTime
+    ? "1"
+    : getMonthDistance(startValue, $("productExpiresInput").value) ?? "1";
+
+  $("productStartInput").disabled = isOneTime;
+  $("productExpiresInput").disabled = isOneTime;
+  $("subscriptionDurationSelect").disabled = isOneTime;
+  $("productStartLabel").classList.toggle("is-disabled", isOneTime);
+  $("productExpiresLabel").classList.toggle("is-disabled", isOneTime);
+  $("subscriptionDurationLabel").classList.toggle("is-disabled", isOneTime);
+  $("subscriptionPeriodHelp").textContent = isOneTime
+    ? "광고 제거는 1회성 상품이므로 기간과 만료일을 사용하지 않습니다."
+    : "월 구독은 시작일을 기준으로 선택한 기간만큼 만료일이 자동 계산됩니다.";
   $("adminNoteInput").value = subscription?.adminNote ?? "";
 };
 
@@ -527,6 +557,10 @@ const showAdmin = (enabled) => {
   loginPanel.classList.toggle("hidden", enabled);
   adminPanel.classList.toggle("hidden", !enabled);
   $("signOutButton").classList.toggle("hidden", !enabled);
+  $("adminIdentity")?.classList.toggle("hidden", !enabled);
+  if (enabled && currentAdmin) {
+    $("adminIdentity").textContent = currentAdmin.email || "관리자";
+  }
 };
 
 const resetBackupManager = () => {
