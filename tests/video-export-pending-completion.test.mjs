@@ -5,29 +5,37 @@ import { readTripClipSource } from "./trip-clip-test-source.mjs";
 const quotaSource = fs.readFileSync("lib/video-export-quota.ts", "utf8");
 const tripClipSource = readTripClipSource();
 
+for (const token of [
+  "GUEST_WEEKLY_VIDEO_EXPORT_USAGE_KEY",
+  "getGuestWeeklyVideoExportUsage",
+  "recordGuestWeeklyVideoExport",
+  "localStorageAdapter"
+]) {
+  assert.ok(
+    quotaSource.includes(token),
+    `guest weekly video quota should persist locally via ${token}`
+  );
+}
+
 assert.ok(
-  quotaSource.includes("pendingWeeklyVideoExportCompletions"),
-  "weekly video export quota should persist pending completions locally"
+  tripClipSource.includes("getGuestWeeklyVideoExportUsage"),
+  "trip clip should restore guest weekly export usage"
 );
 assert.ok(
-  quotaSource.includes("recordPendingWeeklyVideoExportCompletion"),
-  "weekly video export quota should expose a helper to queue failed completions"
-);
-assert.ok(
-  quotaSource.includes("flushPendingWeeklyVideoExportCompletions"),
-  "weekly video export quota should expose a helper to retry pending completions after restart"
-);
-assert.ok(
-  quotaSource.includes("localStorageAdapter"),
-  "weekly video export pending completions should use the existing local storage adapter"
-);
-assert.ok(
-  tripClipSource.includes("recordPendingWeeklyVideoExportCompletion"),
-  "trip clip should queue the reservation when completeWeeklyVideoExport fails after MP4 save"
-);
-assert.ok(
-  tripClipSource.includes("flushPendingWeeklyVideoExportCompletions"),
-  "trip clip should retry queued weekly export completions when loading usage"
+  tripClipSource.includes("recordGuestWeeklyVideoExport"),
+  "trip clip should count a guest export only after the MP4 save succeeds"
 );
 
-console.log("ok - weekly video export pending completion recovery is wired");
+for (const legacyAuthenticatedQuota of [
+  "recordPendingWeeklyVideoExportCompletion",
+  "flushPendingWeeklyVideoExportCompletions",
+  "reserveWeeklyVideoExport(user, weeklyVideoExportLimit)"
+]) {
+  assert.equal(
+    tripClipSource.includes(legacyAuthenticatedQuota),
+    false,
+    `logged-in video exports should not depend on weekly quota recovery: ${legacyAuthenticatedQuota}`
+  );
+}
+
+console.log("ok - guest weekly video quota persists locally without limiting logged-in exports");
