@@ -2,12 +2,12 @@ export const BODY_FRAME_DEFAULT_REFERENCE_MODE = "latest" as const;
 
 export const BODY_FRAME_FREE_LIMITS = {
   maxProgressPhotos: 100,
-  maxProgressVideoSeconds: 10
+  maxProgressVideoSeconds: null
 } as const;
 
 export const BODY_FRAME_PRO_MINIMUMS = {
   maxProgressPhotos: 365,
-  maxProgressVideoSeconds: 36.5
+  maxProgressVideoSeconds: null
 } as const;
 
 export const BODY_FRAME_PROGRESS_POLICY = {
