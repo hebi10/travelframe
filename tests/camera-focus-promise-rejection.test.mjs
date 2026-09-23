@@ -31,6 +31,27 @@ assert.ok(
   "camera focus errors should be converted to a user-facing message"
 );
 assert.ok(
+  cameraSource.includes("const cameraFocusActionTokenRef = useRef(0);") &&
+    cameraSource.includes("const actionToken = ++cameraFocusActionTokenRef.current;") &&
+    cameraSource.includes("if (actionToken !== cameraFocusActionTokenRef.current)") &&
+    cameraSource.includes("return;"),
+  "a newer focus action should supersede an older focus promise without showing a false cancellation error"
+);
+assert.ok(
+  handleCameraTapSource.includes("!cameraNativeControlsReady"),
+  "tap focus should only start after native camera controls are ready"
+);
+assert.ok(
+  toggleCameraFocusLockSource.includes("!cameraNativeControlsReady"),
+  "focus lock should only start after native camera controls are ready"
+);
+assert.ok(
+  cameraSource.includes("cameraFocusActionTokenRef.current += 1;") &&
+    cameraSource.includes("setIsCameraScreenFocused(false);"),
+  "camera blur or session changes should invalidate pending focus promises"
+);
+
+assert.ok(
   handleCameraTapSource.includes("runCameraFocusAction(() =>") &&
     handleCameraTapSource.includes("cameraRef.current?.focusTo(tap,"),
   "tap focus should use the safe native focus wrapper"
@@ -48,4 +69,4 @@ assert.ok(
   "failed focus lock should roll UI state back to unlocked"
 );
 
-console.log("ok - camera focus native promise rejections are handled");
+console.log("ok - camera focus promise rejections ignore superseded tap-to-lock cancellations");
