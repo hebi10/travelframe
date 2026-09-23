@@ -27,7 +27,7 @@ assert.ok(
 );
 
 for (const token of [
-  "const isMonthlyProduct = [",
+  "const isMonthlyProduct = ADMIN_MONTHLY_PRODUCT_IDS.includes(productId);",
   "const safeStartedAt =",
   "const safeExpiresAt =",
   "const safeTermMonths =",
