@@ -1868,7 +1868,15 @@ const requireAdminUid = async (request) => {
 exports.setAdminProductSubscription = secureOnCall(async (request) => {
   try {
     const adminUid = await requireAdminUid(request);
-    const { targetUid, productId, status, expiresAt, adminNote } = request.data ?? {};
+    const {
+      targetUid,
+      productId,
+      status,
+      startedAt,
+      expiresAt,
+      termMonths,
+      adminNote
+    } = request.data ?? {};
 
     if (typeof targetUid !== "string" || !targetUid) {
       throw new HttpsError("invalid-argument", "targetUid is required.");
@@ -1887,14 +1895,48 @@ exports.setAdminProductSubscription = secureOnCall(async (request) => {
       throw new HttpsError("not-found", "Target user was not found.");
     }
 
+    const isMonthlyProduct = [
+      "creator_monthly",
+      "plus_monthly",
+      "expert_monthly"
+    ].includes(productId);
+    const safeStartedAt =
+      isMonthlyProduct &&
+      typeof startedAt === "string" &&
+      !Number.isNaN(new Date(startedAt).getTime())
+        ? startedAt
+        : null;
     const safeExpiresAt =
-      ["creator_monthly", "plus_monthly", "expert_monthly"].includes(productId) &&
+      isMonthlyProduct &&
       typeof expiresAt === "string" &&
       !Number.isNaN(new Date(expiresAt).getTime())
         ? expiresAt
         : null;
+    const safeTermMonths =
+      isMonthlyProduct &&
+      Number.isInteger(termMonths) &&
+      termMonths >= 1 &&
+      termMonths <= 24
+        ? termMonths
+        : null;
+
+    if (isMonthlyProduct && status === "active") {
+      if (!safeStartedAt || !safeExpiresAt) {
+        throw new HttpsError(
+          "invalid-argument",
+          "Active monthly subscriptions require valid startedAt and expiresAt values."
+        );
+      }
+      if (new Date(safeExpiresAt).getTime() <= new Date(safeStartedAt).getTime()) {
+        throw new HttpsError(
+          "invalid-argument",
+          "Subscription expiresAt must be later than startedAt."
+        );
+      }
+    }
+
     const safeAdminNote = typeof adminNote === "string" && adminNote.trim()
-      ? adminNote.trim()
+      ? adminNote.trim().slice(0, 200)
       : null;
     const meta = ADMIN_PRODUCT_META[productId];
     const productRef = db.doc(`users/${targetUid}/subscriptions/${productId}`);
@@ -1906,8 +1948,12 @@ exports.setAdminProductSubscription = secureOnCall(async (request) => {
       productId,
       status,
       provider: "admin",
-      startedAt: previousSubscription?.startedAt ?? nowIso,
-      expiresAt: safeExpiresAt,
+      startedAt:
+        productId === "ad_remove"
+          ? previousSubscription?.startedAt ?? nowIso
+          : safeStartedAt ?? previousSubscription?.startedAt ?? nowIso,
+      expiresAt: productId === "ad_remove" ? null : safeExpiresAt,
+      termMonths: productId === "ad_remove" ? null : safeTermMonths,
       lastPaymentAt:
         status === "active" ? nowIso : previousSubscription?.lastPaymentAt ?? null,
       priceLabel: meta.priceLabel,
@@ -1955,6 +2001,9 @@ exports.setAdminProductSubscription = secureOnCall(async (request) => {
       adminUid,
       adminEmail: request.auth?.token?.email ?? null,
       note: safeAdminNote,
+      startedAt: subscription.startedAt,
+      expiresAt: subscription.expiresAt,
+      termMonths: subscription.termMonths ?? null,
       createdAt: FieldValue.serverTimestamp()
     });
 
