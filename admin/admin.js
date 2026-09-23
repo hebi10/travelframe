@@ -138,14 +138,6 @@ const statusLabels = {
   expired: "만료"
 };
 
-const weeklyVideoExportLimits = {
-  free: 0,
-  ad_remove: 0,
-  pro: 0,
-  plus: 0,
-  expert: 0
-};
-
 const adminPlanLabels = {
   free: "무료",
   ad_remove: "광고 제거",
@@ -355,32 +347,6 @@ const getMonthDistance = (startValue, endValue) => {
   return "custom";
 };
 
-const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
-const DAY_MS = 24 * 60 * 60 * 1000;
-
-const getCurrentVideoExportWeek = (date = new Date()) => {
-  const kstDate = new Date(date.getTime() + KST_OFFSET_MS);
-  const kstDay = kstDate.getUTCDay();
-  const daysFromMonday = (kstDay + 6) % 7;
-  const weekStart = new Date(
-    Date.UTC(
-      kstDate.getUTCFullYear(),
-      kstDate.getUTCMonth(),
-      kstDate.getUTCDate() - daysFromMonday
-    )
-  );
-  const weekEnd = new Date(weekStart.getTime() + 6 * DAY_MS);
-  const format = new Intl.DateTimeFormat("ko-KR", {
-    month: "long",
-    day: "numeric"
-  });
-
-  return {
-    weekId: weekStart.toISOString().slice(0, 10),
-    weekLabel: `${format.format(weekStart)} - ${format.format(weekEnd)}`
-  };
-};
-
 const isSubscriptionActive = (subscription) => {
   if (!subscription || subscription.plan !== "premium" || subscription.status !== "active") {
     return false;
@@ -424,9 +390,6 @@ const getAdminPlanTier = () => {
 
   return "free";
 };
-
-const getWeeklyVideoExportLimitForCurrentUser = () =>
-  weeklyVideoExportLimits[getAdminPlanTier()] ?? weeklyVideoExportLimits.free;
 
 const resolveProductSubscription = (productId, productSnap, current) => {
   if (productSnap.exists()) {
@@ -546,6 +509,7 @@ const showAdmin = (enabled) => {
   adminPanel.classList.toggle("hidden", !enabled);
   $("signOutButton").classList.toggle("hidden", !enabled);
   $("adminIdentity")?.classList.toggle("hidden", !enabled);
+  document.querySelector(".ops-menu")?.classList.toggle("hidden", !enabled);
   if (enabled && currentAdmin) {
     $("adminIdentity").textContent = currentAdmin.email || "관리자";
   }
@@ -574,8 +538,6 @@ const resetBackupManager = () => {
     setMessage("backupItemsMessage", "사용자를 선택한 뒤 탭을 클릭해 백업 데이터를 불러오세요.");
   }
 };
-
-const renderWeeklyVideoExportUsage = async () => null;
 
 const setSelectedUserPanelsVisible = (hasSelectedUser) => {
   $("selectedUserHeader")?.classList.toggle("hidden", !hasSelectedUser);
@@ -1201,7 +1163,6 @@ const loadUserDetail = async ({ preserveBackupItems = false } = {}) => {
   $("userName").textContent = currentUserDoc.displayName ?? "-";
   $("userLastSignIn").textContent = formatDate(currentUserDoc.lastSignInAt);
 
-  const activeProductIds = getActiveProductIds();
   const imageBundleCount = currentBackup?.imageBundleCount ?? 0;
   const videoCount = currentBackup?.videoCount ?? 0;
   const musicCount = currentBackup?.musicCount ?? musicTracks.size;
