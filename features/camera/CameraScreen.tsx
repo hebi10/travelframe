@@ -432,7 +432,7 @@ export default function CameraScreen({
   const cameraNativeControlsReady = isCameraSessionActive && isCameraReady;
   const cameraLightAvailable = cameraFacing === "back" && Boolean(cameraDevice);
   const visibleTorchEnabled = cameraLightAvailable && torchEnabled;
-  const cameraNativeZoom = cameraNativeControlsReady ? cameraZoomFactor : undefined;
+  const cameraNativeZoom = isCameraSessionActive ? cameraZoomFactor : undefined;
   const cameraNativeExposure = cameraNativeControlsReady ? cameraExposureBias : undefined;
   const cameraColorOverlayStyle = useMemo(
     () => [
