@@ -48,6 +48,52 @@ const getEntryDrafts = (entry?: BodyMeasurementEntry | null): Drafts => ({
   waist: entry?.waistCm !== undefined ? String(entry.waistCm) : ""
 });
 
+const formatRecordedDate = (value: string) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(date);
+  const values = Object.fromEntries(
+    parts.map(({ type, value: partValue }) => [type, partValue])
+  );
+
+  return `${values.year}-${values.month}-${values.day}`;
+};
+
+const parseRecordedDate = (value: string, fallback: string) => {
+  const trimmed = value.trim();
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(trimmed);
+  if (!match) {
+    return null;
+  }
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const validationDate = new Date(Date.UTC(year, month - 1, day));
+
+  if (
+    validationDate.getUTCFullYear() !== year ||
+    validationDate.getUTCMonth() !== month - 1 ||
+    validationDate.getUTCDate() !== day
+  ) {
+    return null;
+  }
+
+  if (trimmed === formatRecordedDate(fallback)) {
+    return fallback;
+  }
+
+  return new Date(`${trimmed}T12:00:00+09:00`).toISOString();
+};
+
 const parseDraft = (metric: BodyMeasurementMetric, value: string) => {
   if (metric === "weight") {
     return parseMeasurementInput(value, bodyMeasurementInputRanges.weightKg);
@@ -75,6 +121,8 @@ export function BodyMeasurementEditorSheet({
   recordedAt,
   settings,
   entry,
+  requiredMetrics = [],
+  allowRecordedAtEdit = false,
   onClose,
   onSaved,
   onDeleted
@@ -86,6 +134,8 @@ export function BodyMeasurementEditorSheet({
   recordedAt: string;
   settings: BodyMeasurementSettings;
   entry?: BodyMeasurementEntry | null;
+  requiredMetrics?: BodyMeasurementMetric[];
+  allowRecordedAtEdit?: boolean;
   onClose: () => void;
   onSaved: (entry: BodyMeasurementEntry) => void;
   onDeleted?: () => void;
@@ -93,22 +143,28 @@ export function BodyMeasurementEditorSheet({
   const { palette } = useAppAppearance();
   const insets = useSafeAreaInsets();
   const [drafts, setDrafts] = useState<Drafts>(emptyDrafts);
+  const [recordedDateDraft, setRecordedDateDraft] = useState("");
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const activeMetrics = useMemo(
-    () =>
-      (Object.entries(settings.fields) as [BodyMeasurementMetric, boolean][])
-        .filter(([, enabled]) => enabled)
-        .map(([metric]) => metric),
-    [settings.fields]
-  );
+  const activeMetrics = useMemo(() => {
+    const configuredMetrics = (
+      Object.entries(settings.fields) as [BodyMeasurementMetric, boolean][]
+    )
+      .filter(([, enabled]) => enabled)
+      .map(([metric]) => metric);
+
+    return Array.from(
+      new Set<BodyMeasurementMetric>([...requiredMetrics, ...configuredMetrics])
+    );
+  }, [requiredMetrics, settings.fields]);
 
   useEffect(() => {
     if (!visible) return;
     setDrafts(getEntryDrafts(entry));
+    setRecordedDateDraft(formatRecordedDate(entry?.recordedAt ?? recordedAt));
     setNote(entry?.note ?? "");
-  }, [entry, visible]);
+  }, [entry, recordedAt, visible]);
 
   const updateDraft = (metric: BodyMeasurementMetric, value: string) => {
     setDrafts((current) => ({ ...current, [metric]: value }));
@@ -130,6 +186,17 @@ export function BodyMeasurementEditorSheet({
       return;
     }
 
+    const nextRecordedAt = allowRecordedAtEdit
+      ? parseRecordedDate(recordedDateDraft, entry?.recordedAt ?? recordedAt)
+      : recordedAt;
+    if (!nextRecordedAt) {
+      Alert.alert(
+        "날짜를 확인해 주세요.",
+        "날짜는 YYYY-MM-DD 형식으로 입력해 주세요."
+      );
+      return;
+    }
+
     setSaving(true);
     try {
       const saved = await saveBodyMeasurement({
@@ -137,7 +204,7 @@ export function BodyMeasurementEditorSheet({
         projectId,
         photoId,
         sequence,
-        recordedAt,
+        recordedAt: nextRecordedAt,
         weightKg: parsed.weight ?? undefined,
         bodyFatPercent: parsed.bodyFat ?? undefined,
         skeletalMuscleKg: parsed.skeletalMuscle ?? undefined,
@@ -201,7 +268,13 @@ export function BodyMeasurementEditorSheet({
           <View style={styles.header}>
             <View style={styles.headerCopy}>
               <Text style={[styles.title, { color: palette.text }]}>
-                {entry ? "수치 기록 수정" : "수치 기록"}
+                {allowRecordedAtEdit
+                  ? entry
+                    ? "기록 정보 수정"
+                    : "기록 정보"
+                  : entry
+                    ? "수치 기록 수정"
+                    : "수치 기록"}
               </Text>
               <Text style={[styles.detail, { color: palette.muted }]}>
                 입력한 값은 현재 기기에만 저장됩니다.
@@ -221,6 +294,32 @@ export function BodyMeasurementEditorSheet({
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={styles.content}
           >
+            {allowRecordedAtEdit ? (
+              <View style={styles.field}>
+                <Text style={[styles.label, { color: palette.muted }]}>날짜</Text>
+                <View
+                  style={[
+                    styles.inputRow,
+                    {
+                      borderColor: palette.line,
+                      backgroundColor: palette.background
+                    }
+                  ]}
+                >
+                  <TextInput
+                    value={recordedDateDraft}
+                    onChangeText={setRecordedDateDraft}
+                    placeholder="YYYY-MM-DD"
+                    placeholderTextColor={palette.faint}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    maxLength={10}
+                    style={[styles.input, { color: palette.text }]}
+                  />
+                </View>
+              </View>
+            ) : null}
+
             {activeMetrics.map((metric) => {
               const meta = bodyMeasurementMetricMeta[metric];
               return (
@@ -298,7 +397,7 @@ export function BodyMeasurementEditorSheet({
                 onPress={confirmDelete}
               >
                 <Text style={[styles.deleteText, { color: palette.muted }]}>
-                  수치 기록 삭제
+                  {allowRecordedAtEdit ? "기록 정보 삭제" : "수치 기록 삭제"}
                 </Text>
               </Pressable>
             ) : null}
