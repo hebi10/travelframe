@@ -25,7 +25,7 @@ for (const snippet of [
   "const cameraTorchAppliedRef = useRef(false);",
   "if (!enabled && !cameraTorchAppliedRef.current) {",
   "cameraTorchAppliedRef.current = true;",
-  "const cameraNativeZoom = cameraNativeControlsReady ? cameraZoomFactor : undefined;",
+  "const cameraNativeZoom = isCameraSessionActive ? cameraZoomFactor : undefined;",
   "const cameraNativeExposure = cameraNativeControlsReady ? cameraExposureBias : undefined;",
   "const runCameraFocusAction = useCallback(",
   "try {",
@@ -61,4 +61,4 @@ assert.ok(
   "camera should not force ready=false from a device-id effect because VisionCamera owns lifecycle start/stop events"
 );
 
-console.log("ok - camera native zoom exposure and torch props are guarded until active");
+console.log("ok - camera zoom restores with the active session while exposure and torch remain readiness-guarded");
