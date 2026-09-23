@@ -6,11 +6,9 @@ const js = fs.readFileSync("admin/admin.js", "utf8");
 const css = fs.readFileSync("admin/styles.css", "utf8");
 
 for (const snippet of [
-  'id="leftAdminTabs"',
-  'data-admin-tab="userSearch"',
-  'data-admin-tab="operationLinks"',
-  'id="userSearchPanel"',
-  'id="operationLinksPanel"',
+  'class="admin-console"',
+  'class="user-sidebar panel strong"',
+  'id="selectedUserHeader"',
   'id="rightAdminTabs"',
   'data-admin-tab="userDetail"',
   'data-admin-tab="subscriptionManage"',
@@ -18,36 +16,49 @@ for (const snippet of [
   'id="userDetailPanel"',
   'id="subscriptionManagePanel"',
   'id="backupManagePanel"',
-  'id="userSubscriptionSummary"',
-  'id="resetWeeklyVideoExportButton"'
+  'id="userSubscriptionSummary"'
 ]) {
-  assert.ok(html.includes(snippet), `admin tabbed layout HTML missing: ${snippet}`);
+  assert.ok(html.includes(snippet), `admin console HTML missing: ${snippet}`);
 }
 
 assert.ok(
   html.indexOf('id="searchForm"') < html.indexOf('id="userList"'),
-  "left user tab should put direct search above user selection"
+  "user sidebar should put its single search above the user list"
 );
+
+for (const removed of [
+  'id="leftAdminTabs"',
+  'data-admin-tab="operationLinks"',
+  'id="operationLinksPanel"',
+  'id="userFilterInput"',
+  'id="resetWeeklyVideoExportButton"'
+]) {
+  assert.equal(
+    html.includes(removed),
+    false,
+    `admin console should not expose legacy duplicate controls: ${removed}`
+  );
+}
 
 for (const snippet of [
   "const setAdminSectionTab =",
-  "document.querySelectorAll(\"[data-admin-tab]\")",
-  "const getCurrentVideoExportWeek =",
-  "const resetWeeklyVideoExport = async () =>",
-  "deleteDoc(doc(db, \"users\", currentUserDoc.id, \"usage\", \"videoExports\", \"weeks\", weekId))",
-  'document.querySelectorAll("#leftAdminTabs [data-admin-tab]")',
   'document.querySelectorAll("#rightAdminTabs [data-admin-tab]")',
-  '$("resetWeeklyVideoExportButton").addEventListener("click", resetWeeklyVideoExport);'
+  '$("searchInput").addEventListener("input"',
+  "const syncSubscriptionExpiry = () =>",
+  '$("subscriptionDurationSelect").addEventListener("change", syncSubscriptionExpiry)',
+  '$("productStartInput").addEventListener("change", syncSubscriptionExpiry)'
 ]) {
-  assert.ok(js.includes(snippet), `admin tabbed layout JS missing: ${snippet}`);
+  assert.ok(js.includes(snippet), `admin console JS missing: ${snippet}`);
 }
 
 for (const snippet of [
-  ".admin-tabs",
-  ".admin-tab-panel",
-  ".admin-tab-panel.hidden"
+  ".admin-console",
+  ".user-sidebar",
+  ".selected-user-header",
+  ".admin-tab-panel.hidden",
+  ".subscription-editor-layout"
 ]) {
-  assert.ok(css.includes(snippet), `admin tabbed layout CSS missing: ${snippet}`);
+  assert.ok(css.includes(snippet), `admin console CSS missing: ${snippet}`);
 }
 
-console.log("ok - admin page splits management sections into tabs");
+console.log("ok - admin page uses a user sidebar and selected-user console");
