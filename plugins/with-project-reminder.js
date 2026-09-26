@@ -259,10 +259,7 @@ object ProjectReminderScheduler {
 
     ids.forEach { projectId ->
       val projectName = prefs.getString("name_$projectId", "바디 프레임") ?: "바디 프레임"
-      val notificationMessage =
-      prefs.getString("message_$projectId", "오늘 사진을 기록할 시간입니다.")
-        ?: "오늘 사진을 기록할 시간입니다."
-    val hour = prefs.getInt("hour_$projectId", 20)
+      val hour = prefs.getInt("hour_$projectId", 20)
       val minute = prefs.getInt("minute_$projectId", 0)
       val weekdays = parseWeekdays(
         prefs.getString("weekdays_$projectId", DEFAULT_WEEKDAYS) ?: DEFAULT_WEEKDAYS
@@ -354,6 +351,9 @@ class ProjectReminderReceiver : BroadcastReceiver() {
     val projectName =
       prefs.getString("name_$projectId", intent.getStringExtra(EXTRA_PROJECT_NAME))
         ?: "바디 프레임"
+    val notificationMessage =
+      prefs.getString("message_$projectId", "오늘 사진을 기록할 시간입니다.")
+        ?: "오늘 사진을 기록할 시간입니다."
     val hour = prefs.getInt("hour_$projectId", 20)
     val minute = prefs.getInt("minute_$projectId", 0)
     val weekdays = ProjectReminderScheduler.getStoredWeekdays(context, projectId)
