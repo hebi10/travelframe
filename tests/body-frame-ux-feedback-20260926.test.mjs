@@ -21,7 +21,9 @@ assert.ok(
 assert.ok(
   camera.includes("settings.referencePhotoVisible") &&
     camera.includes("referencePhotoVisible: false") &&
-    camera.includes("referencePhotoVisible: true"),
+    camera.includes("referencePhotoVisible: true") &&
+    camera.includes("commitOverlayOpacityPercent") &&
+    camera.includes("queueAppSettingsUpdate({ overlayOpacity: nextOpacity })"),
   "camera reference-photo visibility should load and update the shared persisted setting"
 );
 assert.ok(
