@@ -4,7 +4,9 @@ import {
 import { useState } from "react";
 import {
   FlatList,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   StyleSheet,
   View
@@ -75,6 +77,10 @@ export function BodyFrameVideoOptionsSheet({
 
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onCancel}>
+      <KeyboardAvoidingView
+        style={styles.keyboardAvoidingRoot}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
       <Pressable style={[styles.backdrop, { paddingTop: insets.top + 24 }]} onPress={onCancel}>
         <Pressable
           style={[styles.sheet, { backgroundColor: palette.surface, paddingBottom: Math.max(insets.bottom, 16) }]}
@@ -282,11 +288,15 @@ export function BodyFrameVideoOptionsSheet({
           </View>
         </Pressable>
       </Pressable>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  keyboardAvoidingRoot: {
+    flex: 1
+  },
   backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" },
   sheet: { maxHeight: "90%", padding: 16, gap: 16, borderTopLeftRadius: 12, borderTopRightRadius: 12 },
   title: { fontSize: 20, fontWeight: "600" },
