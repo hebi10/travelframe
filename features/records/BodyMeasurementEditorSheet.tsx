@@ -5,7 +5,9 @@ import {
   useState } from "react";
 import {
   Alert,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -254,6 +256,10 @@ export function BodyMeasurementEditorSheet({
       visible={visible}
       onRequestClose={onClose}
     >
+      <KeyboardAvoidingView
+        style={styles.keyboardAvoidingRoot}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
       <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable
           style={[
@@ -406,11 +412,15 @@ export function BodyMeasurementEditorSheet({
           </ScrollView>
         </Pressable>
       </Pressable>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  keyboardAvoidingRoot: {
+    flex: 1
+  },
   backdrop: {
     flex: 1,
     justifyContent: "flex-end",
