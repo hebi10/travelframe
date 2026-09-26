@@ -1,13 +1,15 @@
+import { AppText as Text } from "@/components/app-text";
 import Constants from "expo-constants";
-import { router } from "expo-router";
-import { useMemo, useState } from "react";
+import {
+  router } from "expo-router";
+import { useMemo,
+  useState } from "react";
 import {
   Linking,
   Modal,
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   View
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";

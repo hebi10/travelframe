@@ -1,13 +1,17 @@
-import { Feather } from "@expo/vector-icons";
+import { AppText as Text } from "@/components/app-text";
+import {
+  Feather } from "@expo/vector-icons";
 import { Image } from "@/components/private-media-image";
-import { router, useFocusEffect } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
+import { router,
+  useFocusEffect } from "expo-router";
+import { useCallback,
+  useMemo,
+  useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   View
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";

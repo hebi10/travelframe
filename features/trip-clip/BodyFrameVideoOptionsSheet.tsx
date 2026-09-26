@@ -1,12 +1,12 @@
-import { Image } from "@/components/private-media-image";
+import { AppText as Text, AppTextInput as TextInput } from "@/components/app-text";
+import {
+  Image } from "@/components/private-media-image";
 import { useState } from "react";
 import {
   FlatList,
   Modal,
   Pressable,
   StyleSheet,
-  Text,
-  TextInput,
   View
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";

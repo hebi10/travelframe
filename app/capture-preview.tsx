@@ -1,12 +1,17 @@
-import { router, type Href, useLocalSearchParams } from "expo-router";
+import { AppText as Text } from "@/components/app-text";
+import {
+  router,
+  type Href,
+  useLocalSearchParams } from "expo-router";
 import { PrivateNativeImage as NativeImage } from "@/components/private-media-image";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect,
+  useMemo,
+  useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   Pressable,
   StyleSheet,
-  Text,
   View
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";

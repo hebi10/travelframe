@@ -1,13 +1,18 @@
-import { Image } from "@/components/private-media-image";
+import { AppText as Text } from "@/components/app-text";
+import {
+  Image } from "@/components/private-media-image";
 import * as FileSystem from "expo-file-system/legacy";
-import { router, useFocusEffect } from "expo-router";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { router,
+  useFocusEffect } from "expo-router";
+import { useCallback,
+  useMemo,
+  useRef,
+  useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   View
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
