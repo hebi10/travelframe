@@ -1,5 +1,11 @@
-import { useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { AppText as Text } from "@/components/app-text";
+import {
+  useMemo,
+  useState } from "react";
+import { Pressable,
+  StyleSheet,
+  View
+} from "react-native";
 
 import { bodyFrameDesign, bodyFrameTypography } from "@/constants/app-theme";
 import {

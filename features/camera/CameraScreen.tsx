@@ -1,10 +1,21 @@
-import { Feather } from "@expo/vector-icons";
+import { AppText as Text, AppTextInput as TextInput } from "@/components/app-text";
+import {
+  Feather } from "@expo/vector-icons";
 import { PrivateNativeImage as NativeImage } from "@/components/private-media-image";
-import { CAMERA_CAPTURE_TIMEOUT_MESSAGE, CameraCaptureTimeoutError, waitForCameraCapture } from "@/lib/camera-capture-timeout";
+import { CAMERA_CAPTURE_TIMEOUT_MESSAGE,
+  CameraCaptureTimeoutError,
+  waitForCameraCapture } from "@/lib/camera-capture-timeout";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
-import { router, useFocusEffect } from "expo-router";
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { router,
+  useFocusEffect } from "expo-router";
+import { useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type ReactNode } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -15,8 +26,6 @@ import {
   Modal,
   Pressable,
   ScrollView,
-  Text,
-  TextInput,
   View
 } from "react-native";
 import { Gesture, GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";

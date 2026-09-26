@@ -1,6 +1,14 @@
-import { useFocusEffect } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
-import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { AppText as Text } from "@/components/app-text";
+import {
+  useFocusEffect } from "expo-router";
+import { useCallback,
+  useMemo,
+  useState } from "react";
+import { Alert,
+  Pressable,
+  StyleSheet,
+  View
+} from "react-native";
 import type { User } from "firebase/auth";
 
 import { SectionBlock } from "@/components/section-block";

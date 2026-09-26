@@ -1,6 +1,13 @@
-import { Feather } from "@expo/vector-icons";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { AppText as Text } from "@/components/app-text";
+import {
+  Feather } from "@expo/vector-icons";
+import { useCallback,
+  useEffect,
+  useMemo,
+  useState } from "react";
+import { Pressable,
+  View
+} from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { runOnJS, useDerivedValue, useSharedValue } from "react-native-reanimated";
 

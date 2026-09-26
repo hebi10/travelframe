@@ -1,11 +1,14 @@
+import { AppText as Text } from "@/components/app-text";
 import Constants from "expo-constants";
-import { useEffect, useMemo, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState } from "react";
 import {
   Alert,
   Linking,
   Pressable,
   StyleSheet,
-  Text,
   View
 } from "react-native";
 
