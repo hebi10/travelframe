@@ -31,13 +31,13 @@ assert.ok(
 );
 
 const keyboardSafeInputFiles = [
+  "features/camera/CameraScreen.tsx",
+  "features/settings/SettingsScreen.tsx",
   "features/records/BodyMeasurementEditorSheet.tsx",
   "features/camera/BodyFrameProjectSwitcher.tsx",
   "features/records/BodyFrameProjectDetailScreen.tsx",
   "features/trip-clip/BodyFrameVideoOptionsSheet.tsx",
   "features/account/AccountScreen.tsx",
-  "features/trip-clip/components/TripClipHeader.tsx",
-  "features/trip-clip/components/TripClipGuideTab.tsx",
   "features/trip-clip/TripClipScreen.tsx"
 ];
 
@@ -75,7 +75,9 @@ assert.ok(
   edit.includes("captureEditedImage()") &&
     edit.includes("renderedUri: rendered.uri") &&
     edit.includes("renderedWidth: rendered.width") &&
-    edit.includes("renderedHeight: rendered.height"),
+    edit.includes("renderedHeight: rendered.height") &&
+    edit.includes("sourcePhoto?.projectId") &&
+    edit.includes('executeSaveEdit("overwrite")'),
   "photo edit save should persist the exact rendered canvas state"
 );
 
