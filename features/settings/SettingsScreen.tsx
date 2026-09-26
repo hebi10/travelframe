@@ -867,7 +867,7 @@ export default function SettingsScreen() {
                   {isLoggedIn
                     ? planEntitlements.canBackupToCloud
                       ? `${user?.email ?? "계정"}으로 ${planEntitlements.label} 기능과 클라우드 백업을 사용할 수 있습니다.`
-                      : `${user?.email ?? "계정"}으로 로그인하면 무료 플랜에서 프로젝트당 100장과 최대 10초 변화 영상을 사용할 수 있습니다.`
+                      : `${user?.email ?? "계정"}으로 로그인하면 무료 플랜에서 프로젝트 1개, 프로젝트당 사진 최대 100장과 변화 영상 만들기를 사용할 수 있습니다.`
                     : "비로그인 상태에서는 기본 촬영과 로컬 기록을 사용할 수 있습니다."}
                 </Text>
               </View>

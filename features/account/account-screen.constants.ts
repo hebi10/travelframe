@@ -47,10 +47,10 @@ export const initialSubscriptionProducts: UserSubscriptionProducts = {
 };
 
 export const signedInBenefits = [
-  "무료 플랜: 프로젝트 1개 · 사진 최대 100장",
-  "변화 영상 최대 10초",
-  "워터마크 포함, 광고 표시",
-  "Pro 이상: 프로젝트 수 무제한 · 프로젝트당 사진 최대 365장 + 선택 프로젝트 클라우드 백업"
+  "무료 플랜: 프로젝트 1개",
+  "프로젝트당 사진 최대 100장",
+  "변화 영상 만들기 가능",
+  "워터마크 포함, 광고 표시"
 ];
 
 export const paymentPlans: PaymentPlan[] = [

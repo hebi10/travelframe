@@ -11,7 +11,7 @@ const requiredCopy = [
   {
     file: "features/account/AccountScreen.tsx",
     snippets: [
-      "무료 플랜은 프로젝트당 100장과 최대 10초 변화 영상을 지원합니다.",
+      "무료 플랜은 프로젝트 1개, 프로젝트당 사진 최대 100장과 변화 영상 만들기를 지원합니다.",
       'SectionBlock title="현재 상태"',
       'label="현재 플랜"',
       'label="현재 프로젝트"',

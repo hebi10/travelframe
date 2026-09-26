@@ -8,28 +8,31 @@ const accountSource = [
 const settingsSource = fs.readFileSync("features/settings/SettingsScreen.tsx", "utf8");
 
 for (const snippet of [
-  "무료 플랜은 프로젝트당 100장과 최대 10초 변화 영상을 지원합니다.",
-  "무료 플랜: 프로젝트 1개 · 사진 최대 100장",
-  "변화 영상 최대 10초",
-  "Pro 이상: 프로젝트 수 무제한 · 프로젝트당 사진 최대 365장 + 선택 프로젝트 클라우드 백업"
+  "무료 플랜은 프로젝트 1개, 프로젝트당 사진 최대 100장과 변화 영상 만들기를 지원합니다.",
+  "무료 플랜: 프로젝트 1개",
+  "프로젝트당 사진 최대 100장",
+  "변화 영상 만들기 가능"
 ]) {
   assert.ok(accountSource.includes(snippet), `account copy should include ${snippet}`);
 }
 
 assert.ok(
-  settingsSource.includes("프로젝트당 100장과 최대 10초 변화 영상을 사용할 수 있습니다."),
-  "advanced settings login copy should follow Body Frame free-plan limits"
+  settingsSource.includes("무료 플랜에서 프로젝트 1개, 프로젝트당 사진 최대 100장과 변화 영상 만들기를 사용할 수 있습니다."),
+  "advanced settings login copy should follow the current free-plan policy"
 );
 
 for (const stale of [
+  "변화 영상 최대 10초",
+  "무료 플랜은 프로젝트당 100장과 최대 10초 변화 영상을 지원합니다.",
+  "Pro 이상: 프로젝트 수 무제한 · 프로젝트당 사진 최대 365장 + 선택 프로젝트 클라우드 백업",
   "무료 로그인하면 사진 편집과 MP4 영상 주 1회 저장을 사용할 수 있습니다.",
   "사진 편집과 MP4 영상 주 1회"
 ]) {
   assert.equal(
     accountSource.includes(stale),
     false,
-    `primary account copy should remove stale TravelFrame entitlement wording: ${stale}`
+    `primary account copy should remove stale entitlement wording: ${stale}`
   );
 }
 
-console.log("ok - login copy follows Body Frame plan policy");
+console.log("ok - login copy follows Body Frame free-plan policy");
