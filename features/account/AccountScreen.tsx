@@ -3,8 +3,10 @@ import { useFocusEffect } from "expo-router";
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
   Linking,
   Modal,
+  Platform,
   Pressable,
   Text,
   TextInput,
@@ -488,6 +490,10 @@ export default function AccountScreen() {
 
   return (
     <>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
       <ScreenShell
         eyebrow="계정"
         title={isLoggedIn ? "내 계정과 플랜" : "로그인하고 기록을 보호하세요."}
@@ -930,6 +936,7 @@ export default function AccountScreen() {
         </View>
       ) : null}
       </ScreenShell>
+      </KeyboardAvoidingView>
 
       <Modal
         animationType="fade"
