@@ -77,6 +77,7 @@ import { useAppAppearance } from "@/lib/app-appearance";
 import { useAuth } from "@/lib/auth-context";
 import { getPlanEntitlements } from "@/lib/plan-entitlements";
 import {
+  DEFAULT_PROJECT_REMINDER_MESSAGE,
   PROJECT_REMINDER_WEEKDAY_OPTIONS,
   cancelProjectReminder,
   defaultProjectReminderSettings,
@@ -488,6 +489,9 @@ export default function BodyFrameProjectDetailScreen() {
   const [reminderModalOpen, setReminderModalOpen] = useState(false);
   const [reminderEnabledDraft, setReminderEnabledDraft] = useState(false);
   const [reminderTimeDraft, setReminderTimeDraft] = useState("20:00");
+  const [reminderMessageDraft, setReminderMessageDraft] = useState(
+    DEFAULT_PROJECT_REMINDER_MESSAGE
+  );
   const [reminderRepeatModeDraft, setReminderRepeatModeDraft] =
     useState<ProjectReminderRepeatMode>("daily");
   const [reminderWeekdaysDraft, setReminderWeekdaysDraft] =
@@ -665,6 +669,7 @@ export default function BodyFrameProjectDetailScreen() {
   const openReminderSettings = useCallback(() => {
     setReminderEnabledDraft(reminderSettings.enabled);
     setReminderTimeDraft(formatProjectReminderTime(reminderSettings));
+    setReminderMessageDraft(reminderSettings.message);
     setReminderRepeatModeDraft(reminderSettings.repeatMode);
     setReminderWeekdaysDraft(reminderSettings.weekdays);
     setReminderModalOpen(true);
@@ -705,6 +710,7 @@ export default function BodyFrameProjectDetailScreen() {
         projectId: project.id,
         projectName: project.name,
         enabled: reminderEnabledDraft,
+        message: reminderMessageDraft,
         repeatMode: reminderRepeatModeDraft,
         weekdays: reminderWeekdaysDraft,
         ...parsedTime
@@ -725,6 +731,7 @@ export default function BodyFrameProjectDetailScreen() {
   }, [
     project,
     reminderEnabledDraft,
+    reminderMessageDraft,
     reminderRepeatModeDraft,
     reminderSaving,
     reminderTimeDraft,
@@ -1415,6 +1422,39 @@ export default function BodyFrameProjectDetailScreen() {
                       }
                     ]}
                   />
+                </View>
+
+                <View style={styles.reminderMessageBlock}>
+                  <View style={styles.reminderRepeatHeader}>
+                    <Text style={[styles.settingTitle, { color: palette.text }]}>
+                      핸드폰 알림 문구
+                    </Text>
+                    <Text style={[styles.settingDetail, { color: palette.muted }]}>
+                      알림이 도착했을 때 표시할 내용을 입력할 수 있습니다.
+                    </Text>
+                  </View>
+                  <TextInput
+                    value={reminderMessageDraft}
+                    onChangeText={setReminderMessageDraft}
+                    editable={reminderEnabledDraft && !reminderSaving}
+                    multiline
+                    maxLength={80}
+                    placeholder="오늘 사진을 기록할 시간입니다."
+                    placeholderTextColor={palette.faint}
+                    textAlignVertical="top"
+                    style={[
+                      styles.reminderMessageInput,
+                      {
+                        color: palette.text,
+                        borderColor: palette.line,
+                        backgroundColor: palette.background,
+                        opacity: reminderEnabledDraft ? 1 : 0.45
+                      }
+                    ]}
+                  />
+                  <Text style={[styles.reminderMessageCount, { color: palette.faint }]}>
+                    {reminderMessageDraft.length}/80
+                  </Text>
                 </View>
 
                 <View style={styles.reminderRepeatBlock}>
@@ -2239,7 +2279,8 @@ const styles = StyleSheet.create({
   reminderSheetTitleWrap: {
     flex: 1,
     minWidth: 0,
-    gap: 4
+    gap: 5,
+    paddingVertical: 2
   },
   reminderTimeRow: {
     flexDirection: "row",
@@ -2261,6 +2302,22 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     textAlign: "center",
     fontVariant: ["tabular-nums"]
+  },
+  reminderMessageBlock: {
+    gap: 8
+  },
+  reminderMessageInput: {
+    minHeight: 84,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderRadius: bodyFrameDesign.buttonRadius,
+    fontSize: bodyFrameTypography.body,
+    lineHeight: 20
+  },
+  reminderMessageCount: {
+    alignSelf: "flex-end",
+    fontSize: bodyFrameTypography.caption
   },
   reminderRepeatBlock: {
     gap: 10
@@ -2303,7 +2360,9 @@ const styles = StyleSheet.create({
   sheetTitle: {
     flex: 1,
     fontSize: 20,
-    fontWeight: "600"
+    lineHeight: 26,
+    fontWeight: "600",
+    includeFontPadding: false
   },
   sheetActions: {
     flexDirection: "row",
