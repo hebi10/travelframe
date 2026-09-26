@@ -1,12 +1,14 @@
-import { useEffect, useMemo, useState } from "react";
+import { AppText as Text, AppTextInput as TextInput } from "@/components/app-text";
+import {
+  useEffect,
+  useMemo,
+  useState } from "react";
 import {
   Alert,
   Modal,
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
-  TextInput,
   View
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";

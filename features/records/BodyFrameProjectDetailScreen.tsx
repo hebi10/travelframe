@@ -1,9 +1,16 @@
-import { Feather } from "@expo/vector-icons";
+import { AppText as Text, AppTextInput as TextInput } from "@/components/app-text";
+import {
+  Feather } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { Image } from "@/components/private-media-image";
 import { BodyMeasurementSummaryCard } from "@/components/body-measurement-summary-card";
-import { router, type Href, useFocusEffect, useLocalSearchParams } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
+import { router,
+  type Href,
+  useFocusEffect,
+  useLocalSearchParams } from "expo-router";
+import { useCallback,
+  useMemo,
+  useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -13,8 +20,6 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
-  TextInput,
   View
 } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";

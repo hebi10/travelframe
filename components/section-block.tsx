@@ -1,5 +1,9 @@
+import { AppText as Text } from "@/components/app-text";
 import type { ReactNode } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import {
+  StyleSheet,
+  View
+} from "react-native";
 
 import { typography } from "@/constants/app-theme";
 import { useAppAppearance } from "@/lib/app-appearance";

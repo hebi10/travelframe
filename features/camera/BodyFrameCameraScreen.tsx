@@ -1,4 +1,7 @@
-import { router, useFocusEffect } from "expo-router";
+import { AppText as Text } from "@/components/app-text";
+import {
+  router,
+  useFocusEffect } from "expo-router";
 import {
   useCallback,
   useEffect,
@@ -7,7 +10,10 @@ import {
   useState,
   useSyncExternalStore
 } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable,
+  StyleSheet,
+  View
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { bodyFrameDesign, bodyFrameTypography } from "@/constants/app-theme";

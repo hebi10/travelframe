@@ -1,12 +1,13 @@
-import { Feather } from "@expo/vector-icons";
-import { useMemo, useState } from "react";
+import { AppText as Text, AppTextInput as TextInput } from "@/components/app-text";
+import {
+  Feather } from "@expo/vector-icons";
+import { useMemo,
+  useState } from "react";
 import {
   Modal,
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
-  TextInput,
   View
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
