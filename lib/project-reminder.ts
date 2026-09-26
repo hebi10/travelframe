@@ -9,6 +9,8 @@ import { localStorageAdapter } from "@/lib/local-storage";
 const PROJECT_REMINDER_STORAGE_KEY = "body-frame.project-reminders.v1";
 const DEFAULT_PROJECT_REMINDER_HOUR = 20;
 const DEFAULT_PROJECT_REMINDER_MINUTE = 0;
+export const DEFAULT_PROJECT_REMINDER_MESSAGE = "오늘 사진을 기록할 시간입니다.";
+const MAX_PROJECT_REMINDER_MESSAGE_LENGTH = 80;
 const ALL_PROJECT_REMINDER_WEEKDAYS = [0, 1, 2, 3, 4, 5, 6] as const;
 const POST_NOTIFICATIONS_PERMISSION =
   "android.permission.POST_NOTIFICATIONS" as Parameters<
@@ -36,6 +38,7 @@ type AndroidProjectReminderModule = {
   scheduleReminder: (
     projectId: string,
     projectName: string,
+    notificationMessage: string,
     hour: number,
     minute: number,
     weekdaysCsv: string
@@ -45,6 +48,7 @@ type AndroidProjectReminderModule = {
 
 export type ProjectReminderSettings = {
   enabled: boolean;
+  message: string;
   hour: number;
   minute: number;
   repeatMode: ProjectReminderRepeatMode;
@@ -57,6 +61,7 @@ const nativeReminder = NativeModules.AndroidProjectReminder as
 
 export const defaultProjectReminderSettings: ProjectReminderSettings = {
   enabled: false,
+  message: DEFAULT_PROJECT_REMINDER_MESSAGE,
   hour: DEFAULT_PROJECT_REMINDER_HOUR,
   minute: DEFAULT_PROJECT_REMINDER_MINUTE,
   repeatMode: "daily",
@@ -79,6 +84,15 @@ const clampReminderTime = (
       ? minute
       : DEFAULT_PROJECT_REMINDER_MINUTE
 });
+
+const normalizeReminderMessage = (value: unknown) => {
+  if (typeof value !== "string") {
+    return DEFAULT_PROJECT_REMINDER_MESSAGE;
+  }
+
+  const normalized = value.trim().slice(0, MAX_PROJECT_REMINDER_MESSAGE_LENGTH);
+  return normalized || DEFAULT_PROJECT_REMINDER_MESSAGE;
+};
 
 const normalizeWeekdays = (value: unknown): ProjectReminderWeekday[] => {
   if (!Array.isArray(value)) {
@@ -136,6 +150,7 @@ const parseReminderMap = (
             projectId,
             {
               enabled: record.enabled === true,
+              message: normalizeReminderMessage(record.message),
               ...time,
               repeatMode,
               weekdays:
@@ -214,6 +229,7 @@ const scheduleNativeProjectReminder = async ({
   await nativeReminder.scheduleReminder(
     projectId,
     projectName,
+    settings.message,
     settings.hour,
     settings.minute,
     weekdays.join(",")
@@ -224,6 +240,7 @@ export const updateProjectReminderSettings = async ({
   projectId,
   projectName,
   enabled,
+  message,
   hour,
   minute,
   repeatMode,
@@ -232,6 +249,7 @@ export const updateProjectReminderSettings = async ({
   projectId: string;
   projectName: string;
   enabled: boolean;
+  message: string;
   hour: number;
   minute: number;
   repeatMode: ProjectReminderRepeatMode;
@@ -241,6 +259,7 @@ export const updateProjectReminderSettings = async ({
   const normalizedWeekdays = normalizeWeekdays(weekdays);
   const settings: ProjectReminderSettings = {
     enabled,
+    message: normalizeReminderMessage(message),
     ...time,
     repeatMode,
     weekdays:

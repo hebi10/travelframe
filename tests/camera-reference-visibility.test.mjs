@@ -4,6 +4,7 @@ import ts from "typescript";
 
 const source = fs.readFileSync("features/camera/CameraScreen.tsx", "utf8");
 const ast = ts.createSourceFile("camera.tsx", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+
 function runHandler(name, scope) {
   let initializer;
   function visit(node) {
@@ -18,13 +19,15 @@ function runHandler(name, scope) {
   new Function(...Object.keys(scope), `${js}; handler();`)(...Object.values(scope));
 }
 
-let hidden = new Set();
+let visible = true;
 let locked = true;
 let setup = true;
 let resets = 0;
+const persistedPatches = [];
+
 const scope = {
-  referenceProjectKey: "project-b",
-  setHiddenReferenceProjects: update => { hidden = update(hidden); },
+  setReferencePhotoVisible: value => { visible = value; },
+  queueAppSettingsUpdate: patch => { persistedPatches.push(patch); },
   setOverlayLocked: value => { locked = value; },
   setOverlaySetupActive: value => { setup = value; },
   setOverlayOpacity: () => {},
@@ -33,16 +36,21 @@ const scope = {
   setOverlayResetKey: () => { assert.fail("Hiding must not reassign a stale manual guide to the current project"); },
   setReferenceUri: () => { assert.fail("Hiding must retain the current guide for restoring"); }
 };
+
 runHandler("removeReferenceOverlay", scope);
-assert.deepEqual([...hidden], ["project-b"]);
+assert.equal(visible, false);
+assert.deepEqual(persistedPatches.at(-1), { referencePhotoVisible: false });
 assert.equal(setup, false);
 assert.equal(locked, false);
 assert.equal(resets, 1);
+
 runHandler("reopenOverlaySetup", {
   ...scope,
   referenceOverlayVisible: false,
   hasReferenceSource: true
 });
-assert.equal(hidden.size, 0);
+assert.equal(visible, true);
+assert.deepEqual(persistedPatches.at(-1), { referencePhotoVisible: true });
 assert.equal(setup, true);
-console.log("ok - project guide can hide and restore without reassigning its image or deleting photos");
+
+console.log("ok - reference guide visibility persists while retaining the current guide image");

@@ -1,4 +1,5 @@
 import { AppText as Text } from "@/components/app-text";
+import { Feather } from "@expo/vector-icons";
 import {
   Image } from "@/components/private-media-image";
 import { router,
@@ -180,36 +181,36 @@ export default function BodyFrameRecordsScreen() {
         ]}
       >
         <View style={styles.header}>
-          <View style={styles.headerCopy}>
-            <Text style={[styles.pageTitle, { color: palette.text }]}>기록</Text>
-            <Text style={[styles.pageDetail, { color: palette.muted }]}>
-              프로젝트별 몸의 변화를 한눈에 확인합니다.
+          <Text style={[styles.pageTitle, { color: palette.text }]}>기록</Text>
+          <Text style={[styles.pageDetail, { color: palette.muted }]}>
+            프로젝트별 몸의 변화를 한눈에 확인합니다.
+          </Text>
+        </View>
+
+        <View style={styles.quickActions}>
+          <BodyFrameProjectSwitcher
+            createOnly
+            compact
+            projects={projects}
+            photos={photos}
+            activeProject={null}
+            maxProgressPhotos={planEntitlements.maxProgressPhotos}
+            maxProjectCount={planEntitlements.maxProjectCount}
+            upgradePlanLabel={upgradePlanLabel}
+            onSelectProject={() => undefined}
+            onCreateProject={handleCreateProject}
+            onUpgrade={() => router.push("/account")}
+          />
+          <Pressable
+            accessibilityRole="button"
+            style={[styles.captureButton, { backgroundColor: palette.text }]}
+            onPress={() => router.push("/camera")}
+          >
+            <Feather name="camera" size={17} color={palette.inverse} />
+            <Text style={[styles.captureButtonText, { color: palette.inverse }]}>
+              바로 촬영
             </Text>
-          </View>
-          <View style={styles.headerActions}>
-            <BodyFrameProjectSwitcher
-              createOnly
-              compact
-              projects={projects}
-              photos={photos}
-              activeProject={null}
-              maxProgressPhotos={planEntitlements.maxProgressPhotos}
-              maxProjectCount={planEntitlements.maxProjectCount}
-              upgradePlanLabel={upgradePlanLabel}
-              onSelectProject={() => undefined}
-              onCreateProject={handleCreateProject}
-              onUpgrade={() => router.push("/account")}
-            />
-            <Pressable
-              accessibilityRole="button"
-              style={[styles.captureButton, { backgroundColor: palette.text }]}
-              onPress={() => router.push("/camera")}
-            >
-              <Text style={[styles.captureButtonText, { color: palette.inverse }]}>
-                촬영하기
-              </Text>
-            </Pressable>
-          </View>
+          </Pressable>
         </View>
 
         {cards.length === 0 ? (
@@ -228,15 +229,9 @@ export default function BodyFrameRecordsScreen() {
             <Text style={[styles.emptyDetail, { color: palette.muted }]}>
               촬영 화면에서 첫 프로젝트를 만들고 같은 위치와 자세로 기록을 시작하세요.
             </Text>
-            <Pressable
-              accessibilityRole="button"
-              style={[styles.primaryButton, { backgroundColor: palette.text }]}
-              onPress={() => router.push("/camera")}
-            >
-              <Text style={[styles.primaryButtonText, { color: palette.inverse }]}>
-                첫 프로젝트 만들기
-              </Text>
-            </Pressable>
+            <Text style={[styles.emptyDetail, { color: palette.faint }]}>
+              위의 새 프로젝트 버튼으로 프로젝트를 만든 뒤 바로 촬영할 수 있습니다.
+            </Text>
           </View>
         ) : (
           <View style={styles.projectGrid}>
@@ -394,19 +389,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24
   },
   header: {
+    gap: 6,
+    marginBottom: 14
+  },
+  quickActions: {
     flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: 12,
+    alignItems: "stretch",
+    gap: 8,
     marginBottom: 24
-  },
-  headerCopy: {
-    flex: 1,
-    gap: 6
-  },
-  headerActions: {
-    width: 132,
-    gap: 8
   },
   pageTitle: {
     fontSize: bodyFrameTypography.pageTitle,
@@ -417,8 +407,12 @@ const styles = StyleSheet.create({
     lineHeight: 20
   },
   captureButton: {
-    minHeight: bodyFrameDesign.minTouchSize,
+    flex: 1,
+    minHeight: bodyFrameDesign.primaryButtonHeight,
+    flexDirection: "row",
+    alignItems: "center",
     justifyContent: "center",
+    gap: 7,
     paddingHorizontal: 14,
     borderRadius: bodyFrameDesign.buttonRadius
   },

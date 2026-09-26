@@ -39,6 +39,7 @@ import {
 } from "@/features/settings/settings-screen.model";
 
 type InlineSettingKey =
+  | "referencePhotoVisible"
   | "overlayOpacity"
   | "cameraRatio"
   | "storageMode"
@@ -160,6 +161,7 @@ export default function BodyFrameSettingsScreen() {
   );
 
   const modalTitle = useMemo(() => {
+    if (activeSetting === "referencePhotoVisible") return "기준 사진 표시";
     if (activeSetting === "overlayOpacity") return "기준 사진 투명도";
     if (activeSetting === "cameraRatio") return "촬영 비율";
     if (activeSetting === "storageMode") return "저장 방식";
@@ -225,6 +227,12 @@ export default function BodyFrameSettingsScreen() {
         </View>
 
         <SectionBlock title="촬영">
+          <BodyFrameSettingRow
+            label="기준 사진 표시"
+            detail="촬영할 때 이전 기록을 기준 사진으로 겹쳐 표시"
+            mark={settings.referencePhotoVisible ? "켜짐" : "꺼짐"}
+            onPress={() => setActiveSetting("referencePhotoVisible")}
+          />
           <BodyFrameSettingRow
             label="기준 사진 투명도"
             detail="촬영 화면에 겹쳐 보이는 기준 사진의 투명도"
@@ -387,6 +395,23 @@ export default function BodyFrameSettingsScreen() {
               keyboardShouldPersistTaps="handled"
               contentContainerStyle={styles.optionList}
             >
+              {activeSetting === "referencePhotoVisible" ? (
+                <>
+                  <SettingOptionRow
+                    label="켜짐"
+                    detail="기준 사진이 있으면 촬영 화면에 자동으로 표시합니다."
+                    active={settings.referencePhotoVisible}
+                    onPress={() => void updateSetting({ referencePhotoVisible: true })}
+                  />
+                  <SettingOptionRow
+                    label="꺼짐"
+                    detail="기준 사진을 숨기고 일반 카메라 화면으로 촬영합니다."
+                    active={!settings.referencePhotoVisible}
+                    onPress={() => void updateSetting({ referencePhotoVisible: false })}
+                  />
+                </>
+              ) : null}
+
               {activeSetting === "overlayOpacity"
                 ? overlayOpacityOptions.map((opacity) => (
                     <SettingOptionRow
@@ -519,7 +544,7 @@ export default function BodyFrameSettingsScreen() {
         </Pressable>
       </Modal>
 
-      <AppGuideOverlay tabKey="settings" replaySignal={guideReplaySignal} />
+      <AppGuideOverlay tabKey="camera" replaySignal={guideReplaySignal} />
     </View>
   );
 }

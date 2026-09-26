@@ -21,9 +21,11 @@ import {
   Alert,
   AppState,
   type AppStateStatus,
+  KeyboardAvoidingView,
   Linking,
   type LayoutChangeEvent,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   View
@@ -284,7 +286,9 @@ export default function CameraScreen({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [poseGuidance, setPoseGuidance] = useState<BodyPoseGuidance | null>(null);
   const [referenceUri, setReferenceUri] = useState<string | null>(null);
-  const [hiddenReferenceProjects, setHiddenReferenceProjects] = useState<Set<string>>(new Set());
+  const [referencePhotoVisible, setReferencePhotoVisible] = useState(
+    defaultAppSettings.referencePhotoVisible
+  );
   const [overlayOpacity, setOverlayOpacity] = useState(0.42);
   const defaultOverlayOpacity = useRef(0.4);
   const [overlaySetupActive, setOverlaySetupActive] = useState(false);
@@ -342,7 +346,7 @@ export default function CameraScreen({
     : styles.controls;
   const isLineGuideActive = guideVisible;
   const referenceProjectKey = bodyFrameCameraSession.projectId ?? "legacy";
-  const referenceOverlayVisible = !hiddenReferenceProjects.has(referenceProjectKey);
+  const referenceOverlayVisible = referencePhotoVisible;
   const hasReferenceSource = Boolean(
     referenceUri || bodyFrameCameraSession.automaticReferenceUri
   );
@@ -840,6 +844,7 @@ export default function CameraScreen({
         guideOffsetXValue.value = settings.guideOffsetX;
         guideOffsetYValue.value = settings.guideOffsetY;
         setOverlayOpacity(settings.overlayOpacity);
+        setReferencePhotoVisible(settings.referencePhotoVisible);
         setZoomPercent(effectiveZoom);
         const projectCaptureMemoryEnabled =
           Boolean(projectId) && captureContextState?.enabled === true;
@@ -1010,9 +1015,27 @@ export default function CameraScreen({
   };
 
   const applyOverlayOpacityPercent = useCallback((value: number) => {
-    const nextOpacity = Math.round(Math.max(OVERLAY_OPACITY_MIN, Math.min(OVERLAY_OPACITY_MAX, value)));
+    const nextOpacity = Math.round(
+      Math.max(OVERLAY_OPACITY_MIN, Math.min(OVERLAY_OPACITY_MAX, value))
+    );
     setOverlayOpacity(Number((nextOpacity / 100).toFixed(2)));
   }, []);
+
+  const commitOverlayOpacityPercent = useCallback(
+    (value: number) => {
+      const nextOpacity = Number(
+        (
+          Math.round(
+            Math.max(OVERLAY_OPACITY_MIN, Math.min(OVERLAY_OPACITY_MAX, value))
+          ) / 100
+        ).toFixed(2)
+      );
+      setOverlayOpacity(nextOpacity);
+      defaultOverlayOpacity.current = nextOpacity;
+      queueAppSettingsUpdate({ overlayOpacity: nextOpacity });
+    },
+    [queueAppSettingsUpdate]
+  );
 
   const applyZoomPercent = useCallback((value: number) => {
     const nextZoom = Math.round(Math.max(CAMERA_ZOOM_MIN, Math.min(CAMERA_ZOOM_MAX, value)));
@@ -1524,11 +1547,8 @@ export default function CameraScreen({
       });
 
       if (!result.canceled && result.assets[0]?.uri) {
-        setHiddenReferenceProjects((current) => {
-          const next = new Set(current);
-          next.delete(referenceProjectKey);
-          return next;
-        });
+        setReferencePhotoVisible(true);
+        queueAppSettingsUpdate({ referencePhotoVisible: true });
         setReferenceUri(result.assets[0].uri);
         setOverlayOpacity(defaultOverlayOpacity.current);
         setOverlaySetupActive(true);
@@ -1554,7 +1574,8 @@ export default function CameraScreen({
   };
 
   const removeReferenceOverlay = () => {
-    setHiddenReferenceProjects((current) => new Set(current).add(referenceProjectKey));
+    setReferencePhotoVisible(false);
+    queueAppSettingsUpdate({ referencePhotoVisible: false });
     setOverlayLocked(false);
     setOverlaySetupActive(false);
     setOverlayOpacity(defaultOverlayOpacity.current);
@@ -1584,11 +1605,8 @@ export default function CameraScreen({
 
   const reopenOverlaySetup = () => {
     if (!referenceOverlayVisible && hasReferenceSource) {
-      setHiddenReferenceProjects((current) => {
-        const next = new Set(current);
-        next.delete(referenceProjectKey);
-        return next;
-      });
+      setReferencePhotoVisible(true);
+      queueAppSettingsUpdate({ referencePhotoVisible: true });
       setOverlayLocked(false);
       setOverlaySetupActive(true);
       return;
@@ -3202,6 +3220,10 @@ export default function CameraScreen({
         animationType="fade"
         onRequestClose={() => setGuideSettingsOpen(false)}
       >
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
         <GestureHandlerRootView style={styles.modalGestureRoot}>
           <View style={[styles.modalBackdrop, modalSafeStyle]}>
             <View style={[styles.guideModal, { paddingBottom: bottomModalPadding }]}>
@@ -3372,6 +3394,7 @@ export default function CameraScreen({
             </View>
           </View>
         </GestureHandlerRootView>
+        </KeyboardAvoidingView>
       </Modal>
 
       {!isCameraModalOpen && !isGuidePositionAdjusting && !isGridLineControlAdjusting ? (
@@ -3399,7 +3422,7 @@ export default function CameraScreen({
                     max={OVERLAY_OPACITY_MAX}
                     label="투명도"
                     onChange={applyOverlayOpacityPercent}
-                    onCommit={applyOverlayOpacityPercent}
+                    onCommit={commitOverlayOpacityPercent}
                   />
                 </View>
                 <View style={styles.overlaySetupActions}>

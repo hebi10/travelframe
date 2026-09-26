@@ -223,7 +223,7 @@ assert.equal(
 );
 
 assert.ok(
-  guideStepsSource.includes("APP_GUIDE_VERSION = 3"),
+  guideStepsSource.includes("APP_GUIDE_VERSION = 4"),
   "Body Frame onboarding should increment guide version"
 );
 assert.equal(

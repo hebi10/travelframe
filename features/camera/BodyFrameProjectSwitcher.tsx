@@ -4,7 +4,9 @@ import {
 import { useMemo,
   useState } from "react";
 import {
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -184,7 +186,7 @@ export function BodyFrameProjectSwitcher({
         {createOnly ? (
           <View style={styles.createOnlyRow}>
             <Feather name="plus" size={16} color="#F5F5F5" />
-            <Text style={styles.createOnlyText}>새 프로젝트 만들기</Text>
+            <Text style={styles.createOnlyText}>새 프로젝트</Text>
           </View>
         ) : (
           <>
@@ -276,6 +278,10 @@ export function BodyFrameProjectSwitcher({
         visible={createOpen}
         onRequestClose={() => setCreateOpen(false)}
       >
+        <KeyboardAvoidingView
+          style={styles.keyboardAvoidingRoot}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
         <Pressable style={styles.backdrop} onPress={() => setCreateOpen(false)}>
           <Pressable
             style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) }]}
@@ -412,12 +418,16 @@ export function BodyFrameProjectSwitcher({
             </Pressable>
           </Pressable>
         </Pressable>
+        </KeyboardAvoidingView>
       </Modal>
     </>
   );
 }
 
 const styles = StyleSheet.create({
+  keyboardAvoidingRoot: {
+    flex: 1
+  },
   headerButton: {
     minHeight: 54,
     borderWidth: bodyFrameDesign.borderWidth,
@@ -434,7 +444,8 @@ const styles = StyleSheet.create({
     paddingVertical: 5
   },
   createOnlyButton: {
-    minHeight: bodyFrameDesign.minTouchSize,
+    flex: 1,
+    minHeight: bodyFrameDesign.primaryButtonHeight,
     paddingHorizontal: 12,
     paddingVertical: 0
   },

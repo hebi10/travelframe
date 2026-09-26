@@ -56,7 +56,7 @@ import { isMediaLibraryAccessGranted } from "@/lib/media-library-permissions";
 import { requestMediaLibraryAccess } from "@/lib/request-media-library-access";
 import { recordBackupFailure } from "@/lib/backup-failure-queue";
 import { backupPhotoIfEnabled } from "@/lib/cloud-backup";
-import { getPhotoById, saveEditedPhoto } from "@/lib/photo-library";
+import { deleteLocalFile, getPhotoById, saveEditedPhoto } from "@/lib/photo-library";
 import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 import type { PhotoEditTransform, PhotoItem, PhotoRatioLabel } from "@/types/photo";
 
@@ -148,7 +148,7 @@ export default function EditScreen() {
   const loginRequiredAlertShownRef = useRef(false);
   const originalAspectRatio =
     source?.width && source?.height ? source.width / source.height : undefined;
-  const canOverwriteSource = Boolean(sourcePhoto?.edited);
+  const canOverwriteSource = Boolean(sourcePhoto?.edited && !sourcePhoto?.projectId);
 
   useEffect(() => {
     if (isAuthLoading || user || loginRequiredAlertShownRef.current) {
@@ -472,11 +472,18 @@ export default function EditScreen() {
       return;
     }
 
+    let renderedUri: string | null = null;
+
     try {
       setIsSaving(true);
       setMessage(null);
-      const transform =
-        canvasRef.current?.getTransform() ?? getFallbackTransform(ratio);
+      const canvas = canvasRef.current;
+      if (!canvas) {
+        throw new Error("편집 화면을 준비하지 못했습니다. 다시 시도해 주세요.");
+      }
+      const transform = canvas.getTransform();
+      const rendered = await canvas.captureEditedImage();
+      renderedUri = rendered.uri;
 
       const savedPhoto = await saveEditedPhoto({
         sourceUri: source.uri,
@@ -487,6 +494,9 @@ export default function EditScreen() {
         width: source.width,
         height: source.height,
         transform,
+        renderedUri: rendered.uri,
+        renderedWidth: rendered.width,
+        renderedHeight: rendered.height,
         localImageLimit: planEntitlements.localImageLimit
       });
       try {
@@ -513,15 +523,23 @@ export default function EditScreen() {
       }
 
       await clearEditDraft();
-      router.replace("/studio?tab=works" as Href);
+      router.replace(`/photo/${savedPhoto.id}` as Href);
     } catch (error) {
       setMessage(getUserFacingErrorMessage(error, "편집 결과를 저장하지 못했습니다."));
     } finally {
+      if (renderedUri) {
+        await deleteLocalFile(renderedUri).catch(() => undefined);
+      }
       setIsSaving(false);
     }
   };
 
   const confirmSaveEdit = () => {
+    if (sourcePhoto?.projectId) {
+      void executeSaveEdit("overwrite");
+      return;
+    }
+
     if (!canOverwriteSource) {
       void executeSaveEdit("new");
       return;
@@ -529,7 +547,7 @@ export default function EditScreen() {
 
     Alert.alert(
       "저장 방식 선택",
-      "완료된 편집 작업물에 덮어쓸지, 새 작업물로 저장할지 선택해 주세요.",
+      "현재 사진에 편집 내용을 덮어쓸지, 새 작업물로 저장할지 선택해 주세요.",
       [
         { text: "취소", style: "cancel" },
         { text: "새로 저장", onPress: () => executeSaveEdit("new") },

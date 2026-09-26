@@ -103,6 +103,7 @@ class AndroidProjectReminderModule(
   fun scheduleReminder(
     projectId: String,
     projectName: String,
+    notificationMessage: String,
     hour: Int,
     minute: Int,
     weekdaysCsv: String,
@@ -113,6 +114,7 @@ class AndroidProjectReminderModule(
         reactApplicationContext,
         projectId,
         projectName,
+        notificationMessage,
         hour,
         minute,
         weekdaysCsv
@@ -182,6 +184,7 @@ object ProjectReminderScheduler {
     context: Context,
     projectId: String,
     projectName: String,
+    notificationMessage: String,
     hour: Int,
     minute: Int,
     weekdaysCsv: String
@@ -201,6 +204,10 @@ object ProjectReminderScheduler {
     prefs.edit()
       .putStringSet(PROJECT_IDS_KEY, ids)
       .putString("name_$projectId", projectName.ifBlank { "바디 프레임" })
+      .putString(
+        "message_$projectId",
+        notificationMessage.trim().take(80).ifBlank { "오늘 사진을 기록할 시간입니다." }
+      )
       .putInt("hour_$projectId", hour)
       .putInt("minute_$projectId", minute)
       .putString("weekdays_$projectId", weekdays.joinToString(","))
@@ -238,6 +245,7 @@ object ProjectReminderScheduler {
       prefs.edit()
         .putStringSet(PROJECT_IDS_KEY, ids)
         .remove("name_$projectId")
+        .remove("message_$projectId")
         .remove("hour_$projectId")
         .remove("minute_$projectId")
         .remove("weekdays_$projectId")
@@ -343,6 +351,9 @@ class ProjectReminderReceiver : BroadcastReceiver() {
     val projectName =
       prefs.getString("name_$projectId", intent.getStringExtra(EXTRA_PROJECT_NAME))
         ?: "바디 프레임"
+    val notificationMessage =
+      prefs.getString("message_$projectId", "오늘 사진을 기록할 시간입니다.")
+        ?: "오늘 사진을 기록할 시간입니다."
     val hour = prefs.getInt("hour_$projectId", 20)
     val minute = prefs.getInt("minute_$projectId", 0)
     val weekdays = ProjectReminderScheduler.getStoredWeekdays(context, projectId)
@@ -361,8 +372,8 @@ class ProjectReminderReceiver : BroadcastReceiver() {
 
     val notification = Notification.Builder(context, CHANNEL_ID)
       .setSmallIcon(android.R.drawable.ic_menu_camera)
-      .setContentTitle("$projectName 촬영 시간")
-      .setContentText("$projectName 프로젝트의 오늘 사진을 기록할 시간입니다.")
+      .setContentTitle("$projectName 촬영 알림")
+      .setContentText(notificationMessage)
       .setAutoCancel(true)
       .setContentIntent(contentIntent)
       .build()
