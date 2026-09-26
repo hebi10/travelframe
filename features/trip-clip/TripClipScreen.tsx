@@ -16,6 +16,7 @@ import {
   Alert,
   BackHandler,
   Keyboard,
+  KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
@@ -2229,6 +2230,10 @@ export default function TripClipScreen() {
   );
 
   return (
+    <KeyboardAvoidingView
+      style={styles.screenRoot}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+    >
     <View style={styles.screenRoot}>
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
@@ -2672,5 +2677,6 @@ export default function TripClipScreen() {
       />
       <AppGuideOverlay tabKey="tripClip" />
     </View>
+    </KeyboardAvoidingView>
   );
 }
