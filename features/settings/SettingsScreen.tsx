@@ -3,8 +3,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
   Linking,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   Text,
@@ -848,6 +850,10 @@ export default function SettingsScreen() {
 
   return (
     <>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
       <ScreenShell
         eyebrow="설정"
         title="기본값 설정"
@@ -1439,6 +1445,7 @@ export default function SettingsScreen() {
           />
         </SectionBlock>
       </ScreenShell>
+      </KeyboardAvoidingView>
 
       <Modal
         animationType="fade"
