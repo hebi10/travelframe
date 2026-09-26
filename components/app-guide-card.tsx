@@ -1,4 +1,9 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { AppText as Text } from "@/components/app-text";
+import {
+  Pressable,
+  StyleSheet,
+  View
+} from "react-native";
 
 import { bodyFrameDesign, colors, controls, typography } from "@/constants/app-theme";
 import type { AppGuideStep } from "@/constants/app-guide-steps";

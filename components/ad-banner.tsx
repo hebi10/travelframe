@@ -1,4 +1,8 @@
-import { StyleSheet, Text, View } from "react-native";
+import { AppText as Text } from "@/components/app-text";
+import {
+  StyleSheet,
+  View
+} from "react-native";
 
 import { GoogleMobileBanner } from "@/components/google-mobile-banner";
 import { colors, typography } from "@/constants/app-theme";

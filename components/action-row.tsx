@@ -1,6 +1,12 @@
-import { Feather } from "@expo/vector-icons";
-import { Link, type Href } from "expo-router";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { AppText as Text } from "@/components/app-text";
+import {
+  Feather } from "@expo/vector-icons";
+import { Link,
+  type Href } from "expo-router";
+import { Pressable,
+  StyleSheet,
+  View
+} from "react-native";
 
 import { colors, controls, typography } from "@/constants/app-theme";
 import { useAppAppearance } from "@/lib/app-appearance";

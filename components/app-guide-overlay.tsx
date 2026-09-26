@@ -1,4 +1,10 @@
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { AppText as Text } from "@/components/app-text";
+import {
+  Modal,
+  Pressable,
+  StyleSheet,
+  View
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppGuideCard } from "@/components/app-guide-card";

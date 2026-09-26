@@ -1,4 +1,8 @@
-import { StyleSheet, Text, View } from "react-native";
+import { AppText as Text } from "@/components/app-text";
+import {
+  StyleSheet,
+  View
+} from "react-native";
 
 import { colors } from "@/constants/app-theme";
 import { useAppAppearance } from "@/lib/app-appearance";
