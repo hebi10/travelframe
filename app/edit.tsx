@@ -478,11 +478,12 @@ export default function EditScreen() {
       setIsSaving(true);
       setMessage(null);
       const canvas = canvasRef.current;
-      const transform = canvas?.getTransform() ?? getFallbackTransform(ratio);
-      const rendered = canvas
-        ? await canvas.captureEditedImage()
-        : null;
-      renderedUri = rendered?.uri ?? null;
+      if (!canvas) {
+        throw new Error("편집 화면을 준비하지 못했습니다. 다시 시도해 주세요.");
+      }
+      const transform = canvas.getTransform();
+      const rendered = await canvas.captureEditedImage();
+      renderedUri = rendered.uri;
 
       const savedPhoto = await saveEditedPhoto({
         sourceUri: source.uri,
@@ -493,9 +494,9 @@ export default function EditScreen() {
         width: source.width,
         height: source.height,
         transform,
-        renderedUri: rendered?.uri,
-        renderedWidth: rendered?.width,
-        renderedHeight: rendered?.height,
+        renderedUri: rendered.uri,
+        renderedWidth: rendered.width,
+        renderedHeight: rendered.height,
         localImageLimit: planEntitlements.localImageLimit
       });
       try {
