@@ -117,6 +117,7 @@ export type AppSettings = {
   guideShapePoints: GuideShapePoints;
   guideLineOpacity: number;
   overlayOpacity: number;
+  referencePhotoVisible: boolean;
   cameraZoomPercent: number;
   cameraTorchEnabled: boolean;
   cameraFacing: CameraFacing;
@@ -212,6 +213,7 @@ export const defaultAppSettings: AppSettings = {
   guideShapePoints: defaultGuideShapePoints,
   guideLineOpacity: 0.7,
   overlayOpacity: 0.4,
+  referencePhotoVisible: true,
   cameraZoomPercent: 0,
   cameraTorchEnabled: false,
   cameraFacing: "back",
@@ -571,6 +573,10 @@ const normalizeSettings = (value: Partial<AppSettings> | null): AppSettings => {
     gridGuideLinePositions: normalizeGridGuideLinePositions(nextSettings.gridGuideLinePositions),
     guideShapePoints: normalizeGuideShapePoints(nextSettings.guideShapePoints),
     guideLineOpacity: normalizeGuideLineOpacity(nextSettings.guideLineOpacity),
+    referencePhotoVisible:
+      typeof nextSettings.referencePhotoVisible === "boolean"
+        ? nextSettings.referencePhotoVisible
+        : defaultAppSettings.referencePhotoVisible,
     cameraZoomPercent: normalizeCameraZoomPercent(nextSettings.cameraZoomPercent),
     cameraTorchEnabled:
       typeof nextSettings.cameraTorchEnabled === "boolean"
