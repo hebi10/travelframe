@@ -731,7 +731,7 @@ export default function TripClipScreen() {
   );
 
   const showLoginRequiredForVideoCreation = useCallback(() => {
-    setExportMessage("동영상 만들기는 로그인 후 주 1회 무료로 사용할 수 있습니다.");
+    setExportMessage("동영상 만들기는 로그인 후 사용할 수 있습니다.");
     setExportProgress({
       visible: true,
       percent: 100,

@@ -1,13 +1,21 @@
-import { Image } from "@/components/private-media-image";
-import { Stack, router, type Href, useFocusEffect, useLocalSearchParams } from "expo-router";
-import { Component, type ReactNode, useCallback, useState } from "react";
+import { AppText as Text } from "@/components/app-text";
+import {
+  Image } from "@/components/private-media-image";
+import { Stack,
+  router,
+  type Href,
+  useFocusEffect,
+  useLocalSearchParams } from "expo-router";
+import { Component,
+  type ReactNode,
+  useCallback,
+  useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   View
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -57,6 +65,7 @@ export default function VideoDetailScreen() {
   const [video, setVideo] = useState<MadeVideoItem | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
+  const [playbackRequested, setPlaybackRequested] = useState(false);
   const videoSource = video?.uri || null;
   const hasPlayableVideoSource = Boolean(videoSource);
 
@@ -69,6 +78,7 @@ export default function VideoDetailScreen() {
     try {
       setIsLoading(true);
       setMessage(null);
+      setPlaybackRequested(false);
       const storedVideo = await getMadeVideoById(id);
       setVideo(storedVideo);
     } catch (error) {
@@ -87,7 +97,7 @@ export default function VideoDetailScreen() {
   const showLoginRequiredForVideoCreation = () => {
     Alert.alert(
       "로그인이 필요합니다",
-      "동영상 만들기는 로그인 후 주 1회 무료로 사용할 수 있습니다.",
+      "동영상 만들기와 다시 편집하기는 로그인 후 사용할 수 있습니다.",
       [
         { text: "닫기", style: "cancel" },
         { text: "로그인하기", onPress: () => router.push("/account" as Href) }
@@ -137,10 +147,29 @@ export default function VideoDetailScreen() {
         <View
           style={[styles.videoFrame, { aspectRatio: getVideoAspectRatio(video.ratio) }]}
         >
-          {hasPlayableVideoSource ? (
+          {hasPlayableVideoSource && playbackRequested ? (
             <VideoPlaybackBoundary>
               <VideoPlayerFrame source={videoSource as string} />
             </VideoPlaybackBoundary>
+          ) : hasPlayableVideoSource ? (
+            <View style={styles.videoPoster}>
+              {video.coverUri ? (
+                <Image
+                  source={{ uri: video.coverUri }}
+                  style={styles.videoPosterImage}
+                  contentFit="cover"
+                />
+              ) : null}
+              <Pressable
+                accessibilityRole="button"
+                style={styles.videoStartButton}
+                onPress={() => setPlaybackRequested(true)}
+              >
+                <Text selectable={false} style={styles.videoStartButtonText}>
+                  영상 재생
+                </Text>
+              </Pressable>
+            </View>
           ) : (
             <View style={styles.videoUnavailable}>
               <Text selectable style={styles.videoUnavailableText}>
@@ -296,8 +325,8 @@ function NativeVideoPlayerFrame({
       style={styles.video}
       nativeControls
       contentFit="contain"
-      surfaceType="textureView"
-      fullscreenOptions={{ enable: true }}
+      surfaceType="surfaceView"
+      fullscreenOptions={{ enable: false }}
       useExoShutter
     />
   );
@@ -343,6 +372,33 @@ const styles = StyleSheet.create({
   video: {
     width: "100%",
     height: "100%"
+  },
+  videoPoster: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.ink
+  },
+  videoPosterImage: {
+    ...StyleSheet.absoluteFillObject,
+    width: "100%",
+    height: "100%",
+    opacity: 0.62
+  },
+  videoStartButton: {
+    minWidth: 120,
+    minHeight: controls.height,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 20,
+    borderWidth: 1,
+    borderColor: colors.inverse,
+    backgroundColor: "rgba(0,0,0,0.72)"
+  },
+  videoStartButtonText: {
+    color: colors.inverse,
+    fontSize: typography.button,
+    fontWeight: "800"
   },
   videoUnavailable: {
     flex: 1,
