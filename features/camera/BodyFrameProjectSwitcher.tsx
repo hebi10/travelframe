@@ -186,7 +186,7 @@ export function BodyFrameProjectSwitcher({
         {createOnly ? (
           <View style={styles.createOnlyRow}>
             <Feather name="plus" size={16} color="#F5F5F5" />
-            <Text style={styles.createOnlyText}>새 프로젝트 만들기</Text>
+            <Text style={styles.createOnlyText}>새 프로젝트</Text>
           </View>
         ) : (
           <>
@@ -444,7 +444,8 @@ const styles = StyleSheet.create({
     paddingVertical: 5
   },
   createOnlyButton: {
-    minHeight: bodyFrameDesign.minTouchSize,
+    flex: 1,
+    minHeight: bodyFrameDesign.primaryButtonHeight,
     paddingHorizontal: 12,
     paddingVertical: 0
   },
