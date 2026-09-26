@@ -86,17 +86,15 @@ assert.equal(
 );
 
 assert.ok(
-  guideStepsSource.includes("APP_GUIDE_VERSION = 3") &&
+  guideStepsSource.includes("APP_GUIDE_VERSION = 4") &&
     guideStepsSource.includes('id: "body-frame-welcome"') &&
+    guideStepsSource.includes('id: "body-frame-project"') &&
+    guideStepsSource.includes('id: "body-frame-reference"') &&
+    guideStepsSource.includes('id: "body-frame-measurements"') &&
+    guideStepsSource.includes('id: "body-frame-video"') &&
+    guideStepsSource.includes('id: "body-frame-settings-backup"') &&
     guideStepsSource.includes("바디 프레임에 오신 것을 환영합니다."),
-  "first-run guide should be a single Body Frame welcome step"
-);
-assert.equal(
-  guideStepsSource.includes('id: "body-frame-project"') ||
-    guideStepsSource.includes('id: "body-frame-reference"') ||
-    guideStepsSource.includes('id: "body-frame-capture"'),
-  false,
-  "first-run guide should not keep the old multi-step camera onboarding"
+  "first-run guide should explain the complete current Body Frame flow"
 );
 assert.ok(
   guideHookSource.includes('tabKey !== "camera"'),
