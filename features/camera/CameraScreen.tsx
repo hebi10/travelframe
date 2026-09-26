@@ -21,9 +21,11 @@ import {
   Alert,
   AppState,
   type AppStateStatus,
+  KeyboardAvoidingView,
   Linking,
   type LayoutChangeEvent,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   View
@@ -3200,6 +3202,10 @@ export default function CameraScreen({
         animationType="fade"
         onRequestClose={() => setGuideSettingsOpen(false)}
       >
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
         <GestureHandlerRootView style={styles.modalGestureRoot}>
           <View style={[styles.modalBackdrop, modalSafeStyle]}>
             <View style={[styles.guideModal, { paddingBottom: bottomModalPadding }]}>
@@ -3370,6 +3376,7 @@ export default function CameraScreen({
             </View>
           </View>
         </GestureHandlerRootView>
+        </KeyboardAvoidingView>
       </Modal>
 
       {!isCameraModalOpen && !isGuidePositionAdjusting && !isGridLineControlAdjusting ? (
