@@ -1015,9 +1015,27 @@ export default function CameraScreen({
   };
 
   const applyOverlayOpacityPercent = useCallback((value: number) => {
-    const nextOpacity = Math.round(Math.max(OVERLAY_OPACITY_MIN, Math.min(OVERLAY_OPACITY_MAX, value)));
+    const nextOpacity = Math.round(
+      Math.max(OVERLAY_OPACITY_MIN, Math.min(OVERLAY_OPACITY_MAX, value))
+    );
     setOverlayOpacity(Number((nextOpacity / 100).toFixed(2)));
   }, []);
+
+  const commitOverlayOpacityPercent = useCallback(
+    (value: number) => {
+      const nextOpacity = Number(
+        (
+          Math.round(
+            Math.max(OVERLAY_OPACITY_MIN, Math.min(OVERLAY_OPACITY_MAX, value))
+          ) / 100
+        ).toFixed(2)
+      );
+      setOverlayOpacity(nextOpacity);
+      defaultOverlayOpacity.current = nextOpacity;
+      queueAppSettingsUpdate({ overlayOpacity: nextOpacity });
+    },
+    [queueAppSettingsUpdate]
+  );
 
   const applyZoomPercent = useCallback((value: number) => {
     const nextZoom = Math.round(Math.max(CAMERA_ZOOM_MIN, Math.min(CAMERA_ZOOM_MAX, value)));
@@ -3404,7 +3422,7 @@ export default function CameraScreen({
                     max={OVERLAY_OPACITY_MAX}
                     label="투명도"
                     onChange={applyOverlayOpacityPercent}
-                    onCommit={applyOverlayOpacityPercent}
+                    onCommit={commitOverlayOpacityPercent}
                   />
                 </View>
                 <View style={styles.overlaySetupActions}>
