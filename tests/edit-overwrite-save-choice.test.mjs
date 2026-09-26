@@ -25,7 +25,8 @@ for (const snippet of [
 
 for (const snippet of [
   'type SaveEditMode = "new" | "overwrite"',
-  "const canOverwriteSource = Boolean(sourcePhoto?.edited)",
+  "const canOverwriteSource = Boolean(sourcePhoto?.edited && !sourcePhoto?.projectId)",
+  "if (sourcePhoto?.projectId)",
   "const confirmSaveEdit = () =>",
   "Alert.alert(",
   '"덮어쓰기"',
@@ -39,4 +40,4 @@ for (const snippet of [
   assert.ok(editSource.includes(snippet), `edit overwrite confirmation missing: ${snippet}`);
 }
 
-console.log("ok - re-editing a completed photo can choose overwrite or create new");
+console.log("ok - project photos overwrite in place while legacy edited photos keep save choices");
