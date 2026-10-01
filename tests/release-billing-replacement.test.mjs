@@ -44,8 +44,10 @@ const execute = async (oldProductId, productId, confirm = true) => {
     }
   };
   vm.runInNewContext(runnable, context);
-  await context.purchase(productId);
-  return { requests, alerts };
+  let error = null;
+  try { await context.purchase(productId); }
+  catch (caught) { error = caught; }
+  return { requests, alerts, error };
 };
 
 let failures = 0;
@@ -57,7 +59,8 @@ const plans = ["creator_monthly", "plus_monthly", "expert_monthly"];
 for (const oldProductId of plans) {
   for (const productId of plans.filter(id => id !== oldProductId)) {
     await check(`${oldProductId} -> ${productId} uses immediate time credit with disclosure`, async () => {
-      const { requests, alerts } = await execute(oldProductId, productId);
+      const { requests, alerts, error } = await execute(oldProductId, productId);
+      assert.equal(error, null);
       assert.equal(requests.length, 1);
       const google = requests[0].request.google;
       assert.equal(google.purchaseToken, "test-old-purchase");
@@ -69,17 +72,20 @@ for (const oldProductId of plans) {
     });
   }
 }
-await check("declining a plan change never opens Play billing", async () => {
+await check("declining a plan change cannot open billing or report purchase success", async () => {
   const result = await execute("expert_monthly", "creator_monthly", false);
   assert.equal(result.requests.length, 0);
+  assert.match(result.error?.message ?? "", /취소/);
 });
 await check("new subscription does not send old purchase parameters", async () => {
   const result = await execute(null, "creator_monthly");
+  assert.equal(result.error, null);
   assert.equal(result.alerts.length, 0);
   assert.equal(result.requests[0].request.google.subscriptionProductReplacementParams, undefined);
 });
 await check("ad removal stays a non-subscription purchase", async () => {
   const result = await execute(null, "ad_remove");
+  assert.equal(result.error, null);
   assert.equal(result.requests[0].type, "in-app");
   assert.equal(result.alerts.length, 0);
 });
