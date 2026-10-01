@@ -1,7 +1,7 @@
 import Constants from "expo-constants";
 import { Platform } from "react-native";
 
-import { initializeNativeAdMob } from "@/lib/admob-native";
+import { adConsent } from "@/lib/ad-consent";
 import { resolveInterstitialAdUnitId } from "@/lib/admob-units";
 
 type AdMobExtra = {
@@ -45,13 +45,6 @@ export const canUseNativeAdMob = () =>
   Platform.OS === "android" && Constants.appOwnership !== "expo";
 
 export const initializeAdMob = async () => {
-  if (!canUseNativeAdMob()) {
-    return;
-  }
-
-  try {
-    await initializeNativeAdMob();
-  } catch {
-    // Expo Go or builds without the native ad module should keep using the local placeholder.
-  }
+  if (!canUseNativeAdMob()) return false;
+  return adConsent.prepareAds();
 };

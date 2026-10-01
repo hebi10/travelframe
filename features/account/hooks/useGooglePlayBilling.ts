@@ -8,7 +8,7 @@ import {
   useIAP
 } from "expo-iap";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Platform } from "react-native";
+import { Alert, Platform } from "react-native";
 import type { User } from "firebase/auth";
 
 import {
@@ -245,6 +245,23 @@ export function useGooglePlayBilling({
           throw new Error("Google Play 구독 상품의 구매 옵션을 찾지 못했습니다.");
         }
 
+        if (currentSubscriptionPurchase?.purchaseToken) {
+          const confirmed = await new Promise<boolean>((resolve) => {
+            Alert.alert(
+              "구독 플랜 변경",
+              "결제가 완료되면 새 플랜의 기능과 클라우드 백업 한도가 즉시 적용됩니다. 낮은 플랜으로 변경할 때도 동일합니다. 남은 결제 금액은 새 플랜의 이용 기간으로 환산되며 다음 결제일이 달라질 수 있습니다. 정확한 금액과 결제일은 다음 Google Play 화면에서 확인해 주세요.",
+              [
+                { text: "취소", style: "cancel", onPress: () => resolve(false) },
+                { text: "변경 계속", onPress: () => resolve(true) }
+              ],
+              { cancelable: true, onDismiss: () => resolve(false) }
+            );
+          });
+          if (!confirmed) {
+            throw new Error("구독 변경을 취소했습니다.");
+          }
+        }
+
         request = {
           type: "subs",
           request: {
@@ -257,7 +274,7 @@ export function useGooglePlayBilling({
                     purchaseToken: currentSubscriptionPurchase.purchaseToken,
                     subscriptionProductReplacementParams: {
                       oldProductId: currentSubscriptionPurchase.productId,
-                      replacementMode: "charge-prorated-price" as const
+                      replacementMode: "with-time-proration" as const
                     }
                   }
                 : {})

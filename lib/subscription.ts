@@ -27,6 +27,10 @@ export type UserSubscription = {
   lastPaymentAt: string | null;
   priceLabel: string;
   productName: string;
+  adRemoveEntitlement?: {
+    status: SubscriptionStatus;
+    expiresAt: string | null;
+  } | null;
 };
 
 export type UserSubscriptionProducts = {
@@ -114,6 +118,14 @@ export const isCreatorSubscriptionActive = (subscription: UserSubscription | nul
 };
 
 export const isAdFreeSubscription = (subscription: UserSubscription | null) => {
+  const adRemove = subscription?.adRemoveEntitlement;
+  if (
+    adRemove?.status === "active" &&
+    (!adRemove.expiresAt || new Date(adRemove.expiresAt).getTime() > Date.now())
+  ) {
+    return true;
+  }
+
   if (!isPremiumSubscription(subscription)) {
     return false;
   }
@@ -203,23 +215,31 @@ const getVerifiedSubscriptionFromFirestore = async (user: User) => {
     ? parseSubscription(JSON.stringify(expertSnapshot.data()))
     : null;
 
+  const withAdRemoveEntitlement = (subscription: UserSubscription): UserSubscription => ({
+    ...subscription,
+    adRemoveEntitlement:
+      adRemoveSubscription && isSubscriptionProductActive(adRemoveSubscription, "ad_remove")
+        ? { status: "active", expiresAt: adRemoveSubscription.expiresAt }
+        : null
+  });
+
   if (expertSubscription && isSubscriptionProductActive(expertSubscription, "expert_monthly")) {
-    return expertSubscription;
+    return withAdRemoveEntitlement(expertSubscription);
   }
 
   if (plusSubscription && isSubscriptionProductActive(plusSubscription, "plus_monthly")) {
-    return plusSubscription;
+    return withAdRemoveEntitlement(plusSubscription);
   }
 
   if (creatorSubscription && isSubscriptionProductActive(creatorSubscription, "creator_monthly")) {
-    return creatorSubscription;
+    return withAdRemoveEntitlement(creatorSubscription);
   }
 
   if (adRemoveSubscription && isSubscriptionProductActive(adRemoveSubscription, "ad_remove")) {
-    return adRemoveSubscription;
+    return withAdRemoveEntitlement(adRemoveSubscription);
   }
 
-  return currentSubscription;
+  return withAdRemoveEntitlement(currentSubscription);
 };
 
 export const getUserSubscriptionState = async (
@@ -233,17 +253,11 @@ export const getUserSubscriptionState = async (
     };
   }
 
-  const cachedSubscription = await getLocalSubscription(user.uid);
+  const cachedSubscription = await getLocalSubscription(user.uid).catch(() => freeSubscription);
+  let verifiedSubscription: UserSubscription;
 
   try {
-    const verifiedSubscription = await getVerifiedSubscriptionFromFirestore(user);
-    await saveLocalSubscription(user.uid, verifiedSubscription);
-
-    return {
-      verifiedSubscription,
-      cachedSubscription: verifiedSubscription,
-      subscriptionStatus: "verified"
-    };
+    verifiedSubscription = await getVerifiedSubscriptionFromFirestore(user);
   } catch {
     return {
       verifiedSubscription: freeSubscription,
@@ -251,6 +265,13 @@ export const getUserSubscriptionState = async (
       subscriptionStatus: "failed"
     };
   }
+
+  await saveLocalSubscription(user.uid, verifiedSubscription).catch(() => undefined);
+  return {
+    verifiedSubscription,
+    cachedSubscription: verifiedSubscription,
+    subscriptionStatus: "verified"
+  };
 };
 
 export const getUserSubscription = async (user: User | null) => {
