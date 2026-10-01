@@ -1,9 +1,7 @@
 import { useEffect, useRef } from "react";
 
-import { showGoogleMobileInterstitialAd } from "@/components/google-mobile-interstitial";
-import { type AdPlacement, shouldShowAds } from "@/lib/ad-entitlement";
-import { canUseNativeAdMob, getInterstitialAdUnitId } from "@/lib/admob-config";
-import { useAuth } from "@/lib/auth-context";
+import { type AdPlacement } from "@/lib/ad-entitlement";
+import { usePostSaveAd } from "@/lib/use-post-save-ad";
 
 type InterstitialAdModalProps = {
   visible: boolean;
@@ -11,52 +9,18 @@ type InterstitialAdModalProps = {
   onClose: () => void;
 };
 
-export function InterstitialAdModal({
-  visible,
-  onClose
-}: InterstitialAdModalProps) {
-  const { subscription, subscriptionStatus, isAuthLoading, isLoggedIn } = useAuth();
+export function InterstitialAdModal({ visible, onClose }: InterstitialAdModalProps) {
+  const { requestPostSaveAd, cancelPostSaveAd } = usePostSaveAd();
   const onCloseRef = useRef(onClose);
-  const requestIdRef = useRef(0);
-  const canShowAds = isLoggedIn && !isAuthLoading && shouldShowAds(subscription, subscriptionStatus);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
-    onCloseRef.current = onClose;
-  }, [onClose]);
+    if (!visible) return;
+    requestPostSaveAd();
+    onCloseRef.current();
+  }, [requestPostSaveAd, visible]);
 
-  useEffect(() => {
-    if (!visible) {
-      requestIdRef.current += 1;
-      return;
-    }
-
-    const requestId = requestIdRef.current + 1;
-    requestIdRef.current = requestId;
-
-    const finish = () => {
-      if (requestIdRef.current !== requestId) {
-        return;
-      }
-
-      onCloseRef.current();
-    };
-
-    if (!canShowAds) {
-      finish();
-      return;
-    }
-
-    const adUnitId = getInterstitialAdUnitId();
-    if (!canUseNativeAdMob() || !adUnitId) {
-      finish();
-      return;
-    }
-
-    return showGoogleMobileInterstitialAd({
-      adUnitId,
-      onComplete: finish
-    });
-  }, [canShowAds, visible]);
+  useEffect(() => () => cancelPostSaveAd(), [cancelPostSaveAd]);
 
   return null;
 }

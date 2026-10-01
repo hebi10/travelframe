@@ -10,6 +10,7 @@ import { getAdPlacementLabel, type AdPlacement, shouldShowAds } from "@/lib/ad-e
 import { canUseNativeAdMob, getBannerAdUnitId, isAdMobConfigured } from "@/lib/admob-config";
 import { useAppAppearance } from "@/lib/app-appearance";
 import { useAuth } from "@/lib/auth-context";
+import { useAdConsent } from "@/lib/use-ad-consent";
 
 type AdBannerProps = {
   placement: AdPlacement;
@@ -21,8 +22,10 @@ export function AdBanner({ placement, compact = false }: AdBannerProps) {
   const { palette } = useAppAppearance();
   const adUnitId = getBannerAdUnitId();
   const configured = isAdMobConfigured();
+  const eligible = isLoggedIn && !isAuthLoading && shouldShowAds(subscription, subscriptionStatus);
+  const consent = useAdConsent(eligible);
 
-  if (!isLoggedIn || isAuthLoading || !shouldShowAds(subscription, subscriptionStatus)) {
+  if (!eligible || (canUseNativeAdMob() && !consent.canRequestAds)) {
     return null;
   }
 
