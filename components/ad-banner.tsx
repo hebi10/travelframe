@@ -17,12 +17,12 @@ type AdBannerProps = {
 };
 
 export function AdBanner({ placement, compact = false }: AdBannerProps) {
-  const { subscription } = useAuth();
+  const { subscription, subscriptionStatus, isAuthLoading, isLoggedIn } = useAuth();
   const { palette } = useAppAppearance();
   const adUnitId = getBannerAdUnitId();
   const configured = isAdMobConfigured();
 
-  if (!shouldShowAds(subscription)) {
+  if (!isLoggedIn || isAuthLoading || !shouldShowAds(subscription, subscriptionStatus)) {
     return null;
   }
 
