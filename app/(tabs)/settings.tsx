@@ -1,13 +1,3 @@
-import { View } from "react-native";
+import BodyFrameSettingsScreen from "@/features/settings/BodyFrameSettingsWithPrivacyScreen";
 
-import { AdPrivacyOptions } from "@/components/ad-privacy-options";
-import BodyFrameSettingsScreen from "@/features/settings/BodyFrameSettingsScreen";
-
-export default function SettingsTab() {
-  return (
-    <View style={{ flex: 1 }}>
-      <BodyFrameSettingsScreen />
-      <AdPrivacyOptions />
-    </View>
-  );
-}
+export default BodyFrameSettingsScreen;

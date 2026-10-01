@@ -8,6 +8,7 @@ type ConsentInfo = {
 type ConsentApi = {
   gatherConsent: () => Promise<ConsentInfo>;
   getConsentInfo: () => Promise<ConsentInfo>;
+  requestInfoUpdate?: () => Promise<ConsentInfo>;
   showPrivacyOptionsForm: () => Promise<unknown>;
 };
 
@@ -85,8 +86,14 @@ export const createAdConsentController = (
 
   const inspectPrivacyOptions = async () => {
     try {
-      const info = await load()?.getConsentInfo();
-      if (info && !changingPrivacy) {
+      if (preparing) await preparing;
+      if (changingPrivacy) return;
+      const api = load();
+      if (!api) return;
+      const info = !prepared && api.requestInfoUpdate
+        ? await api.requestInfoUpdate()
+        : await api.getConsentInfo();
+      if (!changingPrivacy) {
         publish({ privacyOptionsRequired: info.privacyOptionsRequirementStatus === "REQUIRED" });
       }
     } catch {
