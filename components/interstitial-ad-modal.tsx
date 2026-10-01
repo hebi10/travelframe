@@ -15,10 +15,10 @@ export function InterstitialAdModal({
   visible,
   onClose
 }: InterstitialAdModalProps) {
-  const { subscription } = useAuth();
+  const { subscription, subscriptionStatus, isAuthLoading, isLoggedIn } = useAuth();
   const onCloseRef = useRef(onClose);
   const requestIdRef = useRef(0);
-  const canShowAds = shouldShowAds(subscription);
+  const canShowAds = isLoggedIn && !isAuthLoading && shouldShowAds(subscription, subscriptionStatus);
 
   useEffect(() => {
     onCloseRef.current = onClose;
