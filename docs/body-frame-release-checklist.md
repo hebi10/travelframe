@@ -49,6 +49,8 @@
 - [ ] Verify refund/revocation, RTDN delivery, and refreshed app entitlement.
 
 ## AdMob / consent
+- [x] `admin/app-ads.txt` prepared in the Hosting public root using the publisher ID in `app.json` (source artifact only; not deployed/verified).
+- [ ] Confirm the account's personalized seller entry in AdMob and the developer website domain recorded in Google Play before deploying or claiming app-ads.txt verification.
 - [ ] Confirm AdMob app/store linkage, app readiness, account verification and app-ads.txt verification.
 - [ ] Configure the required Privacy & messaging messages for the actual distribution regions.
 - [ ] Verify UMP required/not-required/declined/error states on a development build using registered test devices.
