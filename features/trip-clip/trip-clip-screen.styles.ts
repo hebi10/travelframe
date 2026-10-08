@@ -830,8 +830,8 @@ export const styles = StyleSheet.create({
     letterSpacing: 0
   },
   smallButton: {
-    minWidth: 34,
-    minHeight: 30,
+    minWidth: bodyFrameDesign.minTouchSize,
+    minHeight: bodyFrameDesign.minTouchSize,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
@@ -971,12 +971,12 @@ export const styles = StyleSheet.create({
   },
   guideColorLabel: {
     color: colors.text,
-    fontSize: 9,
+    fontSize: typography.small,
     fontWeight: "800",
     letterSpacing: 0
   },
   chip: {
-    minHeight: controls.compactHeight,
+    minHeight: bodyFrameDesign.minTouchSize,
     justifyContent: "center",
     paddingHorizontal: 12,
     borderWidth: 1,
@@ -1077,7 +1077,7 @@ export const styles = StyleSheet.create({
   },
   musicPickButton: {
     minWidth: 58,
-    minHeight: 34,
+    minHeight: bodyFrameDesign.minTouchSize,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.text

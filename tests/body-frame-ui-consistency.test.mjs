@@ -123,4 +123,20 @@ assert.ok(styleBody(videoEditorPolish, "timelineDurationKeyboardInput").includes
 assert.ok(styleBody(videoEditorPolish, "timelineDurationKeyboardDoneButton").includes("bodyFrameDesign.minTouchSize"));
 assert.ok(styleBody(accountPolish, "musicDeleteButton").includes("bodyFrameDesign.minTouchSize"));
 
+
+const accountShellPolish = read("components/screen-shell.tsx");
+const guideTabPolish = read("features/trip-clip/components/TripClipGuideTab.tsx");
+const legacyControls = read("features/trip-clip/trip-clip-screen.components.tsx");
+const musicControls = read("features/trip-clip/components/TripClipMusicTab.tsx");
+assert.ok(styleBody(accountShellPolish, "header").includes("gap: 6"));
+assert.ok(accountShellPolish.includes('fontStyle === "noto_sans_kr"'));
+for (const key of ["smallButton", "chip", "musicPickButton"]) {
+  assert.ok(styleBody(videoEditorPolish, key).includes("bodyFrameDesign.minTouchSize"));
+}
+assert.ok(styleBody(videoEditorPolish, "guideColorLabel").includes("fontSize: typography.small"));
+assert.ok(legacyControls.includes('accessibilityLabel={label}'));
+assert.ok(guideTabPolish.includes('accessibilityRole="radio"'));
+assert.ok(guideTabPolish.includes('accessibilityState={{ selected: isActive }}'));
+assert.ok(musicControls.includes('accessibilityLabel={isPlaying ? "음악 미리듣기 정지" : "음악 미리듣기 재생"}'));
+
 console.log("ok - Body Frame UI consistency and accessibility regression");
