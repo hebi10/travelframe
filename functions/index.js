@@ -2633,11 +2633,16 @@ exports.completeAdminBackupUpload = secureOnCall(async (request) => {
   try {
     const adminUid = await requireAdminUid(request);
     const { targetUid, uploadSessionId } = request.data ?? {};
-    if (typeof targetUid !== "string" || !targetUid || typeof uploadSessionId !== "string") {
+    if (
+      typeof targetUid !== "string" || !targetUid ||
+      typeof uploadSessionId !== "string" || !uploadSessionId
+    ) {
       throw new HttpsError("invalid-argument", "targetUid and uploadSessionId are required.");
     }
 
-    const sessionRef = db.doc(`users/${targetUid}/adminBackupUploadSessions/${uploadSessionId}`);
+    const sessionRef = db.doc(
+      `users/${targetUid}/adminBackupUploadSessions/${uploadSessionId}`
+    );
     const sessionSnapshot = await sessionRef.get();
     if (!sessionSnapshot.exists) {
       throw new HttpsError("not-found", "Admin upload session was not found.");
@@ -2645,13 +2650,14 @@ exports.completeAdminBackupUpload = secureOnCall(async (request) => {
 
     const session = sessionSnapshot.data();
     if (session.adminUid !== adminUid || session.targetUid !== targetUid) {
-      throw new HttpsError("permission-denied", "Admin upload session does not belong to this request.");
+      throw new HttpsError(
+        "permission-denied",
+        "Admin upload session does not belong to this request."
+      );
     }
-
     if (session.status === "completed") {
       return { itemId: session.itemId, itemType: session.itemType };
     }
-
     if (session.status !== "reserved") {
       throw new HttpsError("failed-precondition", "Admin upload session is not active.");
     }
@@ -2670,18 +2676,24 @@ exports.completeAdminBackupUpload = secureOnCall(async (request) => {
       metadata.contentType !== session.contentType ||
       metadata.metadata?.adminBackupSessionId !== uploadSessionId
     ) {
-      throw new HttpsError("failed-precondition", "Uploaded admin backup file does not match the reserved session.");
+      throw new HttpsError(
+        "failed-precondition",
+        "Uploaded admin backup file does not match the reserved session."
+      );
     }
 
     const now = new Date().toISOString();
-    const itemId = `${session.itemType}-${Date.now()}`;
+    const itemId = `${session.itemType}-${Date.now()}-${uploadSessionId}`;
     const safeDownloadUrl = getDownloadUrlFromStorageMetadata({
       storagePath: session.storagePath,
       metadata
     });
 
+    let collectionName;
+    let payload;
     if (session.itemType === "photo") {
-      await db.doc(`users/${targetUid}/photoBackups/${itemId}`).set({
+      collectionName = "photoBackups";
+      payload = {
         id: itemId,
         userId: targetUid,
         localId: itemId,
@@ -2700,9 +2712,10 @@ exports.completeAdminBackupUpload = secureOnCall(async (request) => {
         sourceDeviceId: "admin",
         projectId: session.projectId,
         updatedAt: FieldValue.serverTimestamp()
-      });
+      };
     } else if (session.itemType === "video") {
-      await db.doc(`users/${targetUid}/videos/${itemId}`).set({
+      collectionName = "videos";
+      payload = {
         id: itemId,
         userId: targetUid,
         localId: itemId,
@@ -2713,15 +2726,14 @@ exports.completeAdminBackupUpload = secureOnCall(async (request) => {
         fileSize: session.fileSize,
         fileType: session.contentType,
         backupStatus: "backed_up",
-        backupEnabledAt: now,
-        lastBackedUpAt: now,
         backedUpAt: now,
         sourceDeviceId: "admin",
         projectId: session.projectId,
         updatedAt: FieldValue.serverTimestamp()
-      });
-    } else {
-      await db.doc(`users/${targetUid}/musicTracks/${itemId}`).set({
+      };
+    } else if (session.itemType === "music") {
+      collectionName = "musicTracks";
+      payload = {
         id: itemId,
         userId: targetUid,
         name: session.fileName,
@@ -2731,20 +2743,50 @@ exports.completeAdminBackupUpload = secureOnCall(async (request) => {
         downloadUrl: safeDownloadUrl,
         createdAt: now,
         updatedAt: FieldValue.serverTimestamp()
-      });
+      };
+    } else {
+      throw new HttpsError("invalid-argument", "Unsupported backup item type.");
     }
 
-    await sessionRef.set(
-      {
+    const itemRef = db.doc(`users/${targetUid}/${collectionName}/${itemId}`);
+    const projectLockRef = session.projectId
+      ? db.doc(`users/${targetUid}/backupProjectLocks/${session.projectId}`)
+      : null;
+
+    // Store the backup metadata and consume its upload reservation atomically
+    // with a lock read, preventing the administrator from finalizing a file
+    // after a project deletion has entered "replacing" state.
+    const result = await db.runTransaction(async (tx) => {
+      const [freshSession, projectLock] = await Promise.all([
+        tx.get(sessionRef),
+        projectLockRef ? tx.get(projectLockRef) : Promise.resolve(null)
+      ]);
+      if (!freshSession.exists || freshSession.data()?.adminUid !== adminUid ||
+          freshSession.data()?.targetUid !== targetUid) {
+        throw new HttpsError("permission-denied", "Admin upload session ownership changed.");
+      }
+      if (projectLock?.exists) {
+        throw new HttpsError(
+          "failed-precondition",
+          "프로젝트 교체 중에는 관리자 백업 업로드를 완료할 수 없습니다."
+        );
+      }
+      if (freshSession.data()?.status === "completed") {
+        return { itemId: freshSession.data().itemId, itemType: session.itemType };
+      }
+      if (freshSession.data()?.status !== "reserved") {
+        throw new HttpsError("failed-precondition", "Admin upload reservation is no longer active.");
+      }
+      tx.create(itemRef, payload);
+      tx.update(sessionRef, {
         status: "completed",
         itemId,
         completedAt: FieldValue.serverTimestamp()
-      },
-      { merge: true }
-    );
+      });
+      return { itemId, itemType: session.itemType };
+    });
     await refreshAdminBackupOverview(targetUid);
-
-    return { itemId, itemType: session.itemType };
+    return result;
   } catch (error) {
     throw toHttpsError(error);
   }
