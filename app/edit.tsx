@@ -27,7 +27,6 @@ import {
   bodyFrameDesign,
   bodyFrameTypography,
   colors,
-  controls,
   typography
 } from "@/constants/app-theme";
 import type { GuideType } from "@/constants/camera-guides";

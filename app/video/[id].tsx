@@ -25,7 +25,6 @@ import {
   bodyFrameDesign,
   bodyFrameTypography,
   colors,
-  controls,
   spacing,
   typography
 } from "@/constants/app-theme";
