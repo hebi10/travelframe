@@ -120,8 +120,9 @@ function SettingOptionRow({
 
   return (
     <Pressable
-      accessibilityRole="button"
-      disabled={disabled}
+      accessibilityRole="radio"
+      accessibilityState={{ selected: active, disabled }}
+            disabled={disabled}
       onPress={onPress}
       style={({ pressed }) => [
         styles.optionRow,
