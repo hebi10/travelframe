@@ -23,6 +23,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AdBanner } from "@/components/ad-banner";
 import { colors, controls, spacing, typography } from "@/constants/app-theme";
 import { useAuth } from "@/lib/auth-context";
+import { useAppAppearance } from "@/lib/app-appearance";
+import { bodyFrameDesign } from "@/constants/app-theme";
 import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 import { getMadeVideoById } from "@/lib/video-library";
 import { getVideoAspectRatio } from "@/lib/video-utils";
@@ -60,6 +62,7 @@ const formatDuration = (seconds: number) => {
 export default function VideoDetailScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
   const { user } = useAuth();
+  const { palette } = useAppAppearance();
   const insets = useSafeAreaInsets();
   const bottomSafePadding = Math.max(insets.bottom + spacing.screen, spacing.screen);
   const [video, setVideo] = useState<MadeVideoItem | null>(null);
@@ -111,8 +114,8 @@ export default function VideoDetailScreen() {
     return (
       <>
         <Stack.Screen options={{ title: "만든 영상" }} />
-        <View style={styles.centerScreen}>
-          <ActivityIndicator color={colors.text} />
+        <View style={[styles.centerScreen, { backgroundColor: palette.background }]}>
+          <ActivityIndicator color={palette.text} />
         </View>
       </>
     );
@@ -122,13 +125,13 @@ export default function VideoDetailScreen() {
     return (
       <>
         <Stack.Screen options={{ title: "만든 영상" }} />
-        <View style={styles.centerScreen}>
-          <Text selectable style={styles.emptyTitle}>
+        <View style={[styles.centerScreen, { backgroundColor: palette.background }]}>
+          <Text selectable style={[styles.emptyTitle, { color: palette.text }]}>
             영상을 찾을 수 없습니다.
           </Text>
-          <Pressable style={styles.darkButton} onPress={() => router.replace("/studio")}>
-            <Text selectable={false} style={styles.darkButtonText}>
-              편집으로 돌아가기
+          <Pressable accessibilityRole="button" style={[styles.darkButton, { backgroundColor: palette.text }]} onPress={() => router.replace("/video-library")}>
+            <Text selectable={false} style={[styles.darkButtonText, { color: palette.inverse }]}>
+              영상 목록으로 돌아가기
             </Text>
           </Pressable>
         </View>
@@ -140,12 +143,12 @@ export default function VideoDetailScreen() {
     <>
       <Stack.Screen options={{ title: headerTitle }} />
       <ScrollView
-        style={styles.screen}
+        style={[styles.screen, { backgroundColor: palette.background }]}
         contentContainerStyle={[styles.content, { paddingBottom: bottomSafePadding }]}
         contentInsetAdjustmentBehavior="automatic"
       >
         <View
-          style={[styles.videoFrame, { aspectRatio: getVideoAspectRatio(video.ratio) }]}
+          style={[styles.videoFrame, { aspectRatio: getVideoAspectRatio(video.ratio), borderColor: palette.line }]}
         >
           {hasPlayableVideoSource && playbackRequested ? (
             <VideoPlaybackBoundary>
@@ -176,8 +179,9 @@ export default function VideoDetailScreen() {
                 영상을 재생할 파일을 찾지 못했습니다.
               </Text>
               <Pressable
+                accessibilityRole="button"
                 style={styles.lightButton}
-                onPress={() => router.replace("/studio?tab=works" as Href)}
+                onPress={() => router.replace("/video-library" as Href)}
               >
                 <Text selectable={false} style={styles.lightButtonText}>
                   보관함으로 돌아가기
@@ -188,18 +192,18 @@ export default function VideoDetailScreen() {
         </View>
 
         <View style={styles.header}>
-          <Text selectable style={styles.eyebrow}>
+          <Text selectable style={[styles.eyebrow, { color: palette.muted }]}>
             만든 영상
           </Text>
-          <Text selectable style={styles.title}>
+          <Text selectable style={[styles.title, { color: palette.text }]}>
             {video.title}
           </Text>
-          <Text selectable style={styles.detail}>
+          <Text selectable style={[styles.detail, { color: palette.muted }]}>
             {formatDate(video.createdAt)}
           </Text>
         </View>
 
-        <View style={styles.metaPanel}>
+        <View style={[styles.metaPanel, { borderTopColor: palette.line }]}>
           <MetaRow label="비율" value={video.ratio} />
           <MetaRow label="길이" value={formatDuration(video.duration)} />
           <MetaRow label="사진" value={`${video.photoIds.length}장`} />
@@ -207,12 +211,13 @@ export default function VideoDetailScreen() {
         </View>
 
         {video.coverUri ? (
-          <Image source={{ uri: video.coverUri }} style={styles.coverImage} contentFit="cover" />
+          <Image source={{ uri: video.coverUri }} style={[styles.coverImage, { borderColor: palette.line, backgroundColor: palette.surface }]} contentFit="cover" />
         ) : null}
 
         <View style={styles.actions}>
           <Pressable
-            style={styles.darkButton}
+            accessibilityRole="button"
+            style={[styles.darkButton, { backgroundColor: palette.text }]}
             onPress={() => {
               if (!user) {
                 showLoginRequiredForVideoCreation();
@@ -220,22 +225,22 @@ export default function VideoDetailScreen() {
               }
 
               router.push({
-                pathname: "/trip-clip",
+                pathname: "/legacy-video-edit",
                 params: { videoId: video.id, returnTo: `/video/${video.id}` }
               } as Href);
             }}
           >
-            <Text selectable={false} style={styles.darkButtonText}>
+            <Text selectable={false} style={[styles.darkButtonText, { color: palette.inverse }]}>
               다시 편집하기
             </Text>
           </Pressable>
-          <Pressable style={styles.lightButton} onPress={() => router.back()}>
-            <Text selectable={false} style={styles.lightButtonText}>
+          <Pressable accessibilityRole="button" style={[styles.lightButton, { backgroundColor: palette.background, borderColor: palette.text }]} onPress={() => router.back()}>
+            <Text selectable={false} style={[styles.lightButtonText, { color: palette.text }]}>
               돌아가기
             </Text>
           </Pressable>
           {message ? (
-            <Text selectable style={styles.message}>
+            <Text selectable style={[styles.message, { color: palette.muted }]}>
               {message}
             </Text>
           ) : null}
@@ -257,7 +262,7 @@ function VideoPlayerFrame({ source }: { source: string }) {
         </Text>
         <Pressable
           style={styles.lightButton}
-          onPress={() => router.replace("/studio?tab=works" as Href)}
+          onPress={() => router.replace("/video-library" as Href)}
         >
           <Text selectable={false} style={styles.lightButtonText}>
             보관함으로 돌아가기
@@ -293,7 +298,7 @@ class VideoPlaybackBoundary extends Component<
           </Text>
           <Pressable
             style={styles.lightButton}
-            onPress={() => router.replace("/studio?tab=works" as Href)}
+            onPress={() => router.replace("/video-library" as Href)}
           >
             <Text selectable={false} style={styles.lightButtonText}>
               보관함으로 돌아가기
@@ -333,12 +338,13 @@ function NativeVideoPlayerFrame({
 }
 
 function MetaRow({ label, value }: { label: string; value: string }) {
+  const { palette } = useAppAppearance();
   return (
-    <View style={styles.metaRow}>
-      <Text selectable style={styles.metaLabel}>
+    <View style={[styles.metaRow, { borderBottomColor: palette.line }]}>
+      <Text selectable style={[styles.metaLabel, { color: palette.muted }]}>
         {label}
       </Text>
-      <Text selectable style={styles.metaValue}>
+      <Text selectable style={[styles.metaValue, { color: palette.text }]}>
         {value}
       </Text>
     </View>
@@ -352,7 +358,10 @@ const styles = StyleSheet.create({
   },
   content: {
     gap: spacing.section,
-    padding: spacing.screen
+    padding: spacing.screen,
+    width: "100%",
+    maxWidth: bodyFrameDesign.contentMaxWidth,
+    alignSelf: "center"
   },
   centerScreen: {
     flex: 1,

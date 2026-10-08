@@ -42,7 +42,7 @@ export const bodyFrameDarkColors = {
   surfaceStrong: "#1A1A1D",
   text: "#F5F5F5",
   muted: "#A0A0A6",
-  faint: "#68686E",
+  faint: "#88888F",
   line: "#2A2A2E",
   darkLine: "#2A2A2E",
   inverse: "#111111",
@@ -51,6 +51,8 @@ export const bodyFrameDarkColors = {
 
 export const bodyFrameDesign = {
   horizontalPadding: 16,
+  contentMaxWidth: 750,
+  pageTitleFontSize: 26,
   sectionGap: 28,
   controlGap: 10,
   minTouchSize: 44,

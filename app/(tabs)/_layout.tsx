@@ -5,7 +5,6 @@ import { TabGlyph } from "@/components/tab-glyph";
 import { bodyFrameDesign } from "@/constants/app-theme";
 import { useAppAppearance } from "@/lib/app-appearance";
 
-const MAX_APP_WIDTH = 750;
 
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
@@ -25,7 +24,7 @@ export default function TabsLayout() {
         tabBarStyle: {
           height: tabBarHeight,
           width: "100%",
-          maxWidth: MAX_APP_WIDTH,
+          maxWidth: bodyFrameDesign.contentMaxWidth,
           alignSelf: "center",
           paddingTop: 6,
           paddingBottom: tabBarBottomPadding,
