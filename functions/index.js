@@ -18,6 +18,7 @@ const {
 const { ensurePrivateStorageDownload, buildStorageDownloadUrl } = require("./private-storage");
 const {
   decideSlotReplacement,
+  chooseBackupProjectSlot,
   hasBlockingUploads,
   runSlotReplacement
 } = require("./backup-slot-replacement");
@@ -430,27 +431,25 @@ exports.selectCloudBackupProject = secureOnCall(async (request) => {
       const candidates = await Promise.all(
         candidateRefs.map((ref) => tx.get(ref))
       );
-      const existing = candidates.find(
-        (item) => item.exists && item.data()?.projectId === projectId
-      );
-      if (existing) return existing.ref;
-      const available = candidates.find((item) => !item.exists);
-      if (!available) {
+      const chosen = chooseBackupProjectSlot(candidates, projectId);
+      if (!chosen) {
         throw new HttpsError(
           "resource-exhausted",
           `현재 플랜에서는 클라우드 백업 프로젝트를 최대 ${slotLimit}개 선택할 수 있습니다.`
         );
       }
-      const nowIso = new Date().toISOString();
-      tx.create(available.ref, {
-        userId: uid,
-        slotNumber: getBackupProjectSlotNumber(available.id),
-        projectId,
-        status: "active",
-        selectedAt: nowIso,
-        updatedAt: nowIso
-      });
-      return available.ref;
+      if (chosen.action === "create") {
+        const nowIso = new Date().toISOString();
+        tx.create(chosen.slot.ref, {
+          userId: uid,
+          slotNumber: getBackupProjectSlotNumber(chosen.slot.id),
+          projectId,
+          status: "active",
+          selectedAt: nowIso,
+          updatedAt: nowIso
+        });
+      }
+      return chosen.slot.ref;
     });
 
     return { slot: serializeBackupProjectSlot(await selectedSlotRef.get()) };

@@ -11,6 +11,15 @@ const decideSlotReplacement = ({ slot, previousProjectId, projectId }) => {
   return previousProjectId === projectId ? "unchanged" : "begin";
 };
 
+const chooseBackupProjectSlot = (snapshots, projectId) => {
+  const existing = snapshots.find(
+    (snapshot) => snapshot.exists && snapshot.data()?.projectId === projectId
+  );
+  if (existing) return { slot: existing, action: "existing" };
+  const available = snapshots.find((snapshot) => !snapshot.exists);
+  return available ? { slot: available, action: "create" } : null;
+};
+
 const hasBlockingUploads = (sessions, now = Date.now()) =>
   sessions.some((session) => {
     if (session?.status !== "reserved") return false;
@@ -36,6 +45,7 @@ const runSlotReplacement = async ({ begin, remove, finalize }) => {
 
 module.exports = {
   decideSlotReplacement,
+  chooseBackupProjectSlot,
   hasBlockingUploads,
   runSlotReplacement
 };

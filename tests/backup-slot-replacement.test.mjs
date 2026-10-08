@@ -3,7 +3,7 @@ import fs from "node:fs";
 import { createRequire } from "node:module";
 import test from "node:test";
 const require = createRequire(import.meta.url);
-const { decideSlotReplacement, hasBlockingUploads, runSlotReplacement } =
+const { decideSlotReplacement, chooseBackupProjectSlot, hasBlockingUploads, runSlotReplacement } =
   require("../functions/backup-slot-replacement.js");
 
 test("owner backup replacement starts, resumes or rejects conflicts", () => {
@@ -60,4 +60,28 @@ test("server reserves and completes uploads through the project lock", () => {
   assert.ok(flow.includes('operation: "owner"'));
   assert.ok(flow.includes("tx.delete(lockRef)"));
   assert.ok(source.includes("projectLockRef ? transaction.get(projectLockRef)"));
+});
+
+test("new cloud projects never overwrite an occupied numbered slot", () => {
+  const occupied = { id: "slot-1", exists: true, data: () => ({ projectId: "existing" }) };
+  const free = { id: "slot-2", exists: false };
+  const result = chooseBackupProjectSlot([occupied, free], "new");
+  assert.equal(result.action, "create");
+  assert.equal(result.slot.id, "slot-2");
+  const same = chooseBackupProjectSlot([occupied, free], "existing");
+  assert.equal(same.action, "existing");
+  assert.equal(same.slot.id, "slot-1");
+  assert.equal(chooseBackupProjectSlot([occupied], "new"), null);
+});
+
+test("project replacement removes stale upload sessions and Storage objects", () => {
+  const source = fs.readFileSync("functions/index.js", "utf8");
+  const start = source.indexOf("const deleteBackupProjectCloudData = async (");
+  const end = source.indexOf("const assertNoReservedProjectUploads =", start);
+  const code = source.slice(start, end);
+  assert.ok(code.includes('collection("adminBackupUploadSessions")'));
+  assert.ok(code.includes('collection("backupUploadSessions")'));
+  assert.ok(code.includes("...sessionSnapshot.docs.map((item) => item.ref)"));
+  assert.ok(code.includes("...adminSessionSnapshot.docs.map((item) => item.ref)"));
+  assert.ok(code.includes("deleteOwnedCloudBackupStoragePath"));
 });
