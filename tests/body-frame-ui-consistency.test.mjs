@@ -98,8 +98,6 @@ assert.ok(adminCss.includes(".admin-page .backup-item-actions button"));
 assert.ok(adminCss.includes("min-height: 44px"));
 assert.ok(adminCss.includes("@media (max-width: 520px)"));
 
-console.log("ok - Body Frame UI consistency and accessibility regression");
-
 const videoPolish = read("app/video/[id].tsx");
 const photoEditPolish = read("app/edit.tsx");
 const videoEditorPolish = read("features/trip-clip/trip-clip-screen.styles.ts");
@@ -108,7 +106,7 @@ const accountPolish = read("features/account/account-screen.styles.ts");
 const styleBody = (source, key) => {
   const start = source.indexOf(`  ${key}: {`, source.indexOf("StyleSheet.create("));
   assert.ok(start >= 0, `missing ${key} style`);
-  const end = source.indexOf("\\n  },", start);
+  const end = source.indexOf("  },", start);
   assert.ok(end > start, `invalid ${key} style`);
   return source.slice(start, end);
 };
@@ -124,3 +122,5 @@ assert.ok(!photoEditPolish.includes("  guideChip: {"), "unused legacy 9px editor
 assert.ok(styleBody(videoEditorPolish, "timelineDurationKeyboardInput").includes("bodyFrameDesign.minTouchSize"));
 assert.ok(styleBody(videoEditorPolish, "timelineDurationKeyboardDoneButton").includes("bodyFrameDesign.minTouchSize"));
 assert.ok(styleBody(accountPolish, "musicDeleteButton").includes("bodyFrameDesign.minTouchSize"));
+
+console.log("ok - Body Frame UI consistency and accessibility regression");
