@@ -110,8 +110,8 @@ for (const token of [
 
 const storageSource = fs.readFileSync("lib/body-frame-photo-storage.ts", "utf8");
 for (const token of [
-  "buildProjectPhotoRelativePath",
-  "buildProjectPreviewRelativePath",
+  "buildProjectPhotoIdRelativePath",
+  "buildProjectPreviewIdRelativePath",
   "optimizeBodyFramePhotoForStorage",
   "BODY_FRAME_MEDIA_POLICY.previewJpegQuality",
   "storeBodyFramePhotoFile",

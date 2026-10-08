@@ -4,19 +4,25 @@ import { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
-import { AuthProvider } from "@/lib/auth-context";
+import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { useAppAppearance } from "@/lib/app-appearance";
 import { initializeAdMob } from "@/lib/admob-config";
+import { shouldShowAds } from "@/lib/ad-entitlement";
 import { FontLoadProvider } from "@/lib/app-fonts";
 import { ensureBodyFrameStage2Migration } from "@/lib/body-frame-stage2-migration";
 
 function AppStack() {
   const { palette, effectiveThemeMode, fontSizeScale, emphasisWeight, fontFamily } = useAppAppearance();
+  const { subscription, subscriptionStatus, isAuthLoading, isLoggedIn } = useAuth();
+  const eligibleForAds = isLoggedIn && !isAuthLoading && shouldShowAds(subscription, subscriptionStatus);
 
   useEffect(() => {
-    void initializeAdMob();
     void ensureBodyFrameStage2Migration().catch(() => undefined);
   }, []);
+
+  useEffect(() => {
+    if (eligibleForAds) void initializeAdMob();
+  }, [eligibleForAds]);
 
   return (
     <>

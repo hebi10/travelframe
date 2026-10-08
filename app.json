@@ -54,6 +54,7 @@
       "react-native-health-connect",
       "./plugins/with-body-pose-alignment",
       "./plugins/with-android-release-manifest",
+      "./plugins/with-ad-consent",
       "./plugins/with-project-reminder",
       [
         "expo-image-picker",
@@ -89,6 +90,7 @@
         "react-native-google-mobile-ads",
         {
           "androidAppId": "ca-app-pub-3239289311207399~9959086380",
+          "delayAppMeasurementInit": true,
           "optimizeInitialization": true,
           "optimizeAdLoading": true
         }
@@ -98,7 +100,8 @@
       "typedRoutes": true
     },
     "react-native-google-mobile-ads": {
-      "android_app_id": "ca-app-pub-3239289311207399~9959086380"
+      "android_app_id": "ca-app-pub-3239289311207399~9959086380",
+      "delay_app_measurement_init": true
     },
     "extra": {
       "router": {},

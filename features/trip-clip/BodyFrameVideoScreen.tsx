@@ -54,6 +54,7 @@ import {
 } from "@/lib/app-settings";
 import { useAppAppearance } from "@/lib/app-appearance";
 import { useAuth } from "@/lib/auth-context";
+import { usePostSaveAd } from "@/lib/use-post-save-ad";
 import { ensurePhotoPreviews, getPhotos } from "@/lib/photo-library";
 import { getPlanEntitlements } from "@/lib/plan-entitlements";
 import {
@@ -109,6 +110,7 @@ export default function BodyFrameVideoScreen() {
   const recorder = useOptionalViewRecorder();
   const recordingViewAvailable = isRecordingViewAvailable();
   const { isLoggedIn, subscription } = useAuth();
+  const { requestPostSaveAd, cancelPostSaveAd } = usePostSaveAd();
   const planEntitlements = useMemo(
     () => getPlanEntitlements({ isLoggedIn, subscription }),
     [isLoggedIn, subscription]
@@ -378,10 +380,12 @@ export default function BodyFrameVideoScreen() {
       return;
     }
 
+    let saved = false;
     try {
       setIsExporting(true);
       setExportProgress(5);
       setMessage(null);
+      cancelPostSaveAd();
 
       const storedVideos = await getMadeVideos();
       assertLocalLibraryCapacity({
@@ -426,13 +430,23 @@ export default function BodyFrameVideoScreen() {
       setMessage(
         `${projectPhotos.length}장 · ${formatDuration(totalDuration)} 변화 영상을 Body Frame 앨범에 저장했습니다.`
       );
+      saved = true;
     } catch (error) {
       setMessage(getUserFacingErrorMessage(error, "변화 영상을 만들지 못했습니다."));
     } finally {
       setIsExporting(false);
     }
+
+    if (saved) {
+      try {
+        requestPostSaveAd();
+      } catch {
+        // Advertising must never change a successfully saved video's result.
+      }
+    }
   }, [
     activeProject,
+    cancelPostSaveAd,
     durations,
     guestUsage,
     isExporting,
@@ -440,9 +454,11 @@ export default function BodyFrameVideoScreen() {
     planEntitlements.canExportVideo,
     planEntitlements.localVideoLimit,
     planEntitlements.label,
+    planEntitlements.weeklyVideoExportLimit,
     previewPhoto?.uri,
     projectPhotos,
     recordProjectVideo,
+    requestPostSaveAd,
     totalDuration,
     videoOptions.ratio,
     videoLimitState.allowed,
