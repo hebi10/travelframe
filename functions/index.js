@@ -420,34 +420,40 @@ exports.selectCloudBackupProject = secureOnCall(async (request) => {
       return { slot: serializeBackupProjectSlot(existingProjectSlot) };
     }
 
-    const slots = await slotsRef.get();
-    const occupied = new Set(
-      slots.docs.map((item) => Number(item.data()?.slotNumber) || getBackupProjectSlotNumber(item.id))
-    );
-    const slotNumber = Array.from(
-      { length: slotLimit },
-      (_, index) => index + 1
-    ).find((number) => !occupied.has(number));
-
-    if (!slotNumber) {
-      throw new HttpsError(
-        "resource-exhausted",
-        `현재 플랜에서는 클라우드 백업 프로젝트를 최대 ${slotLimit}개 선택할 수 있습니다.`
+    // Allocate a specific numbered slot atomically. Concurrent requests must
+    // never overwrite an existing slot and orphan its cloud backup data.
+    const selectedSlotRef = await db.runTransaction(async (tx) => {
+      const candidateRefs = Array.from(
+        { length: slotLimit },
+        (_, index) => slotsRef.doc(`slot-${index + 1}`)
       );
-    }
-
-    const slotRef = slotsRef.doc(`slot-${slotNumber}`);
-    const nowIso = new Date().toISOString();
-    await slotRef.set({
-      userId: uid,
-      slotNumber,
-      projectId,
-      status: "active",
-      selectedAt: nowIso,
-      updatedAt: nowIso
+      const candidates = await Promise.all(
+        candidateRefs.map((ref) => tx.get(ref))
+      );
+      const existing = candidates.find(
+        (item) => item.exists && item.data()?.projectId === projectId
+      );
+      if (existing) return existing.ref;
+      const available = candidates.find((item) => !item.exists);
+      if (!available) {
+        throw new HttpsError(
+          "resource-exhausted",
+          `현재 플랜에서는 클라우드 백업 프로젝트를 최대 ${slotLimit}개 선택할 수 있습니다.`
+        );
+      }
+      const nowIso = new Date().toISOString();
+      tx.create(available.ref, {
+        userId: uid,
+        slotNumber: getBackupProjectSlotNumber(available.id),
+        projectId,
+        status: "active",
+        selectedAt: nowIso,
+        updatedAt: nowIso
+      });
+      return available.ref;
     });
 
-    return { slot: serializeBackupProjectSlot(await slotRef.get()) };
+    return { slot: serializeBackupProjectSlot(await selectedSlotRef.get()) };
   } catch (error) {
     throw toHttpsError(error);
   }
@@ -455,48 +461,40 @@ exports.selectCloudBackupProject = secureOnCall(async (request) => {
 
 const deleteBackupProjectCloudData = async ({ uid, projectId }) => {
   const userRef = db.doc(`users/${uid}`);
-  const [photoSnapshot, videoSnapshot] = await Promise.all([
-    userRef
-      .collection("photoBackups")
-      .where("projectId", "==", projectId)
-      .get(),
-    userRef
-      .collection("videos")
-      .where("projectId", "==", projectId)
-      .get()
-  ]);
+  const [photoSnapshot, videoSnapshot, sessionSnapshot, adminSessionSnapshot] =
+    await Promise.all([
+      userRef.collection("photoBackups").where("projectId", "==", projectId).get(),
+      userRef.collection("videos").where("projectId", "==", projectId).get(),
+      userRef.collection("backupUploadSessions").where("projectId", "==", projectId).get(),
+      userRef.collection("adminBackupUploadSessions").where("projectId", "==", projectId).get()
+    ]);
 
   const backupDocs = [...photoSnapshot.docs, ...videoSnapshot.docs];
-  const storagePaths = backupDocs.flatMap((item) => {
-    const data = item.data();
-    return [
-      data.storagePath,
-      data.previewStoragePath,
-      ...(Array.isArray(data.storagePaths) ? data.storagePaths : [])
-    ].filter(Boolean);
-  });
+  const storagePaths = [
+    ...backupDocs.flatMap((item) => {
+      const data = item.data();
+      return [
+        data.storagePath,
+        data.previewStoragePath,
+        ...(Array.isArray(data.storagePaths) ? data.storagePaths : [])
+      ].filter(Boolean);
+    }),
+    ...sessionSnapshot.docs.map((item) => item.data().storagePath).filter(Boolean),
+    ...adminSessionSnapshot.docs.map((item) => item.data().storagePath).filter(Boolean)
+  ];
+
+  // A missing Storage object is already deleted; other errors preserve the
+  // durable replacing marker for a later retry rather than reporting success.
   await Promise.all(
-    [...new Set(storagePaths)].map((storagePath) =>
-      deleteOwnedCloudBackupStoragePath(uid, storagePath)
+    [...new Set(storagePaths)].map((path) =>
+      deleteOwnedCloudBackupStoragePath(uid, path)
     )
   );
 
-  const sessionIds = new Set(
-    backupDocs.flatMap((item) => {
-      const data = item.data();
-      return [
-        data.backupSessionId,
-        ...(Array.isArray(data.backupSessionIds)
-          ? data.backupSessionIds
-          : [])
-      ].filter(Boolean);
-    })
-  );
   const refs = [
     ...backupDocs.map((item) => item.ref),
-    ...[...sessionIds].map((sessionId) =>
-      userRef.collection("backupUploadSessions").doc(sessionId)
-    ),
+    ...sessionSnapshot.docs.map((item) => item.ref),
+    ...adminSessionSnapshot.docs.map((item) => item.ref),
     userRef.collection("bodyProjects").doc(projectId)
   ];
   await commitDeleteBatch(refs);
