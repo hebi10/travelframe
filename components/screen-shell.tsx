@@ -2,14 +2,13 @@ import type { ReactNode } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View, type TextStyle } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { spacing, typography } from "@/constants/app-theme";
+import { bodyFrameDesign, bodyFrameTypography, spacing, typography } from "@/constants/app-theme";
 import { type FontStyle } from "@/lib/app-settings";
 import { getFontWeightForStyle, useAppAppearance } from "@/lib/app-appearance";
 
 const TAB_BAR_BASE_HEIGHT = 58;
 const TAB_BAR_CONTENT_RESERVE_HEIGHT = TAB_BAR_BASE_HEIGHT;
 const TAB_BAR_MIN_BOTTOM_PADDING = 16;
-const MAX_CONTENT_WIDTH = 750;
 
 type ScreenShellProps = {
   eyebrow?: string;
@@ -32,8 +31,8 @@ export function ScreenShell({
 }: ScreenShellProps) {
   const insets = useSafeAreaInsets();
   const { settings, palette, fontSizeScale, layoutScale, fontFamily } = useAppAppearance();
-  const screenPadding = Math.round(spacing.screen * layoutScale);
-  const sectionGap = Math.round(spacing.section * layoutScale);
+  const screenPadding = Math.round(bodyFrameDesign.horizontalPadding * layoutScale);
+  const sectionGap = Math.round(bodyFrameDesign.sectionGap * layoutScale);
 
   return (
     <ScrollView
@@ -111,7 +110,7 @@ const styles = StyleSheet.create({
   },
   content: {
     width: "100%",
-    maxWidth: MAX_CONTENT_WIDTH,
+    maxWidth: bodyFrameDesign.contentMaxWidth,
     alignSelf: "center",
     paddingBottom: spacing.section * 2
   },
@@ -154,38 +153,14 @@ const styles = StyleSheet.create({
   }
 });
 
-const titleStyleByFont: Record<FontStyle, { fontSize: number; lineHeight: number }> = {
-  noto_sans_kr: {
-    fontSize: 28,
-    lineHeight: 34
-  },
-  nanum_gothic: {
-    fontSize: 26,
-    lineHeight: 32
-  },
-  gowun_dodum: {
-    fontSize: 28,
-    lineHeight: 34
-  },
-  gugi: {
-    fontSize: 28,
-    lineHeight: 34
-  },
-  black_han_sans: {
-    fontSize: typography.title,
-    lineHeight: 36
-  }
-};
-
 const getTitleStyle = (
   fontStyle: FontStyle,
   scale: number,
   fontFamily?: string
 ): TextStyle => {
-  const style = titleStyleByFont[fontStyle];
   return {
-    fontSize: Math.round(style.fontSize * scale),
-    lineHeight: Math.round(style.lineHeight * scale),
+    fontSize: Math.round(bodyFrameTypography.pageTitle * scale),
+    lineHeight: Math.round(32 * scale),
     fontFamily,
     fontWeight: getFontWeightForStyle(fontStyle)
   };

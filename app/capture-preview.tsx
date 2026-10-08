@@ -225,12 +225,12 @@ export default function CapturePreviewScreen() {
         ) : null}
 
         <View style={styles.actions}>
-          <Pressable style={styles.secondaryButton} onPress={retakePhoto}>
+          <Pressable accessibilityRole="button" style={styles.secondaryButton} onPress={retakePhoto}>
             <Text selectable={false} style={styles.secondaryButtonText}>
               다시 촬영
             </Text>
           </Pressable>
-          <Pressable
+          <Pressable accessibilityRole="button"
             disabled={isSaving || !previewUri}
             style={[styles.primaryButton, (isSaving || !previewUri) && styles.disabledButton]}
             onPress={usePhoto}

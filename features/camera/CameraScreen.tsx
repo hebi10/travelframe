@@ -2397,7 +2397,7 @@ export default function CameraScreen({
         <Text selectable style={styles.permissionText}>
           실시간 카메라 화면을 보여주고 구도 가이드 촬영을 하려면 카메라 권한이 필요합니다.
         </Text>
-        <Pressable
+        <Pressable accessibilityRole="button"
           style={styles.permissionButton}
           onPress={canRequestCameraPermission ? requestCameraPermission : openPermissionSettings}
         >
@@ -2405,7 +2405,7 @@ export default function CameraScreen({
             {canRequestCameraPermission ? "카메라 권한 허용" : "앱 설정에서 권한 허용"}
           </Text>
         </Pressable>
-        <Pressable
+        <Pressable accessibilityRole="button"
           style={[styles.permissionButton, styles.permissionSecondaryButton]}
           onPress={returnFromPermissionScreen}
         >
@@ -2827,7 +2827,7 @@ export default function CameraScreen({
                                       </View>
               
                                       <View style={styles.cameraColorActions}>
-                                        <Pressable
+                                        <Pressable accessibilityRole="button"
                                           style={styles.cameraColorSecondaryButton}
                                           onPress={resetCameraColorSettings}
                                         >
@@ -2843,7 +2843,7 @@ export default function CameraScreen({
                                             초기화
                                           </Text>
                                         </Pressable>
-                                        <Pressable
+                                        <Pressable accessibilityRole="button"
                                           style={styles.cameraColorPrimaryButton}
                                           onPress={saveCameraColorSettings}
                                         >
@@ -2880,7 +2880,7 @@ export default function CameraScreen({
                 <Text selectable={false} style={styles.cameraSettingsEyebrow}>CAMERA</Text>
                 <Text selectable={false} style={styles.cameraSettingsTitle}>촬영</Text>
               </View>
-              <Pressable style={styles.cameraSettingsCloseButton} onPress={() => setCameraSettingsOpen(false)}>
+              <Pressable accessibilityRole="button" style={styles.cameraSettingsCloseButton} onPress={() => setCameraSettingsOpen(false)}>
                 <Text selectable={false} style={styles.cameraSettingsCloseText}>닫기</Text>
               </Pressable>
             </View>
@@ -2989,7 +2989,7 @@ export default function CameraScreen({
                   <Text selectable={false} style={styles.cameraSettingsSectionTitle}>카메라 방향</Text>
                   <View style={styles.cameraSettingsOptionRow}>
                     {CAMERA_FACING_OPTIONS.map((option) => (
-                      <Pressable
+                      <Pressable accessibilityRole="button"
                         key={option.value}
                         style={[
                           styles.cameraSettingsOptionButton,
@@ -3021,7 +3021,7 @@ export default function CameraScreen({
                   <Text selectable={false} style={styles.cameraSettingsSectionTitle}>촬영 타이머</Text>
                   <View style={styles.cameraSettingsOptionRow}>
                     {CAMERA_TIMER_OPTIONS.map((option) => (
-                      <Pressable
+                      <Pressable accessibilityRole="button"
                         key={option.value}
                         style={[
                           styles.cameraSettingsOptionButton,
@@ -3053,7 +3053,7 @@ export default function CameraScreen({
                   <Text selectable={false} style={styles.cameraSettingsSectionTitle}>플래시</Text>
                   <View style={styles.cameraSettingsOptionRow}>
                     {CAMERA_FLASH_OPTIONS.map((option) => (
-                      <Pressable
+                      <Pressable accessibilityRole="button"
                         key={option.value}
                         style={[
                           styles.cameraSettingsOptionButton,
@@ -3094,7 +3094,7 @@ export default function CameraScreen({
                   <Text selectable={false} style={styles.cameraSettingsSectionTitle}>촬영 품질</Text>
                   <View style={styles.cameraSettingsOptionRow}>
                     {CAMERA_QUALITY_OPTIONS.map((option) => (
-                      <Pressable
+                      <Pressable accessibilityRole="button"
                         key={option.value}
                         style={[
                           styles.cameraSettingsOptionButton,
@@ -3121,7 +3121,7 @@ export default function CameraScreen({
                   <Text selectable={false} style={styles.cameraSettingsSectionTitle}>카메라 비율</Text>
                   <View style={styles.cameraSettingsOptionRow}>
                     {CAMERA_RATIO_OPTIONS.map((option) => (
-                      <Pressable
+                      <Pressable accessibilityRole="button"
                         key={option.value}
                         style={[
                           styles.cameraSettingsOptionButton,
@@ -3155,7 +3155,7 @@ export default function CameraScreen({
                         !isCloudSaveTargetDisabled;
 
                       return (
-                        <Pressable
+                        <Pressable accessibilityRole="button"
                           key={option.value}
                           disabled={isCloudSaveTargetDisabled}
                           style={[
@@ -3232,7 +3232,7 @@ export default function CameraScreen({
                   <Text selectable={false} style={styles.modalEyebrow}>GUIDE</Text>
                   <Text selectable={false} style={styles.modalTitle}>가이드 설정</Text>
                 </View>
-                <Pressable style={styles.modalCloseButton} onPress={() => setGuideSettingsOpen(false)}>
+                <Pressable accessibilityRole="button" style={styles.modalCloseButton} onPress={() => setGuideSettingsOpen(false)}>
                   <Text selectable={false} style={styles.modalCloseText}>닫기</Text>
                 </Pressable>
               </View>
@@ -3246,7 +3246,7 @@ export default function CameraScreen({
                   <Text selectable={false} style={styles.modalSectionTitle}>가이드라인</Text>
                   <View style={styles.optionGrid}>
                     {GUIDE_TYPES.map((type) => (
-                      <Pressable
+                      <Pressable accessibilityRole="button"
                         key={type}
                         style={[styles.optionButton, guide === type && styles.optionButtonActive]}
                         onPress={() => {
@@ -3272,7 +3272,7 @@ export default function CameraScreen({
                   <Text selectable={false} style={styles.modalSectionTitle}>크기</Text>
                   <View style={styles.optionRow}>
                     {GUIDE_SIZE_OPTIONS.map((option) => (
-                      <Pressable
+                      <Pressable accessibilityRole="button"
                         key={option.value}
                         style={[
                           styles.optionButton,
@@ -3316,7 +3316,7 @@ export default function CameraScreen({
                 </View>
 
                 {guide !== "grid" ? (
-                  <Pressable style={styles.guidePositionButton} onPress={startGuidePositionAdjustment}>
+                  <Pressable accessibilityRole="button" style={styles.guidePositionButton} onPress={startGuidePositionAdjustment}>
                     <Text selectable={false} style={styles.guidePositionButtonText}>
                       위치·모양 조절
                     </Text>
@@ -3324,7 +3324,7 @@ export default function CameraScreen({
                 ) : null}
 
                 {guide === "grid" ? (
-                  <Pressable style={styles.guidePositionButton} onPress={startGridLineControl}>
+                  <Pressable accessibilityRole="button" style={styles.guidePositionButton} onPress={startGridLineControl}>
                     <Text selectable={false} style={styles.guidePositionButtonText}>
                       선 위치 조절
                     </Text>
@@ -3337,7 +3337,7 @@ export default function CameraScreen({
                     {GUIDE_STROKE_WIDTH_OPTIONS.map((strokeWidth) => {
                       const isActive = guideStrokeWidth === strokeWidth;
                       return (
-                        <Pressable
+                        <Pressable accessibilityRole="button"
                           key={strokeWidth}
                           style={[styles.optionButton, isActive && styles.optionButtonActive]}
                           onPress={() => updateGuideStrokeWidth(strokeWidth)}
@@ -3359,7 +3359,7 @@ export default function CameraScreen({
                   <Text selectable={false} style={styles.modalSectionTitle}>색상</Text>
                   <View style={styles.colorRow}>
                     {GUIDE_COLOR_OPTIONS.map(({ label, value: swatchColor }) => (
-                      <Pressable
+                      <Pressable accessibilityRole="button"
                         key={label}
                         style={[
                           styles.colorOption,
@@ -3375,7 +3375,7 @@ export default function CameraScreen({
                   </View>
                 </View>
 
-                <Pressable
+                <Pressable accessibilityRole="button"
                   style={[styles.visibilityButton, guideVisible && styles.visibilityButtonActive]}
                   onPress={() => updateGuideVisibility(!guideVisible)}
                   accessibilityState={{ selected: guideVisible }}
@@ -3426,16 +3426,16 @@ export default function CameraScreen({
                   />
                 </View>
                 <View style={styles.overlaySetupActions}>
-                  <Pressable style={styles.overlayCompactButton} onPress={() => referenceOverlayRef.current?.scaleBy(-0.1)}>
+                  <Pressable accessibilityRole="button" style={styles.overlayCompactButton} onPress={() => referenceOverlayRef.current?.scaleBy(-0.1)}>
                     <Text selectable={false} style={styles.overlayCompactText}>작게</Text>
                   </Pressable>
-                  <Pressable style={styles.overlayCompactButton} onPress={() => referenceOverlayRef.current?.scaleBy(0.1)}>
+                  <Pressable accessibilityRole="button" style={styles.overlayCompactButton} onPress={() => referenceOverlayRef.current?.scaleBy(0.1)}>
                     <Text selectable={false} style={styles.overlayCompactText}>크게</Text>
                   </Pressable>
-                  <Pressable style={styles.overlayCompactButton} onPress={resetOverlay}>
+                  <Pressable accessibilityRole="button" style={styles.overlayCompactButton} onPress={resetOverlay}>
                     <Text selectable={false} style={styles.overlayCompactText}>초기화</Text>
                   </Pressable>
-                  <Pressable style={styles.overlayConfirmButton} onPress={confirmOverlaySetup}>
+                  <Pressable accessibilityRole="button" style={styles.overlayConfirmButton} onPress={confirmOverlaySetup}>
                     <Text selectable={false} style={styles.overlayConfirmText}>확인</Text>
                   </Pressable>
                 </View>
@@ -3486,7 +3486,7 @@ export default function CameraScreen({
                           const isActive =
                             Math.abs(cameraZoomFactor - presetFactor) < 0.08;
                           return (
-                            <Pressable
+                            <Pressable accessibilityRole="button"
                               key={preset.label}
                               style={[
                                 styles.quickPillButton,
@@ -3524,7 +3524,7 @@ export default function CameraScreen({
                       style={styles.cameraControlPage}
                     >
                       <View style={styles.quickButtonRow}>
-                        <Pressable
+                        <Pressable accessibilityRole="button"
                           disabled={!cameraLightAvailable}
                           style={[
                             styles.quickPillButton,
@@ -3543,7 +3543,7 @@ export default function CameraScreen({
                             끄기
                           </Text>
                         </Pressable>
-                        <Pressable
+                        <Pressable accessibilityRole="button"
                           disabled={!cameraLightAvailable}
                           style={[
                             styles.quickPillButton,
@@ -3641,7 +3641,7 @@ export default function CameraScreen({
 
       {isGuidePositionAdjusting || isGridLineControlAdjusting ? (
         <View style={[styles.guidePositionActionGroup, { right: 16, bottom: bottomSafePadding }]}>
-          <Pressable
+          <Pressable accessibilityRole="button"
             style={styles.guidePositionSecondaryButton}
             onPress={() => {
               if (isGridLineControlAdjusting) {
@@ -3653,18 +3653,18 @@ export default function CameraScreen({
           >
             <Text selectable={false} style={styles.guidePositionSecondaryText}>중앙</Text>
           </Pressable>
-          <Pressable style={styles.guidePositionSecondaryButton} onPress={resetCurrentGuideAdjustment}>
+          <Pressable accessibilityRole="button" style={styles.guidePositionSecondaryButton} onPress={resetCurrentGuideAdjustment}>
             <Text selectable={false} style={styles.guidePositionSecondaryText}>초기화</Text>
           </Pressable>
           {isGuidePositionAdjusting && isShapeGuide(guide) ? (
-            <Pressable
+            <Pressable accessibilityRole="button"
               style={styles.guidePositionSecondaryButton}
               onPress={isGuideShapePointAdjusting ? finishGuideShapePointControl : startGuideShapePointControl}
             >
               <Text selectable={false} style={styles.guidePositionSecondaryText}>선 설정</Text>
             </Pressable>
           ) : null}
-          <Pressable
+          <Pressable accessibilityRole="button"
             style={styles.guidePositionDoneButton}
             onPress={isGridLineControlAdjusting ? finishGridLineControl : finishGuidePositionAdjustment}
           >

@@ -15,6 +15,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { bodyFrameDesign, bodyFrameTypography } from "@/constants/app-theme";
+import { useAppAppearance } from "@/lib/app-appearance";
 import { getBodyProjectProgressSummary } from "@/lib/body-frame-camera-project";
 import {
   getBodyFrameProjectCreationLimitState,
@@ -64,6 +65,7 @@ export function BodyFrameProjectSwitcher({
   createOnly = false
 }: BodyFrameProjectSwitcherProps) {
   const insets = useSafeAreaInsets();
+  const { palette } = useAppAppearance();
   const [pickerOpen, setPickerOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [name, setName] = useState("새 프로젝트");
@@ -220,11 +222,11 @@ export function BodyFrameProjectSwitcher({
       >
         <Pressable style={styles.backdrop} onPress={() => setPickerOpen(false)}>
           <Pressable
-            style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) }]}
+            style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16), backgroundColor: palette.surface, borderColor: palette.line }]}
             onPress={() => undefined}
           >
-            <View style={styles.sheetHandle} />
-            <Text style={styles.sheetTitle}>프로젝트 선택</Text>
+            <View style={[styles.sheetHandle, { backgroundColor: palette.faint }]} />
+            <Text style={[styles.sheetTitle, { color: palette.text }]}>프로젝트 선택</Text>
             <ScrollView style={styles.projectList} showsVerticalScrollIndicator={false}>
               {visibleProjects.map((project) => {
                 const summary = getBodyProjectProgressSummary(photos, project);
@@ -233,8 +235,12 @@ export function BodyFrameProjectSwitcher({
                   <Pressable
                     key={project.id}
                     disabled={disabled}
+                     accessibilityRole="radio"
+                     accessibilityLabel={`${project.name} 프로젝트`}
+                     accessibilityState={{ selected, disabled }}
                     style={({ pressed }) => [
                       styles.projectRow,
+                      { backgroundColor: selected ? palette.surfaceStrong : palette.surface },
                       pressed && styles.projectRowPressed
                     ]}
                     onPress={() => {
@@ -243,29 +249,29 @@ export function BodyFrameProjectSwitcher({
                     }}
                   >
                     <View style={styles.projectTextWrap}>
-                      <Text style={styles.projectName}>{project.name}</Text>
-                      <Text style={styles.projectMeta}>
+                      <Text style={[styles.projectName, { color: palette.text }]}>{project.name}</Text>
+                      <Text style={[styles.projectMeta, { color: palette.muted }]}>
                         {summary.photoCount}장 · {formatDuration(summary.durationSeconds)}초
                       </Text>
                     </View>
-                    {selected ? <Feather name="check" size={18} color="#F5F5F5" /> : null}
+                    {selected ? <Feather name="check" size={18} color={palette.text} /> : null}
                   </Pressable>
                 );
               })}
             </ScrollView>
 
             <View style={styles.sheetActions}>
-              <Pressable style={styles.actionRow} onPress={openCreateSheet}>
-                <Text style={styles.actionText}>+ 새 프로젝트</Text>
+              <Pressable accessibilityRole="button" style={styles.actionRow} onPress={openCreateSheet}>
+                <Text style={[styles.actionText, { color: palette.text }]}>+ 새 프로젝트</Text>
               </Pressable>
-              <Pressable
+              <Pressable accessibilityRole="button"
                 style={styles.actionRow}
                 onPress={() => {
                   setPickerOpen(false);
                   onManageProjects?.();
                 }}
               >
-                <Text style={styles.actionTextSecondary}>프로젝트 관리</Text>
+                <Text style={[styles.actionTextSecondary, { color: palette.muted }]}>프로젝트 관리</Text>
               </Pressable>
             </View>
           </Pressable>
@@ -284,25 +290,25 @@ export function BodyFrameProjectSwitcher({
         >
         <Pressable style={styles.backdrop} onPress={() => setCreateOpen(false)}>
           <Pressable
-            style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) }]}
+            style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16), backgroundColor: palette.surface, borderColor: palette.line }]}
             onPress={() => undefined}
           >
-            <View style={styles.sheetHandle} />
-            <Text style={styles.sheetTitle}>새 프로젝트</Text>
+            <View style={[styles.sheetHandle, { backgroundColor: palette.faint }]} />
+            <Text style={[styles.sheetTitle, { color: palette.text }]}>새 프로젝트</Text>
 
-            <Text style={styles.label}>프로젝트 이름</Text>
+            <Text style={[styles.label, { color: palette.muted }]}>프로젝트 이름</Text>
             <TextInput
               value={name}
               onChangeText={setName}
               placeholder="새 프로젝트"
-              placeholderTextColor="#68686E"
-              style={styles.input}
+              placeholderTextColor={palette.faint}
+              style={[styles.input, { backgroundColor: palette.background, color: palette.text, borderColor: palette.line }]}
               maxLength={40}
             />
 
-            <Text style={styles.label}>목표 기록 수</Text>
+            <Text style={[styles.label, { color: palette.muted }]}>목표 기록 수</Text>
             {maxProgressPhotos !== null ? (
-              <Text style={styles.planLimitText}>
+              <Text style={[styles.planLimitText, { color: palette.muted }]}>
                 현재 플랜 최대 {maxProgressPhotos}장
               </Text>
             ) : null}
@@ -321,9 +327,12 @@ export function BodyFrameProjectSwitcher({
                   <Pressable
                     key={value}
                     disabled={locked}
+                     accessibilityRole="radio"
+                     accessibilityState={{ selected: targetPreset === value, disabled: locked }}
                     style={[
                       styles.choice,
-                      targetPreset === value && styles.choiceSelected,
+                      { borderColor: palette.line },
+                      targetPreset === value && { borderColor: palette.text },
                       locked && styles.disabled
                     ]}
                     onPress={() => {
@@ -331,7 +340,7 @@ export function BodyFrameProjectSwitcher({
                       setCreateError(null);
                     }}
                   >
-                    <Text style={styles.choiceText}>
+                    <Text style={[styles.choiceText, { color: palette.text }]}>
                       {value === "custom"
                         ? "직접 입력"
                         : locked
@@ -350,24 +359,24 @@ export function BodyFrameProjectSwitcher({
                   setCreateError(null);
                 }}
                 keyboardType="number-pad"
-                style={styles.input}
+                style={[styles.input, { backgroundColor: palette.background, color: palette.text, borderColor: palette.line }]}
                 placeholder="100"
-                placeholderTextColor="#68686E"
+                placeholderTextColor={palette.faint}
               />
             ) : null}
             {createError ? (
-              <View style={styles.limitNotice}>
-                <Text style={styles.limitNoticeText}>{createError}</Text>
+              <View style={[styles.limitNotice, { backgroundColor: palette.background, borderColor: palette.line }]}>
+                <Text style={[styles.limitNoticeText, { color: palette.muted }]}>{createError}</Text>
                 {upgradePlanLabel && onUpgrade ? (
                   <Pressable
                     accessibilityRole="button"
-                    style={styles.limitUpgradeButton}
+                    style={[styles.limitUpgradeButton, { borderColor: palette.text }]}
                     onPress={() => {
                       closeAll();
                       onUpgrade();
                     }}
                   >
-                    <Text style={styles.limitUpgradeButtonText}>
+                    <Text style={[styles.limitUpgradeButtonText, { color: palette.text }]}>
                       플랜 보기 · {upgradePlanLabel}
                     </Text>
                   </Pressable>
@@ -375,44 +384,50 @@ export function BodyFrameProjectSwitcher({
               </View>
             ) : null}
 
-            <Text style={styles.label}>기준 사진</Text>
+            <Text style={[styles.label, { color: palette.muted }]}>기준 사진</Text>
             <Pressable
+              accessibilityRole="radio"
+              accessibilityState={{ selected: referenceMode === "latest" }}
               style={[
                 styles.referenceChoice,
-                referenceMode === "latest" && styles.referenceChoiceSelected
+                { borderColor: referenceMode === "latest" ? palette.text : palette.line }
               ]}
               onPress={() => setReferenceMode("latest")}
             >
               <View>
-                <Text style={styles.referenceTitle}>최근 사진</Text>
-                <Text style={styles.referenceMeta}>바로 전 사진과 맞춥니다.</Text>
+                <Text style={[styles.referenceTitle, { color: palette.text }]}>최근 사진</Text>
+                <Text style={[styles.referenceMeta, { color: palette.muted }]}>바로 전 사진과 맞춥니다.</Text>
               </View>
               {referenceMode === "latest" ? (
-                <Feather name="check" size={18} color="#F5F5F5" />
+                <Feather name="check" size={18} color={palette.text} />
               ) : null}
             </Pressable>
             <Pressable
+              accessibilityRole="radio"
+              accessibilityState={{ selected: referenceMode === "first" }}
               style={[
                 styles.referenceChoice,
-                referenceMode === "first" && styles.referenceChoiceSelected
+                { borderColor: referenceMode === "first" ? palette.text : palette.line }
               ]}
               onPress={() => setReferenceMode("first")}
             >
               <View>
-                <Text style={styles.referenceTitle}>첫 번째 사진</Text>
-                <Text style={styles.referenceMeta}>첫 번째 사진과 계속 맞춥니다.</Text>
+                <Text style={[styles.referenceTitle, { color: palette.text }]}>첫 번째 사진</Text>
+                <Text style={[styles.referenceMeta, { color: palette.muted }]}>첫 번째 사진과 계속 맞춥니다.</Text>
               </View>
               {referenceMode === "first" ? (
-                <Feather name="check" size={18} color="#F5F5F5" />
+                <Feather name="check" size={18} color={palette.text} />
               ) : null}
             </Pressable>
 
             <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ disabled: submitting }}
               disabled={submitting}
-              style={[styles.primaryButton, submitting && styles.disabled]}
+              style={[styles.primaryButton, { backgroundColor: palette.text }, submitting && styles.disabled]}
               onPress={() => void submitProject()}
             >
-              <Text style={styles.primaryButtonText}>
+              <Text style={[styles.primaryButtonText, { color: palette.inverse }]}>
                 {submitting ? "생성 중..." : "프로젝트 만들기"}
               </Text>
             </Pressable>
@@ -484,7 +499,7 @@ const styles = StyleSheet.create({
   },
   headerStatusCompact: {
     marginTop: 1,
-    fontSize: 10
+    fontSize: bodyFrameTypography.caption
   },
   disabled: { opacity: 0.5 },
   pressed: { opacity: 0.78 },
@@ -494,6 +509,9 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.62)"
   },
   sheet: {
+    width: "100%",
+    maxWidth: bodyFrameDesign.contentMaxWidth,
+    alignSelf: "center",
     maxHeight: "82%",
     backgroundColor: "#131315",
     borderTopLeftRadius: bodyFrameDesign.bottomSheetRadius,
@@ -534,7 +552,7 @@ const styles = StyleSheet.create({
   label: { color: "#A0A0A6", fontSize: 12, marginTop: 12, marginBottom: 8 },
   planLimitText: {
     marginBottom: 8,
-    color: "#68686E",
+    color: "#A0A0A6",
     fontSize: 12
   },
   input: {

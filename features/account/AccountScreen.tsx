@@ -1,3 +1,4 @@
+import { AppText as Text, AppTextInput as TextInput } from "@/components/app-text";
 import { useCallback, useMemo, useState } from "react";
 import { useFocusEffect } from "expo-router";
 import {
@@ -8,8 +9,6 @@ import {
   Modal,
   Platform,
   Pressable,
-  Text,
-  TextInput,
   View
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -528,7 +527,7 @@ export default function AccountScreen() {
               const isActive = mode === item.value;
 
               return (
-                <Pressable
+                <Pressable accessibilityRole="button"
                   key={item.value}
                   style={[
                     styles.segmentButton,
@@ -583,7 +582,7 @@ export default function AccountScreen() {
                 입력한 이메일로 비밀번호 재설정 메일을 보냅니다.
               </Text>
             )}
-            <Pressable
+            <Pressable accessibilityRole="button"
               disabled={isSubmitting || isAuthLoading}
               style={[
                 styles.primaryButton,
@@ -600,7 +599,7 @@ export default function AccountScreen() {
                     : "재설정 메일 보내기"}
               </Text>
             </Pressable>
-            <Pressable
+            <Pressable accessibilityRole="button"
               disabled={isSubmitting || isAuthLoading || isGoogleSubmitting}
               style={[
                 styles.secondaryButton,
@@ -646,7 +645,7 @@ export default function AccountScreen() {
                     이메일 인증과 유료 구독이 완료되면 워터마크 제거와 클라우드 백업을 사용할 수 있습니다.
                   </Text>
                   <View style={styles.inlineActions}>
-                    <Pressable
+                    <Pressable accessibilityRole="button"
                       disabled={isSubmitting}
                       style={[styles.secondaryButton, themed.secondaryButton]}
                       onPress={() =>
@@ -660,7 +659,7 @@ export default function AccountScreen() {
                         인증 메일 재발송
                       </Text>
                     </Pressable>
-                    <Pressable
+                    <Pressable accessibilityRole="button"
                       disabled={isSubmitting}
                       style={[styles.secondaryButton, themed.secondaryButton]}
                       onPress={() =>
@@ -675,7 +674,7 @@ export default function AccountScreen() {
                 </View>
               ) : null}
               <View style={styles.form}>
-                <Pressable
+                <Pressable accessibilityRole="button"
                   disabled={isSubmitting}
                   style={[styles.primaryButton, themed.activeFill, isSubmitting && styles.disabledButton]}
                   onPress={() => runAuthAction(logOut, "로그아웃했습니다.")}
@@ -684,7 +683,7 @@ export default function AccountScreen() {
                     로그아웃
                   </Text>
                 </Pressable>
-                <Pressable
+                <Pressable accessibilityRole="button"
                   style={[styles.secondaryButton, themed.secondaryButton]}
                   onPress={() => Linking.openURL(PRIVACY_POLICY_URL)}
                 >
@@ -692,7 +691,7 @@ export default function AccountScreen() {
                     개인정보처리방침
                   </Text>
                 </Pressable>
-                <Pressable
+                <Pressable accessibilityRole="button"
                   style={[styles.secondaryButton, themed.secondaryButton]}
                   onPress={() => Linking.openURL(TERMS_OF_SERVICE_URL)}
                 >
@@ -700,7 +699,7 @@ export default function AccountScreen() {
                     이용약관
                   </Text>
                 </Pressable>
-                <Pressable
+                <Pressable accessibilityRole="button"
                   style={[styles.secondaryButton, themed.secondaryButton]}
                   onPress={() => setShowDeleteRequestInfo(true)}
                 >
@@ -798,7 +797,7 @@ export default function AccountScreen() {
               <Text selectable={false} style={[styles.helpText, themed.mutedText]}>
                 설정의 클라우드 백업에서 켜거나 끌 수 있습니다. 구독 기간이 끝나면 새 백업은 중단됩니다. 기존 백업 데이터 삭제는 설정에서 직접 요청할 수 있습니다.
               </Text>
-              <Pressable
+              <Pressable accessibilityRole="button"
                 disabled={isBackupRestoreSubmitting || !isLoggedIn}
                 style={[
                   styles.secondaryButton,
@@ -853,7 +852,7 @@ export default function AccountScreen() {
             ) : null}
             <View style={styles.paymentGrid}>
               {paymentPlans.map((plan) => (
-                <Pressable
+                <Pressable accessibilityRole="button"
                   key={plan.id}
                   style={[styles.paymentPlan, themed.panel]}
                   onPress={() => setSelectedPaymentPlan(plan)}
@@ -955,7 +954,7 @@ export default function AccountScreen() {
                   관련 안내 페이지로 이동하시겠습니까?
                 </Text>
               </View>
-              <Pressable
+              <Pressable accessibilityRole="button"
                 style={[styles.modalCloseButton, themed.secondaryButton]}
                 onPress={() => setShowDeleteRequestInfo(false)}
               >
@@ -972,7 +971,7 @@ export default function AccountScreen() {
               계정 삭제 요청과 추가 데이터 삭제 안내는 별도 안내 페이지에서 확인하실 수 있습니다.
             </Text>
 
-            <Pressable
+            <Pressable accessibilityRole="button"
               style={[styles.primaryButton, themed.activeFill]}
               onPress={openDeleteRequestPage}
             >
@@ -1007,7 +1006,7 @@ export default function AccountScreen() {
                   {selectedPaymentPlan?.billing}
                 </Text>
               </View>
-              <Pressable
+              <Pressable accessibilityRole="button"
                 style={[styles.modalCloseButton, themed.secondaryButton]}
                 onPress={() => setSelectedPaymentPlan(null)}
               >
@@ -1032,7 +1031,7 @@ export default function AccountScreen() {
               ))}
             </View>
 
-            <Pressable
+            <Pressable accessibilityRole="button"
               disabled={
                 isSubmitting ||
                 !billingConnected ||

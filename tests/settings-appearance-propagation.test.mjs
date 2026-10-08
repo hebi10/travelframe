@@ -35,7 +35,7 @@ for (const darkColor of [
   'surfaceStrong: "#1A1A1D"',
   'text: "#F5F5F5"',
   'muted: "#A0A0A6"',
-  'faint: "#68686E"',
+  'faint: "#88888F"',
   'line: "#2A2A2E"',
   'inverse: "#111111"',
   'ink: "#F5F5F5"'

@@ -45,7 +45,7 @@ export function TripClipPhotoTab({
               const isSelected = selectedIndex >= 0;
 
               return (
-                <Pressable
+                <Pressable accessibilityRole="button"
                   key={photo.id}
                   style={[styles.photoTile, isSelected && styles.photoTileActive]}
                   onPress={() => togglePhoto(photo)}
@@ -66,9 +66,9 @@ export function TripClipPhotoTab({
                           {selectedIndex + 1}
                         </Text>
                       </View>
-                      <Pressable
+                      <Pressable accessibilityRole="button"
                         style={styles.removePhotoButton}
-                        hitSlop={8}
+                         hitSlop={10}
                         onPress={(event) => {
                           event.stopPropagation();
                           deselectPickerPhoto(photo);

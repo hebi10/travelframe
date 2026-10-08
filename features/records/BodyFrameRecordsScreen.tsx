@@ -12,6 +12,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  useWindowDimensions,
   View
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -70,6 +71,9 @@ type CreateProjectInput = {
 
 export default function BodyFrameRecordsScreen() {
   const insets = useSafeAreaInsets();
+  const { width: windowWidth } = useWindowDimensions();
+  const contentWidth = Math.min(windowWidth, bodyFrameDesign.contentMaxWidth) - bodyFrameDesign.horizontalPadding * 2;
+  const projectCardWidth = Math.max(0, (contentWidth - 12) / 2);
   const { palette } = useAppAppearance();
   const { isLoggedIn, subscription } = useAuth();
   const planEntitlements = useMemo(
@@ -250,6 +254,7 @@ export default function BodyFrameRecordsScreen() {
                   onPress={() => void openProject(project)}
                   style={({ pressed }) => [
                     styles.projectCard,
+                     { width: projectCardWidth },
                     {
                       backgroundColor: palette.surface,
                       borderColor: palette.line,
@@ -379,6 +384,9 @@ const styles = StyleSheet.create({
     flex: 1
   },
   content: {
+    width: "100%",
+    maxWidth: bodyFrameDesign.contentMaxWidth,
+    alignSelf: "center",
     paddingHorizontal: bodyFrameDesign.horizontalPadding
   },
   centered: {
@@ -428,7 +436,6 @@ const styles = StyleSheet.create({
     gap: 12
   },
   projectCard: {
-    width: "48%",
     overflow: "hidden",
     borderWidth: bodyFrameDesign.borderWidth,
     borderRadius: bodyFrameDesign.cardRadius

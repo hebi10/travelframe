@@ -196,7 +196,7 @@ for (const token of [
   "#2A2A2E",
   "#F5F5F5",
   "#A0A0A6",
-  "#68686E"
+  "#88888F"
 ]) {
   assert.ok(
     appThemeSource.includes(token) || appearanceSource.includes(token),

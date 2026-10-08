@@ -16,7 +16,7 @@ assert.ok(
 );
 
 assert.ok(
-  videoDetailSource.includes('pathname: "/trip-clip"') &&
+  videoDetailSource.includes('pathname: "/legacy-video-edit"') &&
     videoDetailSource.includes("returnTo: `/video/${video.id}`"),
   "video detail edit entry should return to the video detail screen"
 );

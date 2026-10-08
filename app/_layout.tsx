@@ -52,6 +52,7 @@ function AppStack() {
         <Stack.Screen name="project/[id]" options={{ headerShown: false }} />
         <Stack.Screen name="project/[id]/compare" options={{ headerShown: false }} />
         <Stack.Screen name="video-create" options={{ headerShown: false }} />
+        <Stack.Screen name="legacy-video-edit" options={{ headerShown: false }} />
         <Stack.Screen name="video-library" options={{ headerShown: false }} />
         <Stack.Screen name="advanced-settings" options={{ headerShown: false }} />
         <Stack.Screen name="legacy-studio" options={{ headerShown: false }} />

@@ -1,3 +1,4 @@
+import { AppText as Text, AppTextInput as TextInput } from "@/components/app-text";
 import { Image } from "@/components/private-media-image";
 import { useAudioPlayer } from "expo-audio";
 import { Feather } from "@expo/vector-icons";
@@ -21,8 +22,6 @@ import {
   Platform,
   Pressable,
   ScrollView,
-  Text,
-  TextInput,
   View
 } from "react-native";
 import {
@@ -2206,7 +2205,7 @@ export default function TripClipScreen() {
   };
 
   const renderAddPhotoTile = () => (
-    <Pressable
+    <Pressable accessibilityRole="button"
       disabled={isImportingPhotos}
       style={[
         styles.photoTile,
@@ -2438,7 +2437,7 @@ export default function TripClipScreen() {
               ) : null}
             </View>
             <View style={styles.frameFitModalActions}>
-              <Pressable
+              <Pressable accessibilityRole="button"
                 style={styles.frameFitModalButton}
                 onPress={resetActivePhotoAdjustment}
               >
@@ -2446,7 +2445,7 @@ export default function TripClipScreen() {
                   초기화
                 </Text>
               </Pressable>
-              <Pressable
+              <Pressable accessibilityRole="button"
                 style={[styles.frameFitModalButton, styles.frameFitModalPrimaryButton]}
                 onPress={() => setIsFrameFitModalVisible(false)}
               >
@@ -2547,7 +2546,7 @@ export default function TripClipScreen() {
           const isActive = activeEditorTab === tab.value;
 
           return (
-            <Pressable
+            <Pressable accessibilityRole="button"
               key={tab.value}
               disabled={isLocked}
               style={[
@@ -2635,7 +2634,7 @@ export default function TripClipScreen() {
             {!isExporting ? (
               <View style={styles.exportModalActions}>
                 {exportProgress.completedVideoId ? (
-                  <Pressable
+                  <Pressable accessibilityRole="button"
                     style={styles.primaryButton}
                     onPress={() =>
                       router.replace("/studio?tab=works" as Href)
@@ -2646,7 +2645,7 @@ export default function TripClipScreen() {
                     </Text>
                   </Pressable>
                 ) : null}
-                <Pressable
+                <Pressable accessibilityRole="button"
                   style={[
                     exportProgress.error ? styles.primaryButton : styles.secondaryButton,
                     styles.exportModalButton

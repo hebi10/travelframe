@@ -749,6 +749,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
+    width: "100%",
+    maxWidth: bodyFrameDesign.contentMaxWidth,
+    alignSelf: "center",
     paddingHorizontal: bodyFrameDesign.horizontalPadding
   },
   centered: {
@@ -822,8 +825,8 @@ const styles = StyleSheet.create({
   },
   previewFrame: {
     alignSelf: "center",
-    width: "58%",
-    maxWidth: 280,
+    width: "72%",
+    maxWidth: 320,
     overflow: "hidden",
     borderWidth: bodyFrameDesign.borderWidth,
     borderRadius: bodyFrameDesign.cardRadius,

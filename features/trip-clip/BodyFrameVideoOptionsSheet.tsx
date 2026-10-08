@@ -81,7 +81,7 @@ export function BodyFrameVideoOptionsSheet({
         style={styles.keyboardAvoidingRoot}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
-      <Pressable style={[styles.backdrop, { paddingTop: insets.top + 24 }]} onPress={onCancel}>
+      <Pressable accessibilityRole="button" style={[styles.backdrop, { paddingTop: insets.top + 24 }]} onPress={onCancel}>
         <Pressable
           style={[styles.sheet, { backgroundColor: palette.surface, paddingBottom: Math.max(insets.bottom, 16) }]}
           onPress={() => undefined}
@@ -298,7 +298,16 @@ const styles = StyleSheet.create({
     flex: 1
   },
   backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" },
-  sheet: { maxHeight: "90%", padding: 16, gap: 16, borderTopLeftRadius: 12, borderTopRightRadius: 12 },
+  sheet: {
+    width: "100%",
+    maxWidth: bodyFrameDesign.contentMaxWidth,
+    alignSelf: "center",
+    maxHeight: "90%",
+    padding: 16,
+    gap: 16,
+    borderTopLeftRadius: bodyFrameDesign.bottomSheetRadius,
+    borderTopRightRadius: bodyFrameDesign.bottomSheetRadius
+  },
   title: { fontSize: 20, fontWeight: "600" },
   orderNotice: { fontSize: 12, lineHeight: 18 },
   overlaySection: { gap: 10 },

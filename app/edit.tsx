@@ -1,3 +1,4 @@
+import { AppText as Text } from "@/components/app-text";
 import * as ImagePicker from "expo-image-picker";
 import { Feather } from "@expo/vector-icons";
 import { router, type Href, useFocusEffect, useLocalSearchParams } from "expo-router";
@@ -8,7 +9,6 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   View
 } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
@@ -563,7 +563,7 @@ export default function EditScreen() {
   return (
     <View style={styles.screen}>
       <View style={[styles.topBar, { paddingTop: insets.top + 10 }]}>
-        <Pressable style={styles.ghostButton} onPress={() => router.back()}>
+        <Pressable accessibilityRole="button" style={styles.ghostButton} onPress={() => router.back()}>
           <Text selectable={false} style={styles.ghostButtonText}>
             취소
           </Text>
@@ -571,7 +571,7 @@ export default function EditScreen() {
         <Text selectable={false} style={styles.title}>
           사진 편집
         </Text>
-        <Pressable
+        <Pressable accessibilityRole="button"
           android_disableSound
           disabled={isSaving || !source}
           style={[styles.saveButton, (!source || isSaving) && styles.disabledButton]}
@@ -631,7 +631,7 @@ export default function EditScreen() {
           </GestureDetector>
         ) : null}
         {isCanvasExpanded ? (
-          <Pressable
+          <Pressable accessibilityRole="button"
             style={[
               styles.guideMoveButton,
               isGuidePositionAdjusting && styles.expandCanvasButtonActive,
@@ -648,7 +648,7 @@ export default function EditScreen() {
             </Text>
           </Pressable>
         ) : null}
-        <Pressable
+        <Pressable accessibilityRole="button"
           style={[styles.expandCanvasButton, { bottom: bottomSafePadding }]}
           onPress={() => {
             if (isCanvasExpanded && isGuidePositionAdjusting) {
@@ -693,12 +693,12 @@ export default function EditScreen() {
                 </Text>
               </View>
               <View style={styles.draftActions}>
-                <Pressable style={styles.draftButton} onPress={resumeDraft}>
+                <Pressable accessibilityRole="button" style={styles.draftButton} onPress={resumeDraft}>
                   <Text selectable={false} style={styles.draftButtonText}>
                     이어 작업하기
                   </Text>
                 </Pressable>
-                <Pressable style={styles.draftGhostButton} onPress={removeDraft}>
+                <Pressable accessibilityRole="button" style={styles.draftGhostButton} onPress={removeDraft}>
                   <Text selectable={false} style={styles.draftGhostButtonText}>
                     삭제
                   </Text>
@@ -722,7 +722,7 @@ export default function EditScreen() {
                   : "촬영한 사진이나 앨범 사진을 불러와 시작하세요."}
               </Text>
             </View>
-            <Pressable style={styles.loadButton} onPress={pickPhoto}>
+            <Pressable accessibilityRole="button" style={styles.loadButton} onPress={pickPhoto}>
               <Feather name="image" size={16} color={bodyFrameDarkColors.text} />
               <Text selectable={false} style={styles.loadButtonText}>
                 사진 불러오기
@@ -744,7 +744,7 @@ export default function EditScreen() {
               const isActive = ratio === item;
 
               return (
-                <Pressable
+                <Pressable accessibilityRole="button"
                   key={item}
                   style={[styles.ratioChip, isActive && styles.ratioChipActive]}
                   onPress={() => setRatio(item)}
@@ -766,7 +766,7 @@ export default function EditScreen() {
             </Text>
           </View>
           <View style={styles.toolRow}>
-            <Pressable
+            <Pressable accessibilityRole="button"
               style={styles.toolButton}
               onPress={() => canvasRef.current?.straighten()}
             >
@@ -775,7 +775,7 @@ export default function EditScreen() {
                 수평 맞추기
               </Text>
             </Pressable>
-            <Pressable
+            <Pressable accessibilityRole="button"
               style={styles.toolButton}
               onPress={() => canvasRef.current?.fillFrame()}
             >
@@ -784,7 +784,7 @@ export default function EditScreen() {
                 가득 채우기
               </Text>
             </Pressable>
-            <Pressable
+            <Pressable accessibilityRole="button"
               style={styles.toolButton}
               onPress={() => canvasRef.current?.rotateRight()}
             >
@@ -793,7 +793,7 @@ export default function EditScreen() {
                 90도 회전
               </Text>
             </Pressable>
-            <Pressable style={styles.toolButton} onPress={() => canvasRef.current?.reset()}>
+            <Pressable accessibilityRole="button" style={styles.toolButton} onPress={() => canvasRef.current?.reset()}>
               <Feather name="refresh-ccw" size={17} color={bodyFrameDarkColors.text} />
               <Text selectable={false} style={styles.toolButtonText}>
                 초기화
@@ -826,8 +826,6 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingHorizontal: bodyFrameDesign.horizontalPadding,
     paddingBottom: 10,
-    borderBottomWidth: bodyFrameDesign.borderWidth,
-    borderBottomColor: bodyFrameDarkColors.line,
     backgroundColor: bodyFrameDarkColors.background
   },
   title: {
@@ -941,8 +939,6 @@ const styles = StyleSheet.create({
     gap: 14,
     paddingHorizontal: bodyFrameDesign.horizontalPadding,
     paddingTop: 16,
-    borderTopWidth: bodyFrameDesign.borderWidth,
-    borderTopColor: bodyFrameDarkColors.line,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     backgroundColor: bodyFrameDarkColors.background

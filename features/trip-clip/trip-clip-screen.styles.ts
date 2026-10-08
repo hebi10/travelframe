@@ -1,6 +1,6 @@
 import { StyleSheet } from "react-native";
 
-import { colors, controls, spacing, typography } from "@/constants/app-theme";
+import { bodyFrameDesign, colors, controls, spacing, typography } from "@/constants/app-theme";
 import { RECORDING_VIEW_WIDTH } from "@/features/trip-clip/trip-clip-screen.constants";
 
 export const styles = StyleSheet.create({
@@ -85,8 +85,11 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.background
   },
   content: {
+    width: "100%",
+    maxWidth: bodyFrameDesign.contentMaxWidth,
+    alignSelf: "center",
     gap: spacing.section,
-    padding: spacing.screen,
+    padding: bodyFrameDesign.horizontalPadding,
     paddingBottom: spacing.section
   },
   header: {
@@ -101,7 +104,7 @@ export const styles = StyleSheet.create({
     gap: 10
   },
   headerBackButton: {
-    minHeight: controls.compactHeight,
+    minHeight: bodyFrameDesign.minTouchSize,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -118,7 +121,7 @@ export const styles = StyleSheet.create({
     flex: 1
   },
   draftSaveButton: {
-    minHeight: controls.compactHeight,
+    minHeight: bodyFrameDesign.minTouchSize,
     justifyContent: "center",
     paddingHorizontal: 12,
     borderWidth: 1,
@@ -254,7 +257,7 @@ export const styles = StyleSheet.create({
     top: 10,
     left: 10,
     zIndex: 10,
-    minHeight: 34,
+    minHeight: bodyFrameDesign.minTouchSize,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 10,
@@ -285,7 +288,7 @@ export const styles = StyleSheet.create({
     gap: 8
   },
   frameFitInlineButton: {
-    minHeight: 34,
+    minHeight: bodyFrameDesign.minTouchSize,
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
@@ -419,8 +422,8 @@ export const styles = StyleSheet.create({
     letterSpacing: 0
   },
   frameFitModalCloseButton: {
-    width: 36,
-    height: 36,
+    width: bodyFrameDesign.minTouchSize,
+    height: bodyFrameDesign.minTouchSize,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
@@ -441,7 +444,7 @@ export const styles = StyleSheet.create({
   },
   frameFitModalButton: {
     flex: 1,
-    minHeight: 40,
+    minHeight: bodyFrameDesign.minTouchSize,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 12,
@@ -484,7 +487,7 @@ export const styles = StyleSheet.create({
   },
   playToggleButton: {
     minWidth: 56,
-    minHeight: 34,
+    minHeight: bodyFrameDesign.minTouchSize,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.text
@@ -506,7 +509,7 @@ export const styles = StyleSheet.create({
   },
   restartButton: {
     minWidth: 48,
-    minHeight: 34,
+    minHeight: bodyFrameDesign.minTouchSize,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,

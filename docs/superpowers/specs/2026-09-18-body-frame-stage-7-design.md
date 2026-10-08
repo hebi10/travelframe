@@ -34,7 +34,7 @@ Approved dark tokens:
 - border: `#2A2A2E`
 - primary text: `#F5F5F5`
 - secondary text: `#A0A0A6`
-- disabled/faint: `#68686E`
+- disabled/faint: `#88888F`
 - primary button: `#F5F5F5`
 - primary button text: `#111111`
 

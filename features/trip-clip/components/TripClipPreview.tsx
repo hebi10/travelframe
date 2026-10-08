@@ -112,7 +112,7 @@ export function TripClipPreview({
               </Pressable>
               {previewAdjustEnabled ? (
                 <View style={styles.frameFitInlineActions}>
-                  <Pressable
+                  <Pressable accessibilityRole="button"
                     style={styles.frameFitInlineButton}
                     onPress={resetActivePhotoAdjustment}
                   >
@@ -120,7 +120,7 @@ export function TripClipPreview({
                       초기화
                     </Text>
                   </Pressable>
-                  <Pressable
+                  <Pressable accessibilityRole="button"
                     style={[styles.frameFitInlineButton, styles.frameFitInlinePrimaryButton]}
                     onPress={() => {
                       setPreviewAdjustEnabled(true);
@@ -137,7 +137,7 @@ export function TripClipPreview({
                       크게 편집
                     </Text>
                   </Pressable>
-                  <Pressable
+                  <Pressable accessibilityRole="button"
                     style={styles.frameFitInlineButton}
                     onPress={() => setPreviewAdjustEnabled(false)}
                   >
@@ -162,7 +162,7 @@ export function TripClipPreview({
               ) : null}
             </>
           ) : (
-            <Pressable
+            <Pressable accessibilityRole="button"
               disabled={isImportingPhotos}
               style={({ pressed }) => [
                 styles.emptyPreview,
@@ -195,7 +195,7 @@ export function TripClipPreview({
         <View style={styles.playbackPanel}>
           <View style={styles.playbackTopRow}>
             <View style={styles.playbackSide}>
-              <Pressable
+              <Pressable accessibilityRole="button"
                 disabled={selectedPhotoCount === 0}
                 style={[
                   styles.playToggleButton,
@@ -207,7 +207,7 @@ export function TripClipPreview({
                   {isPlaying ? "멈춤" : "재생"}
                 </Text>
               </Pressable>
-              <Pressable style={styles.restartButton} onPress={() => jumpPhoto(-1)}>
+              <Pressable accessibilityRole="button" style={styles.restartButton} onPress={() => jumpPhoto(-1)}>
                 <Text selectable={false} style={styles.restartButtonText}>
                   이전
                 </Text>
@@ -217,12 +217,12 @@ export function TripClipPreview({
               {formatVideoDuration(progressSeconds)} / {formatVideoDuration(totalDuration)}
             </Text>
             <View style={[styles.playbackSide, styles.playbackSideRight]}>
-              <Pressable style={styles.restartButton} onPress={() => jumpPhoto(1)}>
+              <Pressable accessibilityRole="button" style={styles.restartButton} onPress={() => jumpPhoto(1)}>
                 <Text selectable={false} style={styles.restartButtonText}>
                   다음
                 </Text>
               </Pressable>
-              <Pressable style={styles.restartButton} onPress={resetPlayback}>
+              <Pressable accessibilityRole="button" style={styles.restartButton} onPress={resetPlayback}>
                 <Text selectable={false} style={styles.restartButtonText}>
                   처음
                 </Text>

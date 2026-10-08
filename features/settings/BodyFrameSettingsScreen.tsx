@@ -120,8 +120,9 @@ function SettingOptionRow({
 
   return (
     <Pressable
-      accessibilityRole="button"
-      disabled={disabled}
+      accessibilityRole="radio"
+      accessibilityState={{ selected: active, disabled }}
+            disabled={disabled}
       onPress={onPress}
       style={({ pressed }) => [
         styles.optionRow,
@@ -362,7 +363,7 @@ export default function BodyFrameSettingsScreen() {
         visible={Boolean(activeSetting)}
         onRequestClose={() => setActiveSetting(null)}
       >
-        <Pressable
+        <Pressable accessibilityRole="button"
           style={[styles.modalBackdrop, modalSafeStyle]}
           onPress={() => setActiveSetting(null)}
         >
@@ -554,6 +555,9 @@ const styles = StyleSheet.create({
     flex: 1
   },
   content: {
+    width: "100%",
+    maxWidth: bodyFrameDesign.contentMaxWidth,
+    alignSelf: "center",
     paddingHorizontal: bodyFrameDesign.horizontalPadding,
     gap: bodyFrameDesign.sectionGap
   },
@@ -604,6 +608,8 @@ const styles = StyleSheet.create({
   },
   modalPanel: {
     width: "100%",
+    maxWidth: bodyFrameDesign.contentMaxWidth,
+    alignSelf: "center",
     maxHeight: "82%",
     paddingHorizontal: bodyFrameDesign.horizontalPadding,
     paddingTop: 10,
