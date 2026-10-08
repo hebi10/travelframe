@@ -33,7 +33,7 @@ test("UI and server use admin destruction guards on both destructive endpoints",
     (source.match(/assertAdminBackupDestructionAuthorized\(targetUid, confirmationUid\);/g) ?? []).length,
     2
   );
-  assert.ok(source.includes("matchesAdminBackupSlotSnapshot(previousProjectId, expectedProjectId)"));
+  assert.ok(source.includes("decideAdminSlotReplacement({"));
   assert.ok(source.includes("bodyProjects/${projectId}"));
   assert.ok(ui.includes("expectedProjectId: slot.projectId"));
   assert.ok(ui.includes("confirmationUid"));
