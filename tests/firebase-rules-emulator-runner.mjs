@@ -235,6 +235,7 @@ const seedBackupUploadSession = async ({
   contentType = "image/jpeg",
   mediaKind = "image",
   status = "reserved",
+  projectId: sessionProjectId = null,
   expiresAt = new Date(Date.now() + 60_000)
 } = {}) => {
   await seedDoc(`users/${uid}/backupUploadSessions/${sessionId}`, {
@@ -244,6 +245,7 @@ const seedBackupUploadSession = async ({
     storagePath,
     fileSize,
     contentType,
+    ...(sessionProjectId ? { projectId: sessionProjectId } : {}),
     expiresAt
   });
 };
@@ -627,6 +629,78 @@ await expectDenied(
     contentType: "image/jpeg",
     metadata: { backupSessionId: "too-large-session" },
     bytes: tooLargeBytes
+  })
+);
+
+const lockedProjectId = "admin-replacing-project";
+const lockedPhotoPath = `users/${ownerUid}/backups/photos/locked-session/locked.jpg`;
+await seedDoc(`users/${ownerUid}/backupProjectLocks/${lockedProjectId}`, {
+  userId: ownerUid,
+  projectId: lockedProjectId,
+  targetProjectId: "next-project",
+  status: "replacing",
+  slotId: "slot-1"
+});
+await seedBackupUploadSession({
+  sessionId: "locked-session",
+  storagePath: lockedPhotoPath,
+  fileSize: 1024,
+  projectId: lockedProjectId,
+  status: "completed"
+});
+await expectDenied(
+  "clients cannot add photo metadata while admin project deletion is pending",
+  firestoreRequest("PATCH", `users/${ownerUid}/photoBackups/locked-photo`, {
+    uid: ownerUid,
+    data: {
+      ...validPhotoBackup(ownerUid, "locked-photo"),
+      storagePath: lockedPhotoPath,
+      backupSessionId: "locked-session",
+      projectId: lockedProjectId,
+      sequence: 1
+    }
+  })
+);
+await expectDenied(
+  "clients cannot mutate existing photos while administrator is replacing project",
+  firestoreRequest("PATCH", `users/${ownerUid}/photoBackups/body-photo`, {
+    uid: ownerUid,
+    data: { ...bodyPhoto, backupStatus: "failed", projectId: lockedProjectId }
+  })
+);
+await expectDenied(
+  "owners cannot forge admin replacement locks",
+  firestoreRequest("PATCH", `users/${ownerUid}/backupProjectLocks/other-project`, {
+    uid: ownerUid,
+    data: { userId: ownerUid, projectId: "other-project" }
+  })
+);
+await seedBackupUploadSession({
+  sessionId: "locked-storage",
+  storagePath: `users/${ownerUid}/backups/photos/locked-storage/locked.jpg`,
+  fileSize: 3,
+  projectId: lockedProjectId
+});
+await expectDenied(
+  "Storage Rules block already reserved uploads to the locked project",
+  storageRequest("POST", `users/${ownerUid}/backups/photos/locked-storage/locked.jpg`, {
+    uid: ownerUid, contentType: "image/jpeg",
+    metadata: { backupSessionId: "locked-storage" },
+    bytes: new Uint8Array([1, 2, 3])
+  })
+);
+await seedBackupUploadSession({
+  sessionId: "unlocked-storage",
+  storagePath: `users/${ownerUid}/backups/photos/unlocked-storage/okay.jpg`,
+  fileSize: 3,
+  projectId: "unlocked-project"
+});
+await expectAllowed(
+  "other unlocked project uploads still work",
+  storageRequest("POST", `users/${ownerUid}/backups/photos/unlocked-storage/okay.jpg`, {
+    uid: ownerUid, contentType: "image/jpeg",
+    metadata: { backupSessionId: "unlocked-storage" },
+    bytes: new Uint8Array([1, 2, 3])
   })
 );
 
