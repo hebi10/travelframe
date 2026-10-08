@@ -895,7 +895,10 @@ const getProjectBackupStats = (projectId) =>
 const getUsableBackupProjectSlots = () => {
   const policy = getPlanPolicy(getAdminPlanTier());
   return currentBackupProjectSlots.filter(
-    (slot) => slot.slotNumber >= 1 && slot.slotNumber <= policy.maxCloudBackupProjects
+    (slot) =>
+      slot.slotNumber >= 1 &&
+      slot.slotNumber <= policy.maxCloudBackupProjects &&
+      slot.status !== "replacing"
   );
 };
 
@@ -939,14 +942,23 @@ const renderBackupProjectSelects = () => {
 const replaceBackupProjectSlot = async (slot) => {
   if (!currentUserDoc) return;
 
+  const resuming = slot.status === "replacing";
   const projectId = window.prompt(
-    `슬롯 ${slot.slotNumber}에 연결할 새 프로젝트 ID를 입력해 주세요.\n현재 프로젝트: ${getBodyProjectName(slot.projectId)}`,
-    ""
+    resuming
+      ? `슬롯 ${slot.slotNumber}의 중단된 교체를 재시도합니다. 교체 대상 프로젝트 ID를 확인해 주세요.`
+      : `슬롯 ${slot.slotNumber}에 연결할 새 프로젝트 ID를 입력해 주세요.\n현재 프로젝트: ${getBodyProjectName(slot.projectId)}`,
+    resuming ? slot.pendingProjectId ?? "" : ""
   )?.trim();
-  if (!projectId || projectId === slot.projectId) return;
+  if (!projectId || (!resuming && projectId === slot.projectId)) return;
+  if (resuming && projectId !== slot.pendingProjectId) {
+    setMessage("backupMessage", "중단된 교체는 기존 대상 프로젝트 ID로만 재시도할 수 있습니다.");
+    return;
+  }
 
   const confirmed = window.confirm(
-    "백업 프로젝트를 변경하면 현재 프로젝트의 클라우드 사진과 연결된 클라우드 영상이 모두 삭제됩니다. 로컬 기기의 프로젝트와 원본 사진은 삭제되지 않으며, 새 프로젝트는 처음부터 다시 업로드해야 합니다. 계속할까요?"
+    resuming
+      ? "이전 교체 작업이 중단되었습니다. 남은 클라우드 데이터 삭제와 새 프로젝트 전환을 재시도할까요?"
+      : "백업 프로젝트를 변경하면 현재 프로젝트의 클라우드 사진과 연결된 클라우드 영상이 모두 삭제됩니다. 로컬 기기의 프로젝트와 원본 사진은 삭제되지 않으며, 새 프로젝트는 처음부터 다시 업로드해야 합니다. 계속할까요?"
   );
   if (!confirmed) return;
   const confirmationUid = window.prompt(
@@ -986,6 +998,9 @@ const renderBackupProjectSlots = () => {
   const tier = getAdminPlanTier();
   const policy = getPlanPolicy(tier);
   const usableSlots = getUsableBackupProjectSlots();
+  const replacingCount = currentBackupProjectSlots.filter(
+    (slot) => slot.status === "replacing"
+  ).length;
   const overLimitCount = currentBackupProjectSlots.filter(
     (slot) => slot.slotNumber > policy.maxCloudBackupProjects
   ).length;
@@ -996,6 +1011,10 @@ const renderBackupProjectSlots = () => {
   $("cloudPlanPolicy").textContent = policy.maxCloudBackupProjects
     ? `${adminPlanLabels[tier]} · 프로젝트 최대 ${policy.maxCloudBackupProjects}개 · 프로젝트당 사진 최대 ${policy.maxCloudPhotosPerProject}장${overLimitCount ? ` · 플랜 초과 슬롯 ${overLimitCount}개` : ""}`
     : `${adminPlanLabels[tier]} 플랜은 클라우드 프로젝트 백업을 지원하지 않습니다.`;
+
+  if (replacingCount > 0) {
+    $("cloudPlanPolicy").textContent += ` · 교체 중인 슬롯 ${replacingCount}개`;
+  }
 
   list.innerHTML = "";
   const slotMap = new Map(
@@ -1043,12 +1062,15 @@ const renderBackupProjectSlots = () => {
       policy.maxCloudPhotosPerProject > 0 &&
       stats.photoCount >= policy.maxCloudPhotosPerProject;
     const status = document.createElement("span");
-    status.className = `slot-status ${overLimit ? "over-limit" : photoFull ? "full" : ""}`;
-    status.textContent = overLimit
-      ? "플랜 초과"
-      : photoFull
-        ? "사진 한도 도달"
-        : "사용 중";
+    const replacing = slot.status === "replacing";
+    status.className = `slot-status ${overLimit || replacing ? "over-limit" : photoFull ? "full" : ""}`;
+    status.textContent = replacing
+      ? "교체 중 · 재시도 필요"
+      : overLimit
+        ? "플랜 초과"
+        : photoFull
+          ? "사진 한도 도달"
+          : "사용 중";
 
     title.textContent = getBodyProjectName(slot.projectId);
     const counts = document.createElement("span");
@@ -1061,14 +1083,20 @@ const renderBackupProjectSlots = () => {
     selectedAt.className = "meta";
     selectedAt.textContent = `선택일 ${formatDate(slot.selectedAt)}`;
     copy.append(label, title, counts, projectId, selectedAt);
+    if (replacing) {
+      const pending = document.createElement("span");
+      pending.className = "meta";
+      pending.textContent = `교체 예정: ${getBodyProjectName(slot.pendingProjectId)} · 재시도 필요`;
+      copy.appendChild(pending);
+    }
 
     const actions = document.createElement("div");
     actions.className = "backup-project-slot-actions";
-    if (!overLimit) {
+    if (!overLimit || replacing) {
       const replaceButton = document.createElement("button");
       replaceButton.type = "button";
       replaceButton.className = "secondary";
-      replaceButton.textContent = "프로젝트 변경";
+      replaceButton.textContent = replacing ? "교체 재시도" : "프로젝트 변경";
       replaceButton.addEventListener("click", () => replaceBackupProjectSlot(slot));
       actions.appendChild(replaceButton);
     }
@@ -1486,7 +1514,10 @@ const loadUserDetail = async ({ preserveBackupItems = false } = {}) => {
         id: item.id,
         slotNumber: Math.max(1, Number(data.slotNumber ?? item.id.replace("slot-", "")) || 1),
         projectId: String(data.projectId ?? ""),
-        status: data.status === "over_limit" ? "over_limit" : "active",
+        status: data.status === "replacing"
+          ? "replacing"
+          : data.status === "over_limit" ? "over_limit" : "active",
+        pendingProjectId: data.pendingProjectId ?? null,
         selectedAt: data.selectedAt ?? null,
         updatedAt: data.updatedAt ?? null
       };
