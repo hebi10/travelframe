@@ -53,6 +53,9 @@ let currentProductSubscriptions = {
   expert_monthly: null
 };
 let currentBackup = null;
+let currentBackupProjectSlots = [];
+let currentBodyProjects = [];
+let currentProjectBackupStats = {};
 let activeBackupTab = "image";
 let backupItemsByTab = {
   image: [],
@@ -87,6 +90,14 @@ const backupUploadAccept = {
 const reserveAdminBackupUpload = httpsCallable(functions, "reserveAdminBackupUpload");
 const completeAdminBackupUpload = httpsCallable(functions, "completeAdminBackupUpload");
 const deleteAdminBackupItem = httpsCallable(functions, "deleteAdminBackupItem");
+const replaceAdminCloudBackupProject = httpsCallable(
+  functions,
+  "replaceAdminCloudBackupProject"
+);
+const deleteAdminCloudBackupData = httpsCallable(
+  functions,
+  "deleteAdminCloudBackupData"
+);
 const setAdminProductSubscription = httpsCallable(functions, "setAdminProductSubscription");
 const setAdminBackupStatus = httpsCallable(functions, "setAdminBackupStatus");
 
@@ -146,6 +157,23 @@ const adminPlanLabels = {
   expert: "Expert"
 };
 
+const adminPlanPolicies = {
+  free: { localUsage: "프로젝트 1개 · 프로젝트당 사진 100장", maxCloudBackupProjects: 0, maxCloudPhotosPerProject: 0, weeklyVideoExportLimit: 0, visualPolicy: "광고 표시 · 워터마크 표시" },
+  ad_remove: { localUsage: "프로젝트 2개 · 프로젝트당 사진 100장", maxCloudBackupProjects: 0, maxCloudPhotosPerProject: 0, weeklyVideoExportLimit: 0, visualPolicy: "광고 없음 · 워터마크 표시" },
+  pro: { localUsage: "프로젝트 무제한 · 프로젝트당 사진 365장", maxCloudBackupProjects: 1, maxCloudPhotosPerProject: 365, weeklyVideoExportLimit: 0, visualPolicy: "광고 없음 · 워터마크 없음" },
+  plus: { localUsage: "프로젝트 무제한 · 프로젝트당 사진 365장", maxCloudBackupProjects: 3, maxCloudPhotosPerProject: 365, weeklyVideoExportLimit: 0, visualPolicy: "광고 없음 · 워터마크 없음" },
+  expert: { localUsage: "프로젝트 무제한 · 프로젝트당 사진 365장", maxCloudBackupProjects: 5, maxCloudPhotosPerProject: 365, weeklyVideoExportLimit: 0, visualPolicy: "광고 없음 · 워터마크 없음" }
+};
+
+const productPlanTiers = {
+  ad_remove: "ad_remove",
+  creator_monthly: "pro",
+  plus_monthly: "plus",
+  expert_monthly: "expert"
+};
+
+const getPlanPolicy = (tier) => adminPlanPolicies[tier] ?? adminPlanPolicies.free;
+
 const setupSubscriptionPanel = () => {
   subscriptionPanel.innerHTML = `
     <div class="section-heading">
@@ -204,6 +232,13 @@ const setupSubscriptionPanel = () => {
           <button type="submit">구독 저장</button>
         </div>
       </form>
+      <div id="selectedPlanEntitlementPreview" class="plan-entitlement-grid" aria-label="선택 플랜 권한">
+        <div class="entitlement-item"><span class="meta">로컬 프로젝트·사진</span><strong id="selectedLocalUsagePolicy">-</strong></div>
+        <div class="entitlement-item"><span class="meta">클라우드 프로젝트</span><strong id="selectedCloudProjectPolicy">-</strong></div>
+        <div class="entitlement-item"><span class="meta">프로젝트당 사진</span><strong id="selectedCloudPhotoPolicy">-</strong></div>
+        <div class="entitlement-item"><span class="meta">영상 출력</span><strong id="selectedVideoExportPolicy">-</strong></div>
+        <div class="entitlement-item"><span class="meta">광고·워터마크</span><strong id="selectedVisualPolicy">-</strong></div>
+      </div>
       <aside class="subscription-policy-panel">
         <h3>상품 정책</h3>
         <div class="policy-list">
@@ -487,6 +522,56 @@ const fillSubscriptionForm = (productId = $("productSelect").value) => {
   $("adminNoteInput").value = subscription?.adminNote ?? "";
 };
 
+const renderPlanPolicyValues = ({
+  tier,
+  localId,
+  cloudProjectId,
+  cloudPhotoId,
+  videoId,
+  visualId
+}) => {
+  const policy = getPlanPolicy(tier);
+  if ($(localId)) $(localId).textContent = policy.localUsage;
+  if ($(cloudProjectId)) {
+    $(cloudProjectId).textContent = policy.maxCloudBackupProjects
+      ? `최대 ${policy.maxCloudBackupProjects}개`
+      : "사용 불가";
+  }
+  if ($(cloudPhotoId)) {
+    $(cloudPhotoId).textContent = policy.maxCloudPhotosPerProject
+      ? `최대 ${policy.maxCloudPhotosPerProject}장`
+      : "-";
+  }
+  if ($(videoId)) {
+    $(videoId).textContent = policy.weeklyVideoExportLimit === 0 ? "제한 없음" : `주 ${policy.weeklyVideoExportLimit}회`;
+  }
+  if ($(visualId)) $(visualId).textContent = policy.visualPolicy;
+};
+
+const renderSelectedPlanEntitlements = (productId = $("productSelect").value) => {
+  renderPlanPolicyValues({
+    tier: productPlanTiers[productId] ?? "free",
+    localId: "selectedLocalUsagePolicy",
+    cloudProjectId: "selectedCloudProjectPolicy",
+    cloudPhotoId: "selectedCloudPhotoPolicy",
+    videoId: "selectedVideoExportPolicy",
+    visualId: "selectedVisualPolicy"
+  });
+};
+
+const renderCurrentPlanEntitlements = () => {
+  const tier = getAdminPlanTier();
+  $("effectivePlanLabel").textContent = adminPlanLabels[tier] ?? "무료";
+  renderPlanPolicyValues({
+    tier,
+    localId: "localUsagePolicy",
+    cloudProjectId: "cloudProjectPolicy",
+    cloudPhotoId: "cloudPhotoPolicy",
+    videoId: "videoExportPolicy",
+    visualId: "visualPolicy"
+  });
+};
+
 const addMonths = (date, months) => {
   const next = new Date(date);
   next.setMonth(next.getMonth() + months);
@@ -559,6 +644,9 @@ const resetUserPanels = () => {
     expert_monthly: null
   };
   currentBackup = null;
+  currentBackupProjectSlots = [];
+  currentBodyProjects = [];
+  currentProjectBackupStats = {};
   setSelectedUserPanelsVisible(false);
   resetBackupManager();
 };
@@ -741,7 +829,8 @@ const toPhotoBackupItem = (docSnapshot) => {
     )}`,
     date: data.backedUpAt || data.lastBackedUpAt || data.backupEnabledAt,
     url: data.downloadURL || data.uri || data.previewUri,
-    storagePath: data.storagePath ?? "-"
+    storagePath: data.storagePath ?? "-",
+    projectId: data.projectId ?? null
   };
 };
 
@@ -758,7 +847,8 @@ const toImageWorkBackupItem = (docSnapshot) => {
     )}`,
     date: data.backedUpAt || data.lastBackedUpAt || data.backupEnabledAt,
     url: Array.isArray(data.imageUris) ? data.imageUris[0] : null,
-    storagePath: Array.isArray(data.storagePaths) ? data.storagePaths[0] ?? "-" : "-"
+    storagePath: Array.isArray(data.storagePaths) ? data.storagePaths[0] ?? "-" : "-",
+    projectId: data.projectId ?? null
   };
 };
 
@@ -774,7 +864,8 @@ const toVideoBackupItem = (docSnapshot) => {
     )}`,
     date: data.backedUpAt || data.lastBackedUpAt || data.createdAt,
     url: data.downloadURL || data.uri,
-    storagePath: data.storagePath ?? "-"
+    storagePath: data.storagePath ?? "-",
+    projectId: data.projectId ?? null
   };
 };
 
@@ -788,8 +879,195 @@ const toMusicBackupItem = (docSnapshot) => {
     detail: `음악 · ${formatBytes(data.size)} · ${formatDate(data.createdAt || data.updatedAt)}`,
     date: data.createdAt || data.updatedAt,
     url: data.downloadUrl,
-    storagePath: data.storagePath ?? "-"
+    storagePath: data.storagePath ?? "-",
+    projectId: null
   };
+};
+
+const getBodyProjectName = (projectId) =>
+  currentBodyProjects.find((project) => project.id === projectId)?.name ||
+  projectId ||
+  "프로젝트 정보 없음";
+
+const getProjectBackupStats = (projectId) =>
+  currentProjectBackupStats[projectId] ?? { photoCount: 0, videoCount: 0 };
+
+const getUsableBackupProjectSlots = () => {
+  const policy = getPlanPolicy(getAdminPlanTier());
+  return currentBackupProjectSlots.filter(
+    (slot) => slot.slotNumber >= 1 && slot.slotNumber <= policy.maxCloudBackupProjects
+  );
+};
+
+const renderBackupProjectSelects = () => {
+  const filterSelect = $("backupProjectFilterSelect");
+  const uploadSelect = $("backupUploadProjectSelect");
+  if (!filterSelect || !uploadSelect) return;
+
+  const previousFilter = filterSelect.value || "all";
+  const previousUpload = uploadSelect.value;
+  const projectIds = new Set([
+    ...currentBackupProjectSlots.map((slot) => slot.projectId),
+    ...Object.keys(currentProjectBackupStats),
+    ...currentBodyProjects.map((project) => project.id)
+  ]);
+
+  filterSelect.innerHTML = '<option value="all">전체 프로젝트</option>';
+  for (const projectId of projectIds) {
+    if (!projectId) continue;
+    const option = document.createElement("option");
+    option.value = projectId;
+    option.textContent = getBodyProjectName(projectId);
+    filterSelect.appendChild(option);
+  }
+  if ([...filterSelect.options].some((option) => option.value === previousFilter)) {
+    filterSelect.value = previousFilter;
+  }
+
+  uploadSelect.innerHTML = '<option value="">프로젝트 선택</option>';
+  for (const slot of getUsableBackupProjectSlots()) {
+    const option = document.createElement("option");
+    option.value = slot.projectId;
+    option.textContent = `슬롯 ${slot.slotNumber} · ${getBodyProjectName(slot.projectId)}`;
+    uploadSelect.appendChild(option);
+  }
+  if ([...uploadSelect.options].some((option) => option.value === previousUpload)) {
+    uploadSelect.value = previousUpload;
+  }
+};
+
+const replaceBackupProjectSlot = async (slot) => {
+  if (!currentUserDoc) return;
+
+  const projectId = window.prompt(
+    `슬롯 ${slot.slotNumber}에 연결할 새 프로젝트 ID를 입력해 주세요.\n현재 프로젝트: ${getBodyProjectName(slot.projectId)}`,
+    ""
+  )?.trim();
+  if (!projectId || projectId === slot.projectId) return;
+
+  const confirmed = window.confirm(
+    "백업 프로젝트를 변경하면 현재 프로젝트의 클라우드 사진과 연결된 클라우드 영상이 모두 삭제됩니다. 로컬 기기의 프로젝트와 원본 사진은 삭제되지 않으며, 새 프로젝트는 처음부터 다시 업로드해야 합니다. 계속할까요?"
+  );
+  if (!confirmed) return;
+
+  setMessage("backupMessage", "기존 클라우드 데이터를 삭제하고 프로젝트 슬롯을 변경하는 중입니다.");
+  try {
+    const result = await replaceAdminCloudBackupProject({
+      targetUid: currentUserDoc.id,
+      slotId: slot.id,
+      projectId
+    });
+    const deletedPhotoCount = Number(result.data?.deletedPhotoCount ?? 0);
+    const deletedVideoCount = Number(result.data?.deletedVideoCount ?? 0);
+    await loadUserDetail();
+    setMessage(
+      "backupMessage",
+      `프로젝트 슬롯을 변경했습니다. 기존 사진 ${deletedPhotoCount}개, 영상 ${deletedVideoCount}개를 삭제했습니다.`
+    );
+  } catch (error) {
+    setMessage("backupMessage", error?.message ?? "프로젝트 슬롯 변경 중 문제가 발생했습니다.");
+  }
+};
+
+const renderBackupProjectSlots = () => {
+  const list = $("backupProjectSlotList");
+  if (!list) return;
+
+  const tier = getAdminPlanTier();
+  const policy = getPlanPolicy(tier);
+  const usableSlots = getUsableBackupProjectSlots();
+  const overLimitCount = currentBackupProjectSlots.filter(
+    (slot) => slot.slotNumber > policy.maxCloudBackupProjects
+  ).length;
+
+  $("cloudSlotUsage").textContent = policy.maxCloudBackupProjects
+    ? `${usableSlots.length} / ${policy.maxCloudBackupProjects} 슬롯 사용`
+    : "클라우드 미지원";
+  $("cloudPlanPolicy").textContent = policy.maxCloudBackupProjects
+    ? `${adminPlanLabels[tier]} · 프로젝트 최대 ${policy.maxCloudBackupProjects}개 · 프로젝트당 사진 최대 ${policy.maxCloudPhotosPerProject}장${overLimitCount ? ` · 플랜 초과 슬롯 ${overLimitCount}개` : ""}`
+    : `${adminPlanLabels[tier]} 플랜은 클라우드 프로젝트 백업을 지원하지 않습니다.`;
+
+  list.innerHTML = "";
+  const slotMap = new Map(
+    currentBackupProjectSlots.map((slot) => [slot.slotNumber, slot])
+  );
+  const maxVisibleSlot = Math.max(
+    policy.maxCloudBackupProjects,
+    ...currentBackupProjectSlots.map((slot) => slot.slotNumber),
+    0
+  );
+
+  if (maxVisibleSlot === 0) {
+    list.innerHTML =
+      '<div class="empty">선택된 클라우드 백업 프로젝트가 없습니다.</div>';
+    renderBackupProjectSelects();
+    return;
+  }
+
+  for (let slotNumber = 1; slotNumber <= maxVisibleSlot; slotNumber += 1) {
+    const slot = slotMap.get(slotNumber);
+    const row = document.createElement("div");
+    row.className = "backup-project-slot";
+
+    const copy = document.createElement("div");
+    copy.className = "backup-project-slot-copy";
+    const label = document.createElement("span");
+    label.className = "meta";
+    label.textContent = `슬롯 ${slotNumber}`;
+    const title = document.createElement("strong");
+
+    if (!slot) {
+      title.textContent = "비어 있음";
+      const detail = document.createElement("span");
+      detail.className = "meta";
+      detail.textContent = `사진 0 / ${policy.maxCloudPhotosPerProject || 365}`;
+      copy.append(label, title, detail);
+      row.append(copy);
+      list.appendChild(row);
+      continue;
+    }
+
+    const stats = getProjectBackupStats(slot.projectId);
+    const overLimit = slotNumber > policy.maxCloudBackupProjects;
+    const photoFull =
+      policy.maxCloudPhotosPerProject > 0 &&
+      stats.photoCount >= policy.maxCloudPhotosPerProject;
+    const status = document.createElement("span");
+    status.className = `slot-status ${overLimit ? "over-limit" : photoFull ? "full" : ""}`;
+    status.textContent = overLimit
+      ? "플랜 초과"
+      : photoFull
+        ? "사진 한도 도달"
+        : "사용 중";
+
+    title.textContent = getBodyProjectName(slot.projectId);
+    const counts = document.createElement("span");
+    counts.className = "meta";
+    counts.textContent = `사진 ${stats.photoCount} / ${policy.maxCloudPhotosPerProject || 365} · 영상 ${stats.videoCount}개 · ${status.textContent}`;
+    const projectId = document.createElement("span");
+    projectId.className = "uid";
+    projectId.textContent = slot.projectId;
+    const selectedAt = document.createElement("span");
+    selectedAt.className = "meta";
+    selectedAt.textContent = `선택일 ${formatDate(slot.selectedAt)}`;
+    copy.append(label, title, counts, projectId, selectedAt);
+
+    const actions = document.createElement("div");
+    actions.className = "backup-project-slot-actions";
+    if (!overLimit) {
+      const replaceButton = document.createElement("button");
+      replaceButton.type = "button";
+      replaceButton.className = "secondary";
+      replaceButton.textContent = "프로젝트 변경";
+      replaceButton.addEventListener("click", () => replaceBackupProjectSlot(slot));
+      actions.appendChild(replaceButton);
+    }
+
+    row.append(copy, actions);
+    list.appendChild(row);
+  }
+
+  renderBackupProjectSelects();
 };
 
 const renderBackupTabs = () => {
@@ -799,11 +1077,26 @@ const renderBackupTabs = () => {
     button?.setAttribute("aria-selected", String(activeBackupTab === tab));
   });
   $("backupUploadInput").accept = backupUploadAccept[activeBackupTab] ?? "";
+  const needsProject = activeBackupTab === "image" || activeBackupTab === "video";
+  $("backupUploadProjectField")?.classList.toggle("hidden", !needsProject);
+  $("backupProjectFilterField")?.classList.toggle("hidden", !needsProject);
+  if (!needsProject && $("backupProjectFilterSelect")) {
+    $("backupProjectFilterSelect").value = "all";
+  }
+  if ($("backupUploadButton")) {
+    $("backupUploadButton").disabled =
+      needsProject && getUsableBackupProjectSlots().length === 0;
+  }
 };
 
 const renderBackupItems = () => {
   renderBackupTabs();
-  const items = backupItemsByTab[activeBackupTab] ?? [];
+  const allItems = backupItemsByTab[activeBackupTab] ?? [];
+  const selectedProjectId = $("backupProjectFilterSelect")?.value ?? "all";
+  const items =
+    selectedProjectId === "all"
+      ? allItems
+      : allItems.filter((item) => item.projectId === selectedProjectId);
   const totalPages = Math.max(1, Math.ceil(items.length / backupPageSize));
   backupPagesByTab[activeBackupTab] = Math.min(
     Math.max(backupPagesByTab[activeBackupTab], 1),
@@ -851,7 +1144,9 @@ const renderBackupItems = () => {
     title.title = item.title;
     const detail = document.createElement("span");
     detail.className = "meta";
-    detail.textContent = item.detail;
+    detail.textContent = item.projectId
+      ? `${item.detail} · ${getBodyProjectName(item.projectId)}`
+      : item.detail;
     const path = document.createElement("span");
     path.className = "uid";
     path.textContent = item.storagePath;
@@ -962,10 +1257,21 @@ const uploadAdminBackupFile = async (file) => {
   if (!currentUserDoc || !file) return;
 
   const tab = activeBackupTab;
+  const projectId =
+    tab === "image" || tab === "video"
+      ? $("backupUploadProjectSelect")?.value?.trim()
+      : null;
+  if ((tab === "image" || tab === "video") && !projectId) {
+    setMessage("backupItemsMessage", "업로드할 클라우드 백업 프로젝트를 선택해 주세요.");
+    $("backupUploadInput").value = "";
+    return;
+  }
+
   setMessage("backupItemsMessage", `${backupTabLabels[tab]} 파일 업로드를 준비하는 중입니다.`);
   try {
     const reservation = await reserveAdminBackupUpload({
       targetUid: currentUserDoc.id,
+      projectId,
       itemKind: tab,
       fileName: file.name,
       fileSize: file.size,
@@ -1125,7 +1431,10 @@ const loadUserDetail = async ({ preserveBackupItems = false } = {}) => {
     expertMonthlySnap,
     backupSnap,
     photoBackups,
-    musicTracks
+    musicTracks,
+    videos,
+    backupProjectSlots,
+    bodyProjects
   ] = await Promise.all([
     getDoc(doc(db, "users", uid, "subscriptions", "current")),
     getDoc(doc(db, "users", uid, "subscriptions", "ad_remove")),
@@ -1134,7 +1443,10 @@ const loadUserDetail = async ({ preserveBackupItems = false } = {}) => {
     getDoc(doc(db, "users", uid, "subscriptions", "expert_monthly")),
     getDoc(doc(db, "users", uid, "backups", "current")),
     getDocs(collection(db, "users", uid, "photoBackups")),
-    getDocs(collection(db, "users", uid, "musicTracks"))
+    getDocs(collection(db, "users", uid, "musicTracks")),
+    getDocs(collection(db, "users", uid, "videos")),
+    getDocs(collection(db, "users", uid, "backupProjectSlots")),
+    getDocs(collection(db, "users", uid, "bodyProjects"))
   ]);
 
   currentSubscription = subscriptionSnap.exists() ? subscriptionSnap.data() : null;
@@ -1157,6 +1469,35 @@ const loadUserDetail = async ({ preserveBackupItems = false } = {}) => {
     )
   };
   currentBackup = backupSnap.exists() ? backupSnap.data() : null;
+  currentBackupProjectSlots = backupProjectSlots.docs
+    .map((item) => {
+      const data = item.data();
+      return {
+        id: item.id,
+        slotNumber: Math.max(1, Number(data.slotNumber ?? item.id.replace("slot-", "")) || 1),
+        projectId: String(data.projectId ?? ""),
+        status: data.status === "over_limit" ? "over_limit" : "active",
+        selectedAt: data.selectedAt ?? null,
+        updatedAt: data.updatedAt ?? null
+      };
+    })
+    .filter((slot) => slot.projectId)
+    .sort((a, b) => a.slotNumber - b.slotNumber);
+  currentBodyProjects = bodyProjects.docs.map((item) => ({
+    id: item.id,
+    name: item.data().name || item.data().title || item.id
+  }));
+  currentProjectBackupStats = {};
+  const rememberProjectItem = (snapshot, key) => {
+    snapshot.docs.forEach((item) => {
+      const projectId = item.data().projectId;
+      if (!projectId) return;
+      currentProjectBackupStats[projectId] ??= { photoCount: 0, videoCount: 0 };
+      currentProjectBackupStats[projectId][key] += 1;
+    });
+  };
+  rememberProjectItem(photoBackups, "photoCount");
+  rememberProjectItem(videos, "videoCount");
 
   $("userUid").textContent = uid;
   $("userEmail").textContent = currentUserDoc.email ?? "-";
@@ -1186,7 +1527,10 @@ const loadUserDetail = async ({ preserveBackupItems = false } = {}) => {
   $("selectedBackupBadge").classList.toggle("active", backupCount > 0);
 
   renderSubscriptionCards();
+  renderCurrentPlanEntitlements();
   fillSubscriptionForm($("productSelect").value || "ad_remove");
+  renderSelectedPlanEntitlements($("productSelect").value || "ad_remove");
+  renderBackupProjectSlots();
 
   $("backupStatus").textContent = currentBackup?.status ?? "없음";
   $("backupDeleteAfter").textContent = formatDate(currentBackup?.deleteAfter);
@@ -1260,6 +1604,7 @@ const syncSubscriptionExpiry = () => {
 
 $("productSelect").addEventListener("change", (event) => {
   fillSubscriptionForm(event.target.value);
+  renderSelectedPlanEntitlements(event.target.value);
 });
 $("subscriptionDurationSelect").addEventListener("change", syncSubscriptionExpiry);
 $("productStartInput").addEventListener("change", syncSubscriptionExpiry);
@@ -1292,59 +1637,25 @@ $("markBackupExpiredButton").addEventListener("click", async () => {
 $("deleteBackupButton").addEventListener("click", async () => {
   if (!currentUserDoc) return;
   const confirmed = window.confirm(
-    "백업 문서를 삭제 처리할까요? Storage 원본 파일은 Firebase Console 또는 서버 작업에서 별도 확인이 필요합니다."
+    "선택한 사용자의 전체 클라우드 백업을 삭제할까요? 사진·영상·음악·프로젝트 메타데이터·백업 프로젝트 슬롯과 연결된 Storage 파일이 삭제됩니다. 사용자의 로컬 기기 원본은 삭제되지 않습니다."
   );
   if (!confirmed) return;
 
-  setMessage("backupMessage", "삭제 처리 중입니다.");
+  setMessage("backupMessage", "전체 클라우드 데이터를 삭제하는 중입니다.");
 
   try {
-    const [photos, imageWorks, videos, musicTracks] = await Promise.all([
-      getDocs(collection(db, "users", currentUserDoc.id, "photoBackups")),
-      getDocs(collection(db, "users", currentUserDoc.id, "imageWorks")),
-      getDocs(collection(db, "users", currentUserDoc.id, "videos")),
-      getDocs(collection(db, "users", currentUserDoc.id, "musicTracks"))
-    ]);
-    const deleteTasks = [
-      ...photos.docs.map((item) =>
-        deleteAdminBackupItem({
-          targetUid: currentUserDoc.id,
-          itemType: "photo",
-          itemId: item.id
-        })
-      ),
-      ...imageWorks.docs.map((item) =>
-        deleteAdminBackupItem({
-          targetUid: currentUserDoc.id,
-          itemType: "imageWork",
-          itemId: item.id
-        })
-      ),
-      ...videos.docs.map((item) =>
-        deleteAdminBackupItem({
-          targetUid: currentUserDoc.id,
-          itemType: "video",
-          itemId: item.id
-        })
-      ),
-      ...musicTracks.docs.map((item) =>
-        deleteAdminBackupItem({
-          targetUid: currentUserDoc.id,
-          itemType: "music",
-          itemId: item.id
-        })
-      )
-    ];
-
-    await Promise.all(deleteTasks);
-    await setAdminBackupStatus({
-      targetUid: currentUserDoc.id,
-      status: "deleted"
+    const result = await deleteAdminCloudBackupData({
+      targetUid: currentUserDoc.id
     });
-    setMessage("backupMessage", "백업 문서를 삭제 처리했습니다.");
+    const data = result.data ?? {};
+    resetBackupManager();
     await loadUserDetail();
+    setMessage(
+      "backupMessage",
+      `전체 클라우드 데이터를 삭제했습니다. 사진 ${Number(data.photoCount ?? 0)}개 · 영상 ${Number(data.videoCount ?? 0)}개 · 음악 ${Number(data.musicCount ?? 0)}개`
+    );
   } catch (error) {
-    setMessage("backupMessage", error?.message ?? "백업 삭제 중 문제가 발생했습니다.");
+    setMessage("backupMessage", error?.message ?? "전체 클라우드 데이터 삭제 중 문제가 발생했습니다.");
   }
 });
 
@@ -1352,6 +1663,11 @@ backupTabs.forEach((tab) => {
   document.querySelector(`[data-backup-tab="${tab}"]`)?.addEventListener("click", () => {
     loadBackupItems(tab);
   });
+});
+
+$("backupProjectFilterSelect").addEventListener("change", () => {
+  backupPagesByTab[activeBackupTab] = 1;
+  renderBackupItems();
 });
 
 $("backupUploadButton").addEventListener("click", () => {
