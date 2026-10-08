@@ -1,3 +1,4 @@
+import { AppText as Text, AppTextInput as TextInput } from "@/components/app-text";
 import { useCallback, useMemo, useState } from "react";
 import { useFocusEffect } from "expo-router";
 import {
@@ -8,8 +9,6 @@ import {
   Modal,
   Platform,
   Pressable,
-  Text,
-  TextInput,
   View
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";

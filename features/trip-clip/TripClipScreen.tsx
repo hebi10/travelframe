@@ -1,3 +1,4 @@
+import { AppText as Text, AppTextInput as TextInput } from "@/components/app-text";
 import { Image } from "@/components/private-media-image";
 import { useAudioPlayer } from "expo-audio";
 import { Feather } from "@expo/vector-icons";
@@ -21,8 +22,6 @@ import {
   Platform,
   Pressable,
   ScrollView,
-  Text,
-  TextInput,
   View
 } from "react-native";
 import {

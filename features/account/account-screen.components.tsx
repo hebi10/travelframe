@@ -1,5 +1,6 @@
 import { useMemo } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
+import { AppText as Text } from "@/components/app-text";
 
 import { useAppAppearance } from "@/lib/app-appearance";
 import { createAccountThemedStyles, styles } from "@/features/account/account-screen.styles";

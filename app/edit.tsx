@@ -1,3 +1,4 @@
+import { AppText as Text } from "@/components/app-text";
 import * as ImagePicker from "expo-image-picker";
 import { Feather } from "@expo/vector-icons";
 import { router, type Href, useFocusEffect, useLocalSearchParams } from "expo-router";
@@ -8,7 +9,6 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   View
 } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
