@@ -20,7 +20,7 @@ for (const snippet of [
   "useExoShutter",
   "영상을 재생할 파일을 찾지 못했습니다.",
   "동영상 만들기와 다시 편집하기는 로그인 후 사용할 수 있습니다.",
-  "onPress={() => router.replace(\"/studio?tab=works\" as Href)}"
+  "onPress={() => router.replace(\"/video-library\" as Href)}"
 ]) {
   assert.ok(source.includes(snippet), `video detail should guard Android video playback: ${snippet}`);
 }
