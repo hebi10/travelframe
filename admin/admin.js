@@ -949,11 +949,21 @@ const replaceBackupProjectSlot = async (slot) => {
     "백업 프로젝트를 변경하면 현재 프로젝트의 클라우드 사진과 연결된 클라우드 영상이 모두 삭제됩니다. 로컬 기기의 프로젝트와 원본 사진은 삭제되지 않으며, 새 프로젝트는 처음부터 다시 업로드해야 합니다. 계속할까요?"
   );
   if (!confirmed) return;
+  const confirmationUid = window.prompt(
+    "클라우드 데이터를 삭제할 대상 사용자의 UID를 정확히 입력해 주세요.",
+    ""
+  )?.trim();
+  if (confirmationUid !== currentUserDoc.id) {
+    setMessage("backupMessage", "사용자 UID가 일치하지 않아 변경을 취소했습니다.");
+    return;
+  }
 
   setMessage("backupMessage", "기존 클라우드 데이터를 삭제하고 프로젝트 슬롯을 변경하는 중입니다.");
   try {
     const result = await replaceAdminCloudBackupProject({
       targetUid: currentUserDoc.id,
+      confirmationUid,
+      expectedProjectId: slot.projectId,
       slotId: slot.id,
       projectId
     });
@@ -1640,12 +1650,21 @@ $("deleteBackupButton").addEventListener("click", async () => {
     "선택한 사용자의 전체 클라우드 백업을 삭제할까요? 사진·영상·음악·프로젝트 메타데이터·백업 프로젝트 슬롯과 연결된 Storage 파일이 삭제됩니다. 사용자의 로컬 기기 원본은 삭제되지 않습니다."
   );
   if (!confirmed) return;
+  const confirmationUid = window.prompt(
+    "클라우드 전체 삭제 대상 사용자의 UID를 정확히 입력해 주세요.",
+    ""
+  )?.trim();
+  if (confirmationUid !== currentUserDoc.id) {
+    setMessage("backupMessage", "사용자 UID가 일치하지 않아 삭제를 취소했습니다.");
+    return;
+  }
 
   setMessage("backupMessage", "전체 클라우드 데이터를 삭제하는 중입니다.");
 
   try {
     const result = await deleteAdminCloudBackupData({
-      targetUid: currentUserDoc.id
+      targetUid: currentUserDoc.id,
+      confirmationUid
     });
     const data = result.data ?? {};
     resetBackupManager();
