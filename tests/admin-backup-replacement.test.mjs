@@ -91,3 +91,25 @@ test("a failure during final slot transaction remains retryable", async () => {
   await retry();
   assert.deepEqual(state, ["replacing", "active"]);
 });
+
+test("admin upload cannot finalize metadata outside a lock-aware Firestore transaction", () => {
+  const code = fs.readFileSync("functions/index.js", "utf8");
+  const start = code.indexOf("exports.completeAdminBackupUpload = secureOnCall(");
+  const end = code.indexOf("const getBackupItemRef =", start);
+  const segment = code.slice(start, end);
+  assert.ok(start >= 0 && end > start);
+  assert.ok(segment.includes("projectLockRef ? tx.get(projectLockRef)"));
+  assert.ok(segment.includes("if (projectLock?.exists)"));
+  assert.ok(segment.includes("tx.create(itemRef, payload)"));
+  assert.ok(segment.includes("tx.update(sessionRef, {"));
+  assert.ok(segment.includes("await db.runTransaction"));
+});
+
+test("admin backup expiry cannot mark data deleted without deleting the files", () => {
+  const code = fs.readFileSync("functions/index.js", "utf8");
+  const start = code.indexOf("exports.setAdminBackupStatus = secureOnCall(");
+  const end = code.indexOf("const deleteCloudBackupDataForUser =", start);
+  const segment = code.slice(start, end);
+  assert.ok(segment.includes('status !== "expired"'));
+  assert.ok(!segment.includes('status === "deleted"'));
+});

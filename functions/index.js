@@ -2875,8 +2875,11 @@ exports.setAdminBackupStatus = secureOnCall(async (request) => {
       throw new HttpsError("invalid-argument", "targetUid is required.");
     }
 
-    if (!["expired", "deleted"].includes(status)) {
-      throw new HttpsError("invalid-argument", "Unsupported backup status.");
+    if (status !== "expired") {
+      throw new HttpsError(
+        "invalid-argument",
+        "백업 삭제는 확인 절차가 있는 별도 삭제 API를 사용해 주세요."
+      );
     }
 
     const targetUserSnapshot = await db.doc(`users/${targetUid}`).get();
@@ -2890,18 +2893,11 @@ exports.setAdminBackupStatus = secureOnCall(async (request) => {
       !Number.isNaN(new Date(deleteAfter).getTime())
         ? deleteAfter
         : null;
-    const payload = status === "deleted"
-      ? {
-          status: "deleted",
-          deleteAfter: null,
-          deletedAt: new Date().toISOString(),
-          updatedAt: FieldValue.serverTimestamp()
-        }
-      : {
-          status: "expired",
-          deleteAfter: safeDeleteAfter,
-          updatedAt: FieldValue.serverTimestamp()
-        };
+    const payload = {
+      status: "expired",
+      deleteAfter: safeDeleteAfter,
+      updatedAt: FieldValue.serverTimestamp()
+    };
 
     await db.doc(`users/${targetUid}/backups/current`).set(payload, { merge: true });
     return { status };
