@@ -1,0 +1,73 @@
+name: Android installable APK
+
+on:
+  push:
+    branches:
+      - build/android-apk-20261008
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-apk-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-apk:
+    name: Build installable Android APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Android project
+        run: npm run android:prebuild:ci
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+
+      - name: Build standalone Android APK (arm64)
+        working-directory: android
+        env:
+          NODE_ENV: production
+        run: |
+          chmod +x ./gradlew
+          ./gradlew --no-daemon --max-workers=2 --console=plain -PreactNativeArchitectures=arm64-v8a :app:assembleRelease
+
+      - name: Verify installable APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk="android/app/build/outputs/apk/release/app-release.apk"
+          test -s "$apk"
+          unzip -t "$apk" >/dev/null
+          if ! unzip -Z1 "$apk" | grep -Fxq 'assets/index.android.bundle'; then
+            echo 'Expected embedded JavaScript bundle is missing; refusing to publish a Metro-dependent APK' >&2
+            exit 1
+          fi
+          build_tools="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
+          "$build_tools/apksigner" verify "$apk"
+          sha256sum "$apk"
+
+      - name: Upload installable APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: body-frame-android-apk
+          path: android/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+          retention-days: 14
