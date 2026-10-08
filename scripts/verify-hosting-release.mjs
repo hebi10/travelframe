@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import path from "node:path";
 
 export const verifyHostingReleaseSource = (root = process.cwd()) => {
-  const read = (file) => fs.readFileSync(new URL(file, `file://${root.endsWith("/") ? root : root + "/"}`), "utf8");
+  const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
   const firebase = JSON.parse(read("firebase.json"));
   const aliases = JSON.parse(read(".firebaserc"));
   const app = JSON.parse(read("app.json"));
