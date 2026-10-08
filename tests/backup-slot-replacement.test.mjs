@@ -85,3 +85,22 @@ test("project replacement removes stale upload sessions and Storage objects", ()
   assert.ok(code.includes("...adminSessionSnapshot.docs.map((item) => item.ref)"));
   assert.ok(code.includes("deleteOwnedCloudBackupStoragePath"));
 });
+
+test("pending cloud slot replacements claim their destination", () => {
+  const { isBackupTargetInOtherSlot } = require("../functions/backup-slot-replacement.js");
+  const first = { id: "slot-1", exists: true, data: () => ({ projectId: "old", pendingProjectId: "target" }) };
+  const second = { id: "slot-2", exists: false };
+  assert.equal(chooseBackupProjectSlot([first, second], "target").action, "reserved");
+  assert.equal(isBackupTargetInOtherSlot([first, second], "slot-2", "target"), true);
+  assert.equal(isBackupTargetInOtherSlot([first, second], "slot-1", "target"), false);
+  assert.equal(chooseBackupProjectSlot([first, second], "fresh", 1), null);
+  assert.equal(chooseBackupProjectSlot([first, second], "fresh", 2).slot.id, "slot-2");
+});
+
+test("replacements read every slot in the transaction before deleting data", () => {
+  const src = fs.readFileSync("functions/index.js", "utf8");
+  const owner = src.slice(src.indexOf("exports.replaceCloudBackupProject ="),src.indexOf("const getKstWeekStart ="));
+  assert.ok(owner.includes("isBackupTargetInOtherSlot(allSlots, slotId, projectId)"));
+  assert.ok(owner.includes("Promise.all(candidateSlots.map((ref) => tx.get(ref)))"));
+  assert.ok(src.includes("chooseBackupProjectSlot(candidates, projectId, slotLimit)"));
+});

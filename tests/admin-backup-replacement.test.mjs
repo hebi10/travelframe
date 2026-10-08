@@ -113,3 +113,12 @@ test("admin backup expiry cannot mark data deleted without deleting the files", 
   assert.ok(segment.includes('status !== "expired"'));
   assert.ok(!segment.includes('status === "deleted"'));
 });
+
+test("admin slot replacement guards against another slot claiming the target", () => {
+  const source = fs.readFileSync("functions/index.js", "utf8");
+  const start = source.indexOf("exports.replaceAdminCloudBackupProject = secureOnCall(");
+  const end = source.indexOf("exports.setAdminProductSubscription = secureOnCall(", start);
+  const code = source.slice(start, end);
+  assert.ok(code.includes("isBackupTargetInOtherSlot(allSlots, slotId, projectId)"));
+  assert.ok(code.includes("Promise.all(candidateSlots.map((ref) => tx.get(ref)))"));
+});

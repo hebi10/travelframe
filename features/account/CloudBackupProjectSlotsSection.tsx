@@ -67,7 +67,13 @@ export function CloudBackupProjectSlotsSection({
   );
 
   const selectedProjectIds = useMemo(
-    () => new Set(slots.map((slot) => slot.projectId)),
+    () => new Set(
+      slots.flatMap((slot) =>
+        [slot.projectId, slot.pendingProjectId].filter(
+          (projectId): projectId is string => Boolean(projectId)
+        )
+      )
+    ),
     [slots]
   );
   const availableProjects = useMemo(
