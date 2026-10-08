@@ -11,6 +11,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: production-hosting-deploy
+  cancel-in-progress: false
+
 jobs:
   deploy:
     if: github.ref == 'refs/heads/main'
@@ -47,6 +51,15 @@ jobs:
       - name: Deploy complete admin/ directory to Hosting only
         run: firebase deploy --only hosting --project travelframe-4e1fb --non-interactive
       - name: Verify public privacy, account removal and app-ads.txt
-        run: node scripts/probe-public-hosting.mjs --require-verified
+        shell: bash
+        run: |
+          for attempt in 1 2 3; do
+            if node scripts/probe-public-hosting.mjs --require-verified; then
+              exit 0
+            fi
+            sleep 6
+          done
+          echo 'Public Hosting verification failed after deployment.' >&2
+          exit 1
       - name: Explain verification scope
         run: echo 'Hosting verified. AdMob or Play Console acceptance must be checked separately.'
