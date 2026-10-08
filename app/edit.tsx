@@ -826,8 +826,6 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingHorizontal: bodyFrameDesign.horizontalPadding,
     paddingBottom: 10,
-    borderBottomWidth: bodyFrameDesign.borderWidth,
-    borderBottomColor: bodyFrameDarkColors.line,
     backgroundColor: bodyFrameDarkColors.background
   },
   title: {
@@ -941,8 +939,6 @@ const styles = StyleSheet.create({
     gap: 14,
     paddingHorizontal: bodyFrameDesign.horizontalPadding,
     paddingTop: 16,
-    borderTopWidth: bodyFrameDesign.borderWidth,
-    borderTopColor: bodyFrameDarkColors.line,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     backgroundColor: bodyFrameDarkColors.background

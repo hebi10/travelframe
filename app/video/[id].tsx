@@ -203,7 +203,7 @@ export default function VideoDetailScreen() {
           </Text>
         </View>
 
-        <View style={[styles.metaPanel, { borderTopColor: palette.line }]}>
+        <View style={styles.metaPanel}>
           <MetaRow label="비율" value={video.ratio} />
           <MetaRow label="길이" value={formatDuration(video.duration)} />
           <MetaRow label="사진" value={`${video.photoIds.length}장`} />
@@ -340,7 +340,7 @@ function NativeVideoPlayerFrame({
 function MetaRow({ label, value }: { label: string; value: string }) {
   const { palette } = useAppAppearance();
   return (
-    <View style={[styles.metaRow, { borderBottomColor: palette.line }]}>
+    <View style={[styles.metaRow, { borderColor: palette.line, backgroundColor: palette.surface }]}>
       <Text selectable style={[styles.metaLabel, { color: palette.muted }]}>
         {label}
       </Text>
@@ -449,8 +449,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0
   },
   metaPanel: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.line
+    gap: 8
   },
   metaRow: {
     minHeight: 48,
@@ -458,8 +457,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     gap: 16,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.line
+    paddingHorizontal: 14,
+    borderWidth: 1
   },
   metaLabel: {
     color: colors.muted,
