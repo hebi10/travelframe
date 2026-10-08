@@ -115,7 +115,7 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.section * 2
   },
   header: {
-    gap: 12
+    gap: 6
   },
   backButton: {
     alignSelf: "flex-start",
@@ -162,6 +162,8 @@ const getTitleStyle = (
     fontSize: Math.round(bodyFrameTypography.pageTitle * scale),
     lineHeight: Math.round(32 * scale),
     fontFamily,
-    fontWeight: getFontWeightForStyle(fontStyle)
+    fontWeight: fontStyle === "noto_sans_kr"
+      ? "600"
+      : getFontWeightForStyle(fontStyle)
   };
 };
