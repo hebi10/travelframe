@@ -2143,7 +2143,7 @@ exports.replaceAdminCloudBackupProject = secureOnCall(async (request) => {
         // A competing reservation may commit before the lock transaction.
         // Any later reservation/Storage/metadata writes are denied by the lock.
         await assertNoReservedAdminProjectUploads(targetUid, expectedProjectId);
-        return deleteBackupProjectCloudData({
+        return await deleteBackupProjectCloudData({
           uid: targetUid,
           projectId: expectedProjectId
         });
