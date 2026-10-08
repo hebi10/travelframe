@@ -23,7 +23,8 @@ const {
 } = require("./admin-destructive-safety");
 const {
   decideAdminSlotReplacement,
-  hasReservedProjectUploads
+  hasReservedProjectUploads,
+  executeAdminSlotReplacement
 } = require("./admin-backup-replacement");
 const {
   reserveWeeklyVideoExportUsage,
@@ -2034,7 +2035,8 @@ exports.replaceAdminCloudBackupProject = secureOnCall(async (request) => {
     if (firstDecision === "begin") {
       await assertNoReservedAdminProjectUploads(targetUid, expectedProjectId);
     }
-    const transactionDecision = await db.runTransaction(async (tx) => {
+    const outcome = await executeAdminSlotReplacement({
+      begin: async () => await db.runTransaction(async (tx) => {
       const freshSlot = await tx.get(slotRef);
       const decision = decideAdminSlotReplacement({
         slot: freshSlot.exists ? freshSlot.data() : null,
@@ -2053,17 +2055,11 @@ exports.replaceAdminCloudBackupProject = secureOnCall(async (request) => {
         });
       }
       return decision;
-    });
-    if (transactionDecision === "unchanged") {
-      return { slot: serializeBackupProjectSlot(await slotRef.get()), deletedPhotoCount: 0, deletedVideoCount: 0 };
-    }
-
-    // This can be safely retried: Storage 404 and Firestore deletion are idempotent.
-    // The slot remains "replacing" until both deletion and swap have succeeded.
-    const deleted = await deleteBackupProjectCloudData({
+    }),
+      remove: async () => await deleteBackupProjectCloudData({
       uid: targetUid, projectId: expectedProjectId
-    });
-    await db.runTransaction(async (tx) => {
+    }),
+      finalize: async () => await db.runTransaction(async (tx) => {
       const freshSlot = await tx.get(slotRef);
       const state = decideAdminSlotReplacement({
         slot: freshSlot.exists ? freshSlot.data() : null,
@@ -2080,8 +2076,13 @@ exports.replaceAdminCloudBackupProject = secureOnCall(async (request) => {
         updatedAt: new Date().toISOString(),
         previousProjectId: expectedProjectId
       });
+    })
     });
-    return { slot: serializeBackupProjectSlot(await slotRef.get()), ...deleted };
+    return {
+      slot: serializeBackupProjectSlot(await slotRef.get()),
+      deletedPhotoCount: outcome.deletedPhotoCount,
+      deletedVideoCount: outcome.deletedVideoCount
+    };
   } catch (error) {
     throw toHttpsError(error);
   }

@@ -13,4 +13,23 @@ const decideAdminSlotReplacement = ({ slot, expectedProjectId, projectId }) => {
 const hasReservedProjectUploads = (sessions) =>
   sessions.some((item) => item?.status === "reserved");
 
-module.exports = { decideAdminSlotReplacement, hasReservedProjectUploads };
+// Execute a durable roll-forward sequence. A thrown delete or finalize error
+// intentionally leaves the slot in its "replacing" state for retry.
+const executeAdminSlotReplacement = async ({ begin, remove, finalize }) => {
+  const state = await begin();
+  if (state === "unchanged") {
+    return { deletedPhotoCount: 0, deletedVideoCount: 0 };
+  }
+  if (state !== "begin" && state !== "resume") {
+    throw new Error("Invalid replacement state");
+  }
+  const deleted = await remove();
+  await finalize();
+  return deleted;
+};
+
+module.exports = {
+  decideAdminSlotReplacement,
+  hasReservedProjectUploads,
+  executeAdminSlotReplacement
+};
