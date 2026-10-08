@@ -235,6 +235,7 @@ const seedBackupUploadSession = async ({
   contentType = "image/jpeg",
   mediaKind = "image",
   status = "reserved",
+  projectId: sessionProjectId = null,
   expiresAt = new Date(Date.now() + 60_000)
 } = {}) => {
   await seedDoc(`users/${uid}/backupUploadSessions/${sessionId}`, {
@@ -244,6 +245,7 @@ const seedBackupUploadSession = async ({
     storagePath,
     fileSize,
     contentType,
+    ...(sessionProjectId ? { projectId: sessionProjectId } : {}),
     expiresAt
   });
 };
@@ -627,6 +629,89 @@ await expectDenied(
     contentType: "image/jpeg",
     metadata: { backupSessionId: "too-large-session" },
     bytes: tooLargeBytes
+  })
+);
+
+const lockedProjectId = "owner-replacing-project";
+await seedDoc(`users/${ownerUid}/backupProjectLocks/${lockedProjectId}`, {
+  userId: ownerUid,
+  projectId: lockedProjectId,
+  targetProjectId: "new-project",
+  status: "replacing",
+  operation: "owner",
+  slotId: "slot-1"
+});
+const lockedFile = `users/${ownerUid}/backups/photos/locked-photo/file.jpg`;
+await seedBackupUploadSession({
+  sessionId: "locked-photo",
+  storagePath: lockedFile,
+  fileSize: 1024,
+  projectId: lockedProjectId,
+  status: "completed"
+});
+await expectDenied(
+  "owner cannot write metadata to a locked project",
+  firestoreRequest("PATCH", `users/${ownerUid}/photoBackups/locked-photo`, {
+    uid: ownerUid,
+    data: {
+      ...validPhotoBackup(ownerUid, "locked-photo"),
+      storagePath: lockedFile,
+      backupSessionId: "locked-photo",
+      projectId: lockedProjectId,
+      sequence: 1
+    }
+  })
+);
+await expectDenied(
+  "owner cannot repurpose locked upload under another project ID",
+  firestoreRequest("PATCH", `users/${ownerUid}/photoBackups/locked-bypass`, {
+    uid: ownerUid,
+    data: {
+      ...validPhotoBackup(ownerUid, "locked-bypass"),
+      storagePath: lockedFile,
+      backupSessionId: "locked-photo",
+      projectId: "different-project",
+      sequence: 1
+    }
+  })
+);
+await expectDenied(
+  "owner cannot create replacement lock documents",
+  firestoreRequest("PATCH", `users/${ownerUid}/backupProjectLocks/forged`, {
+    uid: ownerUid,
+    data: { userId: ownerUid, projectId: "forged" }
+  })
+);
+const lockedUploadPath = `users/${ownerUid}/backups/photos/locked-upload/locked.jpg`;
+await seedBackupUploadSession({
+  sessionId: "locked-upload",
+  storagePath: lockedUploadPath,
+  fileSize: 3,
+  projectId: lockedProjectId
+});
+await expectDenied(
+  "Storage Rules prevent upload into a locked project",
+  storageRequest("POST", lockedUploadPath, {
+    uid: ownerUid,
+    contentType: "image/jpeg",
+    metadata: { backupSessionId: "locked-upload" },
+    bytes: new Uint8Array([1, 2, 3])
+  })
+);
+const otherProjectPath = `users/${ownerUid}/backups/photos/unlocked-upload/unlocked.jpg`;
+await seedBackupUploadSession({
+  sessionId: "unlocked-upload",
+  storagePath: otherProjectPath,
+  fileSize: 3,
+  projectId: "unlocked-project"
+});
+await expectAllowed(
+  "Storage Rules keep other project uploads permitted",
+  storageRequest("POST", otherProjectPath, {
+    uid: ownerUid,
+    contentType: "image/jpeg",
+    metadata: { backupSessionId: "unlocked-upload" },
+    bytes: new Uint8Array([1, 2, 3])
   })
 );
 
