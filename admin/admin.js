@@ -44,6 +44,10 @@ const subscriptionPanel = $("subscriptionPanel");
 const backupPanel = $("backupPanel");
 
 let currentAdmin = null;
+let adminBackupCapabilities = {
+  canReplaceProjects: false,
+  canDeleteAll: false
+};
 let currentUserDoc = null;
 let currentSubscription = null;
 let currentProductSubscriptions = {
@@ -97,6 +101,10 @@ const replaceAdminCloudBackupProject = httpsCallable(
 const deleteAdminCloudBackupData = httpsCallable(
   functions,
   "deleteAdminCloudBackupData"
+);
+const getAdminBackupCapabilities = httpsCallable(
+  functions,
+  "getAdminBackupCapabilities"
 );
 const setAdminProductSubscription = httpsCallable(functions, "setAdminProductSubscription");
 const setAdminBackupStatus = httpsCallable(functions, "setAdminBackupStatus");
@@ -940,7 +948,7 @@ const renderBackupProjectSelects = () => {
 };
 
 const replaceBackupProjectSlot = async (slot) => {
-  if (!currentUserDoc) return;
+  if (!currentUserDoc || !adminBackupCapabilities.canReplaceProjects) return;
 
   const resuming = slot.status === "replacing";
   const projectId = window.prompt(
@@ -1014,6 +1022,9 @@ const renderBackupProjectSlots = () => {
 
   if (replacingCount > 0) {
     $("cloudPlanPolicy").textContent += ` · 교체 중인 슬롯 ${replacingCount}개`;
+  }
+  if (!adminBackupCapabilities.canReplaceProjects) {
+    $("cloudPlanPolicy").textContent += " · 관리자 교체는 현재 비활성화";
   }
 
   list.innerHTML = "";
@@ -1097,6 +1108,10 @@ const renderBackupProjectSlots = () => {
       replaceButton.type = "button";
       replaceButton.className = "secondary";
       replaceButton.textContent = replacing ? "교체 재시도" : "프로젝트 변경";
+      replaceButton.disabled = !adminBackupCapabilities.canReplaceProjects;
+      replaceButton.title = replaceButton.disabled
+        ? "운영 검증 전까지 관리자 프로젝트 교체가 비활성화되어 있습니다."
+        : "";
       replaceButton.addEventListener("click", () => replaceBackupProjectSlot(slot));
       actions.appendChild(replaceButton);
     }
@@ -1355,6 +1370,7 @@ const uploadAdminBackupFile = async (file) => {
 onAuthStateChanged(auth, async (user) => {
   if (!user) {
     currentAdmin = null;
+    adminBackupCapabilities = { canReplaceProjects: false, canDeleteAll: false };
     allUsers = [];
     showAdmin(false);
     resetUserPanels();
@@ -1370,6 +1386,19 @@ onAuthStateChanged(auth, async (user) => {
   }
 
   currentAdmin = user;
+  const capabilities = await getAdminBackupCapabilities().catch(() => null);
+  if (auth.currentUser?.uid !== user.uid) return;
+  adminBackupCapabilities = {
+    canReplaceProjects: capabilities?.data?.canReplaceProjects === true,
+    canDeleteAll: capabilities?.data?.canDeleteAll === true
+  };
+  const deleteButton = $("deleteBackupButton");
+  if (deleteButton) {
+    deleteButton.disabled = !adminBackupCapabilities.canDeleteAll;
+    deleteButton.title = deleteButton.disabled
+      ? "전체 클라우드 삭제는 별도 승인과 운영 설정이 필요합니다."
+      : "";
+  }
   setMessage("loginMessage", "");
   showAdmin(true);
   await loadUsers();
@@ -1676,7 +1705,7 @@ $("markBackupExpiredButton").addEventListener("click", async () => {
 });
 
 $("deleteBackupButton").addEventListener("click", async () => {
-  if (!currentUserDoc) return;
+  if (!currentUserDoc || !adminBackupCapabilities.canDeleteAll) return;
   const confirmed = window.confirm(
     "선택한 사용자의 전체 클라우드 백업을 삭제할까요? 사진·영상·음악·프로젝트 메타데이터·백업 프로젝트 슬롯과 연결된 Storage 파일이 삭제됩니다. 사용자의 로컬 기기 원본은 삭제되지 않습니다."
   );

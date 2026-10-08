@@ -13,6 +13,21 @@ test("admin cloud destruction is opt-in and disabled by default", () => {
   assert.equal(guards.isAdminBackupDestructionEnabled("true"), true);
 });
 
+test("full cloud deletion requires two independent server flags", () => {
+  const allowed = guards.isAdminFullBackupDeletionEnabled;
+  for (const combination of [
+    [undefined, undefined],
+    ["true", undefined],
+    [undefined, "true"],
+    ["true", "false"],
+    ["false", "true"],
+    ["TRUE", "true"]
+  ]) {
+    assert.equal(allowed(...combination), false);
+  }
+  assert.equal(allowed("true", "true"), true);
+});
+
 test("admin operations require exact target UID confirmation", () => {
   assert.equal(guards.matchesAdminBackupTargetConfirmation("target-a", "target-a"), true);
   assert.equal(guards.matchesAdminBackupTargetConfirmation("target-a", "target-b"), false);
@@ -37,4 +52,7 @@ test("UI and server use admin destruction guards on both destructive endpoints",
   assert.ok(source.includes("bodyProjects/${projectId}"));
   assert.ok(ui.includes("expectedProjectId: slot.projectId"));
   assert.ok(ui.includes("confirmationUid"));
+  assert.ok(source.includes("FUNCTIONS_ENABLE_ADMIN_FULL_BACKUP_DELETION"));
+  assert.ok(source.includes("exports.getAdminBackupCapabilities = secureOnCall"));
+  assert.ok(ui.includes("canDeleteAll: capabilities?.data?.canDeleteAll === true"));
 });

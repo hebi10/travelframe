@@ -22,3 +22,12 @@ Cloud Storage 객체 삭제와 Firestore 슬롯 갱신은 하나의 트랜잭션
 - [ ] 작업 후 Firestore·Storage 잔여 파일과 서버 로그 감사
 
 PR을 병합하는 것과 이 스위치를 활성화하는 것은 별개입니다. 검증 전에는 Draft를 유지합니다.
+
+## 읽기 전용 운영 권한과 UI
+
+새로운 `getAdminBackupCapabilities` Callable은 로그인된 관리자에게 현재 서버 허용 상태만 전달합니다. 기본으로 관리자 교체 및 전체 삭제 버튼이 비활성화되며, 백엔드에서 설정을 명시적으로 켜지 않으면 요청도 거부합니다.
+
+- `FUNCTIONS_ENABLE_ADMIN_BACKUP_DELETION=true`: 관리자 슬롯 변경 동작만 활성화
+- `FUNCTIONS_ENABLE_ADMIN_FULL_BACKUP_DELETION=true`: **첫 번째 설정도 true일 때에만** 관리자 전체 클라우드 삭제 허용
+
+전체 삭제는 슬롯 변경보다 피해 범위가 크므로 별도 스위치로 분리합니다. 기능을 테스트하지 않은 운영 환경에서는 두 설정 모두 비활성으로 유지합니다.

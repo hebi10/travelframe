@@ -18,6 +18,7 @@ const {
 const { ensurePrivateStorageDownload, buildStorageDownloadUrl } = require("./private-storage");
 const {
   isAdminBackupDestructionEnabled,
+  isAdminFullBackupDeletionEnabled,
   matchesAdminBackupTargetConfirmation,
   matchesAdminBackupSlotSnapshot
 } = require("./admin-destructive-safety");
@@ -1970,6 +1971,19 @@ const syncAdminBackupProjectSlotStatuses = async ({ uid, subscription }) => {
   };
 };
 
+exports.getAdminBackupCapabilities = secureOnCall(async (request) => {
+  await requireAdminUid(request);
+  return {
+    canReplaceProjects: isAdminBackupDestructionEnabled(
+      process.env.FUNCTIONS_ENABLE_ADMIN_BACKUP_DELETION
+    ),
+    canDeleteAll: isAdminFullBackupDeletionEnabled(
+      process.env.FUNCTIONS_ENABLE_ADMIN_BACKUP_DELETION,
+      process.env.FUNCTIONS_ENABLE_ADMIN_FULL_BACKUP_DELETION
+    )
+  };
+});
+
 const assertAdminBackupDestructionAuthorized = (targetUid, confirmationUid) => {
   if (!isAdminBackupDestructionEnabled(process.env.FUNCTIONS_ENABLE_ADMIN_BACKUP_DELETION)) {
     throw new HttpsError(
@@ -2989,6 +3003,15 @@ exports.deleteAdminCloudBackupData = secureOnCall(async (request) => {
     }
 
     assertAdminBackupDestructionAuthorized(targetUid, confirmationUid);
+    if (!isAdminFullBackupDeletionEnabled(
+      process.env.FUNCTIONS_ENABLE_ADMIN_BACKUP_DELETION,
+      process.env.FUNCTIONS_ENABLE_ADMIN_FULL_BACKUP_DELETION
+    )) {
+      throw new HttpsError(
+        "failed-precondition",
+        "전체 클라우드 삭제는 별도의 운영 승인 후에만 사용할 수 있습니다."
+      );
+    }
 
     const targetUserSnapshot = await db.doc(`users/${targetUid}`).get();
     if (!targetUserSnapshot.exists) {
