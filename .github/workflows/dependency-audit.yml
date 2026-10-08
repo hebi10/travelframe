@@ -1,0 +1,50 @@
+name: Dependency Audit
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/dependency-audit.yml"
+      - "package.json"
+      - "package-lock.json"
+      - "functions/package.json"
+      - "functions/package-lock.json"
+      - "scripts/summarize-npm-audit.mjs"
+
+permissions:
+  contents: read
+
+jobs:
+  report:
+    name: NPM advisory report
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Install app dependencies
+        run: npm ci
+      - name: Install Functions dependencies
+        run: npm ci --prefix functions
+      - name: Collect audits
+        shell: bash
+        run: |
+          npm audit --json > app-full-audit.json || true
+          npm audit --omit=dev --json > app-prod-audit.json || true
+          npm audit --prefix functions --omit=dev --json > functions-prod-audit.json || true
+      - name: Summarize vulnerable packages
+        run: node scripts/summarize-npm-audit.mjs app-full-audit.json app-prod-audit.json functions-prod-audit.json
+      - name: Upload audit reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-audit-reports
+          path: |
+            app-full-audit.json
+            app-prod-audit.json
+            functions-prod-audit.json
+            audit-summary.md
+          retention-days: 14
