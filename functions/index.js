@@ -17,6 +17,11 @@ const {
 } = require("./backup-delete-safety");
 const { ensurePrivateStorageDownload, buildStorageDownloadUrl } = require("./private-storage");
 const {
+  isAdminBackupDestructionEnabled,
+  matchesAdminBackupTargetConfirmation,
+  matchesAdminBackupSlotSnapshot
+} = require("./admin-destructive-safety");
+const {
   reserveWeeklyVideoExportUsage,
   completeWeeklyVideoExportReservation,
   releaseWeeklyVideoExportReservation
@@ -1922,10 +1927,26 @@ const syncAdminBackupProjectSlotStatuses = async ({ uid, subscription }) => {
   };
 };
 
+const assertAdminBackupDestructionAuthorized = (targetUid, confirmationUid) => {
+  if (!isAdminBackupDestructionEnabled(process.env.FUNCTIONS_ENABLE_ADMIN_BACKUP_DELETION)) {
+    throw new HttpsError(
+      "failed-precondition",
+      "관리자 클라우드 백업 삭제 기능은 운영 검증 전까지 비활성화되어 있습니다."
+    );
+  }
+  if (!matchesAdminBackupTargetConfirmation(targetUid, confirmationUid)) {
+    throw new HttpsError(
+      "failed-precondition",
+      "삭제 대상 사용자를 다시 확인한 뒤 요청해 주세요."
+    );
+  }
+};
+
 exports.replaceAdminCloudBackupProject = secureOnCall(async (request) => {
   try {
     await requireAdminUid(request);
-    const { targetUid } = request.data ?? {};
+    const { targetUid, confirmationUid } = request.data ?? {};
+    const expectedProjectId = normalizeBackupProjectId(request.data?.expectedProjectId);
     const slotId = String(request.data?.slotId ?? "");
     const projectId = normalizeBackupProjectId(request.data?.projectId);
     const slotNumber = getBackupProjectSlotNumber(slotId);
@@ -1939,6 +1960,8 @@ exports.replaceAdminCloudBackupProject = secureOnCall(async (request) => {
         "slotId and projectId are required."
       );
     }
+
+    assertAdminBackupDestructionAuthorized(targetUid, confirmationUid);
 
     const targetUserSnapshot = await db.doc(`users/${targetUid}`).get();
     if (!targetUserSnapshot.exists) {
@@ -1973,12 +1996,28 @@ exports.replaceAdminCloudBackupProject = secureOnCall(async (request) => {
     const previousProjectId = normalizeBackupProjectId(
       slotSnapshot.data()?.projectId
     );
+    if (!matchesAdminBackupSlotSnapshot(previousProjectId, expectedProjectId)) {
+      throw new HttpsError(
+        "aborted",
+        "선택된 백업 프로젝트가 이미 변경되었습니다. 새로고침 후 다시 확인해 주세요."
+      );
+    }
     if (previousProjectId === projectId) {
       return {
         slot: serializeBackupProjectSlot(slotSnapshot),
         deletedPhotoCount: 0,
         deletedVideoCount: 0
       };
+    }
+
+    const targetProjectSnapshot = await db.doc(
+      `users/${targetUid}/bodyProjects/${projectId}`
+    ).get();
+    if (!targetProjectSnapshot.exists) {
+      throw new HttpsError(
+        "failed-precondition",
+        "새 백업 프로젝트 메타데이터를 먼저 확인해 주세요."
+      );
     }
 
     const deleted = previousProjectId
@@ -2777,10 +2816,12 @@ exports.deleteCloudBackupData = secureOnCall(async (request) => {
 exports.deleteAdminCloudBackupData = secureOnCall(async (request) => {
   try {
     await requireAdminUid(request);
-    const { targetUid } = request.data ?? {};
+    const { targetUid, confirmationUid } = request.data ?? {};
     if (typeof targetUid !== "string" || !targetUid) {
       throw new HttpsError("invalid-argument", "targetUid is required.");
     }
+
+    assertAdminBackupDestructionAuthorized(targetUid, confirmationUid);
 
     const targetUserSnapshot = await db.doc(`users/${targetUid}`).get();
     if (!targetUserSnapshot.exists) {
