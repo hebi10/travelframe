@@ -99,3 +99,28 @@ assert.ok(adminCss.includes("min-height: 44px"));
 assert.ok(adminCss.includes("@media (max-width: 520px)"));
 
 console.log("ok - Body Frame UI consistency and accessibility regression");
+
+const videoPolish = read("app/video/[id].tsx");
+const photoEditPolish = read("app/edit.tsx");
+const videoEditorPolish = read("features/trip-clip/trip-clip-screen.styles.ts");
+const accountPolish = read("features/account/account-screen.styles.ts");
+
+const styleBody = (source, key) => {
+  const start = source.indexOf(`  ${key}: {`, source.indexOf("StyleSheet.create("));
+  assert.ok(start >= 0, `missing ${key} style`);
+  const end = source.indexOf("\\n  },", start);
+  assert.ok(end > start, `invalid ${key} style`);
+  return source.slice(start, end);
+};
+assert.ok(styleBody(videoPolish, "content").includes("paddingHorizontal: bodyFrameDesign.horizontalPadding"));
+assert.ok(styleBody(videoPolish, "title").includes("fontSize: bodyFrameTypography.pageTitle"));
+for (const key of ["videoStartButton", "darkButton", "lightButton"]) {
+  assert.ok(styleBody(videoPolish, key).includes("bodyFrameDesign.primaryButtonHeight"));
+  assert.ok(styleBody(videoPolish, key).includes("bodyFrameDesign.buttonRadius"));
+}
+assert.ok(styleBody(photoEditPolish, "ghostButton").includes("bodyFrameDesign.minTouchSize"));
+assert.ok(styleBody(photoEditPolish, "bottomPanel").includes("bodyFrameDesign.bottomSheetRadius"));
+assert.ok(!photoEditPolish.includes("  guideChip: {"), "unused legacy 9px editor guide UI should not return");
+assert.ok(styleBody(videoEditorPolish, "timelineDurationKeyboardInput").includes("bodyFrameDesign.minTouchSize"));
+assert.ok(styleBody(videoEditorPolish, "timelineDurationKeyboardDoneButton").includes("bodyFrameDesign.minTouchSize"));
+assert.ok(styleBody(accountPolish, "musicDeleteButton").includes("bodyFrameDesign.minTouchSize"));

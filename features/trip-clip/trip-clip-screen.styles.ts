@@ -786,7 +786,7 @@ export const styles = StyleSheet.create({
   },
   timelineDurationKeyboardInput: {
     width: 76,
-    minHeight: 38,
+    minHeight: bodyFrameDesign.minTouchSize,
     paddingHorizontal: 10,
     borderWidth: 1,
     borderColor: colors.text,
@@ -800,7 +800,7 @@ export const styles = StyleSheet.create({
   },
   timelineDurationKeyboardDoneButton: {
     minWidth: 58,
-    minHeight: 38,
+    minHeight: bodyFrameDesign.minTouchSize,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 12,

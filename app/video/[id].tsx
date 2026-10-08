@@ -21,10 +21,16 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AdBanner } from "@/components/ad-banner";
-import { colors, controls, spacing, typography } from "@/constants/app-theme";
+import {
+  bodyFrameDesign,
+  bodyFrameTypography,
+  colors,
+  controls,
+  spacing,
+  typography
+} from "@/constants/app-theme";
 import { useAuth } from "@/lib/auth-context";
 import { useAppAppearance } from "@/lib/app-appearance";
-import { bodyFrameDesign } from "@/constants/app-theme";
 import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 import { getMadeVideoById } from "@/lib/video-library";
 import { getVideoAspectRatio } from "@/lib/video-utils";
@@ -357,8 +363,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background
   },
   content: {
-    gap: spacing.section,
-    padding: spacing.screen,
+    gap: bodyFrameDesign.sectionGap,
+    paddingHorizontal: bodyFrameDesign.horizontalPadding,
+    paddingVertical: spacing.screen,
     width: "100%",
     maxWidth: bodyFrameDesign.contentMaxWidth,
     alignSelf: "center"
@@ -396,17 +403,18 @@ const styles = StyleSheet.create({
   },
   videoStartButton: {
     minWidth: 120,
-    minHeight: controls.height,
+    minHeight: bodyFrameDesign.primaryButtonHeight,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 20,
     borderWidth: 1,
     borderColor: colors.inverse,
+    borderRadius: bodyFrameDesign.buttonRadius,
     backgroundColor: "rgba(0,0,0,0.72)"
   },
   videoStartButtonText: {
     color: colors.inverse,
-    fontSize: typography.button,
+    fontSize: bodyFrameTypography.button,
     fontWeight: "800"
   },
   videoUnavailable: {
@@ -437,9 +445,9 @@ const styles = StyleSheet.create({
   },
   title: {
     color: colors.text,
-    fontSize: typography.title,
-    fontWeight: "800",
-    lineHeight: 34,
+    fontSize: bodyFrameTypography.pageTitle,
+    fontWeight: "600",
+    lineHeight: 32,
     letterSpacing: 0
   },
   detail: {
@@ -483,19 +491,21 @@ const styles = StyleSheet.create({
     gap: 10
   },
   darkButton: {
-    minHeight: controls.height,
+    minHeight: bodyFrameDesign.primaryButtonHeight,
+    borderRadius: bodyFrameDesign.buttonRadius,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.text
   },
   darkButtonText: {
     color: colors.inverse,
-    fontSize: typography.button,
+    fontSize: bodyFrameTypography.button,
     fontWeight: "800",
     letterSpacing: 0
   },
   lightButton: {
-    minHeight: controls.height,
+    minHeight: bodyFrameDesign.primaryButtonHeight,
+    borderRadius: bodyFrameDesign.buttonRadius,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
@@ -504,7 +514,7 @@ const styles = StyleSheet.create({
   },
   lightButtonText: {
     color: colors.text,
-    fontSize: typography.button,
+    fontSize: bodyFrameTypography.button,
     fontWeight: "800",
     letterSpacing: 0
   },
