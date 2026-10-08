@@ -8,7 +8,8 @@ export type CloudBackupProjectSlot = {
   id: string;
   slotNumber: number;
   projectId: string;
-  status: "active" | "over_limit";
+  status: "active" | "over_limit" | "replacing";
+  pendingProjectId: string | null;
   selectedAt: string | null;
   updatedAt: string | null;
 };
@@ -48,7 +49,11 @@ export const getCloudBackupProjectSlots = async (
         id: item.id,
         slotNumber: Math.max(1, Number(data.slotNumber ?? 1)),
         projectId: String(data.projectId ?? ""),
-        status: data.status === "over_limit" ? "over_limit" : "active",
+        status: data.status === "replacing"
+          ? "replacing"
+          : data.status === "over_limit" ? "over_limit" : "active",
+        pendingProjectId:
+          typeof data.pendingProjectId === "string" ? data.pendingProjectId : null,
         selectedAt:
           typeof data.selectedAt === "string" ? data.selectedAt : null,
         updatedAt:
@@ -103,8 +108,9 @@ export const getSelectedCloudBackupProjectIds = async (
     (await getCloudBackupProjectSlots(user))
       .filter(
         (slot) =>
-          maxSlots === undefined ||
-          (slot.slotNumber >= 1 && slot.slotNumber <= maxSlots)
+          slot.status !== "replacing" &&
+          (maxSlots === undefined ||
+          (slot.slotNumber >= 1 && slot.slotNumber <= maxSlots))
       )
       .map((slot) => slot.projectId)
   );

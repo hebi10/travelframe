@@ -73,12 +73,24 @@ service firebase.storage {
       return firestore.get(/databases/(default)/documents/users/$(userId)/adminBackupUploadSessions/$(request.resource.metadata.adminBackupSessionId));
     }
 
+    function backupSessionProjectUnlocked(userId, session) {
+      return !session.keys().hasAny(["projectId"])
+        || session.projectId == null
+        || (
+          session.projectId is string
+          && !firestore.exists(
+            /databases/(default)/documents/users/$(userId)/backupProjectLocks/$(session.projectId)
+          )
+        );
+    }
+
     function isReservedBackupUpload(userId, mediaKind, backupSessionId) {
       return isOwner(userId)
         && hasBackupSession(backupSessionId)
         && backupSession(userId, backupSessionId).data.userId == userId
         && backupSession(userId, backupSessionId).data.status == "reserved"
         && backupSession(userId, backupSessionId).data.mediaKind == mediaKind
+        && backupSessionProjectUnlocked(userId, backupSession(userId, backupSessionId).data)
         && backupSession(userId, backupSessionId).data.storagePath == request.resource.name
         && backupSession(userId, backupSessionId).data.fileSize == request.resource.size
         && isValidReservedSize(mediaKind, backupSession(userId, backupSessionId).data.fileSize)
@@ -110,6 +122,7 @@ service firebase.storage {
         && adminBackupSession(userId).data.adminUid == request.auth.uid
         && adminBackupSession(userId).data.status == "reserved"
         && adminBackupSession(userId).data.mediaKind == mediaKind
+        && backupSessionProjectUnlocked(userId, adminBackupSession(userId).data)
         && adminBackupSession(userId).data.storagePath == request.resource.name
         && adminBackupSession(userId).data.fileSize == request.resource.size
         && adminBackupSession(userId).data.contentType == request.resource.contentType

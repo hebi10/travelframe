@@ -361,6 +361,29 @@ service cloud.firestore {
         && backupUploadSession(userId, backupSessionId).data.expiresAt > request.time;
     }
 
+    function projectBackupUnlocked(userId, projectId) {
+      return projectId is string
+        && !exists(/databases/$(database)/documents/users/$(userId)/backupProjectLocks/$(projectId));
+    }
+
+    function requestedProjectWriteUnlocked(userId) {
+      return !request.resource.data.keys().hasAny(["projectId"])
+        || projectBackupUnlocked(userId, request.resource.data.projectId);
+    }
+
+    function backupUploadProjectMatches(userId) {
+      let session = backupUploadSession(
+        userId, request.resource.data.backupSessionId
+      ).data;
+      return !session.keys().hasAny(["projectId"])
+        || session.projectId == null
+        || (
+          request.resource.data.keys().hasAny(["projectId"])
+          && request.resource.data.projectId == session.projectId
+          && projectBackupUnlocked(userId, session.projectId)
+        );
+    }
+
     function hasReservedTypedBackupUploadSession(userId, mediaKind, backupSessionId, storagePath, fileSize, contentType) {
       return hasReservedBackupUploadSession(userId, mediaKind, backupSessionId, storagePath)
         && backupUploadSession(userId, backupSessionId).data.fileSize == fileSize
@@ -400,6 +423,8 @@ service cloud.firestore {
     function isValidPhotoBackup(userId, photoId) {
       return hasValidBackupOwner(userId)
         && validPhotoProjectFields()
+        && requestedProjectWriteUnlocked(userId)
+        && backupUploadProjectMatches(userId)
         && request.resource.data.keys().hasOnly(photoBackupKeys())
         && request.resource.data.localId == photoId
         && request.resource.data.storagePath is string
@@ -443,6 +468,8 @@ service cloud.firestore {
 
     function isValidVideoBackup(userId, videoId) {
       return hasValidBackupOwner(userId)
+        && requestedProjectWriteUnlocked(userId)
+        && backupUploadProjectMatches(userId)
         && (!request.resource.data.keys().hasAny(["projectId"]) || (request.resource.data.projectId is string && request.resource.data.projectId.size() > 0))
         && request.resource.data.keys().hasOnly(videoBackupKeys())
         && request.resource.data.localId == videoId
@@ -474,6 +501,7 @@ service cloud.firestore {
 
     function isValidPhotoBackupUpdate(userId, photoId) {
       return hasValidBackupOwner(userId)
+        && requestedProjectWriteUnlocked(userId)
         && validPhotoProjectFields()
         && request.resource.data.keys().hasOnly(photoBackupKeys())
         && request.resource.data.localId == photoId
@@ -512,6 +540,7 @@ service cloud.firestore {
 
     function isValidVideoBackupUpdate(userId, videoId) {
       return hasValidBackupOwner(userId)
+        && requestedProjectWriteUnlocked(userId)
         && (!request.resource.data.keys().hasAny(["projectId"]) || (request.resource.data.projectId is string && request.resource.data.projectId.size() > 0))
         && request.resource.data.keys().hasOnly(videoBackupKeys())
         && request.resource.data.localId == videoId
@@ -605,6 +634,11 @@ service cloud.firestore {
       }
 
       match /backupProjectSlots/{slotId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow create, update, delete: if false;
+      }
+
+      match /backupProjectLocks/{projectId} {
         allow read: if isOwner(userId) || isAdmin();
         allow create, update, delete: if false;
       }

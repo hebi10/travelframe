@@ -112,13 +112,39 @@ export function CloudBackupProjectSlotsSection({
     }
   };
 
+  const performReplacement = async (
+    slot: CloudBackupProjectSlot,
+    projectId: string,
+    projectName: string
+  ) => {
+    if (busyProjectId) return;
+    setBusyProjectId(projectId);
+    setMessage(null);
+    try {
+      await replaceCloudBackupProject({ user, slotId: slot.id, projectId });
+      setReplacementSlotId(null);
+      await reload();
+      setMessage(
+        `"${projectName}" 프로젝트로 백업 슬롯을 변경했습니다. 새 프로젝트는 처음부터 다시 백업됩니다.`
+      );
+    } catch (error) {
+      await reload().catch(() => undefined);
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "백업 프로젝트 변경이 중단되었습니다. 다시 시도할 수 있습니다."
+      );
+    } finally {
+      setBusyProjectId(null);
+    }
+  };
+
   const confirmReplaceProject = (
     slot: CloudBackupProjectSlot,
     project: BodyProject
   ) => {
     const currentName =
       projectById.get(slot.projectId)?.name ?? "현재 백업 프로젝트";
-
     Alert.alert(
       "백업 프로젝트를 변경할까요?",
       `"${currentName}"의 클라우드 백업 사진과 연결된 프로젝트 영상이 모두 삭제됩니다. 기기에 저장된 원본은 삭제되지 않습니다. "${project.name}" 프로젝트는 처음부터 다시 업로드해야 합니다.`,
@@ -127,32 +153,28 @@ export function CloudBackupProjectSlotsSection({
         {
           text: "기존 백업 삭제 후 변경",
           style: "destructive",
-          onPress: () => {
-            void (async () => {
-              setBusyProjectId(project.id);
-              setMessage(null);
-              try {
-                await replaceCloudBackupProject({
-                  user,
-                  slotId: slot.id,
-                  projectId: project.id
-                });
-                setReplacementSlotId(null);
-                await reload();
-                setMessage(
-                  `"${project.name}" 프로젝트로 백업 슬롯을 변경했습니다. 새 프로젝트는 처음부터 다시 백업됩니다.`
-                );
-              } catch (error) {
-                setMessage(
-                  error instanceof Error
-                    ? error.message
-                    : "백업 프로젝트를 변경하지 못했습니다."
-                );
-              } finally {
-                setBusyProjectId(null);
-              }
-            })();
-          }
+          onPress: () => { void performReplacement(slot, project.id, project.name); }
+        }
+      ]
+    );
+  };
+
+  const resumeReplacement = (slot: CloudBackupProjectSlot) => {
+    const pending = slot.pendingProjectId;
+    if (!pending || busyProjectId) {
+      setMessage("진행 중인 백업 교체의 대상 프로젝트를 확인할 수 없습니다.");
+      return;
+    }
+    const name = projectById.get(pending)?.name ?? "새 프로젝트";
+    Alert.alert(
+      "중단된 백업 프로젝트 변경",
+      `이전 교체 작업이 완료되지 않았습니다. 기존 클라우드 데이터 삭제를 이어서 진행하고 "${name}" 프로젝트로 변경할까요? 이미 삭제된 데이터는 복구되지 않습니다.`,
+      [
+        { text: "취소", style: "cancel" },
+        {
+          text: "남은 삭제 후 변경",
+          style: "destructive",
+          onPress: () => { void performReplacement(slot, pending, name); }
         }
       ]
     );
@@ -192,6 +214,7 @@ export function CloudBackupProjectSlotsSection({
         {slots.map((slot) => {
           const project = projectById.get(slot.projectId);
           const lockedByPlan = slot.slotNumber > maxSlots;
+          const replacing = slot.status === "replacing";
           return (
             <View
               key={slot.id}
@@ -204,21 +227,30 @@ export function CloudBackupProjectSlotsSection({
                 <Text style={[styles.detail, { color: palette.muted }]}>
                   {photoCountByProject.get(slot.projectId) ?? 0} /{" "}
                   {maxPhotosPerProject}장 ·{" "}
-                  {lockedByPlan ? "현재 플랜 한도 초과" : "백업 프로젝트 고정됨"}
+                  {lockedByPlan
+                    ? "현재 플랜 한도 초과"
+                    : replacing
+                      ? "교체 중단 · 재시도 필요"
+                      : "백업 프로젝트 고정됨"}
                 </Text>
               </View>
               {!lockedByPlan ? (
                 <Pressable
                   accessibilityRole="button"
                   style={[styles.smallButton, { borderColor: palette.line }]}
+                  disabled={Boolean(busyProjectId)}
                   onPress={() =>
-                    setReplacementSlotId((current) =>
-                      current === slot.id ? null : slot.id
-                    )
+                    replacing
+                      ? resumeReplacement(slot)
+                      : setReplacementSlotId((current) =>
+                          current === slot.id ? null : slot.id
+                        )
                   }
                 >
                   <Text style={[styles.buttonText, { color: palette.text }]}>
-                    {replacementSlotId === slot.id ? "변경 취소" : "삭제 후 변경"}
+                    {replacing
+                      ? "교체 재시도"
+                      : replacementSlotId === slot.id ? "변경 취소" : "삭제 후 변경"}
                   </Text>
                 </Pressable>
               ) : null}
@@ -226,6 +258,12 @@ export function CloudBackupProjectSlotsSection({
           );
         })}
       </View>
+
+      {slots.some((slot) => slot.status === "replacing") ? (
+        <Text style={[styles.modeText, { color: palette.text }]}>
+          교체 중단된 슬롯은 새 백업을 시작할 수 없습니다. 해당 슬롯의 교체 재시도 버튼으로 작업을 마무리해 주세요.
+        </Text>
+      ) : null}
 
       {replacementSlot ? (
         <Text style={[styles.modeText, { color: palette.text }]}>
@@ -259,7 +297,7 @@ export function CloudBackupProjectSlotsSection({
                 style={[
                   styles.smallButton,
                   { borderColor: palette.line },
-                  busyProjectId && styles.disabled
+                  Boolean(busyProjectId) && styles.disabled
                 ]}
                 onPress={() =>
                   replacementSlot
