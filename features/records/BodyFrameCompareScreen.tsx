@@ -203,7 +203,13 @@ export default function BodyFrameCompareScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  content: { paddingHorizontal: bodyFrameDesign.horizontalPadding, gap: 16 },
+  content: {
+    width: "100%",
+    maxWidth: bodyFrameDesign.contentMaxWidth,
+    alignSelf: "center",
+    paddingHorizontal: bodyFrameDesign.horizontalPadding,
+    gap: 16
+  },
   header: { flexDirection: "row", alignItems: "center", gap: 12 },
   backButton: {
     minHeight: bodyFrameDesign.minTouchSize,

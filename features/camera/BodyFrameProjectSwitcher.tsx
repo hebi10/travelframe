@@ -484,7 +484,7 @@ const styles = StyleSheet.create({
   },
   headerStatusCompact: {
     marginTop: 1,
-    fontSize: 10
+    fontSize: bodyFrameTypography.caption
   },
   disabled: { opacity: 0.5 },
   pressed: { opacity: 0.78 },
@@ -494,6 +494,9 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.62)"
   },
   sheet: {
+    width: "100%",
+    maxWidth: bodyFrameDesign.contentMaxWidth,
+    alignSelf: "center",
     maxHeight: "82%",
     backgroundColor: "#131315",
     borderTopLeftRadius: bodyFrameDesign.bottomSheetRadius,
@@ -534,7 +537,7 @@ const styles = StyleSheet.create({
   label: { color: "#A0A0A6", fontSize: 12, marginTop: 12, marginBottom: 8 },
   planLimitText: {
     marginBottom: 8,
-    color: "#68686E",
+    color: "#A0A0A6",
     fontSize: 12
   },
   input: {

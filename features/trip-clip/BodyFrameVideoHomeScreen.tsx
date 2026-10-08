@@ -383,6 +383,9 @@ const styles = StyleSheet.create({
     fontSize: bodyFrameTypography.body
   },
   content: {
+    width: "100%",
+    maxWidth: bodyFrameDesign.contentMaxWidth,
+    alignSelf: "center",
     paddingHorizontal: bodyFrameDesign.horizontalPadding,
     gap: bodyFrameDesign.sectionGap
   },

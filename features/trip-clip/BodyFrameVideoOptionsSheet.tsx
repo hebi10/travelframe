@@ -298,7 +298,16 @@ const styles = StyleSheet.create({
     flex: 1
   },
   backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" },
-  sheet: { maxHeight: "90%", padding: 16, gap: 16, borderTopLeftRadius: 12, borderTopRightRadius: 12 },
+  sheet: {
+    width: "100%",
+    maxWidth: bodyFrameDesign.contentMaxWidth,
+    alignSelf: "center",
+    maxHeight: "90%",
+    padding: 16,
+    gap: 16,
+    borderTopLeftRadius: bodyFrameDesign.bottomSheetRadius,
+    borderTopRightRadius: bodyFrameDesign.bottomSheetRadius
+  },
   title: { fontSize: 20, fontWeight: "600" },
   orderNotice: { fontSize: 12, lineHeight: 18 },
   overlaySection: { gap: 10 },

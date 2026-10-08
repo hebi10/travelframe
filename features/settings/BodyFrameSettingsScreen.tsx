@@ -554,6 +554,9 @@ const styles = StyleSheet.create({
     flex: 1
   },
   content: {
+    width: "100%",
+    maxWidth: bodyFrameDesign.contentMaxWidth,
+    alignSelf: "center",
     paddingHorizontal: bodyFrameDesign.horizontalPadding,
     gap: bodyFrameDesign.sectionGap
   },
@@ -604,6 +607,8 @@ const styles = StyleSheet.create({
   },
   modalPanel: {
     width: "100%",
+    maxWidth: bodyFrameDesign.contentMaxWidth,
+    alignSelf: "center",
     maxHeight: "82%",
     paddingHorizontal: bodyFrameDesign.horizontalPadding,
     paddingTop: 10,
