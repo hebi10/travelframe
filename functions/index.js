@@ -2131,6 +2131,7 @@ exports.replaceAdminCloudBackupProject = secureOnCall(async (request) => {
             projectId: expectedProjectId,
             targetProjectId: projectId,
             slotId,
+            operation: "admin",
             status: "replacing",
             startedAt: FieldValue.serverTimestamp()
           });
@@ -2144,6 +2145,7 @@ exports.replaceAdminCloudBackupProject = secureOnCall(async (request) => {
           decision === "resume" &&
           (!currentLock.exists ||
             currentLock.data()?.slotId !== slotId ||
+            currentLock.data()?.operation !== "admin" ||
             currentLock.data()?.targetProjectId !== projectId)
         ) {
           throw new HttpsError(
@@ -2176,6 +2178,7 @@ exports.replaceAdminCloudBackupProject = secureOnCall(async (request) => {
           state !== "resume" ||
           !currentLock.exists ||
           currentLock.data()?.slotId !== slotId ||
+          currentLock.data()?.operation !== "admin" ||
           currentLock.data()?.targetProjectId !== projectId
         ) {
           throw new HttpsError(
