@@ -105,6 +105,10 @@ const run = async () => {
     fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, markdown);
   }
   console.log(markdown);
+  if (process.argv.includes("--require-verified") &&
+      rows.some((row) => row.status !== "verified")) {
+    process.exitCode = 1;
+  }
 };
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
