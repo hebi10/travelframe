@@ -67,9 +67,8 @@ export function TripClipPhotoTab({
                         </Text>
                       </View>
                       <Pressable accessibilityRole="button"
-                        hitSlop={10}
-                style={styles.removePhotoButton}
-                        hitSlop={8}
+                        style={styles.removePhotoButton}
+                         hitSlop={10}
                         onPress={(event) => {
                           event.stopPropagation();
                           deselectPickerPhoto(photo);
