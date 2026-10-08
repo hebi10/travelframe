@@ -10,8 +10,13 @@ const decideAdminSlotReplacement = ({ slot, expectedProjectId, projectId }) => {
   return "begin";
 };
 
-const hasReservedProjectUploads = (sessions) =>
-  sessions.some((item) => item?.status === "reserved");
+const hasReservedProjectUploads = (sessions, now = Date.now()) =>
+  sessions.some((item) => {
+    if (item?.status !== "reserved") return false;
+    const expiresAt = item.expiresAt?.toMillis?.() ??
+      (typeof item.expiresAt === "string" ? new Date(item.expiresAt).getTime() : null);
+    return expiresAt === null || !Number.isFinite(expiresAt) || expiresAt > now;
+  });
 
 // Execute a durable roll-forward sequence. A thrown delete or finalize error
 // intentionally leaves the slot in its "replacing" state for retry.

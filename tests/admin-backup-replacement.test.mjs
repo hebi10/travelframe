@@ -19,6 +19,12 @@ test("reserved upload sessions stop a new slot deletion", () => {
   assert.equal(hasReservedProjectUploads([]), false);
   assert.equal(hasReservedProjectUploads([{status: "completed"}, {status: "failed"}]), false);
   assert.equal(hasReservedProjectUploads([{status: "reserved"}]), true);
+  assert.equal(hasReservedProjectUploads([
+    { status: "reserved", expiresAt: { toMillis: () => 100 } }
+  ], 200), false);
+  assert.equal(hasReservedProjectUploads([
+    { status: "reserved", expiresAt: { toMillis: () => 300 } }
+  ], 200), true);
 });
 
 test("replacement state persists before deletion and remains retryable", () => {
