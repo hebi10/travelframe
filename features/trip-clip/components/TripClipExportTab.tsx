@@ -114,7 +114,7 @@ export function TripClipExportTab({
               const isActive = exportFormat === option.value;
 
               return (
-                <Pressable
+                <Pressable accessibilityRole="button"
                   key={option.value}
                   style={[styles.exportFormatOption, isActive && styles.exportFormatOptionActive]}
                   onPress={() => updateTripClipExportFormat(option.value)}
@@ -164,7 +164,7 @@ export function TripClipExportTab({
                   {VIDEO_QUALITY_DESCRIPTION}
                 </Text>
               </View>
-              <Pressable
+              <Pressable accessibilityRole="button"
                 disabled={!canBackupVideoExport}
                 style={[
                   styles.videoBackupOption,
@@ -228,7 +228,7 @@ export function TripClipExportTab({
                   const isActive = imageSaveFormat === option.value;
 
                   return (
-                    <Pressable
+                    <Pressable accessibilityRole="button"
                       key={option.value}
                       style={[
                         styles.imageFormatButton,
@@ -259,7 +259,7 @@ export function TripClipExportTab({
             </View>
           ) : null}
           <View style={styles.previewActions}>
-            <Pressable
+            <Pressable accessibilityRole="button"
               android_disableSound
               disabled={isExporting || selectedPhotoCount === 0 || videoDurationTooLong}
               style={[
@@ -277,7 +277,7 @@ export function TripClipExportTab({
                     : "이미지 저장"}
               </Text>
             </Pressable>
-            <Pressable
+            <Pressable accessibilityRole="button"
               android_disableSound
               disabled={
                 isExporting ||

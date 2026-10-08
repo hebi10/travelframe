@@ -50,7 +50,7 @@ export function TripClipHeader({
             </Text>
           </Pressable>
           <View style={styles.headerSpacer} />
-          <Pressable
+          <Pressable accessibilityRole="button"
             disabled={isLoading || isExporting}
             style={[
               styles.draftSaveButton,
@@ -83,12 +83,12 @@ export function TripClipHeader({
               </Text>
             </View>
             <View style={styles.draftActions}>
-              <Pressable style={styles.draftButton} onPress={resumeTripClipDraft}>
+              <Pressable accessibilityRole="button" style={styles.draftButton} onPress={resumeTripClipDraft}>
                 <Text selectable={false} style={styles.draftButtonText}>
                   이어서 작업하기
                 </Text>
               </Pressable>
-              <Pressable style={styles.draftGhostButton} onPress={removeTripClipDraft}>
+              <Pressable accessibilityRole="button" style={styles.draftGhostButton} onPress={removeTripClipDraft}>
                 <Text selectable={false} style={styles.draftGhostButtonText}>
                   삭제
                 </Text>
