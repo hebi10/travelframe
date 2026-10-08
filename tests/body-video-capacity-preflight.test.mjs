@@ -39,6 +39,8 @@ const runExport = async (storedCount, overrides = {}) => {
     setIsExporting: (value) => exporting.push(value),
     setExportProgress: () => {},
     setMessage: (value) => messages.push(value),
+    cancelPostSaveAd: () => {},
+    requestPostSaveAd: () => { events.push("ad"); },
     getMadeVideos: async () => Array.from({ length: storedCount }),
     assertLocalLibraryCapacity: limitExports.assertLocalLibraryCapacity,
     recordProjectVideo: async () => { events.push("record"); return "file:///video.mp4"; },
@@ -62,11 +64,11 @@ const runExport = async (storedCount, overrides = {}) => {
   return { events, messages, exporting, savedVideos };
 };
 const full = await runExport(30);
-assert.deepEqual(full.events, [], "full storage must prevent native recording and every save");
+assert.deepEqual(full.events, [], "full storage must prevent native recording, every save and new ads");
 assert.match(full.messages.at(-1), /영상 보관함 한도 30개/);
 assert.deepEqual(full.exporting, [true, false], "failure must release the busy state");
 const available = await runExport(29);
-assert.deepEqual(available.events, ["record", "external-save", "app-save"]);
+assert.deepEqual(available.events, ["record", "external-save", "app-save", "ad"]);
 assert.match(available.messages.at(-1), /저장했습니다/);
 assert.deepEqual((await runExport(0, { projectPhotos: [] })).events, [], "empty photo selection must not record or save");
 const overDuration = await runExport(0, { videoLimitState: { allowed: false, limit: 10 }, totalDuration: 20 });

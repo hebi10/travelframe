@@ -1,3 +1,3 @@
-import BodyFrameSettingsScreen from "@/features/settings/BodyFrameSettingsScreen";
+import BodyFrameSettingsScreen from "@/features/settings/BodyFrameSettingsWithPrivacyScreen";
 
 export default BodyFrameSettingsScreen;

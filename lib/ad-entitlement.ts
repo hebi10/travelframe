@@ -1,5 +1,6 @@
 import {
   isAdFreeSubscription,
+  type SubscriptionCheckStatus,
   type UserSubscription
 } from "@/lib/subscription";
 
@@ -11,7 +12,12 @@ export type AdPlacement =
   | "pre_video_export"
   | "post_video_save";
 
-export const shouldShowAds = (subscription: UserSubscription | null) =>
+export const shouldShowAds = (
+  subscription: UserSubscription | null,
+  subscriptionStatus: SubscriptionCheckStatus = "loading"
+) =>
+  subscriptionStatus === "verified" &&
+  subscription !== null &&
   !isAdFreeSubscription(subscription);
 
 export const getAdPlacementLabel = (placement: AdPlacement) => {
