@@ -799,12 +799,115 @@ export default function AccountScreen() {
                 설정의 클라우드 백업에서 켜거나 끌 수 있습니다. 구독 기간이 끝나면 새 백업은 중단됩니다. 기존 백업 데이터 삭제는 설정에서 직접 요청할 수 있습니다.
               </Text>
               <Pressable accessibilityRole="button"
+                disabled={isBackupRestoreSubmitting || !isLoggedIn}
+                style={[
+                  styles.secondaryButton,
+                  themed.secondaryButton,
+                  (isBackupRestoreSubmitting || !isLoggedIn) && styles.disabledButton
+                ]}
+                onPress={confirmCloudRestore}
+              >
+                <Text selectable={false} style={[styles.secondaryButtonText, themed.text]}>
+                  백업 데이터 불러오기
+                </Text>
+              </Pressable>
+            </View>
+          </SectionBlock>
+
+          <SectionBlock title="플랜 및 결제">
+            <View style={[styles.planCard, themed.panelStrong]}>
+              <View style={styles.planHeader}>
+                <View style={styles.planCopy}>
+                  <Text selectable={false} style={[styles.planTitle, themed.text]}>
+                    로그인 혜택
+                  </Text>
+                  <Text selectable={false} style={[styles.planPrice, themed.text]}>
+                    무료
+                  </Text>
+                </View>
+                <StatusBadge label={isLoggedIn ? "사용 중" : "로그인 필요"} active={isLoggedIn} />
+              </View>
+              <View style={styles.benefitList}>
+                {signedInBenefits.map((benefit) => (
+                  <Text key={benefit} selectable style={[styles.benefitText, themed.mutedText]}>
+                    {benefit}
+                  </Text>
+                ))}
+              </View>
+            </View>
+
+            {isLoggedIn && (productLoadError || billingMessage) ? (
+              <Text selectable={false} style={[styles.helpText, themed.mutedText]}>
+                {productLoadError || billingMessage}
+              </Text>
+            ) : null}
+            {isLoggedIn && productLoadError ? (
+              <Pressable
+                accessibilityRole="button"
+                disabled={isLoadingProducts || !billingConnected}
+                style={[styles.secondaryButton, themed.secondaryButton, (isLoadingProducts || !billingConnected) && styles.disabledButton]}
+                onPress={() => void reloadProducts()}
+              >
                 <Text style={[styles.secondaryButtonText, themed.text]}>상품 다시 불러오기</Text>
               </Pressable>
             ) : null}
             <View style={styles.paymentGrid}>
               {paymentPlans.map((plan) => (
                 <Pressable accessibilityRole="button"
+                  key={plan.id}
+                  style={[styles.paymentPlan, themed.panel]}
+                  onPress={() => setSelectedPaymentPlan(plan)}
+                >
+                  <View style={styles.planHeader}>
+                    <View style={styles.planCopy}>
+                      <Text selectable={false} style={[styles.planTitle, themed.text]}>
+                        {plan.title}
+                      </Text>
+                      <Text selectable={false} style={[styles.planPrice, themed.text]}>
+                        {getStorePrice(getPaymentProductId(plan)) ?? plan.price}
+                      </Text>
+                      <Text selectable={false} style={[styles.helpText, themed.mutedText]}>
+                        {plan.id === "adRemove"
+                          ? "1회 결제 · 자동 갱신 없음"
+                          : "월 구독 · 취소 전까지 자동 갱신"}
+                      </Text>
+                    </View>
+                    <StatusBadge
+                      label={getPaymentPlanStatus(plan).label}
+                      active={getPaymentPlanStatus(plan).active}
+                    />
+                  </View>
+                  <Text selectable={false} style={[styles.benefitText, themed.mutedText]}>
+                    {plan.summary}
+                  </Text>
+                  <View style={[styles.paymentOpenButton, themed.activeFill]}>
+                    <Text selectable={false} style={[styles.primaryButtonText, themed.inverseText]}>
+                      안내 보기
+                    </Text>
+                  </View>
+                </Pressable>
+              ))}
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              disabled={!billingConnected || isPurchaseRestoring || isSubmitting}
+              style={[
+                styles.secondaryButton,
+                themed.secondaryButton,
+                (!billingConnected || isPurchaseRestoring || isSubmitting) &&
+                  styles.disabledButton
+              ]}
+              onPress={() => void handleRestorePurchases()}
+            >
+              <Text selectable={false} style={[styles.secondaryButtonText, themed.text]}>
+                {isPurchaseRestoring ? "구매 복원 중..." : "구매 복원"}
+              </Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="link"
+              style={[styles.secondaryButton, themed.secondaryButton]}
+              onPress={() => void Linking.openURL(GOOGLE_PLAY_SUBSCRIPTIONS_URL)}
+            >
               <Text selectable={false} style={[styles.secondaryButtonText, themed.text]}>
                 Google Play 구독 관리
               </Text>
@@ -930,6 +1033,60 @@ export default function AccountScreen() {
             </View>
 
             <Pressable accessibilityRole="button"
+              disabled={
+                isSubmitting ||
+                !billingConnected ||
+                !selectedPaymentPlan ||
+                (selectedPaymentPlan ? getPaymentPlanStatus(selectedPaymentPlan).active : false)
+              }
+              style={[
+                styles.primaryButton,
+                themed.activeFill,
+                (isSubmitting ||
+                  !billingConnected ||
+                  (selectedPaymentPlan ? getPaymentPlanStatus(selectedPaymentPlan).active : false)) &&
+                  styles.disabledButton
+              ]}
+              onPress={handlePaymentPurchase}
+            >
+              <Text selectable={false} style={[styles.primaryButtonText, themed.inverseText]}>
+                {selectedPaymentPlan ? getPaymentActionLabel(selectedPaymentPlan) : "결제하기"}
+              </Text>
+            </Pressable>
+
+            {selectedPaymentPlan?.id !== "adRemove" ? (
+              <>
+                <Pressable
+                  accessibilityRole="link"
+                  style={[styles.secondaryButton, themed.secondaryButton]}
+                  onPress={() => void Linking.openURL(GOOGLE_PLAY_SUBSCRIPTIONS_URL)}
+                >
+                  <Text selectable={false} style={[styles.secondaryButtonText, themed.text]}>
+                    Google Play에서 구독 관리
+                  </Text>
+                </Pressable>
+                <Text selectable={false} style={[styles.helpText, themed.mutedText]}>
+                  구독을 취소하면 다음 갱신 결제가 중단됩니다. 일반적으로 이미 결제한 기간이 끝날 때까지
+                  혜택을 이용할 수 있으며, 환불 여부는 Google Play 정책과 적용 법령에 따라 달라질 수 있습니다.
+                </Text>
+              </>
+            ) : null}
+
+            <View style={styles.form}>
+              <Pressable
+                accessibilityRole="link"
+                style={[styles.secondaryButton, themed.secondaryButton]}
+                onPress={() => void Linking.openURL(TERMS_OF_SERVICE_URL)}
+              >
+                <Text selectable={false} style={[styles.secondaryButtonText, themed.text]}>
+                  이용약관
+                </Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="link"
+                style={[styles.secondaryButton, themed.secondaryButton]}
+                onPress={() => void Linking.openURL(PRIVACY_POLICY_URL)}
+              >
                 <Text selectable={false} style={[styles.secondaryButtonText, themed.text]}>
                   개인정보처리방침
                 </Text>
