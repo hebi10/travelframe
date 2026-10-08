@@ -52,7 +52,6 @@ export const bodyFrameDarkColors = {
 export const bodyFrameDesign = {
   horizontalPadding: 16,
   contentMaxWidth: 750,
-  pageTitleFontSize: 26,
   sectionGap: 28,
   controlGap: 10,
   minTouchSize: 44,

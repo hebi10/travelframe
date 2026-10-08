@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View, type TextStyle } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { bodyFrameDesign, spacing, typography } from "@/constants/app-theme";
+import { bodyFrameDesign, bodyFrameTypography, spacing, typography } from "@/constants/app-theme";
 import { type FontStyle } from "@/lib/app-settings";
 import { getFontWeightForStyle, useAppAppearance } from "@/lib/app-appearance";
 
@@ -153,23 +153,14 @@ const styles = StyleSheet.create({
   }
 });
 
-const titleStyleByFont: Record<FontStyle, { fontSize: number; lineHeight: number }> = {
-  noto_sans_kr: { fontSize: bodyFrameDesign.pageTitleFontSize, lineHeight: 32 },
-  nanum_gothic: { fontSize: bodyFrameDesign.pageTitleFontSize, lineHeight: 32 },
-  gowun_dodum: { fontSize: bodyFrameDesign.pageTitleFontSize, lineHeight: 32 },
-  gugi: { fontSize: bodyFrameDesign.pageTitleFontSize, lineHeight: 32 },
-  black_han_sans: { fontSize: bodyFrameDesign.pageTitleFontSize, lineHeight: 32 }
-};
-
 const getTitleStyle = (
   fontStyle: FontStyle,
   scale: number,
   fontFamily?: string
 ): TextStyle => {
-  const style = titleStyleByFont[fontStyle];
   return {
-    fontSize: Math.round(style.fontSize * scale),
-    lineHeight: Math.round(style.lineHeight * scale),
+    fontSize: Math.round(bodyFrameTypography.pageTitle * scale),
+    lineHeight: Math.round(32 * scale),
     fontFamily,
     fontWeight: getFontWeightForStyle(fontStyle)
   };
