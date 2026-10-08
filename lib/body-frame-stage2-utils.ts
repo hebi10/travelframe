@@ -33,6 +33,21 @@ export const buildProjectPhotoRelativePath = (projectId: string, sequence: numbe
 export const buildProjectPreviewRelativePath = (projectId: string, sequence: number) =>
   `photo-previews/${sanitizeProjectPathSegment(projectId)}/${formatProjectSequenceFileName(sequence)}`;
 
+// An immutable file identity must not change when photos are reordered or deleted.
+// Retain the sequence-based helpers for existing installations.
+export const formatProjectPhotoIdFileName = (photoId: string) => {
+  if (!/^[A-Za-z0-9_-]+$/.test(photoId)) {
+    throw new Error("Invalid photo identity");
+  }
+  return `photo-${photoId}.jpg`;
+};
+
+export const buildProjectPhotoIdRelativePath = (projectId: string, photoId: string) =>
+  `photos/${sanitizeProjectPathSegment(projectId)}/${formatProjectPhotoIdFileName(photoId)}`;
+
+export const buildProjectPreviewIdRelativePath = (projectId: string, photoId: string) =>
+  `photo-previews/${sanitizeProjectPathSegment(projectId)}/${formatProjectPhotoIdFileName(photoId)}`;
+
 const hasProjectId = (photo: ProjectAwarePhoto) =>
   typeof photo.projectId === "string" && photo.projectId.trim().length > 0;
 
