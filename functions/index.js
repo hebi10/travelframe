@@ -17,6 +17,11 @@ const {
 } = require("./backup-delete-safety");
 const { ensurePrivateStorageDownload, buildStorageDownloadUrl } = require("./private-storage");
 const {
+  decideSlotReplacement,
+  hasBlockingUploads,
+  runSlotReplacement
+} = require("./backup-slot-replacement");
+const {
   reserveWeeklyVideoExportUsage,
   completeWeeklyVideoExportReservation,
   releaseWeeklyVideoExportReservation
@@ -314,6 +319,13 @@ const assertBackupProjectSlotAllowed = async ({
       "현재 플랜의 클라우드 프로젝트 슬롯 한도를 초과했습니다."
     );
   }
+  if (slotSnapshot.data()?.status === "replacing" ||
+      (await db.doc(`users/${uid}/backupProjectLocks/${normalizedProjectId}`).get()).exists) {
+    throw new HttpsError(
+      "failed-precondition",
+      "백업 프로젝트 변경 중에는 사진·영상 백업을 업로드할 수 없습니다."
+    );
+  }
 
   return {
     slotId: slotSnapshot.id,
@@ -373,7 +385,10 @@ const serializeBackupProjectSlot = (snapshot) => {
     slotNumber:
       Number(data.slotNumber) || getBackupProjectSlotNumber(snapshot.id),
     projectId: data.projectId,
-    status: data.status === "over_limit" ? "over_limit" : "active",
+    status: data.status === "replacing"
+      ? "replacing"
+      : data.status === "over_limit" ? "over_limit" : "active",
+    pendingProjectId: data.pendingProjectId ?? null,
     selectedAt: data.selectedAt ?? null,
     updatedAt: data.updatedAt ?? null
   };
@@ -493,6 +508,20 @@ const deleteBackupProjectCloudData = async ({ uid, projectId }) => {
   };
 };
 
+const assertNoReservedProjectUploads = async (uid, projectId) => {
+  const ref = db.doc(`users/${uid}`);
+  const [sessions, adminSessions] = await Promise.all([
+    ref.collection("backupUploadSessions").where("projectId", "==", projectId).get(),
+    ref.collection("adminBackupUploadSessions").where("projectId", "==", projectId).get()
+  ]);
+  if (hasBlockingUploads([...sessions.docs, ...adminSessions.docs].map((doc) => doc.data()))) {
+    throw new HttpsError(
+      "failed-precondition",
+      "진행 중인 클라우드 백업이 있습니다. 완료하거나 만료된 후 다시 시도해 주세요."
+    );
+  }
+};
+
 exports.replaceCloudBackupProject = secureOnCall(async (request) => {
   try {
     const uid = requireUid(request);
@@ -500,71 +529,129 @@ exports.replaceCloudBackupProject = secureOnCall(async (request) => {
     const projectId = normalizeBackupProjectId(request.data?.projectId);
     const slotNumber = getBackupProjectSlotNumber(slotId);
     if (!projectId || slotNumber <= 0) {
-      throw new HttpsError(
-        "invalid-argument",
-        "slotId and projectId are required."
-      );
+      throw new HttpsError("invalid-argument", "slotId and projectId are required.");
     }
-
     const subscription = await getBackupSubscription(uid);
     const slotLimit = getCloudBackupProjectSlotLimit(subscription);
-    if (slotNumber > slotLimit || slotLimit <= 0) {
-      throw new HttpsError(
-        "failed-precondition",
-        "현재 플랜에서 사용할 수 없는 클라우드 백업 슬롯입니다."
-      );
+    if (slotLimit <= 0 || slotNumber > slotLimit) {
+      throw new HttpsError("failed-precondition", "현재 플랜에서 사용할 수 없는 백업 슬롯입니다.");
     }
 
-    const slotsRef = db.collection(`users/${uid}/backupProjectSlots`);
-    const slotRef = slotsRef.doc(slotId);
-    const [slotSnapshot, duplicateSnapshot] = await Promise.all([
-      slotRef.get(),
-      getBackupProjectSlotByProject(uid, projectId)
+    const slotRef = db.doc(`users/${uid}/backupProjectSlots/${slotId}`);
+    const [current, duplicate] = await Promise.all([
+      slotRef.get(), getBackupProjectSlotByProject(uid, projectId)
     ]);
-    if (!slotSnapshot.exists) {
-      throw new HttpsError("not-found", "백업 프로젝트 슬롯을 찾을 수 없습니다.");
+    if (!current.exists) throw new HttpsError("not-found", "백업 슬롯을 찾을 수 없습니다.");
+    if (duplicate && duplicate.id !== slotId) {
+      throw new HttpsError("already-exists", "이미 다른 슬롯에 선택된 백업 프로젝트입니다.");
     }
-    if (duplicateSnapshot && duplicateSnapshot.id !== slotId) {
-      throw new HttpsError(
-        "already-exists",
-        "이미 다른 클라우드 백업 슬롯에서 선택한 프로젝트입니다."
-      );
+    const previousProjectId = normalizeBackupProjectId(current.data()?.projectId);
+    if (!previousProjectId) {
+      throw new HttpsError("failed-precondition", "기존 백업 프로젝트를 확인할 수 없습니다.");
     }
-
-    const previousProjectId = normalizeBackupProjectId(
-      slotSnapshot.data()?.projectId
-    );
-    if (previousProjectId === projectId) {
+    const initial = decideSlotReplacement({
+      slot: current.data(), previousProjectId, projectId
+    });
+    if (initial === "conflict" || initial === "unavailable") {
+      throw new HttpsError("aborted", "슬롯 상태가 변경되었습니다. 화면을 새로고침해 주세요.");
+    }
+    if (initial === "unchanged") {
       return {
-        slot: serializeBackupProjectSlot(slotSnapshot),
+        slot: serializeBackupProjectSlot(current),
         deletedPhotoCount: 0,
         deletedVideoCount: 0
       };
     }
 
-    const deleted = previousProjectId
-      ? await deleteBackupProjectCloudData({
-          uid,
-          projectId: previousProjectId
-        })
-      : { deletedPhotoCount: 0, deletedVideoCount: 0 };
-    const nowIso = new Date().toISOString();
-    await slotRef.set(
-      {
-        userId: uid,
-        slotNumber,
-        projectId,
-        status: "active",
-        selectedAt: nowIso,
-        updatedAt: nowIso,
-        previousProjectId: previousProjectId ?? null
+    const lockRef = db.doc(`users/${uid}/backupProjectLocks/${previousProjectId}`);
+    if (initial === "begin") {
+      await assertNoReservedProjectUploads(uid, previousProjectId);
+    }
+    const outcome = await runSlotReplacement({
+      begin: async () => db.runTransaction(async (tx) => {
+        const [slotSnapshot, lockSnapshot] = await Promise.all([
+          tx.get(slotRef), tx.get(lockRef)
+        ]);
+        const decision = decideSlotReplacement({
+          slot: slotSnapshot.exists ? slotSnapshot.data() : null,
+          previousProjectId,
+          projectId
+        });
+        if (decision === "conflict" || decision === "unavailable") {
+          throw new HttpsError("aborted", "다른 작업에서 백업 슬롯을 변경했습니다.");
+        }
+        if (decision === "begin") {
+          if (lockSnapshot.exists) {
+            throw new HttpsError("aborted", "같은 프로젝트에서 다른 교체 작업이 진행 중입니다.");
+          }
+          tx.set(lockRef, {
+            userId: uid,
+            projectId: previousProjectId,
+            targetProjectId: projectId,
+            slotId,
+            operation: "owner",
+            status: "replacing",
+            startedAt: FieldValue.serverTimestamp()
+          });
+          tx.update(slotRef, {
+            status: "replacing",
+            pendingProjectId: projectId,
+            replacementStartedAt: FieldValue.serverTimestamp(),
+            updatedAt: new Date().toISOString()
+          });
+        } else if (
+          decision === "resume" &&
+          (!lockSnapshot.exists ||
+            lockSnapshot.data()?.operation !== "owner" ||
+            lockSnapshot.data()?.slotId !== slotId ||
+            lockSnapshot.data()?.targetProjectId !== projectId)
+        ) {
+          throw new HttpsError("aborted", "작업 잠금 정보가 이전 교체 요청과 일치하지 않습니다.");
+        }
+        return decision;
+      }),
+      remove: async () => {
+        // Lock-aware reservations cannot commit after the replacement lock.
+        // Wait for any reservation that committed before the lock.
+        await assertNoReservedProjectUploads(uid, previousProjectId);
+        return await deleteBackupProjectCloudData({
+          uid, projectId: previousProjectId
+        });
       },
-      { merge: false }
-    );
-
+      finalize: async () => db.runTransaction(async (tx) => {
+        const [slotSnapshot, lockSnapshot] = await Promise.all([
+          tx.get(slotRef), tx.get(lockRef)
+        ]);
+        const state = decideSlotReplacement({
+          slot: slotSnapshot.exists ? slotSnapshot.data() : null,
+          previousProjectId,
+          projectId
+        });
+        if (
+          state !== "resume" ||
+          !lockSnapshot.exists ||
+          lockSnapshot.data()?.operation !== "owner" ||
+          lockSnapshot.data()?.slotId !== slotId ||
+          lockSnapshot.data()?.targetProjectId !== projectId
+        ) {
+          throw new HttpsError("aborted", "백업 슬롯 상태가 변경되었습니다.");
+        }
+        tx.set(slotRef, {
+          userId: uid,
+          slotNumber,
+          projectId,
+          status: "active",
+          selectedAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          previousProjectId
+        });
+        tx.delete(lockRef);
+      })
+    });
     return {
       slot: serializeBackupProjectSlot(await slotRef.get()),
-      ...deleted
+      deletedPhotoCount: outcome.deletedPhotoCount,
+      deletedVideoCount: outcome.deletedVideoCount
     };
   } catch (error) {
     throw toHttpsError(error);
@@ -1136,6 +1223,9 @@ exports.reserveBackupUpload = secureOnCall(async (request) => {
     } = request.data ?? {};
     const subscription = await getBackupSubscription(uid);
     const projectId = normalizeBackupProjectId(rawProjectId);
+    const projectLockRef = projectId
+      ? db.doc(`users/${uid}/backupProjectLocks/${projectId}`)
+      : null;
 
     if (itemType === "photo") {
       await assertBackupProjectSlotAllowed({
@@ -1166,7 +1256,16 @@ exports.reserveBackupUpload = secureOnCall(async (request) => {
     });
 
     await db.runTransaction(async (transaction) => {
-      const usageSnapshot = await transaction.get(usageRef);
+      const [usageSnapshot, projectLock] = await Promise.all([
+        transaction.get(usageRef),
+        projectLockRef ? transaction.get(projectLockRef) : Promise.resolve(null)
+      ]);
+      if (projectLock?.exists) {
+        throw new HttpsError(
+          "failed-precondition",
+          "프로젝트 변경 중에는 백업을 예약할 수 없습니다."
+        );
+      }
       const usage = usageSnapshot.data() ?? {};
 
       assertBackupUploadAllowed({
@@ -1244,6 +1343,16 @@ exports.completeBackupUpload = secureOnCall(async (request) => {
       throw new HttpsError("failed-precondition", "Backup upload session is not active.");
     }
 
+    const projectLockRef = session.projectId
+      ? db.doc(`users/${uid}/backupProjectLocks/${session.projectId}`)
+      : null;
+    if (projectLockRef && (await projectLockRef.get()).exists) {
+      throw new HttpsError(
+        "failed-precondition",
+        "백업 프로젝트 변경 중에는 업로드를 완료할 수 없습니다."
+      );
+    }
+
     if (session.expiresAt?.toMillis && session.expiresAt.toMillis() < Date.now()) {
       await failBackupUploadSession({
         uid,
@@ -1290,10 +1399,17 @@ exports.completeBackupUpload = secureOnCall(async (request) => {
     let nextUsage;
     try {
       nextUsage = await db.runTransaction(async (transaction) => {
-        const [freshSessionSnapshot, usageSnapshot] = await Promise.all([
+        const [freshSessionSnapshot, usageSnapshot, projectLock] = await Promise.all([
           transaction.get(sessionRef),
-          transaction.get(getUsageRef(uid))
+          transaction.get(getUsageRef(uid)),
+          projectLockRef ? transaction.get(projectLockRef) : Promise.resolve(null)
         ]);
+        if (projectLock?.exists) {
+          throw new HttpsError(
+            "failed-precondition",
+            "백업 프로젝트 변경 중에는 업로드 완료를 확정할 수 없습니다."
+          );
+        }
         const freshSession = freshSessionSnapshot.data();
         if (!freshSessionSnapshot.exists || freshSession.status !== "reserved") {
           return normalizeBackupUsage(usageSnapshot.data());
@@ -2475,7 +2591,8 @@ exports.deleteCloudBackupData = secureOnCall(async (request) => {
       musicSnapshot,
       projectSnapshot,
       sessionSnapshot,
-      projectSlotSnapshot
+      projectSlotSnapshot,
+      projectLockSnapshot
     ] = await Promise.all([
       userRef.collection("photoBackups").get(),
       userRef.collection("imageWorks").get(),
@@ -2483,14 +2600,16 @@ exports.deleteCloudBackupData = secureOnCall(async (request) => {
       userRef.collection("musicTracks").get(),
       userRef.collection("bodyProjects").get(),
       userRef.collection("backupUploadSessions").get(),
-      userRef.collection("backupProjectSlots").get()
+      userRef.collection("backupProjectSlots").get(),
+      userRef.collection("backupProjectLocks").get()
     ]);
 
     let imageBackupBytes = 0;
     const documentDeletes = [
       ...projectSnapshot.docs,
       ...sessionSnapshot.docs,
-      ...projectSlotSnapshot.docs
+      ...projectSlotSnapshot.docs,
+      ...projectLockSnapshot.docs
     ].map((item) => item.ref);
     const storageDeletes = collectOwnedCloudBackupStoragePaths({
       uid,
