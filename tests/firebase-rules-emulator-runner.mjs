@@ -704,4 +704,60 @@ await expectAllowed(
   })
 );
 
+await seedBackupUploadSession({
+  sessionId: "unlocked-metadata",
+  storagePath: `users/${ownerUid}/backups/photos/unlocked-metadata/okay.jpg`,
+  fileSize: 1024,
+  projectId: "unlocked-project",
+  status: "completed"
+});
+await expectAllowed(
+  "unlocked project photo metadata remains writable",
+  firestoreRequest("PATCH", `users/${ownerUid}/photoBackups/unlocked-metadata`, {
+    uid: ownerUid,
+    data: {
+      ...validPhotoBackup(ownerUid, "unlocked-metadata"),
+      storagePath: `users/${ownerUid}/backups/photos/unlocked-metadata/okay.jpg`,
+      backupSessionId: "unlocked-metadata",
+      projectId: "unlocked-project",
+      sequence: 1
+    }
+  })
+);
+await expectDenied(
+  "locked project session cannot be used to write metadata under another project",
+  firestoreRequest("PATCH", `users/${ownerUid}/photoBackups/locked-bypass`, {
+    uid: ownerUid,
+    data: {
+      ...validPhotoBackup(ownerUid, "locked-bypass"),
+      storagePath: lockedPhotoPath,
+      backupSessionId: "locked-session",
+      projectId: "fake-project",
+      sequence: 1
+    }
+  })
+);
+const lockedAdminPath = `users/${ownerUid}/backups/photos/locked-admin/locked.jpg`;
+await seedDoc(`users/${ownerUid}/adminBackupUploadSessions/locked-admin`, {
+  targetUid: ownerUid,
+  adminUid,
+  mediaKind: "image",
+  itemType: "photo",
+  status: "reserved",
+  contentType: "image/jpeg",
+  storagePath: lockedAdminPath,
+  fileSize: 3,
+  projectId: lockedProjectId,
+  expiresAt: new Date(Date.now() + 60_000)
+});
+await expectDenied(
+  "Storage Rules also block administrator uploads into a locked project",
+  storageRequest("POST", lockedAdminPath, {
+    uid: adminUid,
+    contentType: "image/jpeg",
+    metadata: { adminBackupSessionId: "locked-admin" },
+    bytes: new Uint8Array([1, 2, 3])
+  })
+);
+
 console.log("ok - Firestore and Storage Rules emulator checks passed");
