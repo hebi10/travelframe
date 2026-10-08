@@ -66,7 +66,7 @@ for (const token of [
   "subscriptionOffers",
   "obfuscatedAccountId",
   "subscriptionProductReplacementParams",
-  "charge-prorated-price",
+  "with-time-proration",
   "verifyGooglePlayPurchase"
 ]) {
   assert.ok(billingHookSource.includes(token), `billing hook should contain ${token}`);

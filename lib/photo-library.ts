@@ -103,7 +103,7 @@ export const saveCapturedPhoto = async (
     const stored = await storeBodyFramePhotoFile({
       sourceUri: legacyPhoto.uri,
       projectId: resolvedProjectId,
-      sequence: resolvedSequence,
+      photoId: legacyPhoto.id,
       width: legacyPhoto.width,
       height: legacyPhoto.height
     });

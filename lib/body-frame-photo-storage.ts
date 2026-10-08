@@ -3,8 +3,8 @@ import { manipulateAsync, SaveFormat } from "expo-image-manipulator";
 
 import { BODY_FRAME_MEDIA_POLICY } from "@/constants/body-frame";
 import {
-  buildProjectPhotoRelativePath,
-  buildProjectPreviewRelativePath
+  buildProjectPhotoIdRelativePath,
+  buildProjectPreviewIdRelativePath
 } from "@/lib/body-frame-stage2-utils";
 import { optimizeBodyFramePhotoForStorage } from "@/lib/image-backup-utils";
 import type { PhotoItem } from "@/types/photo";
@@ -39,34 +39,50 @@ const replaceFileSafely = async (sourceUri: string, destinationUri: string) => {
   }
 
   await ensureParentDirectory(destinationUri);
-  const temporaryUri = `${destinationUri}.migrating`;
-  await FileSystem.deleteAsync(temporaryUri, { idempotent: true });
-  await FileSystem.copyAsync({ from: sourceUri, to: temporaryUri });
-  await FileSystem.deleteAsync(destinationUri, { idempotent: true });
-  await FileSystem.moveAsync({ from: temporaryUri, to: destinationUri });
-  return destinationUri;
+
+  const existing = await FileSystem.getInfoAsync(destinationUri, { md5: true });
+  if (existing.exists) {
+    const source = await FileSystem.getInfoAsync(sourceUri, { md5: true });
+    if (source.exists && source.md5 && existing.md5 === source.md5) {
+      return destinationUri;
+    }
+    throw new Error("같은 사진 저장 경로에 다른 파일이 있습니다. 기존 사진을 보호하기 위해 저장을 중단했습니다.");
+  }
+
+  const temporaryUri = `${destinationUri}.${Math.random().toString(36).slice(2)}.migrating`;
+  try {
+    await FileSystem.copyAsync({ from: sourceUri, to: temporaryUri });
+    const conflict = await FileSystem.getInfoAsync(destinationUri);
+    if (conflict.exists) {
+      throw new Error("사진 저장 중 파일 경로가 중복되었습니다. 기존 파일을 유지합니다.");
+    }
+    await FileSystem.moveAsync({ from: temporaryUri, to: destinationUri });
+    return destinationUri;
+  } finally {
+    await FileSystem.deleteAsync(temporaryUri, { idempotent: true }).catch(() => undefined);
+  }
 };
 
-export const getBodyFrameProjectPhotoUri = (projectId: string, sequence: number) =>
-  absolutePath(buildProjectPhotoRelativePath(projectId, sequence));
+export const getBodyFrameProjectPhotoUri = (projectId: string, photoId: string) =>
+  absolutePath(buildProjectPhotoIdRelativePath(projectId, photoId));
 
-export const getBodyFrameProjectPreviewUri = (projectId: string, sequence: number) =>
-  absolutePath(buildProjectPreviewRelativePath(projectId, sequence));
+export const getBodyFrameProjectPreviewUri = (projectId: string, photoId: string) =>
+  absolutePath(buildProjectPreviewIdRelativePath(projectId, photoId));
 
 export const createBodyFramePreview = async ({
   sourceUri,
   projectId,
-  sequence,
+  photoId,
   width,
   height
 }: {
   sourceUri: string;
   projectId: string;
-  sequence: number;
+  photoId: string;
   width?: number | null;
   height?: number | null;
 }) => {
-  const destinationUri = getBodyFrameProjectPreviewUri(projectId, sequence);
+  const destinationUri = getBodyFrameProjectPreviewUri(projectId, photoId);
   const maxEdge = Math.max(width ?? 0, height ?? 0);
   const scale =
     maxEdge > BODY_FRAME_MEDIA_POLICY.previewMaxLongSide
@@ -99,13 +115,13 @@ export const createBodyFramePreview = async ({
 export const storeBodyFramePhotoFile = async ({
   sourceUri,
   projectId,
-  sequence,
+  photoId,
   width,
   height
 }: {
   sourceUri: string;
   projectId: string;
-  sequence: number;
+  photoId: string;
   width?: number | null;
   height?: number | null;
 }) => {
@@ -114,14 +130,14 @@ export const storeBodyFramePhotoFile = async ({
     width,
     height
   });
-  const destinationUri = getBodyFrameProjectPhotoUri(projectId, sequence);
+  const destinationUri = getBodyFrameProjectPhotoUri(projectId, photoId);
 
   try {
     await replaceFileSafely(optimized.uri, destinationUri);
     const previewUri = await createBodyFramePreview({
       sourceUri: destinationUri,
       projectId,
-      sequence,
+      photoId,
       width: optimized.width,
       height: optimized.height
     });
@@ -158,7 +174,7 @@ export const migratePhotoFilesToProject = async (
   let nextLocalPreviewUri = photo.localPreviewUri;
 
   if (photo.localFileStatus !== "cloud_only" && !isRemoteUri(photo.uri)) {
-    const destinationUri = getBodyFrameProjectPhotoUri(photo.projectId, photo.sequence);
+    const destinationUri = getBodyFrameProjectPhotoUri(photo.projectId, photo.id);
     if (photo.uri !== destinationUri) {
       await replaceFileSafely(photo.uri, destinationUri);
       obsoleteSourceUris.push(photo.uri);
@@ -172,7 +188,7 @@ export const migratePhotoFilesToProject = async (
   if (photo.previewUri && !isRemoteUri(photo.previewUri)) {
     const destinationPreviewUri = getBodyFrameProjectPreviewUri(
       photo.projectId,
-      photo.sequence
+      photo.id
     );
     if (photo.previewUri !== destinationPreviewUri) {
       await replaceFileSafely(photo.previewUri, destinationPreviewUri);

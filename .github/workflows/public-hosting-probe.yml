@@ -1,0 +1,40 @@
+name: Public Hosting Probe
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/public-hosting-probe.yml"
+      - "scripts/probe-public-hosting.mjs"
+      - "admin/app-ads.txt"
+      - "admin/privacy/**"
+      - "admin/privacy/photo-guide-delete-account/**"
+      - "app.json"
+  pull_request:
+    paths:
+      - ".github/workflows/public-hosting-probe.yml"
+      - "scripts/probe-public-hosting.mjs"
+      - "admin/app-ads.txt"
+      - "admin/privacy/**"
+      - "app.json"
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Compare source with published Firebase Hosting
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Probe public URLs without writing to the service
+        run: node scripts/probe-public-hosting.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: public-hosting-probe
+          path: reports/public-hosting-probe.json
+          retention-days: 14

@@ -1173,6 +1173,19 @@ export default function BodyFrameProjectDetailScreen() {
           </Text>
         </Pressable>
 
+        {projectPhotos.length > 1 ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="프로젝트 첫 사진과 마지막 사진 비교"
+            style={[styles.videoAction, { borderColor: palette.line, marginTop: 12 }]}
+            onPress={() => router.push(`/project/${project.id}/compare` as Href)}
+          >
+            <Text style={[styles.videoActionText, { color: palette.text }]}>
+              전후 사진 비교
+            </Text>
+          </Pressable>
+        ) : null}
+
         <View style={styles.recordsSection}>
           <View style={styles.sectionHeader}>
             <View>
