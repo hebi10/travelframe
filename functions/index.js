@@ -1167,24 +1167,27 @@ exports.reserveBackupUpload = secureOnCall(async (request) => {
     } = request.data ?? {};
     const subscription = await getBackupSubscription(uid);
     const projectId = normalizeBackupProjectId(rawProjectId);
+    let reservationSlotRef = null;
 
     if (itemType === "photo") {
-      await assertBackupProjectSlotAllowed({
+      const selectedSlot = await assertBackupProjectSlotAllowed({
         uid,
         subscription,
         projectId
       });
+      reservationSlotRef = db.doc(`users/${uid}/backupProjectSlots/${selectedSlot.slotId}`);
       await assertProjectPhotoBackupCapacity({
         uid,
         projectId,
         itemId
       });
     } else if (itemType === "video" && projectId) {
-      await assertBackupProjectSlotAllowed({
+      const selectedSlot = await assertBackupProjectSlotAllowed({
         uid,
         subscription,
         projectId
       });
+      reservationSlotRef = db.doc(`users/${uid}/backupProjectSlots/${selectedSlot.slotId}`);
     }
 
     await cleanupExpiredBackupUploadSessions(uid);
@@ -1198,6 +1201,14 @@ exports.reserveBackupUpload = secureOnCall(async (request) => {
 
     await db.runTransaction(async (transaction) => {
       const usageSnapshot = await transaction.get(usageRef);
+      if (reservationSlotRef) {
+        const slotSnapshot = await transaction.get(reservationSlotRef);
+        if (!slotSnapshot.exists ||
+            slotSnapshot.data()?.projectId !== projectId ||
+            slotSnapshot.data()?.status === "replacing") {
+          throw new HttpsError("failed-precondition", "프로젝트 변경 중에는 백업을 예약할 수 없습니다.");
+        }
+      }
       const usage = usageSnapshot.data() ?? {};
 
       assertBackupUploadAllowed({
@@ -1273,6 +1284,14 @@ exports.completeBackupUpload = secureOnCall(async (request) => {
 
     if (session.status !== "reserved") {
       throw new HttpsError("failed-precondition", "Backup upload session is not active.");
+    }
+
+    if ((session.itemType === "photo" || session.itemType === "video") && session.projectId) {
+      await assertBackupProjectSlotAllowed({
+        uid,
+        subscription: await getBackupSubscription(uid),
+        projectId: session.projectId
+      });
     }
 
     if (session.expiresAt?.toMillis && session.expiresAt.toMillis() < Date.now()) {
@@ -2499,6 +2518,14 @@ exports.completeAdminBackupUpload = secureOnCall(async (request) => {
 
     if (session.status !== "reserved") {
       throw new HttpsError("failed-precondition", "Admin upload session is not active.");
+    }
+
+    if ((session.itemType === "photo" || session.itemType === "video") && session.projectId) {
+      await assertBackupProjectSlotAllowed({
+        uid: targetUid,
+        subscription: await getBackupSubscription(targetUid),
+        projectId: session.projectId
+      });
     }
 
     const [metadata] = await bucket.file(session.storagePath).getMetadata();
