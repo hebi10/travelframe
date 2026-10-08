@@ -715,4 +715,133 @@ await expectAllowed(
   })
 );
 
+const adminLockedProjectId = "admin-replacing-project";
+const adminLockedPhotoPath = `users/${ownerUid}/backups/photos/locked-session/locked.jpg`;
+await seedDoc(`users/${ownerUid}/backupProjectLocks/${adminLockedProjectId}`, {
+  userId: ownerUid,
+  projectId: adminLockedProjectId,
+  targetProjectId: "next-project",
+  status: "replacing",
+  slotId: "slot-1"
+});
+await seedBackupUploadSession({
+  sessionId: "locked-session",
+  storagePath: adminLockedPhotoPath,
+  fileSize: 1024,
+  projectId: adminLockedProjectId,
+  status: "completed"
+});
+await expectDenied(
+  "clients cannot add photo metadata while admin project deletion is pending",
+  firestoreRequest("PATCH", `users/${ownerUid}/photoBackups/locked-photo`, {
+    uid: ownerUid,
+    data: {
+      ...validPhotoBackup(ownerUid, "locked-photo"),
+      storagePath: adminLockedPhotoPath,
+      backupSessionId: "locked-session",
+      projectId: adminLockedProjectId,
+      sequence: 1
+    }
+  })
+);
+await expectDenied(
+  "clients cannot mutate existing photos while administrator is replacing project",
+  firestoreRequest("PATCH", `users/${ownerUid}/photoBackups/body-photo`, {
+    uid: ownerUid,
+    data: { ...bodyPhoto, backupStatus: "failed", projectId: adminLockedProjectId }
+  })
+);
+await expectDenied(
+  "owners cannot forge admin replacement locks",
+  firestoreRequest("PATCH", `users/${ownerUid}/backupProjectLocks/other-project`, {
+    uid: ownerUid,
+    data: { userId: ownerUid, projectId: "other-project" }
+  })
+);
+await seedBackupUploadSession({
+  sessionId: "locked-storage",
+  storagePath: `users/${ownerUid}/backups/photos/locked-storage/locked.jpg`,
+  fileSize: 3,
+  projectId: adminLockedProjectId
+});
+await expectDenied(
+  "Storage Rules block already reserved uploads to the locked project",
+  storageRequest("POST", `users/${ownerUid}/backups/photos/locked-storage/locked.jpg`, {
+    uid: ownerUid, contentType: "image/jpeg",
+    metadata: { backupSessionId: "locked-storage" },
+    bytes: new Uint8Array([1, 2, 3])
+  })
+);
+await seedBackupUploadSession({
+  sessionId: "unlocked-storage",
+  storagePath: `users/${ownerUid}/backups/photos/unlocked-storage/okay.jpg`,
+  fileSize: 3,
+  projectId: "unlocked-project"
+});
+await expectAllowed(
+  "other unlocked project uploads still work",
+  storageRequest("POST", `users/${ownerUid}/backups/photos/unlocked-storage/okay.jpg`, {
+    uid: ownerUid, contentType: "image/jpeg",
+    metadata: { backupSessionId: "unlocked-storage" },
+    bytes: new Uint8Array([1, 2, 3])
+  })
+);
+
+await seedBackupUploadSession({
+  sessionId: "unlocked-metadata",
+  storagePath: `users/${ownerUid}/backups/photos/unlocked-metadata/okay.jpg`,
+  fileSize: 1024,
+  projectId: "unlocked-project",
+  status: "completed"
+});
+await expectAllowed(
+  "unlocked project photo metadata remains writable",
+  firestoreRequest("PATCH", `users/${ownerUid}/photoBackups/unlocked-metadata`, {
+    uid: ownerUid,
+    data: {
+      ...validPhotoBackup(ownerUid, "unlocked-metadata"),
+      storagePath: `users/${ownerUid}/backups/photos/unlocked-metadata/okay.jpg`,
+      backupSessionId: "unlocked-metadata",
+      projectId: "unlocked-project",
+      sequence: 1
+    }
+  })
+);
+await expectDenied(
+  "locked project session cannot be used to write metadata under another project",
+  firestoreRequest("PATCH", `users/${ownerUid}/photoBackups/locked-bypass`, {
+    uid: ownerUid,
+    data: {
+      ...validPhotoBackup(ownerUid, "locked-bypass"),
+      storagePath: adminLockedPhotoPath,
+      backupSessionId: "locked-session",
+      projectId: "fake-project",
+      sequence: 1
+    }
+  })
+);
+const adminLockedAdminPath = `users/${ownerUid}/backups/photos/locked-admin/locked.jpg`;
+await seedDoc(`users/${ownerUid}/adminBackupUploadSessions/locked-admin`, {
+  targetUid: ownerUid,
+  adminUid,
+  mediaKind: "image",
+  itemType: "photo",
+  status: "reserved",
+  contentType: "image/jpeg",
+  storagePath: adminLockedAdminPath,
+  fileSize: 3,
+  projectId: adminLockedProjectId,
+  expiresAt: new Date(Date.now() + 60_000)
+});
+await expectDenied(
+  "Storage Rules also block administrator uploads into a locked project",
+  storageRequest("POST", adminLockedAdminPath, {
+    uid: adminUid,
+    contentType: "image/jpeg",
+    metadata: { adminBackupSessionId: "locked-admin" },
+    bytes: new Uint8Array([1, 2, 3])
+  })
+);
+
+
 console.log("ok - Firestore and Storage Rules emulator checks passed");

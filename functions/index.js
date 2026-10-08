@@ -24,6 +24,17 @@ const {
   runSlotReplacement
 } = require("./backup-slot-replacement");
 const {
+  isAdminBackupDestructionEnabled,
+  isAdminFullBackupDeletionEnabled,
+  matchesAdminBackupTargetConfirmation,
+  matchesAdminBackupSlotSnapshot
+} = require("./admin-destructive-safety");
+const {
+  decideAdminSlotReplacement,
+  hasReservedProjectUploads,
+  executeAdminSlotReplacement
+} = require("./admin-backup-replacement");
+const {
   reserveWeeklyVideoExportUsage,
   completeWeeklyVideoExportReservation,
   releaseWeeklyVideoExportReservation
@@ -341,26 +352,37 @@ const assertProjectPhotoBackupCapacity = async ({
   projectId,
   itemId
 }) => {
-  const [photoSnapshot, sessionSnapshot, existingItemSnapshot] =
-    await Promise.all([
-      db
-        .collection(`users/${uid}/photoBackups`)
-        .where("projectId", "==", projectId)
-        .get(),
-      db
-        .collection(`users/${uid}/backupUploadSessions`)
-        .where("projectId", "==", projectId)
-        .get(),
-      typeof itemId === "string" && itemId
-        ? db.doc(`users/${uid}/photoBackups/${itemId}`).get()
-        : Promise.resolve(null)
-    ]);
+  const [
+    photoSnapshot,
+    sessionSnapshot,
+    adminSessionSnapshot,
+    existingItemSnapshot
+  ] = await Promise.all([
+    db
+      .collection(`users/${uid}/photoBackups`)
+      .where("projectId", "==", projectId)
+      .get(),
+    db
+      .collection(`users/${uid}/backupUploadSessions`)
+      .where("projectId", "==", projectId)
+      .get(),
+    db
+      .collection(`users/${uid}/adminBackupUploadSessions`)
+      .where("projectId", "==", projectId)
+      .get(),
+    typeof itemId === "string" && itemId
+      ? db.doc(`users/${uid}/photoBackups/${itemId}`).get()
+      : Promise.resolve(null)
+  ]);
 
   if (existingItemSnapshot?.exists) {
     return;
   }
 
-  const pendingPhotoCount = sessionSnapshot.docs.filter((item) => {
+  const pendingPhotoCount = [
+    ...sessionSnapshot.docs,
+    ...adminSessionSnapshot.docs
+  ].filter((item) => {
     const data = item.data();
     return (
       data.status === "reserved" &&
@@ -1367,6 +1389,14 @@ exports.completeBackupUpload = secureOnCall(async (request) => {
       throw new HttpsError("failed-precondition", "Backup upload session is not active.");
     }
 
+    if ((session.itemType === "photo" || session.itemType === "video") && session.projectId) {
+      await assertBackupProjectSlotAllowed({
+        uid,
+        subscription: await getBackupSubscription(uid),
+        projectId: session.projectId
+      });
+    }
+
     const projectLockRef = session.projectId
       ? db.doc(`users/${uid}/backupProjectLocks/${session.projectId}`)
       : null;
@@ -2010,6 +2040,299 @@ const requireAdminUid = async (request) => {
   return adminUid;
 };
 
+const syncAdminBackupProjectSlotStatuses = async ({ uid, subscription }) => {
+  const slotLimit = getCloudBackupProjectSlotLimit(subscription);
+  const snapshot = await db.collection(`users/${uid}/backupProjectSlots`).get();
+
+  if (snapshot.empty) {
+    return { slotLimit, totalSlots: 0, overLimitSlots: 0 };
+  }
+
+  const batch = db.batch();
+  let overLimitSlots = 0;
+  for (const slot of snapshot.docs) {
+    const slotNumber =
+      Number(slot.data()?.slotNumber) || getBackupProjectSlotNumber(slot.id);
+    const status = slot.data()?.status === "replacing"
+      ? "replacing"
+      : slotNumber >= 1 && slotNumber <= slotLimit ? "active" : "over_limit";
+    if (status === "over_limit") {
+      overLimitSlots += 1;
+    }
+    batch.set(
+      slot.ref,
+      {
+        status,
+        updatedAt: new Date().toISOString()
+      },
+      { merge: true }
+    );
+  }
+  await batch.commit();
+
+  return {
+    slotLimit,
+    totalSlots: snapshot.size,
+    overLimitSlots
+  };
+};
+
+exports.getAdminBackupCapabilities = secureOnCall(async (request) => {
+  await requireAdminUid(request);
+  return {
+    canReplaceProjects: isAdminBackupDestructionEnabled(
+      process.env.FUNCTIONS_ENABLE_ADMIN_BACKUP_DELETION
+    ),
+    canDeleteAll: isAdminFullBackupDeletionEnabled(
+      process.env.FUNCTIONS_ENABLE_ADMIN_BACKUP_DELETION,
+      process.env.FUNCTIONS_ENABLE_ADMIN_FULL_BACKUP_DELETION
+    )
+  };
+});
+
+const assertAdminBackupDestructionAuthorized = (targetUid, confirmationUid) => {
+  if (!isAdminBackupDestructionEnabled(process.env.FUNCTIONS_ENABLE_ADMIN_BACKUP_DELETION)) {
+    throw new HttpsError(
+      "failed-precondition",
+      "관리자 클라우드 백업 삭제 기능은 운영 검증 전까지 비활성화되어 있습니다."
+    );
+  }
+  if (!matchesAdminBackupTargetConfirmation(targetUid, confirmationUid)) {
+    throw new HttpsError(
+      "failed-precondition",
+      "삭제 대상 사용자를 다시 확인한 뒤 요청해 주세요."
+    );
+  }
+};
+
+const assertNoReservedAdminProjectUploads = async (uid, projectId) => {
+  const userRef = db.doc(`users/${uid}`);
+  const [normalUploads, adminUploads] = await Promise.all([
+    userRef.collection("backupUploadSessions").where("projectId", "==", projectId).get(),
+    userRef.collection("adminBackupUploadSessions").where("projectId", "==", projectId).get()
+  ]);
+  if (hasReservedProjectUploads([...normalUploads.docs, ...adminUploads.docs].map((doc) => doc.data()))) {
+    throw new HttpsError("failed-precondition", "해당 프로젝트에 진행 중인 백업 업로드가 있습니다.");
+  }
+};
+
+exports.replaceAdminCloudBackupProject = secureOnCall(async (request) => {
+  try {
+    await requireAdminUid(request);
+    const { targetUid, confirmationUid } = request.data ?? {};
+    const expectedProjectId = normalizeBackupProjectId(request.data?.expectedProjectId);
+    const projectId = normalizeBackupProjectId(request.data?.projectId);
+    const slotId = String(request.data?.slotId ?? "");
+    const slotNumber = getBackupProjectSlotNumber(slotId);
+
+    if (
+      typeof targetUid !== "string" ||
+      !targetUid ||
+      !expectedProjectId ||
+      !projectId ||
+      slotNumber < 1
+    ) {
+      throw new HttpsError(
+        "invalid-argument",
+        "targetUid, expectedProjectId, projectId, slotId are required."
+      );
+    }
+    assertAdminBackupDestructionAuthorized(targetUid, confirmationUid);
+
+    const userSnapshot = await db.doc(`users/${targetUid}`).get();
+    if (!userSnapshot.exists) {
+      throw new HttpsError("not-found", "대상 사용자를 찾을 수 없습니다.");
+    }
+
+    const subscription = await getBackupSubscription(targetUid);
+    if (slotNumber > getCloudBackupProjectSlotLimit(subscription)) {
+      throw new HttpsError(
+        "failed-precondition",
+        "현재 플랜에서 사용할 수 없는 백업 슬롯입니다."
+      );
+    }
+
+    const slotRef = db.doc(`users/${targetUid}/backupProjectSlots/${slotId}`);
+    const lockRef = db.doc(
+      `users/${targetUid}/backupProjectLocks/${expectedProjectId}`
+    );
+    const candidateSlots = Array.from(
+      { length: 5 },
+      (_, index) => db.doc(`users/${targetUid}/backupProjectSlots/slot-${index + 1}`)
+    );
+    const [slotSnapshot, duplicate, nextProject] = await Promise.all([
+      slotRef.get(),
+      getBackupProjectSlotByProject(targetUid, projectId),
+      db.doc(`users/${targetUid}/bodyProjects/${projectId}`).get()
+    ]);
+    if (!slotSnapshot.exists) {
+      throw new HttpsError("not-found", "백업 슬롯을 찾을 수 없습니다.");
+    }
+    if (duplicate && duplicate.id !== slotId) {
+      throw new HttpsError(
+        "already-exists",
+        "다른 슬롯에서 선택한 프로젝트입니다."
+      );
+    }
+
+    const firstDecision = decideAdminSlotReplacement({
+      slot: slotSnapshot.data(),
+      expectedProjectId,
+      projectId
+    });
+    if (firstDecision === "conflict") {
+      throw new HttpsError(
+        "aborted",
+        "슬롯 상태가 이미 변경되었습니다. 새로고침해 주세요."
+      );
+    }
+    if (firstDecision === "unavailable") {
+      throw new HttpsError(
+        "failed-precondition",
+        "슬롯 상태 때문에 교체를 시작할 수 없습니다."
+      );
+    }
+    if (firstDecision === "unchanged") {
+      return {
+        slot: serializeBackupProjectSlot(slotSnapshot),
+        deletedPhotoCount: 0,
+        deletedVideoCount: 0
+      };
+    }
+    if (!nextProject.exists) {
+      throw new HttpsError(
+        "failed-precondition",
+        "새 프로젝트의 클라우드 메타데이터가 없습니다."
+      );
+    }
+
+    // Preflight first; a second check after locking closes the reservation race.
+    if (firstDecision === "begin") {
+      await assertNoReservedAdminProjectUploads(targetUid, expectedProjectId);
+    }
+
+    const outcome = await executeAdminSlotReplacement({
+      begin: async () => db.runTransaction(async (tx) => {
+        const [allSlots, currentLock] = await Promise.all([
+          Promise.all(candidateSlots.map((ref) => tx.get(ref))),
+          tx.get(lockRef)
+        ]);
+        const freshSlot = allSlots.find((snapshot) => snapshot.id === slotId);
+        if (isBackupTargetInOtherSlot(allSlots, slotId, projectId)) {
+          throw new HttpsError(
+            "already-exists",
+            "다른 슬롯에서 이미 이 프로젝트를 선택했거나 교체 대상으로 지정했습니다."
+          );
+        }
+        const decision = decideAdminSlotReplacement({
+          slot: freshSlot.exists ? freshSlot.data() : null,
+          expectedProjectId,
+          projectId
+        });
+        if (decision === "conflict" || decision === "unavailable") {
+          throw new HttpsError(
+            "aborted",
+            "다른 작업에서 슬롯 상태가 변경되었습니다."
+          );
+        }
+
+        if (decision === "begin") {
+          if (currentLock.exists) {
+            throw new HttpsError(
+              "aborted",
+              "이 프로젝트의 백업 변경을 다른 작업이 처리하고 있습니다."
+            );
+          }
+          tx.set(lockRef, {
+            userId: targetUid,
+            projectId: expectedProjectId,
+            targetProjectId: projectId,
+            slotId,
+            operation: "admin",
+            status: "replacing",
+            startedAt: FieldValue.serverTimestamp()
+          });
+          tx.update(slotRef, {
+            status: "replacing",
+            pendingProjectId: projectId,
+            replacementStartedAt: FieldValue.serverTimestamp(),
+            updatedAt: new Date().toISOString()
+          });
+        } else if (
+          decision === "resume" &&
+          (!currentLock.exists ||
+            currentLock.data()?.slotId !== slotId ||
+            currentLock.data()?.operation !== "admin" ||
+            currentLock.data()?.targetProjectId !== projectId)
+        ) {
+          throw new HttpsError(
+            "aborted",
+            "이전 백업 교체의 잠금 정보가 일치하지 않습니다."
+          );
+        }
+        return decision;
+      }),
+      remove: async () => {
+        // A competing reservation may commit before the lock transaction.
+        // Any later reservation/Storage/metadata writes are denied by the lock.
+        await assertNoReservedAdminProjectUploads(targetUid, expectedProjectId);
+        return await deleteBackupProjectCloudData({
+          uid: targetUid,
+          projectId: expectedProjectId
+        });
+      },
+      finalize: async () => db.runTransaction(async (tx) => {
+        const [allSlots, currentLock] = await Promise.all([
+          Promise.all(candidateSlots.map((ref) => tx.get(ref))),
+          tx.get(lockRef)
+        ]);
+        const freshSlot = allSlots.find((snapshot) => snapshot.id === slotId);
+        if (isBackupTargetInOtherSlot(allSlots, slotId, projectId)) {
+          throw new HttpsError(
+            "already-exists",
+            "다른 슬롯에서 이미 이 프로젝트를 선택했거나 교체 대상으로 지정했습니다."
+          );
+        }
+        const state = decideAdminSlotReplacement({
+          slot: freshSlot.exists ? freshSlot.data() : null,
+          expectedProjectId,
+          projectId
+        });
+        if (
+          state !== "resume" ||
+          !currentLock.exists ||
+          currentLock.data()?.slotId !== slotId ||
+          currentLock.data()?.operation !== "admin" ||
+          currentLock.data()?.targetProjectId !== projectId
+        ) {
+          throw new HttpsError(
+            "aborted",
+            "프로젝트 교체 진행 상태가 변경되었습니다."
+          );
+        }
+        tx.set(slotRef, {
+          userId: targetUid,
+          slotNumber,
+          projectId,
+          status: "active",
+          selectedAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          previousProjectId: expectedProjectId
+        });
+        tx.delete(lockRef);
+      })
+    });
+
+    return {
+      slot: serializeBackupProjectSlot(await slotRef.get()),
+      deletedPhotoCount: outcome.deletedPhotoCount,
+      deletedVideoCount: outcome.deletedVideoCount
+    };
+  } catch (error) {
+    throw toHttpsError(error);
+  }
+});
+
 exports.setAdminProductSubscription = secureOnCall(async (request) => {
   try {
     const adminUid = await requireAdminUid(request);
@@ -2177,8 +2500,12 @@ exports.setAdminProductSubscription = secureOnCall(async (request) => {
     });
 
     await batch.commit();
+    const slotStatus = await syncAdminBackupProjectSlotStatuses({
+      uid: targetUid,
+      subscription: effectiveSubscription
+    });
 
-    return { saved: true };
+    return { saved: true, slotStatus };
   } catch (error) {
     throw toHttpsError(error);
   }
@@ -2219,7 +2546,14 @@ const getAdminUploadConfig = ({ targetUid, itemKind, fileName }) => {
   throw new HttpsError("invalid-argument", "Unsupported admin backup item kind.");
 };
 
-const validateAdminUploadRequest = ({ targetUid, itemKind, fileName, fileSize, contentType }) => {
+const validateAdminUploadRequest = ({
+  targetUid,
+  itemKind,
+  fileName,
+  fileSize,
+  contentType,
+  subscription
+}) => {
   if (typeof targetUid !== "string" || !targetUid) {
     throw new HttpsError("invalid-argument", "targetUid is required.");
   }
@@ -2227,11 +2561,7 @@ const validateAdminUploadRequest = ({ targetUid, itemKind, fileName, fileSize, c
   const config = getAdminUploadConfig({ targetUid, itemKind, fileName });
   assertBackupUploadAllowed({
     uid: targetUid,
-    subscription: {
-      plan: "premium",
-      productId: "creator_monthly",
-      status: "active"
-    },
+    subscription,
     usage: {},
     mediaKind: config.mediaKind,
     fileSize,
@@ -2335,34 +2665,82 @@ const refreshAdminBackupOverview = async (uid) => {
 exports.reserveAdminBackupUpload = secureOnCall(async (request) => {
   try {
     const adminUid = await requireAdminUid(request);
-    const { targetUid, itemKind, fileName, fileSize, contentType } = request.data ?? {};
+    const {
+      targetUid,
+      projectId: rawProjectId,
+      itemKind,
+      fileName,
+      fileSize,
+      contentType
+    } = request.data ?? {};
+    const targetUserSnapshot = await db.doc(`users/${targetUid}`).get();
+    if (!targetUserSnapshot.exists) {
+      throw new HttpsError("not-found", "Target user was not found.");
+    }
+
+    const subscription = await getBackupSubscription(targetUid);
     const config = validateAdminUploadRequest({
       targetUid,
       itemKind,
       fileName,
       fileSize,
-      contentType
+      contentType,
+      subscription
     });
-    const targetUserSnapshot = await db.doc(`users/${targetUid}`).get();
-    if (!targetUserSnapshot.exists) {
-      throw new HttpsError("not-found", "Target user was not found.");
+    const projectId =
+      itemKind === "music" ? null : normalizeBackupProjectId(rawProjectId);
+
+    if (itemKind !== "music") {
+      if (!projectId) {
+        throw new HttpsError(
+          "invalid-argument",
+          "사진과 동영상 관리자 업로드에는 projectId가 필요합니다."
+        );
+      }
+      await assertBackupProjectSlotAllowed({
+        uid: targetUid,
+        subscription,
+        projectId
+      });
+      if (itemKind === "image") {
+        await assertProjectPhotoBackupCapacity({
+          uid: targetUid,
+          projectId
+        });
+      }
     }
+
     const sessionRef = db.collection(`users/${targetUid}/adminBackupUploadSessions`).doc();
     const storagePath = config.storagePath(sessionRef.id);
 
-    await sessionRef.set({
-      adminUid,
-      targetUid,
-      itemKind,
-      itemType: config.itemType,
-      mediaKind: config.mediaKind,
-      fileName: sanitizeAdminFileName(fileName),
-      fileSize,
-      contentType,
-      storagePath,
-      status: "reserved",
-      createdAt: FieldValue.serverTimestamp(),
-      expiresAt: admin.firestore.Timestamp.fromMillis(Date.now() + BACKUP_UPLOAD_SESSION_TTL_MS)
+    await db.runTransaction(async (tx) => {
+      if (projectId) {
+        const lockRef = db.doc(
+          `users/${targetUid}/backupProjectLocks/${projectId}`
+        );
+        const activeReplacement = await tx.get(lockRef);
+        if (activeReplacement.exists) {
+          throw new HttpsError(
+            "failed-precondition",
+            "프로젝트 교체 중에는 관리자 백업을 예약할 수 없습니다."
+          );
+        }
+      }
+      tx.set(sessionRef, {
+        adminUid,
+        targetUid,
+        projectId,
+        itemKind,
+        itemType: config.itemType,
+        mediaKind: config.mediaKind,
+        fileName: sanitizeAdminFileName(fileName),
+        fileSize,
+        contentType,
+        storagePath,
+        status: "reserved",
+        createdAt: FieldValue.serverTimestamp(),
+        expiresAt: admin.firestore.Timestamp.fromMillis(Date.now() + BACKUP_UPLOAD_SESSION_TTL_MS)
+      });
     });
 
     return {
@@ -2379,11 +2757,16 @@ exports.completeAdminBackupUpload = secureOnCall(async (request) => {
   try {
     const adminUid = await requireAdminUid(request);
     const { targetUid, uploadSessionId } = request.data ?? {};
-    if (typeof targetUid !== "string" || !targetUid || typeof uploadSessionId !== "string") {
+    if (
+      typeof targetUid !== "string" || !targetUid ||
+      typeof uploadSessionId !== "string" || !uploadSessionId
+    ) {
       throw new HttpsError("invalid-argument", "targetUid and uploadSessionId are required.");
     }
 
-    const sessionRef = db.doc(`users/${targetUid}/adminBackupUploadSessions/${uploadSessionId}`);
+    const sessionRef = db.doc(
+      `users/${targetUid}/adminBackupUploadSessions/${uploadSessionId}`
+    );
     const sessionSnapshot = await sessionRef.get();
     if (!sessionSnapshot.exists) {
       throw new HttpsError("not-found", "Admin upload session was not found.");
@@ -2391,15 +2774,24 @@ exports.completeAdminBackupUpload = secureOnCall(async (request) => {
 
     const session = sessionSnapshot.data();
     if (session.adminUid !== adminUid || session.targetUid !== targetUid) {
-      throw new HttpsError("permission-denied", "Admin upload session does not belong to this request.");
+      throw new HttpsError(
+        "permission-denied",
+        "Admin upload session does not belong to this request."
+      );
     }
-
     if (session.status === "completed") {
       return { itemId: session.itemId, itemType: session.itemType };
     }
-
     if (session.status !== "reserved") {
       throw new HttpsError("failed-precondition", "Admin upload session is not active.");
+    }
+
+    if ((session.itemType === "photo" || session.itemType === "video") && session.projectId) {
+      await assertBackupProjectSlotAllowed({
+        uid: targetUid,
+        subscription: await getBackupSubscription(targetUid),
+        projectId: session.projectId
+      });
     }
 
     const [metadata] = await bucket.file(session.storagePath).getMetadata();
@@ -2408,18 +2800,24 @@ exports.completeAdminBackupUpload = secureOnCall(async (request) => {
       metadata.contentType !== session.contentType ||
       metadata.metadata?.adminBackupSessionId !== uploadSessionId
     ) {
-      throw new HttpsError("failed-precondition", "Uploaded admin backup file does not match the reserved session.");
+      throw new HttpsError(
+        "failed-precondition",
+        "Uploaded admin backup file does not match the reserved session."
+      );
     }
 
     const now = new Date().toISOString();
-    const itemId = `${session.itemType}-${Date.now()}`;
+    const itemId = `${session.itemType}-${Date.now()}-${uploadSessionId}`;
     const safeDownloadUrl = getDownloadUrlFromStorageMetadata({
       storagePath: session.storagePath,
       metadata
     });
 
+    let collectionName;
+    let payload;
     if (session.itemType === "photo") {
-      await db.doc(`users/${targetUid}/photoBackups/${itemId}`).set({
+      collectionName = "photoBackups";
+      payload = {
         id: itemId,
         userId: targetUid,
         localId: itemId,
@@ -2436,10 +2834,12 @@ exports.completeAdminBackupUpload = secureOnCall(async (request) => {
         lastBackedUpAt: now,
         backedUpAt: now,
         sourceDeviceId: "admin",
+        projectId: session.projectId,
         updatedAt: FieldValue.serverTimestamp()
-      });
+      };
     } else if (session.itemType === "video") {
-      await db.doc(`users/${targetUid}/videos/${itemId}`).set({
+      collectionName = "videos";
+      payload = {
         id: itemId,
         userId: targetUid,
         localId: itemId,
@@ -2450,14 +2850,14 @@ exports.completeAdminBackupUpload = secureOnCall(async (request) => {
         fileSize: session.fileSize,
         fileType: session.contentType,
         backupStatus: "backed_up",
-        backupEnabledAt: now,
-        lastBackedUpAt: now,
         backedUpAt: now,
         sourceDeviceId: "admin",
+        projectId: session.projectId,
         updatedAt: FieldValue.serverTimestamp()
-      });
-    } else {
-      await db.doc(`users/${targetUid}/musicTracks/${itemId}`).set({
+      };
+    } else if (session.itemType === "music") {
+      collectionName = "musicTracks";
+      payload = {
         id: itemId,
         userId: targetUid,
         name: session.fileName,
@@ -2467,20 +2867,50 @@ exports.completeAdminBackupUpload = secureOnCall(async (request) => {
         downloadUrl: safeDownloadUrl,
         createdAt: now,
         updatedAt: FieldValue.serverTimestamp()
-      });
+      };
+    } else {
+      throw new HttpsError("invalid-argument", "Unsupported backup item type.");
     }
 
-    await sessionRef.set(
-      {
+    const itemRef = db.doc(`users/${targetUid}/${collectionName}/${itemId}`);
+    const projectLockRef = session.projectId
+      ? db.doc(`users/${targetUid}/backupProjectLocks/${session.projectId}`)
+      : null;
+
+    // Store the backup metadata and consume its upload reservation atomically
+    // with a lock read, preventing the administrator from finalizing a file
+    // after a project deletion has entered "replacing" state.
+    const result = await db.runTransaction(async (tx) => {
+      const [freshSession, projectLock] = await Promise.all([
+        tx.get(sessionRef),
+        projectLockRef ? tx.get(projectLockRef) : Promise.resolve(null)
+      ]);
+      if (!freshSession.exists || freshSession.data()?.adminUid !== adminUid ||
+          freshSession.data()?.targetUid !== targetUid) {
+        throw new HttpsError("permission-denied", "Admin upload session ownership changed.");
+      }
+      if (projectLock?.exists) {
+        throw new HttpsError(
+          "failed-precondition",
+          "프로젝트 교체 중에는 관리자 백업 업로드를 완료할 수 없습니다."
+        );
+      }
+      if (freshSession.data()?.status === "completed") {
+        return { itemId: freshSession.data().itemId, itemType: session.itemType };
+      }
+      if (freshSession.data()?.status !== "reserved") {
+        throw new HttpsError("failed-precondition", "Admin upload reservation is no longer active.");
+      }
+      tx.create(itemRef, payload);
+      tx.update(sessionRef, {
         status: "completed",
         itemId,
         completedAt: FieldValue.serverTimestamp()
-      },
-      { merge: true }
-    );
+      });
+      return { itemId, itemType: session.itemType };
+    });
     await refreshAdminBackupOverview(targetUid);
-
-    return { itemId, itemType: session.itemType };
+    return result;
   } catch (error) {
     throw toHttpsError(error);
   }
@@ -2569,8 +2999,11 @@ exports.setAdminBackupStatus = secureOnCall(async (request) => {
       throw new HttpsError("invalid-argument", "targetUid is required.");
     }
 
-    if (!["expired", "deleted"].includes(status)) {
-      throw new HttpsError("invalid-argument", "Unsupported backup status.");
+    if (status !== "expired") {
+      throw new HttpsError(
+        "invalid-argument",
+        "백업 삭제는 확인 절차가 있는 별도 삭제 API를 사용해 주세요."
+      );
     }
 
     const targetUserSnapshot = await db.doc(`users/${targetUid}`).get();
@@ -2584,18 +3017,11 @@ exports.setAdminBackupStatus = secureOnCall(async (request) => {
       !Number.isNaN(new Date(deleteAfter).getTime())
         ? deleteAfter
         : null;
-    const payload = status === "deleted"
-      ? {
-          status: "deleted",
-          deleteAfter: null,
-          deletedAt: new Date().toISOString(),
-          updatedAt: FieldValue.serverTimestamp()
-        }
-      : {
-          status: "expired",
-          deleteAfter: safeDeleteAfter,
-          updatedAt: FieldValue.serverTimestamp()
-        };
+    const payload = {
+      status: "expired",
+      deleteAfter: safeDeleteAfter,
+      updatedAt: FieldValue.serverTimestamp()
+    };
 
     await db.doc(`users/${targetUid}/backups/current`).set(payload, { merge: true });
     return { status };
@@ -2604,110 +3030,160 @@ exports.setAdminBackupStatus = secureOnCall(async (request) => {
   }
 });
 
-exports.deleteCloudBackupData = secureOnCall(async (request) => {
-  try {
-    const uid = requireUid(request);
-    const userRef = db.doc(`users/${uid}`);
-    const [
-      photoSnapshot,
-      imageWorkSnapshot,
-      videoSnapshot,
-      musicSnapshot,
-      projectSnapshot,
-      sessionSnapshot,
-      projectSlotSnapshot,
-      projectLockSnapshot
-    ] = await Promise.all([
-      userRef.collection("photoBackups").get(),
-      userRef.collection("imageWorks").get(),
-      userRef.collection("videos").get(),
-      userRef.collection("musicTracks").get(),
-      userRef.collection("bodyProjects").get(),
-      userRef.collection("backupUploadSessions").get(),
-      userRef.collection("backupProjectSlots").get(),
-      userRef.collection("backupProjectLocks").get()
-    ]);
+const deleteCloudBackupDataForUser = async (uid) => {
+  const userRef = db.doc(`users/${uid}`);
+  const [
+    photoSnapshot,
+    imageWorkSnapshot,
+    videoSnapshot,
+    musicSnapshot,
+    projectSnapshot,
+    sessionSnapshot,
+    adminSessionSnapshot,
+    projectSlotSnapshot,
+    projectLockSnapshot
+  ] = await Promise.all([
+    userRef.collection("photoBackups").get(),
+    userRef.collection("imageWorks").get(),
+    userRef.collection("videos").get(),
+    userRef.collection("musicTracks").get(),
+    userRef.collection("bodyProjects").get(),
+    userRef.collection("backupUploadSessions").get(),
+    userRef.collection("adminBackupUploadSessions").get(),
+    userRef.collection("backupProjectSlots").get(),
+    userRef.collection("backupProjectLocks").get()
+  ]);
 
-    let imageBackupBytes = 0;
-    const documentDeletes = [
-      ...projectSnapshot.docs,
-      ...sessionSnapshot.docs,
-      ...projectSlotSnapshot.docs,
-      ...projectLockSnapshot.docs
-    ].map((item) => item.ref);
-    const storageDeletes = collectOwnedCloudBackupStoragePaths({
-      uid,
-      photoBackups: photoSnapshot.docs.map((item) => item.data()),
-      imageWorks: imageWorkSnapshot.docs.map((item) => item.data()),
-      videos: videoSnapshot.docs.map((item) => item.data()),
-      musicTracks: musicSnapshot.docs.map((item) => item.data())
-    }).map(deleteStoragePath);
-    storageDeletes.push(...sessionSnapshot.docs.map((item) => deleteOwnedCloudBackupStoragePath(uid, item.data().storagePath)));
+  let imageBackupBytes = 0;
+  const documentDeletes = [
+    ...projectSnapshot.docs,
+    ...sessionSnapshot.docs,
+    ...adminSessionSnapshot.docs,
+    ...projectSlotSnapshot.docs,
+    ...projectLockSnapshot.docs
+  ].map((item) => item.ref);
+  const storageDeletes = collectOwnedCloudBackupStoragePaths({
+    uid,
+    photoBackups: photoSnapshot.docs.map((item) => item.data()),
+    imageWorks: imageWorkSnapshot.docs.map((item) => item.data()),
+    videos: videoSnapshot.docs.map((item) => item.data()),
+    musicTracks: musicSnapshot.docs.map((item) => item.data())
+  }).map(deleteStoragePath);
+  storageDeletes.push(
+    ...sessionSnapshot.docs.map((item) =>
+      deleteOwnedCloudBackupStoragePath(uid, item.data().storagePath)
+    ),
+    ...adminSessionSnapshot.docs.map((item) =>
+      deleteOwnedCloudBackupStoragePath(uid, item.data().storagePath)
+    )
+  );
 
-    for (const item of photoSnapshot.docs) {
-      const data = item.data();
-      imageBackupBytes += Number(data.imageBackupSize ?? data.optimizedSize ?? data.fileSize ?? 0);
-      documentDeletes.push(item.ref);
-    }
+  for (const item of photoSnapshot.docs) {
+    const data = item.data();
+    imageBackupBytes += Number(
+      data.imageBackupSize ?? data.optimizedSize ?? data.fileSize ?? 0
+    );
+    documentDeletes.push(item.ref);
+  }
 
-    for (const item of imageWorkSnapshot.docs) {
-      const data = item.data();
-      imageBackupBytes += Number(data.imageBackupSize ?? 0);
-      documentDeletes.push(item.ref);
-    }
+  for (const item of imageWorkSnapshot.docs) {
+    const data = item.data();
+    imageBackupBytes += Number(data.imageBackupSize ?? 0);
+    documentDeletes.push(item.ref);
+  }
 
-    for (const item of videoSnapshot.docs) {
-      documentDeletes.push(item.ref);
-    }
+  for (const item of videoSnapshot.docs) {
+    documentDeletes.push(item.ref);
+  }
 
-    for (const item of musicSnapshot.docs) {
-      documentDeletes.push(item.ref);
-    }
+  for (const item of musicSnapshot.docs) {
+    documentDeletes.push(item.ref);
+  }
 
-    await Promise.all(storageDeletes);
-    await commitDeleteBatch(documentDeletes);
+  await Promise.all(storageDeletes);
+  await commitDeleteBatch(documentDeletes);
 
-    await Promise.all([
-      userRef.collection("backups").doc("current").set(
-        {
-          userId: uid,
-          status: "deleted",
-          photoCount: 0,
-          imageBundleCount: 0,
-          videoCount: 0,
-          musicCount: 0,
-          imageBackupBytes: 0,
-          settings: FieldValue.delete(),
-          imageBundles: FieldValue.delete(),
-          videos: FieldValue.delete(),
-          backedUpAt: null,
-          deleteAfter: null,
-          deletedAt: new Date().toISOString(),
-          updatedAt: FieldValue.serverTimestamp()
-        },
-        { merge: true }
-      ),
-      getUsageRef(uid).set(
-        {
+  await Promise.all([
+    userRef.collection("backups").doc("current").set(
+      {
+        userId: uid,
+        status: "deleted",
+        photoCount: 0,
+        imageBundleCount: 0,
+        videoCount: 0,
+        musicCount: 0,
+        imageBackupBytes: 0,
+        settings: FieldValue.delete(),
+        imageBundles: FieldValue.delete(),
+        videos: FieldValue.delete(),
+        backedUpAt: null,
+        deleteAfter: null,
+        deletedAt: new Date().toISOString(),
+        updatedAt: FieldValue.serverTimestamp()
+      },
+      { merge: true }
+    ),
+    getUsageRef(uid).set(
+      {
+        imageTotalBytes: 0,
+        videoCount: 0,
+        videoTotalBytes: 0,
+        audioTotalBytes: 0,
+        pendingUsage: {
           imageTotalBytes: 0,
           videoCount: 0,
           videoTotalBytes: 0,
-          audioTotalBytes: 0,
-          pendingUsage: { imageTotalBytes: 0, videoCount: 0, videoTotalBytes: 0, audioTotalBytes: 0 },
-          updatedAt: FieldValue.serverTimestamp()
+          audioTotalBytes: 0
         },
-        { merge: true }
-      )
-    ]);
+        updatedAt: FieldValue.serverTimestamp()
+      },
+      { merge: true }
+    )
+  ]);
 
-    return {
-      photoCount: photoSnapshot.size,
-      imageBundleCount: imageWorkSnapshot.size,
-      videoCount: videoSnapshot.size,
-      musicCount: musicSnapshot.size,
-      imageBackupBytes,
-      deleteAfter: null
-    };
+  return {
+    photoCount: photoSnapshot.size,
+    imageBundleCount: imageWorkSnapshot.size,
+    videoCount: videoSnapshot.size,
+    musicCount: musicSnapshot.size,
+    imageBackupBytes,
+    deleteAfter: null
+  };
+};
+
+exports.deleteCloudBackupData = secureOnCall(async (request) => {
+  try {
+    return await deleteCloudBackupDataForUser(requireUid(request));
+  } catch (error) {
+    throw toHttpsError(error);
+  }
+});
+
+exports.deleteAdminCloudBackupData = secureOnCall(async (request) => {
+  try {
+    await requireAdminUid(request);
+    const { targetUid, confirmationUid } = request.data ?? {};
+    if (typeof targetUid !== "string" || !targetUid) {
+      throw new HttpsError("invalid-argument", "targetUid is required.");
+    }
+
+    assertAdminBackupDestructionAuthorized(targetUid, confirmationUid);
+    if (!isAdminFullBackupDeletionEnabled(
+      process.env.FUNCTIONS_ENABLE_ADMIN_BACKUP_DELETION,
+      process.env.FUNCTIONS_ENABLE_ADMIN_FULL_BACKUP_DELETION
+    )) {
+      throw new HttpsError(
+        "failed-precondition",
+        "전체 클라우드 삭제는 별도의 운영 승인 후에만 사용할 수 있습니다."
+      );
+    }
+
+    const targetUserSnapshot = await db.doc(`users/${targetUid}`).get();
+    if (!targetUserSnapshot.exists) {
+      throw new HttpsError("not-found", "Target user was not found.");
+    }
+
+    return await deleteCloudBackupDataForUser(targetUid);
   } catch (error) {
     throw toHttpsError(error);
   }

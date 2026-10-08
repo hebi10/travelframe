@@ -371,6 +371,9 @@ service cloud.firestore {
         || projectBackupUnlocked(userId, request.resource.data.projectId);
     }
 
+    // Older pre-project sessions are permitted to preserve saved photo upgrades.
+    // New project-linked sessions cannot be used to write records outside
+    // their project or bypass an administrator's in-progress replacement.
     function backupUploadProjectMatches(userId) {
       let session = backupUploadSession(
         userId, request.resource.data.backupSessionId
@@ -573,7 +576,8 @@ service cloud.firestore {
       allow delete: if false;
 
       match /bodyProjects/{projectId} {
-        allow read, delete: if isOwner(userId);
+        allow read: if isOwner(userId) || isAdmin();
+        allow delete: if isOwner(userId);
         allow create, update: if isOwner(userId)
           && request.resource.data.keys().hasOnly(["id", "userId", "name", "createdAt", "updatedAt", "targetPhotoCount", "referenceMode", "coverPhotoId", "archived"])
           && request.resource.data.id == projectId

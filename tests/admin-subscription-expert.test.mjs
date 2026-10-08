@@ -3,6 +3,7 @@ import fs from "node:fs";
 
 const adminSource = fs.readFileSync(new URL("../admin/admin.js", import.meta.url), "utf8");
 const adminHtml = fs.readFileSync(new URL("../admin/index.html", import.meta.url), "utf8");
+const functionsSource = fs.readFileSync(new URL("../functions/index.js", import.meta.url), "utf8");
 
 for (const snippet of [
   "plus_monthly: {",
@@ -69,5 +70,27 @@ assert.ok(
     adminSource.includes("await setAdminProductSubscription({"),
   "admin subscription saves should stay on the callable flow"
 );
+
+for (const snippet of [
+  "const adminPlanPolicies = {",
+  'maxCloudBackupProjects: 1',
+  'maxCloudBackupProjects: 3',
+  'maxCloudBackupProjects: 5',
+  'id="currentPlanEntitlements"',
+  'id="selectedPlanEntitlementPreview"'
+]) {
+  assert.ok(
+    adminSource.includes(snippet) || adminHtml.includes(snippet),
+    `admin plan entitlement summary missing: ${snippet}`
+  );
+}
+for (const snippet of [
+  "ADMIN_MONTHLY_PRODUCT_IDS",
+  "shouldSwitchMonthlyPlan",
+  "syncAdminBackupProjectSlotStatuses",
+  '"over_limit"'
+]) {
+  assert.ok(functionsSource.includes(snippet), `admin monthly plan guard missing: ${snippet}`);
+}
 
 console.log("ok - admin subscription UI supports one-time ad removal and all monthly plan tiers");

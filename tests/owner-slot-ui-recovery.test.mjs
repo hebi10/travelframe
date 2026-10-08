@@ -15,7 +15,10 @@ test("replacing project slots are excluded from automatic backups and shown as r
 
 test("backup removal also clears project replacement locks", () => {
   const server = fs.readFileSync("functions/index.js", "utf8");
-  const deletion = server.slice(server.indexOf("exports.deleteCloudBackupData = secureOnCall("));
+  const sharedDelete = server.indexOf("const deleteCloudBackupDataForUser = async (uid) =>");
+  const deletion = sharedDelete >= 0
+    ? server.slice(sharedDelete, server.indexOf("exports.deleteCloudBackupData =", sharedDelete))
+    : server.slice(server.indexOf("exports.deleteCloudBackupData = secureOnCall("));
   assert.ok(deletion.includes('collection("backupProjectLocks").get()'));
   assert.ok(deletion.includes("...projectLockSnapshot.docs"));
 });
