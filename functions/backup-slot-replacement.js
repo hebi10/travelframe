@@ -11,14 +11,25 @@ const decideSlotReplacement = ({ slot, previousProjectId, projectId }) => {
   return previousProjectId === projectId ? "unchanged" : "begin";
 };
 
-const chooseBackupProjectSlot = (snapshots, projectId) => {
+const chooseBackupProjectSlot = (snapshots, projectId, maxSlots = snapshots.length) => {
   const existing = snapshots.find(
     (snapshot) => snapshot.exists && snapshot.data()?.projectId === projectId
   );
   if (existing) return { slot: existing, action: "existing" };
-  const available = snapshots.find((snapshot) => !snapshot.exists);
+  const pending = snapshots.find(
+    (snapshot) => snapshot.exists && snapshot.data()?.pendingProjectId === projectId
+  );
+  if (pending) return { slot: pending, action: "reserved" };
+  const available = snapshots.slice(0, maxSlots).find((snapshot) => !snapshot.exists);
   return available ? { slot: available, action: "create" } : null;
 };
+
+const isBackupTargetInOtherSlot = (snapshots, slotId, projectId) =>
+  snapshots.some(
+    (snapshot) => snapshot.exists && snapshot.id !== slotId &&
+      (snapshot.data()?.projectId === projectId ||
+       snapshot.data()?.pendingProjectId === projectId)
+  );
 
 const hasBlockingUploads = (sessions, now = Date.now()) =>
   sessions.some((session) => {
@@ -46,6 +57,7 @@ const runSlotReplacement = async ({ begin, remove, finalize }) => {
 module.exports = {
   decideSlotReplacement,
   chooseBackupProjectSlot,
+  isBackupTargetInOtherSlot,
   hasBlockingUploads,
   runSlotReplacement
 };

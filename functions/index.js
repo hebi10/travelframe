@@ -19,6 +19,7 @@ const { ensurePrivateStorageDownload, buildStorageDownloadUrl } = require("./pri
 const {
   decideSlotReplacement,
   chooseBackupProjectSlot,
+  isBackupTargetInOtherSlot,
   hasBlockingUploads,
   runSlotReplacement
 } = require("./backup-slot-replacement");
@@ -425,13 +426,19 @@ exports.selectCloudBackupProject = secureOnCall(async (request) => {
     // never overwrite an existing slot and orphan its cloud backup data.
     const selectedSlotRef = await db.runTransaction(async (tx) => {
       const candidateRefs = Array.from(
-        { length: slotLimit },
+        { length: 5 },
         (_, index) => slotsRef.doc(`slot-${index + 1}`)
       );
       const candidates = await Promise.all(
         candidateRefs.map((ref) => tx.get(ref))
       );
-      const chosen = chooseBackupProjectSlot(candidates, projectId);
+      const chosen = chooseBackupProjectSlot(candidates, projectId, slotLimit);
+      if (chosen?.action === "reserved") {
+        throw new HttpsError(
+          "already-exists",
+          "이 프로젝트는 다른 슬롯의 교체 대상으로 지정되어 있습니다."
+        );
+      }
       if (!chosen) {
         throw new HttpsError(
           "resource-exhausted",
@@ -561,14 +568,26 @@ exports.replaceCloudBackupProject = secureOnCall(async (request) => {
     }
 
     const lockRef = db.doc(`users/${uid}/backupProjectLocks/${previousProjectId}`);
+    const candidateSlots = Array.from(
+      { length: 5 },
+      (_, index) => db.doc(`users/${uid}/backupProjectSlots/slot-${index + 1}`)
+    );
     if (initial === "begin") {
       await assertNoReservedProjectUploads(uid, previousProjectId);
     }
     const outcome = await runSlotReplacement({
       begin: async () => db.runTransaction(async (tx) => {
-        const [slotSnapshot, lockSnapshot] = await Promise.all([
-          tx.get(slotRef), tx.get(lockRef)
+        const [allSlots, lockSnapshot] = await Promise.all([
+          Promise.all(candidateSlots.map((ref) => tx.get(ref))),
+          tx.get(lockRef)
         ]);
+        const slotSnapshot = allSlots.find((snapshot) => snapshot.id === slotId);
+        if (isBackupTargetInOtherSlot(allSlots, slotId, projectId)) {
+          throw new HttpsError(
+            "already-exists",
+            "다른 슬롯이 같은 프로젝트를 선택했거나 교체 대상으로 지정했습니다."
+          );
+        }
         const decision = decideSlotReplacement({
           slot: slotSnapshot.exists ? slotSnapshot.data() : null,
           previousProjectId,
@@ -616,9 +635,17 @@ exports.replaceCloudBackupProject = secureOnCall(async (request) => {
         });
       },
       finalize: async () => db.runTransaction(async (tx) => {
-        const [slotSnapshot, lockSnapshot] = await Promise.all([
-          tx.get(slotRef), tx.get(lockRef)
+        const [allSlots, lockSnapshot] = await Promise.all([
+          Promise.all(candidateSlots.map((ref) => tx.get(ref))),
+          tx.get(lockRef)
         ]);
+        const slotSnapshot = allSlots.find((snapshot) => snapshot.id === slotId);
+        if (isBackupTargetInOtherSlot(allSlots, slotId, projectId)) {
+          throw new HttpsError(
+            "already-exists",
+            "다른 슬롯이 같은 프로젝트를 선택했거나 교체 대상으로 지정했습니다."
+          );
+        }
         const state = decideSlotReplacement({
           slot: slotSnapshot.exists ? slotSnapshot.data() : null,
           previousProjectId,
