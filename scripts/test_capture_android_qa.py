@@ -118,6 +118,65 @@ class CaptureHelpersTest(unittest.TestCase):
         self.assertEqual(device.open_control('settings',['MODAL']),present)
         self.assertEqual(device.tap.call_count,1)
 
+    def test_focused_input_is_cleared_with_move_end_and_forty_delete_events(self):
+        initial='<hierarchy><node class="android.widget.EditText" focused="true" text="새 프로젝트"/></hierarchy>'
+        exact='<hierarchy><node class="android.widget.EditText" focused="true" text="QA_keyboard_large_font"/></hierarchy>'
+        device=Mock();device.dump=Mock(side_effect=[initial,exact])
+        result=qa.replace_focused_input(device,'QA_keyboard_large_font')
+        self.assertTrue(result['inputExactlySet'])
+        self.assertEqual(device.shell.call_args_list[0].args,('input','keyevent','KEYCODE_MOVE_END'))
+        self.assertEqual(device.shell.call_args_list[1].args,('input','keyevent',*(['KEYCODE_DEL']*40)))
+        self.assertEqual(device.shell.call_args_list[2].args,('input','text','QA_keyboard_large_font'))
+
+    def test_focused_input_rejects_retained_default_prefix(self):
+        xml='<hierarchy><node class="android.widget.EditText" focused="true" text="새 프로젝트QA_keyboard_large_font"/></hierarchy>'
+        device=Mock();device.dump=Mock(return_value=xml)
+        with self.assertRaises(RuntimeError):qa.replace_focused_input(device,'QA_keyboard_large_font')
+
+    def test_creation_submission_requires_exact_persisted_name(self):
+        import json
+        device=Mock();device.shell.return_value='mInputShown=false';device.storage.return_value={'body-frame.projects.v1':json.dumps([{'name':'새 프로젝트QA_keyboard_large_font'}])}
+        with self.assertRaises(RuntimeError):qa.creation_submit(device)
+
+    def test_viewport_uses_observed_gesture_bar_instead_of_three_button_assumption(self):
+        state='InsetsSource: {mType=statusBars mFrame=[0,0][720,48] mVisible=true}\nInsetsSource: {mType=navigationBars mFrame=[0,1552][720,1600] mVisible=true}'
+        self.assertEqual(qa.usable_viewport(720,1600,320,state),(0,48,720,1552))
+        xml='<hierarchy><node content-desc="적용" clickable="true" enabled="true" bounds="[372,1456][688,1552]"/></hierarchy>'
+        self.assertEqual(qa.target_bounds(xml,'적용',viewport=qa.usable_viewport(720,1600,320,state)),(530,1504))
+
+    def test_fresh_muxer_gate_requires_marker_current_pid_and_fresh_ready_sequence(self):
+        line=lambda pid,tag,text:f'11-03 03:45:26.264 {pid} 9744 D {tag}: {text}\n'
+        old=line(8522,'ViewRecorder','Session vr_1_same ready')+line(8522,'ViewRecorder','Muxer started for session vr_1_same')
+        marker=line(9999,'BodyFrameQA','UNIQUE_BEGIN')
+        fresh=line(8522,'CCodec','allocate(c2.android.avc.encoder)')+line(8522,'ViewRecorder','Session vr_1_same ready')+line(8522,'ViewRecorder','Muxer started for session vr_1_same')
+        self.assertIsNone(qa.fresh_muxer_evidence(old+marker,8522,'UNIQUE_BEGIN'))
+        self.assertEqual(qa.fresh_muxer_evidence(old+marker+fresh,8522,'UNIQUE_BEGIN')['session'],'vr_1_same')
+        self.assertIsNone(qa.fresh_muxer_evidence(marker+fresh,1234,'UNIQUE_BEGIN'))
+        self.assertIsNone(qa.fresh_muxer_evidence(marker+fresh+line(8522,'ViewRecorder','Finishing session vr_1_same (90 frames)'),8522,'UNIQUE_BEGIN'))
+
+    def test_native_option_footer_must_be_fully_visible_and_scroll_container_present(self):
+        xml='<hierarchy><node class="android.widget.ScrollView" package="com.haebi.photoguide"/><node content-desc="취소" clickable="true" enabled="true" bounds="[32,1456][348,1552]"/><node content-desc="적용" clickable="true" enabled="true" bounds="[372,1456][688,1552]"/></hierarchy>'
+        self.assertTrue(qa.option_sheet_evidence(xml,(0,48,720,1552))['footerFullyVisible'])
+        with self.assertRaises(RuntimeError):qa.option_sheet_evidence(xml.replace('[372,1456][688,1552]','[372,1563][688,1600]'),(0,48,720,1552))
+
+    def test_camera_header_hint_must_not_overlap_project_progress(self):
+        old='<hierarchy><node text="3 / 100 · 0.3초" bounds="[162,162][558,232]"/><node text="오늘 4번째 기록" bounds="[282,190][437,224]"/></hierarchy>'
+        with self.assertRaises(RuntimeError):qa.camera_header_evidence(old)
+        self.assertTrue(qa.camera_header_evidence(old.replace('[282,190][437,224]','[282,240][437,274]'))['disjoint'])
+
+    def test_no_scrollable_content_never_swipes_a_dismissing_modal_backdrop(self):
+        device=qa.Device();device.dump=Mock(return_value='<hierarchy><node clickable="true" bounds="[0,0][720,1600]"/></hierarchy>');device.shell=Mock()
+        self.assertFalse(device.scroll_down())
+        device.shell.assert_not_called()
+
+    def test_submission_dismisses_real_keyboard_before_scrolling_and_exact_persistence_check(self):
+        import json
+        device=Mock();device.shell.side_effect=['mInputShown=true','','mInputShown=false']
+        device.storage.return_value={'body-frame.projects.v1':json.dumps([{'id':'created','name':'QA_keyboard_large_font'}])}
+        evidence=qa.creation_submit(device)
+        self.assertTrue(evidence['projectPersisted']);self.assertTrue(evidence['keyboardDismissedForSubmit'])
+        self.assertIn(('input','keyevent','KEYCODE_BACK'),[call.args for call in device.shell.call_args_list])
+
 
 if __name__ == '__main__':
     unittest.main()

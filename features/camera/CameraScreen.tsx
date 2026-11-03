@@ -190,6 +190,7 @@ type CameraScreenProps = {
   projectReferenceMode?: "first" | "latest";
   onProjectReferenceModeChange?: (projectId: string, mode: "first" | "latest") => Promise<void>;
   headerCenter?: ReactNode;
+  onHeaderBottomChange?: (bottom: number) => void;
 };
 
 const CAMERA_PERMISSION_RECOVERY_TIMEOUT_MS = 3_000;
@@ -198,7 +199,8 @@ const CAMERA_PERMISSION_RECOVERY_POLL_MS = 50;
 export default function CameraScreen({
   projectReferenceMode = "latest",
   onProjectReferenceModeChange,
-  headerCenter
+  headerCenter,
+  onHeaderBottomChange
 }: CameraScreenProps = {}) {
   const [isReferenceModeChanging, setIsReferenceModeChanging] = useState(false);
   const referenceModeChangeInProgressRef = useRef(false);
@@ -1891,7 +1893,8 @@ export default function CameraScreen({
     setCameraTopBarHeight((currentHeight) =>
       currentHeight === nextHeight ? currentHeight : nextHeight
     );
-  }, []);
+    onHeaderBottomChange?.(Math.ceil(event.nativeEvent.layout.y + event.nativeEvent.layout.height));
+  }, [onHeaderBottomChange]);
 
   const handleCameraBottomTrayLayout = useCallback((event: LayoutChangeEvent) => {
     const nextHeight = Math.ceil(event.nativeEvent.layout.height);

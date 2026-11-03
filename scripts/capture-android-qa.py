@@ -21,6 +21,7 @@ import struct
 import subprocess
 import tempfile
 import time
+import uuid
 from urllib.parse import urlencode, unquote, urlparse
 import xml.etree.ElementTree as ET
 
@@ -185,6 +186,74 @@ def target_bounds(xml, label, match='exact', viewport=None):
     raise RuntimeError(f'Exact enabled clickable control not found: {label}')
 
 
+
+def usable_viewport(width,height,density,window_state):
+    # Actual InsetsState is authoritative; gesture-navigation fallback matches
+    # this Pixel2 API35 runner when a system build omits dumpable inset sources.
+    top=round(24*density/160);bottom=height-round(24*density/160)
+    for line in window_state.splitlines():
+        if re.search(r'(?:mVisible|visible)=false',line):continue
+        kind='status' if re.search(r'(?:mType|type)=statusBars',line) else 'nav' if re.search(r'(?:mType|type)=navigationBars',line) else None
+        if not kind:continue
+        match=re.search(r'(?:mFrame|frame)=\[(\d+),(\d+)\]\[(\d+),(\d+)\]',line)
+        if not match:continue
+        x1,y1,x2,y2=map(int,match.groups())
+        if x1!=0 or x2!=width:continue
+        if kind=='status' and y1==0 and 0<y2<height/4:top=y2
+        if kind=='nav' and y2==height and height*.75<y1<height:bottom=y1
+    return (0,top,width,bottom)
+
+
+def option_sheet_evidence(xml,viewport,require_scroll=True):
+    root=ET.fromstring(xml);buttons={}
+    for label in ['취소','적용']:
+        target_bounds(xml,label,viewport=viewport)
+        for node in root.iter('node'):
+            if node.get('clickable')=='true' and node.get('enabled')=='true' and label in (node.get('text'),node.get('content-desc')):
+                values=list(map(int,re.findall(r'\d+',node.get('bounds',''))))
+                if len(values)==4 and viewport[0]<=values[0]<values[2]<=viewport[2] and viewport[1]<=values[1]<values[3]<=viewport[3]:
+                    buttons[label]=values;break
+        if label not in buttons:raise RuntimeError(f'Option footer lacks full positive visible bounds: {label}')
+    scroll=any('ScrollView' in node.get('class','') or 'RecyclerView' in node.get('class','') for node in root.iter('node'))
+    if require_scroll and not scroll:raise RuntimeError('Option content lacks its bounded native scroll container')
+    return dict(footerFullyVisible=True,footerBounds=buttons,usableViewport=viewport,scrollContainerPresent=scroll)
+
+
+def camera_header_evidence(xml):
+    progress=hint=None
+    for node in ET.fromstring(xml).iter('node'):
+        text=node.get('text','');bounds=list(map(int,re.findall(r'\d+',node.get('bounds',''))))
+        if len(bounds)!=4:continue
+        if re.search(r'\d+\s*/\s*\d+\s*·.*초',text):progress=bounds
+        if re.search(r'오늘\s+\d+번째 기록',text):hint=bounds
+    if not progress or not hint:raise RuntimeError('Camera project progress/hint bounds are unavailable')
+    if hint[1]<progress[3]:raise RuntimeError(f'Camera hint overlaps project progress: {progress}, {hint}')
+    return dict(disjoint=True,progressBounds=progress,hintBounds=hint)
+
+
+def fresh_muxer_evidence(logs,app_pid,marker):
+    """Accept fresh ordered events, even when a mounted recorder reuses its ID."""
+    active=False;encoder=False;ready={};muxers={};settled=set()
+    line_pattern=re.compile(r'^\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\.\d+\s+(\d+)\s+\d+\s+[VDIWEF]\s+([^:]+):\s*(.*)$')
+    for line in logs.splitlines():
+        match=line_pattern.match(line)
+        if not match:continue
+        pid,tag,message=match.groups();tag=tag.strip()
+        if tag=='BodyFrameQA' and message==marker:
+            active=True;encoder=False;ready={};muxers={};settled=set();continue
+        if not active or int(pid)!=int(app_pid):continue
+        if re.search(r'(?:CCodec|ACodec|MediaCodec)',tag) and re.search(r'encoder',message,re.I):encoder=True
+        begin=re.search(r'Session (vr_[A-Za-z0-9_-]+) ready',message)
+        if tag=='ViewRecorder' and begin and encoder:ready[begin[1]]=line
+        output=re.search(r'Muxer started for session (vr_[A-Za-z0-9_-]+)',message)
+        if tag=='ViewRecorder' and output and output[1] in ready:muxers[output[1]]=line
+        finish=re.search(r'(?:Finishing session |Session )(vr_[A-Za-z0-9_-]+)(?:.*(?:frames|cancelled|complete|failed))',message)
+        if tag=='ViewRecorder' and finish:settled.add(finish[1])
+    for session,line in muxers.items():
+        if session not in settled:return dict(session=session,readyLine=ready[session],muxerLine=line,marker=marker,appPid=int(app_pid))
+    return None
+
+
 class Device:
     def __init__(self, serial=None):
         self.prefix = ['adb'] + (['-s', serial] if serial else [])
@@ -231,8 +300,7 @@ class Device:
     def viewport(self):
         w,h=map(int,re.findall(r'(\d+)x(\d+)',self.shell('wm','size'))[-1])
         density=int(re.findall(r'\d+',self.shell('wm','density'))[-1])
-        # Fixed Pixel2 API35 profile uses24dp status and48dp three-button bars.
-        return (0,round(24*density/160),w,h-round(48*density/160))
+        return usable_viewport(w,h,density,self.shell('dumpsys','window','displays',check=False))
 
     def find_control(self, label, match='exact'):
         viewport=self.viewport()
@@ -242,7 +310,7 @@ class Device:
                 return x, y
             except RuntimeError as error:
                 if attempt == 6:raise
-                self.scroll_down(reverse=(error.direction=='up') if isinstance(error,ControlOutsideViewport) else attempt>=3)
+                if not self.scroll_down(reverse=(error.direction=='up') if isinstance(error,ControlOutsideViewport) else attempt>=3):raise error
 
     def scroll_down(self,reverse=False):
         root=ET.fromstring(self.dump())
@@ -254,12 +322,13 @@ class Device:
         if areas:
             x1,y1,x2,y2=max(areas,key=lambda b:(b[2]-b[0])*(b[3]-b[1]))
         else:
-            w,h=map(int,re.findall(r'(\d+)x(\d+)',self.shell('wm','size'))[-1]);x1,y1,x2,y2=0,0,w,int(h*.65)
+            return False  # Never turn a missing/clipped footer into a swipe on its dismissing backdrop.
         x=(x1+x2)//2
         start=int(y1+(y2-y1)*.85);end=int(y1+(y2-y1)*.25)
         if reverse:start,end=end,start
         self.shell('input','swipe',x,start,x,end,350)
         time.sleep(.5)
+        return True
 
     def storage(self):
         # Read a snapshot without stopping/restarting the app or changing its quota.
@@ -328,6 +397,12 @@ def capture(device, directory, name, route, expected, action=None, open_route=Tr
                 device.ready(action[0])
                 device.open_control(action[1],expected,match=action[2] if len(action)>2 else 'exact')
         xml = device.ready(expected)
+        if name=='video-overlay':
+            device.find_control('우측 하단')
+            xml=device.ready(expected)
+        if name in {'video-photos','video-interval','video-quality','video-ratio','video-overlay'}:
+            record['optionSheetEvidence']=option_sheet_evidence(xml,device.viewport(),require_scroll=name=='video-overlay')
+        if name=='camera':record['cameraHeaderEvidence']=camera_header_evidence(xml)
         foreground = device.shell('dumpsys', 'activity', 'activities')
         resumed = '\n'.join(line for line in foreground.splitlines() if 'ResumedActivity' in line or 'topResumedActivity' in line)
         if PACKAGE not in resumed:
@@ -353,6 +428,25 @@ def capture(device, directory, name, route, expected, action=None, open_route=Tr
 
 
 
+
+def replace_focused_input(device,value):
+    """Replace the whole40-character project field, then verify native exact text."""
+    def focused_value(xml):
+        for node in ET.fromstring(xml).iter('node'):
+            if node.get('class')=='android.widget.EditText' and node.get('focused')=='true':
+                return node.get('text','')
+        raise RuntimeError('Expected project EditText is not focused')
+    focused_value(device.dump())
+    device.shell('input','keyevent','KEYCODE_MOVE_END')
+    device.shell('input','keyevent',*(['KEYCODE_DEL']*40))
+    device.shell('input','text',value)
+    for attempt in range(3):
+        actual=focused_value(device.dump())
+        if actual==value:return dict(inputExactlySet=True,value=value)
+        if attempt<2:time.sleep(.2)
+    raise RuntimeError(f'Project input did not exactly match the requested synthetic name: {actual!r}')
+
+
 def creation_keyboard(device):
     device.ready(['프로젝트별 몸의 변화를'])
     device.tap('새 프로젝트 만들기')
@@ -363,11 +457,11 @@ def creation_keyboard(device):
             x1, y1, x2, y2 = map(int, re.findall(r'\d+', node.get('bounds', '')))
             device.shell('input', 'tap', (x1+x2)//2, (y1+y2)//2)
             time.sleep(2)
-            device.shell('input', 'text', 'QA_keyboard_large_font')
+            evidence=replace_focused_input(device,'QA_keyboard_large_font')
             state = device.shell('dumpsys', 'input_method')
             if not re.search(r'(?:mInputShown|isInputViewShown|mIsInputViewShown)=true', state):
                 raise RuntimeError('Project input focus did not show the native keyboard')
-            return
+            return dict(evidence,keyboardShown=True)
     raise RuntimeError('Project name input not found')
 
 
@@ -418,12 +512,21 @@ def validate_video_probe(probe):
 
 def creation_submit(device):
     # Continue from the keyboard screenshot. No reseed/restart before submission.
+    ime=device.shell('dumpsys','input_method')
+    keyboard_was_shown=bool(re.search(r'(?:mInputShown|isInputViewShown|mIsInputViewShown)=true',ime))
+    if keyboard_was_shown:
+        device.shell('input','keyevent','KEYCODE_BACK')
+        deadline=time.monotonic()+8
+        while re.search(r'(?:mInputShown|isInputViewShown|mIsInputViewShown)=true',device.shell('dumpsys','input_method')):
+            if time.monotonic()>deadline:raise RuntimeError('Native keyboard did not dismiss before submission scrolling')
+            time.sleep(.2)
+    device.ready(['프로젝트 이름','목표 기록 수'])
     device.tap('프로젝트 만들기')
     device.ready(['QA_keyboard_large_font'])
     projects=json.loads(device.storage().get('body-frame.projects.v1','[]'))
-    if len(projects)!=1 or 'QA_keyboard_large_font' not in projects[0].get('name',''):
+    if len(projects)!=1 or projects[0].get('name')!='QA_keyboard_large_font':
         raise RuntimeError('Large-font keyboard form did not persist the newly created project')
-    return dict(projectPersisted=True,project=projects[0])
+    return dict(projectPersisted=True,project=projects[0],keyboardDismissedForSubmit=keyboard_was_shown)
 
 
 def no_export_side_effects(before, after):
@@ -454,44 +557,41 @@ def set_interval(device, value):
 
 
 def background_during_native_encoder(device, directory):
-    """Observe a real encoder start before HOME; absence of evidence is a failure."""
+    """Observe fresh app encoder/session/muxer events before sending HOME."""
     pid=device.shell('pidof',PACKAGE).strip()
-    if not re.fullmatch(r'\d+',pid): raise RuntimeError('Cannot identify the running app process')
+    if not re.fullmatch(r'\d+',pid):raise RuntimeError('Cannot identify the running app process')
     x,y=device.find_control('영상 만들기')
-    monitor=subprocess.Popen([*device.prefix,'logcat','-v','brief','-T','1','--pid='+pid],stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
-    evidence=bytearray();seen_encoder=False;observed=False
-    start=time.monotonic()
+    marker='QA_EXPORT_BEGIN_'+uuid.uuid4().hex
+    # The shell-PID marker must be observable; filter app PID inside the parser.
+    monitor=subprocess.Popen([*device.prefix,'logcat','-b','main','-v','threadtime','-T','1'],stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
+    evidence=bytearray();observed=None
     try:
-        device.shell('input','tap',x,y)  # No fixed sleep: watch the actual MediaCodec state.
+        device.shell('log','-p','i','-t','BodyFrameQA',marker)
+        start=time.monotonic()
+        device.shell('input','tap',x,y)
         while time.monotonic()-start<2.5:
             if select.select([monitor.stdout],[],[],.05)[0]:
                 chunk=os.read(monitor.stdout.fileno(),65536)
-                if not chunk: break
+                if not chunk:break
                 evidence.extend(chunk)
-                text=evidence.decode(errors='replace')
-                seen_encoder=seen_encoder or bool(re.search(r'(?:CCodec|ACodec|MediaCodec).*encoder',text,re.I))
-                if seen_encoder and re.search(r'(?:CCodec|ACodec|MediaCodec|CCodecBufferChannel).*?(?:start:|set\(RUNNING\)|Now Executing|state.*STARTING)',text,re.I):
-                    observed=True
+                observed=fresh_muxer_evidence(evidence.decode(errors='replace'),int(pid),marker)
+                if observed:
                     device.shell('input','keyevent','KEYCODE_HOME')
                     background_sent_after=time.monotonic()-start
                     break
-        if not observed: raise RuntimeError('No active native encoder-start evidence before background deadline; cancellation case not proven')
+        if not observed:raise RuntimeError('No fresh in-flight app encoder/ready/muxer sequence before background deadline; cancellation case not proven')
         (directory/'video-background-home.png').write_bytes(device.run('exec-out','screencap','-p',binary=True))
         (directory/'video-background-home.xml').write_text(device.dump())
-        # Resume the existing Activity without a deep-link remount that could discard
-        # the cancelled screen's terminal message. The final retry may remount later.
         device.shell('am','start','-W','-a','android.intent.action.MAIN','-c','android.intent.category.LAUNCHER','-n',PACKAGE+'/.MainActivity')
         now=device.shell('pidof',PACKAGE).strip()
-        if now!=pid: raise RuntimeError('Background recovery restarted the process instead of preserving the native guard')
+        if now!=pid:raise RuntimeError('Background recovery restarted the process instead of preserving the native guard')
         strings=wait_export_terminal(device,['영상 만들기가 취소되었습니다'])
-        return dict(encoderStartObserved=True,backgroundWithinSeconds=round(background_sent_after,3),
+        return dict(encoderStartObserved=True,nativeStartEvidence=observed,backgroundWithinSeconds=round(background_sent_after,3),
                     pidBefore=pid,pidAfter=now,terminalText=strings)
     finally:
         monitor.terminate()
-        try:
-            remainder=monitor.communicate(timeout=3)[0]
-            evidence.extend(remainder or b'')
-        except subprocess.TimeoutExpired: monitor.kill();monitor.communicate()
+        try:evidence.extend(monitor.communicate(timeout=3)[0] or b'')
+        except subprocess.TimeoutExpired:monitor.kill();monitor.communicate()
         (directory/'video-background-codec-log.txt').write_bytes(evidence)
 
 
@@ -545,7 +645,8 @@ def video_smoke(device, directory, restart=True):
         result.update(retryWithoutForceStop=not restart,pidBeforeRetry=retry_pid)
         device.open('video-create',restart=restart)
         if not restart:
-            for _ in range(3):device.scroll_down(reverse=True)
+            for _ in range(3):
+                if not device.scroll_down(reverse=True):break
         device.ready(['변화 영상 만들기', 'QA 데모'])
         device.tap('영상 만들기')
         result['createClicks'] = 1
