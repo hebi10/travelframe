@@ -100,6 +100,8 @@ import {
   type BodyMeasurementSettings
 } from "@/types/body-measurement";
 import type { PhotoItem } from "@/types/photo";
+import { getPhotoAccessibilityMoveIndex } from "@/features/records/photo-order-accessibility";
+import { PhotoPositionSheet } from "@/features/records/PhotoPositionSheet";
 
 const formatDuration = (seconds: number) =>
   seconds < 60
@@ -157,7 +159,9 @@ function SortableProjectPhotoTile({
   onDragHover,
   onDrop,
   onDragFinish,
-  onOpen
+  onOpen,
+  orderMode,
+  onMoveToPosition
 }: {
   photo: PhotoItem;
   index: number;
@@ -172,6 +176,8 @@ function SortableProjectPhotoTile({
   onDrop: (fromIndex: number, toIndex: number) => void;
   onDragFinish: () => void;
   onOpen: () => void;
+  orderMode: boolean;
+  onMoveToPosition: () => void;
 }) {
   const { palette } = useAppAppearance();
   const translateX = useSharedValue(0);
@@ -417,11 +423,31 @@ function SortableProjectPhotoTile({
   ]);
 
   return (
+    <Animated.View style={[{ width: tileWidth }, animatedStyle]}>
     <GestureDetector gesture={gesture}>
       <Animated.View
+        accessible
         accessibilityRole="adjustable"
         accessibilityLabel={`${photo.sequence ?? ""}번째 기록 ${formatDate(photo.createdAt)}`}
-        accessibilityHint="길게 누른 뒤 원하는 위치로 드래그하여 순서를 변경합니다."
+        accessibilityHint="두 번 탭하여 사진을 엽니다. 위아래로 쓸어 순번을 바꾸거나 순번 이동 동작을 사용하세요."
+        accessibilityState={{ disabled, busy: disabled }}
+        accessibilityValue={{ min: 1, max: count, now: count - index }}
+        accessibilityActions={[
+          { name: "activate", label: "사진 열기" },
+          { name: "increment", label: "다음 순번으로 이동" },
+          { name: "decrement", label: "이전 순번으로 이동" },
+          { name: "moveToPosition", label: "원하는 순번으로 이동" }
+        ]}
+        onAccessibilityTap={onOpen}
+        onAccessibilityAction={(event) => {
+          if (disabled) return;
+          const action = event.nativeEvent.actionName;
+          if (action === "activate") onOpen();
+          else if (action === "moveToPosition") onMoveToPosition();
+          else if (action === "increment" || action === "decrement") {
+            onDrop(index, getPhotoAccessibilityMoveIndex(index, count, action));
+          }
+        }}
         style={[
           styles.photoTile,
           {
@@ -430,8 +456,7 @@ function SortableProjectPhotoTile({
             borderColor: dropTarget ? palette.text : palette.line,
             borderWidth: dropTarget ? 2 : bodyFrameDesign.borderWidth,
             backgroundColor: palette.surfaceStrong
-          },
-          animatedStyle
+          }
         ]}
       >
         <Image
@@ -447,6 +472,19 @@ function SortableProjectPhotoTile({
         </View>
       </Animated.View>
     </GestureDetector>
+    {orderMode ? (
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${photo.sequence ?? count - index}번째 사진 순번 이동`}
+        disabled={disabled}
+        accessibilityState={{ disabled }}
+        style={{ position: "absolute", bottom: 0, left: 0, right: 0, minHeight: bodyFrameDesign.minTouchSize, justifyContent: "center", alignItems: "center", backgroundColor: palette.surface }}
+        onPress={onMoveToPosition}
+      >
+        <Text style={{ color: palette.text, fontSize: bodyFrameTypography.caption }}>순번 이동</Text>
+      </Pressable>
+    ) : null}
+    </Animated.View>
   );
 }
 
@@ -484,6 +522,7 @@ export default function BodyFrameProjectDetailScreen() {
   const [photoDragSourceIndex, setPhotoDragSourceIndex] = useState<number | null>(null);
   const [photoDropTargetIndex, setPhotoDropTargetIndex] = useState<number | null>(null);
   const [photoOrderSaving, setPhotoOrderSaving] = useState(false);
+  const [photoPositionId, setPhotoPositionId] = useState<string | null>(null);
   const [reminderSettings, setReminderSettings] =
     useState<ProjectReminderSettings>(defaultProjectReminderSettings);
   const [reminderModalOpen, setReminderModalOpen] = useState(false);
@@ -1242,7 +1281,7 @@ export default function BodyFrameProjectDetailScreen() {
               {photoOrderSaving
                 ? "변경한 순서를 저장하는 중입니다."
                 : photoOrderMode
-                  ? "사진을 길게 누른 채 원하는 위치로 끌어 놓으세요."
+                  ? "사진을 끌어 놓거나 순번 이동을 눌러 원하는 순번을 입력하세요."
                   : "사진을 길게 누르면 이 화면에서 바로 순서를 바꿀 수 있습니다."}
             </Text>
           ) : null}
@@ -1261,6 +1300,8 @@ export default function BodyFrameProjectDetailScreen() {
                       count={projectPhotos.length}
                       tileWidth={projectPhotoTileWidth}
                       disabled={photoOrderSaving}
+                      orderMode={photoOrderMode}
+                      onMoveToPosition={() => setPhotoPositionId(photo.id)}
                       dropTarget={
                         isPhotoDragging && photoDropTargetIndex === index
                       }
@@ -1282,9 +1323,7 @@ export default function BodyFrameProjectDetailScreen() {
                         setPhotoDropTargetIndex(null);
                       }}
                       onOpen={() => {
-                        if (!photoOrderMode) {
-                          router.push(`/photo/${photo.id}` as Href);
-                        }
+                        router.push(`/photo/${photo.id}` as Href);
                       }}
                     />
                   ))
@@ -1317,6 +1356,19 @@ export default function BodyFrameProjectDetailScreen() {
           </Text>
         </Pressable>
       </ScrollView>
+
+      <PhotoPositionSheet
+        currentPosition={photoPositionId !== null && projectPhotos.some((photo) => photo.id === photoPositionId)
+          ? projectPhotos.length - projectPhotos.findIndex((photo) => photo.id === photoPositionId)
+          : null}
+        count={projectPhotos.length}
+        onClose={() => setPhotoPositionId(null)}
+        onMove={(toIndex) => {
+          const fromIndex = projectPhotos.findIndex((photo) => photo.id === photoPositionId);
+          setPhotoPositionId(null);
+          void handleProjectPhotoDrop(fromIndex, toIndex);
+        }}
+      />
 
       <Modal
         transparent

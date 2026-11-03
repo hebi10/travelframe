@@ -379,6 +379,7 @@ const assertProjectPhotoBackupCapacity = async ({
     return;
   }
 
+  const now = Date.now();
   const pendingPhotoCount = [
     ...sessionSnapshot.docs,
     ...adminSessionSnapshot.docs
@@ -386,8 +387,9 @@ const assertProjectPhotoBackupCapacity = async ({
     const data = item.data();
     return (
       data.status === "reserved" &&
+      (!data.expiresAt?.toMillis || data.expiresAt.toMillis() > now) &&
       data.itemType === "photo" &&
-      data.itemId !== itemId
+      (!itemId || data.itemId !== itemId)
     );
   }).length;
 
@@ -1273,6 +1275,8 @@ exports.reserveBackupUpload = secureOnCall(async (request) => {
       ? db.doc(`users/${uid}/backupProjectLocks/${projectId}`)
       : null;
 
+    await cleanupExpiredBackupUploadSessions(uid);
+
     if (itemType === "photo") {
       await assertBackupProjectSlotAllowed({
         uid,
@@ -1292,7 +1296,6 @@ exports.reserveBackupUpload = secureOnCall(async (request) => {
       });
     }
 
-    await cleanupExpiredBackupUploadSessions(uid);
     const usageRef = getUsageRef(uid);
     const sessionRef = db.collection(`users/${uid}/backupUploadSessions`).doc();
     const reservedStoragePath = buildBackupSessionStoragePath({
@@ -2690,6 +2693,8 @@ exports.reserveAdminBackupUpload = secureOnCall(async (request) => {
     const projectId =
       itemKind === "music" ? null : normalizeBackupProjectId(rawProjectId);
 
+    await cleanupExpiredBackupUploadSessions(targetUid);
+
     if (itemKind !== "music") {
       if (!projectId) {
         throw new HttpsError(
@@ -2753,6 +2758,48 @@ exports.reserveAdminBackupUpload = secureOnCall(async (request) => {
   }
 });
 
+const ADMIN_UPLOAD_EXPIRED_REASON = "Admin upload session expired before completion.";
+const isBackupUploadSessionExpired = (session) =>
+  Boolean(session.expiresAt?.toMillis && session.expiresAt.toMillis() <= Date.now());
+
+const cleanupExpiredAdminBackupUploadSession = async ({ targetUid, adminUid, sessionRef }) => {
+  const expiredSession = await db.runTransaction(async (tx) => {
+    const freshSnapshot = await tx.get(sessionRef);
+    const fresh = freshSnapshot.data();
+    if (!freshSnapshot.exists || fresh.adminUid !== adminUid || fresh.targetUid !== targetUid) {
+      throw new HttpsError("permission-denied", "Admin upload session ownership changed.");
+    }
+    if (fresh.status === "reserved" && isBackupUploadSessionExpired(fresh)) {
+      tx.update(sessionRef, {
+        status: "failed",
+        failureReason: ADMIN_UPLOAD_EXPIRED_REASON,
+        failedAt: FieldValue.serverTimestamp()
+      });
+      return fresh;
+    }
+    // A prior attempt may have marked the reservation failed before Storage
+    // deletion failed. Never remove a concurrently completed upload's file.
+    return fresh.status === "failed" && fresh.failureReason === ADMIN_UPLOAD_EXPIRED_REASON
+      ? fresh
+      : null;
+  });
+  if (!expiredSession || !isOwnedCloudBackupStoragePath(targetUid, expiredSession.storagePath)) {
+    return;
+  }
+  const file = bucket.file(expiredSession.storagePath);
+  let metadata;
+  try {
+    [metadata] = await file.getMetadata();
+  } catch (error) {
+    if (error?.code === 404) return;
+    throw error;
+  }
+  if (metadata.metadata?.adminBackupSessionId !== sessionRef.id) return;
+  await file.delete().catch((error) => {
+    if (error?.code !== 404) throw error;
+  });
+};
+
 exports.completeAdminBackupUpload = secureOnCall(async (request) => {
   try {
     const adminUid = await requireAdminUid(request);
@@ -2781,6 +2828,11 @@ exports.completeAdminBackupUpload = secureOnCall(async (request) => {
     }
     if (session.status === "completed") {
       return { itemId: session.itemId, itemType: session.itemType };
+    }
+    if ((session.status === "reserved" && isBackupUploadSessionExpired(session)) ||
+        (session.status === "failed" && session.failureReason === ADMIN_UPLOAD_EXPIRED_REASON)) {
+      await cleanupExpiredAdminBackupUploadSession({ targetUid, adminUid, sessionRef });
+      throw new HttpsError("deadline-exceeded", "Admin upload session expired.");
     }
     if (session.status !== "reserved") {
       throw new HttpsError("failed-precondition", "Admin upload session is not active.");
@@ -2901,6 +2953,14 @@ exports.completeAdminBackupUpload = secureOnCall(async (request) => {
       if (freshSession.data()?.status !== "reserved") {
         throw new HttpsError("failed-precondition", "Admin upload reservation is no longer active.");
       }
+      if (isBackupUploadSessionExpired(freshSession.data())) {
+        tx.update(sessionRef, {
+          status: "failed",
+          failureReason: ADMIN_UPLOAD_EXPIRED_REASON,
+          failedAt: FieldValue.serverTimestamp()
+        });
+        return { expired: true };
+      }
       tx.create(itemRef, payload);
       tx.update(sessionRef, {
         status: "completed",
@@ -2909,6 +2969,10 @@ exports.completeAdminBackupUpload = secureOnCall(async (request) => {
       });
       return { itemId, itemType: session.itemType };
     });
+    if (result.expired) {
+      await cleanupExpiredAdminBackupUploadSession({ targetUid, adminUid, sessionRef });
+      throw new HttpsError("deadline-exceeded", "Admin upload session expired.");
+    }
     await refreshAdminBackupOverview(targetUid);
     return result;
   } catch (error) {
@@ -3040,6 +3104,7 @@ const deleteCloudBackupDataForUser = async (uid) => {
     projectSnapshot,
     sessionSnapshot,
     adminSessionSnapshot,
+    musicSessionSnapshot,
     projectSlotSnapshot,
     projectLockSnapshot
   ] = await Promise.all([
@@ -3050,6 +3115,7 @@ const deleteCloudBackupDataForUser = async (uid) => {
     userRef.collection("bodyProjects").get(),
     userRef.collection("backupUploadSessions").get(),
     userRef.collection("adminBackupUploadSessions").get(),
+    userRef.collection("musicUploadSessions").get(),
     userRef.collection("backupProjectSlots").get(),
     userRef.collection("backupProjectLocks").get()
   ]);
@@ -3059,6 +3125,7 @@ const deleteCloudBackupDataForUser = async (uid) => {
     ...projectSnapshot.docs,
     ...sessionSnapshot.docs,
     ...adminSessionSnapshot.docs,
+    ...musicSessionSnapshot.docs,
     ...projectSlotSnapshot.docs,
     ...projectLockSnapshot.docs
   ].map((item) => item.ref);
@@ -3067,16 +3134,13 @@ const deleteCloudBackupDataForUser = async (uid) => {
     photoBackups: photoSnapshot.docs.map((item) => item.data()),
     imageWorks: imageWorkSnapshot.docs.map((item) => item.data()),
     videos: videoSnapshot.docs.map((item) => item.data()),
-    musicTracks: musicSnapshot.docs.map((item) => item.data())
+    musicTracks: musicSnapshot.docs.map((item) => item.data()),
+    uploadSessions: [
+      ...sessionSnapshot.docs,
+      ...adminSessionSnapshot.docs,
+      ...musicSessionSnapshot.docs
+    ].map((item) => item.data())
   }).map(deleteStoragePath);
-  storageDeletes.push(
-    ...sessionSnapshot.docs.map((item) =>
-      deleteOwnedCloudBackupStoragePath(uid, item.data().storagePath)
-    ),
-    ...adminSessionSnapshot.docs.map((item) =>
-      deleteOwnedCloudBackupStoragePath(uid, item.data().storagePath)
-    )
-  );
 
   for (const item of photoSnapshot.docs) {
     const data = item.data();

@@ -226,3 +226,16 @@ export const getBodyFrameVideoOverlaySummary = (
 
   return parts.length > 0 ? parts.join(" · ") : "없음";
 };
+
+// Sequence is a mutable display order. Legacy entries without a photoId cannot
+// safely be attached to a current photo and remain available only in history.
+export const getBodyFrameVideoMeasurement = <T extends { photoId?: string }>(
+  photo: { id: string } | null | undefined,
+  measurements: readonly T[]
+): T | null => {
+  if (!photo) return null;
+  for (let index = measurements.length - 1; index >= 0; index--) {
+    if (measurements[index].photoId === photo.id) return measurements[index];
+  }
+  return null;
+};

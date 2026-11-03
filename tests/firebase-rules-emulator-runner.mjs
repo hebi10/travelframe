@@ -446,6 +446,72 @@ await expectAllowed(
     data: { ...validPhotoBackup(ownerUid, "photo-1"), backupStatus: "failed" }
   })
 );
+
+// A cloud-only photo reorder preserves its already verified file/session identity.
+const cloudOnlyPhotoId = "cloud-only-reorder";
+const cloudOnlyStoragePath = `users/${ownerUid}/backups/photos/${cloudOnlyPhotoId}.jpg`;
+const cloudOnlyUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encodeURIComponent(cloudOnlyStoragePath)}?alt=media`;
+const cloudOnlyPhoto = {
+  ...validPhotoBackup(ownerUid, cloudOnlyPhotoId),
+  backupSessionId: cloudOnlyPhotoId,
+  projectId: "project-1",
+  sequence: 1,
+  sourceUpdatedAt: "2026-09-19T00:00:00Z",
+  sourceDeviceId: "original-device",
+  downloadURL: cloudOnlyUrl,
+  uri: cloudOnlyUrl,
+  previewUri: cloudOnlyUrl
+};
+await seedBackupUploadSession({
+  sessionId: cloudOnlyPhotoId,
+  storagePath: cloudOnlyStoragePath,
+  fileSize: cloudOnlyPhoto.fileSize,
+  contentType: cloudOnlyPhoto.fileType,
+  mediaKind: "image",
+  status: "completed",
+  expiresAt: new Date(Date.now() - 60_000)
+});
+await seedDoc(`users/${ownerUid}/photoBackups/${cloudOnlyPhotoId}`, cloudOnlyPhoto);
+const reorderedCloudOnlyPhoto = {
+  ...cloudOnlyPhoto,
+  sequence: 2,
+  sourceUpdatedAt: "2026-11-03T00:00:00Z",
+  updatedAt: new Date()
+};
+await expectAllowed(
+  "cloud-only reorder changes only sequence and timestamps after completed session expiry",
+  firestoreRequest("PATCH", `users/${ownerUid}/photoBackups/${cloudOnlyPhotoId}`, {
+    uid: ownerUid,
+    data: reorderedCloudOnlyPhoto
+  })
+);
+await expectDenied(
+  "another user cannot reorder an owner's cloud-only photo",
+  firestoreRequest("PATCH", `users/${ownerUid}/photoBackups/${cloudOnlyPhotoId}`, {
+    uid: otherUid,
+    data: { ...reorderedCloudOnlyPhoto, sequence: 3 }
+  })
+);
+for (const [field, value] of Object.entries({
+  userId: otherUid,
+  localId: "different-photo",
+  storagePath: `users/${ownerUid}/backups/photos/different.jpg`,
+  backupSessionId: "unverified-session",
+  fileSize: 2048,
+  fileType: "image/png",
+  sourceDeviceId: "different-device",
+  downloadURL: `${cloudOnlyUrl}&changed=true`,
+  uri: `${cloudOnlyUrl}&changed=true`,
+  previewUri: `${cloudOnlyUrl}&changed=true`
+})) {
+  await expectDenied(
+    `cloud-only reorder cannot change ${field} without a newly verified upload`,
+    firestoreRequest("PATCH", `users/${ownerUid}/photoBackups/${cloudOnlyPhotoId}`, {
+      uid: ownerUid,
+      data: { ...reorderedCloudOnlyPhoto, sequence: 3, [field]: value }
+    })
+  );
+}
 await expectDenied(
   "photo backup metadata rejects immutable storage path updates",
   firestoreRequest("PATCH", `users/${ownerUid}/photoBackups/photo-1`, {

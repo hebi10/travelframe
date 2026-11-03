@@ -188,14 +188,12 @@ const createPhotoPreview = async ({
     }
   );
 
-  if (rendered.uri !== previewUri) {
-    await deleteLocalFile(previewUri);
+  try {
+    await FileSystem.copyAsync({ from: rendered.uri, to: previewUri });
+  } catch (error) {
+    await deleteLocalFile(previewUri).catch(() => undefined);
+    throw error;
   }
-
-  await FileSystem.copyAsync({
-    from: rendered.uri,
-    to: previewUri
-  });
 
   return previewUri;
 };
@@ -299,7 +297,7 @@ export const getDeletedPhotoIds = async () => {
   return parseDeletedPhotoIds(value);
 };
 
-export const recordPhotoLocalDeletion = async (id: string) => {
+const recordPhotoLocalDeletionUnlocked = async (id: string) => {
   const deletedPhotoIds = await getDeletedPhotoIds();
   deletedPhotoIds.add(id);
   await localStorageAdapter.setItem(
@@ -322,10 +320,10 @@ export const getRecentPhoto = async () => {
   return photos[0] ?? null;
 };
 
-export const replacePhotosFromBackup = async (photos: PhotoItem[]) => {
+export const replacePhotosFromBackup = async (photos: PhotoItem[]) => runPhotoLibraryMutation(async () => {
   await writePhotos(photos);
   return getPhotos();
-};
+});
 
 export const reorderProjectPhotos = async ({
   projectId,
@@ -401,7 +399,10 @@ export const deleteLocalFile = async (uri?: string | null) => {
 const isRemoteUri = (uri?: string | null) =>
   typeof uri === "string" && /^https?:\/\//i.test(uri);
 
-export const restorePhotoOriginalIfNeeded = async (photo: PhotoItem) => {
+export const restorePhotoOriginalIfNeeded = async (photo: PhotoItem) => runPhotoLibraryMutation(async () => {
+  const current = (await getPhotos()).find(item => item.id === photo.id);
+  if (!current || (await getDeletedPhotoIds()).has(photo.id)) return photo;
+  photo = current;
   if (photo.localFileStatus !== "cloud_only" && !isRemoteUri(photo.uri)) {
     return photo;
   }
@@ -427,12 +428,12 @@ export const restorePhotoOriginalIfNeeded = async (photo: PhotoItem) => {
     photos.map((item) => (item.id === photo.id ? restoredPhoto : item))
   );
   return restoredPhoto;
-};
+});
 
 export const markPhotoCloudOnly = async (
   id: string,
   backup: Partial<PhotoItem> | null
-) => {
+) => runPhotoLibraryMutation(async () => {
   const photos = await getPhotos();
   const photo = photos.find((item) => item.id === id);
   const downloadURL = backup?.downloadURL ?? (isRemoteUri(backup?.uri) ? backup?.uri : undefined);
@@ -461,7 +462,7 @@ export const markPhotoCloudOnly = async (
   }
 
   return nextPhoto;
-};
+});
 
 const normalizeCapturedPhotoForRatio = async ({
   uri,
@@ -538,7 +539,7 @@ const renderCapturedPhotoForSave = async ({
 };
 
 const deleteTemporaryFiles = async (uris: string[]) => {
-  await Promise.all(uris.map((uri) => deleteLocalFile(uri)));
+  await Promise.all([...new Set(uris)].map((uri) => deleteLocalFile(uri).catch(() => undefined)));
 };
 
 const prepareCapturedPhotoForStorage = async (
@@ -639,6 +640,8 @@ export const saveCapturedPhoto = async ({
     colorAdjustment
   }, deferProjectOptimization);
 
+  let committed = false;
+  let previewUri: string | undefined;
   try {
     await FileSystem.copyAsync({
       from: prepared.uri,
@@ -646,7 +649,7 @@ export const saveCapturedPhoto = async ({
     });
 
     // Keep readers from generating a second preview while project storage is finishing.
-    const previewUri = deferProjectOptimization ? destinationUri : await createPhotoPreview({
+    previewUri = deferProjectOptimization ? destinationUri : await createPhotoPreview({
       sourceUri: destinationUri,
       id,
       width: prepared.width,
@@ -673,8 +676,10 @@ export const saveCapturedPhoto = async ({
     };
 
     await writePhotos([photo, ...photos]);
+    committed = true;
     return photo;
   } finally {
+    if (!committed) await deleteTemporaryFiles([destinationUri, previewUri].filter((uri): uri is string => Boolean(uri)));
     await deleteTemporaryFiles(prepared.temporaryUris);
   }
   });
@@ -692,11 +697,12 @@ export const saveEditedPhoto = async ({
   renderedWidth,
   renderedHeight,
   localImageLimit
-}: SaveEditedPhotoInput) => {
+}: SaveEditedPhotoInput) => runPhotoLibraryMutation(async () => {
   const photos = await getPhotos();
   const existingPhoto = targetPhotoId
     ? photos.find((photo) => photo.id === targetPhotoId)
     : null;
+  if (targetPhotoId && !existingPhoto) throw new Error("편집할 사진이 삭제되었습니다.");
   if (!existingPhoto) {
     assertLocalLibraryCapacity({
       currentCount: photos.length,
@@ -706,7 +712,11 @@ export const saveEditedPhoto = async ({
   }
   const id = targetPhotoId ?? createPhotoId();
   const directory = await ensurePhotoDirectory();
-  const destinationUri = `${directory}${id}-edited.jpg`;
+  // Keep photoId immutable; each content version gets independent file paths.
+  const versionId = `${id}-${createPhotoId()}`;
+  const destinationUri = `${directory}${versionId}-edited.jpg`;
+  let previewUri: string | undefined;
+  let committed = false;
   const rendered = renderedUri
     ? {
         uri: renderedUri,
@@ -725,19 +735,15 @@ export const saveEditedPhoto = async ({
     preserveRenderedUri: Boolean(renderedUri)
   });
 
-  if (targetPhotoId && prepared.uri !== destinationUri) {
-    await deleteLocalFile(destinationUri);
-  }
-
   try {
     await FileSystem.copyAsync({
       from: prepared.uri,
       to: destinationUri
     });
 
-    const previewUri = await createPhotoPreview({
+    previewUri = await createPhotoPreview({
       sourceUri: destinationUri,
-      id,
+      id: versionId,
       width: prepared.width,
       height: prepared.height
     });
@@ -775,20 +781,21 @@ export const saveEditedPhoto = async ({
         ? photos.map((item) => (item.id === targetPhotoId ? photo : item))
         : [photo, ...photos];
 
-    if (existingPhoto?.uri && existingPhoto.uri !== destinationUri) {
-      await deleteLocalFile(existingPhoto.uri);
-    }
-
-    if (existingPhoto?.previewUri && existingPhoto.previewUri !== previewUri) {
-      await deleteLocalFile(existingPhoto.previewUri);
-    }
-
     await writePhotos(nextPhotos);
+    committed = true;
+    // Cleanup cannot turn a committed edit into an apparent failed save.
+    await deleteTemporaryFiles([
+      existingPhoto?.uri,
+      existingPhoto?.previewUri,
+      existingPhoto?.localUri,
+      existingPhoto?.localPreviewUri
+    ].filter((uri): uri is string => Boolean(uri) && uri !== destinationUri && uri !== previewUri));
     return photo;
   } finally {
+    if (!committed) await deleteTemporaryFiles([destinationUri, previewUri].filter((uri): uri is string => Boolean(uri)));
     await deleteTemporaryFiles(prepared.temporaryUris);
   }
-};
+});
 
 const prepareEditedPhotoForStorage = async ({
   rendered,
@@ -857,11 +864,12 @@ const renderEditedPhotoFromTransform = async ({
   });
 };
 
-export const deletePhoto = async (id: string) => {
-  await recordPhotoLocalDeletion(id);
+export const deletePhoto = async (id: string) => runPhotoLibraryMutation(async () => {
+  await recordPhotoLocalDeletionUnlocked(id);
   const photos = await getPhotos();
   const photo = photos.find((item) => item.id === id);
 
+  await writePhotos(photos.filter((item) => item.id !== id));
   if (photo) {
     await deleteLocalFile(photo.uri);
     if (photo.previewUri) {
@@ -869,10 +877,9 @@ export const deletePhoto = async (id: string) => {
     }
   }
 
-  await writePhotos(photos.filter((item) => item.id !== id));
-};
+});
 
-export const togglePhotoForVideo = async (id: string) => {
+export const togglePhotoForVideo = async (id: string) => runPhotoLibraryMutation(async () => {
   const photos = await getPhotos();
   let updatedPhoto: PhotoItem | null = null;
   const nextPhotos = photos.map((photo) => {
@@ -889,9 +896,11 @@ export const togglePhotoForVideo = async (id: string) => {
 
   await writePhotos(nextPhotos);
   return updatedPhoto;
-};
+});
 
-export const ensurePhotoPreviews = async (photos: PhotoItem[]) => {
+export const ensurePhotoPreviews = async (photos: PhotoItem[]) => runPhotoLibraryMutation(async () => {
+  const requestedIds = new Set(photos.map(photo => photo.id));
+  photos = await getPhotos();
   let changed = false;
   const nextPhotos = await Promise.all(
     photos.map(async (photo) => {
@@ -921,5 +930,41 @@ export const ensurePhotoPreviews = async (photos: PhotoItem[]) => {
     await writePhotos(nextPhotos);
   }
 
-  return sortPhotos(nextPhotos);
-};
+  return sortPhotos(nextPhotos.filter(photo => requestedIds.has(photo.id)));
+});
+
+export const recordPhotoLocalDeletion = (id: string) =>
+  runPhotoLibraryMutation(() => recordPhotoLocalDeletionUnlocked(id));
+
+// Read local state only after earlier mutations have committed. Local edits win;
+// deletion markers prevent a later cloud restore from resurrecting deleted items.
+export const mergePhotosFromBackup = (incoming: PhotoItem[]) =>
+  runPhotoLibraryMutation(async () => {
+    const current = await getPhotos();
+    const deleted = await getDeletedPhotoIds();
+    const ids = new Set(current.map(item => item.id));
+    const added = incoming.filter(item => {
+      if (ids.has(item.id) || deleted.has(item.id)) return false;
+      ids.add(item.id);
+      return true;
+    });
+    if (added.length) await writePhotos([...current, ...added]);
+    return added;
+  });
+
+// Project capture finalization and rollback must not replace a snapshot read
+// outside the queue: a second capture or cloud restore may have committed since.
+export const updatePhotoMetadata = (id: string, updates: Partial<PhotoItem>) =>
+  runPhotoLibraryMutation(async () => {
+    const photos = await getPhotos();
+    const current = photos.find(photo => photo.id === id);
+    if (!current) throw new Error("저장할 사진을 찾을 수 없습니다.");
+    const next = { ...current, ...updates, id: current.id };
+    await writePhotos(photos.map(photo => photo.id === id ? next : photo));
+    return next;
+  });
+
+export const discardPhotoDraft = (id: string) => runPhotoLibraryMutation(async () => {
+  const photos = await getPhotos();
+  await writePhotos(photos.filter(photo => photo.id !== id));
+});

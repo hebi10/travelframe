@@ -6,9 +6,11 @@ import { router,
   useFocusEffect } from "expo-router";
 import { useCallback,
   useMemo,
+  useRef,
   useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -85,6 +87,8 @@ export default function BodyFrameRecordsScreen() {
   const [archivedProjects, setArchivedProjects] = useState<BodyProject[]>([]);
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const projectActivationInFlight = useRef(false);
+  const [restoringProjectId, setRestoringProjectId] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -127,11 +131,34 @@ export default function BodyFrameRecordsScreen() {
 
   const restoreProject = useCallback(
     async (project: BodyProject) => {
-      await archiveBodyProject(project.id, false);
-      await setLastActiveProjectId(project.id);
-      await reload();
+      if (projectActivationInFlight.current) return;
+      projectActivationInFlight.current = true;
+      setRestoringProjectId(project.id);
+      try {
+        const storedProjects = await getBodyProjects();
+        const activeProjectCount = storedProjects.filter((item) => !item.archived).length;
+        const projectLimitState = getBodyFrameProjectCreationLimitState({
+          activeProjectCount,
+          maxProjectCount: planEntitlements.maxProjectCount
+        });
+        if (!projectLimitState.allowed) {
+          Alert.alert(
+            "프로젝트 복원 한도",
+            `현재 플랜에서는 활성 프로젝트를 최대 ${projectLimitState.limit ?? activeProjectCount}개까지 사용할 수 있습니다. 다른 프로젝트를 보관한 후 다시 복원해 주세요.`
+          );
+          return;
+        }
+        await archiveBodyProject(project.id, false);
+        await setLastActiveProjectId(project.id);
+        await reload();
+      } catch {
+        Alert.alert("프로젝트 복원 실패", "프로젝트를 복원하지 못했습니다. 다시 시도해 주세요.");
+      } finally {
+        projectActivationInFlight.current = false;
+        setRestoringProjectId(null);
+      }
     },
-    [reload]
+    [planEntitlements.maxProjectCount, reload]
   );
 
   const handleCreateProject = useCallback(
@@ -194,6 +221,7 @@ export default function BodyFrameRecordsScreen() {
         <View style={styles.quickActions}>
           <BodyFrameProjectSwitcher
             createOnly
+            disabled={restoringProjectId !== null}
             compact
             projects={projects}
             photos={photos}
@@ -360,10 +388,12 @@ export default function BodyFrameRecordsScreen() {
                   <Pressable
                     accessibilityRole="button"
                     style={[styles.restoreButton, { borderColor: palette.line }]}
+                    disabled={restoringProjectId !== null}
+                    accessibilityState={{ disabled: restoringProjectId !== null, busy: restoringProjectId === project.id }}
                     onPress={() => void restoreProject(project)}
                   >
                     <Text style={[styles.restoreButtonText, { color: palette.text }]}>
-                      복원
+                      {restoringProjectId === project.id ? "복원 중" : "복원"}
                     </Text>
                   </Pressable>
                 </View>

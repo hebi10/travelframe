@@ -148,12 +148,15 @@ const styles = StyleSheet.create({
   actions: {
     minHeight: controls.height,
     flexDirection: "row",
+    flexWrap: "wrap",
     alignItems: "center",
     justifyContent: "space-between",
     gap: 10
   },
   stepActions: {
     flexDirection: "row",
+    flexWrap: "wrap",
+    flexShrink: 1,
     alignItems: "center",
     gap: 8
   },

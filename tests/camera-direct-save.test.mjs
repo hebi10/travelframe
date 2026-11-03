@@ -60,11 +60,11 @@ for (const snippet of [
   "throw deviceError;",
   "사진은 앱 보관함에 저장되었습니다.",
   "핸드폰 앨범 저장 권한이 필요합니다.",
-  "클라우드로 저장",
+  "앱에만 저장",
   "void Linking.openSettings()",
-  'cameraSaveScope: "app"',
-  'storageMode: "local_backup"',
-  "cloudBackupEnabled: true",
+  "createAppOnlySaveFallback()",
+  "setCameraSaveScope(fallback.cameraSaveScope)",
+  "queueAppSettingsUpdate(fallback)",
   "ratioLabel: cameraRatio",
   "setRecentPhoto(savedPhoto)",
   "backupPhotoIfEnabled({",
@@ -73,6 +73,11 @@ for (const snippet of [
   "deleteLocalFile(photoUri)"
 ]) {
   assert.ok(source.includes(snippet), `camera direct save flow missing: ${snippet}`);
+}
+
+const fallbackSource = fs.readFileSync("features/camera/camera-save-fallback.ts", "utf8");
+for (const snippet of ['cameraSaveScope: "app"', 'storageMode: "local_only"', 'cloudBackupEnabled: false']) {
+  assert.ok(fallbackSource.includes(snippet), `album permission fallback must remain app-only: ${snippet}`);
 }
 
 const capturePhotoStart = source.indexOf("  const capturePhoto = async () => {");

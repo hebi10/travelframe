@@ -12,8 +12,8 @@ import {
 import {
   deleteLocalFile,
   deletePhoto as deleteLegacyPhoto,
-  getPhotos,
-  replacePhotosFromBackup,
+  discardPhotoDraft,
+  updatePhotoMetadata,
   reorderProjectPhotos as reorderLegacyProjectPhotos,
   saveCapturedPhoto as saveLegacyCapturedPhoto
 } from "@/lib/legacy-photo-library";
@@ -67,10 +67,7 @@ const rollbackLegacyProjectDraft = async (photo?: PhotoItem | null) => {
     return;
   }
 
-  const photos = await getPhotos();
-  await replacePhotosFromBackup(
-    photos.filter((item) => item.id !== photo.id)
-  );
+  await discardPhotoDraft(photo.id);
   await cleanupOrphanProjectFiles(photo);
 };
 
@@ -118,12 +115,7 @@ export const saveCapturedPhoto = async (
       localFileStatus: "available"
     };
 
-    const photos = await getPhotos();
-    await replacePhotosFromBackup(
-      photos.map((photo) =>
-        photo.id === legacyPhoto?.id ? projectPhoto ?? photo : photo
-      )
-    );
+    projectPhoto = await updatePhotoMetadata(legacyPhoto.id, projectPhoto);
 
     await updateBodyProject(resolvedProjectId, {
       coverPhotoId: projectPhoto.id

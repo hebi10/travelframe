@@ -1,0 +1,107 @@
+name: Body Frame native device QA
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: body-frame-device-qa-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    env:
+      EXPO_NO_DOTENV: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install exact dependencies
+        run: npm ci
+      - name: Generate Android project
+        run: npm run android:prebuild:ci
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+      - name: Embed JavaScript in debuggable QA APK
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('android/app/build.gradle')
+          text = path.read_text()
+          marker = 'react {'
+          if marker not in text:
+              raise SystemExit('Cannot find generated React Native Gradle configuration')
+          path.write_text(text.replace(marker, marker + '\n    debuggableVariants = []', 1))
+          PY
+      - name: Build x86_64 native APK
+        env:
+          NODE_ENV: production
+        run: |
+          mkdir -p artifacts
+          set -o pipefail
+          bash android/gradlew -p android --no-daemon --max-workers=2 --console=plain -PreactNativeArchitectures=x86_64 :app:assembleDebug 2>&1 | tee artifacts/native-build.log
+          unzip -Z1 android/app/build/outputs/apk/debug/app-debug.apk | grep -Fx 'assets/index.android.bundle'
+      - name: Upload standalone APK independently of captures
+        uses: actions/upload-artifact@v4
+        with:
+          name: body-frame-native-qa-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload build diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: body-frame-native-build-logs
+          path: artifacts/
+          if-no-files-found: warn
+          retention-days: 14
+
+  capture-devices:
+    needs: build-apk
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: body-frame-native-qa-apk
+          path: artifacts/apk
+      - name: Verify capture helper
+        run: python3 scripts/test_capture_android_qa.py
+      - name: Enable KVM access
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Capture genuine Android UI at mobile and tablet sizes
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_2
+          ram-size: 3072M
+          heap-size: 512M
+          disk-size: 6000M
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back emulated -camera-front none
+          script: python3 scripts/capture-android-qa.py --apk artifacts/apk/app-debug.apk --output artifacts/native-qa
+      - name: Upload screenshots and capture diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: body-frame-native-device-qa-${{ github.run_id }}
+          path: artifacts/native-qa/
+          if-no-files-found: warn
+          retention-days: 14

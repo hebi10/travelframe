@@ -63,12 +63,12 @@ function harness() {
     "@/lib/cloud-backup-project-slots": {
       getSelectedCloudBackupProjectIds: async () => new Set([project.id])
     },
-    "@/lib/photo-library": { getPhotos: async () => localPhotos, getDeletedPhotoIds: async () => new Set(), wasPhotoDeletedLocally: async () => false, replacePhotosFromBackup: async values => { localPhotos = values; } },
+    "@/lib/photo-library": { getPhotos: async () => localPhotos, getDeletedPhotoIds: async () => new Set(), wasPhotoDeletedLocally: async () => false, mergePhotosFromBackup: async values => { const added = values.filter(value => !localPhotos.some(item => item.id === value.id)); localPhotos = [...localPhotos, ...added]; return added; } },
     "@/lib/body-project-library": { getBodyProjects: async () => localProjects, getBodyProjectById: async id => localProjects.find(p=>p.id===id), mergeBodyProjectsFromBackup: async values => { localProjects = [...localProjects, ...values.filter(p=>!localProjects.some(x=>x.id===p.id))]; }, replaceBodyProjects: async values => { localProjects = values; } },
     "@/lib/subscription": { isCreatorSubscriptionActive: () => true },
     "@/lib/storage-mode": { isStorageSaverMode: () => false, shouldUseCloudBackupForStorageMode: () => true },
-    "@/lib/video-library": { getMadeVideos: async () => [], getDeletedVideoIds: async () => new Set(), wasVideoDeletedLocally: async () => false, replaceMadeVideosFromBackup: async () => {} },
-    "@/lib/work-library": { getImageBundleWorks: async () => localWorks, getDeletedImageWorkIds: async () => new Set(), wasImageWorkDeletedLocally: async () => false, replaceImageBundleWorksFromBackup: async () => {} }
+    "@/lib/video-library": { getMadeVideos: async () => [], getDeletedVideoIds: async () => new Set(), wasVideoDeletedLocally: async () => false, mergeMadeVideosFromBackup: async values => values },
+    "@/lib/work-library": { getImageBundleWorks: async () => localWorks, getDeletedImageWorkIds: async () => new Set(), wasImageWorkDeletedLocally: async () => false, mergeImageBundleWorksFromBackup: async values => values }
   };
   function load(file) {
     const exports = {};

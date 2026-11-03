@@ -76,7 +76,10 @@ export function TripClipRecordingCanvas({
   guideShapePoints,
   photoAdjustments,
   bodyFrameOverlayText = null,
-  bodyFrameOverlayPosition = "bottom-right"
+  bodyFrameOverlayPosition = "bottom-right",
+  currentImageKey,
+  onCurrentImageDisplay,
+  onCurrentImageError
 }: {
   frame: RecordingFrame;
   template: TripClipTemplate;
@@ -98,6 +101,9 @@ export function TripClipRecordingCanvas({
   photoAdjustments: TripClipPhotoAdjustmentMap;
   bodyFrameOverlayText?: string | null;
   bodyFrameOverlayPosition?: BodyFrameVideoOverlayPosition;
+  currentImageKey?: string;
+  onCurrentImageDisplay?: (key: string) => void;
+  onCurrentImageError?: (key: string) => void;
 }) {
   const isFilm = template === "film-log";
   const isCenter = template === "center-cut";
@@ -133,14 +139,18 @@ export function TripClipRecordingCanvas({
         <View style={[styles.recordingLayer, currentLayerStyle]}>
           <View style={[styles.recordingImageMotionLayer, currentAdjustmentStyle]}>
             <Image
+              key={currentImageKey ?? frame.currentPhoto.id}
               source={{ uri: getPreviewUri(frame.currentPhoto) }}
+              onDisplay={() => currentImageKey && onCurrentImageDisplay?.(currentImageKey)}
+              onError={() => currentImageKey && onCurrentImageError?.(currentImageKey)}
+              transition={0}
               style={[
                 styles.recordingImage,
                 getOriginalImageFrameStyle(frame.currentPhoto, frameAspectRatio, contentFit),
                 isFilm && styles.recordingImageFilm
               ]}
               contentFit="fill"
-              cachePolicy="memory-disk"
+              cachePolicy={currentImageKey ? "disk" : "memory-disk"}
             />
           </View>
         </View>

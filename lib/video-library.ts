@@ -10,6 +10,13 @@ const VIDEO_STORAGE_KEY = "travel-frame.videos.v1";
 const VIDEO_DELETION_MARKER_KEY = "travel-frame.video-deletion-markers.v1";
 const VIDEO_DIRECTORY = "made-videos/";
 
+let mutationChain = Promise.resolve();
+const runVideoMutation = async <T>(operation: () => Promise<T>) => {
+  const run = mutationChain.then(operation, operation);
+  mutationChain = run.then(() => undefined, () => undefined);
+  return run;
+};
+
 const createVideoId = () =>
   `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
@@ -219,7 +226,7 @@ export const getDeletedVideoIds = async () => {
   return parseDeletedVideoIds(value);
 };
 
-export const recordVideoLocalDeletion = async (id: string) => {
+const recordVideoLocalDeletionUnlocked = async (id: string) => {
   const deletedVideoIds = await getDeletedVideoIds();
   deletedVideoIds.add(id);
   await localStorageAdapter.setItem(
@@ -237,17 +244,17 @@ export const getMadeVideoById = async (id: string) => {
   return video ? restoreMadeVideoIfNeeded(video) : null;
 };
 
-export const replaceMadeVideosFromBackup = async (videos: MadeVideoItem[]) => {
+export const replaceMadeVideosFromBackup = async (videos: MadeVideoItem[]) => runVideoMutation(async () => {
   await writeVideos(videos);
   return getMadeVideos();
-};
+});
 
 export const saveMadeVideo = async (
   video: Omit<MadeVideoItem, "id" | "createdAt" | "title"> & {
     title?: string;
   },
   options: { localVideoLimit?: number } = {}
-) => {
+) => runVideoMutation(async () => {
   const videos = await getMadeVideos();
   assertLocalLibraryCapacity({
     currentCount: videos.length,
@@ -270,12 +277,12 @@ export const saveMadeVideo = async (
 
   await writeVideos([savedVideo, ...videos]);
   return savedVideo;
-};
+});
 
 export const updateMadeVideo = async (
   id: string,
   updates: Partial<Omit<MadeVideoItem, "id" | "createdAt">>
-) => {
+) => runVideoMutation(async () => {
   const videos = await getMadeVideos();
   const video = videos.find((item) => item.id === id);
 
@@ -306,11 +313,11 @@ export const updateMadeVideo = async (
   }
 
   return updatedVideo;
-};
+});
 
-export const restoreMadeVideoIfNeeded = async (video: MadeVideoItem): Promise<MadeVideoItem> => {
+const restoreMadeVideoUnlocked = async (video: MadeVideoItem): Promise<MadeVideoItem> => {
   if (isRemoteUri(video.uri) && video.localFileStatus !== "cloud_only") {
-    return restoreMadeVideoIfNeeded({ ...video, localFileStatus: "cloud_only" });
+    return restoreMadeVideoUnlocked({ ...video, localFileStatus: "cloud_only" });
   }
   if (video.localFileStatus !== "cloud_only") {
     if (!(await isLocalVideoAvailable(video.uri))) {
@@ -318,7 +325,7 @@ export const restoreMadeVideoIfNeeded = async (video: MadeVideoItem): Promise<Ma
         return { ...video, uri: "", localFileStatus: undefined };
       }
 
-      return restoreMadeVideoIfNeeded({
+      return restoreMadeVideoUnlocked({
         ...video,
         uri: video.downloadURL,
         localFileStatus: "cloud_only"
@@ -363,10 +370,17 @@ export const restoreMadeVideoIfNeeded = async (video: MadeVideoItem): Promise<Ma
   return restoredVideo;
 };
 
+export const restoreMadeVideoIfNeeded = (video: MadeVideoItem): Promise<MadeVideoItem> =>
+  runVideoMutation(async () => {
+    const current = (await getMadeVideos()).find(item => item.id === video.id);
+    if (!current || (await getDeletedVideoIds()).has(video.id)) return video;
+    return restoreMadeVideoUnlocked(current);
+  });
+
 export const markMadeVideoCloudOnly = async (
   id: string,
   backup: Partial<MadeVideoItem> | null
-) => {
+) => runVideoMutation(async () => {
   const videos = await getMadeVideos();
   const video = videos.find((item) => item.id === id);
   const downloadURL = backup?.downloadURL ?? (isRemoteUri(backup?.uri) ? backup?.uri : undefined);
@@ -393,10 +407,10 @@ export const markMadeVideoCloudOnly = async (
   }
 
   return nextVideo;
-};
+});
 
-export const deleteMadeVideo = async (id: string) => {
-  await recordVideoLocalDeletion(id);
+export const deleteMadeVideo = async (id: string) => runVideoMutation(async () => {
+  await recordVideoLocalDeletionUnlocked(id);
   const videos = await getMadeVideos();
   const video = videos.find((item) => item.id === id);
   if (video?.uri && !isRemoteUri(video.uri)) {
@@ -411,4 +425,23 @@ export const deleteMadeVideo = async (id: string) => {
     await FileSystem.deleteAsync(video.coverUri, { idempotent: true });
   }
   await writeVideos(videos.filter((video) => video.id !== id));
-};
+});
+
+export const recordVideoLocalDeletion = (id: string) =>
+  runVideoMutation(() => recordVideoLocalDeletionUnlocked(id));
+
+// Read local state only after earlier mutations have committed. Local edits win;
+// deletion markers prevent a later cloud restore from resurrecting deleted items.
+export const mergeMadeVideosFromBackup = (incoming: MadeVideoItem[]) =>
+  runVideoMutation(async () => {
+    const current = await getMadeVideos();
+    const deleted = await getDeletedVideoIds();
+    const ids = new Set(current.map(item => item.id));
+    const added = incoming.filter(item => {
+      if (ids.has(item.id) || deleted.has(item.id)) return false;
+      ids.add(item.id);
+      return true;
+    });
+    if (added.length) await writeVideos([...current, ...added]);
+    return added;
+  });

@@ -45,26 +45,23 @@ import {
 import { localStorageAdapter } from "@/lib/local-storage";
 import { getPlanEntitlements, getPlanTier } from "@/lib/plan-entitlements";
 import {
-  getDeletedPhotoIds,
   getPhotos,
   markPhotoCloudOnly,
-  replacePhotosFromBackup,
+  mergePhotosFromBackup,
   wasPhotoDeletedLocally
 } from "@/lib/photo-library";
 import { isCreatorSubscriptionActive, type UserSubscription } from "@/lib/subscription";
 import { isStorageSaverMode, shouldUseCloudBackupForStorageMode } from "@/lib/storage-mode";
 import {
-  getDeletedVideoIds,
   getMadeVideos,
   markMadeVideoCloudOnly,
-  replaceMadeVideosFromBackup,
+  mergeMadeVideosFromBackup,
   wasVideoDeletedLocally
 } from "@/lib/video-library";
 import {
-  getDeletedImageWorkIds,
   getImageBundleWorks,
   markImageBundleCloudOnly,
-  replaceImageBundleWorksFromBackup,
+  mergeImageBundleWorksFromBackup,
   wasImageWorkDeletedLocally
 } from "@/lib/work-library";
 import type { PhotoItem } from "@/types/photo";
@@ -867,6 +864,10 @@ export const backupCurrentWorkspace = async ({
   const backupablePhotoBackups: PhotoItem[] = [];
   for (const photo of selectedPhotoBackups) {
     if (photo.localFileStatus === "cloud_only") {
+      const existingData = existingPhotoBackups.get(photo.id);
+      if (!isPhotoBackupCurrent(photo, existingData)) {
+        await updateCloudOnlyPhotoMetadata(user.uid, photo, existingData);
+      }
       continue;
     }
     if (!(await isPhotoStillBackupEligible(photo.id))) {
@@ -1306,6 +1307,27 @@ export const backupCurrentWorkspace = async ({
   }
 };
 
+const updateCloudOnlyPhotoMetadata = async (
+  userId: string,
+  photo: PhotoItem,
+  existingData: Record<string, unknown> | undefined
+) => {
+  // A metadata update may only reference an existing backup of this same photo
+  // in its original project. It must never create an incomplete backup record.
+  if (!firestore || !existingData || existingData.localId !== photo.id ||
+      existingData.projectId !== photo.projectId ||
+      typeof existingData.storagePath !== "string" ||
+      existingData.backupStatus !== "backed_up") return null;
+  if (!(await isPhotoStillBackupEligible(photo.id))) return null;
+  const metadata = {
+    ...(typeof photo.sequence === "number" ? { sequence: photo.sequence } : {}),
+    sourceUpdatedAt: photo.updatedAt ?? photo.createdAt,
+    updatedAt: serverTimestamp()
+  };
+  await setDoc(doc(firestore, "users", userId, "photoBackups", photo.id), metadata, { merge: true });
+  return { ...existingData, ...metadata };
+};
+
 export const backupPhoto = async ({
   user,
   photo,
@@ -1362,7 +1384,7 @@ export const backupPhoto = async ({
   }
 
   if (photo.localFileStatus === "cloud_only") {
-    return null;
+    return updateCloudOnlyPhotoMetadata(user.uid, photo, existingData);
   }
 
   const [settings, sourceDeviceId] = await Promise.all([
@@ -1941,37 +1963,17 @@ export const restoreCloudBackupToLocal = async ({ user }: { user: User | null })
   const videos = videoSnapshot.docs.map((item) =>
     normalizeVideoBackup(item.data(), item.id)
   );
-  const [localPhotos, localImageWorks, localVideos] = await Promise.all([
-    getPhotos(),
-    getImageBundleWorks(),
-    getMadeVideos()
-  ]);
-  const existingPhotoIds = new Set(localPhotos.map((item) => item.id));
-  const deletedPhotoIds = await getDeletedPhotoIds();
-  const existingImageWorkIds = new Set(localImageWorks.map((item) => item.id));
-  const deletedImageWorkIds = await getDeletedImageWorkIds();
-  const existingVideoIds = new Set(localVideos.map((item) => item.id));
-  const deletedVideoIds = await getDeletedVideoIds();
-  const missingPhotos = photos.filter(
-    (item) => !existingPhotoIds.has(item.id) && !deletedPhotoIds.has(item.id)
-  );
-  const missingImageWorks = imageWorks.filter(
-    (item) => !existingImageWorkIds.has(item.id) && !deletedImageWorkIds.has(item.id)
-  );
-  const missingVideos = videos.filter(
-    (item) => !existingVideoIds.has(item.id) && !deletedVideoIds.has(item.id)
-  );
-
   if (firebaseAuth?.currentUser?.uid !== user.uid) throw new Error("계정이 변경되어 복원을 중단했습니다.");
   await assertLocalLibraryOwner(user.uid);
 
   const projects = projectSnapshot.docs.map(item => ({ ...item.data(), id: item.id }) as BodyProject);
-  await mergeBodyProjectsFromBackup(recoverMissingBodyProjects(projects, [...localPhotos, ...missingPhotos]));
-
-  await Promise.all([
-    replacePhotosFromBackup([...localPhotos, ...missingPhotos]),
-    replaceImageBundleWorksFromBackup([...localImageWorks, ...missingImageWorks]),
-    replaceMadeVideosFromBackup([...localVideos, ...missingVideos])
+  // Each library reads and merges current state under its own mutation queue.
+  // No snapshot taken before project restoration can overwrite a later capture.
+  await mergeBodyProjectsFromBackup(recoverMissingBodyProjects(projects, [...await getPhotos(), ...photos]));
+  const [missingPhotos, missingImageWorks, missingVideos] = await Promise.all([
+    mergePhotosFromBackup(photos),
+    mergeImageBundleWorksFromBackup(imageWorks),
+    mergeMadeVideosFromBackup(videos)
   ]);
 
   return {

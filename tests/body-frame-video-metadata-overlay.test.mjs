@@ -45,8 +45,7 @@ for (const token of [
 
 for (const token of [
   "getBodyMeasurements",
-  "measurementByPhotoId",
-  "measurementBySequence",
+  "getBodyFrameVideoMeasurement",
   "getBodyFrameVideoOverlayText",
   'label="텍스트"',
   'setOptionKind("overlay")',
