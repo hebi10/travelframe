@@ -146,26 +146,43 @@ def ui_strings(xml):
             if (value := node.get(key, ''))]
 
 
-def target_bounds(xml, label):
-    root = ET.fromstring(xml)
-    parents = {child: parent for parent in root.iter() for child in parent}
-    nodes = list(root.iter('node'))
-    exact = [node for node in nodes if label in (node.get('text'), node.get('content-desc'))]
-    candidates = exact or [node for node in nodes if any(label in node.get(key, '') for key in ('text', 'content-desc'))]
+class ControlOutsideViewport(RuntimeError):
+    def __init__(self,label,direction):
+        super().__init__(f'Actionable control is outside the usable viewport: {label}')
+        self.direction=direction
+
+
+def target_bounds(xml, label, match='exact', viewport=None):
+    """Select an actual enabled action. Headings never substitute for controls."""
+    if match not in {'exact','summary'}: raise ValueError('Unsupported explicit selector match mode')
+    root=ET.fromstring(xml)
+    parents={child:parent for parent in root.iter() for child in parent}
+    candidates=[]
+    for node in root.iter('node'):
+        values=[node.get('text',''),node.get('content-desc','')]
+        if any(value==label or (match=='summary' and value.startswith(label+', ')) for value in values):
+            candidates.append(node)
+    outside=None
     for node in candidates:
-        if node.get('enabled') == 'false':
-            continue
-        ancestor = node
-        while ancestor.get('clickable') != 'true' and ancestor in parents:
-            ancestor = parents[ancestor]
-        if ancestor.tag == 'node' and ancestor.get('enabled') != 'false':
-            node = ancestor
-        bounds = re.fullmatch(r'\[(\d+),(\d+)\]\[(\d+),(\d+)\]', node.get('bounds', ''))
-        if bounds:
-            x1, y1, x2, y2 = map(int, bounds.groups())
-            if x2 > x1 and y2 > y1:
-                return ((x1+x2)//2, (y1+y2)//2)
-    raise RuntimeError(f'Enabled UI control not found: {label}')
+        ancestor=node
+        disabled=False
+        while ancestor.tag=='node':
+            if ancestor.get('enabled')=='false': disabled=True;break
+            if ancestor.get('clickable')=='true':break
+            ancestor=parents.get(ancestor,root)
+            if ancestor is root:break
+        if disabled or ancestor.tag!='node' or ancestor.get('clickable')!='true' or ancestor.get('enabled')!='true':continue
+        bounds=re.fullmatch(r'\[(\d+),(\d+)\]\[(\d+),(\d+)\]',ancestor.get('bounds',''))
+        if not bounds:continue
+        x1,y1,x2,y2=map(int,bounds.groups())
+        if x2<=x1 or y2<=y1:continue
+        if viewport:
+            left,top,right,bottom=viewport
+            if not (left<=x1<x2<=right and top<=y1<y2<=bottom):
+                outside=ControlOutsideViewport(label,'up' if y1<top else 'down');continue
+        return ((x1+x2)//2,(y1+y2)//2)
+    if outside:raise outside
+    raise RuntimeError(f'Exact enabled clickable control not found: {label}')
 
 
 class Device:
@@ -211,18 +228,23 @@ class Device:
             time.sleep(2)
         raise RuntimeError(f'Expected UI did not appear: {expected}; visible={ui_strings(last) if last else []}')
 
-    def find_control(self, label):
-        for attempt in range(5):
-            try:
-                x, y = target_bounds(self.dump(), label)
-                return x, y
-            except RuntimeError:
-                if attempt == 4:
-                    raise
-                # Find offscreen controls using the actual display, never fixed dp coordinates.
-                self.scroll_down()
+    def viewport(self):
+        w,h=map(int,re.findall(r'(\d+)x(\d+)',self.shell('wm','size'))[-1])
+        density=int(re.findall(r'\d+',self.shell('wm','density'))[-1])
+        # Fixed Pixel2 API35 profile uses24dp status and48dp three-button bars.
+        return (0,round(24*density/160),w,h-round(48*density/160))
 
-    def scroll_down(self):
+    def find_control(self, label, match='exact'):
+        viewport=self.viewport()
+        for attempt in range(7):
+            try:
+                x, y = target_bounds(self.dump(), label,match=match,viewport=viewport)
+                return x, y
+            except RuntimeError as error:
+                if attempt == 6:raise
+                self.scroll_down(reverse=(error.direction=='up') if isinstance(error,ControlOutsideViewport) else attempt>=3)
+
+    def scroll_down(self,reverse=False):
         root=ET.fromstring(self.dump())
         areas=[]
         for node in root.iter('node'):
@@ -234,7 +256,9 @@ class Device:
         else:
             w,h=map(int,re.findall(r'(\d+)x(\d+)',self.shell('wm','size'))[-1]);x1,y1,x2,y2=0,0,w,int(h*.65)
         x=(x1+x2)//2
-        self.shell('input','swipe',x,int(y1+(y2-y1)*.85),x,int(y1+(y2-y1)*.25),350)
+        start=int(y1+(y2-y1)*.85);end=int(y1+(y2-y1)*.25)
+        if reverse:start,end=end,start
+        self.shell('input','swipe',x,start,x,end,350)
         time.sleep(.5)
 
     def storage(self):
@@ -252,10 +276,25 @@ class Device:
                 if attempt==2: raise
                 time.sleep(.3)
 
-    def tap(self, label):
-        x, y = self.find_control(label)
+    def tap(self, label,match='exact'):
+        x, y = self.find_control(label,match=match)
         self.shell('input', 'tap', x, y)
         time.sleep(1)
+
+    def open_control(self,label,expected,match='exact'):
+        """Retry one missed tap only while its actual modal postcondition is absent."""
+        for attempt in range(2):
+            current=self.dump()
+            strings=ui_strings(current)
+            if all(any(marker in text for text in strings) for marker in expected):return current
+            self.tap(label,match=match)
+            try:return self.ready(expected,seconds=10)
+            except RuntimeError:
+                # Recheck before retrying; an animation may have completed meanwhile.
+                current=self.dump();strings=ui_strings(current)
+                if all(any(marker in text for text in strings) for marker in expected):return current
+                if attempt:raise
+        raise RuntimeError('Control did not open its expected modal')
 
     def seed(self, populated, font_size='medium'):
         self.shell('am', 'force-stop', PACKAGE)
@@ -287,7 +326,7 @@ def capture(device, directory, name, route, expected, action=None, open_route=Tr
                 if evidence is not None: record['actionEvidence']=evidence
             else:
                 device.ready(action[0])
-                device.tap(action[1])
+                device.open_control(action[1],expected,match=action[2] if len(action)>2 else 'exact')
         xml = device.ready(expected)
         foreground = device.shell('dumpsys', 'activity', 'activities')
         resumed = '\n'.join(line for line in foreground.splitlines() if 'ResumedActivity' in line or 'topResumedActivity' in line)
@@ -334,7 +373,7 @@ def creation_keyboard(device):
 
 def onboarding_welcome(device):
     device.ready(['기준 사진 표시'])
-    device.tap('사용 가이드')
+    device.tap('사용 가이드',match='summary')
     device.ready(['바디 프레임에 오신 것을 환영합니다.'])
     device.find_control('시작하기')  # Scroll inside the real guide when large text pushes it below the fold.
 
@@ -409,9 +448,9 @@ def wait_export_terminal(device, expected_error=None, seconds=180):
 
 
 def set_interval(device, value):
-    device.tap('사진 간격');device.ready(['사진 간격','적용'])
+    device.tap('사진 간격',match='summary');device.ready(['사진 간격','적용'])
     device.tap(f'{value}초');device.tap('적용')
-    device.ready(['변화 영상 만들기'])
+    device.ready([f'사진 간격, {value}초'])
 
 
 def background_during_native_encoder(device, directory):
@@ -505,6 +544,8 @@ def video_smoke(device, directory, restart=True):
         retry_pid=device.shell('pidof',PACKAGE).strip()
         result.update(retryWithoutForceStop=not restart,pidBeforeRetry=retry_pid)
         device.open('video-create',restart=restart)
+        if not restart:
+            for _ in range(3):device.scroll_down(reverse=True)
         device.ready(['변화 영상 만들기', 'QA 데모'])
         device.tap('영상 만들기')
         result['createClicks'] = 1
@@ -640,7 +681,7 @@ def main():
                 ('records', 'studio', ['QA 데모', '프로젝트별 몸의 변화를'], None),
                 ('project', f'project/{PROJECT}', ['QA 데모', '프로젝트 설정 열기'], None),
                 ('project-settings', f'project/{PROJECT}', ['프로젝트 설정', '변경 저장', '이름'], (['프로젝트 설정 열기'], '프로젝트 설정 열기')),
-                ('project-reminder', f'project/{PROJECT}', ['촬영 알림', '요일'], (['프로젝트 촬영 알림 설정'], '프로젝트 촬영 알림 설정')),
+                ('project-reminder', f'project/{PROJECT}', ['촬영 알림 설정 닫기', '촬영 알림', '요일'], (['프로젝트 촬영 알림 설정'], '프로젝트 촬영 알림 설정')),
                 ('photo', f'photo/{PHOTO}', ['기록 상세'], None),
                 ('photo-measurement', f'photo/{PHOTO}?measurement=1', ['몸무게', '체지방률', '저장'], None),
                 ('edit-login-required', 'edit?' + urlencode({'photoId': PHOTO}), ['로그인이 필요합니다', '사진 편집은 무료 로그인부터'], None),
@@ -649,14 +690,14 @@ def main():
                 ('measurement-create', f'project/{PROJECT}/measurements?add=1', ['몸무게', '저장'], None),
                 ('video', 'trip-clip', ['프로젝트로 변화 영상을'], None),
                 ('video-create', 'video-create', ['변화 영상 만들기', 'QA 데모'], None),
-                ('video-photos', 'video-create', ['사진 선택', '전체 선택'], (['변화 영상 만들기'], '사진 수')),
-                ('video-interval', 'video-create', ['사진 간격', '적용'], (['변화 영상 만들기'], '사진 간격')),
-                ('video-quality', 'video-create', ['영상 화질', '적용'], (['변화 영상 만들기'], '화질')),
-                ('video-ratio', 'video-create', ['화면 비율', '적용'], (['변화 영상 만들기'], '화면 비율')),
-                ('video-overlay', 'video-create', ['텍스트 오버레이', '적용'], (['변화 영상 만들기'], '텍스트')),
+                ('video-photos', 'video-create', ['사진 선택', '전체 선택'], (['변화 영상 만들기'], '사진 수','summary')),
+                ('video-interval', 'video-create', ['사진 간격', '적용'], (['변화 영상 만들기'], '사진 간격','summary')),
+                ('video-quality', 'video-create', ['영상 화질', '적용'], (['변화 영상 만들기'], '화질','summary')),
+                ('video-ratio', 'video-create', ['화면 비율', '적용'], (['변화 영상 만들기'], '화면 비율','summary')),
+                ('video-overlay', 'video-create', ['텍스트 오버레이', '적용'], (['변화 영상 만들기'], '텍스트','summary')),
                 ('video-library', 'video-library', ['영상 관리', '저장한 영상'], None),
                 ('settings', 'settings', ['설정', '기준 사진 표시'], None),
-                ('settings-reference', 'settings', ['기준 사진 표시', '닫기'], (['기준 사진 표시'], '기준 사진 표시')),
+                ('settings-reference', 'settings', ['기준 사진 표시', '닫기'], (['기준 사진 표시'], '기준 사진 표시','summary')),
                 ('account', 'account', ['로그인하고 기록을 보호하세요.'], None),
                 ('capture-preview', 'capture-preview?' + urlencode({'id': PHOTO}), ['촬영 미리보기', '다시 촬영'], None),
             ]

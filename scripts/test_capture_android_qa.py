@@ -5,6 +5,7 @@ from pathlib import Path
 import sqlite3
 import tempfile
 import unittest
+from unittest.mock import Mock
 
 spec = importlib.util.spec_from_file_location('capture_qa', Path(__file__).with_name('capture-android-qa.py'))
 qa = importlib.util.module_from_spec(spec)
@@ -83,6 +84,39 @@ class CaptureHelpersTest(unittest.TestCase):
     def test_declared_frame_count_cannot_replace_counted_decoded_frames(self):
         with self.assertRaises(ValueError):
             qa.validate_video_probe({'streams':[{'codec_type':'video','codec_name':'h264','width':1080,'height':1440,'nb_frames':'9'}],'format':{'duration':'0.3'}})
+
+    def test_export_action_never_falls_back_to_nonclickable_containing_header(self):
+        header='<hierarchy><node clickable="false" enabled="true" bounds="[0,0][720,1600]"><node text="변화 영상 만들기" clickable="false" enabled="true" bounds="[140,84][580,188]"/></node></hierarchy>'
+        with self.assertRaises(RuntimeError):qa.target_bounds(header,'영상 만들기')
+        valid=header.replace('</hierarchy>','<node content-desc="영상 만들기" clickable="true" enabled="true" bounds="[32,1200][688,1296]"/></hierarchy>')
+        self.assertEqual(qa.target_bounds(valid,'영상 만들기',viewport=(0,48,720,1504)),(360,1248))
+
+    def test_action_rejects_nonactionable_exact_label_disabled_ancestor_and_offscreen_bounds(self):
+        for content in ['<node text="영상 만들기" clickable="false" enabled="true" bounds="[0,0][100,100]"/>',
+                        '<node clickable="true" enabled="false" bounds="[0,0][100,100]"><node text="영상 만들기" enabled="true" bounds="[1,1][99,99]"/></node>',
+                        '<node content-desc="영상 만들기" clickable="true" enabled="true" bounds="[10,1550][600,1700]"/>']:
+            with self.assertRaises(RuntimeError):qa.target_bounds('<hierarchy>'+content+'</hierarchy>','영상 만들기',viewport=(0,48,720,1504))
+
+    def test_summary_accessibility_labels_require_explicit_field_matching(self):
+        xml='<hierarchy><node content-desc="사진 간격, 0.1초  ›" clickable="true" enabled="true" bounds="[20,100][700,196]"/></hierarchy>'
+        with self.assertRaises(RuntimeError):qa.target_bounds(xml,'사진 간격')
+        self.assertEqual(qa.target_bounds(xml,'사진 간격',match='summary'),(360,148))
+
+    def test_modal_action_retries_one_missed_tap_only_after_absent_postcondition(self):
+        absent='<hierarchy><node text="page"/></hierarchy>'
+        present='<hierarchy><node text="MODAL"/></hierarchy>'
+        device=qa.Device();device.dump=Mock(side_effect=[absent,absent,absent]);device.tap=Mock()
+        device.ready=Mock(side_effect=[RuntimeError('first tap missed'),present])
+        self.assertEqual(device.open_control('settings',['MODAL']),present)
+        self.assertEqual(device.tap.call_count,2)
+
+    def test_modal_action_does_not_repeat_if_postcondition_appears_after_timeout(self):
+        absent='<hierarchy><node text="page"/></hierarchy>'
+        present='<hierarchy><node text="MODAL"/></hierarchy>'
+        device=qa.Device();device.dump=Mock(side_effect=[absent,present]);device.tap=Mock()
+        device.ready=Mock(side_effect=RuntimeError('animation delayed'))
+        self.assertEqual(device.open_control('settings',['MODAL']),present)
+        self.assertEqual(device.tap.call_count,1)
 
 
 if __name__ == '__main__':
