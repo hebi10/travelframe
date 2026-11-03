@@ -235,6 +235,7 @@ const seedBackupUploadSession = async ({
   contentType = "image/jpeg",
   mediaKind = "image",
   status = "reserved",
+  itemId,
   projectId: sessionProjectId = null,
   expiresAt = new Date(Date.now() + 60_000)
 } = {}) => {
@@ -246,6 +247,7 @@ const seedBackupUploadSession = async ({
     fileSize,
     contentType,
     ...(sessionProjectId ? { projectId: sessionProjectId } : {}),
+    ...(itemId !== undefined ? { itemId, itemType: "photo" } : {}),
     expiresAt
   });
 };
@@ -444,6 +446,47 @@ await expectAllowed(
   firestoreRequest("PATCH", `users/${ownerUid}/photoBackups/photo-1`, {
     uid: ownerUid,
     data: { ...validPhotoBackup(ownerUid, "photo-1"), backupStatus: "failed" }
+  })
+);
+
+const boundPhotoId = "bound-photo";
+const boundSessionId = "bound-photo-session";
+const boundStoragePath = `users/${ownerUid}/backups/photos/bound.jpg`;
+const boundPhoto = {
+  ...validPhotoBackup(ownerUid, boundPhotoId),
+  backupSessionId: boundSessionId,
+  storagePath: boundStoragePath,
+  projectId: "project-1", sequence: 1
+};
+const seedBoundPhotoSession = (status) => seedBackupUploadSession({
+  sessionId: boundSessionId, storagePath: boundStoragePath,
+  itemId: boundPhotoId, projectId: "project-1", fileSize: 1024, status
+});
+await seedBoundPhotoSession("reserved");
+await expectDenied(
+  "new photo identity cannot write metadata before server completion approves capacity",
+  firestoreRequest("PATCH", `users/${ownerUid}/photoBackups/${boundPhotoId}`, { uid: ownerUid, data: boundPhoto })
+);
+await seedBoundPhotoSession("completed");
+await expectAllowed(
+  "completed identity-bound photo session creates its matching immutable photo",
+  firestoreRequest("PATCH", `users/${ownerUid}/photoBackups/${boundPhotoId}`, { uid: ownerUid, data: boundPhoto })
+);
+await expectDenied(
+  "completed photo session cannot be reused to create a different immutable photo",
+  firestoreRequest("PATCH", `users/${ownerUid}/photoBackups/reused-photo`, {
+    uid: ownerUid, data: { ...boundPhoto, localId: "reused-photo" }
+  })
+);
+await seedBackupUploadSession({
+  sessionId: "legacy-null-item", itemId: null,
+  storagePath: `users/${ownerUid}/backups/photos/legacy-null.jpg`, fileSize: 1024
+});
+await expectAllowed(
+  "legacy null-item session retains its existing metadata compatibility",
+  firestoreRequest("PATCH", `users/${ownerUid}/photoBackups/legacy-null`, {
+    uid: ownerUid,
+    data: { ...validPhotoBackup(ownerUid, "legacy-null"), backupSessionId: "legacy-null-item", storagePath: `users/${ownerUid}/backups/photos/legacy-null.jpg` }
   })
 );
 

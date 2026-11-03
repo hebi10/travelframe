@@ -59,6 +59,31 @@ class CaptureHelpersTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             qa.validate_video_probe({'streams': probe['streams'], 'format': {'duration': '0'}})
 
+    def test_fixture_markers_distinguish_every_photo_and_reject_blank_or_stale_pixels(self):
+        for index in (1, 2, 3):
+            pixels = qa.pattern_rgb(index, 120, 160)
+            self.assertEqual(len(pixels), 120*160*3)
+            self.assertEqual(qa.validate_marker_pixels(pixels, 120, 160, index)['photo'], index)
+        for pixels, index in [(bytes(120*160*3), 1), (qa.pattern_rgb(1,120,160), 2)]:
+            with self.assertRaises(ValueError):
+                qa.validate_marker_pixels(pixels,120,160,index)
+
+    def test_native_probe_requires_exact_frame_count_and_one_frame_duration_tolerance(self):
+        stream = {'codec_type':'video','codec_name':'h264','width':1080,'height':1440}
+        for frames, duration in [(None, '0.3'), ('N/A','0.3'), ('9','0.9'), ('9','0.2')]:
+            with self.assertRaises(ValueError):
+                qa.validate_video_probe({'streams':[dict(stream,nb_read_frames=frames)],'format':{'duration':duration}})
+
+    def test_expected_native_failures_must_not_change_videos_or_guest_quota(self):
+        before={'travel-frame.videos.v1':'[]'}
+        self.assertTrue(qa.no_export_side_effects(before,dict(before))['guestQuotaUnchanged'])
+        for after in [dict(before,guestWeeklyVideoExportUsage='{"count":1}'),{'travel-frame.videos.v1':'[{"id":"unexpected"}]'}]:
+            with self.assertRaises(ValueError):qa.no_export_side_effects(before,after)
+
+    def test_declared_frame_count_cannot_replace_counted_decoded_frames(self):
+        with self.assertRaises(ValueError):
+            qa.validate_video_probe({'streams':[{'codec_type':'video','codec_name':'h264','width':1080,'height':1440,'nb_frames':'9'}],'format':{'duration':'0.3'}})
+
 
 if __name__ == '__main__':
     unittest.main()

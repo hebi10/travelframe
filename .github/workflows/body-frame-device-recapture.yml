@@ -1,0 +1,118 @@
+name: Body Frame recapture verified existing APK
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/body-frame-device-recapture.yml'
+      - 'scripts/capture-android-qa.py'
+      - 'scripts/test_capture_android_qa.py'
+      - 'scripts/verify-android-qa-apk.py'
+      - 'scripts/test_verify_android_qa_apk.py'
+      - 'scripts/android-qa-apk-selection.json'
+  workflow_dispatch:
+    inputs:
+      apk_run_id:
+        description: Successful APK build run ID in this repository
+        required: true
+        type: string
+      apk_sha256:
+        description: SHA256 of the exact reviewed APK to capture
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: body-frame-native-recapture-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  capture-existing-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Resolve authenticated selected build and its actual checkout
+        id: selected
+        uses: actions/github-script@v7
+        env:
+          APK_RUN_ID: ${{ inputs.apk_run_id }}
+          APK_SHA256: ${{ inputs.apk_sha256 }}
+        with:
+          script: |
+            const fs = require('fs');
+            let selection = {apk_run_id:process.env.APK_RUN_ID,apk_sha256:process.env.APK_SHA256};
+            if (!selection.apk_run_id) {
+              const path = 'scripts/android-qa-apk-selection.json';
+              if (!fs.existsSync(path)) throw new Error('An explicit reviewed APK selection JSON is required for PR recapture; there is no latest-build fallback');
+              selection = JSON.parse(fs.readFileSync(path,'utf8'));
+            }
+            const runId = Number(selection.apk_run_id);
+            if (!/^[a-fA-F0-9]{64}$/.test(selection.apk_sha256 || '')) throw new Error('Explicit reviewed APK SHA256 is required');
+            core.setOutput('run_id',String(runId));
+            core.setOutput('apk_sha256',selection.apk_sha256);
+            if (!Number.isSafeInteger(runId) || runId <= 0) throw new Error('Invalid selected APK run ID');
+            const run = (await github.rest.actions.getWorkflowRun({...context.repo,run_id:runId})).data;
+            if (run.repository.full_name !== `${context.repo.owner}/${context.repo.repo}`) throw new Error('Selected run is outside this repository');
+            const jobs = (await github.rest.actions.listJobsForWorkflowRun({...context.repo,run_id:runId})).data.jobs;
+            const build = jobs.find(job => job.name === 'build-apk' && job.conclusion === 'success');
+            if (!build) throw new Error('Selected run has no successful native APK build job');
+            const response = await github.rest.actions.downloadJobLogsForWorkflowRun({...context.repo,job_id:build.id});
+            const logs = typeof response.data === 'string' ? response.data : Buffer.from(response.data).toString('utf8');
+            const checkout = logs.match(/git log -1 --format=%H[^\n]*\n[^\n]*?\b([a-f0-9]{40})\b/);
+            if (!checkout) throw new Error('Cannot prove the actual checkout SHA from the successful build checkout log');
+            fs.mkdirSync('artifacts/native-qa',{recursive:true});
+            fs.writeFileSync('artifacts/selected-run.json',JSON.stringify({repository:run.repository.full_name,runId,runUrl:run.html_url,headSha:run.head_sha,checkoutSha:checkout[1],buildJobId:build.id,buildConclusion:build.conclusion},null,2));
+      - uses: actions/download-artifact@v4
+        with:
+          name: body-frame-native-qa-apk
+          path: artifacts/apk
+          run-id: ${{ steps.selected.outputs.run_id }}
+          github-token: ${{ github.token }}
+      - name: Verify exact APK hash and unchanged client/build inputs
+        env:
+          EXPECTED_APK_SHA256: ${{ steps.selected.outputs.apk_sha256 }}
+        run: |
+          selected="$(python3 -c 'import json;print(json.load(open("artifacts/selected-run.json"))["checkoutSha"])')"
+          git cat-file -e "$selected" || git fetch origin "$selected" --depth=1
+          python3 scripts/verify-android-qa-apk.py --run-metadata artifacts/selected-run.json --apk artifacts/apk/app-qaRelease.apk --expected-sha256 "$EXPECTED_APK_SHA256" --output artifacts/native-qa/apk-trust-manifest.json
+      - name: Ensure host image/video inspection tools
+        run: |
+          if ! command -v ffprobe >/dev/null || ! command -v ffmpeg >/dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y ffmpeg
+          fi
+      - name: Verify capture helpers
+        run: |
+          python3 scripts/test_capture_android_qa.py
+          python3 scripts/test_verify_android_qa_apk.py
+      - name: Enable KVM access
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Capture native mobile/tablet and image/lifecycle acceptance
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_2
+          ram-size: 3072M
+          heap-size: 512M
+          disk-size: 6000M
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back emulated -camera-front none
+          script: python3 scripts/capture-android-qa.py --apk artifacts/apk/app-qaRelease.apk --output artifacts/native-qa --trust-manifest artifacts/native-qa/apk-trust-manifest.json
+      - name: Upload capture and strict trust evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: body-frame-native-recapture-${{ github.run_id }}
+          path: artifacts/
+          if-no-files-found: warn
+          retention-days: 14

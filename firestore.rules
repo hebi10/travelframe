@@ -423,6 +423,18 @@ service cloud.firestore {
         && (!request.resource.data.keys().hasAny(["sourceUpdatedAt"]) || request.resource.data.sourceUpdatedAt is string);
     }
 
+    function photoUploadIdentityMatches(userId, photoId) {
+      let session = backupUploadSession(userId, request.resource.data.backupSessionId).data;
+      // Old unbound sessions remain readable/upgradable. New immutable photo
+      // IDs consume one server-approved slot before client metadata is created.
+      return !session.keys().hasAny(["itemId"])
+        || session.itemId == null
+        || session.itemId == ""
+        || (session.itemId is string
+          && session.itemId == photoId
+          && session.status == "completed");
+    }
+
     function isValidPhotoBackup(userId, photoId) {
       return hasValidBackupOwner(userId)
         && validPhotoProjectFields()
@@ -437,6 +449,7 @@ service cloud.firestore {
         && request.resource.data.fileType.matches('image/.*')
         && isValidPhotoBackupUrls(userId)
         && hasValidBackupSessionId()
+        && photoUploadIdentityMatches(userId, photoId)
         && hasReservedTypedBackupUploadSession(
           userId,
           "image",

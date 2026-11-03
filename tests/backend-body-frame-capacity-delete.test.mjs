@@ -12,7 +12,11 @@ const timestamp = (millis) => ({ toMillis: () => millis });
 
 // Execute the production callable bodies with only Firestore/Storage replaced.
 const harness = () => {
-  const docs = new Map();
+  const versions = new Map();
+  const docs = new class extends Map {
+    set(path, value) { versions.set(path, (versions.get(path) ?? 0) + 1); return super.set(path, value); }
+    delete(path) { versions.set(path, (versions.get(path) ?? 0) + 1); return super.delete(path); }
+  }();
   const objects = new Map();
   const deletes = [];
   const events = [];
@@ -24,10 +28,13 @@ const harness = () => {
     constructor(...args) { super(...(args.length ? args : [clockNow])); }
     static now() { return clockNow; }
   }
-  const snapshot = (path) => ({
-    id: path.split("/").at(-1), exists: docs.has(path),
-    data: () => docs.get(path), ref: ref(path)
-  });
+  const snapshot = (path) => {
+    const value = docs.get(path);
+    return {
+      id: path.split("/").at(-1), exists: docs.has(path), version: versions.get(path) ?? 0,
+      data: () => value, ref: ref(path)
+    };
+  };
   const ref = (path) => ({
     path, id: path.split("/").at(-1),
     get: async () => snapshot(path),
@@ -50,22 +57,37 @@ const harness = () => {
   });
   const db = {
     doc: ref, collection,
-    runTransaction: async (body) => body({
-      get: async (target) => target.isQuery ? target.get() : snapshot(target.path),
-      set: (target, data, options) => {
-        events.push(`write:${target.path}`);
-        docs.set(target.path, options?.merge ? { ...docs.get(target.path), ...data } : data);
-      },
-      update: (target, data) => {
-        events.push(`write:${target.path}`);
-        docs.set(target.path, { ...docs.get(target.path), ...data });
-      },
-      create: (target, data) => {
-        assert.equal(docs.has(target.path), false);
-        events.push(`create:${target.path}`);
-        docs.set(target.path, data);
+    runTransaction: async (body) => {
+      for (let attempt = 0; attempt < 20; attempt++) {
+        const reads = new Map();
+        const writes = [];
+        const result = await body({
+          get: async (target) => {
+            assert.equal(writes.length, 0, "Firestore transactions require all reads before writes");
+            const result = target.isQuery ? await target.get() : snapshot(target.path);
+            // Deliberately no query-phantom simulation: capacity safety must have
+            // an actual shared document conflict, not rely on this mock's magic.
+            for (const item of target.isQuery ? result.docs : [result]) reads.set(item.ref.path, item.version);
+            return result;
+          },
+          set: (target, data, options) => writes.push({ target, data, merge: options?.merge }),
+          update: (target, data) => writes.push({ target, data, merge: true }),
+          create: (target, data) => writes.push({ target, data, create: true })
+        });
+        await Promise.resolve();
+        if ([...reads].some(([path, version]) => (versions.get(path) ?? 0) !== version)) {
+          events.push("transaction-retry");
+          continue;
+        }
+        for (const { target, data, merge, create } of writes) {
+          if (create) assert.equal(docs.has(target.path), false);
+          events.push(`${create ? "create" : "write"}:${target.path}`);
+          docs.set(target.path, merge ? { ...docs.get(target.path), ...data } : data);
+        }
+        return result;
       }
-    }),
+      throw Error("Mock transaction retry limit exceeded");
+    },
     batch: () => {
       const refs = [];
       return { delete: (target) => refs.push(target), commit: async () => refs.forEach((target) => docs.delete(target.path)) };
@@ -121,7 +143,7 @@ const addSession = (h, { collection = "backupUploadSessions", id = "pending", ex
   h.docs.set(path, { userId: uid, projectId, itemType: "photo", itemId: "pending-photo", mediaKind: "image", fileSize: 100, storagePath: `users/${uid}/backups/photos/${id}/photo.jpg`, status: "reserved", expiresAt, ...data });
   return path;
 };
-const reserve = (h) => h.output.reserveBackupUpload({ auth: { uid }, data: { projectId, itemType: "photo", itemId: "last-photo", mediaKind: "image", fileSize: 100, contentType: "image/jpeg", storagePath: `users/${uid}/backups/photos/last-photo.jpg` } });
+const reserve = (h, itemId = "last-photo") => h.output.reserveBackupUpload({ auth: { uid }, data: { projectId, itemType: "photo", itemId, mediaKind: "image", fileSize: 100, contentType: "image/jpeg", storagePath: `users/${uid}/backups/photos/${itemId}.jpg` } });
 const exhausted = (error) => error.code === "resource-exhausted";
 const reserveAdmin = (h) => h.output.reserveAdminBackupUpload({ auth: { uid: "admin" }, data: { targetUid: uid, projectId, itemKind: "image", fileName: "photo.jpg", fileSize: 100, contentType: "image/jpeg" } });
 const completeAdmin = (h, uploadSessionId) => h.output.completeAdminBackupUpload({ auth: { uid: "admin" }, data: { targetUid: uid, uploadSessionId } });
@@ -135,6 +157,79 @@ const uploadAdmin = async (h) => {
   return reserved;
 };
 const photoCount = (h) => [...h.docs.keys()].filter((path) => path.startsWith(`users/${uid}/photoBackups/`)).length;
+const uploadOwner = async (h, itemId) => {
+  const reserved = await reserve(h, itemId);
+  h.objects.set(reserved.storagePath, {
+    size: "100", contentType: "image/jpeg", generation: "1",
+    metadata: { backupSessionId: reserved.backupSessionId, firebaseStorageDownloadTokens: "test-token" }
+  });
+  return { ...reserved, itemId };
+};
+const completeOwner = (h, uploaded) => h.output.completeBackupUpload({ auth: { uid }, data: { backupSessionId: uploaded.backupSessionId } });
+const persistOwner = async (h, uploaded) => {
+  await completeOwner(h, uploaded);
+  h.docs.set(`users/${uid}/photoBackups/${uploaded.itemId}`, { projectId, backupSessionId: uploaded.backupSessionId, storagePath: uploaded.storagePath, fileSize: 100 });
+};
+
+for (const kinds of [["owner", "owner"], ["admin", "admin"], ["owner", "admin"]]) {
+  test(`concurrent ${kinds.join("/")} reservations share exactly one final photo slot`, async () => {
+    const h = harness(); addPhotos(h); h.docs.set("admins/admin", {});
+    const results = await Promise.allSettled(kinds.map((kind, index) => kind === "owner" ? uploadOwner(h, `photo-${index}`) : uploadAdmin(h)));
+    assert.equal(results.filter((result) => result.status === "fulfilled").length, 1);
+    assert.equal(results.filter((result) => result.status === "rejected" && result.reason.code === "resource-exhausted").length, 1);
+    if (kinds[0] === kinds[1]) {
+      assert.ok(h.events.includes("transaction-retry"), "a stale shared usage guard read must trigger retry");
+    }
+    for (let index = 0; index < results.length; index++) {
+      if (results[index].status !== "fulfilled") continue;
+      const uploaded = results[index].value;
+      if (kinds[index] === "owner") await persistOwner(h, uploaded);
+      else await completeAdmin(h, uploaded.uploadSessionId);
+    }
+    assert.equal(photoCount(h), 365);
+  });
+
+  test(`legacy overbooked ${kinds.join("/")} completions cannot persist photo 366`, async () => {
+    const h = harness(); addPhotos(h, 363); h.docs.set("admins/admin", {});
+    const uploaded = [];
+    for (let index = 0; index < kinds.length; index++) uploaded.push(kinds[index] === "owner" ? await uploadOwner(h, `old-${index}`) : await uploadAdmin(h));
+    addPhotos(h, 364); // Represents a pre-fix pair of pending reservations.
+    const results = await Promise.allSettled(kinds.map((kind, index) => kind === "owner" ? persistOwner(h, uploaded[index]) : completeAdmin(h, uploaded[index].uploadSessionId)));
+    assert.equal(results.filter((result) => result.status === "fulfilled").length, 1);
+    assert.equal(results.filter((result) => result.status === "rejected" && result.reason.code === "resource-exhausted").length, 1);
+    assert.equal(photoCount(h), 365);
+  });
+}
+
+test("completed owner upload retains its photo slot before client metadata is written", async () => {
+  const h = harness(); addPhotos(h);
+  const uploaded = await uploadOwner(h, "waiting-for-metadata");
+  await completeOwner(h, uploaded);
+  h.docs.set("admins/admin", {});
+  await assert.rejects(reserveAdmin(h), exhausted);
+  await assert.rejects(reserve(h, "different-photo"), exhausted);
+  await persistOwner(h, uploaded);
+  assert.equal(photoCount(h), 365);
+});
+
+test("completed owner sessions and existing photo metadata count once, including replacements", async () => {
+  const h = harness(); addPhotos(h, 363);
+  const uploaded = await uploadOwner(h, "saved-photo");
+  await persistOwner(h, uploaded);
+  const final = await uploadAdmin(h);
+  await completeAdmin(h, final.uploadSessionId);
+  await reserve(h, "saved-photo");
+  assert.equal(photoCount(h), 365);
+});
+
+test("owner completion rechecks expiry after Storage verification before consuming its slot", async () => {
+  const h = harness(); addPhotos(h);
+  const uploaded = await uploadOwner(h, "expired-during-verification");
+  h.onMetadata(() => h.advance(16 * 60_000));
+  await assert.rejects(completeOwner(h, uploaded), (error) => error.code === "deadline-exceeded");
+  assert.equal(h.docs.get(`users/${uid}/backupUploadSessions/${uploaded.backupSessionId}`).status, "failed");
+  assert.equal(h.objects.has(uploaded.storagePath), false);
+});
 
 for (const collection of ["backupUploadSessions", "adminBackupUploadSessions"]) {
   test(`364 photos plus expired ${collection} still permits the last slot`, async () => {

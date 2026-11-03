@@ -350,28 +350,29 @@ const assertBackupProjectSlotAllowed = async ({
 const assertProjectPhotoBackupCapacity = async ({
   uid,
   projectId,
-  itemId
+  itemId,
+  transaction = null,
+  includeReserved = true,
+  excludeSessionId = null
 }) => {
+  const read = (target) => transaction ? transaction.get(target) : target.get();
   const [
     photoSnapshot,
     sessionSnapshot,
     adminSessionSnapshot,
     existingItemSnapshot
   ] = await Promise.all([
-    db
+    read(db
       .collection(`users/${uid}/photoBackups`)
-      .where("projectId", "==", projectId)
-      .get(),
-    db
+      .where("projectId", "==", projectId)),
+    read(db
       .collection(`users/${uid}/backupUploadSessions`)
-      .where("projectId", "==", projectId)
-      .get(),
-    db
+      .where("projectId", "==", projectId)),
+    read(db
       .collection(`users/${uid}/adminBackupUploadSessions`)
-      .where("projectId", "==", projectId)
-      .get(),
+      .where("projectId", "==", projectId)),
     typeof itemId === "string" && itemId
-      ? db.doc(`users/${uid}/photoBackups/${itemId}`).get()
+      ? read(db.doc(`users/${uid}/photoBackups/${itemId}`))
       : Promise.resolve(null)
   ]);
 
@@ -380,21 +381,36 @@ const assertProjectPhotoBackupCapacity = async ({
   }
 
   const now = Date.now();
-  const pendingPhotoCount = [
-    ...sessionSnapshot.docs,
-    ...adminSessionSnapshot.docs
-  ].filter((item) => {
+  const photoIds = new Set(photoSnapshot.docs.map((item) => item.id));
+  const linkedSessionIds = new Set(photoSnapshot.docs.map((item) => item.data().backupSessionId).filter(Boolean));
+  const pendingPhotoSlots = new Set();
+  for (const item of sessionSnapshot.docs) {
     const data = item.data();
-    return (
-      data.status === "reserved" &&
+    if (
+      item.id !== excludeSessionId &&
+      (data.status === "completed" || (includeReserved && data.status === "reserved")) &&
       (!data.expiresAt?.toMillis || data.expiresAt.toMillis() > now) &&
       data.itemType === "photo" &&
-      (!itemId || data.itemId !== itemId)
-    );
-  }).length;
+      (!itemId || data.itemId !== itemId) &&
+      !photoIds.has(data.itemId) && !linkedSessionIds.has(item.id)
+    ) {
+      // Completion precedes the client metadata write. Keep that committed
+      // photo's slot occupied, deduplicating replacements by immutable itemId.
+      pendingPhotoSlots.add(data.itemId ? `photo:${data.itemId}` : `owner:${item.id}`);
+    }
+  }
+  if (includeReserved) {
+    for (const item of adminSessionSnapshot.docs) {
+      const data = item.data();
+      if (data.status === "reserved" && data.itemType === "photo" &&
+          (!data.expiresAt?.toMillis || data.expiresAt.toMillis() > now)) {
+        pendingPhotoSlots.add(`admin:${item.id}`);
+      }
+    }
+  }
 
   if (
-    photoSnapshot.size + pendingPhotoCount >=
+    photoSnapshot.size + pendingPhotoSlots.size >=
     CLOUD_BACKUP_PHOTOS_PER_PROJECT
   ) {
     throw new HttpsError(
@@ -1283,11 +1299,6 @@ exports.reserveBackupUpload = secureOnCall(async (request) => {
         subscription,
         projectId
       });
-      await assertProjectPhotoBackupCapacity({
-        uid,
-        projectId,
-        itemId
-      });
     } else if (itemType === "video" && projectId) {
       await assertBackupProjectSlotAllowed({
         uid,
@@ -1316,6 +1327,10 @@ exports.reserveBackupUpload = secureOnCall(async (request) => {
         );
       }
       const usage = usageSnapshot.data() ?? {};
+
+      if (itemType === "photo") {
+        await assertProjectPhotoBackupCapacity({ uid, projectId, itemId, transaction });
+      }
 
       assertBackupUploadAllowed({
         uid,
@@ -1410,7 +1425,7 @@ exports.completeBackupUpload = secureOnCall(async (request) => {
       );
     }
 
-    if (session.expiresAt?.toMillis && session.expiresAt.toMillis() < Date.now()) {
+    if (isBackupUploadSessionExpired(session)) {
       await failBackupUploadSession({
         uid,
         sessionRef,
@@ -1471,6 +1486,19 @@ exports.completeBackupUpload = secureOnCall(async (request) => {
         if (!freshSessionSnapshot.exists || freshSession.status !== "reserved") {
           return normalizeBackupUsage(usageSnapshot.data());
         }
+        if (isBackupUploadSessionExpired(freshSession)) {
+          throw new HttpsError("deadline-exceeded", "Backup upload session expired.");
+        }
+        if (freshSession.itemType === "photo" && freshSession.projectId) {
+          await assertProjectPhotoBackupCapacity({
+            uid,
+            projectId: freshSession.projectId,
+            itemId: freshSession.itemId,
+            transaction,
+            includeReserved: false,
+            excludeSessionId: backupSessionId
+          });
+        }
 
         const usageDelta = getBackupSessionUsageDelta(freshSession);
         const updatedUsage = completeReservedBackupUsage(
@@ -1499,7 +1527,7 @@ exports.completeBackupUpload = secureOnCall(async (request) => {
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      if (message.includes("quota")) {
+      if (message.includes("quota") || error?.code === "deadline-exceeded") {
         await failBackupUploadSession({
           uid,
           sessionRef,
@@ -2707,16 +2735,11 @@ exports.reserveAdminBackupUpload = secureOnCall(async (request) => {
         subscription,
         projectId
       });
-      if (itemKind === "image") {
-        await assertProjectPhotoBackupCapacity({
-          uid: targetUid,
-          projectId
-        });
-      }
     }
 
     const sessionRef = db.collection(`users/${targetUid}/adminBackupUploadSessions`).doc();
     const storagePath = config.storagePath(sessionRef.id);
+    const usageRef = getUsageRef(targetUid);
 
     await db.runTransaction(async (tx) => {
       if (projectId) {
@@ -2730,6 +2753,12 @@ exports.reserveAdminBackupUpload = secureOnCall(async (request) => {
             "프로젝트 교체 중에는 관리자 백업을 예약할 수 없습니다."
           );
         }
+      }
+      if (itemKind === "image") {
+        // Both owner/admin photo reservations read and write this existing
+        // server-owned ledger, forcing capacity queries to rerun on conflict.
+        await tx.get(usageRef);
+        await assertProjectPhotoBackupCapacity({ uid: targetUid, projectId, transaction: tx });
       }
       tx.set(sessionRef, {
         adminUid,
@@ -2746,6 +2775,9 @@ exports.reserveAdminBackupUpload = secureOnCall(async (request) => {
         createdAt: FieldValue.serverTimestamp(),
         expiresAt: admin.firestore.Timestamp.fromMillis(Date.now() + BACKUP_UPLOAD_SESSION_TTL_MS)
       });
+      if (itemKind === "image") {
+        tx.set(usageRef, { updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+      }
     });
 
     return {
@@ -2935,7 +2967,8 @@ exports.completeAdminBackupUpload = secureOnCall(async (request) => {
     const result = await db.runTransaction(async (tx) => {
       const [freshSession, projectLock] = await Promise.all([
         tx.get(sessionRef),
-        projectLockRef ? tx.get(projectLockRef) : Promise.resolve(null)
+        projectLockRef ? tx.get(projectLockRef) : Promise.resolve(null),
+        session.itemType === "photo" ? tx.get(getUsageRef(targetUid)) : Promise.resolve(null)
       ]);
       if (!freshSession.exists || freshSession.data()?.adminUid !== adminUid ||
           freshSession.data()?.targetUid !== targetUid) {
@@ -2960,6 +2993,15 @@ exports.completeAdminBackupUpload = secureOnCall(async (request) => {
           failedAt: FieldValue.serverTimestamp()
         });
         return { expired: true };
+      }
+      if (session.itemType === "photo" && session.projectId) {
+        await assertProjectPhotoBackupCapacity({
+          uid: targetUid,
+          projectId: session.projectId,
+          transaction: tx,
+          includeReserved: false
+        });
+        tx.set(getUsageRef(targetUid), { updatedAt: FieldValue.serverTimestamp() }, { merge: true });
       }
       tx.create(itemRef, payload);
       tx.update(sessionRef, {

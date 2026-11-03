@@ -2,6 +2,32 @@ name: Body Frame native device QA
 
 on:
   pull_request:
+    paths:
+      - 'app/**'
+      - 'components/**'
+      - 'features/**'
+      - 'lib/**'
+      - 'plugins/**'
+      - 'assets/**'
+      - 'constants/**'
+      - 'types/**'
+      - 'hooks/**'
+      - 'android/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'app.json'
+      - 'app.config.*'
+      - 'babel.config.*'
+      - 'metro.config.*'
+      - 'tsconfig.json'
+      - '.npmrc'
+      - 'scripts/**'
+      - '!scripts/capture-android-qa.py'
+      - '!scripts/test_capture_android_qa.py'
+      - '!scripts/verify-android-qa-apk.py'
+      - '!scripts/test_verify_android_qa_apk.py'
+      - '!scripts/android-qa-apk-selection.json'
+      - '.github/workflows/body-frame-device-qa.yml'
   workflow_dispatch:
 
 permissions:

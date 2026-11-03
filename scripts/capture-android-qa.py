@@ -8,6 +8,9 @@ No app QA route, production credentials, login, purchase or cloud call is used.
 import argparse
 from datetime import datetime, timezone
 import hashlib
+from functools import lru_cache
+import os
+import select
 import json
 from pathlib import Path
 import re
@@ -28,6 +31,68 @@ ROOT = Path(__file__).resolve().parents[1]
 PROFILES = [('mobile', '720x1600', 320), ('tablet', '1200x1920', 240)]
 
 
+
+MARKER_LEVELS = {1: 40, 2: 120, 3: 210}
+DIGITS = {1: ['00100','01100','00100','00100','00100','00100','01110'],
+          2: ['01110','10001','00001','00010','00100','01000','11111'],
+          3: ['11110','00001','00001','01110','00001','00001','11110']}
+
+
+def pattern_rgb(index, width=720, height=960):
+    """Deterministic PPM pixels: broad measurable gray field plus a large1/2/3."""
+    level = MARKER_LEVELS[index]
+    pixels = bytearray([level]) * (width*height*3)
+    ink = 245 if level < 150 else 15
+    def rectangle(x1, y1, x2, y2):
+        row = bytes([ink]) * ((x2-x1)*3)
+        for y in range(y1, y2):
+            offset = (y*width+x1)*3
+            pixels[offset:offset+len(row)] = row
+    scale = max(1, min(width//9, height//11))
+    left, top = (width-5*scale)//2, (height-7*scale)//2
+    for y, row in enumerate(DIGITS[index]):
+        for x, value in enumerate(row):
+            if value == '1': rectangle(left+x*scale, top+y*scale, left+(x+1)*scale, top+(y+1)*scale)
+    return bytes(pixels)
+
+
+@lru_cache(maxsize=6)
+def fixture_jpeg(index, preview=False):
+    width, height = (360,480) if preview else (720,960)
+    ppm = f'P6\n{width} {height}\n255\n'.encode()+pattern_rgb(index,width,height)
+    return subprocess.run(['ffmpeg','-v','error','-f','image2pipe','-vcodec','ppm','-i','pipe:0',
+        '-frames:v','1','-threads','1','-q:v','2','-f','mjpeg','pipe:1'], input=ppm,
+        capture_output=True, check=True, timeout=30).stdout
+
+
+def validate_marker_pixels(pixels, width, height, index):
+    if len(pixels) != width*height*3: raise ValueError('Decoded RGB frame has an invalid size')
+    samples = []
+    for nx, ny in [(0.12,0.12),(0.88,0.12),(0.12,0.88),(0.88,0.88)]:
+        x,y = int(width*nx),int(height*ny)
+        offset=(y*width+x)*3
+        channels=list(pixels[offset:offset+3])
+        if max(channels)-min(channels)>15: raise ValueError('Native frame marker is not the expected monochrome field')
+        samples.append(sum(channels)/3)
+    expected=MARKER_LEVELS[index]
+    if any(abs(value-expected)>18 for value in samples):
+        raise ValueError(f'Blank, stale or wrong photo pixels: photo{index} expected{expected}, got{samples}')
+    return dict(photo=index, expectedLuminance=expected, measuredLuminance=samples)
+
+
+def inspect_native_frames(path, directory):
+    evidence=[]
+    for index, frame in enumerate([0,3,6],1):
+        data=subprocess.run(['ffmpeg','-v','error','-i',str(path),'-vf',f'select=eq(n\\,{frame})',
+            '-frames:v','1','-f','rawvideo','-pix_fmt','rgb24','pipe:1'],capture_output=True,check=True,timeout=30).stdout
+        item=validate_marker_pixels(data,1080,1440,index)
+        item['frame']=frame
+        evidence.append(item)
+        subprocess.run(['ffmpeg','-v','error','-y','-i',str(path),'-vf',f'select=eq(n\\,{frame})',
+            '-frames:v','1',str(directory/f'native-video-photo-{index}-frame-{frame}.png')],capture_output=True,check=True,timeout=30)
+    return evidence
+
+
 def fixture_values(app_dir, populated=True, font_size='medium'):
     """Mirror the versioned schemas in lib/*-library.ts; all values are synthetic."""
     photos = []
@@ -38,7 +103,7 @@ def fixture_values(app_dir, populated=True, font_size='medium'):
         uri = f'file://{app_dir}/files/photos/{PROJECT}/photo-{photo_id}.jpg'
         preview = f'file://{app_dir}/files/photo-previews/{PROJECT}/photo-{photo_id}.jpg'
         photos.append(dict(id=photo_id, uri=uri, previewUri=preview, createdAt=date,
-                           width=1080, height=2400, ratioLabel='Original', kind='original',
+                           width=720, height=960, ratioLabel='Original', kind='original',
                            edited=False, addedToVideo=False, projectId=PROJECT,
                            sequence=index, localFileStatus='available'))
         measurements.append(dict(id=f'qa-demo-measurement-{index}', projectId=PROJECT,
@@ -122,8 +187,9 @@ class Device:
         raw = self.run('exec-out', 'cat', '/sdcard/body-frame-qa.xml', timeout=15)
         return raw[raw.index('<'):]
 
-    def open(self, route):
-        self.shell('am', 'force-stop', PACKAGE)
+    def open(self, route, restart=True):
+        if restart:
+            self.shell('am', 'force-stop', PACKAGE)
         self.shell('am', 'start', '-W', '-a', 'android.intent.action.VIEW',
                    '-d', 'bodyframe://' + route, '-p', PACKAGE)
         time.sleep(2)
@@ -154,10 +220,37 @@ class Device:
                 if attempt == 4:
                     raise
                 # Find offscreen controls using the actual display, never fixed dp coordinates.
-                size = self.shell('wm', 'size')
-                w, h = map(int, re.findall(r'(\d+)x(\d+)', size)[-1])
-                self.shell('input', 'swipe', w//2, int(h*.72), w//2, int(h*.37), 350)
-                time.sleep(.5)
+                self.scroll_down()
+
+    def scroll_down(self):
+        root=ET.fromstring(self.dump())
+        areas=[]
+        for node in root.iter('node'):
+            if node.get('scrollable')=='true' and node.get('package')==PACKAGE:
+                coords=list(map(int,re.findall(r'\d+',node.get('bounds',''))))
+                if len(coords)==4 and coords[3]>coords[1]: areas.append(coords)
+        if areas:
+            x1,y1,x2,y2=max(areas,key=lambda b:(b[2]-b[0])*(b[3]-b[1]))
+        else:
+            w,h=map(int,re.findall(r'(\d+)x(\d+)',self.shell('wm','size'))[-1]);x1,y1,x2,y2=0,0,w,int(h*.65)
+        x=(x1+x2)//2
+        self.shell('input','swipe',x,int(y1+(y2-y1)*.85),x,int(y1+(y2-y1)*.25),350)
+        time.sleep(.5)
+
+    def storage(self):
+        # Read a snapshot without stopping/restarting the app or changing its quota.
+        for attempt in range(3):
+            try:
+                with tempfile.TemporaryDirectory() as temporary:
+                    path=Path(temporary)/'RKStorage'
+                    path.write_bytes(self.run('exec-out','run-as',PACKAGE,'cat','databases/RKStorage',binary=True))
+                    for suffix in ('-wal','-shm'):
+                        data=self.run('exec-out','run-as',PACKAGE,'cat','databases/RKStorage'+suffix,binary=True,check=False)
+                        if data: Path(str(path)+suffix).write_bytes(data)
+                    with sqlite3.connect(path) as db: return dict(db.execute('SELECT key,value FROM catalystLocalStorage'))
+            except sqlite3.Error:
+                if attempt==2: raise
+                time.sleep(.3)
 
     def tap(self, label):
         x, y = self.find_control(label)
@@ -172,12 +265,9 @@ class Device:
         self.shell('run-as', PACKAGE, 'mkdir', '-p', 'databases', f'files/photos/{PROJECT}', f'files/photo-previews/{PROJECT}')
         if populated:
             for index in range(1, 4):
-                for folder, fixture in [('photos', 'travelframe-debug-photo.jpg'), ('photo-previews', 'travelframe-debug-preview.jpg')]:
-                    source = ROOT / 'debug-camera' / fixture
-                    if source.read_bytes()[:2] != b'\xff\xd8':
-                        raise RuntimeError(f'Missing valid repository JPEG fixture: {source}')
+                for folder in ['photos','photo-previews']:
                     relative = f'files/{folder}/{PROJECT}/photo-qa-demo-photo-{index}.jpg'
-                    self.shell('run-as', PACKAGE, 'sh', '-c', f'cat > {relative}', data=source.read_bytes())
+                    self.shell('run-as', PACKAGE, 'sh', '-c', f'cat > {relative}', data=fixture_jpeg(index,folder=='photo-previews'))
         with tempfile.TemporaryDirectory() as temporary:
             db = Path(temporary) / 'RKStorage'
             write_storage(db, fixture_values(app_dir, populated, font_size))
@@ -193,7 +283,8 @@ def capture(device, directory, name, route, expected, action=None, open_route=Tr
             device.open(route)
         if action:
             if callable(action):
-                action(device)
+                evidence=action(device)
+                if evidence is not None: record['actionEvidence']=evidence
             else:
                 device.ready(action[0])
                 device.tap(action[1])
@@ -276,22 +367,144 @@ def validate_video_probe(probe):
     if (stream.get('width'), stream.get('height')) != (1080, 1440):
         raise ValueError('Native video dimensions do not match default 1080p 3:4 output')
     duration = float(probe.get('format', {}).get('duration', 0))
-    if not 0.2 <= duration <= 1.0:
+    if abs(duration-0.3) > 1/30+0.0001:
         raise ValueError(f'Unexpected duration for three 0.1-second photos: {duration}')
-    frames = stream.get('nb_read_frames', stream.get('nb_frames'))
-    if frames not in (None, 'N/A') and int(frames) != 9:
+    frames = stream.get('nb_read_frames')
+    if frames in (None,'N/A') or int(frames) != 9:
         raise ValueError(f'Expected nine native frames, got {frames}')
     return dict(codec=stream['codec_name'], width=stream['width'], height=stream['height'],
                 duration=duration, frames=frames)
 
 
-def video_smoke(device, directory):
+
+def creation_submit(device):
+    # Continue from the keyboard screenshot. No reseed/restart before submission.
+    device.tap('프로젝트 만들기')
+    device.ready(['QA_keyboard_large_font'])
+    projects=json.loads(device.storage().get('body-frame.projects.v1','[]'))
+    if len(projects)!=1 or 'QA_keyboard_large_font' not in projects[0].get('name',''):
+        raise RuntimeError('Large-font keyboard form did not persist the newly created project')
+    return dict(projectPersisted=True,project=projects[0])
+
+
+def no_export_side_effects(before, after):
+    for key in ['travel-frame.videos.v1','guestWeeklyVideoExportUsage']:
+        if before.get(key)!=after.get(key):
+            raise ValueError(f'Failed/cancelled export changed persisted video/quota state: {key}')
+    return dict(videosUnchanged=True, guestQuotaUnchanged=True)
+
+
+def wait_export_terminal(device, expected_error=None, seconds=180):
+    deadline=time.monotonic()+seconds
+    while time.monotonic()<deadline:
+        xml=device.dump();strings=ui_strings(xml)
+        running=any('영상 만드는 중' in value for value in strings)
+        button=any(value.strip()=='영상 만들기' for value in strings)
+        if not running and button:
+            if expected_error and not any(any(marker in value for marker in expected_error) for value in strings):
+                raise RuntimeError(f'Export stopped without the expected real error: {strings}')
+            return strings
+        time.sleep(1)
+    raise RuntimeError('Native export/encoder did not settle within180seconds')
+
+
+def set_interval(device, value):
+    device.tap('사진 간격');device.ready(['사진 간격','적용'])
+    device.tap(f'{value}초');device.tap('적용')
+    device.ready(['변화 영상 만들기'])
+
+
+def background_during_native_encoder(device, directory):
+    """Observe a real encoder start before HOME; absence of evidence is a failure."""
+    pid=device.shell('pidof',PACKAGE).strip()
+    if not re.fullmatch(r'\d+',pid): raise RuntimeError('Cannot identify the running app process')
+    x,y=device.find_control('영상 만들기')
+    monitor=subprocess.Popen([*device.prefix,'logcat','-v','brief','-T','1','--pid='+pid],stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
+    evidence=bytearray();seen_encoder=False;observed=False
+    start=time.monotonic()
+    try:
+        device.shell('input','tap',x,y)  # No fixed sleep: watch the actual MediaCodec state.
+        while time.monotonic()-start<2.5:
+            if select.select([monitor.stdout],[],[],.05)[0]:
+                chunk=os.read(monitor.stdout.fileno(),65536)
+                if not chunk: break
+                evidence.extend(chunk)
+                text=evidence.decode(errors='replace')
+                seen_encoder=seen_encoder or bool(re.search(r'(?:CCodec|ACodec|MediaCodec).*encoder',text,re.I))
+                if seen_encoder and re.search(r'(?:CCodec|ACodec|MediaCodec|CCodecBufferChannel).*?(?:start:|set\(RUNNING\)|Now Executing|state.*STARTING)',text,re.I):
+                    observed=True
+                    device.shell('input','keyevent','KEYCODE_HOME')
+                    background_sent_after=time.monotonic()-start
+                    break
+        if not observed: raise RuntimeError('No active native encoder-start evidence before background deadline; cancellation case not proven')
+        (directory/'video-background-home.png').write_bytes(device.run('exec-out','screencap','-p',binary=True))
+        (directory/'video-background-home.xml').write_text(device.dump())
+        # Resume the existing Activity without a deep-link remount that could discard
+        # the cancelled screen's terminal message. The final retry may remount later.
+        device.shell('am','start','-W','-a','android.intent.action.MAIN','-c','android.intent.category.LAUNCHER','-n',PACKAGE+'/.MainActivity')
+        now=device.shell('pidof',PACKAGE).strip()
+        if now!=pid: raise RuntimeError('Background recovery restarted the process instead of preserving the native guard')
+        strings=wait_export_terminal(device,['영상 만들기가 취소되었습니다'])
+        return dict(encoderStartObserved=True,backgroundWithinSeconds=round(background_sent_after,3),
+                    pidBefore=pid,pidAfter=now,terminalText=strings)
+    finally:
+        monitor.terminate()
+        try:
+            remainder=monitor.communicate(timeout=3)[0]
+            evidence.extend(remainder or b'')
+        except subprocess.TimeoutExpired: monitor.kill();monitor.communicate()
+        (directory/'video-background-codec-log.txt').write_bytes(evidence)
+
+
+def video_failure_and_background_smoke(device, directory):
+    records=[]
+    relative=f'files/photos/{PROJECT}/photo-qa-demo-photo-2.jpg'
+    device.open('video-create')
+    device.ready(['변화 영상 만들기','QA 데모'])
+    first_pid=device.shell('pidof',PACKAGE).strip()
+    for case in ['missing-original','corrupt-original','background-cancel']:
+        result=dict(profile=directory.name,screen='video-'+case,route='video-create',createClicks=0)
+        before=device.storage()
+        try:
+            if case=='missing-original': device.shell('run-as',PACKAGE,'rm',relative)
+            elif case=='corrupt-original': device.shell('run-as',PACKAGE,'sh','-c',f'cat > {relative}',data=b'not-a-jpeg-qa-corrupt-original')
+            if case=='background-cancel':
+                set_interval(device,'1')
+                result.update(background_during_native_encoder(device,directory));result['createClicks']=1
+            else:
+                device.tap('영상 만들기');result['createClicks']=1
+                markers=['사진 원본을 확인하지 못했습니다'] if case=='missing-original' else ['사진을 불러오지 못했습니다','사진 표시 시간이 초과되었습니다']
+                result['terminalText']=wait_export_terminal(device,markers)
+            records.append(capture(device,directory,'video-'+case+'-result','video-create',[],open_route=False))
+            result.update(no_export_side_effects(before,device.storage()))
+            if device.shell('pidof',PACKAGE).strip()!=first_pid:
+                raise RuntimeError('Native failure/cancellation acceptance unexpectedly restarted the app process')
+            result['status']='captured'
+        except Exception as error:
+            result.update(status='failed',error=str(error))
+            records.append(capture(device,directory,'video-'+case+'-failure','video-create',[],open_route=False))
+        finally:
+            # Restore just the task-owned original file; never edit guest quota or RKStorage here.
+            device.shell('run-as',PACKAGE,'sh','-c',f'cat > {relative}',data=fixture_jpeg(2))
+        (directory/f'video-{case}.json').write_text(json.dumps(result,indent=2,ensure_ascii=False))
+        records.append(result)
+    # Real UI resets the next export to0.1 seconds; no force-stop/reseed/quota reset.
+    try:
+        set_interval(device,'0.1')
+    except Exception as error:
+        records.append(dict(profile=directory.name,screen='video-short-interval-reset',status='failed',error=str(error)))
+    return records
+
+
+def video_smoke(device, directory, restart=True):
     """Perform one real guest export; never retry/alter quota or call paid services."""
     records = []
     result = dict(profile=directory.name, screen='video-native-export', route='video-create',
                   expectedPhotos=3, expectedFrames=9, expectedDuration=0.3, createClicks=0)
     try:
-        device.open('video-create')
+        retry_pid=device.shell('pidof',PACKAGE).strip()
+        result.update(retryWithoutForceStop=not restart,pidBeforeRetry=retry_pid)
+        device.open('video-create',restart=restart)
         device.ready(['변화 영상 만들기', 'QA 데모'])
         device.tap('영상 만들기')
         result['createClicks'] = 1
@@ -313,6 +526,9 @@ def video_smoke(device, directory):
         result['albumSaved'] = any('앨범에 저장했습니다.' in value for value in strings)
         result['appSavedMessage'] = any('영상은 앱에 저장했습니다.' in value for value in strings)
         result['completionText'] = strings
+        result['pidAfterExport']=device.shell('pidof',PACKAGE).strip()
+        if not restart and result['pidAfterExport']!=retry_pid:
+            raise RuntimeError('Final retry changed process identity instead of proving same-process recovery')
         library = capture(device, directory, 'video-library-populated', 'video-library',
                           ['영상 관리', 'QA 데모'])
         records.append(library)
@@ -326,8 +542,11 @@ def video_smoke(device, directory):
                 if data:
                     Path(str(db_path)+suffix).write_bytes(data)
             with sqlite3.connect(db_path) as db:
-                row = db.execute('SELECT value FROM catalystLocalStorage WHERE key=?', ('travel-frame.videos.v1',)).fetchone()
-            videos = json.loads(row[0]) if row else []
+                persisted=dict(db.execute('SELECT key,value FROM catalystLocalStorage'))
+            videos=json.loads(persisted.get('travel-frame.videos.v1','[]'))
+            quota=json.loads(persisted.get('guestWeeklyVideoExportUsage','{}'))
+            if quota.get('count')!=1: raise RuntimeError('Final successful guest export did not consume exactly one quota unit')
+            result['guestQuotaAfter']=quota
         if len(videos) != 1 or videos[0].get('photoIds') != [f'qa-demo-photo-{index}' for index in range(1, 4)]:
             raise RuntimeError('Native export did not persist exactly one video with all three fixture photo identities')
         video = videos[0]
@@ -352,6 +571,7 @@ def video_smoke(device, directory):
         if shutil.which('ffmpeg'):
             subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', str(path), '-frames:v', '1', str(directory/'native-video-first-frame.png')], capture_output=True, check=True, timeout=30)
             result['firstFrameDecoded'] = True
+            result['intervalPixelEvidence'] = inspect_native_frames(path,directory)
         if not result['albumSaved']:
             raise RuntimeError('Video persisted in the app, but native album completion was not confirmed')
         if any(item['status'] != 'captured' for item in records):
@@ -371,15 +591,22 @@ def main():
     parser.add_argument('--apk', required=True, type=Path)
     parser.add_argument('--output', required=True, type=Path)
     parser.add_argument('--serial')
+    parser.add_argument('--trust-manifest',type=Path)
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
+    fixtures=args.output/'synthetic-fixtures';fixtures.mkdir(exist_ok=True)
+    for index in (1,2,3):
+        for preview in (False,True):
+            (fixtures/f'card-{index}{"-preview" if preview else ""}.jpg').write_bytes(fixture_jpeg(index,preview))
     device = Device(args.serial)
     records = []
     manifest = dict(package=PACKAGE, apkSha256=hashlib.sha256(args.apk.read_bytes()).hexdigest(),
-                    fixture='repository debug-camera JPEGs copied to synthetic guest records',
+                    fixture='host-generated synthetic monochrome numbered cards1/2/3; no user images',
                     network='emulator Wi-Fi and mobile data disabled; no authentication configured',
                     limits=['No signed-in/cloud/billing operations', 'No actual Health Connect import',
                             'Photo editor requires login: guest capture shows the real login-required alert'], captures=records)
+    if args.trust_manifest:
+        manifest['apkTrust']=json.loads(args.trust_manifest.read_text())
     try:
         if device.shell('getprop', 'ro.kernel.qemu').strip() != '1':
             raise RuntimeError('Refusing to seed a physical Android device')
@@ -404,6 +631,8 @@ def main():
             device.shell('settings', 'put', 'system', 'font_scale', '1.3')
             records.append(capture(device, directory, 'create-project-large-font-keyboard', 'studio',
                                    ['프로젝트 이름'], creation_keyboard))
+            records.append(capture(device,directory,'create-project-large-font-submitted','studio',
+                                   ['QA_keyboard_large_font'],creation_submit,open_route=False))
             device.shell('settings', 'put', 'system', 'font_scale', '1.0')
             device.seed(True)
             screens = [
@@ -443,7 +672,8 @@ def main():
                                    ['다음', '스킵'], onboarding_scrolled))
             device.shell('settings', 'put', 'system', 'font_scale', '1.0')
             device.seed(True)
-            records.extend(video_smoke(device, directory))
+            records.extend(video_failure_and_background_smoke(device,directory))
+            records.extend(video_smoke(device, directory,restart=False))
             (directory / 'device.txt').write_text(device.shell('wm', 'size') + device.shell('wm', 'density') + device.shell('getprop', 'ro.build.version.sdk'))
     except Exception as error:
         manifest['fatalError'] = str(error)
