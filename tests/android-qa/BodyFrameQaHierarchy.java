@@ -1,6 +1,7 @@
 import android.accessibilityservice.AccessibilityServiceInfo;
 import android.app.UiAutomation;
 import android.graphics.Rect;
+import android.graphics.Bitmap;
 import android.os.HandlerThread;
 import android.os.Looper;
 import android.os.Process;
@@ -71,7 +72,7 @@ public final class BodyFrameQaHierarchy {
             if (args.length == 3) {
                 snapshot = acquireClick(automation, args[2], output);
                 click = snapshot.click;
-                try { click.perform(); } finally { publish(output, snapshot.render()); }
+                try { click.perform(automation, new File(output.getPath() + ".preclick.png")); } finally { publish(output, snapshot.render()); }
             } else {
                 snapshot = snapshot(automation, null);
                 publish(output, snapshot.render());
@@ -129,6 +130,11 @@ public final class BodyFrameQaHierarchy {
             attribute(metadata, "enabled-candidate-count", Integer.toString(click.enabledCandidates));
             attribute(metadata, "fully-visible-candidate-count", Integer.toString(click.matches));
             attribute(metadata, "candidate-details", click.details);
+            attribute(metadata, "semantic-eligible-candidate-count", Integer.toString(click.semanticEligible));
+            attribute(metadata, "ancestor-clip-conflict", Boolean.toString(click.semanticEligible > 0 && click.matches == 0));
+            attribute(metadata, "activation-policy", click.semanticPolicy ? "native-semantic-after-show" : "strict-full-visible");
+            attribute(metadata, "preclick-screenshot-path", click.screenshotPath);
+            attribute(metadata, "preclick-screenshot-at-ms", Long.toString(click.screenshotAt));
             attribute(metadata, "acquisition-attempts", Integer.toString(click.attempts));
             attribute(metadata, "click-window-bounds", click.windowBounds.toShortString());
             attribute(metadata, "click-window-package", click.windowPackage);
@@ -178,7 +184,11 @@ public final class BodyFrameQaHierarchy {
                 publish(output, current.render());
                 publish(new File(output.getPath() + ".attempt-" + attempts + ".xml"), current.render());
                 if (target.enabledCandidates > 1 || target.matches > 1) throw new IOException("Ambiguous exact-label accessibility targets: " + target.enabledCandidates);
-                if (target.matches == 1) { retained = true; return current; }
+                if (target.matches == 1 || target.selectSemanticAfterReveal()) {
+                    publish(output, current.render());
+                    retained = true;
+                    return current;
+                }
                 if (shows == 0 && !target.windowBounds.isEmpty() && target.enabledCandidates == 1 && target.revealNode != null) {
                     shows++;
                     target.showActions = shows;
@@ -262,7 +272,12 @@ public final class BodyFrameQaHierarchy {
         AccessibilityNodeInfo node;
         Rect bounds;
         Rect scrollClip;
-        int matches, candidates, enabledCandidates, attempts, actions, showActions;
+        int matches, candidates, enabledCandidates, attempts, actions, showActions, semanticEligible;
+        boolean semanticPolicy;
+        AccessibilityNodeInfo semanticNode;
+        Rect semanticBounds;
+        String screenshotPath = "";
+        long screenshotAt;
         AccessibilityNodeInfo revealNode;
         String windowPackage = "", showResult = "not-requested";
         final StringBuilder details = new StringBuilder();
@@ -288,6 +303,15 @@ public final class BodyFrameQaHierarchy {
             if (!enabled) return;
             enabledCandidates++;
             if (revealNode == null) revealNode = AccessibilityNodeInfo.obtain(candidate);
+            if (candidate.isVisibleToUser() && !raw.isEmpty() && windowBounds.contains(raw)
+                    && "프로젝트 만들기".equals(label) && "com.haebi.photoguide".equals(windowPackage)
+                    && "com.haebi.photoguide".contentEquals(candidate.getPackageName() == null ? "" : candidate.getPackageName())) {
+                semanticEligible++;
+                if (semanticNode == null) {
+                    semanticNode = AccessibilityNodeInfo.obtain(candidate);
+                    semanticBounds = new Rect(raw);
+                }
+            }
             if (!candidate.isVisibleToUser() || !raw.equals(visible) || raw.isEmpty() || !windowBounds.contains(raw)) return;
             matches++;
             if (node == null) {
@@ -297,25 +321,54 @@ public final class BodyFrameQaHierarchy {
             }
         }
 
-        void requireUnique() throws IOException {
-            if (matches != 1) throw new IOException("Expected one fully visible enabled clickable exact-label target; found " + matches + " for " + label);
+        boolean selectSemanticAfterReveal() {
+            if (matches != 0 || enabledCandidates != 1 || semanticEligible != 1
+                    || showActions != 1 || !"true".equals(showResult)) return false;
+            // Native accessibility activation is distinct from visual hit testing.
+            // Keep the conflicting ancestor geometry; the connected PNG is a
+            // separate visual acceptance gate, not proof derived from this policy.
+            semanticPolicy = true;
+            node = semanticNode;
+            semanticNode = null;
+            bounds = new Rect(semanticBounds);
+            return true;
         }
 
-        void perform() throws IOException {
+        void requireUnique() throws IOException {
+            if ((!semanticPolicy && matches != 1) || (semanticPolicy && (semanticEligible != 1 || enabledCandidates != 1 || showActions != 1 || !"true".equals(showResult)))) throw new IOException("Expected one fully visible enabled clickable exact-label target; found " + matches + " for " + label);
+        }
+
+        void perform(UiAutomation automation, File screenshot) throws IOException {
             requireUnique();
             if (!node.refresh() || !node.isVisibleToUser() || !node.isEnabled() || !node.isClickable() || !exactLabel(node)) {
                 throw new IOException("Accessibility target changed before click: " + label);
             }
             Rect current = new Rect();
             node.getBoundsInScreen(current);
-            if (current.isEmpty() || !windowBounds.contains(current) || (scrollClip != null && !scrollClip.contains(current))) {
+            if (current.isEmpty() || !windowBounds.contains(current) || (!semanticPolicy && scrollClip != null && !scrollClip.contains(current))) {
                 throw new IOException("Accessibility target is no longer fully visible: " + label);
             }
+            if (semanticPolicy && (!"com.haebi.photoguide".equals(windowPackage)
+                    || !"com.haebi.photoguide".contentEquals(node.getPackageName() == null ? "" : node.getPackageName()))) {
+                throw new IOException("Semantic activation is outside the expected app window");
+            }
+            screenshotAt = System.currentTimeMillis();
+            Bitmap image = automation.takeScreenshot();
+            if (image == null) throw new IOException("Connected pre-click screenshot is unavailable");
+            try {
+                try (FileOutputStream stream = new FileOutputStream(screenshot)) {
+                    if (!image.compress(Bitmap.CompressFormat.PNG, 100, stream)) throw new IOException("Connected screenshot PNG compression failed");
+                    stream.flush();
+                    stream.getFD().sync();
+                }
+            } finally { image.recycle(); }
+            if (screenshot.length() < 8) throw new IOException("Connected screenshot PNG is empty");
+            screenshotPath = screenshot.getAbsolutePath();
             actions++;
             if (!node.performAction(AccessibilityNodeInfo.ACTION_CLICK)) throw new IOException("Native accessibility ACTION_CLICK rejected: " + label);
         }
 
-        void recycle() { if (node != null) node.recycle(); if (revealNode != null) revealNode.recycle(); }
+        void recycle() { if (node != null) node.recycle(); if (revealNode != null) revealNode.recycle(); if (semanticNode != null) semanticNode.recycle(); }
     }
 
     private static void attribute(StringBuilder xml, String name, CharSequence value) {

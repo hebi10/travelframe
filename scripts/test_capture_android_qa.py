@@ -361,14 +361,56 @@ class FreshHierarchyTest(unittest.TestCase):
         device.run.assert_not_called()
 
 
+def native_click_fixture(device, attributes, screenshot=None):
+    import base64
+    png=base64.b64decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6CwoAAAAASUVORK5CYII=') if screenshot is None else screenshot
+    state={}
+    def shell(*args,**kwargs):
+        if args[0]=='env':state['target']=args[5];return 'BODY_FRAME_QA_HIERARCHY_CLICKED '+args[5]
+        return ''
+    def read(*args,**kwargs):
+        if kwargs.get('binary'):return png
+        return '<hierarchy action="accessibility-click" requested-click-label="프로젝트 만들기" preclick-screenshot-path="'+state['target']+'.preclick.png" preclick-screenshot-at-ms="123" activation-policy="strict-full-visible" '+attributes+'/>'
+    device.shell=Mock(side_effect=shell);device.run=Mock(side_effect=read)
+
+
+class NativePreclickEvidenceTest(unittest.TestCase):
+    def test_native_preclick_png_is_retained_with_hash_dimensions_and_explicit_visual_gate(self):
+        with tempfile.TemporaryDirectory() as temp:
+            device=qa.Device();device.capture_directory=Path(temp);device.native_hierarchy_jar='/data/local/tmp/qa.jar'
+            native_click_fixture(device,'click-action-count="1" show-on-screen-action-count="0"')
+            device.dump(click_label='프로젝트 만들기')
+            record=device.last_hierarchy_evidence['preclickScreenshot']
+            self.assertEqual([record['width'],record['height']],[1,1]);self.assertTrue(record['requiresVisualReview'])
+            self.assertEqual(qa.hashlib.sha256((Path(temp)/record['png']).read_bytes()).hexdigest(),record['sha256'])
+            self.assertEqual(record['activationPolicy'],'strict-full-visible')
+
+    def test_failed_native_action_retains_connected_png_without_claiming_ack(self):
+        import json
+        with tempfile.TemporaryDirectory() as temp:
+            device=qa.Device();device.capture_directory=Path(temp);device.native_hierarchy_jar='/data/local/tmp/qa.jar'
+            native_click_fixture(device,'click-action-count="1" show-on-screen-action-count="0"')
+            original=device.shell.side_effect
+            def shell(*args,**kwargs):
+                result=original(*args,**kwargs)
+                if args[0]=='env':raise RuntimeError('Native ACTION_CLICK returned false')
+                return result
+            device.shell.side_effect=shell
+            with self.assertRaisesRegex(RuntimeError,'returned false'):device.dump(click_label='프로젝트 만들기')
+            record=json.loads(next((Path(temp)/'diagnostics/hierarchy-dumps').glob('dump-*.json')).read_text())
+            self.assertFalse(record['acknowledged']);self.assertNotIn('nativeActionCount',record)
+            self.assertTrue((Path(temp)/record['unacknowledgedPreclickScreenshot']['png']).exists())
+
+    def test_ack_without_valid_native_preclick_png_fails_closed(self):
+        device=qa.Device();device.native_hierarchy_jar='/data/local/tmp/qa.jar'
+        native_click_fixture(device,'click-action-count="1"',screenshot=b'not png')
+        with self.assertRaisesRegex(RuntimeError,'preclick.*PNG'):device.dump(click_label='프로젝트 만들기')
+
+
 class NativeActivationTest(unittest.TestCase):
     def test_semantic_activation_uses_one_exact_native_click_request_without_coordinate_tap(self):
         device=qa.Device();device.native_hierarchy_jar='/data/local/tmp/qa.jar';device.find_control=Mock(return_value=(360,1470))
-        def shell(*args,**kwargs):
-            if args[0]=='env':return 'BODY_FRAME_QA_HIERARCHY_CLICKED '+args[5]
-            return ''
-        device.shell=Mock(side_effect=shell)
-        device.run=Mock(return_value='<hierarchy action="accessibility-click" requested-click-label="프로젝트 만들기" click-target-bounds="[34,1422][686,1518]" click-action-count="1"/>')
+        native_click_fixture(device,'click-target-bounds="[34,1422][686,1518]" click-action-count="1"')
         result=device.activate('프로젝트 만들기',search='below')
         self.assertEqual(result['nativeActionCount'],1)
         calls=[call.args for call in device.shell.call_args_list if call.args[0]=='env']
@@ -399,7 +441,9 @@ class NativeActionFailureEvidenceTest(unittest.TestCase):
                 if args[0]=='env':raise RuntimeError('Unique target count0')
                 if args[0]=='rm':events.append('remove')
                 return ''
-            def read(*args,**kwargs):events.append('preserve');return '<hierarchy candidate-count="0"/>'
+            def read(*args,**kwargs):
+                if kwargs.get('binary'):return b''
+                events.append('preserve');return '<hierarchy candidate-count="0"/>'
             device.shell=Mock(side_effect=shell);device.run=Mock(side_effect=read)
             with self.assertRaises(RuntimeError):device.dump(click_label='프로젝트 만들기')
             folder=Path(temp)/'diagnostics/hierarchy-dumps'
@@ -410,8 +454,7 @@ class NativeActionFailureEvidenceTest(unittest.TestCase):
 
     def test_native_show_action_count_is_separate_from_single_click_ack(self):
         device=qa.Device();device.native_hierarchy_jar='/data/local/tmp/qa.jar';device.find_control=Mock(return_value=(360,1470))
-        device.shell=Mock(side_effect=lambda *args,**kwargs:'BODY_FRAME_QA_HIERARCHY_CLICKED '+args[5] if args[0]=='env' else '')
-        device.run=Mock(return_value='<hierarchy action="accessibility-click" requested-click-label="프로젝트 만들기" show-on-screen-action-count="1" click-action-count="1"/>')
+        native_click_fixture(device,'show-on-screen-action-count="1" click-action-count="1"')
         result=device.activate('프로젝트 만들기',search='below')
         self.assertEqual(result['nativeClickActionCount'],1);self.assertEqual(result['nativeShowOnScreenActionCount'],1)
 

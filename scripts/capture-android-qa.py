@@ -315,6 +315,35 @@ class Device:
     def shell(self, *args, **kwargs):
         return self.run('shell', shlex.join(list(map(str, args))), **kwargs)
 
+    def retain_preclick(self,target,attributes,required):
+        remote=target+'.preclick.png'
+        if required and attributes.get('preclick-screenshot-path')!=remote:
+            raise RuntimeError('Native preclick PNG path does not match this action')
+        image=self.run('exec-out','cat',remote,binary=True,check=required,timeout=10)
+        if not image and not required:return None
+        if not isinstance(image,bytes) or len(image)<33 or image[:8]!=b'\x89PNG\r\n\x1a\n' or image[12:16]!=b'IHDR':
+            raise RuntimeError('Native preclick evidence is not a valid PNG header')
+        width,height=struct.unpack('>II',image[16:24])
+        if width<=0 or height<=0:raise RuntimeError('Native preclick PNG has invalid dimensions')
+        policy=attributes.get('activation-policy')
+        if required and policy not in ('strict-full-visible','native-semantic-after-show'):
+            raise RuntimeError('Native preclick evidence lacks an explicit activation policy')
+        captured_at=int(attributes.get('preclick-screenshot-at-ms','0'))
+        if required and captured_at<=0:raise RuntimeError('Native preclick PNG capture timestamp is absent')
+        record=dict(remotePath=remote,sha256=hashlib.sha256(image).hexdigest(),width=width,height=height,
+                    capturedAtMs=captured_at,activationPolicy=policy,requiresVisualReview=True,
+                    policyTrace={key:value for key,value in attributes.items() if key in (
+                        'activation-policy','ancestor-clip-conflict','semantic-eligible-candidate-count',
+                        'fully-visible-candidate-count','candidate-details','click-target-bounds',
+                        'click-window-bounds','click-window-package','show-on-screen-action-count',
+                        'show-on-screen-result','click-action-count')})
+        directory=getattr(self,'capture_directory',None)
+        if directory:
+            folder=Path(directory)/'diagnostics/hierarchy-dumps';folder.mkdir(parents=True,exist_ok=True)
+            path=folder/f'action-{self.hierarchy_sequence:04}.preclick.png';path.write_bytes(image)
+            record['png']=str(path.relative_to(directory))
+        return record
+
     def dump(self,click_label=None):
         self.hierarchy_sequence+=1
         target='/data/local/tmp/body-frame-qa-'+uuid.uuid4().hex+'.xml'
@@ -346,6 +375,7 @@ class Device:
                 show_count=int(root.get('show-on-screen-action-count','0'))
                 if show_count not in (0,1):raise RuntimeError('Native show-on-screen action exceeded its one-action bound')
                 evidence.update(nativeActionCount=click_count,nativeClickActionCount=click_count,nativeShowOnScreenActionCount=show_count)
+                evidence['preclickScreenshot']=self.retain_preclick(target,root.attrib,required=True)
             self.last_hierarchy_evidence=evidence
             return xml
         except Exception as error:
@@ -359,6 +389,10 @@ class Device:
                         try:evidence['unacknowledgedRootAttributes']=ET.fromstring(raw).attrib
                         except ET.ParseError as parse_error:evidence['unacknowledgedXmlParseError']=str(parse_error)
                 except Exception as diagnostic_error:evidence['unacknowledgedXmlReadError']=str(diagnostic_error)
+                try:
+                    screenshot=self.retain_preclick(target,evidence.get('unacknowledgedRootAttributes',{}),required=False)
+                    if screenshot:evidence['unacknowledgedPreclickScreenshot']=screenshot
+                except Exception as diagnostic_error:evidence['unacknowledgedPreclickReadError']=str(diagnostic_error)
             raise
         finally:
             directory=getattr(self,'capture_directory',None)
@@ -386,7 +420,7 @@ class Device:
                 except Exception as error:
                     evidence['acquisitionArchiveError']=str(error)
                     if 'error' not in evidence:archive_error=RuntimeError('Native acquisition snapshots could not be retained: '+str(error))
-            try:self.shell('rm','-f',target,check=False,timeout=5)
+            try:self.shell('rm','-f',target,*([target+'.preclick.png'] if click_label is not None else []),check=False,timeout=5)
             finally:
                 if folder:
                     if click_label is not None and evidence.get('acknowledged'):
