@@ -43,6 +43,11 @@ public final class BodyFrameQaHierarchy {
             File parent = output.getParentFile();
             if (parent == null || !parent.isDirectory()) throw new IOException("Output parent does not exist");
 
+            // Standalone app_process has no ActivityThread to prepare the main
+            // Looper. API 35 AccessibilityInteractionClient constructs a Handler
+            // against getMainLooper() even on UiAutomation's callback thread.
+            // Queries remain synchronous; the dedicated callback thread loops.
+            if (Looper.getMainLooper() == null) Looper.prepareMainLooper();
             thread = new HandlerThread("BodyFrameQaHierarchy");
             thread.start();
             Class<?> connectionClass = Class.forName("android.app.UiAutomationConnection");
