@@ -10,7 +10,7 @@ for (const snippet of [
   "export const getDeletedImageWorkIds",
   "export const recordImageWorkLocalDeletion",
   "export const wasImageWorkDeletedLocally",
-  "await recordImageWorkLocalDeletion(id);"
+  "await recordImageWorkLocalDeletionUnlocked(id);"
 ]) {
   assert.ok(workLibrarySource.includes(snippet), `image work deletion marker missing: ${snippet}`);
 }
@@ -20,7 +20,7 @@ for (const snippet of [
   "export const getDeletedVideoIds",
   "export const recordVideoLocalDeletion",
   "export const wasVideoDeletedLocally",
-  "await recordVideoLocalDeletion(id);"
+  "await recordVideoLocalDeletionUnlocked(id);"
 ]) {
   assert.ok(videoLibrarySource.includes(snippet), `video deletion marker missing: ${snippet}`);
 }
@@ -31,8 +31,8 @@ for (const snippet of [
   "releaseBackupUploads(backupSessionIds)",
   "await removeBackupIfImageWorkWasDeleted({",
   "await removeBackupIfVideoWasDeleted({",
-  "const deletedImageWorkIds = await getDeletedImageWorkIds();",
-  "const deletedVideoIds = await getDeletedVideoIds();"
+  "mergeImageBundleWorksFromBackup(imageWorks)",
+  "mergeMadeVideosFromBackup(videos)"
 ]) {
   assert.ok(backupSource.includes(snippet), `backup/restore should defend work/video deletion races: ${snippet}`);
 }

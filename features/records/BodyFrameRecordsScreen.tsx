@@ -163,29 +163,36 @@ export default function BodyFrameRecordsScreen() {
 
   const handleCreateProject = useCallback(
     async ({ name, targetPhotoCount, referenceMode }: CreateProjectInput) => {
-      const activeProjectCount = projects.filter(
-        (project) => !project.archived
-      ).length;
-      const projectLimitState = getBodyFrameProjectCreationLimitState({
-        activeProjectCount,
-        maxProjectCount: planEntitlements.maxProjectCount
-      });
-
-      if (!projectLimitState.allowed) {
-        throw new Error(
-          `현재 플랜에서는 프로젝트를 최대 ${projectLimitState.limit ?? activeProjectCount}개까지 만들 수 있습니다.`
-        );
+      if (projectActivationInFlight.current) {
+        throw new Error("프로젝트 작업이 진행 중입니다. 잠시 후 다시 시도해 주세요.");
       }
+      projectActivationInFlight.current = true;
+      try {
+        const storedProjects = await getBodyProjects();
+        const activeProjectCount = storedProjects.filter((project) => !project.archived).length;
+        const projectLimitState = getBodyFrameProjectCreationLimitState({
+          activeProjectCount,
+          maxProjectCount: planEntitlements.maxProjectCount
+        });
 
-      const project = await createBodyProject({
-        name,
-        targetPhotoCount,
-        referenceMode
-      });
-      await setLastActiveProjectId(project.id);
-      await reload();
+        if (!projectLimitState.allowed) {
+          throw new Error(
+            `현재 플랜에서는 프로젝트를 최대 ${projectLimitState.limit ?? activeProjectCount}개까지 만들 수 있습니다.`
+          );
+        }
+
+        const project = await createBodyProject({
+          name,
+          targetPhotoCount,
+          referenceMode
+        });
+        await setLastActiveProjectId(project.id);
+        await reload();
+      } finally {
+        projectActivationInFlight.current = false;
+      }
     },
-    [planEntitlements.maxProjectCount, projects, reload]
+    [planEntitlements.maxProjectCount, reload]
   );
 
   if (loading) {

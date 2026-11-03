@@ -45,22 +45,21 @@ check("album denial offers local app save without enabling backup", () => {
 await (async () => {
   try {
     const { createAppOnlySaveFallback } = await loadPure("features/camera/camera-save-fallback.ts");
-    check("app-only fallback matches its label and turns backup off", () => {
-      assert.deepEqual(createAppOnlySaveFallback(), {
-        cameraSaveScope: "app", storageMode: "local_only", cloudBackupEnabled: false
-      });
+    check("app-only fallback changes the camera scope without changing global backup settings", () => {
+      assert.deepEqual(createAppOnlySaveFallback(), { cameraSaveScope: "app" });
       assert.ok(camera.includes('text: "앱에만 저장"'));
     });
     const expression = findExpression(camera,
       (node, ast) => ts.isVariableDeclaration(node) && node.name.getText(ast) === "showDeviceAlbumPermissionPrompt",
       (node) => node.initializer.arguments[0]);
     const updates = [];
+    let persistedSettings = { cameraSaveScope: "all", storageMode: "local_backup", cloudBackupEnabled: true };
     let selectedScope;
     let actions;
     evaluate(expression, {
       createAppOnlySaveFallback, setErrorMessage: () => {},
       setCameraSaveScope: (scope) => { selectedScope = scope; },
-      queueAppSettingsUpdate: (settings) => updates.push(settings),
+      queueAppSettingsUpdate: (settings) => { updates.push(settings); persistedSettings = { ...persistedSettings, ...settings }; },
       Alert: { alert: (_title, _message, buttons) => { actions = buttons; } },
       Linking: { openSettings: () => {} }
     })("권한 거절");
@@ -68,6 +67,7 @@ await (async () => {
     check("actual permission prompt callback applies the local fallback", () => {
       assert.equal(selectedScope, "app");
       assert.deepEqual(updates, [createAppOnlySaveFallback()]);
+      assert.deepEqual(persistedSettings, { cameraSaveScope: "app", storageMode: "local_backup", cloudBackupEnabled: true });
     });
   } catch (error) { failures.push("app-only fallback behavior"); console.error(`FAIL - app-only fallback behavior: ${error.message}`); }
 })();
@@ -131,6 +131,46 @@ for (const [activeCount, limit, expected] of [[1, 1, false], [0, 1, true], [50, 
   check("rapid restore taps cannot activate two projects from the same available slot", () => {
     assert.equal(activations.length, 1);
   });
+}
+const createCallback = findExpression(records,
+  (node, ast) => ts.isVariableDeclaration(node) && node.name.getText(ast) === "handleCreateProject",
+  (node) => node.initializer.arguments[0]);
+{
+  let activeCount = 0;
+  let releaseCreation;
+  let markCreationStarted;
+  const creationStarted = new Promise((resolve) => { markCreationStarted = resolve; });
+  const creationGate = new Promise((resolve) => { releaseCreation = resolve; });
+  const context = {
+    projects: [], planEntitlements: { maxProjectCount: 1 },
+    projectActivationInFlight: { current: false }, setRestoringProjectId: () => {},
+    getBodyFrameProjectCreationLimitState,
+    getBodyProjects: async () => Array.from({ length: activeCount }, (_, id) => ({ id: String(id), archived: false })),
+    createBodyProject: async () => { markCreationStarted(); await creationGate; activeCount++; return { id: "created" }; },
+    archiveBodyProject: async () => { await creationGate; activeCount++; },
+    setLastActiveProjectId: async () => {}, reload: async () => {}, Alert: { alert: () => {} }
+  };
+  const create = evaluate(createCallback, context);
+  const restore = evaluate(restoreCallback, context);
+  const pendingCreate = create({ name: "New", targetPhotoCount: 100, referenceMode: "latest" });
+  await creationStarted;
+  const pendingRestore = restore({ id: "archived" });
+  releaseCreation();
+  await Promise.all([pendingCreate, pendingRestore]);
+  check("creation and restoration share one activation slot while creation is pending", () => assert.equal(activeCount, 1));
+}
+{
+  let created = false;
+  const create = evaluate(createCallback, {
+    projects: [], planEntitlements: { maxProjectCount: 1 },
+    projectActivationInFlight: { current: false },
+    getBodyFrameProjectCreationLimitState,
+    getBodyProjects: async () => [{ id: "fresh-active", archived: false }],
+    createBodyProject: async () => { created = true; return { id: "created" }; },
+    setLastActiveProjectId: async () => {}, reload: async () => {}
+  });
+  await create({ name: "New", targetPhotoCount: 100, referenceMode: "latest" }).catch(() => {});
+  check("creation checks fresh active projects instead of the stale rendered list", () => assert.equal(created, false));
 }
 check("creation and onboarding content can scroll inside bounded containers", () => {
   const create = switcher.slice(switcher.indexOf("visible={createOpen}"));

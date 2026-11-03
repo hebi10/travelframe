@@ -91,3 +91,29 @@ export const createBodyFrameImageReadiness = (timeoutMs = 15_000) => {
     })
   };
 };
+
+// The optional recorder API exposes record(), but no stop()/release(). Keep a
+// process-wide guard across screen remounts and do not release staged files when
+// only our JS timeout/abort has settled. Native settlement is the release point.
+let nativeRecordingActive = false;
+export const runBodyFrameNativeRecording = async <T>(
+  start: () => Promise<T>,
+  signal?: AbortSignal,
+  timeoutMs = 60_000
+): Promise<T> => {
+  if (nativeRecordingActive) throw new Error("이전 영상 작업이 종료되는 중입니다. 잠시 후 다시 시도해 주세요.");
+  assertBodyFrameExportActive(signal);
+  nativeRecordingActive = true;
+  let recording: Promise<T> | undefined;
+  try {
+    recording = start();
+    return await withBodyFrameExportTimeout(recording, signal, timeoutMs);
+  } catch (error) {
+    // A rejected callback may stop the native loop, but that is not proof that
+    // its encoder resources have been released. Await the actual record promise.
+    await recording?.catch(() => undefined);
+    throw error;
+  } finally {
+    nativeRecordingActive = false;
+  }
+};

@@ -28,6 +28,7 @@ import {
   getBodyFrameVideoOverlayText,
   getBodyFrameVideoPhotoIndex,
   getBodyFrameVideoMeasurement,
+  getBodyFrameVideoPreviewTransform,
   selectBodyFrameVideoPhotos,
   BODY_FRAME_VIDEO_TEMPLATE,
   BODY_FRAME_VIDEO_TRANSITION,
@@ -37,7 +38,7 @@ import {
   getBodyFrameVideoPhotos,
   getBodyFrameVideoTotalFrames
 } from "@/lib/body-frame-video";
-import { assertBodyFrameExportActive, createBodyFrameImageReadiness, prepareBodyFrameVideoPhotos, withBodyFrameExportTimeout } from "@/lib/body-frame-video-export";
+import { assertBodyFrameExportActive, createBodyFrameImageReadiness, prepareBodyFrameVideoPhotos, runBodyFrameNativeRecording, withBodyFrameExportTimeout } from "@/lib/body-frame-video-export";
 import { downloadPrivateFile } from "@/lib/private-storage";
 import { selectActiveBodyProject } from "@/lib/body-frame-camera-project";
 import {
@@ -132,6 +133,7 @@ export default function BodyFrameVideoScreen() {
     [availablePhotos, selectedIds]
   );
   const [recordingPhotos, setRecordingPhotos] = useState<PhotoItem[]>([]);
+  const [previewWidth, setPreviewWidth] = useState(0);
   const [recordingRunId, setRecordingRunId] = useState("");
   const exportController = useRef<AbortController | null>(null);
   const imageReadiness = useRef(createBodyFrameImageReadiness());
@@ -192,7 +194,11 @@ export default function BodyFrameVideoScreen() {
     [getMeasurementForPhoto, previewPhoto, videoOptions.overlay]
   );
   const currentImageKey = `${recordingRunId}:${recordingFrame.currentPhoto?.id ?? ""}`;
-  const cancelExport = useCallback(() => { exportController.current?.abort(); }, []);
+  const cancelExport = useCallback(() => {
+    if (!exportController.current) return;
+    exportController.current.abort();
+    setMessage("취소를 요청했습니다. 현재 영상 작업이 종료될 때까지 기다려 주세요.");
+  }, []);
   useEffect(() => {
     const subscription = AppState.addEventListener("change", state => {
       if (state !== "active") cancelExport();
@@ -279,7 +285,14 @@ export default function BodyFrameVideoScreen() {
 
     const runId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
     const directory = `${FileSystem.cacheDirectory}body-frame-export-${runId}/`;
+    const outputUri = `${FileSystem.cacheDirectory}body-frame-${runId}.mp4`;
     await FileSystem.makeDirectoryAsync(directory, { intermediates: true });
+    const cleanup = async () => {
+      setRecordingPhotos([]);
+      await FileSystem.deleteAsync(directory, { idempotent: true }).catch(() => undefined);
+      await FileSystem.deleteAsync(outputUri, { idempotent: true }).catch(() => undefined);
+    };
+    let completed = false;
     try {
       const stagedPhotos = await prepareBodyFrameVideoPhotos(projectPhotos, async (uri, photoId) => {
         assertBodyFrameExportActive(signal);
@@ -303,8 +316,7 @@ export default function BodyFrameVideoScreen() {
       await imageReadiness.current.wait(`${runId}:${stagedPhotos[0].id}`, signal);
       await withBodyFrameExportTimeout(waitForPaint(), signal, 15_000);
 
-      const outputUri = `${FileSystem.cacheDirectory}body-frame-${Date.now()}.mp4`;
-      const recordedPath = await withBodyFrameExportTimeout(recorder.record({
+      const recordedPath = await runBodyFrameNativeRecording(() => recorder.record({
         output: toNativeFilePath(outputUri),
         fps: BODY_FRAME_VIDEO_FPS,
         totalFrames,
@@ -338,10 +350,10 @@ export default function BodyFrameVideoScreen() {
         throw new Error("MP4 파일 생성은 완료됐지만 저장할 파일을 찾지 못했습니다.");
       }
 
-      return recordedUri;
+      completed = true;
+      return { uri: recordedUri, coverUri: stagedPhotos[0].uri, cleanup };
     } finally {
-      setRecordingPhotos([]);
-      await FileSystem.deleteAsync(directory, { idempotent: true }).catch(() => undefined);
+      if (!completed) await cleanup();
     }
   }, [
     projectPhotos,
@@ -381,6 +393,7 @@ export default function BodyFrameVideoScreen() {
 
     let saved = false;
     let appSaved = false;
+    let recordingResult: Awaited<ReturnType<typeof recordProjectVideo>> | null = null;
     const controller = new AbortController();
     exportController.current = controller;
     try {
@@ -396,13 +409,14 @@ export default function BodyFrameVideoScreen() {
         label: "영상"
       });
       assertBodyFrameExportActive(controller.signal);
-      const videoUri = await recordProjectVideo(controller.signal);
+      recordingResult = await recordProjectVideo(controller.signal);
+      const videoUri = recordingResult.uri;
       setExportProgress(88);
       assertBodyFrameExportActive(controller.signal);
       const savedVideo = await saveMadeVideo(
         {
           uri: videoUri,
-          coverUri: previewPhoto?.uri,
+          coverUri: recordingResult.coverUri,
           projectId: activeProject.id,
           title: `${activeProject.name} 변화 영상`,
           ratio: videoOptions.ratio,
@@ -445,6 +459,7 @@ export default function BodyFrameVideoScreen() {
       const detail = getUserFacingErrorMessage(error, "변화 영상을 만들지 못했습니다.");
       setMessage(appSaved ? `영상은 앱에 저장했습니다. ${detail} 아래에서 앨범 저장을 다시 시도하거나 영상 관리에서 저장해 주세요.` : detail);
     } finally {
+      await recordingResult?.cleanup();
       if (exportController.current === controller) exportController.current = null;
       setIsExporting(false);
     }
@@ -467,7 +482,6 @@ export default function BodyFrameVideoScreen() {
     planEntitlements.localVideoLimit,
     planEntitlements.label,
     planEntitlements.weeklyVideoExportLimit,
-    previewPhoto?.uri,
     projectPhotos,
     recordProjectVideo,
     requestPostSaveAd,
@@ -555,27 +569,31 @@ export default function BodyFrameVideoScreen() {
           ]}
         >
           {previewPhoto ? (
-            <TripClipRecordingCanvas
-              frame={{ currentPhoto: previewPhoto, nextPhoto: null, transitionProgress: 0 }}
-              template={BODY_FRAME_VIDEO_TEMPLATE}
-              transition={BODY_FRAME_VIDEO_TRANSITION}
-              showWatermark={planEntitlements.showWatermark}
-              frameAspectRatio={frameAspectRatio}
-              guideVisible={false}
-              guide="circle"
-              guideSize={44}
-              guideStrokeWidth={1}
-              guideColor={DEFAULT_GUIDE_COLOR}
-              guideOffsetX={0}
-              guideOffsetY={0}
-              guideOffsetFrameWidth={0}
-              guideOffsetFrameHeight={0}
-              gridGuideLinePositions={defaultGridGuideLinePositions}
-              guideShapePoints={defaultGuideShapePoints}
-              photoAdjustments={EMPTY_ADJUSTMENTS}
-              bodyFrameOverlayText={previewOverlayText}
-              bodyFrameOverlayPosition={videoOptions.overlay.position}
-            />
+            <View style={styles.previewViewport} onLayout={event => setPreviewWidth(event.nativeEvent.layout.width)}>
+              <View style={[styles.previewLogicalCanvas, getBodyFrameVideoPreviewTransform(previewWidth, frameAspectRatio, RECORDING_VIEW_WIDTH)]}>
+                <TripClipRecordingCanvas
+                  frame={{ currentPhoto: previewPhoto, nextPhoto: null, transitionProgress: 0 }}
+                  template={BODY_FRAME_VIDEO_TEMPLATE}
+                  transition={BODY_FRAME_VIDEO_TRANSITION}
+                  showWatermark={planEntitlements.showWatermark}
+                  frameAspectRatio={frameAspectRatio}
+                  guideVisible={false}
+                  guide="circle"
+                  guideSize={44}
+                  guideStrokeWidth={1}
+                  guideColor={DEFAULT_GUIDE_COLOR}
+                  guideOffsetX={0}
+                  guideOffsetY={0}
+                  guideOffsetFrameWidth={0}
+                  guideOffsetFrameHeight={0}
+                  gridGuideLinePositions={defaultGridGuideLinePositions}
+                  guideShapePoints={defaultGuideShapePoints}
+                  photoAdjustments={EMPTY_ADJUSTMENTS}
+                  bodyFrameOverlayText={previewOverlayText}
+                  bodyFrameOverlayPosition={videoOptions.overlay.position}
+                />
+              </View>
+            </View>
           ) : (
             <View style={styles.previewEmpty}>
               <Text style={[styles.previewEmptyText, { color: palette.faint }]}>
@@ -861,6 +879,15 @@ const styles = StyleSheet.create({
     borderWidth: bodyFrameDesign.borderWidth,
     borderRadius: bodyFrameDesign.cardRadius,
     backgroundColor: "#131315"
+  },
+  previewViewport: {
+    flex: 1,
+    overflow: "hidden"
+  },
+  previewLogicalCanvas: {
+    position: "absolute",
+    left: 0,
+    top: 0
   },
   previewEmpty: {
     flex: 1,

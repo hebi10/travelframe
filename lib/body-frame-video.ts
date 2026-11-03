@@ -239,3 +239,16 @@ export const getBodyFrameVideoMeasurement = <T extends { photoId?: string }>(
   }
   return null;
 };
+
+// Both preview and encoder lay out text/watermarks against the same logical
+// width. Scale the complete preview only after text wrapping has been resolved.
+export const getBodyFrameVideoPreviewTransform = (
+  previewWidth: number,
+  aspectRatio: number,
+  logicalWidth: number
+) => ({
+  width: logicalWidth,
+  height: logicalWidth / aspectRatio,
+  transformOrigin: "top left" as const,
+  transform: [{ scale: Math.max(0, previewWidth) / logicalWidth }]
+});

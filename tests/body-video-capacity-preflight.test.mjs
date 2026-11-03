@@ -49,7 +49,7 @@ const runExport = async (storedCount, overrides = {}) => {
     requestPostSaveAd: () => { events.push("ad"); },
     getMadeVideos: async () => Array.from({ length: storedCount }),
     assertLocalLibraryCapacity: limitExports.assertLocalLibraryCapacity,
-    recordProjectVideo: async () => { events.push("record"); return "file:///video.mp4"; },
+    recordProjectVideo: async () => { events.push("record"); return { uri: "file:///video.mp4", coverUri: "file:///cover.jpg", cleanup: async () => {} }; },
     saveVideoToLibrary: async () => { events.push("external-save"); },
     saveMadeVideo: async (video) => { events.push("app-save"); savedVideos.push(video); return { ...video, uri: "file:///persisted.mp4" }; },
     recordGuestWeeklyVideoExport: async () => ({ count: 1, remaining: 0 }),
@@ -124,6 +124,7 @@ for (const ratio of ["3:4", "9:16", "1:1", "16:9"]) {
       createBodyFrameImageReadiness: () => ({ wait: async () => {} }),
       imageReadiness: { current: null }, setRecordingPhotos: () => {}, setRecordingRunId: () => {},
       withBodyFrameExportTimeout: async promise => promise,
+      runBodyFrameNativeRecording: async start => start(),
       assertBodyFrameExportActive: () => {},
       setRecordingFrameIndex: () => {}, waitForPaint: async () => {},
       recorder: { record: async options => { nativeOptions = options; return "/cache/result.mp4"; } },
@@ -131,7 +132,7 @@ for (const ratio of ["3:4", "9:16", "1:1", "16:9"]) {
       toNativeFilePath: uri => uri.replace("file://", ""), toFileUri: path => `file://${path}`,
       setExportProgress: () => {}
     });
-    assert.equal(await record(new AbortController().signal), "file:///cache/result.mp4");
+    assert.equal((await record(new AbortController().signal)).uri, "file:///cache/result.mp4");
     assert.equal(nativeOptions.width, outputSize.width);
     assert.equal(nativeOptions.height, outputSize.height);
     assert.equal(nativeOptions.totalFrames, 42);

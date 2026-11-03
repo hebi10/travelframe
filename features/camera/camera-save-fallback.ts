@@ -1,6 +1,4 @@
-// Album permission recovery is a local choice; it must not opt into cloud backup.
+// Only the camera destination changes; other features keep their backup preferences.
 export const createAppOnlySaveFallback = () => ({
-  cameraSaveScope: "app" as const,
-  storageMode: "local_only" as const,
-  cloudBackupEnabled: false
+  cameraSaveScope: "app" as const
 });

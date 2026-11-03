@@ -113,7 +113,7 @@ const exportFixture = async ({ saveFails = false, adThrows = false } = {}) => {
     formatDuration: value => `${value}초`, setIsExporting: value => { if (!value) events.push("finished"); },
     setExportProgress: () => {}, setMessage: value => messages.push(value), setGuestUsage: () => {},
     getMadeVideos: async () => [], assertLocalLibraryCapacity: () => {},
-    recordProjectVideo: async () => "file:///video.mp4",
+    recordProjectVideo: async () => ({ uri: "file:///video.mp4", coverUri: "file:///cover.jpg", cleanup: async () => {} }),
     saveVideoToLibrary: async () => events.push("album"),
     saveMadeVideo: async () => { if (saveFails) throw new Error("save failed"); events.push("local"); return { uri: "file:///persisted.mp4" }; },
     recordGuestWeeklyVideoExport: async () => ({}), getUserFacingErrorMessage: error => error.message,

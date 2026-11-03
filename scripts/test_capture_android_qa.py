@@ -42,6 +42,23 @@ class CaptureHelpersTest(unittest.TestCase):
         self.assertEqual(json.loads(values['body-frame.projects.v1']), [])
         self.assertNotIn('body-frame.last-active-project-id.v1', values)
 
+    def test_private_video_extraction_refuses_remote_other_package_and_traversal(self):
+        app = '/data/user/0/' + qa.PACKAGE
+        self.assertEqual(qa.private_video_path('file://' + app + '/files/made-videos/123-demo.mp4', app), 'files/made-videos/123-demo.mp4')
+        for uri in ['https://example.com/a.mp4', 'file:///data/user/0/other/files/made-videos/a.mp4', 'file://' + app + '/files/made-videos/%2e%2e/a.mp4']:
+            with self.assertRaises(ValueError):
+                qa.private_video_path(uri, app)
+
+    def test_native_probe_requires_expected_codec_dimensions_frames_and_duration(self):
+        probe = {'streams': [{'codec_type': 'video', 'codec_name': 'h264', 'width': 1080, 'height': 1440, 'nb_read_frames': '9'}], 'format': {'duration': '0.300'}}
+        self.assertEqual(qa.validate_video_probe(probe)['duration'], 0.3)
+        for key, value in [('codec_name', 'mpeg4'), ('width', 720), ('nb_read_frames', '1')]:
+            broken = {'streams': [dict(probe['streams'][0], **{key: value})], 'format': probe['format']}
+            with self.assertRaises(ValueError):
+                qa.validate_video_probe(broken)
+        with self.assertRaises(ValueError):
+            qa.validate_video_probe({'streams': probe['streams'], 'format': {'duration': '0'}})
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -441,6 +441,10 @@ export const markPhotoCloudOnly = async (
   if (!photo || !downloadURL) {
     return photo ?? null;
   }
+  // The completed upload owns only the source version it actually read. A later
+  // edit must stay local/pending, even if its older backup finished successfully.
+  if (backup?.localUri !== photo.uri ||
+      backup.updatedAt !== (photo.updatedAt ?? photo.createdAt)) return photo;
 
   const originalUri = photo.uri;
   const nextPhoto: PhotoItem = {
@@ -954,17 +958,31 @@ export const mergePhotosFromBackup = (incoming: PhotoItem[]) =>
 
 // Project capture finalization and rollback must not replace a snapshot read
 // outside the queue: a second capture or cloud restore may have committed since.
-export const updatePhotoMetadata = (id: string, updates: Partial<PhotoItem>) =>
+const isSamePhotoVersion = (current: PhotoItem, expected: PhotoItem) =>
+  current.uri === expected.uri &&
+  (current.updatedAt ?? current.createdAt) === (expected.updatedAt ?? expected.createdAt);
+
+export const updatePhotoMetadata = (id: string, updates: Partial<PhotoItem>, expectedDraft?: PhotoItem) =>
   runPhotoLibraryMutation(async () => {
     const photos = await getPhotos();
     const current = photos.find(photo => photo.id === id);
     if (!current) throw new Error("저장할 사진을 찾을 수 없습니다.");
-    const next = { ...current, ...updates, id: current.id };
+    const applicableUpdates = expectedDraft && !isSamePhotoVersion(current, expectedDraft)
+      ? {
+          // Capture still owns its reservation, but no longer owns these pixels.
+          projectId: current.projectId ?? updates.projectId,
+          sequence: current.sequence ?? updates.sequence
+        }
+      : updates;
+    const next = { ...current, ...applicableUpdates, id: current.id };
     await writePhotos(photos.map(photo => photo.id === id ? next : photo));
     return next;
   });
 
-export const discardPhotoDraft = (id: string) => runPhotoLibraryMutation(async () => {
+export const discardPhotoDraft = (id: string, expectedDraft?: PhotoItem) => runPhotoLibraryMutation(async () => {
   const photos = await getPhotos();
+  const current = photos.find(photo => photo.id === id);
+  if (!current || (expectedDraft && !isSamePhotoVersion(current, expectedDraft))) return null;
   await writePhotos(photos.filter(photo => photo.id !== id));
+  return current;
 });

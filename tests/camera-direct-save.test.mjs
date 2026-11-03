@@ -76,9 +76,11 @@ for (const snippet of [
 }
 
 const fallbackSource = fs.readFileSync("features/camera/camera-save-fallback.ts", "utf8");
-for (const snippet of ['cameraSaveScope: "app"', 'storageMode: "local_only"', 'cloudBackupEnabled: false']) {
+for (const snippet of ['cameraSaveScope: "app"']) {
   assert.ok(fallbackSource.includes(snippet), `album permission fallback must remain app-only: ${snippet}`);
 }
+assert.equal(fallbackSource.includes("storageMode:"), false, "camera fallback must preserve unrelated global storage mode");
+assert.equal(fallbackSource.includes("cloudBackupEnabled:"), false, "camera fallback must preserve unrelated global backup preference");
 
 const capturePhotoStart = source.indexOf("  const capturePhoto = async () => {");
 const takePhotoStart = source.indexOf("  const takePhoto = async () => {", capturePhotoStart);

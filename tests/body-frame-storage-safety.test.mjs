@@ -6,17 +6,21 @@ import ts from "typescript";
 
 // Execute production modules; only native and network boundaries are replaced.
 const load = (file, dependencies = {}) => {
-  const code = ts.transpileModule(fs.readFileSync(file, "utf8"), {
+  const code = ts.transpileModule(fs.readFileSync(new URL(`../${file}`, import.meta.url), "utf8"), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
   }).outputText;
-  const context = { exports: {}, require: name => {
+  const context = { exports: {}, fetch: async () => ({ blob: async () => ({ size: 100 }) }), require: name => {
     if (!(name in dependencies)) throw Error(`Unexpected import ${name}`);
     return dependencies[name];
   }};
   vm.runInNewContext(code, context, { filename: file });
   return context.exports;
 };
-const barrier = () => Promise.withResolvers();
+const barrier = () => {
+  let resolve;
+  const promise = new Promise(complete => { resolve = complete; });
+  return { promise, resolve };
+};
 const photoKey = "travel-frame.photos.v1";
 const oldPhoto = { id: "p", uri: "file:///docs/photos/p-edited.jpg", previewUri: "file:///docs/photo-previews/p-preview.jpg", createdAt: "2026-10-01", width: 100, height: 100, projectId: "pr", sequence: 1 };
 function fixture(fault) {
@@ -34,7 +38,7 @@ function fixture(fault) {
       assert.ok(files.has(from), `source exists ${from}`); files.set(to, files.get(from));
     }},
     "@/lib/private-storage": { downloadPrivateFile: async (source, uri) => { files.set(uri, "download"); return { uri }; } },
-    "expo-image-manipulator": { SaveFormat: { JPEG: "jpeg" }, manipulateAsync: async () => ({ uri: "file:///rendered.jpg", width: 100, height: 100 }) },
+    "expo-image-manipulator": { SaveFormat: { JPEG: "jpeg" }, manipulateAsync: async () => { files.set("file:///rendered.jpg", "rendered"); return { uri: "file:///rendered.jpg", width: 100, height: 100 }; } },
     "@/lib/local-storage": { localStorageAdapter: adapter },
     "@/lib/local-library-limit": { assertLocalLibraryCapacity: () => {} },
     "@/lib/image-backup-utils": { optimizeImageForStorage: async x => x, resolveImageDimensions: async () => ({ width: 100, height: 100 }) },
@@ -85,17 +89,25 @@ function cloudFixture(f, hooks = {}) {
   const user = { uid: "u" }, remote = { ...oldPhoto, localId: "p", sequence: 1, sourceUpdatedAt: "2026-10-01", storagePath: "original/storage", downloadURL: "https://private/photo", uri: "https://private/photo", backupSessionId: "owner-session", sourceDeviceId: "owner-device", backupStatus: "backed_up" };
   const documents = new Map([["photoBackups/p", remote]]); let uploads = 0;
   const deps = new Proxy({
-    "@/lib/firebase": { firebaseAuth: { currentUser: user }, firestore: {}, firebaseStorage: {} },
+    "@/lib/firebase": { firebaseAuth: { currentUser: user }, firestore: {}, firebaseStorage: {}, firebaseFunctions: {} },
     "@/lib/local-library-owner": { assertLocalLibraryOwner: async () => {} },
     "@/lib/cloud-backup-project-slots": { getSelectedCloudBackupProjectIds: async () => new Set(["pr"]) },
-    "@/lib/plan-entitlements": { getPlanEntitlements: () => ({ maxCloudBackupProjects: 1 }) },
+    "@/lib/plan-entitlements": { getPlanEntitlements: () => ({ maxCloudBackupProjects: 1 }), getPlanTier: () => "pro" },
     "@/lib/body-project-library": { getBodyProjects: async () => [], mergeBodyProjectsFromBackup: hooks.mergeProjects ?? (async () => {}) },
     "@/lib/work-library": load("lib/work-library.ts", f.dependencies),
     "@/lib/video-library": load("lib/video-library.ts", f.dependencies),
     "@/lib/body-project-backup": load("lib/body-project-backup.ts", {}),
     "@/lib/photo-library": f.api,
     "firebase/firestore": { doc: (_, ...parts) => parts.slice(-2).join("/"), collection: (_, ...parts) => parts.at(-1), getDocs: async prefix => ({ docs: [...documents].filter(([key]) => key.startsWith(`${prefix}/`)).map(([key, data]) => ({ id: key.split("/").at(-1), data: () => data })) }), getDoc: async key => ({ exists: () => documents.has(key), data: () => documents.get(key) }), setDoc: async (key, value, options) => { documents.set(key, options?.merge ? { ...documents.get(key), ...value } : value); }, serverTimestamp: () => "server-time" },
-    "firebase/storage": { uploadBytes: async () => { uploads++; throw Error("must not upload"); } }
+    "@/lib/private-storage": { privateStorageUrl: path => `https://private/${path}` },
+    "@/lib/local-storage": f.dependencies["@/lib/local-storage"],
+    "@/lib/app-settings": { getAppSettings: async () => ({ storageMode: "local_saver", imageBackupQuality: "high" }), isCloudBackupTargetEnabled: () => true },
+    "@/lib/storage-mode": { isStorageSaverMode: () => true },
+    "@/lib/subscription": { isCreatorSubscriptionActive: () => true },
+    "@/lib/cloud-backup-limits": { getCloudBackupStorageLimitBytes: () => 1e9, canBackupMoreVideos: () => true, getCloudBackupVideoLimit: () => 100 },
+    "@/lib/image-backup-utils": { optimizeImageForBackup: async x => ({ ...x, size: 100 }), calculateCombinedImageBackupSize: (current, sizes) => current + sizes.reduce((a,b) => a+b, 0), isImageBackupSizeExceeded: () => false },
+    "firebase/functions": { httpsCallable: (_, name) => async () => ({ data: name === "reserveBackupUpload" ? { backupSessionId: "new-session", storagePath: "users/u/backups/new-photo.jpg" } : {} }) },
+    "firebase/storage": { ref: (_, path) => path, uploadBytes: async () => { uploads++; if (hooks.upload) return hooks.upload(); throw Error("must not upload"); } }
   }, { has: () => true, get: (target, key) => target[key] ?? {} });
   return { user, documents, remote, api: load("lib/cloud-backup.ts", deps), uploads: () => uploads };
 }
@@ -155,4 +167,79 @@ test("cloud restore paused at project merge preserves a completed project captur
   assert.ok(f.files.has(captured.uri)); assert.ok(f.files.has(edited.uri));
   assert.equal(photos.some(item => item.id === "deleted"), false);
   assert.equal(counts.photoCount, 0);
+});
+
+
+for (const finishWithError of [false, true]) test(`project finalization ${finishWithError ? "failure" : "success"} preserves an edit completed while project storage was paused`, async () => {
+  const f = fixture(); const reached = barrier(), resume = barrier(); let draftId, stagedUri, stagedPreview;
+  const api = load("lib/photo-library.ts", {
+    "@/lib/legacy-photo-library": f.api,
+    "@/lib/body-frame-camera-session": { finishBodyFrameCameraCapture: () => {} },
+    "@/lib/body-project-library": { updateBodyProject: async () => {} },
+    "@/lib/body-measurement-library": {},
+    "@/lib/body-frame-photo-storage": { storeBodyFramePhotoFile: async ({ photoId }) => {
+      draftId = photoId; reached.resolve(); await resume.promise;
+      if (finishWithError) throw Error("project store failed");
+      stagedUri = `file:///docs/project/${photoId}.jpg`; stagedPreview = `file:///docs/project/${photoId}-preview.jpg`;
+      f.files.set(stagedUri, "capture"); f.files.set(stagedPreview, "capture preview");
+      return { uri: stagedUri, previewUri: stagedPreview, width: 100, height: 100 };
+    } }
+  });
+  const capture = api.saveCapturedPhoto({ uri: "file:///camera.jpg", width: 100, height: 100 }, { projectId: "pr", sequence: 2, reservationId: "r" });
+  await reached.promise; f.files.set("file:///rendered.jpg", "new edit");
+  const edited = await f.api.saveEditedPhoto({ ...editInput, targetPhotoId: draftId });
+  resume.resolve();
+  if (finishWithError) await assert.rejects(capture, /project store failed/); else await capture;
+  const persisted = (await f.api.getPhotos()).find(item => item.id === draftId);
+  assert.ok(persisted, "rollback must keep the newer content version");
+  assert.equal(persisted.uri, edited.uri); assert.equal(persisted.edited, true);
+  assert.equal(persisted.updatedAt, edited.updatedAt); assert.ok(f.files.has(edited.uri));
+  assert.equal(persisted.projectId, "pr"); assert.equal(persisted.sequence, 2);
+  if (!finishWithError) { assert.equal(f.files.has(stagedUri), false); assert.equal(f.files.has(stagedPreview), false); }
+});
+
+for (const mode of ["single", "workspace"]) test(`${mode} backup completion cannot evict a newer photo edit`, async () => {
+  const f = fixture(); const reached = barrier(), resume = barrier();
+  const c = cloudFixture(f, { upload: async () => { reached.resolve(); await resume.promise; } });
+  c.documents.clear();
+  const backup = mode === "single" ? c.api.backupPhoto({ user: c.user, photo: oldPhoto, enabled: true }) : c.api.backupCurrentWorkspace({ user: c.user, subscription: {} });
+  await reached.promise; const edited = await f.api.saveEditedPhoto(editInput);
+  resume.resolve(); await backup;
+  const persisted = (await f.api.getPhotos()).find(item => item.id === "p");
+  assert.equal(persisted.uri, edited.uri); assert.equal(persisted.localFileStatus, "available");
+  assert.equal(persisted.backupStatus, "pending"); assert.ok(f.files.has(edited.uri), "new edit bytes must remain local until its own backup completes");
+});
+
+for (const mode of ["single", "workspace"]) test(`${mode} backup evicts the unchanged source version after its upload`, async () => {
+  const f = fixture(); const c = cloudFixture(f, { upload: async () => {} }); c.documents.clear();
+  if (mode === "single") await c.api.backupPhoto({ user: c.user, photo: oldPhoto, enabled: true });
+  else await c.api.backupCurrentWorkspace({ user: c.user, subscription: {} });
+  const persisted = (await f.api.getPhotos()).find(item => item.id === "p");
+  assert.equal(persisted.localFileStatus, "cloud_only"); assert.match(persisted.uri, /^https:/);
+  assert.equal(f.files.has(oldPhoto.uri), false); assert.equal(f.files.has(oldPhoto.previewUri), true);
+});
+
+test("project rollback does not adopt and discard an edit queued before reservation attachment", async () => {
+  const f = fixture(); const reached = barrier(), resume = barrier(); let pause = true;
+  f.adapter.setItem = async (key, value) => {
+    f.storage.set(key, value);
+    if (key === photoKey && pause) { pause = false; reached.resolve(); await resume.promise; }
+  };
+  const api = load("lib/photo-library.ts", {
+    "@/lib/legacy-photo-library": f.api,
+    "@/lib/body-frame-camera-session": { finishBodyFrameCameraCapture: () => {} },
+    "@/lib/body-project-library": { updateBodyProject: async () => {} },
+    "@/lib/body-measurement-library": {},
+    "@/lib/body-frame-photo-storage": { storeBodyFramePhotoFile: async () => { throw Error("project store failed"); } }
+  });
+  const capture = api.saveCapturedPhoto({ uri: "file:///camera.jpg", width: 100, height: 100 }, { projectId: "pr", sequence: 2, reservationId: "r" });
+  const rejectedCapture = assert.rejects(capture, /project store failed/);
+  await reached.promise;
+  const draftId = (await f.api.getPhotos()).find(item => item.id !== "p").id;
+  f.files.set("file:///early-edit.jpg", "early edit");
+  const editing = f.api.saveEditedPhoto({ ...editInput, renderedUri: "file:///early-edit.jpg", targetPhotoId: draftId });
+  resume.resolve(); const edited = await editing; await rejectedCapture;
+  const persisted = (await f.api.getPhotos()).find(item => item.id === draftId);
+  assert.ok(persisted, "a newer edit is never an unfinished capture draft");
+  assert.equal(persisted.uri, edited.uri); assert.ok(f.files.has(edited.uri)); assert.equal(persisted.projectId, "pr");
 });

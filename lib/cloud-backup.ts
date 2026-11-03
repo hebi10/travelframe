@@ -160,7 +160,11 @@ const applyStorageSaverPolicy = async ({
   }
 
   if (photo) {
-    await markPhotoCloudOnly(photo.id, photoBackup ?? null);
+    await markPhotoCloudOnly(photo.id, {
+      ...photoBackup,
+      localUri: photo.uri,
+      updatedAt: photo.updatedAt ?? photo.createdAt
+    });
   }
 
   if (imageBundle) {
