@@ -515,8 +515,12 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(backupOverviewMutableKeys());
     }
 
-    function isValidPhotoBackupUpdate(userId, photoId) {
-      return hasValidBackupOwner(userId)
+    function isValidPhotoBackupMetadataUpdate(userId, photoId) {
+      return request.resource.data.storagePath == resource.data.storagePath
+        && request.resource.data.fileSize == resource.data.fileSize
+        && request.resource.data.fileType == resource.data.fileType
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(photoBackupMutableKeys())
+        && hasValidBackupOwner(userId)
         && requestedProjectWriteUnlocked(userId)
         && validPhotoProjectFields()
         && request.resource.data.keys().hasOnly(photoBackupKeys())
@@ -528,17 +532,20 @@ service cloud.firestore {
         && request.resource.data.fileType.matches('image/.*')
         && isValidPhotoBackupUrls(userId)
         && hasValidBackupSessionId()
-        && isValidBackupStatus(request.resource.data.backupStatus)
-        && request.resource.data.userId == resource.data.userId
-        && request.resource.data.localId == resource.data.localId
-        && ((request.resource.data.storagePath == resource.data.storagePath
-        && request.resource.data.backupSessionId == resource.data.backupSessionId
-        && request.resource.data.fileSize == resource.data.fileSize
-        && request.resource.data.fileType == resource.data.fileType
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(photoBackupMutableKeys()))
-        || (request.resource.data.backupSessionId != resource.data.backupSessionId
-          && isValidPhotoBackup(userId, photoId)
-          && backupUploadSession(userId, request.resource.data.backupSessionId).data.status == "completed"));
+        && isValidBackupStatus(request.resource.data.backupStatus);
+    }
+
+    function isValidPhotoBackupUpdate(userId, photoId) {
+      let requested = request.resource.data;
+      let existing = resource.data;
+      return requested.userId == existing.userId
+        && requested.localId == existing.localId
+        // Only one full validator runs: replacement already validates the same
+        // owner/path/file/project shape plus its newly completed upload session.
+        && (requested.backupSessionId == existing.backupSessionId
+          ? isValidPhotoBackupMetadataUpdate(userId, photoId)
+          : (backupUploadSession(userId, requested.backupSessionId).data.status == "completed"
+            && isValidPhotoBackup(userId, photoId)));
     }
 
     function isValidImageWorkBackupUpdate(userId, workId) {

@@ -479,6 +479,22 @@ await expectDenied(
   })
 );
 await seedBackupUploadSession({
+  sessionId: "bound-photo-replacement", itemId: boundPhotoId,
+  projectId: "project-1", status: "completed", fileSize: 1024,
+  storagePath: `users/${ownerUid}/backups/photos/bound-edited.jpg`
+});
+await expectAllowed(
+  "completed identity-bound upload replaces its edited photo within the Rules expression budget",
+  firestoreRequest("PATCH", `users/${ownerUid}/photoBackups/${boundPhotoId}`, {
+    uid: ownerUid,
+    data: {
+      ...boundPhoto, edited: true,
+      backupSessionId: "bound-photo-replacement",
+      storagePath: `users/${ownerUid}/backups/photos/bound-edited.jpg`
+    }
+  })
+);
+await seedBackupUploadSession({
   sessionId: "legacy-null-item", itemId: null,
   storagePath: `users/${ownerUid}/backups/photos/legacy-null.jpg`, fileSize: 1024
 });
