@@ -210,7 +210,7 @@ class CaptureScenarioTest(unittest.TestCase):
             trust=root/'trust.json';trust.write_text(json.dumps({'clientMatch':True,'apkSha256':'exact-reviewed-hash'}))
             argv=['capture-android-qa.py','--apk',str(apk),'--output',str(root/'captures'),'--trust-manifest',str(trust)]
             if scenario is not None:argv+=['--scenario',scenario]
-            with patch('sys.argv',argv),patch.object(qa,'Device',return_value=device),patch.object(qa,'capture',side_effect=capture),patch.object(qa,'fixture_jpeg',return_value=b'JPEG') as fixtures,patch.object(qa.time,'sleep'),patch.object(qa,'video_failure_and_background_smoke',return_value=[]) as failures,patch.object(qa,'video_smoke',return_value=[]) as videos:
+            with patch('sys.argv',argv),patch.object(qa,'Device',return_value=device),patch.object(qa,'capture',side_effect=capture),patch.object(qa,'prepare_native_hierarchy',return_value={'backend':'native-no-idle'}) as hierarchy,patch.object(qa,'fixture_jpeg',return_value=b'JPEG') as fixtures,patch.object(qa.time,'sleep'),patch.object(qa,'video_failure_and_background_smoke',return_value=[]) as failures,patch.object(qa,'video_smoke',return_value=[]) as videos:
                 qa.main()
                 manifest=json.loads((root/'captures/capture-manifest.json').read_text())
                 files=sorted(str(path.relative_to(root/'captures')) for path in (root/'captures').rglob('*') if path.is_file())
@@ -222,6 +222,7 @@ class CaptureScenarioTest(unittest.TestCase):
             ('create-project-large-font-keyboard',qa.creation_keyboard,True),
             ('create-project-large-font-submitted',qa.creation_submit,False)]]
         self.assertEqual(calls,expected)
+        self.assertEqual(manifest['hierarchyBackend']['backend'],'native-no-idle')
         self.assertEqual(manifest['scenario'],'keyboard');self.assertEqual(manifest['captured'],4);self.assertEqual(manifest['failed'],0)
         self.assertEqual(manifest['apkTrust'],{'clientMatch':True,'apkSha256':'exact-reviewed-hash'})
         self.assertEqual([call.args for call in device.seed.call_args_list],[(False,'large'),(False,'large')])
@@ -333,6 +334,31 @@ class ImeVisibilityTest(unittest.TestCase):
         device=qa.Device();device.shell=Mock(return_value='mInputShown=false')
         with self.assertRaises(RuntimeError):qa.ensure_keyboard_hidden(device)
         self.assertFalse(any(call.args==('input','keyevent','KEYCODE_BACK') for call in device.shell.call_args_list))
+
+
+class FreshHierarchyTest(unittest.TestCase):
+    def test_legacy_exit_zero_without_dump_ack_never_reads_any_old_xml(self):
+        device=qa.Device();device.shell=Mock(return_value='');device.run=Mock(return_value='<hierarchy/>')
+        with self.assertRaises(RuntimeError):device.dump()
+        device.run.assert_not_called()
+
+    def test_fresh_native_output_requires_exact_ack_for_unique_path(self):
+        device=qa.Device();device.native_hierarchy_jar='/data/local/tmp/qa.jar'
+        def shell(*args,**kwargs):
+            if args and args[0]=='env':return 'BODY_FRAME_QA_HIERARCHY_DUMPED '+args[-1]
+            return ''
+        device.shell=Mock(side_effect=shell);device.run=Mock(return_value='<hierarchy><node text="fresh"/></hierarchy>')
+        self.assertIn('fresh',device.dump());self.assertIn('fresh',device.dump())
+        paths=[call.args[-1] for call in device.shell.call_args_list if call.args[0]=='env']
+        self.assertEqual(len(set(paths)),2)
+        self.assertTrue(all('/data/local/tmp/body-frame-qa-' in path for path in paths))
+        self.assertTrue(all(call.args[:5]==('env','CLASSPATH=/data/local/tmp/qa.jar','app_process','/system/bin','BodyFrameQaHierarchy') for call in device.shell.call_args_list if call.args[0]=='env'))
+
+    def test_native_ack_for_different_path_is_rejected_without_read(self):
+        device=qa.Device();device.native_hierarchy_jar='/data/local/tmp/qa.jar'
+        device.shell=Mock(return_value='BODY_FRAME_QA_HIERARCHY_DUMPED /sdcard/old.xml');device.run=Mock()
+        with self.assertRaises(RuntimeError):device.dump()
+        device.run.assert_not_called()
 
 
 if __name__ == '__main__':

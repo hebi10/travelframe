@@ -22,6 +22,7 @@ import subprocess
 import tempfile
 import time
 import uuid
+import zipfile
 from urllib.parse import urlencode, unquote, urlparse
 import xml.etree.ElementTree as ET
 
@@ -254,13 +255,59 @@ def fresh_muxer_evidence(logs,app_pid,marker):
     return None
 
 
+
+def build_native_hierarchy(output,android_sdk=None):
+    """Build only the disposable shell QA driver, never the application APK."""
+    source=ROOT/'tests/android-qa/BodyFrameQaHierarchy.java'
+    sdk=Path(android_sdk or os.environ.get('ANDROID_HOME') or os.environ.get('ANDROID_SDK_ROOT') or '')
+    preferred=sdk/'platforms/android-35/android.jar'
+    jars=[path for path in (sdk/'platforms').glob('android-*/android.jar') if re.fullmatch(r'android-\d+',path.parent.name)]
+    if not preferred.exists() and not jars:raise RuntimeError('Native QA hierarchy requires SDK35 or an installed numeric Android platform')
+    android_jar=preferred if preferred.exists() else max(jars,key=lambda path:int(path.parent.name.split('-')[1]))
+    dexers=[path for path in (sdk/'build-tools').glob('*/d8') if re.fullmatch(r'\d+(?:\.\d+)*',path.parent.name)]
+    if not dexers:raise RuntimeError('Native QA hierarchy requires an installed stable Android build-tools D8')
+    d8=max(dexers,key=lambda path:tuple(map(int,path.parent.name.split('.'))))
+    classes=output/'classes';dex=output/'dex';classes.mkdir(parents=True,exist_ok=True);dex.mkdir(exist_ok=True)
+    log=[]
+    commands=[['javac','-source','8','-target','8','-encoding','UTF-8','-cp',str(android_jar),'-d',str(classes),str(source)]]
+    try:
+        for command in commands:
+            run=subprocess.run(command,capture_output=True,text=True,timeout=60)
+            log.extend(['$ '+shlex.join(command),run.stdout,run.stderr])
+            if run.returncode:raise RuntimeError('Native hierarchy javac failed: '+run.stderr[-3000:])
+        command=[str(d8),'--min-api','26','--lib',str(android_jar),'--output',str(dex),*[str(path) for path in classes.rglob('*.class')]]
+        run=subprocess.run(command,capture_output=True,text=True,timeout=60);log.extend(['$ '+shlex.join(command),run.stdout,run.stderr])
+        if run.returncode:raise RuntimeError('Native hierarchy D8 failed: '+run.stderr[-3000:])
+        jar=output/'body-frame-qa-hierarchy.jar'
+        with zipfile.ZipFile(jar,'w',compression=zipfile.ZIP_STORED) as archive:
+            for path in dex.glob('*.dex'):archive.write(path,path.name)
+        metadata=dict(backend='native-no-idle',source=str(source.relative_to(ROOT)),sourceSha256=hashlib.sha256(source.read_bytes()).hexdigest(),
+                      jarSha256=hashlib.sha256(jar.read_bytes()).hexdigest(),androidPlatform=android_jar.parent.name,d8Version=d8.parent.name)
+        (output/'build-metadata.json').write_text(json.dumps(metadata,indent=2))
+        return jar,metadata
+    finally:(output/'hierarchy-build.log').write_text('\n'.join(log))
+
+
+def prepare_native_hierarchy(device,output):
+    jar,metadata=build_native_hierarchy(output/'host-tools/hierarchy')
+    remote='/data/local/tmp/body-frame-qa-hierarchy-'+metadata['jarSha256'][:16]+'.jar'
+    device.run('push',str(jar),remote)
+    device.shell('chmod','0444',remote)
+    device.native_hierarchy_jar=remote
+    return metadata
+
+
 class Device:
     def __init__(self, serial=None):
         self.prefix = ['adb'] + (['-s', serial] if serial else [])
+        self.native_hierarchy_jar=None
+        self.command_stderr=''
+        self.hierarchy_sequence=0
 
     def run(self, *args, binary=False, check=True, data=None, timeout=120):
         result = subprocess.run([*self.prefix, *map(str, args)], input=data,
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=timeout)
+        self.command_stderr=result.stderr.decode(errors='replace')
         if check and result.returncode:
             raise RuntimeError(f'adb {args}: {result.stderr.decode(errors="replace")}')
         return result.stdout if binary else result.stdout.decode(errors='replace')
@@ -269,9 +316,36 @@ class Device:
         return self.run('shell', shlex.join(list(map(str, args))), **kwargs)
 
     def dump(self):
-        self.shell('uiautomator', 'dump', '--compressed', '/sdcard/body-frame-qa.xml', timeout=30)
-        raw = self.run('exec-out', 'cat', '/sdcard/body-frame-qa.xml', timeout=15)
-        return raw[raw.index('<'):]
+        self.hierarchy_sequence+=1
+        target='/data/local/tmp/body-frame-qa-'+uuid.uuid4().hex+'.xml'
+        backend='native-no-idle' if self.native_hierarchy_jar else 'legacy-uiautomator'
+        evidence=dict(sequence=self.hierarchy_sequence,backend=backend,remotePath=target,startedAt=datetime.now(timezone.utc).isoformat())
+        try:
+            self.shell('rm','-f',target)
+            if self.native_hierarchy_jar:
+                output=self.shell('env','CLASSPATH='+self.native_hierarchy_jar,'app_process','/system/bin','BodyFrameQaHierarchy',target,timeout=20)
+                accepted=['BODY_FRAME_QA_HIERARCHY_DUMPED '+target]
+            else:
+                output=self.shell('uiautomator','dump','--compressed',target,timeout=30)
+                accepted=['UI hierchary dumped to: '+target,'UI hierarchy dumped to: '+target]
+            evidence.update(stdout=output,stderr=self.command_stderr)
+            if not any(ack in output.splitlines() for ack in accepted):
+                raise RuntimeError('Hierarchy command did not acknowledge a newly written XML file: '+output+' '+self.command_stderr)
+            raw=self.run('exec-out','cat',target,timeout=15)
+            xml=raw[raw.index('<'):];root=ET.fromstring(xml)
+            if root.tag!='hierarchy':raise RuntimeError('Fresh hierarchy output has an unexpected root')
+            evidence.update(acknowledged=True,xmlSha256=hashlib.sha256(xml.encode()).hexdigest(),completedAt=datetime.now(timezone.utc).isoformat(),rootAttributes=root.attrib)
+            return xml
+        except Exception as error:
+            evidence['error']=str(error)
+            raise
+        finally:
+            try:self.shell('rm','-f',target,check=False,timeout=5)
+            finally:
+                directory=getattr(self,'capture_directory',None)
+                if directory:
+                    folder=Path(directory)/'diagnostics/hierarchy-dumps';folder.mkdir(parents=True,exist_ok=True)
+                    (folder/f'dump-{self.hierarchy_sequence:04}.json').write_text(json.dumps(evidence,indent=2,ensure_ascii=False))
 
     def open(self, route, restart=True):
         if restart:
@@ -865,6 +939,7 @@ def main():
         if device.shell('getprop', 'ro.kernel.qemu').strip() != '1':
             raise RuntimeError('Refusing to seed a physical Android device')
         device.run('install', '-r', '-g', args.apk.resolve())
+        manifest['hierarchyBackend']=prepare_native_hierarchy(device,args.output)
         device.shell('svc', 'wifi', 'disable')
         device.shell('svc', 'data', 'disable')
         device.shell('input', 'keyevent', 'KEYCODE_WAKEUP')
