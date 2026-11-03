@@ -135,9 +135,10 @@ class CaptureHelpersTest(unittest.TestCase):
 
     def test_creation_submission_requires_exact_persisted_name(self):
         import json
-        device=Mock();device.shell.return_value='mInputShown=false';device.storage.return_value={'body-frame.projects.v1':json.dumps([{'name':'새 프로젝트QA_keyboard_large_font'}])}
-        with patch.object(qa,'ensure_keyboard_hidden',return_value={'keyboardWasShown':False,'hiddenConfirmed':True}):
-            with self.assertRaises(RuntimeError):qa.creation_submit(device)
+        device=Mock();device.storage.return_value={'body-frame.projects.v1':json.dumps([{'name':'새 프로젝트QA_keyboard_large_font'}])}
+        with patch.object(qa,'record_ime_visibility',return_value={'visible':True,'source':'window-insets'}):
+            with self.assertRaisesRegex(RuntimeError,'did not persist'):qa.creation_submit(device)
+        device.activate.assert_called_once_with('프로젝트 만들기',prequery=False)
 
     def test_viewport_uses_observed_gesture_bar_instead_of_three_button_assumption(self):
         state='InsetsSource: {mType=statusBars mFrame=[0,0][720,48] mVisible=true}\nInsetsSource: {mType=navigationBars mFrame=[0,1552][720,1600] mVisible=true}'
@@ -170,13 +171,19 @@ class CaptureHelpersTest(unittest.TestCase):
         self.assertFalse(device.scroll_down())
         device.shell.assert_not_called()
 
-    def test_submission_dismisses_real_keyboard_before_scrolling_and_exact_persistence_check(self):
+    def test_submission_records_actual_ime_before_after_without_back_or_drag_and_requires_persistence(self):
         import json
-        device=Mock();device.shell.side_effect=['mInputShown=true','','mInputShown=false']
+        device=Mock()
         device.storage.return_value={'body-frame.projects.v1':json.dumps([{'id':'created','name':'QA_keyboard_large_font'}])}
-        with patch.object(qa,'ensure_keyboard_hidden',return_value={'keyboardWasShown':True,'hiddenConfirmed':True}) as guard:
+        before={'visible':True,'source':'window-insets'};after={'visible':False,'source':'window-insets'}
+        with patch.object(qa,'record_ime_visibility',side_effect=[before,after]) as observe:
             evidence=qa.creation_submit(device)
-        self.assertTrue(evidence['projectPersisted']);self.assertTrue(evidence['keyboardDismissedForSubmit']);guard.assert_called_once_with(device)
+        self.assertTrue(evidence['projectPersisted']);self.assertFalse(evidence['keyboardDismissedForSubmit'])
+        self.assertTrue(evidence['keyboardVisibleBeforeActivation'])
+        self.assertEqual(evidence['imeVisibilityEvidence'],{'before':before,'after':after})
+        self.assertEqual([call.args for call in observe.call_args_list],[(device,'submit-keyboard-before'),(device,'submit-keyboard-after')])
+        device.activate.assert_called_once_with('프로젝트 만들기',prequery=False);device.shell.assert_not_called()
+        device.ready.assert_called_once_with(['QA_keyboard_large_font 프로젝트 열기'])
 
     def test_background_tap_occurs_only_after_monitor_acknowledges_marker(self):
         device=Mock();events=[]
@@ -417,19 +424,35 @@ class NativeActivationTest(unittest.TestCase):
         self.assertEqual(len(calls),1);self.assertEqual(calls[0][-2:],('--click-label','프로젝트 만들기'))
         self.assertFalse(any(call.args[:2]==('input','tap') for call in device.shell.call_args_list))
 
+    def test_direct_semantic_activation_never_queries_or_physically_scrolls(self):
+        device=qa.Device();device.native_hierarchy_jar='/data/local/tmp/qa.jar';device.find_control=Mock()
+        native_click_fixture(device,'click-action-count="1" show-on-screen-action-count="1"')
+        result=device.activate('프로젝트 만들기',prequery=False)
+        device.find_control.assert_not_called()
+        self.assertIsNone(result['prequeryPoint']);self.assertEqual(result['physicalPrequeryActionCount'],0)
+        self.assertFalse(any(call.args[0]=='input' for call in device.shell.call_args_list))
+
     def test_semantic_activation_has_no_legacy_or_coordinate_fallback(self):
         device=qa.Device();device.shell=Mock();device.find_control=Mock()
         with self.assertRaises(RuntimeError):device.activate('프로젝트 만들기',search='below')
         device.shell.assert_not_called();device.find_control.assert_not_called()
 
+    def test_direct_keyboard_submission_rejects_hidden_or_unknown_actual_ime(self):
+        for visible in (False,None):
+            device=Mock()
+            with self.subTest(visible=visible),patch.object(qa,'record_ime_visibility',return_value={'visible':visible}):
+                with self.assertRaisesRegex(RuntimeError,'must remain visible'):qa.creation_submit(device)
+            device.activate.assert_not_called();device.shell.assert_not_called()
+
     def test_submission_activates_once_then_requires_exact_ui_and_persistence(self):
         import json
         device=Mock();device.activate.return_value={'nativeActionCount':1}
         device.storage.return_value={'body-frame.projects.v1':json.dumps([{'id':'created','name':'QA_keyboard_large_font'}])}
-        with patch.object(qa,'ensure_keyboard_hidden',return_value={'keyboardWasShown':True,'hiddenConfirmed':True}):result=qa.creation_submit(device)
-        device.activate.assert_called_once_with('프로젝트 만들기',search='below');device.tap.assert_not_called()
+        with patch.object(qa,'record_ime_visibility',return_value={'visible':True,'source':'window-insets'}):result=qa.creation_submit(device)
+        device.activate.assert_called_once_with('프로젝트 만들기',prequery=False);device.tap.assert_not_called();device.shell.assert_not_called()
         device.ready.assert_any_call(['QA_keyboard_large_font 프로젝트 열기'])
         self.assertTrue(result['projectPersisted']);self.assertEqual(result['submitActivation']['nativeActionCount'],1)
+        self.assertEqual(result['physicalBackActionCount'],0);self.assertEqual(result['physicalDragActionCount'],0)
 
 
 class NativeActionFailureEvidenceTest(unittest.TestCase):

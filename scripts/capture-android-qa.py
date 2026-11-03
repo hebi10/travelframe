@@ -547,16 +547,16 @@ class Device:
         self.shell('input', 'tap', x, y)
         time.sleep(1)
 
-    def activate(self,label,search='default'):
+    def activate(self,label,search='default',prequery=True):
         """Invoke one frontend accessibility action in the same fresh connection."""
         if not self.native_hierarchy_jar:raise RuntimeError('Native accessibility activation is unavailable; no coordinate fallback is allowed')
-        point=self.find_control(label,search=search)  # Scroll only; this coordinate is never tapped.
+        point=self.find_control(label,search=search) if prequery else None  # Never tap this coordinate; direct mode preserves the open IME.
         xml=self.dump(click_label=label)
         proof=self.last_hierarchy_evidence
         if not proof.get('acknowledged') or proof.get('nativeActionCount')!=1:
             raise RuntimeError('Exactly one acknowledged native accessibility action is required')
         return dict(method='AccessibilityNodeInfo.ACTION_CLICK',label=label,nativeActionCount=1,nativeClickActionCount=1,
-                    nativeShowOnScreenActionCount=proof.get('nativeShowOnScreenActionCount',0),prequeryPoint=point,preactionAttributes=ET.fromstring(xml).attrib,hierarchyAction=proof)
+                    nativeShowOnScreenActionCount=proof.get('nativeShowOnScreenActionCount',0),prequeryPoint=point,physicalPrequeryActionCount=0 if not prequery else None,preactionAttributes=ET.fromstring(xml).attrib,hierarchyAction=proof)
 
     def open_control(self,label,expected,match='exact'):
         """Retry one missed tap only while its actual modal postcondition is absent."""
@@ -768,17 +768,33 @@ def ensure_keyboard_hidden(device):
         time.sleep(.2)
 
 
+def record_ime_visibility(device,stage):
+    displays=device.shell('dumpsys','window','displays')
+    windows=device.shell('dumpsys','window','windows')
+    method=device.shell('dumpsys','input_method')
+    record=dict(stage=stage,capturedAt=datetime.now(timezone.utc).isoformat(),**actual_ime_visibility(displays,method))
+    directory=getattr(device,'capture_directory',None)
+    if directory:
+        folder=Path(directory)/'diagnostics/ime-visibility';folder.mkdir(parents=True,exist_ok=True)
+        for suffix,text in [('window-displays',displays),('window-windows',windows),('input-method',method)]:
+            path=folder/f'{stage}-{suffix}.txt';path.write_text(text);record[suffix]=str(path.relative_to(directory))
+        (folder/f'{stage}.json').write_text(json.dumps(record,indent=2))
+    return record
+
+
 def creation_submit(device):
-    # Continue from the keyboard screenshot. No reseed/restart before submission.
-    ime_evidence=ensure_keyboard_hidden(device)
-    keyboard_was_shown=ime_evidence['keyboardWasShown']
-    device.ready(['프로젝트 이름','목표 기록 수'])
-    activation=device.activate('프로젝트 만들기',search='below')
+    # Continue from the real keyboard screenshot; native SHOW_ON_SCREEN avoids a
+    # physical drag (on-drag dismisses IME) or Back-induced resize before CLICK.
+    before=record_ime_visibility(device,'submit-keyboard-before')
+    if before['visible'] is not True:raise RuntimeError('Actual native keyboard must remain visible before direct submission')
+    activation=device.activate('프로젝트 만들기',prequery=False)
+    after=record_ime_visibility(device,'submit-keyboard-after')
     device.ready(['QA_keyboard_large_font 프로젝트 열기'])
     projects=json.loads(device.storage().get('body-frame.projects.v1','[]'))
     if len(projects)!=1 or projects[0].get('name')!='QA_keyboard_large_font':
         raise RuntimeError('Large-font keyboard form did not persist the newly created project')
-    return dict(projectPersisted=True,project=projects[0],keyboardDismissedForSubmit=keyboard_was_shown,imeVisibilityEvidence=ime_evidence,submitActivation=activation)
+    return dict(projectPersisted=True,project=projects[0],keyboardDismissedForSubmit=False,keyboardVisibleBeforeActivation=True,
+                physicalBackActionCount=0,physicalDragActionCount=0,imeVisibilityEvidence=dict(before=before,after=after),submitActivation=activation)
 
 
 def no_export_side_effects(before, after):
