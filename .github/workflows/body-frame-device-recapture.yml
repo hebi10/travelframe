@@ -20,6 +20,15 @@ on:
         required: true
         type: string
 
+      capture_scenario:
+        description: Native capture scope
+        required: false
+        type: choice
+        default: all
+        options:
+          - all
+          - keyboard
+
 permissions:
   contents: read
   actions: read
@@ -42,15 +51,19 @@ jobs:
         env:
           APK_RUN_ID: ${{ inputs.apk_run_id }}
           APK_SHA256: ${{ inputs.apk_sha256 }}
+          CAPTURE_SCENARIO: ${{ inputs.capture_scenario }}
         with:
           script: |
             const fs = require('fs');
-            let selection = {apk_run_id:process.env.APK_RUN_ID,apk_sha256:process.env.APK_SHA256};
+            let selection = {apk_run_id:process.env.APK_RUN_ID,apk_sha256:process.env.APK_SHA256,capture_scenario:process.env.CAPTURE_SCENARIO || 'all'};
             if (!selection.apk_run_id) {
               const path = 'scripts/android-qa-apk-selection.json';
               if (!fs.existsSync(path)) throw new Error('An explicit reviewed APK selection JSON is required for PR recapture; there is no latest-build fallback');
               selection = JSON.parse(fs.readFileSync(path,'utf8'));
             }
+            const captureScenario = selection.capture_scenario ?? 'all';
+            if (!['all','keyboard'].includes(captureScenario)) throw new Error('Invalid capture scenario; expected all or keyboard');
+            core.setOutput('capture_scenario',captureScenario);
             const runId = Number(selection.apk_run_id);
             if (!/^[a-fA-F0-9]{64}$/.test(selection.apk_sha256 || '')) throw new Error('Explicit reviewed APK SHA256 is required');
             core.setOutput('run_id',String(runId));
@@ -95,8 +108,10 @@ jobs:
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
-      - name: Capture native mobile/tablet and image/lifecycle acceptance
+      - name: Capture native mobile/tablet (${{ steps.selected.outputs.capture_scenario }})
         uses: reactivecircus/android-emulator-runner@v2
+        env:
+          CAPTURE_SCENARIO: ${{ steps.selected.outputs.capture_scenario }}
         with:
           api-level: 35
           target: google_apis
@@ -107,7 +122,7 @@ jobs:
           disk-size: 6000M
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back emulated -camera-front none
-          script: python3 scripts/capture-android-qa.py --apk artifacts/apk/app-qaRelease.apk --output artifacts/native-qa --trust-manifest artifacts/native-qa/apk-trust-manifest.json
+          script: python3 scripts/capture-android-qa.py --apk artifacts/apk/app-qaRelease.apk --output artifacts/native-qa --trust-manifest artifacts/native-qa/apk-trust-manifest.json --scenario "$CAPTURE_SCENARIO"
       - name: Upload capture and strict trust evidence
         if: always()
         uses: actions/upload-artifact@v4

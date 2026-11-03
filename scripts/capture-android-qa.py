@@ -302,15 +302,52 @@ class Device:
         density=int(re.findall(r'\d+',self.shell('wm','density'))[-1])
         return usable_viewport(w,h,density,self.shell('dumpsys','window','displays',check=False))
 
-    def find_control(self, label, match='exact'):
+    def find_control(self,label,match='exact',search='default'):
+        if search not in {'default','below'}:raise ValueError('Unknown control search policy')
         viewport=self.viewport()
-        for attempt in range(7):
+        attempts=13 if search=='below' else 7
+        for attempt in range(attempts):
+            xml=self.dump()
             try:
-                x, y = target_bounds(self.dump(), label,match=match,viewport=viewport)
-                return x, y
+                point=target_bounds(xml,label,match=match,viewport=viewport)
             except RuntimeError as error:
-                if attempt == 6:raise
-                if not self.scroll_down(reverse=(error.direction=='up') if isinstance(error,ControlOutsideViewport) else attempt>=3):raise error
+                reverse=(error.direction=='up') if isinstance(error,ControlOutsideViewport) else (search=='default' and attempt>=3)
+                diagnostic=self.search_snapshot(label,attempt,xml,viewport,'searching',str(error),reverse) if search=='below' else None
+                if attempt==attempts-1:raise
+                if not self.scroll_down(reverse=reverse):raise error
+                if diagnostic:
+                    diagnostic['swipe']=getattr(self,'last_scroll_gesture',None)
+                    self.write_search_metadata(diagnostic)
+            else:
+                if search=='below':self.search_snapshot(label,attempt,xml,viewport,'control-visible',point=point)
+                return point
+
+    def write_search_metadata(self,record):
+        path=record.get('_metadata_path')
+        if path:
+            Path(path).write_text(json.dumps({key:value for key,value in record.items() if not key.startswith('_')},indent=2,ensure_ascii=False))
+
+    def search_snapshot(self,label,step,xml,viewport,state,error=None,reverse=False,point=None):
+        directory=getattr(self,'capture_directory',None)
+        if directory is None:return None
+        folder=Path(directory)/'diagnostics'/'project-submit-search';folder.mkdir(parents=True,exist_ok=True)
+        prefix=folder/f'step-{step:02}'
+        root=ET.fromstring(xml)
+        scrolls=[dict(bounds=node.get('bounds'),className=node.get('class')) for node in root.iter('node')
+                 if node.get('scrollable')=='true' and node.get('package')==PACKAGE]
+        record=dict(step=step,label=label,searchPolicy='known-below',state=state,error=error,viewport=viewport,
+                    nextScrollDirection='up' if reverse else 'down',point=point,scrollContainers=scrolls,
+                    xmlCapturedAt=datetime.now(timezone.utc).isoformat(),visibleText=ui_strings(xml),
+                    xml=str(prefix.with_suffix('.xml').relative_to(directory)),png=str(prefix.with_suffix('.png').relative_to(directory)),
+                    _metadata_path=str(prefix.with_suffix('.json')))
+        prefix.with_suffix('.xml').write_text(xml)
+        image=self.run('exec-out','screencap','-p',binary=True)
+        if image[:8]!=b'\x89PNG\r\n\x1a\n':raise RuntimeError('Search diagnostic screencap was not a native PNG')
+        prefix.with_suffix('.png').write_bytes(image)
+        record['pngCapturedAt']=datetime.now(timezone.utc).isoformat()
+        self.write_search_metadata(record)
+        self.search_diagnostics.append(str(prefix.with_suffix('.json').relative_to(directory)))
+        return record
 
     def scroll_down(self,reverse=False):
         root=ET.fromstring(self.dump())
@@ -326,6 +363,7 @@ class Device:
         x=(x1+x2)//2
         start=int(y1+(y2-y1)*.85);end=int(y1+(y2-y1)*.25)
         if reverse:start,end=end,start
+        self.last_scroll_gesture=dict(x=x,startY=start,endY=end,durationMs=350,scrollBounds=[x1,y1,x2,y2])
         self.shell('input','swipe',x,start,x,end,350)
         time.sleep(.5)
         return True
@@ -345,8 +383,8 @@ class Device:
                 if attempt==2: raise
                 time.sleep(.3)
 
-    def tap(self, label,match='exact'):
-        x, y = self.find_control(label,match=match)
+    def tap(self,label,match='exact',search='default'):
+        x,y=self.find_control(label,match=match,search=search)
         self.shell('input', 'tap', x, y)
         time.sleep(1)
 
@@ -386,6 +424,8 @@ class Device:
 
 def capture(device, directory, name, route, expected, action=None, open_route=True):
     record = dict(profile=directory.name, screen=name, route=route, expected=expected, startedAt=datetime.now(timezone.utc).isoformat())
+    device.capture_directory=directory
+    device.search_diagnostics=[]
     try:
         if open_route:
             device.open(route)
@@ -422,8 +462,10 @@ def capture(device, directory, name, route, expected, action=None, open_route=Tr
             (directory / f'{name}.failure.xml').write_text(device.dump())
         except Exception as diagnostics_error:
             record['diagnosticsError'] = str(diagnostics_error)
+    if device.search_diagnostics:record['controlSearchDiagnostics']=device.search_diagnostics
     (directory / f'{name}.json').write_text(json.dumps(record, indent=2, ensure_ascii=False))
-    print(f"{directory.name}/{name}: {record['status']}", flush=True)
+    detail=': '+record['error'] if record['status']=='failed' else ''
+    print(f"{directory.name}/{name}: {record['status']}{detail}", flush=True)
     return record
 
 
@@ -510,23 +552,63 @@ def validate_video_probe(probe):
 
 
 
+
+def actual_ime_visibility(window_displays,input_method):
+    """Use actual window/source status; requested InputShown flags are not evidence."""
+    sources=[]
+    for line in window_displays.splitlines():
+        if re.search(r'(?:mType|type)=ime(?=[\s,}])',line):
+            state=re.search(r'(?:mVisible|visible)=(true|false)',line)
+            if state:sources.append(state[1]=='true')
+    if sources:return dict(visible=any(sources),source='WindowManager.InsetsSource.ime',sourceStates=sources)
+    values=re.findall(r'\bmImeWindowVis=(0x[0-9a-fA-F]+|\d+)',input_method)
+    bits={int(value,16 if value.lower().startswith('0x') else 10) for value in values}
+    if len(bits)==1:
+        status=next(iter(bits))
+        return dict(visible=bool(status&0x2),source='InputMethodManagerService.mImeWindowVis',statusBits=status)
+    return dict(visible=None,source='unknown-actual-ime-visibility')
+
+
+def ensure_keyboard_hidden(device):
+    observations=[]
+    directory=getattr(device,'capture_directory',None)
+    folder=Path(directory)/'diagnostics'/'ime-visibility' if directory is not None else None
+    if folder:folder.mkdir(parents=True,exist_ok=True)
+    def observe(stage):
+        displays=device.shell('dumpsys','window','displays')
+        windows=device.shell('dumpsys','window','windows')
+        method=device.shell('dumpsys','input_method')
+        evidence=dict(stage=stage,capturedAt=datetime.now(timezone.utc).isoformat(),**actual_ime_visibility(displays,method))
+        if folder:
+            for suffix,text in [('window-displays',displays),('window-windows',windows),('input-method',method)]:
+                path=folder/f'{stage}-{suffix}.txt';path.write_text(text);evidence[suffix]=str(path.relative_to(directory))
+            (folder/f'{stage}.json').write_text(json.dumps(evidence,indent=2))
+        observations.append(evidence)
+        return evidence
+    before=observe('before')
+    if before['visible'] is None:raise RuntimeError('Actual IME visibility is unknown; requested InputShown flags cannot authorize a Back action')
+    keyboard_was_shown=before['visible']
+    if keyboard_was_shown:device.shell('input','keyevent','KEYCODE_BACK')
+    deadline=time.monotonic()+8;attempt=0
+    while True:
+        current=observe(f'after-{attempt:02}');attempt+=1
+        if current['visible'] is False:
+            return dict(hiddenConfirmed=True,keyboardWasShown=keyboard_was_shown,confirmation=current['source'],observations=observations)
+        if time.monotonic()>deadline:raise RuntimeError(f'Actual IME hidden state was not confirmed before submission scrolling: {current}')
+        time.sleep(.2)
+
+
 def creation_submit(device):
     # Continue from the keyboard screenshot. No reseed/restart before submission.
-    ime=device.shell('dumpsys','input_method')
-    keyboard_was_shown=bool(re.search(r'(?:mInputShown|isInputViewShown|mIsInputViewShown)=true',ime))
-    if keyboard_was_shown:
-        device.shell('input','keyevent','KEYCODE_BACK')
-        deadline=time.monotonic()+8
-        while re.search(r'(?:mInputShown|isInputViewShown|mIsInputViewShown)=true',device.shell('dumpsys','input_method')):
-            if time.monotonic()>deadline:raise RuntimeError('Native keyboard did not dismiss before submission scrolling')
-            time.sleep(.2)
+    ime_evidence=ensure_keyboard_hidden(device)
+    keyboard_was_shown=ime_evidence['keyboardWasShown']
     device.ready(['프로젝트 이름','목표 기록 수'])
-    device.tap('프로젝트 만들기')
+    device.tap('프로젝트 만들기',search='below')
     device.ready(['QA_keyboard_large_font'])
     projects=json.loads(device.storage().get('body-frame.projects.v1','[]'))
     if len(projects)!=1 or projects[0].get('name')!='QA_keyboard_large_font':
         raise RuntimeError('Large-font keyboard form did not persist the newly created project')
-    return dict(projectPersisted=True,project=projects[0],keyboardDismissedForSubmit=keyboard_was_shown)
+    return dict(projectPersisted=True,project=projects[0],keyboardDismissedForSubmit=keyboard_was_shown,imeVisibilityEvidence=ime_evidence)
 
 
 def no_export_side_effects(before, after):
@@ -761,16 +843,19 @@ def main():
     parser.add_argument('--output', required=True, type=Path)
     parser.add_argument('--serial')
     parser.add_argument('--trust-manifest',type=Path)
+    parser.add_argument('--scenario', choices=('all','keyboard'), default='all')
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
-    fixtures=args.output/'synthetic-fixtures';fixtures.mkdir(exist_ok=True)
-    for index in (1,2,3):
-        for preview in (False,True):
-            (fixtures/f'card-{index}{"-preview" if preview else ""}.jpg').write_bytes(fixture_jpeg(index,preview))
+    if args.scenario == 'all':
+        fixtures=args.output/'synthetic-fixtures';fixtures.mkdir(exist_ok=True)
+        for index in (1,2,3):
+            for preview in (False,True):
+                (fixtures/f'card-{index}{"-preview" if preview else ""}.jpg').write_bytes(fixture_jpeg(index,preview))
     device = Device(args.serial)
     records = []
-    manifest = dict(package=PACKAGE, apkSha256=hashlib.sha256(args.apk.read_bytes()).hexdigest(),
-                    fixture='host-generated synthetic monochrome numbered cards1/2/3; no user images',
+    manifest = dict(package=PACKAGE, scenario=args.scenario, apkSha256=hashlib.sha256(args.apk.read_bytes()).hexdigest(),
+                    fixture=('empty synthetic guest library; no user images' if args.scenario == 'keyboard' else
+                             'host-generated synthetic monochrome numbered cards1/2/3; no user images'),
                     network='emulator Wi-Fi and mobile data disabled; no authentication configured',
                     limits=['No signed-in/cloud/billing operations', 'No actual Health Connect import',
                             'Photo editor requires login: guest capture shows the real login-required alert'], captures=records)
@@ -791,11 +876,12 @@ def main():
             time.sleep(3)
             directory = args.output / profile
             directory.mkdir(exist_ok=True)
-            device.seed(False)
-            record = capture(device, directory, 'create-project', 'studio', ['프로젝트 이름', '목표 기록 수'],
-                             (['프로젝트별 몸의 변화를'], '새 프로젝트 만들기'))
-            record['profile'] = profile
-            records.append(record)
+            if args.scenario == 'all':
+                device.seed(False)
+                record = capture(device, directory, 'create-project', 'studio', ['프로젝트 이름', '목표 기록 수'],
+                                 (['프로젝트별 몸의 변화를'], '새 프로젝트 만들기'))
+                record['profile'] = profile
+                records.append(record)
             device.seed(False, 'large')
             device.shell('settings', 'put', 'system', 'font_scale', '1.3')
             records.append(capture(device, directory, 'create-project-large-font-keyboard', 'studio',
@@ -803,6 +889,9 @@ def main():
             records.append(capture(device,directory,'create-project-large-font-submitted','studio',
                                    ['QA_keyboard_large_font'],creation_submit,open_route=False))
             device.shell('settings', 'put', 'system', 'font_scale', '1.0')
+            if args.scenario == 'keyboard':
+                (directory / 'device.txt').write_text(device.shell('wm', 'size') + device.shell('wm', 'density') + device.shell('getprop', 'ro.build.version.sdk'))
+                continue
             device.seed(True)
             screens = [
                 ('camera', 'camera', ['프로젝트 선택', '사진 촬영'], None),

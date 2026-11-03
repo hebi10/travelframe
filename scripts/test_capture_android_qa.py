@@ -136,7 +136,8 @@ class CaptureHelpersTest(unittest.TestCase):
     def test_creation_submission_requires_exact_persisted_name(self):
         import json
         device=Mock();device.shell.return_value='mInputShown=false';device.storage.return_value={'body-frame.projects.v1':json.dumps([{'name':'새 프로젝트QA_keyboard_large_font'}])}
-        with self.assertRaises(RuntimeError):qa.creation_submit(device)
+        with patch.object(qa,'ensure_keyboard_hidden',return_value={'keyboardWasShown':False,'hiddenConfirmed':True}):
+            with self.assertRaises(RuntimeError):qa.creation_submit(device)
 
     def test_viewport_uses_observed_gesture_bar_instead_of_three_button_assumption(self):
         state='InsetsSource: {mType=statusBars mFrame=[0,0][720,48] mVisible=true}\nInsetsSource: {mType=navigationBars mFrame=[0,1552][720,1600] mVisible=true}'
@@ -173,9 +174,9 @@ class CaptureHelpersTest(unittest.TestCase):
         import json
         device=Mock();device.shell.side_effect=['mInputShown=true','','mInputShown=false']
         device.storage.return_value={'body-frame.projects.v1':json.dumps([{'id':'created','name':'QA_keyboard_large_font'}])}
-        evidence=qa.creation_submit(device)
-        self.assertTrue(evidence['projectPersisted']);self.assertTrue(evidence['keyboardDismissedForSubmit'])
-        self.assertIn(('input','keyevent','KEYCODE_BACK'),[call.args for call in device.shell.call_args_list])
+        with patch.object(qa,'ensure_keyboard_hidden',return_value={'keyboardWasShown':True,'hiddenConfirmed':True}) as guard:
+            evidence=qa.creation_submit(device)
+        self.assertTrue(evidence['projectPersisted']);self.assertTrue(evidence['keyboardDismissedForSubmit']);guard.assert_called_once_with(device)
 
     def test_background_tap_occurs_only_after_monitor_acknowledges_marker(self):
         device=Mock();events=[]
@@ -192,6 +193,146 @@ class CaptureHelpersTest(unittest.TestCase):
         with patch.object(qa,'await_log_marker',side_effect=RuntimeError('marker acknowledgement timed out')):
             with self.assertRaises(RuntimeError):qa.begin_monitored_export(device,Mock(),bytearray(),'unique-marker',10,20)
         device.shell.assert_not_called()
+
+
+class CaptureScenarioTest(unittest.TestCase):
+    def run_scenario(self, scenario=None):
+        import json
+        device=Mock()
+        device.shell.side_effect=lambda *args,**kwargs:'1' if args==('getprop','ro.kernel.qemu') else ''
+        device.run.return_value=''
+        calls=[]
+        def capture(_device,directory,name,route,expected,action=None,open_route=True):
+            calls.append((directory.name,name,action,open_route))
+            return dict(profile=directory.name,screen=name,status='captured')
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary);apk=root/'reviewed.apk';apk.write_bytes(b'APK test')
+            trust=root/'trust.json';trust.write_text(json.dumps({'clientMatch':True,'apkSha256':'exact-reviewed-hash'}))
+            argv=['capture-android-qa.py','--apk',str(apk),'--output',str(root/'captures'),'--trust-manifest',str(trust)]
+            if scenario is not None:argv+=['--scenario',scenario]
+            with patch('sys.argv',argv),patch.object(qa,'Device',return_value=device),patch.object(qa,'capture',side_effect=capture),patch.object(qa,'fixture_jpeg',return_value=b'JPEG') as fixtures,patch.object(qa.time,'sleep'),patch.object(qa,'video_failure_and_background_smoke',return_value=[]) as failures,patch.object(qa,'video_smoke',return_value=[]) as videos:
+                qa.main()
+                manifest=json.loads((root/'captures/capture-manifest.json').read_text())
+                files=sorted(str(path.relative_to(root/'captures')) for path in (root/'captures').rglob('*') if path.is_file())
+            return manifest,calls,device,fixtures.call_count,failures.call_count,videos.call_count,files
+
+    def test_keyboard_scenario_captures_only_both_large_font_creation_actions(self):
+        manifest,calls,device,fixtures,failures,videos,files=self.run_scenario('keyboard')
+        expected=[(profile,name,action,open_route) for profile,_,_ in qa.PROFILES for name,action,open_route in [
+            ('create-project-large-font-keyboard',qa.creation_keyboard,True),
+            ('create-project-large-font-submitted',qa.creation_submit,False)]]
+        self.assertEqual(calls,expected)
+        self.assertEqual(manifest['scenario'],'keyboard');self.assertEqual(manifest['captured'],4);self.assertEqual(manifest['failed'],0)
+        self.assertEqual(manifest['apkTrust'],{'clientMatch':True,'apkSha256':'exact-reviewed-hash'})
+        self.assertEqual([call.args for call in device.seed.call_args_list],[(False,'large'),(False,'large')])
+        self.assertEqual((fixtures,failures,videos),(0,0,0),'keyboard-only capture must not generate media fixtures or run video acceptance/quota work')
+        device.storage.assert_not_called()
+        self.assertEqual(sum(call.args==('settings','put','system','font_scale','1.3') for call in device.shell.call_args_list),2)
+        self.assertIn('mobile/device.txt',files);self.assertIn('tablet/device.txt',files)
+        device.run.assert_any_call('install','-r','-g',unittest.mock.ANY)
+        device.shell.assert_any_call('svc','wifi','disable');device.shell.assert_any_call('svc','data','disable')
+
+    def test_default_all_matches_explicit_all_existing_capture_flow(self):
+        default=self.run_scenario();explicit=self.run_scenario('all')
+        self.assertEqual(default[1],explicit[1]);self.assertEqual(default[3:6],(6,2,2))
+        self.assertEqual([call.args for call in default[2].seed.call_args_list],[call.args for call in explicit[2].seed.call_args_list])
+        self.assertEqual(default[1][0][1],'create-project')
+        self.assertIn(('mobile','camera',None,True),default[1]);self.assertIn(('tablet','video-create',None,True),default[1])
+
+    def test_unknown_scenario_is_rejected_before_device_or_fixture_access(self):
+        import contextlib
+        import io
+        with contextlib.redirect_stderr(io.StringIO()),patch('sys.argv',['capture-android-qa.py','--apk','missing.apk','--output','unused','--scenario','keyboard;invalid']),patch.object(qa,'Device') as device,patch.object(qa,'fixture_jpeg') as fixtures:
+            with self.assertRaises(SystemExit):qa.main()
+        device.assert_not_called();fixtures.assert_not_called()
+
+    def test_workflow_selection_validates_scenario_before_authenticated_build_calls(self):
+        import json
+        import subprocess
+        import textwrap
+        workflow=(Path(__file__).parents[1]/'.github/workflows/body-frame-device-recapture.yml').read_text()
+        script=textwrap.dedent(workflow.split('          script: |\n',1)[1].split('      - uses: actions/download-artifact',1)[0])
+        harness="""
+const {script,selection,env={}}=JSON.parse(process.argv[1]);
+const outputs={};let authenticatedCalls=0;
+const run=new(require('node:vm').Script)(`(async function(require,process,core,github,context){${script} })`).runInThisContext();
+const files={existsSync:()=>true,readFileSync:()=>JSON.stringify(selection),mkdirSync:()=>{},writeFileSync:()=>{}};
+const actions={getWorkflowRun:async()=>{authenticatedCalls++;return {data:{repository:{full_name:'owner/repo'},html_url:'https://example.invalid/run',head_sha:'a'.repeat(40)}};},listJobsForWorkflowRun:async()=>({data:{jobs:[{name:'build-apk',conclusion:'success',id:1}]}}),downloadJobLogsForWorkflowRun:async()=>({data:'git log -1 --format=%H\\n'+ 'b'.repeat(40)})};
+run(()=>files,{env},{setOutput:(key,value)=>outputs[key]=value},{rest:{actions}},{repo:{owner:'owner',repo:'repo'}}).then(()=>console.log(JSON.stringify({outputs,authenticatedCalls}))).catch(error=>console.log(JSON.stringify({error:error.message,authenticatedCalls})));
+"""
+        base={'apk_run_id':123,'apk_sha256':'a'*64}
+        for value,expected in [(None,'all'),('all','all'),('keyboard','keyboard'),('keyboard; echo unsafe',None),('',None),([],None)]:
+            selection=dict(base)
+            if value is not None:selection['capture_scenario']=value
+            result=subprocess.run(['node','-e',harness,json.dumps(dict(script=script,selection=selection))],capture_output=True,text=True,check=True)
+            data=json.loads(result.stdout)
+            if expected is None:self.assertIn('capture scenario',data['error']);self.assertEqual(data['authenticatedCalls'],0)
+            else:self.assertEqual(data['outputs']['capture_scenario'],expected);self.assertEqual(data['authenticatedCalls'],1)
+        for scenario in ['all','keyboard','keyboard; echo unsafe']:
+            env={'APK_RUN_ID':'123','APK_SHA256':'a'*64,'CAPTURE_SCENARIO':scenario}
+            result=subprocess.run(['node','-e',harness,json.dumps(dict(script=script,selection={},env=env))],capture_output=True,text=True,check=True)
+            data=json.loads(result.stdout)
+            if scenario in ['all','keyboard']:self.assertEqual(data['outputs']['capture_scenario'],scenario)
+            else:self.assertEqual(data['authenticatedCalls'],0);self.assertIn('capture scenario',data['error'])
+        self.assertIn('--scenario "$CAPTURE_SCENARIO"',workflow)
+        self.assertIn('CAPTURE_SCENARIO: ${{ steps.selected.outputs.capture_scenario }}',workflow)
+
+
+class KnownBelowSearchTest(unittest.TestCase):
+    def test_known_below_submit_search_keeps_scrolling_down_past_generic_three_swipe_limit(self):
+        absent='<hierarchy><node text="form"/></hierarchy>'
+        present='<hierarchy><node content-desc="프로젝트 만들기" clickable="true" enabled="true" bounds="[32,800][688,896]"/></hierarchy>'
+        device=qa.Device();device.viewport=Mock(return_value=(0,48,720,1552));device.dump=Mock(side_effect=[absent]*5+[present])
+        device.scroll_down=Mock(return_value=True);device.search_snapshot=Mock(return_value=None)
+        self.assertEqual(device.find_control('프로젝트 만들기',search='below'),(360,848))
+        self.assertEqual(device.scroll_down.call_count,5)
+        self.assertTrue(all(call.kwargs=={'reverse':False} for call in device.scroll_down.call_args_list))
+
+    def test_known_below_search_reverses_only_for_explicit_above_viewport_evidence(self):
+        above='<hierarchy><node content-desc="프로젝트 만들기" clickable="true" enabled="true" bounds="[32,0][688,43]"/></hierarchy>'
+        visible=above.replace('[32,0][688,43]','[32,100][688,196]')
+        device=qa.Device();device.viewport=Mock(return_value=(0,48,720,1552));device.dump=Mock(side_effect=[above,visible]);device.scroll_down=Mock(return_value=True);device.search_snapshot=Mock(return_value=None)
+        self.assertEqual(device.find_control('프로젝트 만들기',search='below'),(360,148));device.scroll_down.assert_called_once_with(reverse=True)
+
+    def test_known_below_diagnostic_writes_neutral_step_png_xml_and_json(self):
+        with tempfile.TemporaryDirectory() as temp:
+            device=qa.Device();device.capture_directory=Path(temp);device.search_diagnostics=[]
+            device.run=Mock(return_value=b'\x89PNG\r\n\x1a\n'+b'fixture')
+            record=device.search_snapshot('프로젝트 만들기',0,'<hierarchy/>',(0,48,720,1552),'searching')
+            folder=Path(temp)/'diagnostics/project-submit-search'
+            self.assertTrue(all((folder/('step-00.'+suffix)).exists() for suffix in ['png','xml','json']))
+            self.assertNotIn('failure',record['png']);self.assertEqual(record['state'],'searching')
+
+
+class ImeVisibilityTest(unittest.TestCase):
+    def test_hidden_window_source_overrides_stale_requested_input_flags(self):
+        state=qa.actual_ime_visibility('InsetsSource: {mType=ime mVisible=false}', 'mInputShown=true isInputViewShown=true')
+        self.assertIs(state['visible'],False)
+        self.assertEqual(state['source'],'WindowManager.InsetsSource.ime')
+
+    def test_verified_actual_status_bit_fallback_distinguishes_active_from_visible(self):
+        self.assertIs(qa.actual_ime_visibility('', 'mInputShown=true mImeWindowVis=0x1')['visible'],False)
+        self.assertIs(qa.actual_ime_visibility('', 'mInputShown=false mImeWindowVis=0x3')['visible'],True)
+
+    def test_absent_actual_fields_never_turn_requested_false_into_hidden_proof(self):
+        self.assertIsNone(qa.actual_ime_visibility('', 'mInputShown=false')['visible'])
+
+    def test_guard_accepts_real_hide_even_while_requested_flag_stays_true(self):
+        state={'visible':True};device=qa.Device()
+        def shell(*args,**kwargs):
+            if args==('input','keyevent','KEYCODE_BACK'):state['visible']=False;return ''
+            if args==('dumpsys','window','displays'):return 'InsetsSource: {mType=ime mVisible='+str(state['visible']).lower()+'}'
+            if args==('dumpsys','input_method'):return 'mInputShown=true mImeWindowVis='+('0x3' if state['visible'] else '0x1')
+            return ''
+        device.shell=Mock(side_effect=shell)
+        evidence=qa.ensure_keyboard_hidden(device)
+        self.assertTrue(evidence['hiddenConfirmed']);self.assertTrue(evidence['keyboardWasShown'])
+        self.assertEqual(sum(call.args==('input','keyevent','KEYCODE_BACK') for call in device.shell.call_args_list),1)
+
+    def test_unknown_actual_visibility_fails_before_back(self):
+        device=qa.Device();device.shell=Mock(return_value='mInputShown=false')
+        with self.assertRaises(RuntimeError):qa.ensure_keyboard_hidden(device)
+        self.assertFalse(any(call.args==('input','keyevent','KEYCODE_BACK') for call in device.shell.call_args_list))
 
 
 if __name__ == '__main__':
