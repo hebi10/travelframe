@@ -319,12 +319,13 @@ class Device:
         self.hierarchy_sequence+=1
         target='/data/local/tmp/body-frame-qa-'+uuid.uuid4().hex+'.xml'
         backend='native-no-idle' if self.native_hierarchy_jar else 'legacy-uiautomator'
-        evidence=dict(sequence=self.hierarchy_sequence,backend=backend,remotePath=target,startedAt=datetime.now(timezone.utc).isoformat(),requestedClickLabel=click_label)
+        evidence=dict(sequence=self.hierarchy_sequence,backend=backend,remotePath=target,startedAt=datetime.now(timezone.utc).isoformat(),requestedClickLabel=click_label,acknowledged=False)
+        unacknowledged_xml=None
         try:
             self.shell('rm','-f',target)
             if self.native_hierarchy_jar:
                 extra=['--click-label',click_label] if click_label is not None else []
-                output=self.shell('env','CLASSPATH='+self.native_hierarchy_jar,'app_process','/system/bin','BodyFrameQaHierarchy',target,*extra,timeout=20)
+                output=self.shell('env','CLASSPATH='+self.native_hierarchy_jar,'app_process','/system/bin','BodyFrameQaHierarchy',target,*extra,timeout=30)
                 accepted=[('BODY_FRAME_QA_HIERARCHY_CLICKED ' if click_label is not None else 'BODY_FRAME_QA_HIERARCHY_DUMPED ')+target]
             else:
                 if click_label is not None:raise RuntimeError('Semantic activation requires the prepared native hierarchy helper')
@@ -339,22 +340,63 @@ class Device:
             if click_label is not None and (root.get('action')!='accessibility-click' or root.get('requested-click-label')!=click_label):
                 raise RuntimeError('Native action acknowledgement lacks matching preaction label evidence')
             evidence.update(acknowledged=True,xmlSha256=hashlib.sha256(xml.encode()).hexdigest(),completedAt=datetime.now(timezone.utc).isoformat(),rootAttributes=root.attrib)
-            if click_label is not None:evidence['nativeActionCount']=1
+            if click_label is not None:
+                click_count=int(root.get('click-action-count','-1'))
+                if click_count!=1:raise RuntimeError('Native click acknowledgement must record exactly one click action')
+                show_count=int(root.get('show-on-screen-action-count','0'))
+                if show_count not in (0,1):raise RuntimeError('Native show-on-screen action exceeded its one-action bound')
+                evidence.update(nativeActionCount=click_count,nativeClickActionCount=click_count,nativeShowOnScreenActionCount=show_count)
             self.last_hierarchy_evidence=evidence
             return xml
         except Exception as error:
-            evidence['error']=str(error)
+            evidence.update(error=str(error),stderr=self.command_stderr,acknowledged=False)
+            if click_label is not None:
+                try:
+                    raw=self.run('exec-out','cat',target,check=False,timeout=5)
+                    if raw.strip():
+                        unacknowledged_xml=raw
+                        evidence['unacknowledgedXmlSha256']=hashlib.sha256(raw.encode()).hexdigest()
+                        try:evidence['unacknowledgedRootAttributes']=ET.fromstring(raw).attrib
+                        except ET.ParseError as parse_error:evidence['unacknowledgedXmlParseError']=str(parse_error)
+                except Exception as diagnostic_error:evidence['unacknowledgedXmlReadError']=str(diagnostic_error)
             raise
         finally:
+            directory=getattr(self,'capture_directory',None)
+            folder=Path(directory)/'diagnostics/hierarchy-dumps' if directory else None
+            if folder:folder.mkdir(parents=True,exist_ok=True)
+            archive_error=None
+            if click_label is not None:
+                evidence['acquisitionSnapshots']=[]
+                try:
+                    listing=self.shell('find','/data/local/tmp','-maxdepth','1','-type','f','-name',Path(target).name+'.attempt-*.xml',timeout=5)
+                    paths=sorted((path for path in listing.splitlines() if re.fullmatch(re.escape(target)+r'\.attempt-\d+\.xml',path)),key=lambda path:int(re.search(r'\.attempt-(\d+)\.xml$',path)[1]))
+                    for remote in paths:
+                        item=dict(remotePath=remote)
+                        try:
+                            content=self.run('exec-out','cat',remote,timeout=5)
+                            item['sha256']=hashlib.sha256(content.encode()).hexdigest()
+                            try:item['rootAttributes']=ET.fromstring(content).attrib
+                            except ET.ParseError as parse_error:item['parseError']=str(parse_error)
+                            if folder:
+                                attempt=re.search(r'\.attempt-(\d+)\.xml$',remote)[1]
+                                local=folder/f'action-{self.hierarchy_sequence:04}-attempt-{int(attempt):03}.xml';local.write_text(content)
+                                item['xml']=str(local.relative_to(directory))
+                        finally:self.shell('rm','-f',remote,check=False,timeout=5)
+                        evidence['acquisitionSnapshots'].append(item)
+                except Exception as error:
+                    evidence['acquisitionArchiveError']=str(error)
+                    if 'error' not in evidence:archive_error=RuntimeError('Native acquisition snapshots could not be retained: '+str(error))
             try:self.shell('rm','-f',target,check=False,timeout=5)
             finally:
-                directory=getattr(self,'capture_directory',None)
-                if directory:
-                    folder=Path(directory)/'diagnostics/hierarchy-dumps';folder.mkdir(parents=True,exist_ok=True)
+                if folder:
                     if click_label is not None and evidence.get('acknowledged'):
                         action_path=folder/f'action-{self.hierarchy_sequence:04}.xml';action_path.write_text(xml)
                         evidence['preactionXml']=str(action_path.relative_to(directory))
+                    if unacknowledged_xml is not None:
+                        action_path=folder/f'action-{self.hierarchy_sequence:04}.unacknowledged.xml';action_path.write_text(unacknowledged_xml)
+                        evidence['unacknowledgedActionXml']=str(action_path.relative_to(directory))
                     (folder/f'dump-{self.hierarchy_sequence:04}.json').write_text(json.dumps(evidence,indent=2,ensure_ascii=False))
+            if archive_error:raise archive_error
 
     def open(self, route, restart=True):
         if restart:
@@ -479,8 +521,8 @@ class Device:
         proof=self.last_hierarchy_evidence
         if not proof.get('acknowledged') or proof.get('nativeActionCount')!=1:
             raise RuntimeError('Exactly one acknowledged native accessibility action is required')
-        return dict(method='AccessibilityNodeInfo.ACTION_CLICK',label=label,nativeActionCount=1,
-                    prequeryPoint=point,preactionAttributes=ET.fromstring(xml).attrib,hierarchyAction=proof)
+        return dict(method='AccessibilityNodeInfo.ACTION_CLICK',label=label,nativeActionCount=1,nativeClickActionCount=1,
+                    nativeShowOnScreenActionCount=proof.get('nativeShowOnScreenActionCount',0),prequeryPoint=point,preactionAttributes=ET.fromstring(xml).attrib,hierarchyAction=proof)
 
     def open_control(self,label,expected,match='exact'):
         """Retry one missed tap only while its actual modal postcondition is absent."""

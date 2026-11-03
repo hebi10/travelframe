@@ -368,7 +368,7 @@ class NativeActivationTest(unittest.TestCase):
             if args[0]=='env':return 'BODY_FRAME_QA_HIERARCHY_CLICKED '+args[5]
             return ''
         device.shell=Mock(side_effect=shell)
-        device.run=Mock(return_value='<hierarchy action="accessibility-click" requested-click-label="프로젝트 만들기" click-target-bounds="[34,1422][686,1518]"/>')
+        device.run=Mock(return_value='<hierarchy action="accessibility-click" requested-click-label="프로젝트 만들기" click-target-bounds="[34,1422][686,1518]" click-action-count="1"/>')
         result=device.activate('프로젝트 만들기',search='below')
         self.assertEqual(result['nativeActionCount'],1)
         calls=[call.args for call in device.shell.call_args_list if call.args[0]=='env']
@@ -388,6 +388,61 @@ class NativeActivationTest(unittest.TestCase):
         device.activate.assert_called_once_with('프로젝트 만들기',search='below');device.tap.assert_not_called()
         device.ready.assert_any_call(['QA_keyboard_large_font 프로젝트 열기'])
         self.assertTrue(result['projectPersisted']);self.assertEqual(result['submitActivation']['nativeActionCount'],1)
+
+
+class NativeActionFailureEvidenceTest(unittest.TestCase):
+    def test_native_guard_failure_preserves_xml_before_cleanup_without_ack_or_success_count(self):
+        import json
+        with tempfile.TemporaryDirectory() as temp:
+            device=qa.Device();device.capture_directory=Path(temp);device.native_hierarchy_jar='/data/local/tmp/qa.jar';events=[]
+            def shell(*args,**kwargs):
+                if args[0]=='env':raise RuntimeError('Unique target count0')
+                if args[0]=='rm':events.append('remove')
+                return ''
+            def read(*args,**kwargs):events.append('preserve');return '<hierarchy candidate-count="0"/>'
+            device.shell=Mock(side_effect=shell);device.run=Mock(side_effect=read)
+            with self.assertRaises(RuntimeError):device.dump(click_label='프로젝트 만들기')
+            folder=Path(temp)/'diagnostics/hierarchy-dumps'
+            xml=next(folder.glob('*.unacknowledged.xml'));self.assertIn('candidate-count="0"',xml.read_text())
+            record=json.loads(next(folder.glob('dump-*.json')).read_text())
+            self.assertFalse(record['acknowledged']);self.assertNotIn('nativeActionCount',record)
+            self.assertEqual(events,['remove','preserve','remove'])
+
+    def test_native_show_action_count_is_separate_from_single_click_ack(self):
+        device=qa.Device();device.native_hierarchy_jar='/data/local/tmp/qa.jar';device.find_control=Mock(return_value=(360,1470))
+        device.shell=Mock(side_effect=lambda *args,**kwargs:'BODY_FRAME_QA_HIERARCHY_CLICKED '+args[5] if args[0]=='env' else '')
+        device.run=Mock(return_value='<hierarchy action="accessibility-click" requested-click-label="프로젝트 만들기" show-on-screen-action-count="1" click-action-count="1"/>')
+        result=device.activate('프로젝트 만들기',search='below')
+        self.assertEqual(result['nativeClickActionCount'],1);self.assertEqual(result['nativeShowOnScreenActionCount'],1)
+
+
+    def test_success_ack_requires_recorded_exactly_one_click(self):
+        for count in ('0','2',None):
+            device=qa.Device();device.native_hierarchy_jar='/data/local/tmp/qa.jar'
+            device.shell=Mock(side_effect=lambda *args,**kwargs:'BODY_FRAME_QA_HIERARCHY_CLICKED '+args[5] if args[0]=='env' else '')
+            attr='' if count is None else ' click-action-count="'+count+'"'
+            device.run=Mock(return_value='<hierarchy action="accessibility-click" requested-click-label="프로젝트 만들기"'+attr+'/>')
+            with self.subTest(count=count),self.assertRaisesRegex(RuntimeError,'exactly one click'):device.dump(click_label='프로젝트 만들기')
+
+
+class NativeAcquisitionSnapshotTest(unittest.TestCase):
+    def test_failed_native_action_archives_each_attempt_before_remote_cleanup(self):
+        import json
+        with tempfile.TemporaryDirectory() as temp:
+            device=qa.Device();device.capture_directory=Path(temp);device.native_hierarchy_jar='/data/local/tmp/qa.jar';state={};events=[]
+            def shell(*args,**kwargs):
+                if args[0]=='env':state['target']=args[5];raise RuntimeError('Unique target count0')
+                if args[0]=='find':return state['target']+'.attempt-1.xml'
+                if args[0]=='rm':events.append(('remove',args[-1]))
+                return ''
+            def read(*args,**kwargs):events.append(('read',args[-1]));return '<hierarchy candidate-count="0" acquisition-attempts="1"/>'
+            device.shell=Mock(side_effect=shell);device.run=Mock(side_effect=read)
+            with self.assertRaises(RuntimeError):device.dump(click_label='프로젝트 만들기')
+            folder=Path(temp)/'diagnostics/hierarchy-dumps';record=json.loads(next(folder.glob('dump-*.json')).read_text())
+            snapshot=record['acquisitionSnapshots'][0]
+            self.assertTrue((Path(temp)/snapshot['xml']).exists());self.assertFalse(record['acknowledged'])
+            remote=state['target']+'.attempt-1.xml'
+            self.assertLess(events.index(('read',remote)),events.index(('remove',remote)))
 
 
 if __name__ == '__main__':

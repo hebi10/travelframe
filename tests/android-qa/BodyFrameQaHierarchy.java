@@ -32,7 +32,6 @@ public final class BodyFrameQaHierarchy {
     public static void main(String[] args) {
         HandlerThread thread = null;
         UiAutomation automation = null;
-        File temporary = null;
         ClickTarget click = null;
         String acknowledgement = null;
         int status = 1;
@@ -68,39 +67,15 @@ public final class BodyFrameQaHierarchy {
             info.flags |= AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS | AccessibilityServiceInfo.FLAG_INCLUDE_NOT_IMPORTANT_VIEWS;
             info.notificationTimeout = 0;
             automation.setServiceInfo(info);
-            AccessibilityNodeInfo root = freshRoot(automation);
+            Snapshot snapshot;
             if (args.length == 3) {
-                Rect windowBounds = new Rect();
-                root.getBoundsInScreen(windowBounds);
-                click = new ClickTarget(args[2], windowBounds);
+                snapshot = acquireClick(automation, args[2], output);
+                click = snapshot.click;
+                try { click.perform(); } finally { publish(output, snapshot.render()); }
+            } else {
+                snapshot = snapshot(automation, null);
+                publish(output, snapshot.render());
             }
-            StringBuilder xml = new StringBuilder(16384);
-            xml.append("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><hierarchy rotation=\"0\" generated-at-ms=\"").append(System.currentTimeMillis()).append("\">");
-            int[] count = {0};
-            try {
-                appendNode(xml, root, 0, 0, count, null, click, true);
-            } finally {
-                root.recycle();
-            }
-            if (count[0] == 0) throw new IOException("No refreshed visible nodes in the active window");
-            xml.append("</hierarchy>");
-            if (click != null) {
-                click.requireUnique();
-                StringBuilder metadata = new StringBuilder();
-                attribute(metadata, "action", "accessibility-click");
-                attribute(metadata, "requested-click-label", click.label);
-                attribute(metadata, "click-target-bounds", click.bounds.toShortString());
-                xml.insert(xml.indexOf(">", xml.indexOf("<hierarchy")), metadata);
-            }
-            temporary = File.createTempFile("body-frame-qa-hierarchy-", ".xml.tmp", parent);
-            try (FileOutputStream stream = new FileOutputStream(temporary)) {
-                stream.write(xml.toString().getBytes(StandardCharsets.UTF_8));
-                stream.flush();
-                stream.getFD().sync();
-            }
-            if (!temporary.renameTo(output)) throw new IOException("Cannot publish hierarchy output: " + output);
-            temporary = null;
-            if (click != null) click.perform();
             acknowledgement = (click == null ? "BODY_FRAME_QA_HIERARCHY_DUMPED " : "BODY_FRAME_QA_HIERARCHY_CLICKED ") + args[0];
             status = 0;
         } catch (Throwable error) {
@@ -121,10 +96,103 @@ public final class BodyFrameQaHierarchy {
                 thread.quitSafely();
                 try { thread.join(2000); } catch (InterruptedException error) { Thread.currentThread().interrupt(); status = 1; }
             }
-            if (temporary != null && !temporary.delete()) System.err.println("BODY_FRAME_QA_HIERARCHY_TEMP_DELETE_FAILED " + temporary);
         }
         if (status == 0) { System.out.println(acknowledgement); System.out.flush(); }
         System.exit(status);
+    }
+
+    private static void publish(File output, String xml) throws IOException {
+        File temporary = File.createTempFile("body-frame-qa-hierarchy-", ".xml.tmp", output.getParentFile());
+        try {
+            try (FileOutputStream stream = new FileOutputStream(temporary)) {
+                stream.write(xml.getBytes(StandardCharsets.UTF_8));
+                stream.flush();
+                stream.getFD().sync();
+            }
+            if (!temporary.renameTo(output)) throw new IOException("Cannot publish hierarchy output: " + output);
+        } finally {
+            if (temporary.exists() && !temporary.delete()) System.err.println("BODY_FRAME_QA_HIERARCHY_TEMP_DELETE_FAILED " + temporary);
+        }
+    }
+
+    private static final class Snapshot {
+        final String xml;
+        final ClickTarget click;
+        Snapshot(String xml, ClickTarget click) { this.xml = xml; this.click = click; }
+        String render() {
+            if (click == null) return xml;
+            StringBuilder metadata = new StringBuilder();
+            attribute(metadata, "action", "accessibility-click");
+            attribute(metadata, "requested-click-label", click.label);
+            attribute(metadata, "click-target-bounds", click.bounds == null ? "" : click.bounds.toShortString());
+            attribute(metadata, "candidate-count", Integer.toString(click.candidates));
+            attribute(metadata, "enabled-candidate-count", Integer.toString(click.enabledCandidates));
+            attribute(metadata, "fully-visible-candidate-count", Integer.toString(click.matches));
+            attribute(metadata, "candidate-details", click.details);
+            attribute(metadata, "acquisition-attempts", Integer.toString(click.attempts));
+            attribute(metadata, "click-window-bounds", click.windowBounds.toShortString());
+            attribute(metadata, "click-window-package", click.windowPackage);
+            attribute(metadata, "click-action-count", Integer.toString(click.actions));
+            attribute(metadata, "show-on-screen-action-count", Integer.toString(click.showActions));
+            attribute(metadata, "show-on-screen-result", click.showResult);
+            return new StringBuilder(xml).insert(xml.indexOf(">", xml.indexOf("<hierarchy")), metadata).toString();
+        }
+    }
+
+    private static Snapshot snapshot(UiAutomation automation, String label) throws IOException {
+        AccessibilityNodeInfo root = freshRoot(automation);
+        ClickTarget click = null;
+        try {
+            if (label != null) {
+                Rect window = new Rect(); root.getBoundsInScreen(window);
+                click = new ClickTarget(label, window);
+                click.windowPackage = String.valueOf(root.getPackageName());
+            }
+            StringBuilder xml = new StringBuilder(16384);
+            xml.append("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><hierarchy rotation=\"0\" generated-at-ms=\"").append(System.currentTimeMillis()).append("\">");
+            int[] count = {0};
+            appendNode(xml, root, 0, 0, count, null, click, true);
+            if (count[0] == 0) throw new IOException("No refreshed nodes in the active window");
+            xml.append("</hierarchy>");
+            return new Snapshot(xml.toString(), click);
+        } catch (Throwable error) {
+            if (click != null) click.recycle();
+            throw error;
+        } finally { root.recycle(); }
+    }
+
+    private static Snapshot acquireClick(UiAutomation automation, String label, File output) throws IOException {
+        long deadline = SystemClock.uptimeMillis() + 5000;
+        int attempts = 0, shows = 0;
+        String showResult = "not-requested";
+        while (true) {
+            automation.clearCache();
+            Snapshot current = snapshot(automation, label);
+            ClickTarget target = current.click;
+            boolean retained = false;
+            try {
+                target.attempts = ++attempts;
+                target.showActions = shows;
+                target.showResult = showResult;
+                // Keep the actual queried tree and candidate geometry even on rejection.
+                publish(output, current.render());
+                publish(new File(output.getPath() + ".attempt-" + attempts + ".xml"), current.render());
+                if (target.enabledCandidates > 1 || target.matches > 1) throw new IOException("Ambiguous exact-label accessibility targets: " + target.enabledCandidates);
+                if (target.matches == 1) { retained = true; return current; }
+                if (shows == 0 && !target.windowBounds.isEmpty() && target.enabledCandidates == 1 && target.revealNode != null) {
+                    shows++;
+                    target.showActions = shows;
+                    showResult = Boolean.toString(target.revealNode.performAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_SHOW_ON_SCREEN.getId()));
+                    target.showResult = showResult;
+                    publish(output, current.render());
+                }
+                if (SystemClock.uptimeMillis() >= deadline) {
+                    target.requireUnique();
+                    throw new IOException("Accessibility target acquisition expired");
+                }
+            } finally { if (!retained) target.recycle(); }
+            SystemClock.sleep(100);
+        }
     }
 
     private static AccessibilityNodeInfo freshRoot(UiAutomation automation) throws IOException {
@@ -143,14 +211,16 @@ public final class BodyFrameQaHierarchy {
 
     private static void appendNode(StringBuilder xml, AccessibilityNodeInfo node, int index, int depth, int[] count, Rect scrollClip, ClickTarget click, boolean ancestorsEnabled) throws IOException {
         if (depth > MAX_DEPTH || count[0] >= MAX_NODES) throw new IOException("Accessibility hierarchy exceeds bounded traversal limits");
-        if (!node.refresh() || !node.isVisibleToUser()) return;
+        if (!node.refresh()) return;
+        boolean visible = node.isVisibleToUser();
         Rect rawBounds = new Rect();
         node.getBoundsInScreen(rawBounds);
         Rect bounds = new Rect(rawBounds);
-        if (bounds.isEmpty() || (scrollClip != null && !bounds.intersect(scrollClip))) return;
+        if (scrollClip != null && !bounds.intersect(scrollClip)) bounds.setEmpty();
+        if (click == null && (!visible || bounds.isEmpty())) return;
         count[0]++;
         boolean enabled = ancestorsEnabled && node.isEnabled();
-        if (click != null && enabled) click.consider(node, rawBounds, bounds, scrollClip);
+        if (click != null) click.consider(node, rawBounds, bounds, scrollClip, enabled);
         // Preserve overflow-visible ordinary View parents. Only scrolling
         // ancestors constrain descendant action bounds; retain raw geometry too.
         String className = String.valueOf(node.getClassName());
@@ -173,7 +243,7 @@ public final class BodyFrameQaHierarchy {
         attribute(xml, "long-clickable", Boolean.toString(node.isLongClickable()));
         attribute(xml, "password", Boolean.toString(node.isPassword()));
         attribute(xml, "selected", Boolean.toString(node.isSelected()));
-        attribute(xml, "visible-to-user", "true");
+        attribute(xml, "visible-to-user", Boolean.toString(visible));
         attribute(xml, "raw-bounds", "[" + rawBounds.left + "," + rawBounds.top + "][" + rawBounds.right + "," + rawBounds.bottom + "]");
         attribute(xml, "bounds", "[" + bounds.left + "," + bounds.top + "][" + bounds.right + "," + bounds.bottom + "]");
         xml.append('>');
@@ -192,7 +262,10 @@ public final class BodyFrameQaHierarchy {
         AccessibilityNodeInfo node;
         Rect bounds;
         Rect scrollClip;
-        int matches;
+        int matches, candidates, enabledCandidates, attempts, actions, showActions;
+        AccessibilityNodeInfo revealNode;
+        String windowPackage = "", showResult = "not-requested";
+        final StringBuilder details = new StringBuilder();
 
         ClickTarget(String label, Rect windowBounds) {
             this.label = label;
@@ -204,8 +277,18 @@ public final class BodyFrameQaHierarchy {
                     || label.contentEquals(candidate.getContentDescription() == null ? "" : candidate.getContentDescription());
         }
 
-        void consider(AccessibilityNodeInfo candidate, Rect raw, Rect visible, Rect clip) {
-            if (!candidate.isClickable() || !exactLabel(candidate) || !raw.equals(visible) || !windowBounds.contains(raw)) return;
+        void consider(AccessibilityNodeInfo candidate, Rect raw, Rect visible, Rect clip, boolean ancestorsEnabled) {
+            if (!candidate.isClickable() || !exactLabel(candidate)) return;
+            candidates++;
+            boolean enabled = candidate.isEnabled() && ancestorsEnabled;
+            details.append("candidate=").append(candidates).append(" raw=").append(raw.toShortString())
+                    .append(" clipped=").append(visible.toShortString()).append(" enabled=").append(enabled)
+                    .append(" visible=").append(candidate.isVisibleToUser()).append(" ancestor-enabled=").append(ancestorsEnabled).append(';');
+            // Hidden/offscreen nodes can expose SHOW_ON_SCREEN; never CLICK them.
+            if (!enabled) return;
+            enabledCandidates++;
+            if (revealNode == null) revealNode = AccessibilityNodeInfo.obtain(candidate);
+            if (!candidate.isVisibleToUser() || !raw.equals(visible) || raw.isEmpty() || !windowBounds.contains(raw)) return;
             matches++;
             if (node == null) {
                 node = AccessibilityNodeInfo.obtain(candidate);
@@ -228,10 +311,11 @@ public final class BodyFrameQaHierarchy {
             if (current.isEmpty() || !windowBounds.contains(current) || (scrollClip != null && !scrollClip.contains(current))) {
                 throw new IOException("Accessibility target is no longer fully visible: " + label);
             }
+            actions++;
             if (!node.performAction(AccessibilityNodeInfo.ACTION_CLICK)) throw new IOException("Native accessibility ACTION_CLICK rejected: " + label);
         }
 
-        void recycle() { if (node != null) node.recycle(); }
+        void recycle() { if (node != null) node.recycle(); if (revealNode != null) revealNode.recycle(); }
     }
 
     private static void attribute(StringBuilder xml, String name, CharSequence value) {
