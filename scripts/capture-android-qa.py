@@ -556,6 +556,35 @@ def set_interval(device, value):
     device.ready([f'사진 간격, {value}초'])
 
 
+
+def await_log_marker(device,monitor,evidence,marker,seconds=3):
+    """Handshake with the logcat reader before injecting any export action."""
+    start=time.monotonic();deadline=start+seconds;next_emit=start;emissions=0
+    pattern=re.compile(r'^\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\.\d+\s+\d+\s+\d+\s+[VDIWEF]\s+BodyFrameQA\s*:\s*'+re.escape(marker)+r'\s*$',re.MULTILINE)
+    while time.monotonic()<deadline:
+        now=time.monotonic()
+        if now>=next_emit:
+            # Re-emit only before the tap so a slow logcat startup cannot lose
+            # the sole -T1 sentinel. All copies precede native recording work.
+            device.shell('log','-p','i','-t','BodyFrameQA',marker,timeout=max(.1,min(1,deadline-now)))
+            emissions+=1;next_emit=time.monotonic()+.4
+        if select.select([monitor.stdout],[],[],.05)[0]:
+            chunk=os.read(monitor.stdout.fileno(),65536)
+            if not chunk:raise RuntimeError('Logcat exited before marker acknowledgement; export was not tapped')
+            evidence.extend(chunk)
+            if pattern.search(evidence.decode(errors='replace')):
+                return dict(markerObserved=True,waitSeconds=round(time.monotonic()-start,3),emissions=emissions)
+        if monitor.poll() is not None:raise RuntimeError('Logcat stopped before marker acknowledgement; export was not tapped')
+    raise RuntimeError('Logcat marker acknowledgement timed out; export was not tapped')
+
+
+def begin_monitored_export(device,monitor,evidence,marker,x,y):
+    ack=await_log_marker(device,monitor,evidence,marker)
+    start=time.monotonic()  # The encoder deadline excludes the reader handshake.
+    device.shell('input','tap',x,y)
+    return start,ack
+
+
 def background_during_native_encoder(device, directory):
     """Observe fresh app encoder/session/muxer events before sending HOME."""
     pid=device.shell('pidof',PACKAGE).strip()
@@ -566,9 +595,7 @@ def background_during_native_encoder(device, directory):
     monitor=subprocess.Popen([*device.prefix,'logcat','-b','main','-v','threadtime','-T','1'],stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
     evidence=bytearray();observed=None
     try:
-        device.shell('log','-p','i','-t','BodyFrameQA',marker)
-        start=time.monotonic()
-        device.shell('input','tap',x,y)
+        start,marker_ack=begin_monitored_export(device,monitor,evidence,marker,x,y)
         while time.monotonic()-start<2.5:
             if select.select([monitor.stdout],[],[],.05)[0]:
                 chunk=os.read(monitor.stdout.fileno(),65536)
@@ -586,7 +613,7 @@ def background_during_native_encoder(device, directory):
         now=device.shell('pidof',PACKAGE).strip()
         if now!=pid:raise RuntimeError('Background recovery restarted the process instead of preserving the native guard')
         strings=wait_export_terminal(device,['영상 만들기가 취소되었습니다'])
-        return dict(encoderStartObserved=True,nativeStartEvidence=observed,backgroundWithinSeconds=round(background_sent_after,3),
+        return dict(encoderStartObserved=True,markerAcknowledgement=marker_ack,nativeStartEvidence=observed,backgroundWithinSeconds=round(background_sent_after,3),
                     pidBefore=pid,pidAfter=now,terminalText=strings)
     finally:
         monitor.terminate()

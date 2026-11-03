@@ -5,7 +5,7 @@ from pathlib import Path
 import sqlite3
 import tempfile
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 spec = importlib.util.spec_from_file_location('capture_qa', Path(__file__).with_name('capture-android-qa.py'))
 qa = importlib.util.module_from_spec(spec)
@@ -176,6 +176,22 @@ class CaptureHelpersTest(unittest.TestCase):
         evidence=qa.creation_submit(device)
         self.assertTrue(evidence['projectPersisted']);self.assertTrue(evidence['keyboardDismissedForSubmit'])
         self.assertIn(('input','keyevent','KEYCODE_BACK'),[call.args for call in device.shell.call_args_list])
+
+    def test_background_tap_occurs_only_after_monitor_acknowledges_marker(self):
+        device=Mock();events=[]
+        def acknowledge(*args,**kwargs):
+            device.shell.assert_not_called();events.append('marker-observed');return {'markerObserved':True}
+        device.shell.side_effect=lambda *args,**kwargs:events.append('tap')
+        with patch.object(qa,'await_log_marker',side_effect=acknowledge):
+            _,ack=qa.begin_monitored_export(device,Mock(),bytearray(),'unique-marker',10,20)
+        self.assertEqual(events,['marker-observed','tap']);self.assertTrue(ack['markerObserved'])
+        device.shell.assert_called_once_with('input','tap',10,20)
+
+    def test_missing_marker_never_injects_export_tap(self):
+        device=Mock()
+        with patch.object(qa,'await_log_marker',side_effect=RuntimeError('marker acknowledgement timed out')):
+            with self.assertRaises(RuntimeError):qa.begin_monitored_export(device,Mock(),bytearray(),'unique-marker',10,20)
+        device.shell.assert_not_called()
 
 
 if __name__ == '__main__':
