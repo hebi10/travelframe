@@ -33,10 +33,13 @@ public final class BodyFrameQaHierarchy {
         HandlerThread thread = null;
         UiAutomation automation = null;
         File temporary = null;
+        ClickTarget click = null;
         String acknowledgement = null;
         int status = 1;
         try {
-            if (args.length != 1) throw new IllegalArgumentException("Expected one absolute, unique output XML path");
+            if (args.length != 1 && (args.length != 3 || !"--click-label".equals(args[1]) || args[2].isEmpty())) {
+                throw new IllegalArgumentException("Expected absolute unique output XML path [--click-label exact-label]");
+            }
             File output = new File(args[0]);
             if (!output.isAbsolute() || output.exists()) throw new IOException("Output must be absolute and must not already exist: " + output);
             if (Process.myUid() != 2000) throw new SecurityException("Run this QA helper as Android shell UID 2000");
@@ -66,16 +69,29 @@ public final class BodyFrameQaHierarchy {
             info.notificationTimeout = 0;
             automation.setServiceInfo(info);
             AccessibilityNodeInfo root = freshRoot(automation);
+            if (args.length == 3) {
+                Rect windowBounds = new Rect();
+                root.getBoundsInScreen(windowBounds);
+                click = new ClickTarget(args[2], windowBounds);
+            }
             StringBuilder xml = new StringBuilder(16384);
             xml.append("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><hierarchy rotation=\"0\" generated-at-ms=\"").append(System.currentTimeMillis()).append("\">");
             int[] count = {0};
             try {
-                appendNode(xml, root, 0, 0, count, null);
+                appendNode(xml, root, 0, 0, count, null, click, true);
             } finally {
                 root.recycle();
             }
             if (count[0] == 0) throw new IOException("No refreshed visible nodes in the active window");
             xml.append("</hierarchy>");
+            if (click != null) {
+                click.requireUnique();
+                StringBuilder metadata = new StringBuilder();
+                attribute(metadata, "action", "accessibility-click");
+                attribute(metadata, "requested-click-label", click.label);
+                attribute(metadata, "click-target-bounds", click.bounds.toShortString());
+                xml.insert(xml.indexOf(">", xml.indexOf("<hierarchy")), metadata);
+            }
             temporary = File.createTempFile("body-frame-qa-hierarchy-", ".xml.tmp", parent);
             try (FileOutputStream stream = new FileOutputStream(temporary)) {
                 stream.write(xml.toString().getBytes(StandardCharsets.UTF_8));
@@ -84,13 +100,15 @@ public final class BodyFrameQaHierarchy {
             }
             if (!temporary.renameTo(output)) throw new IOException("Cannot publish hierarchy output: " + output);
             temporary = null;
-            acknowledgement = "BODY_FRAME_QA_HIERARCHY_DUMPED " + args[0];
+            if (click != null) click.perform();
+            acknowledgement = (click == null ? "BODY_FRAME_QA_HIERARCHY_DUMPED " : "BODY_FRAME_QA_HIERARCHY_CLICKED ") + args[0];
             status = 0;
         } catch (Throwable error) {
             Throwable cause = error instanceof InvocationTargetException && error.getCause() != null ? error.getCause() : error;
             System.err.println("BODY_FRAME_QA_HIERARCHY_FAILED " + cause.getClass().getName() + ": " + cause.getMessage());
             cause.printStackTrace(System.err);
         } finally {
+            if (click != null) click.recycle();
             if (automation != null) {
                 try {
                     UiAutomation.class.getMethod("disconnect").invoke(automation);
@@ -123,7 +141,7 @@ public final class BodyFrameQaHierarchy {
         throw new IOException("No refreshed visible active-window root within 3 seconds");
     }
 
-    private static void appendNode(StringBuilder xml, AccessibilityNodeInfo node, int index, int depth, int[] count, Rect scrollClip) throws IOException {
+    private static void appendNode(StringBuilder xml, AccessibilityNodeInfo node, int index, int depth, int[] count, Rect scrollClip, ClickTarget click, boolean ancestorsEnabled) throws IOException {
         if (depth > MAX_DEPTH || count[0] >= MAX_NODES) throw new IOException("Accessibility hierarchy exceeds bounded traversal limits");
         if (!node.refresh() || !node.isVisibleToUser()) return;
         Rect rawBounds = new Rect();
@@ -131,6 +149,8 @@ public final class BodyFrameQaHierarchy {
         Rect bounds = new Rect(rawBounds);
         if (bounds.isEmpty() || (scrollClip != null && !bounds.intersect(scrollClip))) return;
         count[0]++;
+        boolean enabled = ancestorsEnabled && node.isEnabled();
+        if (click != null && enabled) click.consider(node, rawBounds, bounds, scrollClip);
         // Preserve overflow-visible ordinary View parents. Only scrolling
         // ancestors constrain descendant action bounds; retain raw geometry too.
         String className = String.valueOf(node.getClassName());
@@ -160,9 +180,58 @@ public final class BodyFrameQaHierarchy {
         for (int childIndex = 0; childIndex < node.getChildCount(); childIndex++) {
             AccessibilityNodeInfo child = node.getChild(childIndex);
             if (child == null) continue;
-            try { appendNode(xml, child, childIndex, depth + 1, count, childClip); } finally { child.recycle(); }
+            try { appendNode(xml, child, childIndex, depth + 1, count, childClip, click, enabled); } finally { child.recycle(); }
         }
         xml.append("</node>");
+    }
+
+    /** Retains one native accessibility target until ACTION_CLICK completes. */
+    private static final class ClickTarget {
+        final String label;
+        final Rect windowBounds;
+        AccessibilityNodeInfo node;
+        Rect bounds;
+        Rect scrollClip;
+        int matches;
+
+        ClickTarget(String label, Rect windowBounds) {
+            this.label = label;
+            this.windowBounds = new Rect(windowBounds);
+        }
+
+        private boolean exactLabel(AccessibilityNodeInfo candidate) {
+            return label.contentEquals(candidate.getText() == null ? "" : candidate.getText())
+                    || label.contentEquals(candidate.getContentDescription() == null ? "" : candidate.getContentDescription());
+        }
+
+        void consider(AccessibilityNodeInfo candidate, Rect raw, Rect visible, Rect clip) {
+            if (!candidate.isClickable() || !exactLabel(candidate) || !raw.equals(visible) || !windowBounds.contains(raw)) return;
+            matches++;
+            if (node == null) {
+                node = AccessibilityNodeInfo.obtain(candidate);
+                bounds = new Rect(raw);
+                scrollClip = clip == null ? null : new Rect(clip);
+            }
+        }
+
+        void requireUnique() throws IOException {
+            if (matches != 1) throw new IOException("Expected one fully visible enabled clickable exact-label target; found " + matches + " for " + label);
+        }
+
+        void perform() throws IOException {
+            requireUnique();
+            if (!node.refresh() || !node.isVisibleToUser() || !node.isEnabled() || !node.isClickable() || !exactLabel(node)) {
+                throw new IOException("Accessibility target changed before click: " + label);
+            }
+            Rect current = new Rect();
+            node.getBoundsInScreen(current);
+            if (current.isEmpty() || !windowBounds.contains(current) || (scrollClip != null && !scrollClip.contains(current))) {
+                throw new IOException("Accessibility target is no longer fully visible: " + label);
+            }
+            if (!node.performAction(AccessibilityNodeInfo.ACTION_CLICK)) throw new IOException("Native accessibility ACTION_CLICK rejected: " + label);
+        }
+
+        void recycle() { if (node != null) node.recycle(); }
     }
 
     private static void attribute(StringBuilder xml, String name, CharSequence value) {

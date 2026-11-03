@@ -361,5 +361,34 @@ class FreshHierarchyTest(unittest.TestCase):
         device.run.assert_not_called()
 
 
+class NativeActivationTest(unittest.TestCase):
+    def test_semantic_activation_uses_one_exact_native_click_request_without_coordinate_tap(self):
+        device=qa.Device();device.native_hierarchy_jar='/data/local/tmp/qa.jar';device.find_control=Mock(return_value=(360,1470))
+        def shell(*args,**kwargs):
+            if args[0]=='env':return 'BODY_FRAME_QA_HIERARCHY_CLICKED '+args[5]
+            return ''
+        device.shell=Mock(side_effect=shell)
+        device.run=Mock(return_value='<hierarchy action="accessibility-click" requested-click-label="프로젝트 만들기" click-target-bounds="[34,1422][686,1518]"/>')
+        result=device.activate('프로젝트 만들기',search='below')
+        self.assertEqual(result['nativeActionCount'],1)
+        calls=[call.args for call in device.shell.call_args_list if call.args[0]=='env']
+        self.assertEqual(len(calls),1);self.assertEqual(calls[0][-2:],('--click-label','프로젝트 만들기'))
+        self.assertFalse(any(call.args[:2]==('input','tap') for call in device.shell.call_args_list))
+
+    def test_semantic_activation_has_no_legacy_or_coordinate_fallback(self):
+        device=qa.Device();device.shell=Mock();device.find_control=Mock()
+        with self.assertRaises(RuntimeError):device.activate('프로젝트 만들기',search='below')
+        device.shell.assert_not_called();device.find_control.assert_not_called()
+
+    def test_submission_activates_once_then_requires_exact_ui_and_persistence(self):
+        import json
+        device=Mock();device.activate.return_value={'nativeActionCount':1}
+        device.storage.return_value={'body-frame.projects.v1':json.dumps([{'id':'created','name':'QA_keyboard_large_font'}])}
+        with patch.object(qa,'ensure_keyboard_hidden',return_value={'keyboardWasShown':True,'hiddenConfirmed':True}):result=qa.creation_submit(device)
+        device.activate.assert_called_once_with('프로젝트 만들기',search='below');device.tap.assert_not_called()
+        device.ready.assert_any_call(['QA_keyboard_large_font 프로젝트 열기'])
+        self.assertTrue(result['projectPersisted']);self.assertEqual(result['submitActivation']['nativeActionCount'],1)
+
+
 if __name__ == '__main__':
     unittest.main()

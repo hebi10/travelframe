@@ -315,17 +315,19 @@ class Device:
     def shell(self, *args, **kwargs):
         return self.run('shell', shlex.join(list(map(str, args))), **kwargs)
 
-    def dump(self):
+    def dump(self,click_label=None):
         self.hierarchy_sequence+=1
         target='/data/local/tmp/body-frame-qa-'+uuid.uuid4().hex+'.xml'
         backend='native-no-idle' if self.native_hierarchy_jar else 'legacy-uiautomator'
-        evidence=dict(sequence=self.hierarchy_sequence,backend=backend,remotePath=target,startedAt=datetime.now(timezone.utc).isoformat())
+        evidence=dict(sequence=self.hierarchy_sequence,backend=backend,remotePath=target,startedAt=datetime.now(timezone.utc).isoformat(),requestedClickLabel=click_label)
         try:
             self.shell('rm','-f',target)
             if self.native_hierarchy_jar:
-                output=self.shell('env','CLASSPATH='+self.native_hierarchy_jar,'app_process','/system/bin','BodyFrameQaHierarchy',target,timeout=20)
-                accepted=['BODY_FRAME_QA_HIERARCHY_DUMPED '+target]
+                extra=['--click-label',click_label] if click_label is not None else []
+                output=self.shell('env','CLASSPATH='+self.native_hierarchy_jar,'app_process','/system/bin','BodyFrameQaHierarchy',target,*extra,timeout=20)
+                accepted=[('BODY_FRAME_QA_HIERARCHY_CLICKED ' if click_label is not None else 'BODY_FRAME_QA_HIERARCHY_DUMPED ')+target]
             else:
+                if click_label is not None:raise RuntimeError('Semantic activation requires the prepared native hierarchy helper')
                 output=self.shell('uiautomator','dump','--compressed',target,timeout=30)
                 accepted=['UI hierchary dumped to: '+target,'UI hierarchy dumped to: '+target]
             evidence.update(stdout=output,stderr=self.command_stderr)
@@ -334,7 +336,11 @@ class Device:
             raw=self.run('exec-out','cat',target,timeout=15)
             xml=raw[raw.index('<'):];root=ET.fromstring(xml)
             if root.tag!='hierarchy':raise RuntimeError('Fresh hierarchy output has an unexpected root')
+            if click_label is not None and (root.get('action')!='accessibility-click' or root.get('requested-click-label')!=click_label):
+                raise RuntimeError('Native action acknowledgement lacks matching preaction label evidence')
             evidence.update(acknowledged=True,xmlSha256=hashlib.sha256(xml.encode()).hexdigest(),completedAt=datetime.now(timezone.utc).isoformat(),rootAttributes=root.attrib)
+            if click_label is not None:evidence['nativeActionCount']=1
+            self.last_hierarchy_evidence=evidence
             return xml
         except Exception as error:
             evidence['error']=str(error)
@@ -345,6 +351,9 @@ class Device:
                 directory=getattr(self,'capture_directory',None)
                 if directory:
                     folder=Path(directory)/'diagnostics/hierarchy-dumps';folder.mkdir(parents=True,exist_ok=True)
+                    if click_label is not None and evidence.get('acknowledged'):
+                        action_path=folder/f'action-{self.hierarchy_sequence:04}.xml';action_path.write_text(xml)
+                        evidence['preactionXml']=str(action_path.relative_to(directory))
                     (folder/f'dump-{self.hierarchy_sequence:04}.json').write_text(json.dumps(evidence,indent=2,ensure_ascii=False))
 
     def open(self, route, restart=True):
@@ -461,6 +470,17 @@ class Device:
         x,y=self.find_control(label,match=match,search=search)
         self.shell('input', 'tap', x, y)
         time.sleep(1)
+
+    def activate(self,label,search='default'):
+        """Invoke one frontend accessibility action in the same fresh connection."""
+        if not self.native_hierarchy_jar:raise RuntimeError('Native accessibility activation is unavailable; no coordinate fallback is allowed')
+        point=self.find_control(label,search=search)  # Scroll only; this coordinate is never tapped.
+        xml=self.dump(click_label=label)
+        proof=self.last_hierarchy_evidence
+        if not proof.get('acknowledged') or proof.get('nativeActionCount')!=1:
+            raise RuntimeError('Exactly one acknowledged native accessibility action is required')
+        return dict(method='AccessibilityNodeInfo.ACTION_CLICK',label=label,nativeActionCount=1,
+                    prequeryPoint=point,preactionAttributes=ET.fromstring(xml).attrib,hierarchyAction=proof)
 
     def open_control(self,label,expected,match='exact'):
         """Retry one missed tap only while its actual modal postcondition is absent."""
@@ -677,12 +697,12 @@ def creation_submit(device):
     ime_evidence=ensure_keyboard_hidden(device)
     keyboard_was_shown=ime_evidence['keyboardWasShown']
     device.ready(['프로젝트 이름','목표 기록 수'])
-    device.tap('프로젝트 만들기',search='below')
-    device.ready(['QA_keyboard_large_font'])
+    activation=device.activate('프로젝트 만들기',search='below')
+    device.ready(['QA_keyboard_large_font 프로젝트 열기'])
     projects=json.loads(device.storage().get('body-frame.projects.v1','[]'))
     if len(projects)!=1 or projects[0].get('name')!='QA_keyboard_large_font':
         raise RuntimeError('Large-font keyboard form did not persist the newly created project')
-    return dict(projectPersisted=True,project=projects[0],keyboardDismissedForSubmit=keyboard_was_shown,imeVisibilityEvidence=ime_evidence)
+    return dict(projectPersisted=True,project=projects[0],keyboardDismissedForSubmit=keyboard_was_shown,imeVisibilityEvidence=ime_evidence,submitActivation=activation)
 
 
 def no_export_side_effects(before, after):
