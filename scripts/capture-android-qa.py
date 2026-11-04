@@ -31,6 +31,32 @@ PROJECT = 'qa-demo-project'
 PHOTO = 'qa-demo-photo-1'
 ROOT = Path(__file__).resolve().parents[1]
 PROFILES = [('mobile', '720x1600', 320), ('tablet', '1200x1920', 240)]
+MARKETING_FIXTURES = None
+
+
+def fixture_project_name():
+    return '나의 변화 기록' if MARKETING_FIXTURES else 'QA 데모 · 몸의 변화'
+
+
+def configure_marketing_fixtures(directory):
+    global MARKETING_FIXTURES
+    MARKETING_FIXTURES = None
+    fixture_jpeg.cache_clear()
+    marketing_reference_pixels.cache_clear()
+    if directory is None:
+        return
+    directory = Path(directory).resolve()
+    files = [directory / f'photo-{index}.jpg' for index in (1, 2, 3)]
+    for path in files:
+        if not path.is_file():
+            raise ValueError(f'Missing marketing fixture: {path.name}')
+        process = subprocess.run(['ffmpeg', '-v', 'error', '-i', str(path), '-frames:v', '1', '-f', 'null', '-'], capture_output=True, timeout=30)
+        if process.returncode:
+            raise ValueError(f'Marketing fixture is not a decodable image: {path.name}')
+    hashes = [hashlib.sha256(path.read_bytes()).hexdigest() for path in files]
+    if len(set(hashes)) != 3:
+        raise ValueError('Marketing fixtures must contain three distinct images')
+    MARKETING_FIXTURES = dict(directory=str(directory), sourceSha256=hashes, projectName='나의 변화 기록')
 
 
 
@@ -61,6 +87,12 @@ def pattern_rgb(index, width=720, height=960):
 @lru_cache(maxsize=6)
 def fixture_jpeg(index, preview=False):
     width, height = (360,480) if preview else (720,960)
+    if MARKETING_FIXTURES:
+        path = Path(MARKETING_FIXTURES['directory']) / f'photo-{index}.jpg'
+        return subprocess.run(['ffmpeg', '-v', 'error', '-i', str(path), '-vf',
+            f'scale={width}:{height}:force_original_aspect_ratio=increase,crop={width}:{height},setsar=1',
+            '-frames:v', '1', '-threads', '1', '-q:v', '2', '-f', 'mjpeg', 'pipe:1'],
+            capture_output=True, check=True, timeout=30).stdout
     ppm = f'P6\n{width} {height}\n255\n'.encode()+pattern_rgb(index,width,height)
     return subprocess.run(['ffmpeg','-v','error','-f','image2pipe','-vcodec','ppm','-i','pipe:0',
         '-frames:v','1','-threads','1','-q:v','2','-f','mjpeg','pipe:1'], input=ppm,
@@ -82,12 +114,35 @@ def validate_marker_pixels(pixels, width, height, index):
     return dict(photo=index, expectedLuminance=expected, measuredLuminance=samples)
 
 
+@lru_cache(maxsize=6)
+def marketing_reference_pixels(index, width, height):
+    return subprocess.run(['ffmpeg', '-v', 'error', '-i', 'pipe:0', '-vf', f'scale={width}:{height}',
+        '-frames:v', '1', '-f', 'rawvideo', '-pix_fmt', 'rgb24', 'pipe:1'],
+        input=fixture_jpeg(index), capture_output=True, check=True, timeout=30).stdout
+
+
+def validate_marketing_pixels(pixels, width, height, index):
+    if len(pixels) != width*height*3:
+        raise ValueError('Decoded marketing frame has an invalid size')
+    errors = []
+    for candidate in (1, 2, 3):
+        reference = marketing_reference_pixels(candidate, width, height)
+        errors.append(sum(abs(actual-expected) for actual, expected in zip(pixels, reference))/len(pixels))
+    error = errors[index-1]
+    other = min(value for candidate, value in enumerate(errors, 1) if candidate != index)
+    if error > 18 or other-error < 1:
+        raise ValueError(f'Blank, stale or wrong marketing photo pixels: photo{index}, errors={errors}')
+    return dict(photo=index, validation='source-image-rgb-distance', meanAbsoluteError=error, competingMeanAbsoluteErrors=errors)
+
+
 def inspect_native_frames(path, directory):
     evidence=[]
     for index, frame in enumerate([0,3,6],1):
-        data=subprocess.run(['ffmpeg','-v','error','-i',str(path),'-vf',f'select=eq(n\\,{frame})',
+        width, height = (96, 128) if MARKETING_FIXTURES else (1080, 1440)
+        filters = f'select=eq(n\\,{frame})' + (f',scale={width}:{height}' if MARKETING_FIXTURES else '')
+        data=subprocess.run(['ffmpeg','-v','error','-i',str(path),'-vf',filters,
             '-frames:v','1','-f','rawvideo','-pix_fmt','rgb24','pipe:1'],capture_output=True,check=True,timeout=30).stdout
-        item=validate_marker_pixels(data,1080,1440,index)
+        item=(validate_marketing_pixels if MARKETING_FIXTURES else validate_marker_pixels)(data,width,height,index)
         item['frame']=frame
         evidence.append(item)
         subprocess.run(['ffmpeg','-v','error','-y','-i',str(path),'-vf',f'select=eq(n\\,{frame})',
@@ -112,8 +167,8 @@ def fixture_values(app_dir, populated=True, font_size='medium'):
                                  photoId=photo_id, sequence=index, recordedAt=date,
                                  weightKg=72-index*0.5, bodyFatPercent=21-index*0.3,
                                  skeletalMuscleKg=30, waistCm=84-index,
-                                 note='QA synthetic sample', source='manual'))
-    project = dict(id=PROJECT, name='QA 데모 · 몸의 변화', createdAt=dates[0], updatedAt=dates[-1],
+                                 note='예시 수치 기록' if MARKETING_FIXTURES else 'QA synthetic sample', source='manual'))
+    project = dict(id=PROJECT, name=fixture_project_name(), createdAt=dates[0], updatedAt=dates[-1],
                    targetPhotoCount=100, referenceMode='first', coverPhotoId=photos[-1]['id'], archived=False)
     values = {
         'body-frame.projects.v1': [project] if populated else [],
@@ -894,7 +949,7 @@ def video_failure_and_background_smoke(device, directory):
     records=[]
     relative=f'files/photos/{PROJECT}/photo-qa-demo-photo-2.jpg'
     device.open('video-create')
-    device.ready(['변화 영상 만들기','QA 데모'])
+    device.ready(['변화 영상 만들기', fixture_project_name()])
     first_pid=device.shell('pidof',PACKAGE).strip()
     for case in ['missing-original','corrupt-original','background-cancel']:
         result=dict(profile=directory.name,screen='video-'+case,route='video-create',createClicks=0)
@@ -942,7 +997,7 @@ def video_smoke(device, directory, restart=True):
         if not restart:
             for _ in range(3):
                 if not device.scroll_down(reverse=True):break
-        device.ready(['변화 영상 만들기', 'QA 데모'])
+        device.ready(['변화 영상 만들기', fixture_project_name()])
         device.tap('영상 만들기')
         result['createClicks'] = 1
         started = time.monotonic()
@@ -967,7 +1022,7 @@ def video_smoke(device, directory, restart=True):
         if not restart and result['pidAfterExport']!=retry_pid:
             raise RuntimeError('Final retry changed process identity instead of proving same-process recovery')
         library = capture(device, directory, 'video-library-populated', 'video-library',
-                          ['영상 관리', 'QA 데모'])
+                          ['영상 관리', fixture_project_name()])
         records.append(library)
         device.shell('am', 'force-stop', PACKAGE)
         app_dir = device.shell('run-as', PACKAGE, 'pwd').strip()
@@ -987,7 +1042,7 @@ def video_smoke(device, directory, restart=True):
         if len(videos) != 1 or videos[0].get('photoIds') != [f'qa-demo-photo-{index}' for index in range(1, 4)]:
             raise RuntimeError('Native export did not persist exactly one video with all three fixture photo identities')
         video = videos[0]
-        records.append(capture(device, directory, 'video-detail', 'video/' + video['id'], ['QA 데모']))
+        records.append(capture(device, directory, 'video-detail', 'video/' + video['id'], [fixture_project_name()]))
         device.shell('am', 'force-stop', PACKAGE)
         relative = private_video_path(video['uri'], app_dir)
         data = device.run('exec-out', 'run-as', PACKAGE, 'cat', relative, binary=True)
@@ -1030,10 +1085,12 @@ def main():
     parser.add_argument('--serial')
     parser.add_argument('--trust-manifest',type=Path)
     parser.add_argument('--scenario', choices=('all','keyboard'), default='all')
+    parser.add_argument('--marketing-fixtures', type=Path, default=os.environ.get('BODY_FRAME_MARKETING_FIXTURES') or None)
     args = parser.parse_args()
+    configure_marketing_fixtures(args.marketing_fixtures)
     args.output.mkdir(parents=True, exist_ok=True)
     if args.scenario == 'all':
-        fixtures=args.output/'synthetic-fixtures';fixtures.mkdir(exist_ok=True)
+        fixtures=args.output/('marketing-fixtures' if MARKETING_FIXTURES else 'synthetic-fixtures');fixtures.mkdir(exist_ok=True)
         for index in (1,2,3):
             for preview in (False,True):
                 (fixtures/f'card-{index}{"-preview" if preview else ""}.jpg').write_bytes(fixture_jpeg(index,preview))
@@ -1041,10 +1098,14 @@ def main():
     records = []
     manifest = dict(package=PACKAGE, scenario=args.scenario, apkSha256=hashlib.sha256(args.apk.read_bytes()).hexdigest(),
                     fixture=('empty synthetic guest library; no user images' if args.scenario == 'keyboard' else
+                             'AI-generated adult example photos and synthetic measurements; no user images' if MARKETING_FIXTURES else
                              'host-generated synthetic monochrome numbered cards1/2/3; no user images'),
                     network='emulator Wi-Fi and mobile data disabled; no authentication configured',
                     limits=['No signed-in/cloud/billing operations', 'No actual Health Connect import',
                             'Photo editor requires login: guest capture shows the real login-required alert'], captures=records)
+    if MARKETING_FIXTURES:
+        manifest['marketingFixtures'] = {key: value for key, value in MARKETING_FIXTURES.items() if key != 'directory'}
+        manifest['marketingFixtures']['nativePixelValidation'] = 'source-image-rgb-distance'
     if args.trust_manifest:
         manifest['apkTrust']=json.loads(args.trust_manifest.read_text())
     try:
@@ -1082,18 +1143,18 @@ def main():
             device.seed(True)
             screens = [
                 ('camera', 'camera', ['프로젝트 선택', '사진 촬영'], None),
-                ('records', 'studio', ['QA 데모', '프로젝트별 몸의 변화를'], None),
-                ('project', f'project/{PROJECT}', ['QA 데모', '프로젝트 설정 열기'], None),
+                ('records', 'studio', [fixture_project_name(), '프로젝트별 몸의 변화를'], None),
+                ('project', f'project/{PROJECT}', [fixture_project_name(), '프로젝트 설정 열기'], None),
                 ('project-settings', f'project/{PROJECT}', ['프로젝트 설정', '변경 저장', '이름'], (['프로젝트 설정 열기'], '프로젝트 설정 열기')),
                 ('project-reminder', f'project/{PROJECT}', ['촬영 알림 설정 닫기', '촬영 알림', '요일'], (['프로젝트 촬영 알림 설정'], '프로젝트 촬영 알림 설정')),
                 ('photo', f'photo/{PHOTO}', ['기록 상세'], None),
                 ('photo-measurement', f'photo/{PHOTO}?measurement=1', ['몸무게', '체지방률', '저장'], None),
                 ('edit-login-required', 'edit?' + urlencode({'photoId': PHOTO}), ['로그인이 필요합니다', '사진 편집은 무료 로그인부터'], None),
                 ('compare', f'project/{PROJECT}/compare', ['전후 사진 비교', '첫 사진', '마지막 사진'], None),
-                ('measurements', f'project/{PROJECT}/measurements', ['수치 기록', 'QA 데모'], None),
+                ('measurements', f'project/{PROJECT}/measurements', ['수치 기록', fixture_project_name()], None),
                 ('measurement-create', f'project/{PROJECT}/measurements?add=1', ['몸무게', '저장'], None),
                 ('video', 'trip-clip', ['프로젝트로 변화 영상을'], None),
-                ('video-create', 'video-create', ['변화 영상 만들기', 'QA 데모'], None),
+                ('video-create', 'video-create', ['변화 영상 만들기', fixture_project_name()], None),
                 ('video-photos', 'video-create', ['사진 선택', '전체 선택'], (['변화 영상 만들기'], '사진 수','summary')),
                 ('video-interval', 'video-create', ['사진 간격', '적용'], (['변화 영상 만들기'], '사진 간격','summary')),
                 ('video-quality', 'video-create', ['영상 화질', '적용'], (['변화 영상 만들기'], '화질','summary')),
