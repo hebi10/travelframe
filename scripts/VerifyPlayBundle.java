@@ -15,6 +15,10 @@ import org.w3c.dom.Element;
 
 public class VerifyPlayBundle {
     public static void main(String[] args) throws Exception {
+        if (args.length == 4 && args[0].equals("--manifest")) {
+            verifyManifest(args[1], args[2], args[3]);
+            return;
+        }
         if (args.length != 5) throw new IllegalArgumentException("Expected bundle, fingerprint, manifest, versionCode and versionName");
         String fingerprint = args[1];
         Set<String> entries = new HashSet<>();
@@ -49,21 +53,25 @@ public class VerifyPlayBundle {
             }
         }
         if (!arm64) throw new SecurityException("ARM64 native libraries are missing");
+        verifyManifest(args[2], args[3], args[4]);
+        System.out.println("Verified every bundle payload signature, release contents and actual AAB manifest");
+    }
+
+    private static void verifyManifest(String manifestPath, String versionCode, String versionName) throws Exception {
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
         factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
         factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
         factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");
         factory.setNamespaceAware(true);
-        Element manifest = factory.newDocumentBuilder().parse(Path.of(args[2]).toFile()).getDocumentElement();
+        Element manifest = factory.newDocumentBuilder().parse(Path.of(manifestPath).toFile()).getDocumentElement();
         String android = "http://schemas.android.com/apk/res/android";
         if (!manifest.getAttribute("package").equals("com.haebi.photoguide")) throw new SecurityException("Wrong package ID");
-        if (!manifest.getAttributeNS(android, "versionCode").equals(args[3])) throw new SecurityException("Wrong AAB versionCode");
-        if (!manifest.getAttributeNS(android, "versionName").equals(args[4])) throw new SecurityException("Wrong AAB versionName");
+        if (!manifest.getAttributeNS(android, "versionCode").equals(versionCode)) throw new SecurityException("Wrong Android versionCode");
+        if (!manifest.getAttributeNS(android, "versionName").equals(versionName)) throw new SecurityException("Wrong Android versionName");
         var applications = manifest.getElementsByTagName("application");
         if (applications.getLength() != 1) throw new SecurityException("Expected one application manifest element");
         Element application = (Element) applications.item(0);
         if (application.hasAttributeNS(android, "debuggable") && !application.getAttributeNS(android, "debuggable").equals("false")) throw new SecurityException("Debuggable AAB is forbidden");
         if (application.hasAttributeNS(android, "testOnly") && !application.getAttributeNS(android, "testOnly").equals("false")) throw new SecurityException("Test-only AAB is forbidden");
-        System.out.println("Verified every bundle payload signature, release contents and actual AAB manifest");
     }
 }

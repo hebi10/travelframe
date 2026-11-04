@@ -1,24 +1,33 @@
-name: Android signed Play AAB
+name: Android Play test release
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
-      source_sha:
-        description: Exact reviewed app source commit (40 hexadecimal characters)
+      operation:
+        description: Publish a test release or inspect current Play inventory without signing/upload
         required: true
+        default: publish
+        type: choice
+        options: [publish, inventory]
+      track:
+        description: Test audience (closed uses the existing alpha track)
+        required: true
+        default: internal
+        type: choice
+        options: [internal, closed]
+      source_sha:
+        description: Optional exact reviewed source SHA; empty uses this main run commit
+        required: false
         type: string
       version_code:
-        description: New versionCode greater than every version already uploaded to Play
-        required: true
-        type: string
-      last_play_version_code:
-        description: Latest versionCode confirmed in Play Console across all tracks
-        required: true
-        default: '26092622'
+        description: Optional unused versionCode; empty uses the current Play maximum plus one
+        required: false
         type: string
       version_name:
-        description: Release version name (three numeric parts)
-        required: true
+        description: Build-only version name override; automatic pushes use source app.json
+        required: false
         default: '1.0.32'
         type: string
 
@@ -30,12 +39,96 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  signed-aab:
-    name: Build verified Play upload bundle
+  plan:
+    name: Plan exact source and test release from Play inventory
+    if: github.repository == 'hebi10/travelframe' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      operation: ${{ steps.resolve.outputs.operation }}
+      source_sha: ${{ steps.resolve.outputs.source_sha }}
+      logical_track: ${{ steps.resolve.outputs.logical_track }}
+      api_track: ${{ steps.plan.outputs.api_track }}
+      version_code: ${{ steps.plan.outputs.version_code }}
+      last_play_version_code: ${{ steps.plan.outputs.last_play_version_code }}
+      version_name: ${{ steps.plan.outputs.version_name }}
+    env:
+      PLAY_WORKLOAD_IDENTITY_PROVIDER: ${{ vars.PLAY_WORKLOAD_IDENTITY_PROVIDER }}
+      PLAY_SERVICE_ACCOUNT: ${{ vars.PLAY_SERVICE_ACCOUNT }}
+      PLAY_INTERNAL_TRACK: ${{ vars.PLAY_INTERNAL_TRACK }}
+      ANDROID_UPLOAD_CERT_SHA256: ${{ vars.ANDROID_UPLOAD_CERT_SHA256 }}
+      INPUT_SOURCE_SHA: ${{ inputs.source_sha }}
+      INPUT_OPERATION: ${{ inputs.operation }}
+      INPUT_TRACK: ${{ inputs.track }}
+      INPUT_VERSION_CODE: ${{ inputs.version_code }}
+      INPUT_VERSION_NAME: ${{ inputs.version_name }}
+    steps:
+      - name: Checkout trusted workflow tools
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: build-tools
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Validate event, source and WIF configuration
+        id: resolve
+        run: node build-tools/scripts/publish-play-release.mjs resolve
+      - name: Require existing signing secrets before contacting Play
+        if: steps.resolve.outputs.operation == 'publish'
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: node build-tools/scripts/prepare-play-aab.mjs check-signing
+      - name: Checkout exact app metadata
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.resolve.outputs.source_sha }}
+          path: source
+          persist-credentials: false
+      - name: Test Publisher guards without credentials
+        working-directory: build-tools
+        run: node --test tests/play-publish.test.mjs
+      - name: Get short-lived Android Publisher token
+        id: auth
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        with:
+          workload_identity_provider: ${{ vars.PLAY_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.PLAY_SERVICE_ACCOUNT }}
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/androidpublisher
+          create_credentials_file: false
+          export_environment_variables: false
+      - name: Read all current tracks, bundles and APKs and choose an unused version
+        id: plan
+        env:
+          SOURCE_DIR: ${{ github.workspace }}/source
+          PLAY_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+        run: node build-tools/scripts/publish-play-release.mjs plan
+
+  build:
+    name: Build and verify signed AAB and installation APK
+    needs: plan
+    if: needs.plan.outputs.operation == 'publish'
     runs-on: ubuntu-latest
     timeout-minutes: 120
+    outputs:
+      artifact_name: ${{ steps.artifact.outputs.artifact_name }}
+      build_attempt: ${{ steps.artifact.outputs.build_attempt }}
     env:
       BUILD_WORKFLOW_SHA: ${{ github.workflow_sha }}
+      SOURCE_SHA: ${{ needs.plan.outputs.source_sha }}
+      VERSION_CODE: ${{ needs.plan.outputs.version_code }}
+      LAST_PLAY_VERSION_CODE: ${{ needs.plan.outputs.last_play_version_code }}
+      VERSION_NAME: ${{ needs.plan.outputs.version_name }}
+      ANDROID_UPLOAD_CERT_SHA256: ${{ vars.ANDROID_UPLOAD_CERT_SHA256 }}
       EXPO_PUBLIC_FIREBASE_API_KEY: ${{ secrets.EXPO_PUBLIC_FIREBASE_API_KEY }}
       EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN }}
       EXPO_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.EXPO_PUBLIC_FIREBASE_PROJECT_ID }}
@@ -51,65 +144,34 @@ jobs:
           printf 'AAB_BUILD_INPUTS=%s/play-aab-inputs.json\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
           printf 'AAB_ARTIFACT_DIR=%s/play-aab-artifacts\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
           printf 'BUNDLETOOL_JAR=%s/bundletool-all-1.18.3.jar\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
-
       - name: Checkout trusted workflow tools
         uses: actions/checkout@v4
         with:
           ref: ${{ github.workflow_sha }}
           path: build-tools
           persist-credentials: false
-
-      - name: Require a full source commit SHA
-        shell: bash
-        env:
-          SOURCE_SHA: ${{ inputs.source_sha }}
-        run: |
-          if [[ ! "$SOURCE_SHA" =~ ^[0-9a-fA-F]{40}$ ]]; then
-            echo 'source_sha must be a full 40-character commit SHA' >&2
-            exit 1
-          fi
-
       - name: Checkout exact app source
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.source_sha }}
+          ref: ${{ needs.plan.outputs.source_sha }}
           path: source
           persist-credentials: false
-
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: npm
           cache-dependency-path: source/package-lock.json
-
-      - name: Validate release inputs and set build version
-        env:
-          SOURCE_SHA: ${{ inputs.source_sha }}
-          VERSION_CODE: ${{ inputs.version_code }}
-          LAST_PLAY_VERSION_CODE: ${{ inputs.last_play_version_code }}
-          VERSION_NAME: ${{ inputs.version_name }}
-          ANDROID_UPLOAD_CERT_SHA256: ${{ vars.ANDROID_UPLOAD_CERT_SHA256 }}
+      - name: Validate production configuration and apply build-only versions
         run: node build-tools/scripts/prepare-play-aab.mjs inputs
-
-      - name: Require existing upload-key secrets before building
-        env:
-          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: node build-tools/scripts/prepare-play-aab.mjs check-signing
-
       - name: Set up JDK
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '21'
-
       - name: Test release preparation and signature rejection
         working-directory: build-tools
         run: node --test tests/play-aab-build.test.mjs tests/play-aab-signature.test.mjs
-
       - name: Download and verify pinned official bundletool
         shell: bash
         run: |
@@ -118,15 +180,12 @@ jobs:
             https://github.com/google/bundletool/releases/download/1.18.3/bundletool-all-1.18.3.jar \
             --output "$BUNDLETOOL_JAR"
           printf '%s  %s\n' a099cfa1543f55593bc2ed16a70a7c67fe54b1747bb7301f37fdfd6d91028e29 "$BUNDLETOOL_JAR" | sha256sum --check --status
-
       - name: Install exact app dependencies
         working-directory: source
         run: npm ci
-
       - name: Generate clean Android project
         working-directory: source
         run: npm run android:prebuild:ci
-
       - name: Verify release source and app regressions
         working-directory: source
         run: |
@@ -134,7 +193,6 @@ jobs:
           npm run typecheck
           npm run format:check
           npm test
-
       - name: Match existing Play upload certificate and configure release signing
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -142,7 +200,6 @@ jobs:
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: node build-tools/scripts/prepare-play-aab.mjs signing
-
       - name: Build signed release AAB
         working-directory: source/android
         env:
@@ -153,19 +210,116 @@ jobs:
         run: |
           chmod +x ./gradlew
           ./gradlew --no-daemon --max-workers=2 --console=plain :app:bundleRelease
-
-      - name: Verify AAB contents, signer, version and R8 mapping
+      - name: Verify AAB contents, signer, actual manifest and R8 mapping
         run: node build-tools/scripts/prepare-play-aab.mjs verify
-
-      - name: Upload verified Play bundle and provenance
+      - name: Generate and verify an installation APK from the same verified bundle
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: node build-tools/scripts/prepare-play-aab.mjs apk
+      - name: Record the actual build attempt artifact
+        id: artifact
+        shell: bash
+        run: |
+          printf 'artifact_name=body-frame-play-%s-%s-%s\n' "$VERSION_CODE" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"
+          printf 'build_attempt=%s\n' "$GITHUB_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"
+      - name: Upload verified build artifacts and provenance
+        id: upload
         uses: actions/upload-artifact@v4
         with:
-          name: body-frame-play-aab-${{ inputs.version_code }}-${{ github.run_id }}
+          name: ${{ steps.artifact.outputs.artifact_name }}
           path: ${{ env.AAB_ARTIFACT_DIR }}/
           if-no-files-found: error
           retention-days: 14
-
-      - name: Remove temporary upload key
+      - name: Remove temporary upload key and password files
         if: always()
         shell: bash
         run: rm -rf -- "$RUNNER_TEMP/body-frame-upload-key"
+
+  publish:
+    name: Publish AAB to the selected test track and verify committed state
+    needs: [plan, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      BUILD_WORKFLOW_SHA: ${{ github.workflow_sha }}
+      BUILD_RUN_ATTEMPT: ${{ needs.build.outputs.build_attempt }}
+      SOURCE_SHA: ${{ needs.plan.outputs.source_sha }}
+      LOGICAL_TRACK: ${{ needs.plan.outputs.logical_track }}
+      API_TRACK: ${{ needs.plan.outputs.api_track }}
+      VERSION_CODE: ${{ needs.plan.outputs.version_code }}
+      LAST_PLAY_VERSION_CODE: ${{ needs.plan.outputs.last_play_version_code }}
+      VERSION_NAME: ${{ needs.plan.outputs.version_name }}
+      PLAY_INTERNAL_TRACK: ${{ vars.PLAY_INTERNAL_TRACK }}
+      ANDROID_UPLOAD_CERT_SHA256: ${{ vars.ANDROID_UPLOAD_CERT_SHA256 }}
+      EXPO_PUBLIC_FIREBASE_API_KEY: ${{ secrets.EXPO_PUBLIC_FIREBASE_API_KEY }}
+      EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN }}
+      EXPO_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.EXPO_PUBLIC_FIREBASE_PROJECT_ID }}
+      EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET }}
+      EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
+      EXPO_PUBLIC_FIREBASE_APP_ID: ${{ secrets.EXPO_PUBLIC_FIREBASE_APP_ID }}
+      EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID: ${{ secrets.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID }}
+    steps:
+      - name: Initialize temporary verification paths
+        shell: bash
+        run: |
+          printf 'AAB_ARTIFACT_DIR=%s/play-aab-artifacts\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
+          printf 'PLAY_RECEIPT_DIR=%s/play-release-receipt\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
+          printf 'BUNDLETOOL_JAR=%s/bundletool-all-1.18.3.jar\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
+      - name: Checkout trusted workflow tools
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: build-tools
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Download only this run's verified artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build.outputs.artifact_name }}
+          path: ${{ env.AAB_ARTIFACT_DIR }}
+      - name: Download and verify pinned official bundletool
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 --proto '=https' --tlsv1.2 \
+            https://github.com/google/bundletool/releases/download/1.18.3/bundletool-all-1.18.3.jar \
+            --output "$BUNDLETOOL_JAR"
+          printf '%s  %s\n' a099cfa1543f55593bc2ed16a70a7c67fe54b1747bb7301f37fdfd6d91028e29 "$BUNDLETOOL_JAR" | sha256sum --check --status
+      - name: Independently verify downloaded AAB, signer, manifest and run provenance
+        run: node build-tools/scripts/publish-play-release.mjs verify-artifact
+      - name: Get fresh short-lived Android Publisher token
+        id: auth
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        with:
+          workload_identity_provider: ${{ vars.PLAY_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.PLAY_SERVICE_ACCOUNT }}
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/androidpublisher
+          create_credentials_file: false
+          export_environment_variables: false
+      - name: Upload AAB and R8 mapping, commit test track and read back release
+        env:
+          PLAY_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+        run: node build-tools/scripts/publish-play-release.mjs publish
+      - name: Preserve the commit outcome and readback receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: body-frame-play-receipt-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.PLAY_RECEIPT_DIR }}/
+          if-no-files-found: ignore
+          retention-days: 14

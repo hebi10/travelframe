@@ -1,69 +1,109 @@
-# GitHub Actions Play AAB build
+# GitHub Actions Play test releases
 
-`Android signed Play AAB` builds a signed Android App Bundle without Expo login or an Expo token. It uses the existing Google Play upload key. It does not upload to Play, deploy Firebase, create a signing key, or fall back to a debug key.
+`Android Play test release` builds a signed AAB and an installation APK, then uploads **only the AAB** and R8 mapping to Google Play. The package is fixed to `com.haebi.photoguide`. The default audience is internal testing; a manual run can select the existing closed `alpha` track. Production, custom tracks and other apps cannot be selected.
 
-## Repository configuration
+## Trigger and source
 
-In Settings → Secrets and variables → Actions, configure these repository **secrets** using the existing release configuration. Do not put their values in source files, issues, pull requests, or build logs.
+Every push to `main` runs the pipeline using that push's exact commit SHA. This fits the repository's existing main/pull-request Quality checks and does not depend on a separate tag or release process. The build also runs release verification, TypeScript, lint and the app tests itself before signing. There is no release/tag trigger that could duplicate the push deployment. Keep reviewed product changes on `main` before relying on automatic internal releases.
 
-| Secret | Existing value to use |
+Manual runs must select `main` as the workflow branch. Inputs are passed through environment variables and validated:
+
+| Input | Behavior |
 | --- | --- |
-| `ANDROID_KEYSTORE_BASE64` | Base64 of the existing Play upload keystore file |
+| `operation` | Default `publish`; `inventory` reads current version/track metadata without signing, uploading or committing |
+| `track` | Default `internal`; `closed` selects only the existing `alpha` API track |
+| `source_sha` | Optional full 40-character reviewed commit; empty uses the exact main commit associated with this run |
+| `version_code` | Optional positive integer above every API-observed version; empty uses maximum + 1, at most `2100000000` |
+| `version_name` | Manual default `1.0.32`; empty uses the source's `app.json` version |
+
+Automatic pushes use the source's `app.json` versionName. A manual `1.0.32` override works even when the source is `1.0.30`: only the build checkout's Expo/package version and generated Gradle version metadata change. The repository and EAS version state are untouched. The versionCode is always allocated from Play, independently of the display versionName. If a new display version is desired for every automatic push, update the normal app version in the reviewed source change.
+
+Tools are checked out at the immutable workflow commit, separately from app source. Only this repository's `main` workflow can release. Forks, pull-request events and non-main workflow branches cannot publish. A single concurrency group serializes planning, building and publishing; if an external Console/API upload races the build, the final version guard fails and requires a fresh build.
+
+## Existing signing and app configuration
+
+Configure these repository **secrets** using the existing release configuration. Never put values in code, issues, pull requests or logs.
+
+| Secret | Existing value |
+| --- | --- |
+| `ANDROID_KEYSTORE_BASE64` | Base64 of the existing Play upload keystore |
 | `ANDROID_KEYSTORE_PASSWORD` | Existing keystore password |
-| `ANDROID_KEY_ALIAS` | Existing upload key alias |
-| `ANDROID_KEY_PASSWORD` | Existing upload key password |
+| `ANDROID_KEY_ALIAS` | Existing upload alias |
+| `ANDROID_KEY_PASSWORD` | Existing key password |
 | `EXPO_PUBLIC_FIREBASE_API_KEY` | Production Firebase client configuration |
 | `EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN` | Production Firebase client configuration |
-| `EXPO_PUBLIC_FIREBASE_PROJECT_ID` | Production Firebase project from the source `.firebaserc` |
+| `EXPO_PUBLIC_FIREBASE_PROJECT_ID` | Source `.firebaserc` project |
 | `EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET` | That project's Storage bucket |
 | `EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` | Production Firebase client configuration |
 | `EXPO_PUBLIC_FIREBASE_APP_ID` | Production Firebase client configuration |
-| `EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID` | Existing Android Google sign-in OAuth client |
+| `EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID` | Existing Android sign-in OAuth client |
 
-The `EXPO_PUBLIC_` settings are client configuration embedded in the app. They are stored as Actions secrets here so their values are masked in workflow logs. They are not Firebase service-account credentials. `EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID` and `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` are not required by the current Android sign-in path. Existing AdMob app, banner, and interstitial IDs come from `app.json`; the preflight rejects missing or Google sample IDs.
+Client configuration is embedded in the app; Actions secrets mask it in logs. It is not a Firebase service-account key. The Android path does not require `EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID` or `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`. Production AdMob app/banner/interstitial IDs come from the source `app.json`; missing/sample IDs fail preflight. Firebase project/bucket/sender consistency is checked and every required client value must appear in the built JavaScript/Hermes bundle, without printing values.
 
-Configure repository **variable** `ANDROID_UPLOAD_CERT_SHA256` with the SHA-256 fingerprint under Play Console → App integrity → **Upload key certificate**. Use the upload certificate, not the separate app signing certificate. Colons and whitespace are accepted. The keystore certificate must match this fingerprint and be currently valid. An Android Debug certificate is rejected even if its fingerprint matches the variable.
+Configure repository **variables**:
 
-No new keystore should be generated to fill a missing secret. Recover the existing upload key through its established owner/backup instead. This workflow cannot safely build a Play upload candidate until all required settings exist.
-
-## Manual run
-
-GitHub requires the workflow file to be present on the repository's default branch before the Run workflow UI is available. Merge the workflow/tool/test/documentation change into `main` first. A workflow-only integration does not require merging the product source branches: the workflow checks out build tools at its own immutable workflow commit and app source separately at `source_sha`.
-
-Open Actions → Android signed Play AAB → Run workflow. Select the reviewed workflow branch and enter:
-
-| Input | Rule / current candidate |
+| Variable | Required value |
 | --- | --- |
-| `source_sha` | Full 40-character reviewed commit SHA; current ad-removal-sales candidate: `9103b26b94e19f40c2302873e2dd0d4c39c9db25` |
-| `last_play_version_code` | Highest versionCode currently uploaded across every Play track; last confirmed floor is `26092622`, not a promise that it remains the latest |
-| `version_code` | Unused positive integer greater than that Play maximum, at most `2100000000` |
-| `version_name` | Three numeric parts; default `1.0.32` distinguishes this build from the older `1.0.30` bundle / `1.0.31` release label |
+| `ANDROID_UPLOAD_CERT_SHA256` | Play Console → App integrity → **Upload key certificate** SHA-256; not the app signing certificate |
+| `PLAY_WORKLOAD_IDENTITY_PROVIDER` | Existing WIF provider resource `projects/NUMBER/locations/global/workloadIdentityPools/POOL/providers/PROVIDER` |
+| `PLAY_SERVICE_ACCOUNT` | App-specific release service-account email |
+| `PLAY_INTERNAL_TRACK` | Explicitly confirmed API name `internal` or `qa`; no implicit alias fallback |
 
-The workflow rejects refs such as `main` for `source_sha`, checks the actual checkout SHA, and passes inputs through environment variables rather than shell interpolation. It applies `version_name` to the build checkout's Expo/package metadata and applies `version_code` to the generated Android Gradle file. These build overrides do not change the repository or EAS remote version state and are recorded in the provenance file.
+The upload keystore certificate must match the configured public fingerprint, be currently valid and not be Android Debug. No missing key can be replaced by a new/debug key. Publish runs fail before contacting Play until the existing four signing secrets are available. Read-only inventory runs do not require signing material.
 
-## Verification and output
+## Keyless Play authentication
 
-The build performs clean Expo prebuild, release source verification, TypeScript, lint and app tests before introducing the upload key. Production Firebase and Android sign-in settings must be present and internally consistent. The resulting embedded JavaScript/Hermes bundle must contain each required configuration value; the checks never print those values.
+Use Google Workload Identity Federation with the existing app-specific service account. `google-github-actions/auth` is pinned to the reviewed v3 commit and mints a short-lived access token with only the `androidpublisher` OAuth scope. No long-lived JSON credential fallback or Expo token is used.
 
-Release signing is injected into the generated Gradle project using environment references only. R8 minification and resource shrinking are enabled. No architecture override is applied, preserving the source project's normal release architectures, and ARM64 libraries must be present.
+The release GCP project (`hebi-app-release-80847404`) and service account (`play-bodyframe@hebi-app-release-80847404.iam.gserviceaccount.com`) are separate from the app's Firebase backend project (`travelframe-4e1fb`). This workflow does not create or modify Cloud projects, IAM bindings, providers, Firebase resources, OAuth clients or Play users. An existing account/project alone does not prove WIF or Play permissions are ready.
 
-Official `google/bundletool` version `1.18.3` is downloaded from its release URL and checked against SHA-256 `a099cfa1543f55593bc2ed16a70a7c67fe54b1747bb7301f37fdfd6d91028e29` before execution. `bundletool validate` and `dump manifest` verify the actual AAB structure and manifest. The JDK verifier reads every payload entry to completion, rejects unsigned/tampered entries or another signer, checks the upload certificate and validity, and rejects a debuggable/test-only manifest. The package, versionCode, versionName, embedded JS, native libraries and nonempty R8 mapping must match.
+The configured WIF trust must restrict the immutable GitHub repository identity, `refs/heads/main` and this workflow. Give the service account access only to this app and the Play permissions needed to view app/release information and release to testing tracks; production/account-wide permissions are unnecessary. Enable the required existing Publisher/IAM credentials services through the account owner. Authentication configuration and Play grants must be verified before the first real run.
 
-Only after all checks pass is artifact `body-frame-play-aab-<versionCode>-<runId>` uploaded, retained for 14 days. It contains:
+OIDC is available only in the `plan` and `publish` jobs. They execute trusted workflow scripts without installing/running app dependencies. The npm/Expo/Gradle `build` job has no OIDC permission or Play access token. Fresh Play authentication occurs after download verification, avoiding token expiry during a long build. Auth creates no credentials file and exports no Google SDK environment credentials.
+
+## Play inventory, edit and commit
+
+For initial setup, run manually with `operation=inventory` after WIF/Play access is configured. This mode works without signing secrets or `PLAY_INTERNAL_TRACK`. It creates a temporary edit, lists tracks/bundles/APKs, logs only actual track names and public version/count metadata, then deletes the edit. Build and publish jobs are skipped; no artifact upload, track update, validation or commit is performed. Confirm the actual internal name from this result and set `PLAY_INTERNAL_TRACK` before a publish run. Automatic pushes always force `publish` + `internal`, ignoring manual-mode inputs.
+
+Planning creates a temporary edit and reads `edits.tracks.list`, `edits.bundles.list` and `edits.apks.list`. This includes bundles/APKs returned by the API even when no track references them. The maximum also retains the previously confirmed floor `26092622`; this is a lower bound, not a claim that it remains the latest. The API lists current resources rather than promising an exhaustive lifetime archive, and Play remains the final authority on version reuse. Invalid/incomplete inventory responses fail closed.
+
+The logical internal choice requires `PLAY_INTERNAL_TRACK` to be `internal` or `qa` and that exact name to exist once in `edits.tracks.list`. The closed choice requires exact `alpha` to exist. No track is created and no custom name, form-factor prefix or production alias is guessed.
+
+After independently verifying the downloaded AAB, publishing starts a **new** edit, rechecks all current versions and track mapping, then:
+
+1. Uploads the verified AAB through a resumable session. Only documented Google API hosts and the exact package/edit/bundle upload path are allowed for the session URL; redirects are rejected. A broken transfer fails the run rather than blindly repeating it.
+2. Requires the returned versionCode and server SHA-256 to match the local AAB and attaches that version's R8 mapping.
+3. Updates only the selected test track to the new version with `completed` status and validates the edit.
+4. Commits with `changesInReviewBehavior=ERROR_IF_IN_REVIEW`. Existing review is never automatically cancelled. There is no fallback to draft, production or `changesNotSentForReview`.
+5. Opens another temporary edit and reads the committed test track back, requiring the exact version and completed status. Temporary read edits are deleted.
+
+Uncommitted failed edits are discarded when possible. A timeout after commit can leave the outcome uncertain: the receipt distinguishes `commit-outcome-unconfirmed`, `committed-readback-unverified` and `committed-and-read-back`. Only the last state is workflow success. Do not infer tester delivery from upload success alone. Play processing, review or managed publishing may still delay availability.
+
+If only publishing failed, a failed-job rerun downloads the artifact from the **actual successful build attempt**, preserving its provenance. It still performs all verification and version checks with a fresh token. A version already committed by an earlier attempt is rejected, never silently republished. Inspect the receipt/Console before retrying an uncertain commit. A full rerun creates a fresh inventory/build and may allocate a new versionCode.
+
+## Build verification and files
+
+Clean Android prebuild, release verification, TypeScript, lint and app regression tests run before the key is materialized. Release signing references environment variables, with R8/resource shrinking enabled and source architectures preserved. Official bundletool `1.18.3` is SHA-256 pinned to `a099cfa1543f55593bc2ed16a70a7c67fe54b1747bb7301f37fdfd6d91028e29`.
+
+The verifier reads every AAB payload entry to completion, validates its JAR signature and exact upload certificate, rejects duplicate/unsigned/tampered content and checks ARM64 native code, embedded production configuration, actual package/version/release manifest and nonempty R8 mapping. The publish job repeats actual AAB, signer, package and manifest checks and binds provenance/hashes to the exact workflow/source/run/build attempt.
+
+A universal APK is generated from that same verified AAB with explicit existing upload-key signing; bundletool's implicit debug signing is never used. Android SDK `apksigner` verifies its signature/certificate and `apkanalyzer` supplies the real manifest for package/version/debug/test-only checks. The APK is for direct installation. **Its upload-key signature can differ from Play's app signing key, so it may not update an existing Play-installed app.** Test store sign-in/billing using the Play-installed build.
+
+GitHub build artifact `body-frame-play-<versionCode>-<runId>-<buildAttempt>` is retained for 14 days and contains:
 
 - `BodyFrame-<versionName>-<versionCode>.aab`
-- `mapping.txt`
-- `AndroidManifest.xml` dumped from that AAB
-- `SHA256SUMS`
-- `build-provenance.json`: source/workflow commits, run, version overrides, public certificate fingerprint and output hashes; no environment values or signing credentials
+- `BodyFrame-<versionName>-<versionCode>-upload-key.apk`
+- `mapping.txt`, actual AAB `AndroidManifest.xml`, `SHA256SUMS`
+- `build-provenance.json`: source/workflow/run/build attempt, versions, public certificate, AAB/APK/mapping hashes and configuration **names**, with no environment values or signing credentials
 
-The temporary keystore is removed on success and failure and is never an artifact. Regression tests use disposable, clearly named test-only certificates in temporary directories; those keys are deleted and cannot be selected by the production signing path.
+The separate receipt artifact records public package/track/version/hash and commit/readback outcome. The keystore/password files are temporary, permission-restricted, removed on success/failure and excluded from artifacts. No Drive file, backend, product/pricing, listing, tester list, country setting or production track is modified by this pipeline.
 
-A successful build proves configuration inclusion and artifact integrity. It does not prove production Functions/Rules deployment, Publisher API/RTDN access, Google sign-in OAuth certificate registration, purchase/refund/restore success, AdMob approval, or physical-device behavior. Validate those using the exact Play-installed candidate and the release checklist.
+## Validation and limits
 
-## Implementation checks
+```bash
+node --test tests/play-aab-build.test.mjs tests/play-aab-signature.test.mjs tests/play-publish.test.mjs
+```
 
-- Input, version, configuration and signing preparation tests: `node --test tests/play-aab-build.test.mjs`
-- Real signed/unsigned/tampered fixture verification: `node --test tests/play-aab-signature.test.mjs` (JDK 17+ and `keytool`)
-- Final repository CI: Quality and Secret Scan on the workflow PR
-- Signed production build: remains blocked until the existing key and configuration are supplied; never replace that check with a QA APK
+Signature tests use disposable test-only keys in temporary directories, deleted afterward; they cannot be selected by the production path. Publisher tests use mocked HTTP responses and never authenticate or change Play. Production signing, actual API permission, first upload and physical-device sign-in/billing/ad behavior remain unverified until the real configuration/key and a successful run exist. A green repository Quality run alone does not prove deployment or device QA.
+
+Official references: [Publisher setup](https://developers.google.com/android-publisher/getting_started), [tracks](https://developers.google.com/android-publisher/tracks), [bundle upload](https://developers.google.com/android-publisher/api-ref/rest/v3/edits.bundles/upload), [media sessions](https://developers.google.com/android-publisher/upload), [commit review behavior](https://developers.google.com/android-publisher/api-ref/rest/v3/edits/commit), [keyless GitHub auth](https://github.com/google-github-actions/auth), [bundletool](https://developer.android.com/tools/bundletool).

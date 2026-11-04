@@ -7,7 +7,7 @@ import { test } from "node:test";
 
 const scriptPath = path.resolve("scripts/prepare-play-aab.mjs");
 assert.ok(fs.existsSync(scriptPath), "Play AAB input/signing preparation is not implemented");
-const { validateBuildInputs, validateAppConfiguration, patchBuildGradle, configureSourceVersion, decodeKeystore } = await import(scriptPath);
+const { validateBuildInputs, validateAppConfiguration, patchBuildGradle, configureSourceVersion, decodeKeystore, verifyApkSigner } = await import(scriptPath);
 const valid = {
   sourceSha: "9103b26b94e19f40c2302873e2dd0d4c39c9db25",
   versionCode: "26092623",
@@ -32,6 +32,12 @@ test("rejects invalid source refs and reused, understated or overflowing Play ve
 test("rejects malformed or empty keystore base64 before creating a file", () => {
   assert.deepEqual(decodeKeystore("YWJj\n"), Buffer.from("abc"));
   for (const value of ["", "not base64!", "abc", "===="]) assert.throws(() => decodeKeystore(value));
+});
+
+test("install APK signer inspection rejects absent, wrong and additional signers", () => {
+  const fingerprint = "ab".repeat(32);
+  assert.doesNotThrow(() => verifyApkSigner(`Signer #1 certificate SHA-256 digest: ${fingerprint}\n`, fingerprint));
+  for (const output of ["", `Signer #1 certificate SHA-256 digest: ${"cd".repeat(32)}`, `Signer #1 certificate SHA-256 digest: ${fingerprint}\nSigner #2 certificate SHA-256 digest: ${fingerprint}\n`]) assert.throws(() => verifyApkSigner(output, fingerprint));
 });
 
 test("rejects missing production Firebase and Android sign-in settings without leaking values", () => {

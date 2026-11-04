@@ -1,4 +1,5 @@
 import { AppText as Text, AppTextInput as TextInput } from "@/components/app-text";
+import { createAppOnlySaveFallback } from "@/features/camera/camera-save-fallback";
 import {
   Feather } from "@expo/vector-icons";
 import { PrivateNativeImage as NativeImage } from "@/components/private-media-image";
@@ -189,6 +190,7 @@ type CameraScreenProps = {
   projectReferenceMode?: "first" | "latest";
   onProjectReferenceModeChange?: (projectId: string, mode: "first" | "latest") => Promise<void>;
   headerCenter?: ReactNode;
+  onHeaderBottomChange?: (bottom: number) => void;
 };
 
 const CAMERA_PERMISSION_RECOVERY_TIMEOUT_MS = 3_000;
@@ -197,7 +199,8 @@ const CAMERA_PERMISSION_RECOVERY_POLL_MS = 50;
 export default function CameraScreen({
   projectReferenceMode = "latest",
   onProjectReferenceModeChange,
-  headerCenter
+  headerCenter,
+  onHeaderBottomChange
 }: CameraScreenProps = {}) {
   const [isReferenceModeChanging, setIsReferenceModeChanging] = useState(false);
   const referenceModeChangeInProgressRef = useRef(false);
@@ -1890,7 +1893,8 @@ export default function CameraScreen({
     setCameraTopBarHeight((currentHeight) =>
       currentHeight === nextHeight ? currentHeight : nextHeight
     );
-  }, []);
+    onHeaderBottomChange?.(Math.ceil(event.nativeEvent.layout.y + event.nativeEvent.layout.height));
+  }, [onHeaderBottomChange]);
 
   const handleCameraBottomTrayLayout = useCallback((event: LayoutChangeEvent) => {
     const nextHeight = Math.ceil(event.nativeEvent.layout.height);
@@ -2099,18 +2103,15 @@ export default function CameraScreen({
       setErrorMessage(message);
       Alert.alert(
         "핸드폰 앨범 저장 권한이 필요합니다.",
-        `${message}\n\n설정에서 사진 및 동영상 권한을 허용하거나 클라우드로만 저장하도록 바꿀 수 있습니다.`,
+        `${message}\n\n설정에서 사진 및 동영상 권한을 허용하거나 앱에만 저장하도록 바꿀 수 있습니다.`,
         [
           { text: "나중에", style: "cancel" },
           {
-            text: "클라우드로 저장",
+            text: "앱에만 저장",
             onPress: () => {
-              setCameraSaveScope("app");
-              queueAppSettingsUpdate({
-                cameraSaveScope: "app",
-                storageMode: "local_backup",
-                cloudBackupEnabled: true
-              });
+              const fallback = createAppOnlySaveFallback();
+              setCameraSaveScope(fallback.cameraSaveScope);
+              queueAppSettingsUpdate(fallback);
             }
           },
           { text: "설정 열기", onPress: () => void Linking.openSettings() }

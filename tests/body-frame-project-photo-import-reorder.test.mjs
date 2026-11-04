@@ -53,7 +53,7 @@ for (const token of [
   "orderedPhotoIds = [...nextDisplayedPhotos]",
   ".reverse()",
   "reorderBodyProjectPhotos",
-  "사진을 길게 누른 채 원하는 위치로 끌어 놓으세요."
+  "사진을 끌어 놓거나 순번 이동을 눌러 원하는 순번을 입력하세요."
 ]) {
   assert.ok(detail.includes(token), `inline project drag reorder missing: ${token}`);
 }

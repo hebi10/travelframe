@@ -1,0 +1,153 @@
+name: Body Frame native device QA
+
+on:
+  pull_request:
+    paths:
+      - 'app/**'
+      - 'components/**'
+      - 'features/**'
+      - 'lib/**'
+      - 'plugins/**'
+      - 'assets/**'
+      - 'constants/**'
+      - 'types/**'
+      - 'hooks/**'
+      - 'android/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'app.json'
+      - 'app.config.*'
+      - 'babel.config.*'
+      - 'metro.config.*'
+      - 'tsconfig.json'
+      - '.npmrc'
+      - 'scripts/**'
+      - '!scripts/capture-android-qa.py'
+      - '!scripts/test_capture_android_qa.py'
+      - '!scripts/verify-android-qa-apk.py'
+      - '!scripts/test_verify_android_qa_apk.py'
+      - '!scripts/android-qa-apk-selection.json'
+      - '.github/workflows/body-frame-device-qa.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: body-frame-device-qa-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    env:
+      EXPO_NO_DOTENV: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install exact dependencies
+        run: npm ci
+      - name: Generate Android project
+        run: npm run android:prebuild:ci
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+      - name: Configure standalone release host with disposable QA debugging
+        run: |
+          python3 - <<'PYQA'
+          from pathlib import Path
+          import re
+          launcher = Path('node_modules/expo-dev-launcher/android')
+          delegates = [launcher/'src/disableInRelease/java/expo/modules/devlauncher/DevLauncherPackageDelegate.kt', launcher/'src/release/java/expo/modules/devlauncher/DevLauncherPackageDelegate.kt']
+          contracts = ['createApplicationLifecycleListeners', 'createReactActivityHandlers', 'createReactNativeHostHandlers']
+          inert = next((path for path in delegates if path.exists() and all(re.search(r'fun\s+' + name + r'\([^)]*\)\s*:\s*List<[^>]+>\s*=\s*emptyList\(\)', path.read_text()) for name in contracts)), None)
+          if inert is None:
+              raise SystemExit('Installed DevLauncher has no verified inert release delegate')
+          factory = Path('node_modules/expo/android/src/main/java/expo/modules/ExpoReactHostFactory.kt')
+          if not factory.exists() or 'useDevSupport: Boolean' not in factory.read_text():
+              raise SystemExit('Installed Expo host contract does not expose useDevSupport')
+          apps = list(Path('android/app/src/main/java').rglob('MainApplication.kt'))
+          if len(apps) != 1 or 'ExpoReactHostFactory.getDefaultReactHost(' not in apps[0].read_text():
+              raise SystemExit('Generated application does not match the verified Expo55 host contract')
+          app = apps[0]
+          app.write_text(app.read_text().replace('ExpoReactHostFactory.getDefaultReactHost(', 'ExpoReactHostFactory.getDefaultReactHost(\n      useDevSupport = false,', 1))
+          gradle = Path('android/app/build.gradle')
+          gradle.write_text(gradle.read_text() + '\nandroid { buildTypes { qaRelease { initWith release; debuggable true; signingConfig signingConfigs.debug; matchingFallbacks = ["release"] } } }\n')
+          print('QA variant selects release dependency source sets, embedded JS and developer support disabled; run-as enabled only for disposable emulator seeding')
+          PYQA
+      - name: Build x86_64 native APK
+        env:
+          NODE_ENV: production
+          CMAKE_BUILD_PARALLEL_LEVEL: '2'
+        run: |
+          mkdir -p artifacts
+          set -o pipefail
+          bash android/gradlew -p android --no-daemon --build-cache --max-workers=2 --console=plain -Pexpo.devlauncher.configureInRelease=false -PreactNativeArchitectures=x86_64 :app:assembleQaRelease 2>&1 | tee artifacts/native-build.log
+          unzip -Z1 android/app/build/outputs/apk/qaRelease/app-qaRelease.apk | grep -Fx 'assets/index.android.bundle'
+      - name: Upload standalone APK independently of captures
+        uses: actions/upload-artifact@v4
+        with:
+          name: body-frame-native-qa-apk
+          path: android/app/build/outputs/apk/qaRelease/app-qaRelease.apk
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload build diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: body-frame-native-build-logs
+          path: artifacts/
+          if-no-files-found: warn
+          retention-days: 14
+
+  capture-devices:
+    needs: build-apk
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: body-frame-native-qa-apk
+          path: artifacts/apk
+      - name: Verify capture helper
+        run: python3 scripts/test_capture_android_qa.py
+      - name: Ensure native video inspection tools
+        run: |
+          if ! command -v ffprobe >/dev/null || ! command -v ffmpeg >/dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y ffmpeg
+          fi
+          ffprobe -version | head -1
+      - name: Enable KVM access
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Capture genuine Android UI at mobile and tablet sizes
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_2
+          ram-size: 3072M
+          heap-size: 512M
+          disk-size: 6000M
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back emulated -camera-front none
+          script: python3 scripts/capture-android-qa.py --apk artifacts/apk/app-qaRelease.apk --output artifacts/native-qa
+      - name: Upload screenshots and capture diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: body-frame-native-device-qa-${{ github.run_id }}
+          path: artifacts/native-qa/
+          if-no-files-found: warn
+          retention-days: 14

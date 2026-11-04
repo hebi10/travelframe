@@ -102,6 +102,9 @@ const exportFixture = async ({ saveFails = false, adThrows = false } = {}) => {
   const events = [];
   const messages = [];
   const context = {
+    exportController: { current: null }, AbortController,
+    assertBodyFrameExportActive: signal => { if (signal.aborted) throw new Error("취소"); },
+    FileSystem: { deleteAsync: async () => {} }, setAlbumRetryUri: () => {},
     activeProject: { id: "test-project", name: "test" }, projectPhotos: [{ id: "photo", uri: "file:///photo.jpg" }],
     isExporting: false, isLoggedIn: true, guestUsage: null,
     planEntitlements: { canExportVideo: true, localVideoLimit: 30, label: "무료", weeklyVideoExportLimit: 0 },
@@ -110,9 +113,9 @@ const exportFixture = async ({ saveFails = false, adThrows = false } = {}) => {
     formatDuration: value => `${value}초`, setIsExporting: value => { if (!value) events.push("finished"); },
     setExportProgress: () => {}, setMessage: value => messages.push(value), setGuestUsage: () => {},
     getMadeVideos: async () => [], assertLocalLibraryCapacity: () => {},
-    recordProjectVideo: async () => "file:///video.mp4",
+    recordProjectVideo: async () => ({ uri: "file:///video.mp4", coverUri: "file:///cover.jpg", cleanup: async () => {} }),
     saveVideoToLibrary: async () => events.push("album"),
-    saveMadeVideo: async () => { if (saveFails) throw new Error("save failed"); events.push("local"); },
+    saveMadeVideo: async () => { if (saveFails) throw new Error("save failed"); events.push("local"); return { uri: "file:///persisted.mp4" }; },
     recordGuestWeeklyVideoExport: async () => ({}), getUserFacingErrorMessage: error => error.message,
     cancelPostSaveAd: () => {},
     requestPostSaveAd: () => { events.push("ad"); if (adThrows) throw new Error("ad failed"); }
@@ -123,7 +126,7 @@ const exportFixture = async ({ saveFails = false, adThrows = false } = {}) => {
 };
 await check("current Body Frame export requests an ad only after durable save and completion", async () => {
   const { events } = await exportFixture();
-  assert.deepEqual(events, ["album", "local", "finished", "ad"]);
+  assert.deepEqual(events, ["local", "album", "finished", "ad"]);
 });
 await check("failed local video save never requests an ad", async () => {
   const { events } = await exportFixture({ saveFails: true });

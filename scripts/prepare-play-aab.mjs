@@ -190,6 +190,55 @@ function verifyBundle() {
   console.log(`Verified Play AAB: ${name}; source ${inputs.sourceSha}`);
 }
 
+export function verifyApkSigner(output, expectedFingerprint) {
+  const certificates = [...output.matchAll(/^Signer #\d+ certificate SHA-256 digest:\s*([a-f0-9]+)\s*$/gim)];
+  if (certificates.length !== 1 || certificates[0][1].toLowerCase() !== expectedFingerprint) throw new Error("APK signer does not match the existing Play upload certificate");
+}
+
+function buildInstallApk() {
+  requireSigningSecrets();
+  const inputs = readInputs();
+  const directory = path.join(process.env.RUNNER_TEMP, "body-frame-upload-key");
+  const keystore = path.join(directory, "upload-keystore.jks");
+  if (process.env.ANDROID_KEYSTORE_PATH !== keystore || !fs.existsSync(keystore)) throw new Error("Verified existing upload keystore is required for APK generation; debug fallback is forbidden");
+  if (hash(process.env.BUNDLETOOL_JAR) !== BUNDLETOOL_SHA256) throw new Error("Pinned bundletool SHA-256 mismatch");
+  const destination = process.env.AAB_ARTIFACT_DIR;
+  const aab = path.join(destination, `BodyFrame-${inputs.versionName}-${inputs.versionCode}.aab`);
+  const provenancePath = path.join(destination, "build-provenance.json");
+  const provenance = JSON.parse(fs.readFileSync(provenancePath, "utf8"));
+  if (hash(aab) !== provenance.aabSha256) throw new Error("Verified AAB changed before APK generation");
+  const storePassword = path.join(directory, "store-password.txt");
+  const keyPassword = path.join(directory, "key-password.txt");
+  for (const [file, value] of [[storePassword, process.env.ANDROID_KEYSTORE_PASSWORD], [keyPassword, process.env.ANDROID_KEY_PASSWORD]]) {
+    if (/[\r\n]/.test(value)) throw new Error("APK password-file signing requires passwords without line breaks");
+    fs.writeFileSync(file, value, { mode: 0o600 });
+  }
+  const archive = path.join(process.env.RUNNER_TEMP, "body-frame-universal.apks");
+  run("java", ["-jar", process.env.BUNDLETOOL_JAR, "build-apks", `--bundle=${aab}`, `--output=${archive}`, "--mode=universal", "--overwrite", `--ks=${keystore}`, `--ks-key-alias=${process.env.ANDROID_KEY_ALIAS}`, `--ks-pass=file:${storePassword}`, `--key-pass=file:${keyPassword}`]);
+  const apk = path.join(process.env.RUNNER_TEMP, "body-frame-universal.apk");
+  run("python3", ["-c", "import sys,zipfile\nwith zipfile.ZipFile(sys.argv[1]) as z:\n e=z.getinfo('universal.apk')\n assert e.file_size > 0\n with z.open(e) as src, open(sys.argv[2], 'wb') as dst:\n  import shutil; shutil.copyfileobj(src,dst)", archive, apk]);
+  const sdk = process.env.ANDROID_HOME || process.env.ANDROID_SDK_ROOT;
+  if (!sdk) throw new Error("Android SDK is required to verify the install APK");
+  const buildTools = fs.readdirSync(path.join(sdk, "build-tools")).filter((name) => /^\d+\.\d+\.\d+$/.test(name)).sort((left, right) => right.localeCompare(left, undefined, { numeric: true }));
+  if (!buildTools.length) throw new Error("Android apksigner is unavailable");
+  const signature = run(path.join(sdk, "build-tools", buildTools[0], "apksigner"), ["verify", "--verbose", "--print-certs", apk]);
+  verifyApkSigner(signature, inputs.certificateSha256);
+  const manifest = run(path.join(sdk, "cmdline-tools/latest/bin/apkanalyzer"), ["manifest", "print", apk]);
+  const manifestPath = path.join(process.env.RUNNER_TEMP, "body-frame-apk-manifest.xml");
+  fs.writeFileSync(manifestPath, manifest);
+  run("java", [path.join(path.dirname(fileURLToPath(import.meta.url)), "VerifyPlayBundle.java"), "--manifest", manifestPath, String(inputs.versionCode), inputs.versionName]);
+  const name = `BodyFrame-${inputs.versionName}-${inputs.versionCode}-upload-key.apk`;
+  fs.copyFileSync(apk, path.join(destination, name));
+  provenance.apkSha256 = hash(apk);
+  provenance.apkSourceAabSha256 = provenance.aabSha256;
+  provenance.apkSigningCertificateSha256 = inputs.certificateSha256;
+  provenance.apkPurpose = "Direct installation with upload-key signature; Play distributes APKs signed by the separate Play app signing key";
+  provenance.validations.push("universal APK generated from the verified AAB", "apksigner verification and upload certificate", "actual APK package/version/release manifest");
+  fs.writeFileSync(provenancePath, JSON.stringify(provenance, null, 2) + "\n");
+  fs.appendFileSync(path.join(destination, "SHA256SUMS"), `${provenance.apkSha256}  ${name}\n`);
+  console.log(`Verified universal installation APK from the same AAB: ${name}`);
+}
+
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
     const command = process.argv[2];
@@ -197,7 +246,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     else if (command === "check-signing") requireSigningSecrets();
     else if (command === "signing") prepareSigning();
     else if (command === "verify") verifyBundle();
-    else throw new Error("Expected inputs, check-signing, signing or verify command");
+    else if (command === "apk") buildInstallApk();
+    else throw new Error("Expected inputs, check-signing, signing, verify or apk command");
   } catch (error) {
     console.error(`Play AAB preparation failed: ${error.message}`);
     process.exitCode = 1;

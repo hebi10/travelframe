@@ -34,10 +34,6 @@ for (const token of [
 
 for (const token of [
   'price: "2,000원"',
-  "광고만 영구 제거",
-  "프로젝트 최대 2개",
-  "프로젝트당 사진 최대 100장",
-  "월 Pro(2,000원)부터",
   "프로젝트 수 무제한",
   "프로젝트당 사진 최대 365장",
   "클라우드 백업 프로젝트 1개"
@@ -47,12 +43,5 @@ for (const token of [
     `revised purchase policy copy missing: ${token}`
   );
 }
-
-assert.ok(
-  account.includes(
-    "광고 제거는 2,000원 1회 구매이며 광고만 제거됩니다."
-  ),
-  "ad removal confirmation should start with the correct 2,000 won one-time price"
-);
 
 console.log("ok - payment modal text stays transparent and plan copy matches revised limits");

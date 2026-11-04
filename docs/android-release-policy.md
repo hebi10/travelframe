@@ -1,8 +1,8 @@
 # Android release policy
 
-## GitHub Actions signed AAB
+## GitHub Actions Play test releases
 
-The manual `Android signed Play AAB` workflow builds an exact reviewed source commit with the existing Play upload key, explicit version inputs, certificate matching and verified artifacts. See [GitHub Play AAB build](github-play-aab-build.md) for required repository settings, default-branch registration, and provenance. Missing signing or production client configuration fails the build; no Expo token or new signing key is used.
+`Android Play test release` builds the exact main push (or a manual reviewed source SHA) with the existing upload key, verifies AAB/APK artifacts, and uploads only the AAB to internal testing by default. Manual closed testing is limited to the existing `alpha` track; production is blocked. See [GitHub Play test releases](github-play-aab-build.md) for OIDC settings, version allocation, build provenance and commit/readback guarantees. Missing signing, production app configuration or Play authorization fails the workflow; no Expo token, JSON key fallback or new signing key is used.
 
 ## Local AAB versionCode
 

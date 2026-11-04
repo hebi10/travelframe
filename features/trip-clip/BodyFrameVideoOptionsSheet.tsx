@@ -1,13 +1,14 @@
 import { AppText as Text, AppTextInput as TextInput } from "@/components/app-text";
 import {
   Image } from "@/components/private-media-image";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import {
   FlatList,
   KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   View
 } from "react-native";
@@ -81,12 +82,18 @@ export function BodyFrameVideoOptionsSheet({
         style={styles.keyboardAvoidingRoot}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
-      <Pressable accessibilityRole="button" style={[styles.backdrop, { paddingTop: insets.top + 24 }]} onPress={onCancel}>
+      <View style={[styles.backdrop, { paddingTop: insets.top + 24 }]}>
         <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="영상 설정 닫기"
+          style={StyleSheet.absoluteFill}
+          onPress={onCancel}
+        />
+        <View
           style={[styles.sheet, { backgroundColor: palette.surface, paddingBottom: Math.max(insets.bottom, 16) }]}
-          onPress={() => undefined}
         >
           <Text style={[styles.title, { color: palette.text }]}>{titles[kind]}</Text>
+          <OptionContent virtualized={kind === "photos"}>
           {kind === "photos" ? (
             <>
               <Text style={[styles.orderNotice, { color: palette.muted }]}>
@@ -278,6 +285,7 @@ export function BodyFrameVideoOptionsSheet({
             {selectedCount}장 · 예상 {getBodyFrameVideoDuration(selectedCount, draftOptions.interval)}초
           </Text>
           {kind === "ratio" ? <Text style={{ color: palette.muted }}>사진은 선택한 화면 비율에 맞춰 잘릴 수 있습니다.</Text> : null}
+          </OptionContent>
           <View style={styles.actions}>
             <Pressable accessibilityRole="button" style={[styles.footerButton, { borderColor: palette.line }]} onPress={onCancel}>
               <Text style={{ color: palette.text }}>취소</Text>
@@ -286,10 +294,25 @@ export function BodyFrameVideoOptionsSheet({
               <Text style={{ color: palette.inverse }}>적용</Text>
             </Pressable>
           </View>
-        </Pressable>
-      </Pressable>
+        </View>
+      </View>
       </KeyboardAvoidingView>
     </Modal>
+  );
+}
+
+function OptionContent({ virtualized, children }: { virtualized: boolean; children: ReactNode }) {
+  if (virtualized) return <View style={[styles.optionContent, styles.optionScrollContent]}>{children}</View>;
+  return (
+    <ScrollView
+      style={styles.optionContent}
+      contentContainerStyle={styles.optionScrollContent}
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag"
+      nestedScrollEnabled
+    >
+      {children}
+    </ScrollView>
   );
 }
 
@@ -309,6 +332,8 @@ const styles = StyleSheet.create({
     borderTopRightRadius: bodyFrameDesign.bottomSheetRadius
   },
   title: { fontSize: 20, fontWeight: "600" },
+  optionContent: { flexShrink: 1 },
+  optionScrollContent: { gap: 16 },
   orderNotice: { fontSize: 12, lineHeight: 18 },
   overlaySection: { gap: 10 },
   groupLabel: { marginTop: 4, fontSize: 12, fontWeight: "600" },

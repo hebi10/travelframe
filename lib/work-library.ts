@@ -10,6 +10,13 @@ const IMAGE_BUNDLE_STORAGE_KEY = "travel-frame.image-bundles.v1";
 const IMAGE_BUNDLE_DELETION_MARKER_KEY = "travel-frame.image-bundle-deletion-markers.v1";
 const IMAGE_BUNDLE_DIRECTORY = "image-bundles/";
 
+let mutationChain = Promise.resolve();
+const runImageWorkMutation = async <T>(operation: () => Promise<T>) => {
+  const run = mutationChain.then(operation, operation);
+  mutationChain = run.then(() => undefined, () => undefined);
+  return run;
+};
+
 const createWorkId = () =>
   `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
@@ -145,7 +152,7 @@ export const getDeletedImageWorkIds = async () => {
   return parseDeletedImageWorkIds(value);
 };
 
-export const recordImageWorkLocalDeletion = async (id: string) => {
+const recordImageWorkLocalDeletionUnlocked = async (id: string) => {
   const deletedImageWorkIds = await getDeletedImageWorkIds();
   deletedImageWorkIds.add(id);
   await localStorageAdapter.setItem(
@@ -163,17 +170,17 @@ export const getImageBundleWorkById = async (id: string) => {
   return item ? restoreImageBundleWorkIfNeeded(item) : null;
 };
 
-export const replaceImageBundleWorksFromBackup = async (items: ImageBundleWorkItem[]) => {
+export const replaceImageBundleWorksFromBackup = async (items: ImageBundleWorkItem[]) => runImageWorkMutation(async () => {
   await writeImageBundles(items);
   return getImageBundleWorks();
-};
+});
 
 export const saveImageBundleWork = async (
   item: Omit<ImageBundleWorkItem, "id" | "createdAt" | "title" | "kind"> & {
     title?: string;
   },
   options: { localImageLimit?: number } = {}
-) => {
+) => runImageWorkMutation(async () => {
   const items = await getImageBundleWorks();
   assertLocalLibraryCapacity({
     currentCount: items.length,
@@ -190,14 +197,14 @@ export const saveImageBundleWork = async (
 
   await writeImageBundles([savedItem, ...items]);
   return savedItem;
-};
+});
 
 export const updateImageBundleWork = async (
   id: string,
   updates: Partial<
     Omit<ImageBundleWorkItem, "id" | "kind" | "createdAt">
   >
-) => {
+) => runImageWorkMutation(async () => {
   const items = await getImageBundleWorks();
   let updatedItem: ImageBundleWorkItem | null = null;
   const nextItems = items.map((item) => {
@@ -222,9 +229,12 @@ export const updateImageBundleWork = async (
 
   await writeImageBundles(nextItems);
   return updatedItem;
-};
+});
 
-export const restoreImageBundleWorkIfNeeded = async (work: ImageBundleWorkItem) => {
+export const restoreImageBundleWorkIfNeeded = async (work: ImageBundleWorkItem) => runImageWorkMutation(async () => {
+  const current = (await getImageBundleWorks()).find(item => item.id === work.id);
+  if (!current || (await getDeletedImageWorkIds()).has(work.id)) return work;
+  work = current;
   if (work.localFileStatus !== "cloud_only" && !work.imageUris.some(isRemoteUri)) {
     return work;
   }
@@ -261,12 +271,12 @@ export const restoreImageBundleWorkIfNeeded = async (work: ImageBundleWorkItem) 
     items.map((item) => (item.id === work.id ? restoredWork : item))
   );
   return restoredWork;
-};
+});
 
 export const markImageBundleCloudOnly = async (
   id: string,
   backup: Partial<ImageBundleWorkItem> | null
-) => {
+) => runImageWorkMutation(async () => {
   const items = await getImageBundleWorks();
   const work = items.find((item) => item.id === id);
   const remoteImageUris = backup?.imageUris?.filter((uri) => isRemoteUri(uri)) ?? [];
@@ -293,10 +303,10 @@ export const markImageBundleCloudOnly = async (
   );
 
   return nextWork;
-};
+});
 
-export const deleteImageBundleWork = async (id: string) => {
-  await recordImageWorkLocalDeletion(id);
+export const deleteImageBundleWork = async (id: string) => runImageWorkMutation(async () => {
+  await recordImageWorkLocalDeletionUnlocked(id);
   const items = await getImageBundleWorks();
   const work = items.find((item) => item.id === id);
   if (work) {
@@ -312,4 +322,23 @@ export const deleteImageBundleWork = async (id: string) => {
     );
   }
   await writeImageBundles(items.filter((item) => item.id !== id));
-};
+});
+
+export const recordImageWorkLocalDeletion = (id: string) =>
+  runImageWorkMutation(() => recordImageWorkLocalDeletionUnlocked(id));
+
+// Read local state only after earlier mutations have committed. Local edits win;
+// deletion markers prevent a later cloud restore from resurrecting deleted items.
+export const mergeImageBundleWorksFromBackup = (incoming: ImageBundleWorkItem[]) =>
+  runImageWorkMutation(async () => {
+    const current = await getImageBundleWorks();
+    const deleted = await getDeletedImageWorkIds();
+    const ids = new Set(current.map(item => item.id));
+    const added = incoming.filter(item => {
+      if (ids.has(item.id) || deleted.has(item.id)) return false;
+      ids.add(item.id);
+      return true;
+    });
+    if (added.length) await writeImageBundles([...current, ...added]);
+    return added;
+  });

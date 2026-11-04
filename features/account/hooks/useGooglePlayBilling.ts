@@ -2,7 +2,6 @@ import {
   ErrorCode,
   fetchProducts as fetchStoreProducts,
   getAvailablePurchases,
-  type Product,
   type ProductSubscription,
   type Purchase,
   useIAP
@@ -12,10 +11,8 @@ import { Alert, Platform } from "react-native";
 import type { User } from "firebase/auth";
 
 import {
-  GOOGLE_PLAY_ONE_TIME_PRODUCT_IDS,
   GOOGLE_PLAY_PRODUCT_IDS,
   GOOGLE_PLAY_SUBSCRIPTION_IDS,
-  getGooglePlayProductType,
   getGooglePlayStorePrice,
   getGooglePlaySubscriptionOfferToken,
   isGooglePlayProductId,
@@ -43,7 +40,6 @@ export function useGooglePlayBilling({
 }) {
   const [isRestoring, setIsRestoring] = useState(false);
   const [billingMessage, setBillingMessage] = useState<string | null>(null);
-  const [products, setProducts] = useState<Product[]>([]);
   const [subscriptions, setSubscriptions] = useState<ProductSubscription[]>([]);
   const [productLoadError, setProductLoadError] = useState<string | null>(null);
   const [isLoadingProducts, setIsLoadingProducts] = useState(false);
@@ -140,15 +136,12 @@ export function useGooglePlayBilling({
     setProductLoadError(null);
     // Use the promise API so expected store availability errors are handled here,
     // instead of useIAP's fetch wrapper also reporting them as console errors.
-    const results = await Promise.allSettled([
-      fetchStoreProducts({ skus: [...GOOGLE_PLAY_ONE_TIME_PRODUCT_IDS], type: "in-app" }),
+    const [recurring] = await Promise.allSettled([
       fetchStoreProducts({ skus: [...GOOGLE_PLAY_SUBSCRIPTION_IDS], type: "subs" })
     ]);
     if (version !== productQueryVersionRef.current) return;
-    const [oneTime, recurring] = results;
-    setProducts(oneTime.status === "fulfilled" ? (oneTime.value ?? []) as Product[] : []);
     setSubscriptions(recurring.status === "fulfilled" ? (recurring.value ?? []) as ProductSubscription[] : []);
-    if (results.some(result => result.status === "rejected" || !result.value?.length)) {
+    if (recurring.status === "rejected" || !recurring.value?.length) {
       setProductLoadError("Google Play 상품 정보를 불러오지 못했습니다. 로그인과 무료 기능은 계속 사용할 수 있습니다. 잠시 후 다시 시도해주세요.");
     }
     setIsLoadingProducts(false);
@@ -156,7 +149,6 @@ export function useGooglePlayBilling({
 
   useEffect(() => {
     const queryVersion = productQueryVersionRef;
-    setProducts([]);
     setSubscriptions([]);
     setProductLoadError(null);
     setBillingMessage(null);
@@ -181,6 +173,9 @@ export function useGooglePlayBilling({
       if (Platform.OS !== "android") {
         throw new Error("Google Play 결제는 Android 앱에서만 사용할 수 있습니다.");
       }
+      if (productId === "ad_remove") {
+        throw new Error("광고 제거 상품의 신규 판매가 종료되었습니다. 기존 구매는 구매 복원으로 이용할 수 있습니다.");
+      }
       if (!user) {
         throw new Error("로그인 후 결제할 수 있습니다.");
       }
@@ -191,107 +186,60 @@ export function useGooglePlayBilling({
         throw new Error("이미 진행 중인 결제가 있습니다.");
       }
 
-      const type = getGooglePlayProductType(productId);
-      if (type === "in-app" && !products.some(product => product.id === productId)) {
-        throw new Error("Google Play 상품 정보를 먼저 불러와주세요. 상품 다시 불러오기를 눌러 재시도할 수 있습니다.");
+      const availablePurchases = await getAvailablePurchases({
+        includeSuspendedAndroid: false
+      });
+      const subscriptionProductIds = new Set<string>(GOOGLE_PLAY_SUBSCRIPTION_IDS);
+      const currentSubscriptionPurchase = availablePurchases.find(
+        (purchase) =>
+          purchase.productId !== productId &&
+          subscriptionProductIds.has(purchase.productId) &&
+          purchase.purchaseState === "purchased" &&
+          Boolean(purchase.purchaseToken)
+      ) ?? null;
+
+      const subscription = subscriptionsById.get(productId);
+      const offerToken = getGooglePlaySubscriptionOfferToken(subscription);
+      if (!offerToken) {
+        throw new Error("Google Play 구독 상품의 구매 옵션을 찾지 못했습니다.");
       }
-      const availablePurchases =
-        type === "subs"
-          ? await getAvailablePurchases({
-              includeSuspendedAndroid: false
-            })
-          : [];
-      const subscriptionProductIds = new Set([
-        "creator_monthly",
-        "plus_monthly",
-        "expert_monthly"
-      ]);
-      const currentSubscriptionPurchase =
-        type === "subs"
-          ? availablePurchases.find(
-              (purchase) =>
-                purchase.productId !== productId &&
-                subscriptionProductIds.has(purchase.productId) &&
-                purchase.purchaseState === "purchased" &&
-                Boolean(purchase.purchaseToken)
-            ) ?? null
-          : null;
 
-      let request:
-        | {
-            type: "in-app";
-            request: {
-              google: {
-                skus: string[];
-                obfuscatedAccountId: string;
-              };
-            };
-          }
-        | {
-            type: "subs";
-            request: {
-              google: {
-                skus: string[];
-                subscriptionOffers: { sku: string; offerToken: string }[];
-                obfuscatedAccountId: string;
-              };
-            };
-          };
-
-      if (type === "subs") {
-        const subscription = subscriptionsById.get(productId);
-        const offerToken = getGooglePlaySubscriptionOfferToken(subscription);
-        if (!offerToken) {
-          throw new Error("Google Play 구독 상품의 구매 옵션을 찾지 못했습니다.");
+      if (currentSubscriptionPurchase?.purchaseToken) {
+        const confirmed = await new Promise<boolean>((resolve) => {
+          Alert.alert(
+            "구독 플랜 변경",
+            "결제가 완료되면 새 플랜의 기능과 클라우드 백업 한도가 즉시 적용됩니다. 낮은 플랜으로 변경할 때도 동일합니다. 남은 결제 금액은 새 플랜의 이용 기간으로 환산되며 다음 결제일이 달라질 수 있습니다. 정확한 금액과 결제일은 다음 Google Play 화면에서 확인해 주세요.",
+            [
+              { text: "취소", style: "cancel", onPress: () => resolve(false) },
+              { text: "변경 계속", onPress: () => resolve(true) }
+            ],
+            { cancelable: true, onDismiss: () => resolve(false) }
+          );
+        });
+        if (!confirmed) {
+          throw new Error("구독 변경을 취소했습니다.");
         }
+      }
 
-        if (currentSubscriptionPurchase?.purchaseToken) {
-          const confirmed = await new Promise<boolean>((resolve) => {
-            Alert.alert(
-              "구독 플랜 변경",
-              "결제가 완료되면 새 플랜의 기능과 클라우드 백업 한도가 즉시 적용됩니다. 낮은 플랜으로 변경할 때도 동일합니다. 남은 결제 금액은 새 플랜의 이용 기간으로 환산되며 다음 결제일이 달라질 수 있습니다. 정확한 금액과 결제일은 다음 Google Play 화면에서 확인해 주세요.",
-              [
-                { text: "취소", style: "cancel", onPress: () => resolve(false) },
-                { text: "변경 계속", onPress: () => resolve(true) }
-              ],
-              { cancelable: true, onDismiss: () => resolve(false) }
-            );
-          });
-          if (!confirmed) {
-            throw new Error("구독 변경을 취소했습니다.");
-          }
-        }
-
-        request = {
-          type: "subs",
-          request: {
-            google: {
-              skus: [productId],
-              subscriptionOffers: [{ sku: productId, offerToken }],
-              obfuscatedAccountId: user.uid,
-              ...(currentSubscriptionPurchase?.purchaseToken
-                ? {
-                    purchaseToken: currentSubscriptionPurchase.purchaseToken,
-                    subscriptionProductReplacementParams: {
-                      oldProductId: currentSubscriptionPurchase.productId,
-                      replacementMode: "with-time-proration" as const
-                    }
+      const request = {
+        type: "subs" as const,
+        request: {
+          google: {
+            skus: [productId],
+            subscriptionOffers: [{ sku: productId, offerToken }],
+            obfuscatedAccountId: user.uid,
+            ...(currentSubscriptionPurchase?.purchaseToken
+              ? {
+                  purchaseToken: currentSubscriptionPurchase.purchaseToken,
+                  subscriptionProductReplacementParams: {
+                    oldProductId: currentSubscriptionPurchase.productId,
+                    replacementMode: "with-time-proration" as const
                   }
-                : {})
-            }
+                }
+              : {})
           }
-        };
-      } else {
-        request = {
-          type: "in-app",
-          request: {
-            google: {
-              skus: [productId],
-              obfuscatedAccountId: user.uid
-            }
-          }
-        };
-      }
+        }
+      };
 
       setBillingMessage(null);
       await new Promise<void>((resolve, reject) => {
@@ -304,7 +252,7 @@ export function useGooglePlayBilling({
         });
       });
     },
-    [connected, products, requestPurchase, subscriptionsById, user]
+    [connected, requestPurchase, subscriptionsById, user]
   );
 
   const restorePurchases = useCallback(async () => {
@@ -351,10 +299,10 @@ export function useGooglePlayBilling({
     (productId: GooglePlayProductId) =>
       getGooglePlayStorePrice({
         productId,
-        products,
+        products: [],
         subscriptions
       }),
-    [products, subscriptions]
+    [subscriptions]
   );
 
   return {

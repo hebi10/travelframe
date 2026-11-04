@@ -23,6 +23,7 @@ import {
   getExposureTrackXFromControlX
 } from "@/features/camera/camera-screen.helpers";
 import { styles } from "@/features/camera/camera-screen.styles";
+import { getAccessibleSliderValue } from "@/features/camera/slider-accessibility";
 import {
   GUIDE_SIZE_MAX,
   GUIDE_SIZE_MIN,
@@ -410,6 +411,20 @@ export function SmoothValueSlider({
   const thumbTranslateX = useDerivedValue(() => thumbX.value - 9);
   const previewValue = onChange ?? onCommit;
   const valueLabel = formatValue ? formatValue(value) : `${Math.round(value)}%`;
+  const sliderAccessibilityProps = {
+    accessible: true,
+    accessibilityRole: "adjustable" as const,
+    accessibilityLabel: label,
+    accessibilityValue: { min, max, now: value, text: valueLabel },
+    accessibilityActions: [{ name: "increment" }, { name: "decrement" }],
+    onAccessibilityAction: (event: { nativeEvent: { actionName: string } }) => {
+      const action = event.nativeEvent.actionName;
+      if (action !== "increment" && action !== "decrement") return;
+      const nextValue = getAccessibleSliderValue(value, min, max, action);
+      onChange?.(nextValue);
+      onCommit(nextValue);
+    }
+  };
 
   useEffect(() => {
     if (trackWidth <= 0) {
@@ -483,6 +498,7 @@ export function SmoothValueSlider({
           </Text>
           <GestureDetector gesture={sliderGesture}>
             <Animated.View
+              {...sliderAccessibilityProps}
               collapsable={false}
               style={[styles.sizeTrack, styles.compactSizeTrack]}
               onLayout={(event) => setTrackWidth(event.nativeEvent.layout.width)}
@@ -535,6 +551,7 @@ export function SmoothValueSlider({
       </View>
       <GestureDetector gesture={sliderGesture}>
         <Animated.View
+          {...sliderAccessibilityProps}
           collapsable={false}
           style={styles.sizeTrack}
           onLayout={(event) => setTrackWidth(event.nativeEvent.layout.width)}

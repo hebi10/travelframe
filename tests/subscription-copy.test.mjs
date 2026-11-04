@@ -18,12 +18,9 @@ const requiredCopy = [
       'label="현재 기록"',
       'SectionBlock title="클라우드 백업"',
       'SectionBlock title="플랜 및 결제"',
-      '"구독 포함"',
       '"확인 중..."',
-      '"구매하기"',
       '"구독하기"',
       "구독이 활성화되었습니다.",
-      "광고 제거 구매를 확인했습니다.",
       "getStorePrice"
     ]
   },
@@ -38,7 +35,6 @@ const requiredCopy = [
       'price: "6,000원"',
       "프로젝트 수 무제한",
       "프로젝트당 사진 최대 365장",
-      "프로젝트 최대 2개",
       "프로젝트당 사진 최대 100장",
       "클라우드 백업 프로젝트 1개",
       "클라우드 백업 프로젝트 최대 3개",
@@ -48,7 +44,7 @@ const requiredCopy = [
   },
   {
     file: "components/ad-banner.tsx",
-    snippets: ["광고 제거 또는 구독 이용 시 표시되지 않습니다."]
+    snippets: ["구독 중이거나 기존 광고 제거 구매가 있으면 표시되지 않습니다."]
   }
 ];
 
