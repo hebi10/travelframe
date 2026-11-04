@@ -16,7 +16,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { bodyFrameDesign, bodyFrameTypography } from "@/constants/app-theme";
+import { bodyFrameAccent, bodyFrameDesign, bodyFrameTypography } from "@/constants/app-theme";
 import {
   getBodyProjectProgressSummary,
   selectActiveBodyProject
@@ -51,7 +51,9 @@ const formatDate = (value: string) =>
 
 export default function BodyFrameVideoHomeScreen() {
   const insets = useSafeAreaInsets();
-  const { palette } = useAppAppearance();
+  const { palette, effectiveThemeMode } = useAppAppearance();
+  const primaryColor = effectiveThemeMode === "dark" ? bodyFrameAccent : palette.text;
+  const primaryTextColor = effectiveThemeMode === "dark" ? "#0B0B0C" : palette.inverse;
   const { isLoggedIn, subscription } = useAuth();
   const planEntitlements = useMemo(
     () => getPlanEntitlements({ isLoggedIn, subscription }),
@@ -180,13 +182,13 @@ export default function BodyFrameVideoHomeScreen() {
             style={[
               styles.primaryButton,
               {
-                backgroundColor: palette.text,
+                backgroundColor: primaryColor,
                 opacity: activeProject ? 1 : 0.4
               }
             ]}
           >
-            <Feather name="play" size={16} color={palette.inverse} />
-            <Text style={[styles.primaryButtonText, { color: palette.inverse }]}>
+            <Feather name="play" size={16} color={primaryTextColor} />
+            <Text style={[styles.primaryButtonText, { color: primaryTextColor }]}>
               영상 만들기
             </Text>
           </Pressable>

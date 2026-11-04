@@ -559,19 +559,19 @@ const styles = StyleSheet.create({
     maxWidth: bodyFrameDesign.contentMaxWidth,
     alignSelf: "center",
     paddingHorizontal: bodyFrameDesign.horizontalPadding,
-    gap: bodyFrameDesign.sectionGap
+    gap: 22
   },
   header: {
     gap: 6
   },
   settingRow: {
-    minHeight: 64,
+    minHeight: 60,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: 12,
     paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingVertical: 9,
     borderWidth: bodyFrameDesign.borderWidth,
     borderRadius: bodyFrameDesign.cardRadius
   },

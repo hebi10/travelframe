@@ -20,7 +20,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppGuideOverlay } from "@/components/app-guide-overlay";
-import { bodyFrameDesign, bodyFrameTypography } from "@/constants/app-theme";
+import { bodyFrameAccent, bodyFrameDesign, bodyFrameTypography } from "@/constants/app-theme";
 import { BodyFrameProjectSwitcher } from "@/features/camera/BodyFrameProjectSwitcher";
 import { useAuth } from "@/lib/auth-context";
 import {
@@ -76,7 +76,9 @@ export default function BodyFrameRecordsScreen() {
   const { width: windowWidth } = useWindowDimensions();
   const contentWidth = Math.min(windowWidth, bodyFrameDesign.contentMaxWidth) - bodyFrameDesign.horizontalPadding * 2;
   const projectCardWidth = Math.max(0, (contentWidth - 12) / 2);
-  const { palette } = useAppAppearance();
+  const { palette, effectiveThemeMode } = useAppAppearance();
+  const highlightColor = effectiveThemeMode === "dark" ? bodyFrameAccent : palette.text;
+  const coverWidth = Math.min(160, Math.max(120, Math.round(contentWidth * 0.36)));
   const { isLoggedIn, subscription } = useAuth();
   const planEntitlements = useMemo(
     () => getPlanEntitlements({ isLoggedIn, subscription }),
@@ -289,7 +291,8 @@ export default function BodyFrameRecordsScreen() {
                   onPress={() => void openProject(project)}
                   style={({ pressed }) => [
                     styles.projectCard,
-                     { width: projectCardWidth },
+                     { width: cards.length === 1 ? contentWidth : projectCardWidth },
+                    cards.length === 1 && styles.singleProjectCard,
                     {
                       backgroundColor: palette.surface,
                       borderColor: palette.line,
@@ -300,6 +303,7 @@ export default function BodyFrameRecordsScreen() {
                   <View
                     style={[
                       styles.coverFrame,
+                      cards.length === 1 && { width: coverWidth },
                       { backgroundColor: palette.surfaceStrong }
                     ]}
                   >
@@ -319,7 +323,7 @@ export default function BodyFrameRecordsScreen() {
                     )}
                   </View>
 
-                  <View style={styles.projectCopy}>
+                  <View style={[styles.projectCopy, cards.length === 1 && styles.singleProjectCopy]}>
                     <Text
                       numberOfLines={1}
                       style={[styles.projectName, { color: palette.text }]}
@@ -347,8 +351,8 @@ export default function BodyFrameRecordsScreen() {
                         style={[
                           styles.progressFill,
                           {
-                            backgroundColor: palette.text,
-                            width: `${progressPercent}%`
+                            backgroundColor: highlightColor,
+                             width: `${progressPercent}%`
                           }
                         ]}
                       />
@@ -476,6 +480,14 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     borderWidth: bodyFrameDesign.borderWidth,
     borderRadius: bodyFrameDesign.cardRadius
+  },
+  singleProjectCard: {
+    flexDirection: "row"
+  },
+  singleProjectCopy: {
+    flex: 1,
+    justifyContent: "center",
+    padding: 16
   },
   coverFrame: {
     width: "100%",
