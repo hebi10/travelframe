@@ -1,0 +1,171 @@
+name: Android signed Play AAB
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact reviewed app source commit (40 hexadecimal characters)
+        required: true
+        type: string
+      version_code:
+        description: New versionCode greater than every version already uploaded to Play
+        required: true
+        type: string
+      last_play_version_code:
+        description: Latest versionCode confirmed in Play Console across all tracks
+        required: true
+        default: '26092622'
+        type: string
+      version_name:
+        description: Release version name (three numeric parts)
+        required: true
+        default: '1.0.32'
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-play-aab
+  cancel-in-progress: false
+
+jobs:
+  signed-aab:
+    name: Build verified Play upload bundle
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      BUILD_WORKFLOW_SHA: ${{ github.workflow_sha }}
+      EXPO_PUBLIC_FIREBASE_API_KEY: ${{ secrets.EXPO_PUBLIC_FIREBASE_API_KEY }}
+      EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN }}
+      EXPO_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.EXPO_PUBLIC_FIREBASE_PROJECT_ID }}
+      EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET }}
+      EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
+      EXPO_PUBLIC_FIREBASE_APP_ID: ${{ secrets.EXPO_PUBLIC_FIREBASE_APP_ID }}
+      EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID: ${{ secrets.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID }}
+    steps:
+      - name: Initialize temporary build paths
+        shell: bash
+        run: |
+          printf 'SOURCE_DIR=%s/source\n' "$GITHUB_WORKSPACE" >> "$GITHUB_ENV"
+          printf 'AAB_BUILD_INPUTS=%s/play-aab-inputs.json\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
+          printf 'AAB_ARTIFACT_DIR=%s/play-aab-artifacts\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
+          printf 'BUNDLETOOL_JAR=%s/bundletool-all-1.18.3.jar\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
+
+      - name: Checkout trusted workflow tools
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: build-tools
+          persist-credentials: false
+
+      - name: Require a full source commit SHA
+        shell: bash
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          if [[ ! "$SOURCE_SHA" =~ ^[0-9a-fA-F]{40}$ ]]; then
+            echo 'source_sha must be a full 40-character commit SHA' >&2
+            exit 1
+          fi
+
+      - name: Checkout exact app source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha }}
+          path: source
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: source/package-lock.json
+
+      - name: Validate release inputs and set build version
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          VERSION_CODE: ${{ inputs.version_code }}
+          LAST_PLAY_VERSION_CODE: ${{ inputs.last_play_version_code }}
+          VERSION_NAME: ${{ inputs.version_name }}
+          ANDROID_UPLOAD_CERT_SHA256: ${{ vars.ANDROID_UPLOAD_CERT_SHA256 }}
+        run: node build-tools/scripts/prepare-play-aab.mjs inputs
+
+      - name: Require existing upload-key secrets before building
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: node build-tools/scripts/prepare-play-aab.mjs check-signing
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Test release preparation and signature rejection
+        working-directory: build-tools
+        run: node --test tests/play-aab-build.test.mjs tests/play-aab-signature.test.mjs
+
+      - name: Download and verify pinned official bundletool
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 --proto '=https' --tlsv1.2 \
+            https://github.com/google/bundletool/releases/download/1.18.3/bundletool-all-1.18.3.jar \
+            --output "$BUNDLETOOL_JAR"
+          printf '%s  %s\n' a099cfa1543f55593bc2ed16a70a7c67fe54b1747bb7301f37fdfd6d91028e29 "$BUNDLETOOL_JAR" | sha256sum --check --status
+
+      - name: Install exact app dependencies
+        working-directory: source
+        run: npm ci
+
+      - name: Generate clean Android project
+        working-directory: source
+        run: npm run android:prebuild:ci
+
+      - name: Verify release source and app regressions
+        working-directory: source
+        run: |
+          npm run release:verify
+          npm run typecheck
+          npm run format:check
+          npm test
+
+      - name: Match existing Play upload certificate and configure release signing
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: node build-tools/scripts/prepare-play-aab.mjs signing
+
+      - name: Build signed release AAB
+        working-directory: source/android
+        env:
+          NODE_ENV: production
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          chmod +x ./gradlew
+          ./gradlew --no-daemon --max-workers=2 --console=plain :app:bundleRelease
+
+      - name: Verify AAB contents, signer, version and R8 mapping
+        run: node build-tools/scripts/prepare-play-aab.mjs verify
+
+      - name: Upload verified Play bundle and provenance
+        uses: actions/upload-artifact@v4
+        with:
+          name: body-frame-play-aab-${{ inputs.version_code }}-${{ github.run_id }}
+          path: ${{ env.AAB_ARTIFACT_DIR }}/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Remove temporary upload key
+        if: always()
+        shell: bash
+        run: rm -rf -- "$RUNNER_TEMP/body-frame-upload-key"
