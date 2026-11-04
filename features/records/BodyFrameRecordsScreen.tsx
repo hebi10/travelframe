@@ -297,7 +297,8 @@ export default function BodyFrameRecordsScreen() {
                   onPress={() => void openProject(project)}
                   style={({ pressed }) => [
                     styles.projectCard,
-                     { width: cards.length === 1 ? contentWidth : projectCardWidth },
+                     { width: projectCardWidth },
+                    cards.length === 1 && { width: contentWidth },
                     cards.length === 1 && styles.singleProjectCard,
                     {
                       backgroundColor: palette.surface,
