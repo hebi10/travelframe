@@ -71,6 +71,8 @@ Planning creates a temporary edit and reads `edits.tracks.list`, `edits.bundles.
 
 The logical internal choice requires `PLAY_INTERNAL_TRACK` to be `internal` or `qa` and that exact name to exist once in `edits.tracks.list`. The closed choice requires exact `alpha` to exist. No track is created and no custom name, form-factor prefix or production alias is guessed.
 
+Both planning and the fresh publish edit check the selected track before any bundle upload or track update. An existing draft with version codes or saved metadata, an `inProgress`/`halted` release, an unknown status or malformed release data blocks the run so existing work is preserved. This applies equally to automatic internal and manual closed releases. Empty tracks and completed releases with valid version codes are allowed. The only allowed draft shell has `status: draft`, absent/empty `versionCodes`, and no other fields; a named draft or saved release notes remain protected. Inventory mode only inspects metadata and does not require the target to be publishable. A blocked run requires the existing work to be resolved deliberately in Play Console before starting a new release; the workflow never clears it or switches tracks.
+
 After independently verifying the downloaded AAB, publishing starts a **new** edit, rechecks all current versions and track mapping, then:
 
 1. Uploads the verified AAB through a resumable session. Only documented Google API hosts and the exact package/edit/bundle upload path are allowed for the session URL; redirects are rejected. A broken transfer fails the run rather than blindly repeating it.
@@ -103,7 +105,7 @@ The separate receipt artifact records public package/track/version/hash and comm
 ## Validation and limits
 
 ```bash
-node --test tests/play-aab-build.test.mjs tests/play-aab-signature.test.mjs tests/play-publish.test.mjs tests/play-source.test.mjs
+node --test tests/play-aab-build.test.mjs tests/play-aab-signature.test.mjs tests/play-publish.test.mjs tests/play-release-state.test.mjs tests/play-source.test.mjs
 ```
 
 Signature tests use disposable test-only keys in temporary directories, deleted afterward; they cannot be selected by the production path. Publisher tests use mocked HTTP responses and never authenticate or change Play. Production signing, actual API permission, first upload and physical-device sign-in/billing/ad behavior remain unverified until the real configuration/key and a successful run exist. A green repository Quality run alone does not prove deployment or device QA.

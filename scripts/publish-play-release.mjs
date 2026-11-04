@@ -36,7 +36,26 @@ export function resolveTrack(logicalTrack, internalTrack, tracks) {
   return apiTrack;
 }
 
+function requireReplaceableTarget(tracks, apiTrack) {
+  const target = tracks.find((track) => track.track === apiTrack);
+  const releases = target.releases === undefined ? [] : target.releases;
+  const blocked = () => { throw new Error("Target test track contains an existing draft, staged, halted or unknown release; preserve it in Play Console before publishing"); };
+  if (!Array.isArray(releases)) blocked();
+  for (const release of releases) {
+    if (!release || typeof release !== "object" || Array.isArray(release)) blocked();
+    const codes = release.versionCodes === undefined ? [] : release.versionCodes;
+    if (!Array.isArray(codes)) blocked();
+    if (release.status === "completed" && codes.length > 0) {
+      codes.forEach(version);
+      continue;
+    }
+    if (release.status === "draft" && codes.length === 0 && Object.keys(release).every((field) => ["status", "versionCodes"].includes(field))) continue;
+    blocked();
+  }
+}
+
 function version(value) {
+  if (typeof value !== "string" && typeof value !== "number") throw new Error("Invalid Play versionCode");
   const text = String(value);
   if (!/^[1-9]\d{0,9}$/.test(text) || Number(text) > MAXIMUM) throw new Error("Invalid Play versionCode");
   return Number(text);
@@ -101,9 +120,11 @@ export function createPublisher(accessToken, fetchImpl = fetch) {
 
 export async function planRelease(client, request) {
   const snapshot = await client.snapshot();
+  const apiTrack = resolveTrack(request.logicalTrack, request.internalTrack, snapshot.tracks);
+  requireReplaceableTarget(snapshot.tracks, apiTrack);
   const lastPlayVersionCode = maximumVersion(snapshot);
   const inputs = validateBuildInputs({ ...request, versionCode: request.versionCode || String(lastPlayVersionCode + 1), lastPlayVersionCode: String(lastPlayVersionCode) });
-  return { ...inputs, logicalTrack: request.logicalTrack, apiTrack: resolveTrack(request.logicalTrack, request.internalTrack, snapshot.tracks) };
+  return { ...inputs, logicalTrack: request.logicalTrack, apiTrack };
 }
 
 export async function inspectInventory(client) {
@@ -121,6 +142,7 @@ export async function publishRelease(client, plan, aab, mapping, onReceipt = () 
   try {
     const snapshot = await client.readSnapshot(id);
     if (resolveTrack(plan.logicalTrack, plan.logicalTrack === "internal" ? plan.apiTrack : "", snapshot.tracks) !== plan.apiTrack) throw new Error("Test track mapping changed after planning");
+    requireReplaceableTarget(snapshot.tracks, plan.apiTrack);
     if (plan.versionCode <= maximumVersion(snapshot)) throw new Error("Planned versionCode is no longer above every current Play version; rebuild with a fresh plan");
     const bundle = await client.uploadBundle(id, aab);
     if (bundle.versionCode !== plan.versionCode || bundle.sha256?.toLowerCase() !== sha256(aab)) throw new Error("Play uploaded bundle versionCode or SHA-256 hash does not match the verified local AAB");
