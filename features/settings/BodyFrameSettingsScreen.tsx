@@ -565,7 +565,7 @@ const styles = StyleSheet.create({
     gap: 6
   },
   settingRow: {
-    minHeight: 60,
+    minHeight: 64,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
