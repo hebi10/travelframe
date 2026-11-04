@@ -51,7 +51,9 @@ class SignFixture { public static void main(String[] a) throws Exception {
     const normalManifest = '<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.haebi.photoguide" android:versionCode="26092623" android:versionName="1.0.32"><application android:debuggable="false"/></manifest>';
     fs.writeFileSync(manifest, normalManifest);
     const verify = (bundle, expected = fingerprint, overrides = {}) => spawnSync("java", [path.resolve("scripts/VerifyPlayBundle.java"), bundle, expected, manifest, "26092623", "1.0.32"], { encoding: "utf8", env: { ...process.env, ...values, ...overrides } });
+    const verifyApkManifest = () => spawnSync("java", [path.resolve("scripts/VerifyPlayBundle.java"), "--manifest", manifest, "26092623", "1.0.32"], { encoding: "utf8" });
     assert.equal(verify(signed).status, 0);
+    assert.equal(verifyApkManifest().status, 0);
     assert.notEqual(verify(unsigned).status, 0);
     assert.notEqual(verify(signed, "00".repeat(32)).status, 0);
     assert.notEqual(verify(signed, fingerprint, { EXPO_PUBLIC_FIREBASE_APP_ID: "missing-from-bundle" }).status, 0);
@@ -76,6 +78,10 @@ class SignFixture { public static void main(String[] a) throws Exception {
       normalManifest.replace('debuggable="false"', 'testOnly="true"'),
       normalManifest.replace("26092623", "26092622"),
       normalManifest.replace("com.haebi.photoguide", "other.application")
-    ]) { fs.writeFileSync(manifest, change); assert.notEqual(verify(signed).status, 0); }
+    ]) {
+      fs.writeFileSync(manifest, change);
+      assert.notEqual(verify(signed).status, 0);
+      assert.notEqual(verifyApkManifest().status, 0);
+    }
   } finally { fs.rmSync(directory, { recursive: true, force: true }); }
 });
