@@ -25,7 +25,7 @@ const execute = async (oldProductId, productId, confirm = true) => {
   const products = ["creator_monthly", "plus_monthly", "expert_monthly"];
   const context = {
     Platform: { OS: "android" }, user: { uid: "billing-test-user" }, connected: true,
-    pendingPurchaseRef, products: [{ id: "ad_remove" }],
+    pendingPurchaseRef, GOOGLE_PLAY_SUBSCRIPTION_IDS: products,
     subscriptionsById: new Map(products.map(id => [id, { id }])),
     getGooglePlayProductType: id => id === "ad_remove" ? "in-app" : "subs",
     getGooglePlaySubscriptionOfferToken: () => "test-offer",
@@ -83,10 +83,10 @@ await check("new subscription does not send old purchase parameters", async () =
   assert.equal(result.alerts.length, 0);
   assert.equal(result.requests[0].request.google.subscriptionProductReplacementParams, undefined);
 });
-await check("ad removal stays a non-subscription purchase", async () => {
+await check("retired ad removal cannot start a new purchase", async () => {
   const result = await execute(null, "ad_remove");
-  assert.equal(result.error, null);
-  assert.equal(result.requests[0].type, "in-app");
+  assert.match(result.error?.message ?? "", /신규 판매가 종료/);
+  assert.equal(result.requests.length, 0);
   assert.equal(result.alerts.length, 0);
 });
 if (failures) throw new Error(`${failures} billing replacement regressions`);

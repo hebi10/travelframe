@@ -2,6 +2,7 @@ import { AppText as Text } from "@/components/app-text";
 import {
   Modal,
   Pressable,
+  ScrollView,
   StyleSheet,
   View
 } from "react-native";
@@ -75,6 +76,12 @@ export function AppGuideOverlay({
             }
           ]}
         >
+          <ScrollView
+            style={styles.contentScroll}
+            contentContainerStyle={styles.contentScrollContainer}
+            showsVerticalScrollIndicator
+            keyboardShouldPersistTaps="handled"
+          >
           {isWelcome ? (
             <View style={styles.welcomeContent}>
               <Text style={[styles.welcomeTitle, { color: palette.text }]}>
@@ -118,6 +125,7 @@ export function AppGuideOverlay({
               />
             </>
           )}
+          </ScrollView>
         </View>
       </View>
     </Modal>
@@ -132,12 +140,15 @@ const styles = StyleSheet.create({
   },
   modal: {
     width: "100%",
+    maxHeight: "100%",
     maxWidth: 520,
     alignSelf: "center",
     overflow: "hidden",
     borderWidth: 1,
     borderRadius: 10
   },
+  contentScroll: { flexShrink: 1 },
+  contentScrollContainer: { flexGrow: 1 },
   brandBlock: {
     gap: 6,
     paddingHorizontal: 18,

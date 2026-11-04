@@ -10,7 +10,7 @@ for (const snippet of [
   "PHOTO_DELETION_MARKER_KEY",
   "export const recordPhotoLocalDeletion",
   "export const wasPhotoDeletedLocally",
-  "await recordPhotoLocalDeletion(id);"
+  "await recordPhotoLocalDeletionUnlocked(id);"
 ]) {
   assert.ok(
     photoLibrarySource.includes(snippet),
@@ -94,10 +94,12 @@ const restoreStart = backupSource.indexOf("export const restoreCloudBackupToLoca
 const restoreEnd = backupSource.indexOf("export const markBackupExpired", restoreStart);
 assert.ok(restoreStart >= 0 && restoreEnd > restoreStart, "restoreCloudBackupToLocal should exist");
 
-const restoreSource = backupSource.slice(restoreStart, restoreEnd);
+// Filtering moved into the photo mutation queue; the executable storage-safety
+// suite exercises deletion while restore and backup operations are in flight.
+const restoreSource = photoLibrarySource.slice(photoLibrarySource.indexOf("export const mergePhotosFromBackup"));
 assert.ok(
-  restoreSource.includes("const deletedPhotoIds = await getDeletedPhotoIds();") &&
-    restoreSource.includes("!deletedPhotoIds.has(item.id)"),
+  restoreSource.includes("const deleted = await getDeletedPhotoIds();") &&
+    restoreSource.includes("deleted.has(item.id)"),
   "restore should not re-import photos deleted on this device"
 );
 

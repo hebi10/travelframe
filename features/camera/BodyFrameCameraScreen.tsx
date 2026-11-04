@@ -80,6 +80,7 @@ export default function BodyFrameCameraScreen() {
   const [measurementPromptPhotoId, setMeasurementPromptPhotoId] =
     useState<string | null>(null);
   const [poseAlignmentEnabled, setPoseAlignmentEnabled] = useState(false);
+  const [cameraHeaderBottom, setCameraHeaderBottom] = useState<number | null>(null);
   const lastHandledSaveAtRef = useRef(0);
 
   const reloadProjectState = useCallback(async () => {
@@ -336,6 +337,7 @@ export default function BodyFrameCameraScreen() {
   return (
     <View style={styles.screen}>
       <CameraScreen
+        onHeaderBottomChange={setCameraHeaderBottom}
         projectReferenceMode={activeProject?.referenceMode}
         onProjectReferenceModeChange={activeProject ? handleChangeReferenceMode : undefined}
         headerCenter={
@@ -360,7 +362,7 @@ export default function BodyFrameCameraScreen() {
         pointerEvents="box-none"
         style={[
           styles.captureHintWrap,
-          { top: Math.max(insets.top + 64, 76) }
+          { top: cameraHeaderBottom ?? Math.max(insets.top + 64, 76) }
         ]}
       >
         <Text style={styles.captureHint}>{firstPhotoHint}</Text>

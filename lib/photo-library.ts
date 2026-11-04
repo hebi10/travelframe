@@ -12,8 +12,8 @@ import {
 import {
   deleteLocalFile,
   deletePhoto as deleteLegacyPhoto,
-  getPhotos,
-  replacePhotosFromBackup,
+  discardPhotoDraft,
+  updatePhotoMetadata,
   reorderProjectPhotos as reorderLegacyProjectPhotos,
   saveCapturedPhoto as saveLegacyCapturedPhoto
 } from "@/lib/legacy-photo-library";
@@ -67,11 +67,8 @@ const rollbackLegacyProjectDraft = async (photo?: PhotoItem | null) => {
     return;
   }
 
-  const photos = await getPhotos();
-  await replacePhotosFromBackup(
-    photos.filter((item) => item.id !== photo.id)
-  );
-  await cleanupOrphanProjectFiles(photo);
+  const discarded = await discardPhotoDraft(photo.id, photo);
+  if (discarded) await cleanupOrphanProjectFiles(discarded);
 };
 
 export const saveCapturedPhoto = async (
@@ -91,6 +88,7 @@ export const saveCapturedPhoto = async (
   const resolvedSequence = reserved.sequence;
   let legacyPhoto: PhotoItem | null = null;
   let projectPhoto: PhotoItem | null = null;
+  let stagedProjectPhoto: PhotoItem | null = null;
 
   try {
     legacyPhoto = await saveLegacyCapturedPhoto({
@@ -99,6 +97,13 @@ export const saveCapturedPhoto = async (
       projectId: undefined,
       sequence: undefined
     }, { deferProjectOptimization: true });
+    // Make the reservation available to an edit of this visible draft, including
+    // when later project-file storage fails and that newer edit must survive.
+    await updatePhotoMetadata(legacyPhoto.id, {
+      projectId: resolvedProjectId,
+      sequence: resolvedSequence
+    }, legacyPhoto);
+    legacyPhoto = { ...legacyPhoto, projectId: resolvedProjectId, sequence: resolvedSequence };
 
     const stored = await storeBodyFramePhotoFile({
       sourceUri: legacyPhoto.uri,
@@ -108,7 +113,7 @@ export const saveCapturedPhoto = async (
       height: legacyPhoto.height
     });
 
-    projectPhoto = {
+    stagedProjectPhoto = {
       ...legacyPhoto,
       ...stored,
       projectId: resolvedProjectId,
@@ -118,12 +123,10 @@ export const saveCapturedPhoto = async (
       localFileStatus: "available"
     };
 
-    const photos = await getPhotos();
-    await replacePhotosFromBackup(
-      photos.map((photo) =>
-        photo.id === legacyPhoto?.id ? projectPhoto ?? photo : photo
-      )
-    );
+    projectPhoto = await updatePhotoMetadata(legacyPhoto.id, stagedProjectPhoto, legacyPhoto);
+    if (projectPhoto.uri !== stagedProjectPhoto.uri) {
+      await cleanupOrphanProjectFiles(stagedProjectPhoto);
+    }
 
     await updateBodyProject(resolvedProjectId, {
       coverPhotoId: projectPhoto.id
@@ -148,8 +151,8 @@ export const saveCapturedPhoto = async (
     return projectPhoto;
   } catch (error) {
     try {
-      if (projectPhoto) {
-        await cleanupOrphanProjectFiles(projectPhoto);
+      if (stagedProjectPhoto && !projectPhoto) {
+        await cleanupOrphanProjectFiles(stagedProjectPhoto);
       }
       if (legacyPhoto) {
         await rollbackLegacyProjectDraft(legacyPhoto);

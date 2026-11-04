@@ -1,15 +1,15 @@
 import { AppText as Text } from "@/components/app-text";
-import {
-  Image } from "@/components/private-media-image";
 import * as FileSystem from "expo-file-system/legacy";
 import { router,
   useFocusEffect } from "expo-router";
 import { useCallback,
   useMemo,
+  useEffect,
   useRef,
   useState } from "react";
 import {
   ActivityIndicator,
+  AppState,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -27,6 +27,8 @@ import {
   getBodyFrameVideoOverlaySummary,
   getBodyFrameVideoOverlayText,
   getBodyFrameVideoPhotoIndex,
+  getBodyFrameVideoMeasurement,
+  getBodyFrameVideoPreviewTransform,
   selectBodyFrameVideoPhotos,
   BODY_FRAME_VIDEO_TEMPLATE,
   BODY_FRAME_VIDEO_TRANSITION,
@@ -36,6 +38,8 @@ import {
   getBodyFrameVideoPhotos,
   getBodyFrameVideoTotalFrames
 } from "@/lib/body-frame-video";
+import { assertBodyFrameExportActive, createBodyFrameImageReadiness, prepareBodyFrameVideoPhotos, runBodyFrameNativeRecording, withBodyFrameExportTimeout } from "@/lib/body-frame-video-export";
+import { downloadPrivateFile } from "@/lib/private-storage";
 import { selectActiveBodyProject } from "@/lib/body-frame-camera-project";
 import {
   getBodyFrameUpgradeLabel,
@@ -128,39 +132,15 @@ export default function BodyFrameVideoScreen() {
     () => selectBodyFrameVideoPhotos(availablePhotos, selectedIds),
     [availablePhotos, selectedIds]
   );
-  const recordingPhotos = useMemo(
-    () => projectPhotos.map(photo => ({ ...photo, previewUri: photo.uri })),
-    [projectPhotos]
-  );
-  const measurementByPhotoId = useMemo(() => {
-    const map = new Map<string, BodyMeasurementEntry>();
-    measurements.forEach((entry) => {
-      if (entry.photoId) {
-        map.set(entry.photoId, entry);
-      }
-    });
-    return map;
-  }, [measurements]);
-  const measurementBySequence = useMemo(() => {
-    const map = new Map<number, BodyMeasurementEntry>();
-    measurements.forEach((entry) => {
-      if (typeof entry.sequence === "number") {
-        map.set(entry.sequence, entry);
-      }
-    });
-    return map;
-  }, [measurements]);
+  const [recordingPhotos, setRecordingPhotos] = useState<PhotoItem[]>([]);
+  const [previewWidth, setPreviewWidth] = useState(0);
+  const [recordingRunId, setRecordingRunId] = useState("");
+  const exportController = useRef<AbortController | null>(null);
+  const imageReadiness = useRef(createBodyFrameImageReadiness());
+  const [albumRetryUri, setAlbumRetryUri] = useState<string | null>(null);
   const getMeasurementForPhoto = useCallback(
-    (photo?: PhotoItem | null) => {
-      if (!photo) return null;
-      return (
-        measurementByPhotoId.get(photo.id) ??
-        (typeof photo.sequence === "number"
-          ? measurementBySequence.get(photo.sequence) ?? null
-          : null)
-      );
-    },
-    [measurementByPhotoId, measurementBySequence]
+    (photo?: PhotoItem | null) => getBodyFrameVideoMeasurement(photo, measurements),
+    [measurements]
   );
   const outputSize = getBodyFrameVideoOutputSize(videoOptions.ratio, videoOptions.quality);
   const frameAspectRatio = outputSize.width / outputSize.height;
@@ -213,14 +193,18 @@ export default function BodyFrameVideoScreen() {
       }),
     [getMeasurementForPhoto, previewPhoto, videoOptions.overlay]
   );
-  const previewOverlayPositionStyle =
-    videoOptions.overlay.position === "top-left"
-      ? styles.previewOverlayTopLeft
-      : videoOptions.overlay.position === "top-right"
-        ? styles.previewOverlayTopRight
-        : videoOptions.overlay.position === "bottom-left"
-          ? styles.previewOverlayBottomLeft
-          : styles.previewOverlayBottomRight;
+  const currentImageKey = `${recordingRunId}:${recordingFrame.currentPhoto?.id ?? ""}`;
+  const cancelExport = useCallback(() => {
+    if (!exportController.current) return;
+    exportController.current.abort();
+    setMessage("취소를 요청했습니다. 현재 영상 작업이 종료될 때까지 기다려 주세요.");
+  }, []);
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", state => {
+      if (state !== "active") cancelExport();
+    });
+    return () => { subscription.remove(); cancelExport(); };
+  }, [cancelExport]);
 
   const loadActiveProject = useCallback(async () => {
     setIsLoading(true);
@@ -280,23 +264,11 @@ export default function BodyFrameVideoScreen() {
   useFocusEffect(
     useCallback(() => {
       void loadActiveProject();
-    }, [loadActiveProject])
+      return cancelExport;
+    }, [cancelExport, loadActiveProject])
   );
 
-  const preloadProjectPhotos = useCallback(async () => {
-    const uris = recordingPhotos.map((photo) => photo.uri);
-    if (uris.length === 0) {
-      return;
-    }
-
-    try {
-      await Image.prefetch(uris, "memory-disk");
-    } catch {
-      // Preloading is best-effort. The recorder can still resolve the image URI.
-    }
-  }, [recordingPhotos]);
-
-  const recordProjectVideo = useCallback(async () => {
+  const recordProjectVideo = useCallback(async (signal: AbortSignal) => {
     if (!recordingViewAvailable) {
       throw new Error(
         "MP4 저장 기능을 사용할 수 없습니다. 앱을 최신 버전으로 업데이트해 주세요."
@@ -311,42 +283,81 @@ export default function BodyFrameVideoScreen() {
       throw new Error("영상으로 만들 프로젝트 사진이 없습니다.");
     }
 
-    await preloadProjectPhotos();
-    setRecordingFrameIndex(0);
-    await waitForPaint();
+    const runId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const directory = `${FileSystem.cacheDirectory}body-frame-export-${runId}/`;
+    const outputUri = `${FileSystem.cacheDirectory}body-frame-${runId}.mp4`;
+    await FileSystem.makeDirectoryAsync(directory, { intermediates: true });
+    const cleanup = async () => {
+      setRecordingPhotos([]);
+      await FileSystem.deleteAsync(directory, { idempotent: true }).catch(() => undefined);
+      await FileSystem.deleteAsync(outputUri, { idempotent: true }).catch(() => undefined);
+    };
+    let completed = false;
+    try {
+      const stagedPhotos = await prepareBodyFrameVideoPhotos(projectPhotos, async (uri, photoId) => {
+        assertBodyFrameExportActive(signal);
+        const destination = `${directory}${encodeURIComponent(photoId)}-${Math.random().toString(36).slice(2)}.image`;
+        if (/^https?:\/\//i.test(uri)) {
+          await downloadPrivateFile(uri, destination);
+        } else {
+          const info = await FileSystem.getInfoAsync(uri);
+          if (!info.exists || info.isDirectory || !(info.size > 0)) throw new Error("원본 사진 파일을 찾지 못했습니다.");
+          await FileSystem.copyAsync({ from: uri, to: destination });
+        }
+        assertBodyFrameExportActive(signal);
+        const info = await FileSystem.getInfoAsync(destination);
+        if (!info.exists || info.isDirectory || !(info.size > 0)) throw new Error("원본 사진 파일이 비어 있습니다.");
+        return destination;
+      }, signal, (prepared, total) => setExportProgress(5 + Math.round(prepared / total * 15)));
+      imageReadiness.current = createBodyFrameImageReadiness();
+      setRecordingPhotos(stagedPhotos);
+      setRecordingRunId(runId);
+      setRecordingFrameIndex(0);
+      await imageReadiness.current.wait(`${runId}:${stagedPhotos[0].id}`, signal);
+      await withBodyFrameExportTimeout(waitForPaint(), signal, 15_000);
 
-    const outputUri = `${FileSystem.cacheDirectory}body-frame-${Date.now()}.mp4`;
-    const recordedPath = await recorder.record({
-      output: toNativeFilePath(outputUri),
-      fps: BODY_FRAME_VIDEO_FPS,
-      totalFrames,
-      width: outputSize.width,
-      height: outputSize.height,
-      codec: "h264",
-      quality: 0.92,
-      bitrate: BODY_FRAME_VIDEO_BITRATE,
-      keyFrameInterval: 1,
-      onFrame: async ({ frameIndex }) => {
-        setRecordingFrameIndex(frameIndex);
-        await waitForPaint();
-      },
-      onProgress: ({ framesEncoded }) => {
-        setExportProgress(
-          Math.min(84, Math.max(5, Math.round((framesEncoded / totalFrames) * 84)))
-        );
+      const recordedPath = await runBodyFrameNativeRecording(() => recorder.record({
+        output: toNativeFilePath(outputUri),
+        fps: BODY_FRAME_VIDEO_FPS,
+        totalFrames,
+        width: outputSize.width,
+        height: outputSize.height,
+        codec: "h264",
+        quality: 0.92,
+        bitrate: BODY_FRAME_VIDEO_BITRATE,
+        keyFrameInterval: 1,
+        onFrame: async ({ frameIndex }) => {
+          assertBodyFrameExportActive(signal);
+          const photo = stagedPhotos[getBodyFrameVideoPhotoIndex(frameIndex, videoOptions.interval)];
+          const ready = imageReadiness.current.wait(`${runId}:${photo.id}`, signal);
+          setRecordingFrameIndex(frameIndex);
+          await ready;
+          await withBodyFrameExportTimeout(waitForPaint(), signal, 15_000);
+          assertBodyFrameExportActive(signal);
+        },
+        onProgress: ({ framesEncoded }) => {
+          if (signal.aborted) return;
+          setExportProgress(
+            Math.min(84, Math.max(20, 20 + Math.round((framesEncoded / totalFrames) * 64)))
+          );
+        }
+      }), signal, Math.max(60_000, totalFrames * 1_000));
+      assertBodyFrameExportActive(signal);
+
+      const recordedUri = toFileUri(recordedPath);
+      const fileInfo = await FileSystem.getInfoAsync(recordedUri);
+      if (!fileInfo.exists || !(fileInfo.size > 0)) {
+        throw new Error("MP4 파일 생성은 완료됐지만 저장할 파일을 찾지 못했습니다.");
       }
-    });
 
-    const recordedUri = toFileUri(recordedPath);
-    const fileInfo = await FileSystem.getInfoAsync(recordedUri);
-    if (!fileInfo.exists) {
-      throw new Error("MP4 파일 생성은 완료됐지만 저장할 파일을 찾지 못했습니다.");
+      completed = true;
+      return { uri: recordedUri, coverUri: stagedPhotos[0].uri, cleanup };
+    } finally {
+      if (!completed) await cleanup();
     }
-
-    return recordedUri;
   }, [
-    preloadProjectPhotos,
-    projectPhotos.length,
+    projectPhotos,
+    videoOptions.interval,
     recorder,
     recordingViewAvailable,
     outputSize.width,
@@ -355,7 +366,7 @@ export default function BodyFrameVideoScreen() {
   ]);
 
   const createVideo = useCallback(async () => {
-    if (!activeProject || projectPhotos.length === 0 || isExporting) {
+    if (!activeProject || projectPhotos.length === 0 || isExporting || exportController.current) {
       return;
     }
 
@@ -381,6 +392,10 @@ export default function BodyFrameVideoScreen() {
     }
 
     let saved = false;
+    let appSaved = false;
+    let recordingResult: Awaited<ReturnType<typeof recordProjectVideo>> | null = null;
+    const controller = new AbortController();
+    exportController.current = controller;
     try {
       setIsExporting(true);
       setExportProgress(5);
@@ -393,15 +408,15 @@ export default function BodyFrameVideoScreen() {
         limit: planEntitlements.localVideoLimit,
         label: "영상"
       });
-      const videoUri = await recordProjectVideo();
+      assertBodyFrameExportActive(controller.signal);
+      recordingResult = await recordProjectVideo(controller.signal);
+      const videoUri = recordingResult.uri;
       setExportProgress(88);
-      await saveVideoToLibrary(videoUri);
-      setExportProgress(94);
-
-      await saveMadeVideo(
+      assertBodyFrameExportActive(controller.signal);
+      const savedVideo = await saveMadeVideo(
         {
           uri: videoUri,
-          coverUri: previewPhoto?.uri,
+          coverUri: recordingResult.coverUri,
           projectId: activeProject.id,
           title: `${activeProject.name} 변화 영상`,
           ratio: videoOptions.ratio,
@@ -419,6 +434,11 @@ export default function BodyFrameVideoScreen() {
         }
       );
 
+      appSaved = true;
+      await FileSystem.deleteAsync(videoUri, { idempotent: true }).catch(() => undefined);
+      setAlbumRetryUri(savedVideo.uri);
+      setExportProgress(94);
+
       if (!isLoggedIn) {
         const nextUsage = await recordGuestWeeklyVideoExport(
           planEntitlements.weeklyVideoExportLimit
@@ -426,14 +446,21 @@ export default function BodyFrameVideoScreen() {
         setGuestUsage(nextUsage);
       }
 
+      assertBodyFrameExportActive(controller.signal);
+      await saveVideoToLibrary(savedVideo.uri);
+      setAlbumRetryUri(null);
       setExportProgress(100);
       setMessage(
         `${projectPhotos.length}장 · ${formatDuration(totalDuration)} 변화 영상을 Body Frame 앨범에 저장했습니다.`
       );
       saved = true;
     } catch (error) {
-      setMessage(getUserFacingErrorMessage(error, "변화 영상을 만들지 못했습니다."));
+      controller.abort();
+      const detail = getUserFacingErrorMessage(error, "변화 영상을 만들지 못했습니다.");
+      setMessage(appSaved ? `영상은 앱에 저장했습니다. ${detail} 아래에서 앨범 저장을 다시 시도하거나 영상 관리에서 저장해 주세요.` : detail);
     } finally {
+      await recordingResult?.cleanup();
+      if (exportController.current === controller) exportController.current = null;
       setIsExporting(false);
     }
 
@@ -455,7 +482,6 @@ export default function BodyFrameVideoScreen() {
     planEntitlements.localVideoLimit,
     planEntitlements.label,
     planEntitlements.weeklyVideoExportLimit,
-    previewPhoto?.uri,
     projectPhotos,
     recordProjectVideo,
     requestPostSaveAd,
@@ -543,25 +569,31 @@ export default function BodyFrameVideoScreen() {
           ]}
         >
           {previewPhoto ? (
-            <>
-              <Image
-                source={{ uri: previewPhoto.previewUri ?? previewPhoto.uri }}
-                style={styles.previewImage}
-                contentFit="cover"
-                cachePolicy="memory-disk"
-              />
-              {previewOverlayText ? (
-                <Text
-                  numberOfLines={2}
-                  style={[
-                    styles.previewOverlayText,
-                    previewOverlayPositionStyle
-                  ]}
-                >
-                  {previewOverlayText}
-                </Text>
-              ) : null}
-            </>
+            <View style={styles.previewViewport} onLayout={event => setPreviewWidth(event.nativeEvent.layout.width)}>
+              <View style={[styles.previewLogicalCanvas, getBodyFrameVideoPreviewTransform(previewWidth, frameAspectRatio, RECORDING_VIEW_WIDTH)]}>
+                <TripClipRecordingCanvas
+                  frame={{ currentPhoto: previewPhoto, nextPhoto: null, transitionProgress: 0 }}
+                  template={BODY_FRAME_VIDEO_TEMPLATE}
+                  transition={BODY_FRAME_VIDEO_TRANSITION}
+                  showWatermark={planEntitlements.showWatermark}
+                  frameAspectRatio={frameAspectRatio}
+                  guideVisible={false}
+                  guide="circle"
+                  guideSize={44}
+                  guideStrokeWidth={1}
+                  guideColor={DEFAULT_GUIDE_COLOR}
+                  guideOffsetX={0}
+                  guideOffsetY={0}
+                  guideOffsetFrameWidth={0}
+                  guideOffsetFrameHeight={0}
+                  gridGuideLinePositions={defaultGridGuideLinePositions}
+                  guideShapePoints={defaultGuideShapePoints}
+                  photoAdjustments={EMPTY_ADJUSTMENTS}
+                  bodyFrameOverlayText={previewOverlayText}
+                  bodyFrameOverlayPosition={videoOptions.overlay.position}
+                />
+              </View>
+            </View>
           ) : (
             <View style={styles.previewEmpty}>
               <Text style={[styles.previewEmptyText, { color: palette.faint }]}>
@@ -665,6 +697,19 @@ export default function BodyFrameVideoScreen() {
           )}
         </Pressable>
 
+        {isExporting ? (
+          <SummaryRow label="취소" value="영상 만들기 취소" onPress={cancelExport} />
+        ) : albumRetryUri ? (
+          <SummaryRow label="앨범 저장" value="다시 시도" onPress={() => {
+            const uri = albumRetryUri;
+            setIsExporting(true);
+            void saveVideoToLibrary(uri).then(() => {
+              setAlbumRetryUri(null);
+              setMessage("앱에 저장한 영상을 Body Frame 앨범에 저장했습니다.");
+            }).catch(error => setMessage(getUserFacingErrorMessage(error, "앨범 저장을 다시 시도해 주세요.")))
+              .finally(() => setIsExporting(false));
+          }} />
+        ) : null}
         {message ? (
           <Text style={[styles.message, { color: palette.muted }]}>{message}</Text>
         ) : null}
@@ -696,6 +741,9 @@ export default function BodyFrameVideoScreen() {
           >
             <TripClipRecordingCanvas
               frame={recordingFrame}
+              currentImageKey={currentImageKey}
+              onCurrentImageDisplay={imageReadiness.current.displayed}
+              onCurrentImageError={imageReadiness.current.failed}
               template={BODY_FRAME_VIDEO_TEMPLATE}
               transition={BODY_FRAME_VIDEO_TRANSITION}
               showWatermark={planEntitlements.showWatermark}
@@ -832,41 +880,14 @@ const styles = StyleSheet.create({
     borderRadius: bodyFrameDesign.cardRadius,
     backgroundColor: "#131315"
   },
-  previewImage: {
-    width: "100%",
-    height: "100%"
+  previewViewport: {
+    flex: 1,
+    overflow: "hidden"
   },
-  previewOverlayText: {
+  previewLogicalCanvas: {
     position: "absolute",
-    zIndex: 4,
-    maxWidth: "72%",
-    color: "rgba(255, 255, 255, 0.72)",
-    fontSize: 11,
-    lineHeight: 15,
-    fontWeight: "600",
-    textShadowColor: "rgba(0, 0, 0, 0.72)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2
-  },
-  previewOverlayTopLeft: {
-    top: 10,
-    left: 10,
-    textAlign: "left"
-  },
-  previewOverlayTopRight: {
-    top: 10,
-    right: 10,
-    textAlign: "right"
-  },
-  previewOverlayBottomLeft: {
-    bottom: 10,
-    left: 10,
-    textAlign: "left"
-  },
-  previewOverlayBottomRight: {
-    right: 10,
-    bottom: 10,
-    textAlign: "right"
+    left: 0,
+    top: 0
   },
   previewEmpty: {
     flex: 1,

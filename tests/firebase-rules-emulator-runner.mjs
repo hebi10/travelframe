@@ -235,6 +235,7 @@ const seedBackupUploadSession = async ({
   contentType = "image/jpeg",
   mediaKind = "image",
   status = "reserved",
+  itemId,
   projectId: sessionProjectId = null,
   expiresAt = new Date(Date.now() + 60_000)
 } = {}) => {
@@ -246,6 +247,7 @@ const seedBackupUploadSession = async ({
     fileSize,
     contentType,
     ...(sessionProjectId ? { projectId: sessionProjectId } : {}),
+    ...(itemId !== undefined ? { itemId, itemType: "photo" } : {}),
     expiresAt
   });
 };
@@ -446,6 +448,129 @@ await expectAllowed(
     data: { ...validPhotoBackup(ownerUid, "photo-1"), backupStatus: "failed" }
   })
 );
+
+const boundPhotoId = "bound-photo";
+const boundSessionId = "bound-photo-session";
+const boundStoragePath = `users/${ownerUid}/backups/photos/bound.jpg`;
+const boundPhoto = {
+  ...validPhotoBackup(ownerUid, boundPhotoId),
+  backupSessionId: boundSessionId,
+  storagePath: boundStoragePath,
+  projectId: "project-1", sequence: 1
+};
+const seedBoundPhotoSession = (status) => seedBackupUploadSession({
+  sessionId: boundSessionId, storagePath: boundStoragePath,
+  itemId: boundPhotoId, projectId: "project-1", fileSize: 1024, status
+});
+await seedBoundPhotoSession("reserved");
+await expectDenied(
+  "new photo identity cannot write metadata before server completion approves capacity",
+  firestoreRequest("PATCH", `users/${ownerUid}/photoBackups/${boundPhotoId}`, { uid: ownerUid, data: boundPhoto })
+);
+await seedBoundPhotoSession("completed");
+await expectAllowed(
+  "completed identity-bound photo session creates its matching immutable photo",
+  firestoreRequest("PATCH", `users/${ownerUid}/photoBackups/${boundPhotoId}`, { uid: ownerUid, data: boundPhoto })
+);
+await expectDenied(
+  "completed photo session cannot be reused to create a different immutable photo",
+  firestoreRequest("PATCH", `users/${ownerUid}/photoBackups/reused-photo`, {
+    uid: ownerUid, data: { ...boundPhoto, localId: "reused-photo" }
+  })
+);
+await seedBackupUploadSession({
+  sessionId: "bound-photo-replacement", itemId: boundPhotoId,
+  projectId: "project-1", status: "completed", fileSize: 1024,
+  storagePath: `users/${ownerUid}/backups/photos/bound-edited.jpg`
+});
+await expectAllowed(
+  "completed identity-bound upload replaces its edited photo within the Rules expression budget",
+  firestoreRequest("PATCH", `users/${ownerUid}/photoBackups/${boundPhotoId}`, {
+    uid: ownerUid,
+    data: {
+      ...boundPhoto, edited: true,
+      backupSessionId: "bound-photo-replacement",
+      storagePath: `users/${ownerUid}/backups/photos/bound-edited.jpg`
+    }
+  })
+);
+await seedBackupUploadSession({
+  sessionId: "legacy-null-item", itemId: null,
+  storagePath: `users/${ownerUid}/backups/photos/legacy-null.jpg`, fileSize: 1024
+});
+await expectAllowed(
+  "legacy null-item session retains its existing metadata compatibility",
+  firestoreRequest("PATCH", `users/${ownerUid}/photoBackups/legacy-null`, {
+    uid: ownerUid,
+    data: { ...validPhotoBackup(ownerUid, "legacy-null"), backupSessionId: "legacy-null-item", storagePath: `users/${ownerUid}/backups/photos/legacy-null.jpg` }
+  })
+);
+
+// A cloud-only photo reorder preserves its already verified file/session identity.
+const cloudOnlyPhotoId = "cloud-only-reorder";
+const cloudOnlyStoragePath = `users/${ownerUid}/backups/photos/${cloudOnlyPhotoId}.jpg`;
+const cloudOnlyUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encodeURIComponent(cloudOnlyStoragePath)}?alt=media`;
+const cloudOnlyPhoto = {
+  ...validPhotoBackup(ownerUid, cloudOnlyPhotoId),
+  backupSessionId: cloudOnlyPhotoId,
+  projectId: "project-1",
+  sequence: 1,
+  sourceUpdatedAt: "2026-09-19T00:00:00Z",
+  sourceDeviceId: "original-device",
+  downloadURL: cloudOnlyUrl,
+  uri: cloudOnlyUrl,
+  previewUri: cloudOnlyUrl
+};
+await seedBackupUploadSession({
+  sessionId: cloudOnlyPhotoId,
+  storagePath: cloudOnlyStoragePath,
+  fileSize: cloudOnlyPhoto.fileSize,
+  contentType: cloudOnlyPhoto.fileType,
+  mediaKind: "image",
+  status: "completed",
+  expiresAt: new Date(Date.now() - 60_000)
+});
+await seedDoc(`users/${ownerUid}/photoBackups/${cloudOnlyPhotoId}`, cloudOnlyPhoto);
+const reorderedCloudOnlyPhoto = {
+  ...cloudOnlyPhoto,
+  sequence: 2,
+  sourceUpdatedAt: "2026-11-03T00:00:00Z",
+  updatedAt: new Date()
+};
+await expectAllowed(
+  "cloud-only reorder changes only sequence and timestamps after completed session expiry",
+  firestoreRequest("PATCH", `users/${ownerUid}/photoBackups/${cloudOnlyPhotoId}`, {
+    uid: ownerUid,
+    data: reorderedCloudOnlyPhoto
+  })
+);
+await expectDenied(
+  "another user cannot reorder an owner's cloud-only photo",
+  firestoreRequest("PATCH", `users/${ownerUid}/photoBackups/${cloudOnlyPhotoId}`, {
+    uid: otherUid,
+    data: { ...reorderedCloudOnlyPhoto, sequence: 3 }
+  })
+);
+for (const [field, value] of Object.entries({
+  userId: otherUid,
+  localId: "different-photo",
+  storagePath: `users/${ownerUid}/backups/photos/different.jpg`,
+  backupSessionId: "unverified-session",
+  fileSize: 2048,
+  fileType: "image/png",
+  sourceDeviceId: "different-device",
+  downloadURL: `${cloudOnlyUrl}&changed=true`,
+  uri: `${cloudOnlyUrl}&changed=true`,
+  previewUri: `${cloudOnlyUrl}&changed=true`
+})) {
+  await expectDenied(
+    `cloud-only reorder cannot change ${field} without a newly verified upload`,
+    firestoreRequest("PATCH", `users/${ownerUid}/photoBackups/${cloudOnlyPhotoId}`, {
+      uid: ownerUid,
+      data: { ...reorderedCloudOnlyPhoto, sequence: 3, [field]: value }
+    })
+  );
+}
 await expectDenied(
   "photo backup metadata rejects immutable storage path updates",
   firestoreRequest("PATCH", `users/${ownerUid}/photoBackups/photo-1`, {

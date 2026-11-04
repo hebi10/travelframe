@@ -3,7 +3,6 @@ import fs from "node:fs";
 
 const entitlements = fs.readFileSync("lib/plan-entitlements.ts", "utf8");
 const slots = fs.readFileSync("lib/cloud-backup-project-slots.ts", "utf8");
-const account = fs.readFileSync("features/account/AccountScreen.tsx", "utf8");
 const slotUi = fs.readFileSync(
   "features/account/CloudBackupProjectSlotsSection.tsx",
   "utf8"
@@ -73,15 +72,6 @@ assert.ok(
 );
 
 for (const token of [
-  '"광고만 제거할까요?"',
-  "광고 제거는 2,000원 1회 구매",
-  "월 Pro(2,000원)부터",
-  "선택한 프로젝트 1개를 클라우드에 백업"
-]) {
-  assert.ok(account.includes(token), `ad-removal comparison missing: ${token}`);
-}
-
-for (const token of [
   "renderBackupProjectSlots",
   "backupProjectFilterSelect",
   "backupUploadProjectSelect",
@@ -119,5 +109,5 @@ assert.ok(
 );
 
 console.log(
-  "ok - project-slot pricing, fixed backup selection, admin management, and ad-removal comparison are guarded"
+  "ok - project-slot pricing, fixed backup selection, and admin management are guarded"
 );

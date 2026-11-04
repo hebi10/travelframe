@@ -36,6 +36,8 @@ for (const [file, method, storageKey, item] of [
   assert.equal(downloads.length, 1, `${file} must use authenticated download without requiring cloud_only metadata`);
   assert.equal(restored.localFileStatus, "available");
   assert.match(restored.uri ?? restored.imageUris[0], /^file:/);
+  // Simulate a still-cloud-only record; stale caller objects now use latest local state.
+  stored.set(storageKey, JSON.stringify([item]));
   const before = stored.get(storageKey);
   denied = true;
   await assert.rejects(context.exports[method](item), /permission denied/);

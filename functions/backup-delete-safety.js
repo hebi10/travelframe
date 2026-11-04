@@ -18,7 +18,8 @@ const collectOwnedCloudBackupStoragePaths = ({
   photoBackups = [],
   imageWorks = [],
   videos = [],
-  musicTracks = []
+  musicTracks = [],
+  uploadSessions = []
 }) => {
   const seen = new Set();
   const paths = [];
@@ -48,6 +49,10 @@ const collectOwnedCloudBackupStoragePaths = ({
 
   for (const musicTrack of musicTracks) {
     pushOwnedPath(musicTrack?.storagePath);
+  }
+
+  for (const session of uploadSessions) {
+    pushOwnedPath(session?.storagePath);
   }
 
   return paths;

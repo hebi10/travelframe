@@ -295,7 +295,13 @@ export function BodyFrameProjectSwitcher({
           >
             <View style={[styles.sheetHandle, { backgroundColor: palette.faint }]} />
             <Text style={[styles.sheetTitle, { color: palette.text }]}>새 프로젝트</Text>
-
+            <ScrollView
+              style={styles.createScroll}
+              contentContainerStyle={styles.createScrollContent}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
+              showsVerticalScrollIndicator
+            >
             <Text style={[styles.label, { color: palette.muted }]}>프로젝트 이름</Text>
             <TextInput
               value={name}
@@ -304,6 +310,7 @@ export function BodyFrameProjectSwitcher({
               placeholderTextColor={palette.faint}
               style={[styles.input, { backgroundColor: palette.background, color: palette.text, borderColor: palette.line }]}
               maxLength={40}
+              accessibilityLabel="프로젝트 이름"
             />
 
             <Text style={[styles.label, { color: palette.muted }]}>목표 기록 수</Text>
@@ -359,6 +366,7 @@ export function BodyFrameProjectSwitcher({
                   setCreateError(null);
                 }}
                 keyboardType="number-pad"
+                accessibilityLabel="목표 기록 수 직접 입력"
                 style={[styles.input, { backgroundColor: palette.background, color: palette.text, borderColor: palette.line }]}
                 placeholder="100"
                 placeholderTextColor={palette.faint}
@@ -394,7 +402,7 @@ export function BodyFrameProjectSwitcher({
               ]}
               onPress={() => setReferenceMode("latest")}
             >
-              <View>
+              <View style={styles.referenceText}>
                 <Text style={[styles.referenceTitle, { color: palette.text }]}>최근 사진</Text>
                 <Text style={[styles.referenceMeta, { color: palette.muted }]}>바로 전 사진과 맞춥니다.</Text>
               </View>
@@ -411,7 +419,7 @@ export function BodyFrameProjectSwitcher({
               ]}
               onPress={() => setReferenceMode("first")}
             >
-              <View>
+              <View style={styles.referenceText}>
                 <Text style={[styles.referenceTitle, { color: palette.text }]}>첫 번째 사진</Text>
                 <Text style={[styles.referenceMeta, { color: palette.muted }]}>첫 번째 사진과 계속 맞춥니다.</Text>
               </View>
@@ -431,6 +439,7 @@ export function BodyFrameProjectSwitcher({
                 {submitting ? "생성 중..." : "프로젝트 만들기"}
               </Text>
             </Pressable>
+            </ScrollView>
           </Pressable>
         </Pressable>
         </KeyboardAvoidingView>
@@ -443,6 +452,8 @@ const styles = StyleSheet.create({
   keyboardAvoidingRoot: {
     flex: 1
   },
+  createScroll: { flexShrink: 1 },
+  createScrollContent: { paddingBottom: 16 },
   headerButton: {
     minHeight: 54,
     borderWidth: bodyFrameDesign.borderWidth,
@@ -584,9 +595,11 @@ const styles = StyleSheet.create({
     borderColor: "#2A2A2E",
     borderRadius: 8,
     paddingHorizontal: 12,
+    paddingVertical: 10,
     marginBottom: 8
   },
   referenceChoiceSelected: { borderColor: "#F5F5F5" },
+  referenceText: { flex: 1 },
   referenceTitle: { color: "#F5F5F5", fontSize: bodyFrameTypography.rowTitle, fontWeight: "500" },
   referenceMeta: { color: "#A0A0A6", fontSize: 12, marginTop: 3 },
   limitNotice: {

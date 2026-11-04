@@ -31,11 +31,11 @@
 - [x] Android release manifest PASS.
 
 ## Google Play Billing / external configuration
-- [ ] Create/activate `ad_remove`.
+- [ ] Confirm `ad_remove` is no longer offered for new purchases, while existing permanent ad-removal purchases still verify and restore.
 - [x] Create/activate `creator_monthly` Pro subscription/base plan.
 - [x] Create/activate `plus_monthly` Plus subscription/base plan.
 - [x] Create/activate `expert_monthly` Expert subscription/base plan.
-- [ ] Reconfirm all four products and their actual store prices in the release track.
+- [ ] Reconfirm the three monthly subscriptions and their actual store prices in the release track.
 - [ ] Grant Firebase Functions runtime identity Android Publisher API / Play Console access.
 - [ ] Configure RTDN Pub/Sub topic `body-frame-play-billing`.
 - [ ] Deploy Functions and Firestore Rules.

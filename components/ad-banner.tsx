@@ -67,7 +67,7 @@ export function AdBanner({ placement, compact = false }: AdBannerProps) {
         <Text selectable style={[styles.detail, { color: palette.muted }]}>
           {configured
             ? "Google AdMob 배너 단위가 연결되었습니다."
-            : "광고 제거 또는 구독 이용 시 표시되지 않습니다."}
+            : "구독 중이거나 기존 광고 제거 구매가 있으면 표시되지 않습니다."}
         </Text>
         {adUnitId ? (
           <Text selectable={false} style={[styles.unitLabel, { color: palette.faint }]}>

@@ -348,23 +348,19 @@ export default function AccountScreen() {
 
   const getPaymentProductId = (
     plan: PaymentPlan
-  ): Exclude<SubscriptionProductId, "free"> =>
-    plan.id === "adRemove"
-      ? "ad_remove"
-      : plan.id === "expert"
-        ? "expert_monthly"
-        : plan.id === "plus"
-          ? "plus_monthly"
-          : "creator_monthly";
+  ): Exclude<SubscriptionProductId, "free" | "ad_remove"> =>
+    plan.id === "expert"
+      ? "expert_monthly"
+      : plan.id === "plus"
+        ? "plus_monthly"
+        : "creator_monthly";
 
   const getPaymentActionLabel = (plan: PaymentPlan) =>
     getPaymentPlanStatus(plan).active
       ? "사용 중"
       : !billingConnected
         ? "Google Play 연결 중..."
-        : plan.id === "adRemove"
-          ? "구매하기"
-          : "구독하기";
+        : "구독하기";
 
   const runPaymentPurchase = async (plan: PaymentPlan) => {
     if (isSubmitting) return;
@@ -374,9 +370,7 @@ export default function AccountScreen() {
       setMessage(null);
       await purchaseProduct(getPaymentProductId(plan));
       setMessage(
-        plan.id === "adRemove"
-          ? "광고 제거 구매를 확인했습니다."
-          : `${plan.title} 구독이 활성화되었습니다. 아래 클라우드 프로젝트 백업에서 백업할 프로젝트를 선택할 수 있습니다.`
+        `${plan.title} 구독이 활성화되었습니다. 아래 클라우드 프로젝트 백업에서 백업할 프로젝트를 선택할 수 있습니다.`
       );
       setSelectedPaymentPlan(null);
     } catch (error) {
@@ -391,33 +385,7 @@ export default function AccountScreen() {
       return;
     }
 
-    if (selectedPaymentPlan.id !== "adRemove") {
-      void runPaymentPurchase(selectedPaymentPlan);
-      return;
-    }
-
-    const proPlan = paymentPlans.find((plan) => plan.id === "creator");
-    Alert.alert(
-      "광고만 제거할까요?",
-      "광고 제거는 2,000원 1회 구매이며 광고만 제거됩니다. 프로젝트는 최대 2개까지 만들 수 있고 각 프로젝트에는 사진을 최대 100장까지 기록할 수 있으며 클라우드 백업은 포함되지 않습니다. 월 Pro(2,000원)부터는 프로젝트 수를 제한 없이 만들 수 있고 프로젝트당 사진을 최대 365장까지 기록할 수 있으며, Pro는 선택한 프로젝트 1개를 클라우드에 백업할 수 있습니다.",
-      [
-        { text: "취소", style: "cancel" },
-        ...(proPlan
-          ? [
-              {
-                text: "Pro 보기",
-                onPress: () => setSelectedPaymentPlan(proPlan)
-              }
-            ]
-          : []),
-        {
-          text: "광고 제거 구매",
-          onPress: () => {
-            void runPaymentPurchase(selectedPaymentPlan);
-          }
-        }
-      ]
-    );
+    void runPaymentPurchase(selectedPaymentPlan);
   };
 
   const handleRestorePurchases = async () => {
@@ -443,24 +411,6 @@ export default function AccountScreen() {
       return {
         active: false,
         label: "확인 중..."
-      };
-    }
-
-    if (plan.id === "adRemove") {
-      const includedBySubscription = Boolean(
-        effectiveSubscriptionProducts.creatorMonthly ||
-          effectiveSubscriptionProducts.plusMonthly ||
-          effectiveSubscriptionProducts.expertMonthly
-      );
-      return {
-        active: Boolean(
-          effectiveSubscriptionProducts.adRemove || includedBySubscription
-        ),
-        label: effectiveSubscriptionProducts.adRemove
-          ? "구매 완료"
-          : includedBySubscription
-            ? "구독 포함"
-            : "미구매"
       };
     }
 
@@ -866,9 +816,7 @@ export default function AccountScreen() {
                         {getStorePrice(getPaymentProductId(plan)) ?? plan.price}
                       </Text>
                       <Text selectable={false} style={[styles.helpText, themed.mutedText]}>
-                        {plan.id === "adRemove"
-                          ? "1회 결제 · 자동 갱신 없음"
-                          : "월 구독 · 취소 전까지 자동 갱신"}
+                        월 구독 · 취소 전까지 자동 갱신
                       </Text>
                     </View>
                     <StatusBadge
@@ -912,7 +860,7 @@ export default function AccountScreen() {
               </Text>
             </Pressable>
             <Text selectable={false} style={[styles.helpText, themed.mutedText]}>
-              같은 Google Play 계정으로 구매한 광고 제거와 활성 구독을 다시 확인합니다.
+              같은 Google Play 계정의 기존 광고 제거 구매와 활성 구독을 다시 확인합니다.
               월 구독의 변경·취소는 Google Play 정기 결제 화면에서 관리할 수 있습니다.
             </Text>
           </SectionBlock>
@@ -1053,23 +1001,19 @@ export default function AccountScreen() {
               </Text>
             </Pressable>
 
-            {selectedPaymentPlan?.id !== "adRemove" ? (
-              <>
-                <Pressable
-                  accessibilityRole="link"
-                  style={[styles.secondaryButton, themed.secondaryButton]}
-                  onPress={() => void Linking.openURL(GOOGLE_PLAY_SUBSCRIPTIONS_URL)}
-                >
-                  <Text selectable={false} style={[styles.secondaryButtonText, themed.text]}>
-                    Google Play에서 구독 관리
-                  </Text>
-                </Pressable>
-                <Text selectable={false} style={[styles.helpText, themed.mutedText]}>
-                  구독을 취소하면 다음 갱신 결제가 중단됩니다. 일반적으로 이미 결제한 기간이 끝날 때까지
-                  혜택을 이용할 수 있으며, 환불 여부는 Google Play 정책과 적용 법령에 따라 달라질 수 있습니다.
-                </Text>
-              </>
-            ) : null}
+            <Pressable
+              accessibilityRole="link"
+              style={[styles.secondaryButton, themed.secondaryButton]}
+              onPress={() => void Linking.openURL(GOOGLE_PLAY_SUBSCRIPTIONS_URL)}
+            >
+              <Text selectable={false} style={[styles.secondaryButtonText, themed.text]}>
+                Google Play에서 구독 관리
+              </Text>
+            </Pressable>
+            <Text selectable={false} style={[styles.helpText, themed.mutedText]}>
+              구독을 취소하면 다음 갱신 결제가 중단됩니다. 일반적으로 이미 결제한 기간이 끝날 때까지
+              혜택을 이용할 수 있으며, 환불 여부는 Google Play 정책과 적용 법령에 따라 달라질 수 있습니다.
+            </Text>
 
             <View style={styles.form}>
               <Pressable
