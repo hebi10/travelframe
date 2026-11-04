@@ -1,5 +1,6 @@
 {
-  "apk_run_id": 41576638971,
-  "apk_sha256": "6a29d0fa7d2804b703cd6766c3a3c0087c6bb833d1d7049d8c0eb76124625e3c",
-  "capture_scenario": "keyboard"
+  "apk_run_id": 41592096562,
+  "apk_sha256": "f89070422f1c4d257af026a3c24de973ceb0a7615a2ae5e5e943ff8127243ca4",
+  "capture_scenario": "all",
+  "marketing_fixtures_dir": "tests/fixtures/body-frame-marketing"
 }

@@ -9,6 +9,7 @@ on:
       - 'scripts/verify-android-qa-apk.py'
       - 'scripts/test_verify_android_qa_apk.py'
       - 'scripts/android-qa-apk-selection.json'
+      - 'tests/fixtures/body-frame-marketing/**'
   workflow_dispatch:
     inputs:
       apk_run_id:
@@ -28,6 +29,11 @@ on:
         options:
           - all
           - keyboard
+      marketing_fixtures_dir:
+        description: Optional host-only marketing fixture directory
+        required: false
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -52,10 +58,11 @@ jobs:
           APK_RUN_ID: ${{ inputs.apk_run_id }}
           APK_SHA256: ${{ inputs.apk_sha256 }}
           CAPTURE_SCENARIO: ${{ inputs.capture_scenario }}
+          MARKETING_FIXTURES_DIR: ${{ inputs.marketing_fixtures_dir }}
         with:
           script: |
             const fs = require('fs');
-            let selection = {apk_run_id:process.env.APK_RUN_ID,apk_sha256:process.env.APK_SHA256,capture_scenario:process.env.CAPTURE_SCENARIO || 'all'};
+            let selection = {apk_run_id:process.env.APK_RUN_ID,apk_sha256:process.env.APK_SHA256,capture_scenario:process.env.CAPTURE_SCENARIO || 'all',marketing_fixtures_dir:process.env.MARKETING_FIXTURES_DIR || ''};
             if (!selection.apk_run_id) {
               const path = 'scripts/android-qa-apk-selection.json';
               if (!fs.existsSync(path)) throw new Error('An explicit reviewed APK selection JSON is required for PR recapture; there is no latest-build fallback');
@@ -64,6 +71,9 @@ jobs:
             const captureScenario = selection.capture_scenario ?? 'all';
             if (!['all','keyboard'].includes(captureScenario)) throw new Error('Invalid capture scenario; expected all or keyboard');
             core.setOutput('capture_scenario',captureScenario);
+            const marketingFixturesDir = selection.marketing_fixtures_dir ?? '';
+            if (typeof marketingFixturesDir !== 'string' || (marketingFixturesDir && !/^tests\/fixtures\/body-frame-marketing(?:\/[A-Za-z0-9][A-Za-z0-9._-]*)*$/.test(marketingFixturesDir))) throw new Error('Marketing fixtures must stay within tests/fixtures/body-frame-marketing');
+            core.setOutput('marketing_fixtures_dir',marketingFixturesDir);
             const runId = Number(selection.apk_run_id);
             if (!/^[a-fA-F0-9]{64}$/.test(selection.apk_sha256 || '')) throw new Error('Explicit reviewed APK SHA256 is required');
             core.setOutput('run_id',String(runId));
@@ -112,6 +122,7 @@ jobs:
         uses: reactivecircus/android-emulator-runner@v2
         env:
           CAPTURE_SCENARIO: ${{ steps.selected.outputs.capture_scenario }}
+          BODY_FRAME_MARKETING_FIXTURES: ${{ steps.selected.outputs.marketing_fixtures_dir }}
         with:
           api-level: 35
           target: google_apis

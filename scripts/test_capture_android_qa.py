@@ -13,6 +13,54 @@ spec.loader.exec_module(qa)
 
 
 class CaptureHelpersTest(unittest.TestCase):
+    def test_marketing_fixtures_normalize_photos_and_keep_guest_storage(self):
+        import json
+        import subprocess
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = Path(temporary)
+            for index in (1, 2, 3):
+                (folder / f'photo-{index}.jpg').write_bytes(qa.fixture_jpeg(index))
+            qa.configure_marketing_fixtures(folder)
+            try:
+                values = qa.fixture_values('/data/user/0/' + qa.PACKAGE)
+                self.assertEqual(json.loads(values['body-frame.projects.v1'])[0]['name'], '나의 변화 기록')
+                self.assertTrue(all(item['note'] == '예시 수치 기록' for item in json.loads(values['body-frame.measurements.v1'])))
+                self.assertFalse(any('firebase' in key or 'owner' in key for key in values))
+                jpeg = qa.fixture_jpeg(1, preview=True)
+                result = subprocess.run(['ffprobe', '-v', 'error', '-show_entries', 'stream=width,height', '-of', 'json', '-i', 'pipe:0'], input=jpeg, capture_output=True, check=True)
+                dimensions = json.loads(result.stdout)['streams'][0]
+                self.assertEqual((dimensions['width'], dimensions['height']), (360, 480))
+            finally:
+                qa.configure_marketing_fixtures(None)
+        self.assertEqual(json.loads(qa.fixture_values('/app')['body-frame.projects.v1'])[0]['name'], 'QA 데모 · 몸의 변화')
+
+    def test_marketing_fixtures_require_three_decodable_distinct_photos(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = Path(temporary)
+            with self.assertRaisesRegex(ValueError, 'photo-1.jpg'):
+                qa.configure_marketing_fixtures(folder)
+            for index in (1, 2, 3):
+                (folder / f'photo-{index}.jpg').write_bytes(b'not a JPEG')
+            with self.assertRaises(ValueError):
+                qa.configure_marketing_fixtures(folder)
+        qa.configure_marketing_fixtures(None)
+
+    def test_marketing_frame_validation_rejects_stale_or_blank_frames(self):
+        import subprocess
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = Path(temporary)
+            for index in (1, 2, 3):
+                (folder / f'photo-{index}.jpg').write_bytes(qa.fixture_jpeg(index))
+            qa.configure_marketing_fixtures(folder)
+            try:
+                pixels = subprocess.run(['ffmpeg', '-v', 'error', '-i', str(folder / 'photo-1.jpg'), '-vf', 'scale=96:128', '-frames:v', '1', '-f', 'rawvideo', '-pix_fmt', 'rgb24', 'pipe:1'], capture_output=True, check=True).stdout
+                self.assertEqual(qa.validate_marketing_pixels(pixels, 96, 128, 1)['photo'], 1)
+                for broken, expected in [(pixels, 2), (bytes(96*128*3), 1)]:
+                    with self.assertRaises(ValueError):
+                        qa.validate_marketing_pixels(broken, 96, 128, expected)
+            finally:
+                qa.configure_marketing_fixtures(None)
+
     def test_click_uses_clickable_parent_bounds_and_ignores_disabled_control(self):
         xml = '''<hierarchy><node clickable="true" enabled="false" bounds="[0,0][100,100]" content-desc="사진 수"/><node clickable="true" enabled="true" bounds="[10,40][310,100]"><node text="사진 수" enabled="true" bounds="[20,50][70,80]"/></node></hierarchy>'''
         self.assertEqual(qa.target_bounds(xml, '사진 수'), (160, 70))
