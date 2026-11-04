@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { patchViewRecorderAndroidCallbacks } from "./patch-view-recorder.mjs";
 
 const root = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const reactNativeVisionCameraRoot = path.join(
@@ -195,6 +196,17 @@ function patchGoogleMobileAdsExpoConfig() {
   console.info("applied local Google Mobile Ads Expo config patch");
 }
 
+function patchViewRecorderAndroidStopRace() {
+  if (!packageJson.dependencies?.["react-native-view-recorder"]) return;
+  const packageRoot = path.join(root, "node_modules", "react-native-view-recorder");
+  const installed = JSON.parse(readFrom(packageRoot, "package.json"));
+  const relativePath = "android/src/main/java/com/reactnativeviewrecorder/ViewRecorderModule.kt";
+  const source = readFrom(packageRoot, relativePath);
+  writeTo(packageRoot, relativePath, patchViewRecorderAndroidCallbacks(source, installed.version));
+  console.info("applied local ViewRecorder Android callback stop-race patch");
+}
+
 patchVisionCameraAndroidShutterSound();
 patchReactNativeGradleFoojayResolver();
 patchGoogleMobileAdsExpoConfig();
+patchViewRecorderAndroidStopRace();
