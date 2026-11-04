@@ -330,7 +330,7 @@ export default function BodyFrameSettingsScreen() {
           />
           <BodyFrameSettingRow
             label="플랜 및 Google Play 결제"
-            detail="Pro/Expert, 광고 제거, 구매 복원과 구독 상태"
+            detail="Pro/Plus/Expert 구독, 기존 구매 복원과 구독 상태"
             mark={planEntitlements.label}
             onPress={() => router.push("/account")}
           />

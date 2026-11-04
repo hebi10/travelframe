@@ -44,7 +44,6 @@ for (const token of [
   "TERMS_OF_SERVICE_URL",
   "PRIVACY_POLICY_URL",
   "purchaseNotice",
-  "1회 결제 · 자동 갱신 없음",
   "월 구독 · 취소 전까지 자동 갱신",
   "환불 여부는 Google Play 정책"
 ]) {
@@ -52,8 +51,6 @@ for (const token of [
 }
 
 for (const token of [
-  "1회성 구매",
-  "정기 결제나 자동 갱신은 없습니다",
   "월 구독",
   "자동 갱신됩니다",
   "Google Play 정기 결제",

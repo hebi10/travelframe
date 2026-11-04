@@ -2,7 +2,7 @@ import type { CloudBackupOverview } from "@/lib/cloud-backup";
 import type { UserSubscriptionProducts } from "@/lib/subscription";
 
 export type AuthMode = "signIn" | "signUp" | "recover";
-export type PaymentPlanId = "adRemove" | "creator" | "plus" | "expert";
+export type PaymentPlanId = "creator" | "plus" | "expert";
 
 export type PaymentPlan = {
   id: PaymentPlanId;
@@ -54,21 +54,6 @@ export const signedInBenefits = [
 ];
 
 export const paymentPlans: PaymentPlan[] = [
-  {
-    id: "adRemove",
-    title: "광고 제거",
-    price: "2,000원",
-    billing: "1회 결제",
-    summary: "2,000원 1회 결제로 광고만 영구 제거합니다. 사진은 프로젝트당 최대 100장, 프로젝트는 최대 2개까지 만들 수 있습니다.",
-    purchaseNotice:
-      "Google Play를 통한 2,000원 1회성 구매입니다. 정기 결제나 자동 갱신은 없습니다. 광고 제거 외의 구독 혜택은 포함되지 않습니다. 월 Pro(2,000원)부터는 프로젝트 수를 제한 없이 만들 수 있고 프로젝트당 사진을 최대 365장까지 기록할 수 있으며, Pro는 선택한 프로젝트 1개를 클라우드에 백업할 수 있습니다.",
-    benefits: [
-      "앱 전반의 광고 영구 제거",
-      "프로젝트 최대 2개",
-      "프로젝트당 사진 최대 100장",
-      "클라우드 백업 미포함"
-    ]
-  },
   {
     id: "creator",
     title: "Pro",
