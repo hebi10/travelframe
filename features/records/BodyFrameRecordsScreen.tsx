@@ -264,6 +264,12 @@ export default function BodyFrameRecordsScreen() {
               }
             ]}
           >
+            <Image
+              source={require("../../assets/ui/illustrations/empty-project.png")}
+              style={styles.emptyArtwork}
+              contentFit="contain"
+              accessibilityLabel="새 프로젝트를 만드는 안내 아이콘"
+            />
             <Text style={[styles.emptyTitle, { color: palette.text }]}>
               아직 프로젝트가 없습니다.
             </Text>
@@ -595,6 +601,11 @@ const styles = StyleSheet.create({
   restoreButtonText: {
     fontSize: 13,
     fontWeight: "600"
+  },
+  emptyArtwork: {
+    width: 108,
+    height: 108,
+    alignSelf: "center"
   },
   emptyCard: {
     gap: 12,

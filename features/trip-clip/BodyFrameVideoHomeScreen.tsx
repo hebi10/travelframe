@@ -274,6 +274,12 @@ export default function BodyFrameVideoHomeScreen() {
             </View>
           ) : (
             <View style={[styles.emptyCard, { borderColor: palette.line }]}>
+              <Image
+                source={require("../../assets/ui/illustrations/empty-project.png")}
+                style={styles.emptyArtwork}
+                contentFit="contain"
+                accessibilityLabel="프로젝트가 없는 상태"
+              />
               <Text style={[styles.emptyTitle, { color: palette.text }]}>
                 프로젝트가 없습니다.
               </Text>
@@ -352,6 +358,12 @@ export default function BodyFrameVideoHomeScreen() {
             </View>
           ) : (
             <View style={[styles.emptyCard, { borderColor: palette.line }]}>
+              <Image
+                source={require("../../assets/ui/illustrations/empty-videos.png")}
+                style={styles.emptyArtwork}
+                contentFit="contain"
+                accessibilityLabel="저장한 영상이 없는 상태"
+              />
               <Text style={[styles.emptyTitle, { color: palette.text }]}>
                 아직 저장한 영상이 없습니다.
               </Text>
@@ -547,6 +559,11 @@ const styles = StyleSheet.create({
   videoCoverImage: {
     width: "100%",
     height: "100%"
+  },
+  emptyArtwork: {
+    width: 88,
+    height: 88,
+    alignSelf: "center"
   },
   emptyCard: {
     gap: 6,

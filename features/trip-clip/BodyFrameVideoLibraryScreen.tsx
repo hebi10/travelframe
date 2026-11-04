@@ -227,7 +227,12 @@ export default function BodyFrameVideoLibraryScreen() {
           </View>
         ) : (
           <View style={[styles.emptyCard, { borderColor: palette.line }]}>
-            <Feather name="film" size={24} color={palette.muted} />
+            <Image
+              source={require("../../assets/ui/illustrations/empty-videos.png")}
+              style={styles.emptyArtwork}
+              contentFit="contain"
+              accessibilityLabel="저장한 영상이 없는 상태"
+            />
             <Text style={[styles.emptyTitle, { color: palette.text }]}>
               저장한 영상이 없습니다.
             </Text>
@@ -370,6 +375,10 @@ const styles = StyleSheet.create({
   cardButtonText: {
     fontSize: bodyFrameTypography.button,
     fontWeight: "600"
+  },
+  emptyArtwork: {
+    width: 112,
+    height: 112
   },
   emptyCard: {
     alignItems: "center",
