@@ -172,6 +172,18 @@ function run(command, arguments_) {
   return result.stdout;
 }
 
+function verifySourceAncestry(sourceDirectory, sourceSha, mainSha) {
+  if (!/^[a-f0-9]{40}$/.test(mainSha ?? "")) throw new Error("The run must identify an exact main commit");
+  const git = (...arguments_) => {
+    const result = spawnSync("git", arguments_, { cwd: sourceDirectory, encoding: "utf8" });
+    if (result.error || result.status !== 0) throw new Error("Release source must be an ancestor of the run's main commit; complete Git history is required");
+    return result.stdout.trim();
+  };
+  if (git("rev-parse", "HEAD") !== sourceSha) throw new Error("Source checkout SHA does not match source_sha");
+  git("rev-parse", "--verify", `${mainSha}^{commit}`);
+  git("merge-base", "--is-ancestor", sourceSha, mainSha);
+}
+
 function verifyArtifact(plan) {
   const files = verifyArtifactMetadata(process.env.AAB_ARTIFACT_DIR, plan);
   if (sha256(process.env.BUNDLETOOL_JAR) !== BUNDLETOOL_SHA256) throw new Error("Pinned bundletool SHA-256 mismatch");
@@ -189,6 +201,10 @@ async function main() {
     authConfiguration();
     const request = resolveRequest(process.env);
     fs.appendFileSync(process.env.GITHUB_OUTPUT, `source_sha=${request.sourceSha}\nlogical_track=${request.logicalTrack}\noperation=${request.operation}\n`);
+  } else if (command === "check-source") {
+    const request = resolveRequest(process.env);
+    verifySourceAncestry(process.env.SOURCE_DIR, request.sourceSha, process.env.GITHUB_SHA);
+    console.log(`Verified release source ${request.sourceSha} belongs to the run's main history`);
   } else if (command === "plan") {
     const request = resolveRequest(process.env);
     const client = createPublisher(process.env.PLAY_ACCESS_TOKEN);
@@ -213,7 +229,7 @@ async function main() {
     const receipt = await publishRelease(createPublisher(process.env.PLAY_ACCESS_TOKEN), plan, files.aab, files.mapping, (value) => fs.writeFileSync(receiptPath, JSON.stringify(value, null, 2) + "\n"));
     console.log(`Committed and read back ${receipt.packageId}, ${receipt.apiTrack}, version ${receipt.versionCode}, source ${receipt.sourceSha}`);
     if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `Play test release committed and read back: \`${PACKAGE}\`, \`${receipt.apiTrack}\`, \`${receipt.versionName} (${receipt.versionCode})\`, source \`${receipt.sourceSha}\`. Play processing, review and tester delivery can take additional time.\n`);
-  } else throw new Error("Expected resolve, plan, verify-artifact or publish command");
+  } else throw new Error("Expected resolve, check-source, plan, verify-artifact or publish command");
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main().catch((error) => { console.error(`Play release failed: ${error.message}`); process.exitCode = 1; });

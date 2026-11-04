@@ -20,6 +20,8 @@ Automatic pushes use the source's `app.json` versionName. A manual `1.0.32` over
 
 Tools are checked out at the immutable workflow commit, separately from app source. Only this repository's `main` workflow can release. Forks, pull-request events and non-main workflow branches cannot publish. A single concurrency group serializes planning, building and publishing; if an external Console/API upload races the build, the final version guard fails and requires a fresh build.
 
+Before Play authentication, the exact source checkout must also be an ancestor of the main commit associated with this run. Manual `source_sha` can select an earlier merged main commit, but cannot select an unmerged branch commit or a later main commit. Complete Git history is required for this check; missing history fails closed.
+
 ## Existing signing and app configuration
 
 Configure these repository **secrets** using the existing release configuration. Never put values in code, issues, pull requests or logs.
@@ -101,7 +103,7 @@ The separate receipt artifact records public package/track/version/hash and comm
 ## Validation and limits
 
 ```bash
-node --test tests/play-aab-build.test.mjs tests/play-aab-signature.test.mjs tests/play-publish.test.mjs
+node --test tests/play-aab-build.test.mjs tests/play-aab-signature.test.mjs tests/play-publish.test.mjs tests/play-source.test.mjs
 ```
 
 Signature tests use disposable test-only keys in temporary directories, deleted afterward; they cannot be selected by the production path. Publisher tests use mocked HTTP responses and never authenticate or change Play. Production signing, actual API permission, first upload and physical-device sign-in/billing/ad behavior remain unverified until the real configuration/key and a successful run exist. A green repository Quality run alone does not prove deployment or device QA.

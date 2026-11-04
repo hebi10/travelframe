@@ -92,10 +92,15 @@ jobs:
         with:
           ref: ${{ steps.resolve.outputs.source_sha }}
           path: source
+          fetch-depth: 0
           persist-credentials: false
+      - name: Verify exact app source belongs to the run's main history
+        env:
+          SOURCE_DIR: ${{ github.workspace }}/source
+        run: node build-tools/scripts/publish-play-release.mjs check-source
       - name: Test Publisher guards without credentials
         working-directory: build-tools
-        run: node --test tests/play-publish.test.mjs
+        run: node --test tests/play-publish.test.mjs tests/play-source.test.mjs
       - name: Get short-lived Android Publisher token
         id: auth
         uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
