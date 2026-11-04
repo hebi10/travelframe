@@ -27,7 +27,6 @@ import {
   bodyFrameDesign,
   bodyFrameTypography,
   colors,
-  controls,
   typography
 } from "@/constants/app-theme";
 import type { GuideType } from "@/constants/camera-guides";
@@ -836,7 +835,7 @@ const styles = StyleSheet.create({
   },
   ghostButton: {
     minWidth: 68,
-    minHeight: controls.compactHeight,
+    minHeight: bodyFrameDesign.minTouchSize,
     justifyContent: "center"
   },
   ghostButtonText: {
@@ -939,8 +938,8 @@ const styles = StyleSheet.create({
     gap: 14,
     paddingHorizontal: bodyFrameDesign.horizontalPadding,
     paddingTop: 16,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    borderTopLeftRadius: bodyFrameDesign.bottomSheetRadius,
+    borderTopRightRadius: bodyFrameDesign.bottomSheetRadius,
     backgroundColor: bodyFrameDarkColors.background
   },
   editPanelHeader: {
@@ -1112,179 +1111,6 @@ const styles = StyleSheet.create({
   },
   ratioTextActive: {
     color: bodyFrameDarkColors.inverse
-  },
-  guidePanel: {
-    gap: 10,
-    paddingTop: 2
-  },
-  guidePanelHeader: {
-    minHeight: controls.compactHeight,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-    paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: colors.line
-  },
-  guidePanelCopy: {
-    flex: 1,
-    gap: 3
-  },
-  guidePanelTitle: {
-    color: colors.text,
-    fontSize: typography.button,
-    fontWeight: "800",
-    letterSpacing: 0
-  },
-  guidePanelDetail: {
-    color: colors.muted,
-    fontSize: 11,
-    letterSpacing: 0
-  },
-  guidePanelAction: {
-    color: colors.text,
-    fontSize: typography.button,
-    fontWeight: "800",
-    letterSpacing: 0
-  },
-  guideControls: {
-    gap: 8
-  },
-  guideOptionRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6
-  },
-  guideChip: {
-    minHeight: 34,
-    justifyContent: "center",
-    paddingHorizontal: 10,
-    borderWidth: 1,
-    borderColor: colors.line
-  },
-  guideChipActive: {
-    borderColor: colors.text,
-    backgroundColor: colors.text
-  },
-  guideChipText: {
-    color: colors.text,
-    fontSize: 11,
-    fontWeight: "800",
-    letterSpacing: 0
-  },
-  guideChipTextActive: {
-    color: colors.inverse
-  },
-  guideSizeSlider: {
-    gap: 8
-  },
-  guideSizeSliderHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12
-  },
-  guideSizeSliderLabel: {
-    color: colors.muted,
-    fontSize: 11,
-    fontWeight: "800",
-    letterSpacing: 0
-  },
-  guideSizeSliderValue: {
-    minWidth: 34,
-    color: colors.text,
-    textAlign: "right",
-    fontSize: 11,
-    fontWeight: "900",
-    letterSpacing: 0,
-    fontVariant: ["tabular-nums"]
-  },
-  guideSizeTrack: {
-    height: 30,
-    justifyContent: "center",
-    position: "relative"
-  },
-  guideSizeTrackBase: {
-    height: 2,
-    backgroundColor: colors.line
-  },
-  guideSizeTrackFill: {
-    position: "absolute",
-    left: 0,
-    height: 2,
-    backgroundColor: colors.text
-  },
-  guideSizeThumb: {
-    position: "absolute",
-    width: 18,
-    height: 18,
-    marginLeft: -9,
-    borderWidth: 2,
-    borderColor: colors.text,
-    backgroundColor: colors.background
-  },
-  guideSizeSliderRange: {
-    flexDirection: "row",
-    justifyContent: "space-between"
-  },
-  guideSizeSliderRangeText: {
-    color: colors.muted,
-    fontSize: 10,
-    fontWeight: "800",
-    letterSpacing: 0,
-    fontVariant: ["tabular-nums"]
-  },
-  guideColorRow: {
-    flexDirection: "row",
-    flexWrap: "nowrap",
-    justifyContent: "space-between",
-    gap: 4
-  },
-  guideColorOption: {
-    flex: 1,
-    minHeight: 42,
-    minWidth: 0,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 4,
-    paddingHorizontal: 4,
-    borderWidth: 1,
-    borderColor: colors.line
-  },
-  guideColorOptionActive: {
-    borderColor: colors.text
-  },
-  guideColorSwatch: {
-    width: 16,
-    height: 16,
-    borderWidth: 1,
-    borderColor: colors.darkLine
-  },
-  guideColorLabel: {
-    color: colors.text,
-    fontSize: 9,
-    fontWeight: "800",
-    letterSpacing: 0
-  },
-  guideVisibilityButton: {
-    minHeight: controls.compactHeight,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: colors.text
-  },
-  guideVisibilityButtonActive: {
-    backgroundColor: colors.text
-  },
-  guideVisibilityText: {
-    color: colors.text,
-    fontSize: typography.button,
-    fontWeight: "800",
-    letterSpacing: 0
-  },
-  guideVisibilityTextActive: {
-    color: colors.inverse
   },
   toolRow: {
     flexDirection: "row",

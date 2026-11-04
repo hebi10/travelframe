@@ -189,6 +189,9 @@ export function TripClipGuideTab({
             return (
               <Pressable
                 key={option.label}
+                accessibilityRole="radio"
+                accessibilityLabel={`${option.label} 가이드 색상`}
+                accessibilityState={{ selected: isActive }}
                 style={[styles.guideColorOption, isActive && styles.guideColorOptionActive]}
                 onPress={() => updatePreviewGuideColor(option.value)}
               >

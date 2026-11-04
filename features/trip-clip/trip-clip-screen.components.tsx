@@ -125,7 +125,12 @@ export function TimelineScrubber({
 
 export function SmallButton({ label, onPress }: { label: string; onPress: () => void }) {
   return (
-    <Pressable style={styles.smallButton} onPress={onPress}>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      style={styles.smallButton}
+      onPress={onPress}
+    >
       <Text selectable={false} style={styles.smallButtonText}>
         {label}
       </Text>

@@ -121,6 +121,9 @@ export function TripClipMusicTab({
             {activeMusicLabel}
           </Text>
           <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={isPlaying ? "음악 미리듣기 정지" : "음악 미리듣기 재생"}
+            accessibilityState={{ disabled: !activeMusicSource }}
             disabled={!activeMusicSource}
             style={[styles.musicPickButton, !activeMusicSource && styles.disabledButton]}
             onPress={() => {
