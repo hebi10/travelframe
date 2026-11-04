@@ -1,5 +1,9 @@
 # Android release policy
 
+## GitHub Actions signed AAB
+
+The manual `Android signed Play AAB` workflow builds an exact reviewed source commit with the existing Play upload key, explicit version inputs, certificate matching and verified artifacts. See [GitHub Play AAB build](github-play-aab-build.md) for required repository settings, default-branch registration, and provenance. Missing signing or production client configuration fails the build; no Expo token or new signing key is used.
+
 ## Local AAB versionCode
 
 `npm run android:build-prod-local` runs `scripts/build-android-aab.ps1`.
