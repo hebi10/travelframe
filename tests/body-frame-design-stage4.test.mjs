@@ -27,6 +27,28 @@ for (const [path, content] of Object.entries(sources)) {
   );
 }
 
+const modernModalCounts = [
+  ["features/camera/BodyFrameProjectSwitcher.tsx", 2],
+  ["features/records/PhotoPositionSheet.tsx", 1],
+  ["features/records/BodyMeasurementEditorSheet.tsx", 1],
+  ["features/trip-clip/BodyFrameVideoOptionsSheet.tsx", 1],
+  ["features/records/BodyFrameProjectDetailScreen.tsx", 2],
+  ["features/settings/BodyFrameSettingsScreen.tsx", 1],
+  ["features/account/AccountScreen.tsx", 2],
+  ["features/camera/CameraScreen.tsx", 2],
+  ["components/app-guide-overlay.tsx", 1]
+];
+assert.equal(modernModalCounts.reduce((sum, [, count]) => sum + count, 0), 13);
+for (const [path, expected] of modernModalCounts) {
+  const content = source(path);
+  assert.equal((content.match(/<Modal\b/g) ?? []).length, expected, path + " must preserve its modal count");
+  assert.equal(
+    (content.match(/\baccessibilityViewIsModal\b/g) ?? []).length,
+    expected,
+    path + " must isolate every modal from its underlying accessibility hierarchy"
+  );
+}
+
 const theme = read("constants/app-theme.ts");
 const common = source("components/body-frame-sheet.tsx");
 assert.ok(theme.includes("export const bodyFrameSheetDesign = {"));
