@@ -1054,6 +1054,23 @@ def video_smoke(device, directory, restart=True):
     return records
 
 
+def wait_for_visual_profile(device, size, density, timeout_seconds=25):
+    """Wait for the actual Android screenshot surface after wm size/density changes."""
+    expected = tuple(int(part) for part in size.split('x'))
+    deadline = time.monotonic() + timeout_seconds
+    observed = None
+    while True:
+        screenshot = device.run('exec-out', 'screencap', '-p', binary=True)
+        if screenshot[:8] != b'\\x89PNG\\r\\n\\x1a\\n' or len(screenshot) < 24:
+            raise RuntimeError('Native screenshot surface did not return a valid PNG')
+        observed = struct.unpack('>II', screenshot[16:24])
+        if observed == expected:
+            return {'requestedPixels': list(expected), 'observedPixels': list(observed), 'density': density}
+        if time.monotonic() >= deadline:
+            raise RuntimeError(f'Display viewport did not settle: requested={expected}, captured={observed}')
+        time.sleep(.5)
+
+
 def capture_design_matrix(device, output, records, manifest):
     """Capture actual Android UI on disposable offline guest fixtures at four dp widths."""
     screens = [
@@ -1088,6 +1105,8 @@ def capture_design_matrix(device, output, records, manifest):
         device.shell('am', 'force-stop', PACKAGE)
         device.shell('wm', 'size', size)
         device.shell('wm', 'density', density)
+        settled = wait_for_visual_profile(device, size, density)
+        manifest['visualDesignMatrix'].setdefault('displaySettleEvidence', {})[profile] = settled
         for variant, theme, app_font, system_scale in DESIGN_VARIANTS:
             directory = output / profile / variant
             directory.mkdir(parents=True, exist_ok=True)
