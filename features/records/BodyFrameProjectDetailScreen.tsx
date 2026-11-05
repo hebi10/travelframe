@@ -4,7 +4,7 @@ import {
 import * as ImagePicker from "expo-image-picker";
 import { Image } from "@/components/private-media-image";
 import { BodyMeasurementSummaryCard } from "@/components/body-measurement-summary-card";
-import { BodyFrameSheetFooter, BodyFrameSheetHeader } from "@/components/body-frame-sheet";
+import { BodyFrameSheetFooter, BodyFrameSheetHandle, BodyFrameSheetHeader } from "@/components/body-frame-sheet";
 import { router,
   type Href,
   useFocusEffect,
@@ -32,7 +32,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { bodyFrameAccent, bodyFrameDesign, bodyFrameTypography, getBodyFrameControlColors } from "@/constants/app-theme";
+import { bodyFrameAccent, bodyFrameDesign, bodyFrameSheetDesign, bodyFrameTypography, getBodyFrameControlColors } from "@/constants/app-theme";
 import {
   getBodyProjectPhotos,
   getBodyProjectProgressSummary,
@@ -496,7 +496,8 @@ export default function BodyFrameProjectDetailScreen() {
   const insets = useSafeAreaInsets();
   const { palette, effectiveThemeMode } = useAppAppearance();
   const accent = effectiveThemeMode === "dark" ? bodyFrameAccent : palette.text;
-  const accentText = effectiveThemeMode === "dark" ? "#0B0B0C" : palette.inverse;
+  const { selected: modalSelectionColor, primaryText: modalSelectionText } =
+    getBodyFrameControlColors(palette);
   const { primaryBackground: primaryColor, primaryText: primaryTextColor } =
     getBodyFrameControlColors(palette);
   const { isLoggedIn, subscription, user } = useAuth();
@@ -1440,8 +1441,9 @@ export default function BodyFrameProjectDetailScreen() {
                   paddingBottom: Math.max(insets.bottom + 18, 28)
                 }
               ]}
+              accessibilityViewIsModal
             >
-              <View style={styles.sheetHandle} />
+              <BodyFrameSheetHandle />
               <BodyFrameSheetHeader
                 title="촬영 알림"
                 description={`“${project.name}” 프로젝트의 촬영 시간과 요일을 설정합니다.`}
@@ -1470,9 +1472,9 @@ export default function BodyFrameProjectDetailScreen() {
                         style={[
                           styles.choiceButton,
                           {
-                            borderColor: active ? accent : palette.line,
+                            borderColor: active ? modalSelectionColor : palette.line,
                             backgroundColor: active
-                              ? accent
+                              ? modalSelectionColor
                               : palette.background
                           }
                         ]}
@@ -1481,7 +1483,7 @@ export default function BodyFrameProjectDetailScreen() {
                         <Text
                           style={[
                             styles.choiceText,
-                            { color: active ? accentText : palette.text }
+                            { color: active ? modalSelectionText : palette.text }
                           ]}
                         >
                           {label}
@@ -1578,9 +1580,9 @@ export default function BodyFrameProjectDetailScreen() {
                           style={[
                             styles.choiceButton,
                             {
-                              borderColor: active ? accent : palette.line,
+                              borderColor: active ? modalSelectionColor : palette.line,
                               backgroundColor: active
-                                ? accent
+                                ? modalSelectionColor
                                 : palette.background,
                               opacity: reminderEnabledDraft ? 1 : 0.45
                             }
@@ -1590,7 +1592,7 @@ export default function BodyFrameProjectDetailScreen() {
                           <Text
                             style={[
                               styles.choiceText,
-                              { color: active ? accentText : palette.text }
+                              { color: active ? modalSelectionText : palette.text }
                             ]}
                           >
                             {label}
@@ -1614,7 +1616,7 @@ export default function BodyFrameProjectDetailScreen() {
                             style={[
                               styles.reminderWeekdayButton,
                               {
-                                borderColor: active ? accent : palette.line,
+                                borderColor: active ? modalSelectionColor : palette.line,
                                 backgroundColor: active
                                   ? palette.text
                                   : palette.background,
@@ -1626,7 +1628,7 @@ export default function BodyFrameProjectDetailScreen() {
                             <Text
                               style={[
                                 styles.reminderWeekdayText,
-                                { color: active ? accentText : palette.text }
+                                { color: active ? modalSelectionText : palette.text }
                               ]}
                             >
                               {label}
@@ -1660,6 +1662,10 @@ export default function BodyFrameProjectDetailScreen() {
         visible={settingsOpen}
         onRequestClose={() => setSettingsOpen(false)}
       >
+        <KeyboardAvoidingView
+          style={styles.keyboardAvoidingRoot}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
         <View style={styles.modalBackdrop}>
           <Pressable
             accessibilityRole="button"
@@ -1676,8 +1682,9 @@ export default function BodyFrameProjectDetailScreen() {
                 paddingBottom: Math.max(insets.bottom, 16)
               }
             ]}
+            accessibilityViewIsModal
           >
-            <View style={styles.sheetHandle} />
+            <BodyFrameSheetHandle />
             <BodyFrameSheetHeader
               title="프로젝트 설정"
               onClose={() => setSettingsOpen(false)}
@@ -1692,7 +1699,7 @@ export default function BodyFrameProjectDetailScreen() {
               showsVerticalScrollIndicator={false}
               contentContainerStyle={[
                 styles.settingsContent,
-                { paddingBottom: Math.max(insets.bottom + 24, 40) }
+                { paddingBottom: 16 }
               ]}
             >
               <Text style={[styles.label, { color: palette.muted }]}>이름</Text>
@@ -1772,15 +1779,15 @@ export default function BodyFrameProjectDetailScreen() {
                       style={[
                         styles.choiceButton,
                         {
-                          borderColor: active ? accent : palette.line,
-                          backgroundColor: active ? accent : palette.background
+                          borderColor: active ? modalSelectionColor : palette.line,
+                          backgroundColor: active ? modalSelectionColor : palette.background
                         }
                       ]}
                     >
                       <Text
                         style={[
                           styles.choiceText,
-                          { color: active ? accentText : palette.text }
+                          { color: active ? modalSelectionText : palette.text }
                         ]}
                       >
                         {label}
@@ -1811,7 +1818,7 @@ export default function BodyFrameProjectDetailScreen() {
                       style={[
                         styles.choiceButton,
                         {
-                          borderColor: active ? accent : palette.line,
+                          borderColor: active ? modalSelectionColor : palette.line,
                           backgroundColor: active
                             ? palette.text
                             : palette.background
@@ -1822,7 +1829,7 @@ export default function BodyFrameProjectDetailScreen() {
                       <Text
                         style={[
                           styles.choiceText,
-                          { color: active ? accentText : palette.text }
+                          { color: active ? modalSelectionText : palette.text }
                         ]}
                       >
                         {label}
@@ -1853,7 +1860,7 @@ export default function BodyFrameProjectDetailScreen() {
                       style={[
                         styles.choiceButton,
                         {
-                          borderColor: active ? accent : palette.line,
+                          borderColor: active ? modalSelectionColor : palette.line,
                           backgroundColor: active
                             ? palette.text
                             : palette.background
@@ -1864,7 +1871,7 @@ export default function BodyFrameProjectDetailScreen() {
                       <Text
                         style={[
                           styles.choiceText,
-                          { color: active ? accentText : palette.text }
+                          { color: active ? modalSelectionText : palette.text }
                         ]}
                       >
                         {label}
@@ -1899,8 +1906,8 @@ export default function BodyFrameProjectDetailScreen() {
                       style={[
                         styles.choiceButton,
                         {
-                          borderColor: active ? accent : palette.line,
-                          backgroundColor: active ? accent : palette.background
+                          borderColor: active ? modalSelectionColor : palette.line,
+                          backgroundColor: active ? modalSelectionColor : palette.background
                         }
                       ]}
                       onPress={() =>
@@ -1910,7 +1917,7 @@ export default function BodyFrameProjectDetailScreen() {
                       <Text
                         style={[
                           styles.choiceText,
-                          { color: active ? accentText : palette.text }
+                          { color: active ? modalSelectionText : palette.text }
                         ]}
                       >
                         {label}
@@ -1936,7 +1943,7 @@ export default function BodyFrameProjectDetailScreen() {
                             style={[
                               styles.metricChoice,
                               {
-                                borderColor: active ? accent : palette.line,
+                                borderColor: active ? modalSelectionColor : palette.line,
                                 backgroundColor: active
                                   ? palette.surfaceStrong
                                   : palette.background
@@ -1976,7 +1983,7 @@ export default function BodyFrameProjectDetailScreen() {
                             style={[
                               styles.metricChoice,
                               {
-                                borderColor: active ? accent : palette.line,
+                                borderColor: active ? modalSelectionColor : palette.line,
                                 backgroundColor: active
                                   ? palette.text
                                   : palette.background
@@ -1992,7 +1999,7 @@ export default function BodyFrameProjectDetailScreen() {
                             <Text
                               style={[
                                 styles.metricChoiceText,
-                                { color: active ? accentText : palette.text }
+                                { color: active ? modalSelectionText : palette.text }
                               ]}
                             >
                               {bodyMeasurementMetricMeta[metric].label}
@@ -2018,8 +2025,8 @@ export default function BodyFrameProjectDetailScreen() {
                           style={[
                             styles.choiceButton,
                             {
-                              borderColor: active ? accent : palette.line,
-                              backgroundColor: active ? accent : palette.background
+                              borderColor: active ? modalSelectionColor : palette.line,
+                              backgroundColor: active ? modalSelectionColor : palette.background
                             }
                           ]}
                           onPress={() =>
@@ -2032,7 +2039,7 @@ export default function BodyFrameProjectDetailScreen() {
                           <Text
                             style={[
                               styles.choiceText,
-                              { color: active ? accentText : palette.text }
+                              { color: active ? modalSelectionText : palette.text }
                             ]}
                           >
                             {label}
@@ -2073,6 +2080,7 @@ export default function BodyFrameProjectDetailScreen() {
             </View>
           </View>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
@@ -2376,12 +2384,14 @@ const styles = StyleSheet.create({
   modalBackdrop: {
     flex: 1,
     justifyContent: "flex-end",
-    backgroundColor: "rgba(0,0,0,0.62)"
+    backgroundColor: bodyFrameSheetDesign.backdropColor
   },
   settingsSheet: {
     width: "100%",
+    maxWidth: bodyFrameDesign.contentMaxWidth,
+    alignSelf: "center",
     gap: 10,
-    maxHeight: "86%",
+    maxHeight: bodyFrameSheetDesign.maxHeight,
     paddingHorizontal: bodyFrameDesign.horizontalPadding,
     paddingTop: 10,
     borderWidth: bodyFrameDesign.borderWidth,
@@ -2393,7 +2403,9 @@ const styles = StyleSheet.create({
   },
   reminderSheet: {
     width: "100%",
-    maxHeight: "88%",
+    maxWidth: bodyFrameDesign.contentMaxWidth,
+    alignSelf: "center",
+    maxHeight: bodyFrameSheetDesign.maxHeight,
     gap: 16,
     paddingHorizontal: bodyFrameDesign.horizontalPadding,
     paddingTop: 10,
@@ -2475,13 +2487,6 @@ const styles = StyleSheet.create({
     fontSize: bodyFrameTypography.caption,
     fontWeight: "700"
   },
-  sheetHandle: {
-    alignSelf: "center",
-    width: 36,
-    height: 4,
-    marginBottom: 14,
-    backgroundColor: "#3A3A3E"
-  },
   sheetHeader: {
     minHeight: bodyFrameDesign.minTouchSize,
     flexDirection: "row",
@@ -2515,7 +2520,8 @@ const styles = StyleSheet.create({
   },
   projectSettingsFooter: { paddingTop: 8 },
   settingsScroll: {
-    flexShrink: 1
+    flexShrink: 1,
+    minHeight: 0
   },
   settingsContent: {
     gap: 10

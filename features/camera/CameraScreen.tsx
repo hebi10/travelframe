@@ -2874,14 +2874,14 @@ export default function CameraScreen({
         onRequestClose={() => setCameraSettingsOpen(false)}
       >
         <View style={[styles.navModalBackdrop, modalSafeStyle]}>
-          <View style={[styles.navModal, { paddingBottom: bottomModalPadding }]}>
+          <View style={[styles.navModal, { paddingBottom: bottomModalPadding }]} accessibilityViewIsModal>
             <View style={styles.cameraSettingsHandle} />
             <View style={styles.cameraSettingsHeader}>
               <View style={styles.modalTitleGroup}>
                 <Text selectable={false} style={styles.cameraSettingsEyebrow}>CAMERA</Text>
                 <Text selectable={false} style={styles.cameraSettingsTitle}>촬영</Text>
               </View>
-              <Pressable accessibilityRole="button" style={styles.cameraSettingsCloseButton} onPress={() => setCameraSettingsOpen(false)}>
+              <Pressable accessibilityRole="button" accessibilityLabel="촬영 설정 닫기" style={styles.cameraSettingsCloseButton} onPress={() => setCameraSettingsOpen(false)}>
                 <Text selectable={false} style={styles.cameraSettingsCloseText}>닫기</Text>
               </Pressable>
             </View>
@@ -2891,6 +2891,8 @@ export default function CameraScreen({
                 style={styles.cameraSettingsScroll}
                 contentContainerStyle={styles.cameraSettingsContent}
                 showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                nestedScrollEnabled
               >
                 <View style={styles.cameraSettingBlock}>
                   <View style={styles.cameraToolIntro}>
@@ -3227,13 +3229,14 @@ export default function CameraScreen({
         >
         <GestureHandlerRootView style={styles.modalGestureRoot}>
           <View style={[styles.modalBackdrop, modalSafeStyle]}>
-            <View style={[styles.guideModal, { paddingBottom: bottomModalPadding }]}>
+            <View style={[styles.guideModal, { paddingBottom: bottomModalPadding }]} accessibilityViewIsModal>
+              <View style={styles.cameraSettingsHandle} />
               <View style={styles.modalHeader}>
                 <View style={styles.modalTitleGroup}>
                   <Text selectable={false} style={styles.modalEyebrow}>GUIDE</Text>
                   <Text selectable={false} style={styles.modalTitle}>가이드 설정</Text>
                 </View>
-                <Pressable accessibilityRole="button" style={styles.modalCloseButton} onPress={() => setGuideSettingsOpen(false)}>
+                <Pressable accessibilityRole="button" accessibilityLabel="가이드 설정 닫기" style={styles.modalCloseButton} onPress={() => setGuideSettingsOpen(false)}>
                   <Text selectable={false} style={styles.modalCloseText}>닫기</Text>
                 </Pressable>
               </View>
@@ -3242,6 +3245,9 @@ export default function CameraScreen({
                 style={styles.guideSettingsScroll}
                 contentContainerStyle={styles.guideSettingsContent}
                 showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                keyboardDismissMode="on-drag"
+                nestedScrollEnabled
               >
                 <View style={styles.modalSection}>
                   <Text selectable={false} style={styles.modalSectionTitle}>가이드라인</Text>

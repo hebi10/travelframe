@@ -77,6 +77,7 @@ export function AppGuideOverlay({
               borderColor: palette.line
             }
           ]}
+          accessibilityViewIsModal
         >
           <ScrollView
             style={styles.contentScroll}
@@ -155,7 +156,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: bodyFrameDesign.modalRadius
   },
-  contentScroll: { flexShrink: 1 },
+  contentScroll: { flexShrink: 1, minHeight: 0 },
   contentScrollContainer: { flexGrow: 1 },
   brandBlock: {
     gap: 6,

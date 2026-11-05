@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
-import { KeyboardAvoidingView, Modal, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppText as Text, AppTextInput as TextInput } from "@/components/app-text";
-import { BodyFrameSheetFooter, BodyFrameSheetHeader } from "@/components/body-frame-sheet";
-import { bodyFrameDesign, bodyFrameTypography } from "@/constants/app-theme";
+import { BodyFrameSheetFooter, BodyFrameSheetHandle, BodyFrameSheetHeader } from "@/components/body-frame-sheet";
+import { bodyFrameDesign, bodyFrameSheetDesign, bodyFrameTypography } from "@/constants/app-theme";
 import { getPhotoPositionIndex } from "@/features/records/photo-order-accessibility";
 import { useAppAppearance } from "@/lib/app-appearance";
 
@@ -24,7 +24,7 @@ export function PhotoPositionSheet({ currentPosition, count, onClose, onMove }: 
 
   return (
     <Modal transparent animationType="slide" visible={currentPosition !== null} onRequestClose={onClose}>
-      <KeyboardAvoidingView style={styles.root} behavior="height">
+      <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === "ios" ? "padding" : "height"}>
         <View style={[styles.backdrop, { paddingTop: Math.max(insets.top, 16) }]}>
           <Pressable
             accessibilityRole="button"
@@ -33,14 +33,16 @@ export function PhotoPositionSheet({ currentPosition, count, onClose, onMove }: 
             onPress={onClose}
           />
           <View
+            accessibilityViewIsModal
             style={[
               styles.sheet,
               { backgroundColor: palette.surface, borderColor: palette.line, paddingBottom: Math.max(insets.bottom, 16) }
             ]}
           >
-            <View style={[styles.handle, { backgroundColor: palette.faint }]} />
+            <BodyFrameSheetHandle />
             <BodyFrameSheetHeader title="사진 순번 이동" onClose={onClose} />
             <ScrollView
+              style={styles.contentScroll}
               keyboardShouldPersistTaps="handled"
               keyboardDismissMode="on-drag"
               contentContainerStyle={styles.content}
@@ -72,18 +74,18 @@ export function PhotoPositionSheet({ currentPosition, count, onClose, onMove }: 
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  backdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.62)" },
+  backdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: bodyFrameSheetDesign.backdropColor },
   sheet: {
     width: "100%",
     maxWidth: bodyFrameDesign.contentMaxWidth,
-    maxHeight: "86%",
+    maxHeight: bodyFrameSheetDesign.maxHeight,
     alignSelf: "center",
     padding: bodyFrameDesign.horizontalPadding,
     gap: 12,
     borderWidth: bodyFrameDesign.borderWidth,
     borderRadius: bodyFrameDesign.bottomSheetRadius
   },
-  handle: { alignSelf: "center", width: 36, height: 4, marginBottom: 2 },
+  contentScroll: { flexShrink: 1, minHeight: 0 },
   content: { gap: 12, paddingBottom: 8 },
   description: { fontSize: bodyFrameTypography.body, lineHeight: 20 },
   input: {

@@ -88,6 +88,15 @@ export const bodyFrameDesign = {
   borderWidth: 1
 } as const;
 
+export const bodyFrameSheetDesign = {
+  backdropColor: "rgba(0,0,0,0.62)",
+  maxHeight: "86%",
+  handleWidth: 36,
+  handleHeight: 4,
+  handleRadius: 2,
+  footerGap: 10
+} as const;
+
 export const bodyFrameTypography = {
   pageTitle: 26,
   projectTitle: 24,

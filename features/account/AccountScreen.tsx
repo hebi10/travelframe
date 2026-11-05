@@ -15,6 +15,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ScreenShell } from "@/components/screen-shell";
+import { BodyFrameSheetHandle } from "@/components/body-frame-sheet";
 import { CloudBackupProjectSlotsSection } from "@/features/account/CloudBackupProjectSlotsSection";
 import { SectionBlock } from "@/components/section-block";
 import {
@@ -895,7 +896,8 @@ export default function AccountScreen() {
         onRequestClose={() => setShowDeleteRequestInfo(false)}
       >
         <View style={[styles.paymentModalBackdrop, modalSafeStyle]}>
-          <View style={[styles.paymentModalPanel, themed.panelStrong]}>
+          <View style={[styles.paymentModalPanel, themed.panelStrong]} accessibilityViewIsModal>
+            <BodyFrameSheetHandle />
             <View style={styles.modalHeader}>
               <View style={styles.planCopy}>
                 <Text selectable={false} style={[styles.planTitle, themed.text]}>
@@ -906,7 +908,8 @@ export default function AccountScreen() {
                 </Text>
               </View>
               <Pressable accessibilityRole="button"
-                style={[styles.modalCloseButton, themed.secondaryButton]}
+                accessibilityLabel="모달 닫기"
+                 style={[styles.modalCloseButton, themed.secondaryButton]}
                 onPress={() => setShowDeleteRequestInfo(false)}
               >
                 <Text selectable={false} style={[styles.secondaryButtonText, themed.text]}>
@@ -915,12 +918,19 @@ export default function AccountScreen() {
               </Pressable>
             </View>
 
-            <Text selectable={false} style={[styles.helpText, themed.mutedText]}>
-              백업 데이터는 설정 화면의 클라우드 백업에서 백업 데이터 삭제를 누르면 계정에서 제거됩니다.
-            </Text>
-            <Text selectable={false} style={[styles.helpText, themed.mutedText]}>
-              계정 삭제 요청과 추가 데이터 삭제 안내는 별도 안내 페이지에서 확인하실 수 있습니다.
-            </Text>
+            <ScrollView
+              style={styles.paymentModalScroll}
+              contentContainerStyle={styles.paymentModalBody}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              <Text selectable={false} style={[styles.helpText, themed.mutedText]}>
+                백업 데이터는 설정 화면의 클라우드 백업에서 백업 데이터 삭제를 누르면 계정에서 제거됩니다.
+              </Text>
+              <Text selectable={false} style={[styles.helpText, themed.mutedText]}>
+                계정 삭제 요청과 추가 데이터 삭제 안내는 별도 안내 페이지에서 확인하실 수 있습니다.
+              </Text>
+            </ScrollView>
 
             <Pressable accessibilityRole="button"
               style={[styles.primaryButton, themed.primaryFill]}
@@ -941,7 +951,8 @@ export default function AccountScreen() {
         onRequestClose={() => setSelectedPaymentPlan(null)}
       >
         <View style={[styles.paymentModalBackdrop, modalSafeStyle]}>
-          <View style={[styles.paymentModalPanel, themed.panelStrong]}>
+          <View style={[styles.paymentModalPanel, themed.panelStrong]} accessibilityViewIsModal>
+            <BodyFrameSheetHandle />
             <View style={styles.modalHeader}>
               <View style={styles.planCopy}>
                 <Text selectable={false} style={[styles.planTitle, themed.text]}>
@@ -958,7 +969,8 @@ export default function AccountScreen() {
                 </Text>
               </View>
               <Pressable accessibilityRole="button"
-                style={[styles.modalCloseButton, themed.secondaryButton]}
+                accessibilityLabel="모달 닫기"
+                 style={[styles.modalCloseButton, themed.secondaryButton]}
                 onPress={() => setSelectedPaymentPlan(null)}
               >
                 <Text selectable={false} style={[styles.secondaryButtonText, themed.text]}>

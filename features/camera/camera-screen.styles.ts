@@ -1,6 +1,6 @@
 import { StyleSheet } from "react-native";
 
-import { bodyFrameAccent, bodyFrameDarkColors, bodyFrameDesign, bodyFrameTypography, colors, controls, typography } from "@/constants/app-theme";
+import { bodyFrameAccent, bodyFrameDarkColors, bodyFrameDesign, bodyFrameSheetDesign, bodyFrameTypography, colors, controls, typography } from "@/constants/app-theme";
 import {
   CAMERA_CONTROL_TRAY_HORIZONTAL_PADDING,
   CAMERA_FOCUS_INDICATOR_RADIUS,
@@ -368,7 +368,7 @@ export const styles = StyleSheet.create({
   guideModal: {
     gap: 16,
     flexGrow: 0,
-    maxHeight: "88%",
+    maxHeight: bodyFrameSheetDesign.maxHeight,
     padding: 18,
     paddingBottom: 22,
     borderWidth: 1,
@@ -379,7 +379,7 @@ export const styles = StyleSheet.create({
   navModal: {
     gap: 18,
     flexGrow: 0,
-    maxHeight: "88%",
+    maxHeight: bodyFrameSheetDesign.maxHeight,
     paddingHorizontal: 16,
     paddingTop: 12,
     paddingBottom: 22,
@@ -392,10 +392,10 @@ export const styles = StyleSheet.create({
   },
   cameraSettingsHandle: {
     alignSelf: "center",
-    width: 44,
-    height: 4,
+    width: bodyFrameSheetDesign.handleWidth,
+    height: bodyFrameSheetDesign.handleHeight,
     marginBottom: 2,
-    borderRadius: 2,
+    borderRadius: bodyFrameSheetDesign.handleRadius,
     backgroundColor: "#55555B"
   },
   cameraSettingsHeader: {
@@ -513,7 +513,9 @@ export const styles = StyleSheet.create({
     color: bodyFrameDarkColors.text
   },
   guideSettingsScroll: {
-    flexGrow: 0
+    flexGrow: 0,
+    flexShrink: 1,
+    minHeight: 0
   },
   guideSettingsContent: {
     gap: 16,

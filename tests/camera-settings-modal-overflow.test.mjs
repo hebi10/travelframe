@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 
+const themeSource = fs.readFileSync("constants/app-theme.ts", "utf8");
+
 const cameraSource = [
   fs.readFileSync("features/camera/CameraScreen.tsx", "utf8"),
   fs.readFileSync("features/camera/camera-screen.styles.ts", "utf8")
@@ -18,7 +20,9 @@ const cameraSettingsScrollStyle = readStyleBlock("cameraSettingsScroll");
 const cameraSettingsContentStyle = readStyleBlock("cameraSettingsContent");
 
 assert.ok(
-  navModalStyle.includes('maxHeight: "88%"') && navModalStyle.includes('overflow: "hidden"'),
+  navModalStyle.includes("maxHeight: bodyFrameSheetDesign.maxHeight") &&
+    navModalStyle.includes('overflow: "hidden"') &&
+    themeSource.includes('maxHeight: "86%"'),
   "camera settings modal should clip content that exceeds the panel"
 );
 
