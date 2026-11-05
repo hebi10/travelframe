@@ -960,7 +960,9 @@ def video_smoke(device, directory, restart=True):
             xml = device.dump()
             strings = ui_strings(xml)
             running = any('영상 만드는 중' in value for value in strings)
-            if not running and time.monotonic()-started > 2 and any(value.strip() == '영상 만들기' for value in strings):
+            if (not running and time.monotonic()-started > 2
+                    and any(value.strip() == '영상 만들기' for value in strings)
+                    and any('앨범에 저장했습니다.' in value for value in strings)):
                 break
             # Permission prompts are not bypassed. Their actual state is retained on timeout.
             time.sleep(2)
@@ -1026,7 +1028,15 @@ def video_smoke(device, directory, restart=True):
         result['status'] = 'captured'
     except Exception as error:
         result.update(status='failed', error=str(error))
-        records.append(capture(device, directory, 'video-export-result', 'video-create', [], open_route=False))
+        # The persisted-media audit intentionally force-stops the app. Preserve
+        # the original export failure rather than inventing a second capture failure.
+        activity=device.shell('dumpsys','activity','activities',check=False)
+        resumed='\n'.join(line for line in activity.splitlines()
+                          if 'ResumedActivity' in line or 'topResumedActivity' in line)
+        if PACKAGE in resumed:
+            records.append(capture(device, directory, 'video-export-result', 'video-create', [], open_route=False))
+        else:
+            result['captureSkippedReason']='App not foreground after inspection; original failure retained'
     (directory / 'video-native-export.json').write_text(json.dumps(result, indent=2, ensure_ascii=False))
     print(f"{directory.name}/video-native-export: {result['status']}", flush=True)
     records.append(result)
