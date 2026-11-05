@@ -65,6 +65,8 @@ assert.ok(chooser.includes("onCreateProject") && chooser.includes("onSelectProje
 
 const position = source("features/records/PhotoPositionSheet.tsx");
 assert.ok(position.includes("BodyFrameSheetHandle"));
+assert.ok(position.includes("accessibilityViewIsModal"));
+assert.ok(position.includes('behavior={Platform.OS === "ios" ? "padding" : "height"}'));
 assert.ok(position.includes("styles.contentScroll"));
 assert.ok(position.includes("flexShrink: 1, minHeight: 0"));
 assert.ok(position.includes("BodyFrameSheetFooter"));
@@ -73,6 +75,7 @@ assert.ok(position.includes("if (targetIndex !== null) onMove(targetIndex)"));
 
 const measurement = source("features/records/BodyMeasurementEditorSheet.tsx");
 assert.ok(measurement.includes("BodyFrameSheetHandle"));
+assert.ok(measurement.includes("accessibilityViewIsModal"));
 assert.ok(measurement.includes('accessibilityLabel="기록 날짜"'));
 assert.ok(measurement.includes('accessibilityLabel="수치 기록 메모"'));
 assert.ok(measurement.includes("styles.contentScroll"));
