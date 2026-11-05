@@ -365,7 +365,9 @@ export default function BodyFrameCameraScreen() {
           { top: cameraHeaderBottom ?? Math.max(insets.top + 64, 76) }
         ]}
       >
-        <Text style={styles.captureHint}>{firstPhotoHint}</Text>
+        <View pointerEvents="none" style={styles.captureHintPanel}>
+          <Text style={styles.captureHint}>{firstPhotoHint}</Text>
+        </View>
         {captureBlockedReason && upgradePlanLabel ? (
           <Pressable
             accessibilityRole="button"
@@ -378,7 +380,7 @@ export default function BodyFrameCameraScreen() {
       </View>
 
       {saveMessage ? (
-        <View style={styles.snackbar}>
+        <View style={styles.snackbar} accessibilityLiveRegion="polite">
           <Text style={styles.snackbarText}>{saveMessage}</Text>
           {measurementPromptPhotoId ? (
             <Pressable
@@ -411,10 +413,17 @@ const styles = StyleSheet.create({
     right: bodyFrameDesign.horizontalPadding,
     zIndex: 40
   },
+  captureHintPanel: {
+    alignSelf: "center",
+    maxWidth: "100%",
+    marginTop: 7,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: "rgba(11,11,12,0.78)"
+  },
   captureHint: {
     alignSelf: "center",
-    marginTop: 7,
-    color: "#D7D7DB",
+    color: "#F5F5F5",
     fontSize: bodyFrameTypography.caption,
     lineHeight: 17,
     textAlign: "center"
