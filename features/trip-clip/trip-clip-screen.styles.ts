@@ -1342,7 +1342,7 @@ export const createTripClipStyles = (colors: AppPalette) => StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 18,
     paddingVertical: 24,
-    backgroundColor: "rgba(0, 0, 0, 0.62)"
+    backgroundColor: bodyFrameSheetDesign.backdropColor
   },
   exportModalPanel: {
     width: "92%",

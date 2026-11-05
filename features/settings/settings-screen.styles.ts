@@ -1,6 +1,6 @@
 import { StyleSheet } from "react-native";
 
-import { bodyFrameDesign, colors, controls, spacing, typography } from "@/constants/app-theme";
+import { bodyFrameDesign, bodyFrameSheetDesign, colors, controls, spacing, typography } from "@/constants/app-theme";
 import type { AppPalette } from "@/lib/app-appearance";
 
 export const createThemedStyles = (palette: AppPalette, fontFamily?: string) => {
@@ -28,7 +28,7 @@ export const createThemedStyles = (palette: AppPalette, fontFamily?: string) => 
     },
     activeFill: {
       borderColor: palette.text,
-      backgroundColor: isDark ? palette.surfaceStrong : palette.text
+      backgroundColor: palette.text
     },
     secondaryButton: {
       borderColor: palette.line,
@@ -54,7 +54,7 @@ export const createThemedStyles = (palette: AppPalette, fontFamily?: string) => 
       ...fontTextStyle
     },
     inverseText: {
-      color: isDark ? palette.text : palette.inverse,
+      color: palette.inverse,
       ...fontTextStyle
     },
     inverseMutedText: {
@@ -80,7 +80,7 @@ export const styles = StyleSheet.create({
   modalBackdrop: {
     flex: 1,
     justifyContent: "flex-end",
-    backgroundColor: "rgba(0, 0, 0, 0.42)"
+    backgroundColor: bodyFrameSheetDesign.backdropColor
   },
   modalPanel: {
     width: "100%",
@@ -88,16 +88,19 @@ export const styles = StyleSheet.create({
     alignSelf: "center",
     gap: 14,
     flexGrow: 0,
-    maxHeight: "86%",
+    maxHeight: bodyFrameSheetDesign.maxHeight,
     padding: bodyFrameDesign.horizontalPadding,
     borderWidth: bodyFrameDesign.borderWidth,
     borderColor: colors.line,
     backgroundColor: colors.background
   },
   modalScroll: {
-    flexGrow: 0
+    flexGrow: 0,
+    flexShrink: 1,
+    minHeight: 0
   },
   modalHeader: {
+    minHeight: bodyFrameDesign.minTouchSize,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -111,6 +114,7 @@ export const styles = StyleSheet.create({
     letterSpacing: 0
   },
   closeButton: {
+    minWidth: bodyFrameDesign.minTouchSize,
     minHeight: bodyFrameDesign.minTouchSize,
     justifyContent: "center",
     paddingHorizontal: 12,
@@ -603,14 +607,14 @@ export const styles = StyleSheet.create({
     letterSpacing: 0
   },
   deleteRequestPrimaryButton: {
-    minHeight: controls.height,
+    minHeight: bodyFrameDesign.primaryButtonHeight,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.text
   },
   authPrimaryButton: {
     flex: 1,
-    minHeight: controls.height,
+    minHeight: bodyFrameDesign.primaryButtonHeight,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.text
