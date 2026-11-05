@@ -22,7 +22,7 @@ class CaptureHelpersTest(unittest.TestCase):
     def test_visual_profile_awaits_actual_screenshot_dimensions(self):
         import struct
         def png(width, height):
-            return b'\\x89PNG\\r\\n\\x1a\\n' + b'\\x00'*8 + struct.pack('>II', width, height)
+            return b'\x89PNG\r\n\x1a\n' + b'\x00'*8 + struct.pack('>II', width, height)
         device = Mock()
         device.run.side_effect = [png(900, 1600), png(1125, 1800)]
         with patch.object(qa.time, 'sleep'):
