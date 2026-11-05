@@ -76,7 +76,7 @@ for (const token of [
   "styles.reminderScroll",
   'keyboardShouldPersistTaps="handled"',
   'keyboardDismissMode="on-drag"',
-  'maxHeight: "88%"'
+  'maxHeight: bodyFrameSheetDesign.maxHeight'
 ]) {
   assert.ok(projectDetail.includes(token), `project reminder UI missing: ${token}`);
 }
