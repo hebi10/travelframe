@@ -31,6 +31,17 @@ PROJECT = 'qa-demo-project'
 PHOTO = 'qa-demo-photo-1'
 ROOT = Path(__file__).resolve().parents[1]
 PROFILES = [('mobile', '720x1600', 320), ('tablet', '1200x1920', 240)]
+DESIGN_PROFILES = [
+    ('phone-360dp', '720x1600', 320),
+    ('phone-412dp', '824x1832', 320),
+    ('tablet-600dp', '900x1600', 240),
+    ('tablet-750dp', '1125x1800', 240),
+]
+DESIGN_VARIANTS = [
+    ('dark-100', 'dark', 'medium', 1.0),
+    ('light-130', 'light', 'large', 1.3),
+    ('dark-150', 'dark', 'large', 1.5),
+]
 
 
 
@@ -95,7 +106,7 @@ def inspect_native_frames(path, directory):
     return evidence
 
 
-def fixture_values(app_dir, populated=True, font_size='medium'):
+def fixture_values(app_dir, populated=True, font_size='medium', theme_mode='dark'):
     """Mirror the versioned schemas in lib/*-library.ts; all values are synthetic."""
     photos = []
     measurements = []
@@ -126,7 +137,7 @@ def fixture_values(app_dir, populated=True, font_size='medium'):
         'travel-frame.guide-progress.v1': dict(seenGuideVersion=4, seenIntro=True,
             seenTabs={tab: True for tab in ['camera', 'studio', 'tripClip', 'account', 'settings']}),
         'travel-frame.settings.v1': dict(storageMode='local_only', cloudBackupEnabled=False,
-            themeMode='dark', cameraFacing='back', referencePhotoVisible=True, fontSize=font_size),
+            themeMode=theme_mode, cameraFacing='back', referencePhotoVisible=True, fontSize=font_size),
     }
     encoded = {key: json.dumps(value, ensure_ascii=False) for key, value in values.items()}
     encoded['body-frame.stage-2-migration.v1'] = 'completed'
@@ -573,7 +584,7 @@ class Device:
                 if attempt:raise
         raise RuntimeError('Control did not open its expected modal')
 
-    def seed(self, populated, font_size='medium'):
+    def seed(self, populated, font_size='medium', theme_mode='dark'):
         self.shell('am', 'force-stop', PACKAGE)
         app_dir = self.shell('run-as', PACKAGE, 'pwd').strip()
         if not re.fullmatch(r'/data/(?:user/\d+|data)/com\.haebi\.photoguide', app_dir):
@@ -586,7 +597,7 @@ class Device:
                     self.shell('run-as', PACKAGE, 'sh', '-c', f'cat > {relative}', data=fixture_jpeg(index,folder=='photo-previews'))
         with tempfile.TemporaryDirectory() as temporary:
             db = Path(temporary) / 'RKStorage'
-            write_storage(db, fixture_values(app_dir, populated, font_size))
+            write_storage(db, fixture_values(app_dir, populated, font_size, theme_mode))
             self.shell('run-as', PACKAGE, 'rm', '-f', 'databases/RKStorage-wal', 'databases/RKStorage-shm', 'databases/RKStorage-journal')
             self.shell('run-as', PACKAGE, 'sh', '-c', 'cat > databases/RKStorage', data=db.read_bytes())
         return app_dir
@@ -1043,13 +1054,77 @@ def video_smoke(device, directory, restart=True):
     return records
 
 
+def capture_design_matrix(device, output, records, manifest):
+    """Capture actual Android UI on disposable offline guest fixtures at four dp widths."""
+    screens = [
+        ('camera', 'camera', ['프로젝트 선택', '사진 촬영'], None),
+        ('records', 'studio', ['QA 데모', '프로젝트별 몸의 변화를'], None),
+        ('project', f'project/{PROJECT}', ['QA 데모', '프로젝트 설정 열기'], None),
+        ('compare', f'project/{PROJECT}/compare', ['전후 사진 비교', '첫 사진', '마지막 사진'], None),
+        ('measurements', f'project/{PROJECT}/measurements', ['수치 기록', 'QA 데모'], None),
+        ('video-home', 'trip-clip', ['프로젝트로 변화 영상을'], None),
+        ('video-create', 'video-create', ['변화 영상 만들기', 'QA 데모'], None),
+        ('video-library', 'video-library', ['영상 관리', '저장한 영상'], None),
+        ('settings', 'settings', ['설정', '기준 사진 표시'], None),
+        ('account', 'account', ['로그인하고 기록을 보호하세요.'], None),
+        ('project-settings', f'project/{PROJECT}', ['프로젝트 설정', '변경 저장', '이름'],
+         (['프로젝트 설정 열기'], '프로젝트 설정 열기')),
+        ('video-photos', 'video-create', ['사진 선택', '전체 선택'],
+         (['변화 영상 만들기'], '사진 수', 'summary')),
+    ]
+    manifest['visualDesignMatrix'] = {
+        'profiles': [{'name': p, 'size': size, 'density': dpi,
+                      'widthDp': round(int(size.split('x')[0]) * 160 / dpi)}
+                     for p, size, dpi in DESIGN_PROFILES],
+        'variants': [{'name': name, 'theme': theme, 'appFont': font, 'systemFontScale': scale}
+                     for name, theme, font, scale in DESIGN_VARIANTS],
+        'screens': [name for name, _, _, _ in screens],
+        'screenshotsAreActualAndroid': True,
+        'designGuideMatchRequiresVisualReview': True,
+        'notTested': ['TalkBack spoken order', 'real login and Play Billing',
+                      'Health Connect', 'signed Play installation', 'private user media'],
+    }
+    for profile, size, density in DESIGN_PROFILES:
+        device.shell('am', 'force-stop', PACKAGE)
+        device.shell('wm', 'size', size)
+        device.shell('wm', 'density', density)
+        for variant, theme, app_font, system_scale in DESIGN_VARIANTS:
+            directory = output / profile / variant
+            directory.mkdir(parents=True, exist_ok=True)
+            device.shell('settings', 'put', 'system', 'font_scale', system_scale)
+            device.seed(True, app_font, theme_mode=theme)
+            for name, route, expected, action in screens:
+                record = capture(device, directory, name, route, expected, action)
+                record.update(profile=profile, variant=variant,
+                              theme=theme, fontScale=system_scale, appFont=app_font)
+                (directory / f'{name}.json').write_text(json.dumps(record, indent=2, ensure_ascii=False))
+                records.append(record)
+            if variant == 'dark-150':
+                record = capture(device, directory, 'onboarding-large-font', 'settings',
+                                 ['바디 프레임에 오신 것을 환영합니다.', '시작하기'],
+                                 onboarding_welcome)
+                record.update(profile=profile, variant=variant, theme=theme,
+                              fontScale=system_scale, appFont=app_font)
+                records.append(record)
+            if variant == 'dark-100':
+                device.seed(False, app_font, theme_mode=theme)
+                record = capture(device, directory, 'empty-projects', 'studio',
+                                 ['프로젝트별 몸의 변화를'], None)
+                record.update(profile=profile, variant=variant, theme=theme, fontScale=system_scale)
+                records.append(record)
+        (output / profile / 'device.txt').write_text(
+            device.shell('wm', 'size') + device.shell('wm', 'density') +
+            device.shell('getprop', 'ro.build.version.sdk'))
+    device.shell('settings', 'put', 'system', 'font_scale', '1.0')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--apk', required=True, type=Path)
     parser.add_argument('--output', required=True, type=Path)
     parser.add_argument('--serial')
     parser.add_argument('--trust-manifest',type=Path)
-    parser.add_argument('--scenario', choices=('all','keyboard'), default='all')
+    parser.add_argument('--scenario', choices=('all','keyboard','visual'), default='all')
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
     if args.scenario == 'all':
@@ -1076,72 +1151,75 @@ def main():
         device.shell('svc', 'data', 'disable')
         device.shell('input', 'keyevent', 'KEYCODE_WAKEUP')
         device.shell('wm', 'dismiss-keyguard')
-        for profile, size, density in PROFILES:
-            device.shell('am', 'force-stop', PACKAGE)
-            device.shell('wm', 'size', size)
-            device.shell('wm', 'density', density)
-            time.sleep(3)
-            directory = args.output / profile
-            directory.mkdir(exist_ok=True)
-            if args.scenario == 'all':
-                device.seed(False)
-                record = capture(device, directory, 'create-project', 'studio', ['프로젝트 이름', '목표 기록 수'],
-                                 (['프로젝트별 몸의 변화를'], '새 프로젝트 만들기'))
-                record['profile'] = profile
-                records.append(record)
-            device.seed(False, 'large')
-            device.shell('settings', 'put', 'system', 'font_scale', '1.3')
-            records.append(capture(device, directory, 'create-project-large-font-keyboard', 'studio',
-                                   ['프로젝트 이름'], creation_keyboard))
-            records.append(capture(device,directory,'create-project-large-font-submitted','studio',
-                                   ['QA_keyboard_large_font'],creation_submit,open_route=False))
-            device.shell('settings', 'put', 'system', 'font_scale', '1.0')
-            if args.scenario == 'keyboard':
+        if args.scenario == 'visual':
+            capture_design_matrix(device, args.output, records, manifest)
+        else:
+            for profile, size, density in PROFILES:
+                device.shell('am', 'force-stop', PACKAGE)
+                device.shell('wm', 'size', size)
+                device.shell('wm', 'density', density)
+                time.sleep(3)
+                directory = args.output / profile
+                directory.mkdir(exist_ok=True)
+                if args.scenario == 'all':
+                    device.seed(False)
+                    record = capture(device, directory, 'create-project', 'studio', ['프로젝트 이름', '목표 기록 수'],
+                                     (['프로젝트별 몸의 변화를'], '새 프로젝트 만들기'))
+                    record['profile'] = profile
+                    records.append(record)
+                device.seed(False, 'large')
+                device.shell('settings', 'put', 'system', 'font_scale', '1.3')
+                records.append(capture(device, directory, 'create-project-large-font-keyboard', 'studio',
+                                       ['프로젝트 이름'], creation_keyboard))
+                records.append(capture(device,directory,'create-project-large-font-submitted','studio',
+                                       ['QA_keyboard_large_font'],creation_submit,open_route=False))
+                device.shell('settings', 'put', 'system', 'font_scale', '1.0')
+                if args.scenario == 'keyboard':
+                    (directory / 'device.txt').write_text(device.shell('wm', 'size') + device.shell('wm', 'density') + device.shell('getprop', 'ro.build.version.sdk'))
+                    continue
+                device.seed(True)
+                screens = [
+                    ('camera', 'camera', ['프로젝트 선택', '사진 촬영'], None),
+                    ('records', 'studio', ['QA 데모', '프로젝트별 몸의 변화를'], None),
+                    ('project', f'project/{PROJECT}', ['QA 데모', '프로젝트 설정 열기'], None),
+                    ('project-settings', f'project/{PROJECT}', ['프로젝트 설정', '변경 저장', '이름'], (['프로젝트 설정 열기'], '프로젝트 설정 열기')),
+                    ('project-reminder', f'project/{PROJECT}', ['촬영 알림 설정 닫기', '촬영 알림', '요일'], open_project_reminder),
+                    ('photo', f'photo/{PHOTO}', ['기록 상세'], None),
+                    ('photo-measurement', f'photo/{PHOTO}?measurement=1', ['몸무게', '체지방률', '저장'], None),
+                    ('edit-login-required', 'edit?' + urlencode({'photoId': PHOTO}), ['로그인이 필요합니다', '사진 편집은 무료 로그인부터'], None),
+                    ('compare', f'project/{PROJECT}/compare', ['전후 사진 비교', '첫 사진', '마지막 사진'], None),
+                    ('measurements', f'project/{PROJECT}/measurements', ['수치 기록', 'QA 데모'], None),
+                    ('measurement-create', f'project/{PROJECT}/measurements?add=1', ['몸무게', '저장'], None),
+                    ('video', 'trip-clip', ['프로젝트로 변화 영상을'], None),
+                    ('video-create', 'video-create', ['변화 영상 만들기', 'QA 데모'], None),
+                    ('video-photos', 'video-create', ['사진 선택', '전체 선택'], (['변화 영상 만들기'], '사진 수','summary')),
+                    ('video-interval', 'video-create', ['사진 간격', '적용'], (['변화 영상 만들기'], '사진 간격','summary')),
+                    ('video-quality', 'video-create', ['영상 화질', '적용'], (['변화 영상 만들기'], '화질','summary')),
+                    ('video-ratio', 'video-create', ['화면 비율', '적용'], (['변화 영상 만들기'], '화면 비율','summary')),
+                    ('video-overlay', 'video-create', ['텍스트 오버레이', '적용'], (['변화 영상 만들기'], '텍스트','summary')),
+                    ('video-library', 'video-library', ['영상 관리', '저장한 영상'], None),
+                    ('settings', 'settings', ['설정', '기준 사진 표시'], None),
+                    ('settings-reference', 'settings', ['기준 사진 표시', '닫기'], (['기준 사진 표시'], '기준 사진 표시','summary')),
+                    ('legacy-studio', 'legacy-studio', ['사진과 영상을 관리하세요.'], None),
+                    ('legacy-advanced-settings', 'advanced-settings', ['기본값 설정'], None),
+                    ('account', 'account', ['로그인하고 기록을 보호하세요.'], None),
+                    ('capture-preview', 'capture-preview?' + urlencode({'id': PHOTO}), ['촬영 미리보기', '다시 촬영'], None),
+                ]
+                for name, route, expected, action in screens:
+                    record = capture(device, directory, name, route, expected, action)
+                    record['profile'] = profile
+                    records.append(record)
+                device.seed(True, 'large')
+                device.shell('settings', 'put', 'system', 'font_scale', '1.3')
+                records.append(capture(device, directory, 'onboarding-welcome-large-font', 'settings',
+                                       ['바디 프레임에 오신 것을 환영합니다.', '시작하기'], onboarding_welcome))
+                records.append(capture(device, directory, 'onboarding-scroll-large-font', 'settings',
+                                       ['다음', '스킵'], onboarding_scrolled))
+                device.shell('settings', 'put', 'system', 'font_scale', '1.0')
+                device.seed(True)
+                records.extend(video_failure_and_background_smoke(device,directory))
+                records.extend(video_smoke(device, directory,restart=False))
                 (directory / 'device.txt').write_text(device.shell('wm', 'size') + device.shell('wm', 'density') + device.shell('getprop', 'ro.build.version.sdk'))
-                continue
-            device.seed(True)
-            screens = [
-                ('camera', 'camera', ['프로젝트 선택', '사진 촬영'], None),
-                ('records', 'studio', ['QA 데모', '프로젝트별 몸의 변화를'], None),
-                ('project', f'project/{PROJECT}', ['QA 데모', '프로젝트 설정 열기'], None),
-                ('project-settings', f'project/{PROJECT}', ['프로젝트 설정', '변경 저장', '이름'], (['프로젝트 설정 열기'], '프로젝트 설정 열기')),
-                ('project-reminder', f'project/{PROJECT}', ['촬영 알림 설정 닫기', '촬영 알림', '요일'], open_project_reminder),
-                ('photo', f'photo/{PHOTO}', ['기록 상세'], None),
-                ('photo-measurement', f'photo/{PHOTO}?measurement=1', ['몸무게', '체지방률', '저장'], None),
-                ('edit-login-required', 'edit?' + urlencode({'photoId': PHOTO}), ['로그인이 필요합니다', '사진 편집은 무료 로그인부터'], None),
-                ('compare', f'project/{PROJECT}/compare', ['전후 사진 비교', '첫 사진', '마지막 사진'], None),
-                ('measurements', f'project/{PROJECT}/measurements', ['수치 기록', 'QA 데모'], None),
-                ('measurement-create', f'project/{PROJECT}/measurements?add=1', ['몸무게', '저장'], None),
-                ('video', 'trip-clip', ['프로젝트로 변화 영상을'], None),
-                ('video-create', 'video-create', ['변화 영상 만들기', 'QA 데모'], None),
-                ('video-photos', 'video-create', ['사진 선택', '전체 선택'], (['변화 영상 만들기'], '사진 수','summary')),
-                ('video-interval', 'video-create', ['사진 간격', '적용'], (['변화 영상 만들기'], '사진 간격','summary')),
-                ('video-quality', 'video-create', ['영상 화질', '적용'], (['변화 영상 만들기'], '화질','summary')),
-                ('video-ratio', 'video-create', ['화면 비율', '적용'], (['변화 영상 만들기'], '화면 비율','summary')),
-                ('video-overlay', 'video-create', ['텍스트 오버레이', '적용'], (['변화 영상 만들기'], '텍스트','summary')),
-                ('video-library', 'video-library', ['영상 관리', '저장한 영상'], None),
-                ('settings', 'settings', ['설정', '기준 사진 표시'], None),
-                ('settings-reference', 'settings', ['기준 사진 표시', '닫기'], (['기준 사진 표시'], '기준 사진 표시','summary')),
-                ('legacy-studio', 'legacy-studio', ['사진과 영상을 관리하세요.'], None),
-                ('legacy-advanced-settings', 'advanced-settings', ['기본값 설정'], None),
-                ('account', 'account', ['로그인하고 기록을 보호하세요.'], None),
-                ('capture-preview', 'capture-preview?' + urlencode({'id': PHOTO}), ['촬영 미리보기', '다시 촬영'], None),
-            ]
-            for name, route, expected, action in screens:
-                record = capture(device, directory, name, route, expected, action)
-                record['profile'] = profile
-                records.append(record)
-            device.seed(True, 'large')
-            device.shell('settings', 'put', 'system', 'font_scale', '1.3')
-            records.append(capture(device, directory, 'onboarding-welcome-large-font', 'settings',
-                                   ['바디 프레임에 오신 것을 환영합니다.', '시작하기'], onboarding_welcome))
-            records.append(capture(device, directory, 'onboarding-scroll-large-font', 'settings',
-                                   ['다음', '스킵'], onboarding_scrolled))
-            device.shell('settings', 'put', 'system', 'font_scale', '1.0')
-            device.seed(True)
-            records.extend(video_failure_and_background_smoke(device,directory))
-            records.extend(video_smoke(device, directory,restart=False))
-            (directory / 'device.txt').write_text(device.shell('wm', 'size') + device.shell('wm', 'density') + device.shell('getprop', 'ro.build.version.sdk'))
     except Exception as error:
         manifest['fatalError'] = str(error)
         raise
