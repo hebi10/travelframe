@@ -47,14 +47,15 @@ assert.ok(records.includes("styles.coverEmptyArtwork") && records.includes("empt
 assert.ok(records.includes("archiveBodyProject") && records.includes("restoreProject"));
 
 assert.ok(detail.includes("sortProjectPhotos(getBodyProjectPhotos(photos, project.id))"));
-assert.ok(detail.includes("const firstPhoto = projectPhotos[projectPhotos.length - 1]"));
-assert.ok(detail.includes("const latestPhoto = projectPhotos[0]"));
+assert.ok(detail.includes("getBodyFrameComparisonPhotos(projectPhotos, project.id)"));
+assert.ok(detail.includes("const firstPhoto = comparisonPreview?.before"));
+assert.ok(detail.includes("const latestPhoto = comparisonPreview?.after"));
 assert.ok(detail.includes("styles.comparePreviewPair") && detail.includes("styles.comparePreviewImage"));
 assert.ok(detail.includes('accessibilityLabel="프로젝트 첫 사진과 마지막 사진 비교"'));
 assert.ok(detail.includes("contentFit=\"contain\""), "body photo preview must not crop the user");
 assert.ok(detail.includes('accessibilityRole="progressbar"'));
 assert.ok(detail.includes("primaryBackground: primaryColor"));
-assert.ok(detail.includes('router.push("'+"/camera"+'")'));
+assert.ok(detail.includes('router.push("/camera")'));
 assert.ok(detail.indexOf("<BodyMeasurementSummaryCard") <
           detail.indexOf('accessibilityLabel="프로젝트 촬영 알림 설정"'),
           "measurement summary should lead secondary information ahead of reminders");

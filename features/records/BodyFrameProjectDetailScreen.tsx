@@ -57,6 +57,7 @@ import {
   updateBodyMeasurementSettings
 } from "@/lib/body-measurement-library";
 import { getBodyMeasurementSeries } from "@/lib/body-measurement-series";
+import { getBodyFrameComparisonPhotos } from "@/lib/body-frame-photo-compare";
 import { setLastActiveProjectId } from "@/lib/body-project-preferences";
 import {
   getBodyFrameUpgradeLabel,
@@ -1047,8 +1048,9 @@ export default function BodyFrameProjectDetailScreen() {
     summary.photoCount / Math.max(1, summary.targetPhotoCount)
   );
   const progressPercent = Math.round(progress * 100);
-  const firstPhoto = projectPhotos[projectPhotos.length - 1];
-  const latestPhoto = projectPhotos[0];
+  const comparisonPreview = getBodyFrameComparisonPhotos(projectPhotos, project.id);
+  const firstPhoto = comparisonPreview?.before;
+  const latestPhoto = comparisonPreview?.after;
 
   return (
     <View style={[styles.screen, { backgroundColor: palette.background }]}>
