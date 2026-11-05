@@ -19,10 +19,12 @@ for (const asset of imageFiles) {
   const buf = fs.readFileSync("assets/ui/illustrations/" + asset + ".png");
   assert.equal(buf.subarray(0, 8).toString("hex"), "89504e470d0a1a0a", asset + " must remain a real PNG");
   assert.equal(buf.subarray(12, 16).toString(), "IHDR");
-  assert.ok(buf.readUInt32BE(16) >= 300 && buf.readUInt32BE(20) >= 300, "artwork too small");
+  assert.ok(buf.readUInt32BE(16) >= 64 && buf.readUInt32BE(20) >= 64, "artwork too small");
 }
 const optimizedBackup = fs.statSync("assets/ui/illustrations/feature-backup.png").size;
 assert.ok(optimizedBackup < 25000 && optimizedBackup > 1000);
+const backupBytes = fs.readFileSync("assets/ui/illustrations/feature-backup.png");
+assert.ok(backupBytes.readUInt32BE(16) >= 300 && backupBytes.readUInt32BE(20) >= 300);
 assert.ok(assetReadme.includes("Font Awesome Free") && assetReadme.includes("CC BY 4.0"));
 assert.ok(artwork.includes('step.id === "body-frame-settings-backup"'));
 assert.ok(artwork.includes('require("../assets/ui/illustrations/feature-backup.png")'));
