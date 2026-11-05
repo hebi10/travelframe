@@ -2,8 +2,19 @@ import { Feather } from "@expo/vector-icons";
 import { Pressable, StyleSheet, View } from "react-native";
 
 import { AppText as Text } from "@/components/app-text";
-import { bodyFrameDesign, bodyFrameTypography, getBodyFrameControlColors } from "@/constants/app-theme";
+import { bodyFrameDesign, bodyFrameSheetDesign, bodyFrameTypography, getBodyFrameControlColors } from "@/constants/app-theme";
 import { useAppAppearance } from "@/lib/app-appearance";
+
+export function BodyFrameSheetHandle() {
+  const { palette } = useAppAppearance();
+  return (
+    <View
+      accessible={false}
+      importantForAccessibility="no"
+      style={[styles.handle, { backgroundColor: palette.faint }]}
+    />
+  );
+}
 
 type BodyFrameSheetHeaderProps = {
   title: string;
@@ -73,7 +84,7 @@ export function BodyFrameSheetFooter({
         onPress={onCancel}
         style={[styles.footerButton, { borderColor: secondaryBorder, backgroundColor: secondaryBackground }]}
       >
-        <Text style={[styles.footerText, { color: palette.text }]}>{cancelLabel}</Text>
+        <Text numberOfLines={2} style={[styles.footerText, { color: palette.text }]}>{cancelLabel}</Text>
       </Pressable>
       <Pressable
         accessibilityRole="button"
@@ -85,7 +96,7 @@ export function BodyFrameSheetFooter({
           { borderColor: primaryBackground, backgroundColor: primaryBackground, opacity: disabled ? 0.5 : 1 }
         ]}
       >
-        <Text style={[styles.footerText, { color: primaryForeground }]}>{confirmLabel}</Text>
+        <Text numberOfLines={2} style={[styles.footerText, { color: primaryForeground }]}>{confirmLabel}</Text>
       </Pressable>
     </View>
   );
@@ -99,7 +110,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: 12
   },
-  headerCopy: { flex: 1, gap: 4 },
+  headerCopy: { flex: 1, minWidth: 0, gap: 4 },
   title: { fontSize: bodyFrameTypography.sectionTitle, fontWeight: "600" },
   description: { fontSize: bodyFrameTypography.caption, lineHeight: 18 },
   close: {
@@ -110,15 +121,27 @@ const styles = StyleSheet.create({
     borderWidth: bodyFrameDesign.borderWidth,
     borderRadius: bodyFrameDesign.buttonRadius
   },
-  footer: { flexDirection: "row", gap: 10 },
+  handle: {
+    alignSelf: "center",
+    width: bodyFrameSheetDesign.handleWidth,
+    height: bodyFrameSheetDesign.handleHeight,
+    borderRadius: bodyFrameSheetDesign.handleRadius,
+    marginBottom: 10
+  },
+  footer: {
+    flexDirection: "row",
+    gap: bodyFrameSheetDesign.footerGap
+  },
   footerButton: {
     flex: 1,
+    minWidth: 0,
     minHeight: bodyFrameDesign.primaryButtonHeight,
     paddingHorizontal: 12,
+    paddingVertical: 8,
     borderWidth: bodyFrameDesign.borderWidth,
     borderRadius: bodyFrameDesign.buttonRadius,
     alignItems: "center",
     justifyContent: "center"
   },
-  footerText: { fontSize: bodyFrameTypography.button, fontWeight: "700" }
+  footerText: { fontSize: bodyFrameTypography.button, fontWeight: "700", textAlign: "center" }
 });
