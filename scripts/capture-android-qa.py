@@ -1122,6 +1122,8 @@ def main():
                 ('video-library', 'video-library', ['영상 관리', '저장한 영상'], None),
                 ('settings', 'settings', ['설정', '기준 사진 표시'], None),
                 ('settings-reference', 'settings', ['기준 사진 표시', '닫기'], (['기준 사진 표시'], '기준 사진 표시','summary')),
+                ('legacy-studio', 'legacy-studio', ['사진과 영상을 관리하세요.'], None),
+                ('legacy-advanced-settings', 'advanced-settings', ['기본값 설정'], None),
                 ('account', 'account', ['로그인하고 기록을 보호하세요.'], None),
                 ('capture-preview', 'capture-preview?' + urlencode({'id': PHOTO}), ['촬영 미리보기', '다시 촬영'], None),
             ]
