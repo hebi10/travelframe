@@ -1,6 +1,6 @@
 import { StyleSheet } from "react-native";
 
-import { bodyFrameDesign, colors, controls, spacing, typography } from "@/constants/app-theme";
+import { bodyFrameDesign, bodyFrameTypography, colors, controls, spacing, typography } from "@/constants/app-theme";
 import type { AppPalette } from "@/lib/app-appearance";
 
 export const createAccountThemedStyles = (palette: AppPalette, fontFamily?: string) => {
@@ -29,6 +29,15 @@ export const createAccountThemedStyles = (palette: AppPalette, fontFamily?: stri
     activeFill: {
       borderColor: palette.text,
       backgroundColor: isDark ? palette.surfaceStrong : palette.text
+    },
+    primaryFill: {
+      borderColor: palette.text,
+      backgroundColor: palette.text
+    },
+    primaryContrastText: {
+      color: palette.inverse,
+      backgroundColor: "transparent",
+      ...fontTextStyle
     },
     text: {
       color: palette.text,
@@ -80,7 +89,8 @@ export const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderRadius: bodyFrameDesign.buttonRadius,
     borderColor: colors.line,
     backgroundColor: colors.background
   },
@@ -101,38 +111,41 @@ export const styles = StyleSheet.create({
     gap: 10
   },
   input: {
-    minHeight: controls.height,
+    minHeight: bodyFrameDesign.primaryButtonHeight,
     paddingHorizontal: 12,
-    borderWidth: 1,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderRadius: bodyFrameDesign.buttonRadius,
     borderColor: colors.line,
     color: colors.text,
     fontSize: typography.body,
     letterSpacing: 0
   },
   primaryButton: {
-    minHeight: controls.height,
+    minHeight: bodyFrameDesign.primaryButtonHeight,
     alignItems: "center",
     justifyContent: "center",
+    borderRadius: bodyFrameDesign.buttonRadius,
     backgroundColor: colors.text
   },
   primaryButtonText: {
     color: colors.inverse,
-    fontSize: typography.button,
+    fontSize: bodyFrameTypography.button,
     fontWeight: "800",
     letterSpacing: 0
   },
   secondaryButton: {
-    minHeight: controls.height,
+    minHeight: bodyFrameDesign.primaryButtonHeight,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 12,
-    borderWidth: 1,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderRadius: bodyFrameDesign.buttonRadius,
     borderColor: colors.text,
     backgroundColor: colors.background
   },
   secondaryButtonText: {
     color: colors.text,
-    fontSize: typography.button,
+    fontSize: bodyFrameTypography.button,
     fontWeight: "800",
     letterSpacing: 0
   },
@@ -147,8 +160,9 @@ export const styles = StyleSheet.create({
     letterSpacing: 0
   },
   profilePanel: {
-    padding: spacing.row,
-    borderWidth: 1,
+    padding: bodyFrameDesign.horizontalPadding,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderRadius: bodyFrameDesign.cardRadius,
     borderColor: colors.line,
     gap: 14
   },
@@ -246,15 +260,17 @@ export const styles = StyleSheet.create({
     letterSpacing: 0
   },
   backupSummaryPanel: {
-    padding: spacing.row,
-    borderWidth: 1,
+    padding: bodyFrameDesign.horizontalPadding,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderRadius: bodyFrameDesign.cardRadius,
     borderColor: colors.line,
     gap: 12,
     backgroundColor: colors.background
   },
   planCard: {
-    padding: spacing.row,
-    borderWidth: 1,
+    padding: bodyFrameDesign.horizontalPadding,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderRadius: bodyFrameDesign.cardRadius,
     borderColor: colors.text,
     gap: 14,
     backgroundColor: colors.background
@@ -263,8 +279,9 @@ export const styles = StyleSheet.create({
     gap: 10
   },
   paymentPlan: {
-    padding: spacing.row,
-    borderWidth: 1,
+    padding: bodyFrameDesign.horizontalPadding,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderRadius: bodyFrameDesign.cardRadius,
     borderColor: colors.line,
     gap: 12,
     backgroundColor: colors.background
@@ -305,7 +322,8 @@ export const styles = StyleSheet.create({
     letterSpacing: 0
   },
   paymentOpenButton: {
-    minHeight: controls.compactHeight,
+    minHeight: bodyFrameDesign.minTouchSize,
+    borderRadius: bodyFrameDesign.buttonRadius,
     alignItems: "center",
     justifyContent: "center"
   },
@@ -434,8 +452,9 @@ export const styles = StyleSheet.create({
     letterSpacing: 0
   },
   messagePanel: {
-    padding: spacing.row,
-    borderWidth: 1,
+    padding: bodyFrameDesign.horizontalPadding,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderRadius: bodyFrameDesign.cardRadius,
     borderColor: colors.line,
     gap: 10
   },
