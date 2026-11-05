@@ -41,7 +41,7 @@ concurrency:
 jobs:
   plan:
     name: Plan exact source and test release from Play inventory
-    if: github.repository == 'hebi10/travelframe' && github.ref == 'refs/heads/main'
+    if: github.repository == 'hebi10/travelframe' && github.ref == 'refs/heads/main' && (inputs.operation == 'inventory' || vars.BODY_FRAME_PLAY_SIGNING_APPROVED_20261107 == 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
