@@ -31,7 +31,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { bodyFrameDesign, bodyFrameTypography } from "@/constants/app-theme";
+import { bodyFrameAccent, bodyFrameDesign, bodyFrameTypography } from "@/constants/app-theme";
 import {
   getBodyProjectPhotos,
   getBodyProjectProgressSummary,
@@ -492,7 +492,9 @@ export default function BodyFrameProjectDetailScreen() {
   const { id } = useLocalSearchParams<{ id?: string | string[] }>();
   const projectId = Array.isArray(id) ? id[0] : id;
   const insets = useSafeAreaInsets();
-  const { palette } = useAppAppearance();
+  const { palette, effectiveThemeMode } = useAppAppearance();
+  const accent = effectiveThemeMode === "dark" ? bodyFrameAccent : palette.text;
+  const accentText = effectiveThemeMode === "dark" ? "#0B0B0C" : palette.inverse;
   const { isLoggedIn, subscription, user } = useAuth();
   const planEntitlements = useMemo(
     () => getPlanEntitlements({ isLoggedIn, subscription }),
@@ -1101,7 +1103,7 @@ export default function BodyFrameProjectDetailScreen() {
                 styles.progressFill,
                 {
                   width: `${progressPercent}%`,
-                  backgroundColor: palette.text
+                  backgroundColor: accent
                 }
               ]}
             />
@@ -1110,104 +1112,10 @@ export default function BodyFrameProjectDetailScreen() {
 
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="프로젝트 촬영 알림 설정"
-          style={[
-            styles.reminderCard,
-            {
-              borderColor: palette.line,
-              backgroundColor: palette.surface
-            }
-          ]}
-          onPress={openReminderSettings}
-        >
-          <View
-            style={[
-              styles.reminderIcon,
-              {
-                borderColor: palette.line,
-                backgroundColor: palette.background
-              }
-            ]}
-          >
-            <Feather
-              name={reminderSettings.enabled ? "bell" : "bell-off"}
-              size={18}
-              color={palette.text}
-            />
-          </View>
-          <View style={styles.reminderCopy}>
-            <Text style={[styles.reminderTitle, { color: palette.text }]}>
-              촬영 알림
-            </Text>
-            <Text style={[styles.reminderDetail, { color: palette.muted }]}>
-              {reminderSettings.enabled
-                ? `${formatProjectReminderSchedule(reminderSettings)} · 이 기기에서 알림`
-                : "프로젝트별 시간과 요일을 정해 촬영 알림을 받을 수 있습니다."}
-            </Text>
-          </View>
-          <Feather name="chevron-right" size={18} color={palette.muted} />
-        </Pressable>
-
-        {measurementSettings.enabled ? (
-          <BodyMeasurementSummaryCard
-            metric={measurementSettings.primaryMetric}
-            series={measurementSeries}
-            onOpenHistory={() =>
-              router.push({
-                pathname: "/project/[id]/measurements",
-                params: { id: project.id }
-              })
-            }
-            onAddMeasurement={
-              projectPhotos[0]
-                ? () =>
-                    router.push({
-                      pathname: "/photo/[id]",
-                      params: {
-                        id: projectPhotos[0].id,
-                        measurement: "1"
-                      }
-                    })
-                : () =>
-                    router.push({
-                      pathname: "/project/[id]/measurements",
-                      params: { id: project.id, add: "1" }
-                    })
-            }
-          />
-        ) : null}
-
-        <View style={styles.statGrid}>
-          <View
-            style={[
-              styles.statCard,
-              { borderColor: palette.line, backgroundColor: palette.surface }
-            ]}
-          >
-            <Text style={[styles.statLabel, { color: palette.muted }]}>시작일</Text>
-            <Text style={[styles.statValue, { color: palette.text }]}>
-              {formatDate(project.createdAt)}
-            </Text>
-          </View>
-          <View
-            style={[
-              styles.statCard,
-              { borderColor: palette.line, backgroundColor: palette.surface }
-            ]}
-          >
-            <Text style={[styles.statLabel, { color: palette.muted }]}>변화 영상</Text>
-            <Text style={[styles.statValue, { color: palette.text }]}>
-              {formatDuration(summary.durationSeconds)}
-            </Text>
-          </View>
-        </View>
-
-        <Pressable
-          accessibilityRole="button"
-          style={[styles.primaryAction, { backgroundColor: palette.text }]}
+          style={[styles.primaryAction, { backgroundColor: accent }]}
           onPress={() => void openCamera()}
         >
-          <Text style={[styles.primaryActionText, { color: palette.inverse }]}>
+          <Text style={[styles.primaryActionText, { color: accentText }]}>
             오늘 사진 찍기
           </Text>
         </Pressable>
@@ -1336,6 +1244,12 @@ export default function BodyFrameProjectDetailScreen() {
                 { borderColor: palette.line, backgroundColor: palette.surface }
               ]}
             >
+              <Image
+                source={require("../../assets/ui/illustrations/empty-project.png")}
+                style={styles.emptyIllustration}
+                contentFit="contain"
+                accessibilityLabel="첫 사진 기록을 시작하는 안내 이미지"
+              />
               <Text style={[styles.emptyTitle, { color: palette.text }]}>
                 아직 기록된 사진이 없습니다.
               </Text>
@@ -1355,6 +1269,107 @@ export default function BodyFrameProjectDetailScreen() {
             변화 영상 만들기
           </Text>
         </Pressable>
+
+        <View style={styles.secondaryInfoSection}>
+          <Text style={[styles.sectionTitle, { color: palette.text }]}>
+            기록 정보
+          </Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="프로젝트 촬영 알림 설정"
+          style={[
+            styles.reminderCard,
+            {
+              borderColor: palette.line,
+              backgroundColor: palette.surface
+            }
+          ]}
+          onPress={openReminderSettings}
+        >
+          <View
+            style={[
+              styles.reminderIcon,
+              {
+                borderColor: palette.line,
+                backgroundColor: palette.background
+              }
+            ]}
+          >
+            <Feather
+              name={reminderSettings.enabled ? "bell" : "bell-off"}
+              size={18}
+              color={palette.text}
+            />
+          </View>
+          <View style={styles.reminderCopy}>
+            <Text style={[styles.reminderTitle, { color: palette.text }]}>
+              촬영 알림
+            </Text>
+            <Text style={[styles.reminderDetail, { color: palette.muted }]}>
+              {reminderSettings.enabled
+                ? `${formatProjectReminderSchedule(reminderSettings)} · 이 기기에서 알림`
+                : "프로젝트별 시간과 요일을 정해 촬영 알림을 받을 수 있습니다."}
+            </Text>
+          </View>
+          <Feather name="chevron-right" size={18} color={palette.muted} />
+        </Pressable>
+
+        {measurementSettings.enabled ? (
+          <BodyMeasurementSummaryCard
+            metric={measurementSettings.primaryMetric}
+            series={measurementSeries}
+            onOpenHistory={() =>
+              router.push({
+                pathname: "/project/[id]/measurements",
+                params: { id: project.id }
+              })
+            }
+            onAddMeasurement={
+              projectPhotos[0]
+                ? () =>
+                    router.push({
+                      pathname: "/photo/[id]",
+                      params: {
+                        id: projectPhotos[0].id,
+                        measurement: "1"
+                      }
+                    })
+                : () =>
+                    router.push({
+                      pathname: "/project/[id]/measurements",
+                      params: { id: project.id, add: "1" }
+                    })
+            }
+          />
+        ) : null}
+
+        <View style={styles.statGrid}>
+          <View
+            style={[
+              styles.statCard,
+              { borderColor: palette.line, backgroundColor: palette.surface }
+            ]}
+          >
+            <Text style={[styles.statLabel, { color: palette.muted }]}>시작일</Text>
+            <Text style={[styles.statValue, { color: palette.text }]}>
+              {formatDate(project.createdAt)}
+            </Text>
+          </View>
+          <View
+            style={[
+              styles.statCard,
+              { borderColor: palette.line, backgroundColor: palette.surface }
+            ]}
+          >
+            <Text style={[styles.statLabel, { color: palette.muted }]}>변화 영상</Text>
+            <Text style={[styles.statValue, { color: palette.text }]}>
+              {formatDuration(summary.durationSeconds)}
+            </Text>
+          </View>
+        </View>
+
+
+        </View>
       </ScrollView>
 
       <PhotoPositionSheet
@@ -2212,11 +2227,20 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: bodyFrameDesign.buttonRadius,
-    marginBottom: 28
+    marginBottom: 16
   },
   primaryActionText: {
     fontSize: bodyFrameTypography.button,
     fontWeight: "700"
+  },
+  secondaryInfoSection: {
+    marginTop: 28,
+    gap: 12
+  },
+  emptyIllustration: {
+    width: 96,
+    height: 96,
+    alignSelf: "center"
   },
   recordsSection: {
     gap: 12
