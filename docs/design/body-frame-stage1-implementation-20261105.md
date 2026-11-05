@@ -1,7 +1,7 @@
 # Body Frame 디자인 통합 Stage 1 — 공통 토큰 및 컴포넌트
 
 - 기준: `main@2f1189fc9ba570b2224e6b1cfd2fe3d76a3fd846`
-- 단계 기준: [Stage 0 디자인 정책](./body-frame-stage0-baseline-20261105.md) (PR #83 미병합 상태이므로 이 문서도 동일 정책을 적용)
+- 단계 기준: [Stage 0 디자인 정책](https://github.com/hebi10/travelframe/blob/docs/body-frame-design-stage0-20261105/docs/design/body-frame-stage0-baseline-20261105.md) (PR #83 미병합 상태이므로 이 문서도 동일 정책을 적용)
 - 범위: **공통 토큰·시트·온보딩 CTA·하단 탭·공통 섹션/행·뒤로가기 아이콘·최소 터치 영역**
 - 제외: 사진/영상 원본, 프로젝트·수치 데이터, 구독/결제, 백업/복원, Health Connect, Play 배포, 레거시 영상 출력 렌더링
 
