@@ -264,6 +264,7 @@ export function BodyMeasurementEditorSheet({
       <View style={styles.backdrop}>
         <Pressable accessibilityRole="button" accessibilityLabel="수치 기록 닫기" style={StyleSheet.absoluteFill} onPress={onClose} />
         <View
+          accessibilityViewIsModal
           style={[
             styles.sheet,
             {
