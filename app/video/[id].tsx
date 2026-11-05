@@ -22,7 +22,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AdBanner } from "@/components/ad-banner";
-import { bodyFrameAccent, bodyFrameDesign, colors, controls, spacing, typography } from "@/constants/app-theme";
+import { bodyFrameDesign, bodyFrameTypography, colors, spacing, typography, getBodyFrameControlColors } from "@/constants/app-theme";
 import { useAuth } from "@/lib/auth-context";
 import { useAppAppearance } from "@/lib/app-appearance";
 import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
@@ -62,9 +62,9 @@ const formatDuration = (seconds: number) => {
 export default function VideoDetailScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
   const { user } = useAuth();
-  const { palette, effectiveThemeMode } = useAppAppearance();
-  const actionColor = effectiveThemeMode === "dark" ? bodyFrameAccent : palette.text;
-  const actionTextColor = effectiveThemeMode === "dark" ? "#0B0B0C" : palette.inverse;
+  const { palette } = useAppAppearance();
+  const { primaryBackground: actionColor, primaryText: actionTextColor } =
+    getBodyFrameControlColors(palette);
   const insets = useSafeAreaInsets();
   const bottomSafePadding = Math.max(insets.bottom + spacing.screen, spacing.screen);
   const [video, setVideo] = useState<MadeVideoItem | null>(null);
@@ -174,14 +174,17 @@ export default function VideoDetailScreen() {
                 <Image
                   source={{ uri: video.coverUri }}
                   style={styles.videoPosterImage}
-                  contentFit="cover"
+                  contentFit="contain"
+                  accessible={false}
                 />
               ) : null}
               <Pressable
                 accessibilityRole="button"
+                accessibilityLabel="저장한 영상 재생"
                 style={styles.videoStartButton}
                 onPress={() => setPlaybackRequested(true)}
               >
+                <Feather name="play" size={bodyFrameDesign.iconSize} color="#FFFFFF" />
                 <Text selectable={false} style={styles.videoStartButtonText}>
                   영상 재생
                 </Text>
@@ -225,7 +228,7 @@ export default function VideoDetailScreen() {
         </View>
 
         {video.coverUri ? (
-          <Image source={{ uri: video.coverUri }} style={[styles.coverImage, { borderColor: palette.line, backgroundColor: palette.surface }]} contentFit="cover" />
+          <Image source={{ uri: video.coverUri }} style={[styles.coverImage, { borderColor: palette.line, backgroundColor: palette.surface }]} contentFit="contain" accessible={false} />
         ) : null}
 
         <View style={styles.actions}>
@@ -373,7 +376,8 @@ const styles = StyleSheet.create({
   },
   content: {
     gap: 16,
-    padding: spacing.screen,
+    paddingHorizontal: bodyFrameDesign.horizontalPadding,
+    paddingTop: bodyFrameDesign.horizontalPadding,
     width: "100%",
     maxWidth: bodyFrameDesign.contentMaxWidth,
     alignSelf: "center"
@@ -401,11 +405,14 @@ const styles = StyleSheet.create({
     borderRadius: bodyFrameDesign.buttonRadius
   },
   topBarSpacer: { width: bodyFrameDesign.minTouchSize },
-  pageTitle: { fontSize: 18, fontWeight: "600" },
+  pageTitle: { fontSize: bodyFrameTypography.pageTitle, fontWeight: "600" },
   videoFrame: {
     width: "100%",
+    maxWidth: 480,
+    alignSelf: "center",
     overflow: "hidden",
-    borderWidth: 1,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderRadius: bodyFrameDesign.cardRadius,
     borderColor: colors.text,
     backgroundColor: colors.ink
   },
@@ -426,19 +433,22 @@ const styles = StyleSheet.create({
     opacity: 0.62
   },
   videoStartButton: {
-    minWidth: 120,
-    minHeight: controls.height,
+    minWidth: 144,
+    minHeight: bodyFrameDesign.primaryButtonHeight,
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 20,
-    borderWidth: 1,
-    borderColor: colors.inverse,
+    gap: 8,
+    paddingHorizontal: 18,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderRadius: bodyFrameDesign.buttonRadius,
+    borderColor: "#FFFFFF",
     backgroundColor: "rgba(0,0,0,0.72)"
   },
   videoStartButtonText: {
-    color: colors.inverse,
-    fontSize: typography.button,
-    fontWeight: "800"
+    color: "#FFFFFF",
+    fontSize: bodyFrameTypography.button,
+    fontWeight: "700"
   },
   videoUnavailable: {
     flex: 1,
@@ -468,7 +478,7 @@ const styles = StyleSheet.create({
   },
   title: {
     color: colors.text,
-    fontSize: 24,
+    fontSize: bodyFrameTypography.projectTitle,
     fontWeight: "600",
     lineHeight: 34,
     letterSpacing: 0
@@ -483,7 +493,7 @@ const styles = StyleSheet.create({
     gap: 8
   },
   metaRow: {
-    minHeight: 48,
+    minHeight: bodyFrameDesign.primaryButtonHeight,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -493,14 +503,16 @@ const styles = StyleSheet.create({
   },
   metaLabel: {
     color: colors.muted,
-    fontSize: typography.small,
+    fontSize: bodyFrameTypography.caption,
     fontWeight: "700",
     letterSpacing: 0
   },
   metaValue: {
+    flexShrink: 1,
     color: colors.text,
-    fontSize: typography.small,
-    fontWeight: "800",
+    fontSize: bodyFrameTypography.body,
+    fontWeight: "600",
+    textAlign: "right",
     letterSpacing: 0
   },
   coverImage: {
@@ -519,11 +531,12 @@ const styles = StyleSheet.create({
     gap: 8,
     alignItems: "center",
     justifyContent: "center",
+    borderRadius: bodyFrameDesign.buttonRadius,
     backgroundColor: colors.text
   },
   darkButtonText: {
     color: colors.inverse,
-    fontSize: typography.button,
+    fontSize: bodyFrameTypography.button,
     fontWeight: "800",
     letterSpacing: 0
   },
@@ -531,13 +544,14 @@ const styles = StyleSheet.create({
     minHeight: bodyFrameDesign.primaryButtonHeight,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderRadius: bodyFrameDesign.buttonRadius,
     borderColor: colors.text,
     backgroundColor: colors.background
   },
   lightButtonText: {
     color: colors.text,
-    fontSize: typography.button,
+    fontSize: bodyFrameTypography.button,
     fontWeight: "800",
     letterSpacing: 0
   },
