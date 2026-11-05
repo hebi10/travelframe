@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { KeyboardAvoidingView, Modal, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppText as Text, AppTextInput as TextInput } from "@/components/app-text";
@@ -24,7 +24,7 @@ export function PhotoPositionSheet({ currentPosition, count, onClose, onMove }: 
 
   return (
     <Modal transparent animationType="slide" visible={currentPosition !== null} onRequestClose={onClose}>
-      <KeyboardAvoidingView style={styles.root} behavior="height">
+      <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === "ios" ? "padding" : "height"}>
         <View style={[styles.backdrop, { paddingTop: Math.max(insets.top, 16) }]}>
           <Pressable
             accessibilityRole="button"
@@ -33,6 +33,7 @@ export function PhotoPositionSheet({ currentPosition, count, onClose, onMove }: 
             onPress={onClose}
           />
           <View
+            accessibilityViewIsModal
             style={[
               styles.sheet,
               { backgroundColor: palette.surface, borderColor: palette.line, paddingBottom: Math.max(insets.bottom, 16) }
