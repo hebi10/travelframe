@@ -8,7 +8,7 @@ import { Pressable,
   View
 } from "react-native";
 
-import { colors, controls, typography } from "@/constants/app-theme";
+import { bodyFrameDesign, bodyFrameTypography, colors } from "@/constants/app-theme";
 import { useAppAppearance } from "@/lib/app-appearance";
 
 type ActionRowProps = {
@@ -20,7 +20,7 @@ type ActionRowProps = {
 };
 
 export function ActionRow({ href, label, detail, mark = ">", onPress }: ActionRowProps) {
-  const { palette, fontSizeScale, layoutScale, emphasisWeight, fontFamily } = useAppAppearance();
+  const { palette, layoutScale } = useAppAppearance();
   const isDark = palette.background !== colors.background;
   const content = (
     <Pressable
@@ -41,13 +41,7 @@ export function ActionRow({ href, label, detail, mark = ">", onPress }: ActionRo
           selectable
           style={[
             styles.label,
-            {
-              color: palette.text,
-              fontSize: Math.round(typography.body * fontSizeScale),
-              lineHeight: Math.round(21 * fontSizeScale),
-              fontFamily,
-              fontWeight: emphasisWeight
-            }
+            { color: palette.text }
           ]}
         >
           {label}
@@ -57,13 +51,7 @@ export function ActionRow({ href, label, detail, mark = ">", onPress }: ActionRo
             selectable
             style={[
               styles.detail,
-              {
-                color: palette.muted,
-                fontSize: Math.round(typography.small * fontSizeScale),
-                lineHeight: Math.round(18 * fontSizeScale),
-                fontFamily,
-                fontWeight: "700"
-              }
+              { color: palette.muted }
             ]}
           >
             {detail}
@@ -74,7 +62,6 @@ export function ActionRow({ href, label, detail, mark = ">", onPress }: ActionRo
         style={[
           styles.markBox,
           {
-            minHeight: Math.round(controls.compactHeight * layoutScale),
             borderColor: palette.text,
             backgroundColor: isDark ? "transparent" : palette.text
           }
@@ -87,13 +74,7 @@ export function ActionRow({ href, label, detail, mark = ">", onPress }: ActionRo
             selectable={false}
             style={[
               styles.markText,
-              {
-                color: isDark ? palette.text : palette.inverse,
-                fontSize: Math.round(typography.button * fontSizeScale),
-                lineHeight: Math.round(18 * fontSizeScale),
-                fontFamily,
-                fontWeight: emphasisWeight
-              }
+              { color: isDark ? palette.text : palette.inverse }
             ]}
           >
             {mark}
@@ -117,33 +98,34 @@ export function ActionRow({ href, label, detail, mark = ">", onPress }: ActionRo
 const styles = StyleSheet.create({
   row: {
     gap: 12,
-    borderWidth: 1
+    borderWidth: bodyFrameDesign.borderWidth
   },
   copy: {
     gap: 4
   },
   label: {
-    fontSize: typography.body,
-    fontWeight: "800",
+    fontSize: bodyFrameTypography.body,
+    fontWeight: "600",
     lineHeight: 21,
     letterSpacing: 0
   },
   detail: {
-    fontSize: typography.small,
+    fontSize: bodyFrameTypography.caption,
     lineHeight: 18,
     letterSpacing: 0
   },
   markBox: {
-    minHeight: controls.compactHeight,
+    minWidth: bodyFrameDesign.minTouchSize,
+    minHeight: bodyFrameDesign.minTouchSize,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1
   },
   markText: {
-    fontSize: typography.button,
-    fontWeight: "800",
+    fontSize: bodyFrameTypography.button,
+    fontWeight: "600",
     textAlign: "center",
-    lineHeight: 18,
+    lineHeight: 20,
     letterSpacing: 0
   }
 });

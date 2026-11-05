@@ -77,12 +77,18 @@ assert.ok(
   "screen shell should apply selected font family and font size to page titles"
 );
 assert.ok(
-  actionRow.includes("fontSizeScale") && actionRow.includes("layoutScale") && actionRow.includes("fontFamily"),
-  "action rows should apply font size, selected font family, and layout settings"
+  actionRow.includes('from "@/components/app-text"') &&
+    actionRow.includes("bodyFrameTypography") &&
+    actionRow.includes("layoutScale") &&
+    !actionRow.includes("fontSizeScale"),
+  "action rows should use AppText for one font-scale pass while retaining layout settings"
 );
 assert.ok(
-  sectionBlock.includes("fontSizeScale") && sectionBlock.includes("layoutScale") && sectionBlock.includes("fontFamily"),
-  "section blocks should apply font size, selected font family, and layout settings"
+  sectionBlock.includes('from "@/components/app-text"') &&
+    sectionBlock.includes("bodyFrameTypography.sectionTitle") &&
+    sectionBlock.includes("layoutScale") &&
+    !sectionBlock.includes("fontSizeScale"),
+  "section headers should use AppText for one font-scale pass while retaining layout settings"
 );
 
 console.log("ok - app appearance settings propagate to shared UI");
