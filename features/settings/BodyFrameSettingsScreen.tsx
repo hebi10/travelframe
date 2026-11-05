@@ -16,7 +16,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppGuideOverlay } from "@/components/app-guide-overlay";
 import { SectionBlock } from "@/components/section-block";
-import { bodyFrameDesign, bodyFrameTypography } from "@/constants/app-theme";
+import { BodyFrameSheetHeader } from "@/components/body-frame-sheet";
+import { bodyFrameAccent, bodyFrameDesign, bodyFrameTypography } from "@/constants/app-theme";
 import { PRIVACY_POLICY_URL, TERMS_OF_SERVICE_URL } from "@/constants/legal-links";
 import {
   saveAppSettings,
@@ -116,7 +117,8 @@ function SettingOptionRow({
   disabled?: boolean;
   onPress: () => void;
 }) {
-  const { palette } = useAppAppearance();
+  const { palette, effectiveThemeMode } = useAppAppearance();
+  const selectedColor = effectiveThemeMode === "dark" ? bodyFrameAccent : palette.text;
 
   return (
     <Pressable
@@ -127,7 +129,7 @@ function SettingOptionRow({
       style={({ pressed }) => [
         styles.optionRow,
         {
-          borderColor: active ? palette.text : palette.line,
+          borderColor: active ? selectedColor : palette.line,
           backgroundColor: palette.background,
           opacity: disabled ? 0.45 : pressed ? 0.82 : 1
         }
@@ -137,7 +139,7 @@ function SettingOptionRow({
         <Text style={[styles.optionLabel, { color: palette.text }]}>{label}</Text>
         <Text style={[styles.optionDetail, { color: palette.muted }]}>{detail}</Text>
       </View>
-      <Text style={[styles.optionMark, { color: active ? palette.text : palette.faint }]}>
+      <Text style={[styles.optionMark, { color: active ? selectedColor : palette.faint }]}>
         {active ? "●" : "○"}
       </Text>
     </Pressable>
@@ -378,19 +380,11 @@ export default function BodyFrameSettingsScreen() {
             onPress={() => undefined}
           >
             <View style={styles.modalHandle} />
-            <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: palette.text }]}>
-                {modalTitle}
-              </Text>
-              <Pressable
-                accessibilityRole="button"
-                style={[styles.modalCloseButton, { borderColor: palette.line }]}
-                onPress={() => setActiveSetting(null)}
-              >
-                <Text style={[styles.modalCloseText, { color: palette.text }]}>닫기</Text>
-              </Pressable>
-            </View>
-
+            <BodyFrameSheetHeader
+              title={modalTitle}
+              onClose={() => setActiveSetting(null)}
+              closeLabel="설정 닫기"
+            />
             <ScrollView
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
@@ -559,7 +553,7 @@ const styles = StyleSheet.create({
     maxWidth: bodyFrameDesign.contentMaxWidth,
     alignSelf: "center",
     paddingHorizontal: bodyFrameDesign.horizontalPadding,
-    gap: bodyFrameDesign.sectionGap
+    gap: 22
   },
   header: {
     gap: 6
@@ -571,7 +565,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: 12,
     paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingVertical: 9,
     borderWidth: bodyFrameDesign.borderWidth,
     borderRadius: bodyFrameDesign.cardRadius
   },
@@ -616,7 +610,8 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
     borderWidth: bodyFrameDesign.borderWidth,
     borderTopLeftRadius: bodyFrameDesign.bottomSheetRadius,
-    borderTopRightRadius: bodyFrameDesign.bottomSheetRadius
+    borderTopRightRadius: bodyFrameDesign.bottomSheetRadius,
+    gap: 12
   },
   modalHandle: {
     alignSelf: "center",

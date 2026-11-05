@@ -4,6 +4,7 @@ import {
 import * as ImagePicker from "expo-image-picker";
 import { Image } from "@/components/private-media-image";
 import { BodyMeasurementSummaryCard } from "@/components/body-measurement-summary-card";
+import { BodyFrameSheetFooter, BodyFrameSheetHeader } from "@/components/body-frame-sheet";
 import { router,
   type Href,
   useFocusEffect,
@@ -31,7 +32,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { bodyFrameDesign, bodyFrameTypography } from "@/constants/app-theme";
+import { bodyFrameAccent, bodyFrameDesign, bodyFrameTypography } from "@/constants/app-theme";
 import {
   getBodyProjectPhotos,
   getBodyProjectProgressSummary,
@@ -492,7 +493,9 @@ export default function BodyFrameProjectDetailScreen() {
   const { id } = useLocalSearchParams<{ id?: string | string[] }>();
   const projectId = Array.isArray(id) ? id[0] : id;
   const insets = useSafeAreaInsets();
-  const { palette } = useAppAppearance();
+  const { palette, effectiveThemeMode } = useAppAppearance();
+  const accent = effectiveThemeMode === "dark" ? bodyFrameAccent : palette.text;
+  const accentText = effectiveThemeMode === "dark" ? "#0B0B0C" : palette.inverse;
   const { isLoggedIn, subscription, user } = useAuth();
   const planEntitlements = useMemo(
     () => getPlanEntitlements({ isLoggedIn, subscription }),
@@ -1101,7 +1104,7 @@ export default function BodyFrameProjectDetailScreen() {
                 styles.progressFill,
                 {
                   width: `${progressPercent}%`,
-                  backgroundColor: palette.text
+                  backgroundColor: accent
                 }
               ]}
             />
@@ -1110,104 +1113,10 @@ export default function BodyFrameProjectDetailScreen() {
 
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="프로젝트 촬영 알림 설정"
-          style={[
-            styles.reminderCard,
-            {
-              borderColor: palette.line,
-              backgroundColor: palette.surface
-            }
-          ]}
-          onPress={openReminderSettings}
-        >
-          <View
-            style={[
-              styles.reminderIcon,
-              {
-                borderColor: palette.line,
-                backgroundColor: palette.background
-              }
-            ]}
-          >
-            <Feather
-              name={reminderSettings.enabled ? "bell" : "bell-off"}
-              size={18}
-              color={palette.text}
-            />
-          </View>
-          <View style={styles.reminderCopy}>
-            <Text style={[styles.reminderTitle, { color: palette.text }]}>
-              촬영 알림
-            </Text>
-            <Text style={[styles.reminderDetail, { color: palette.muted }]}>
-              {reminderSettings.enabled
-                ? `${formatProjectReminderSchedule(reminderSettings)} · 이 기기에서 알림`
-                : "프로젝트별 시간과 요일을 정해 촬영 알림을 받을 수 있습니다."}
-            </Text>
-          </View>
-          <Feather name="chevron-right" size={18} color={palette.muted} />
-        </Pressable>
-
-        {measurementSettings.enabled ? (
-          <BodyMeasurementSummaryCard
-            metric={measurementSettings.primaryMetric}
-            series={measurementSeries}
-            onOpenHistory={() =>
-              router.push({
-                pathname: "/project/[id]/measurements",
-                params: { id: project.id }
-              })
-            }
-            onAddMeasurement={
-              projectPhotos[0]
-                ? () =>
-                    router.push({
-                      pathname: "/photo/[id]",
-                      params: {
-                        id: projectPhotos[0].id,
-                        measurement: "1"
-                      }
-                    })
-                : () =>
-                    router.push({
-                      pathname: "/project/[id]/measurements",
-                      params: { id: project.id, add: "1" }
-                    })
-            }
-          />
-        ) : null}
-
-        <View style={styles.statGrid}>
-          <View
-            style={[
-              styles.statCard,
-              { borderColor: palette.line, backgroundColor: palette.surface }
-            ]}
-          >
-            <Text style={[styles.statLabel, { color: palette.muted }]}>시작일</Text>
-            <Text style={[styles.statValue, { color: palette.text }]}>
-              {formatDate(project.createdAt)}
-            </Text>
-          </View>
-          <View
-            style={[
-              styles.statCard,
-              { borderColor: palette.line, backgroundColor: palette.surface }
-            ]}
-          >
-            <Text style={[styles.statLabel, { color: palette.muted }]}>변화 영상</Text>
-            <Text style={[styles.statValue, { color: palette.text }]}>
-              {formatDuration(summary.durationSeconds)}
-            </Text>
-          </View>
-        </View>
-
-        <Pressable
-          accessibilityRole="button"
-          style={[styles.primaryAction, { backgroundColor: palette.text }]}
+          style={[styles.primaryAction, { backgroundColor: accent }]}
           onPress={() => void openCamera()}
         >
-          <Text style={[styles.primaryActionText, { color: palette.inverse }]}>
+          <Text style={[styles.primaryActionText, { color: accentText }]}>
             오늘 사진 찍기
           </Text>
         </Pressable>
@@ -1336,6 +1245,12 @@ export default function BodyFrameProjectDetailScreen() {
                 { borderColor: palette.line, backgroundColor: palette.surface }
               ]}
             >
+              <Image
+                source={require("../../assets/ui/illustrations/empty-photos.png")}
+                style={styles.emptyIllustration}
+                contentFit="contain"
+                accessibilityLabel="첫 사진 기록을 시작하는 안내 이미지"
+              />
               <Text style={[styles.emptyTitle, { color: palette.text }]}>
                 아직 기록된 사진이 없습니다.
               </Text>
@@ -1355,6 +1270,107 @@ export default function BodyFrameProjectDetailScreen() {
             변화 영상 만들기
           </Text>
         </Pressable>
+
+        <View style={styles.secondaryInfoSection}>
+          <Text style={[styles.sectionTitle, { color: palette.text }]}>
+            기록 정보
+          </Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="프로젝트 촬영 알림 설정"
+          style={[
+            styles.reminderCard,
+            {
+              borderColor: palette.line,
+              backgroundColor: palette.surface
+            }
+          ]}
+          onPress={openReminderSettings}
+        >
+          <View
+            style={[
+              styles.reminderIcon,
+              {
+                borderColor: palette.line,
+                backgroundColor: palette.background
+              }
+            ]}
+          >
+            <Feather
+              name={reminderSettings.enabled ? "bell" : "bell-off"}
+              size={18}
+              color={palette.text}
+            />
+          </View>
+          <View style={styles.reminderCopy}>
+            <Text style={[styles.reminderTitle, { color: palette.text }]}>
+              촬영 알림
+            </Text>
+            <Text style={[styles.reminderDetail, { color: palette.muted }]}>
+              {reminderSettings.enabled
+                ? `${formatProjectReminderSchedule(reminderSettings)} · 이 기기에서 알림`
+                : "프로젝트별 시간과 요일을 정해 촬영 알림을 받을 수 있습니다."}
+            </Text>
+          </View>
+          <Feather name="chevron-right" size={18} color={palette.muted} />
+        </Pressable>
+
+        {measurementSettings.enabled ? (
+          <BodyMeasurementSummaryCard
+            metric={measurementSettings.primaryMetric}
+            series={measurementSeries}
+            onOpenHistory={() =>
+              router.push({
+                pathname: "/project/[id]/measurements",
+                params: { id: project.id }
+              })
+            }
+            onAddMeasurement={
+              projectPhotos[0]
+                ? () =>
+                    router.push({
+                      pathname: "/photo/[id]",
+                      params: {
+                        id: projectPhotos[0].id,
+                        measurement: "1"
+                      }
+                    })
+                : () =>
+                    router.push({
+                      pathname: "/project/[id]/measurements",
+                      params: { id: project.id, add: "1" }
+                    })
+            }
+          />
+        ) : null}
+
+        <View style={styles.statGrid}>
+          <View
+            style={[
+              styles.statCard,
+              { borderColor: palette.line, backgroundColor: palette.surface }
+            ]}
+          >
+            <Text style={[styles.statLabel, { color: palette.muted }]}>시작일</Text>
+            <Text style={[styles.statValue, { color: palette.text }]}>
+              {formatDate(project.createdAt)}
+            </Text>
+          </View>
+          <View
+            style={[
+              styles.statCard,
+              { borderColor: palette.line, backgroundColor: palette.surface }
+            ]}
+          >
+            <Text style={[styles.statLabel, { color: palette.muted }]}>변화 영상</Text>
+            <Text style={[styles.statValue, { color: palette.text }]}>
+              {formatDuration(summary.durationSeconds)}
+            </Text>
+          </View>
+        </View>
+
+
+        </View>
       </ScrollView>
 
       <PhotoPositionSheet
@@ -1398,25 +1414,12 @@ export default function BodyFrameProjectDetailScreen() {
               ]}
             >
               <View style={styles.sheetHandle} />
-              <View style={styles.sheetHeader}>
-                <View style={styles.reminderSheetTitleWrap}>
-                  <Text style={[styles.sheetTitle, { color: palette.text }]}>
-                    촬영 알림
-                  </Text>
-                  <Text style={[styles.settingDetail, { color: palette.muted }]}>
-                    “{project.name}” 프로젝트의 촬영 시간과 요일을 설정합니다.
-                  </Text>
-                </View>
-                <Pressable
-                  accessibilityRole="button"
-                  style={[styles.sheetCloseButton, { borderColor: palette.line }]}
-                  onPress={() => setReminderModalOpen(false)}
-                >
-                  <Text style={[styles.sheetCloseText, { color: palette.text }]}>
-                    닫기
-                  </Text>
-                </Pressable>
-              </View>
+              <BodyFrameSheetHeader
+                title="촬영 알림"
+                description={`“${project.name}” 프로젝트의 촬영 시간과 요일을 설정합니다.`}
+                onClose={() => setReminderModalOpen(false)}
+                closeLabel="촬영 알림 설정 닫기"
+              />
 
               <ScrollView
                 style={styles.reminderScroll}
@@ -1439,9 +1442,9 @@ export default function BodyFrameProjectDetailScreen() {
                         style={[
                           styles.choiceButton,
                           {
-                            borderColor: active ? palette.text : palette.line,
+                            borderColor: active ? accent : palette.line,
                             backgroundColor: active
-                              ? palette.text
+                              ? accent
                               : palette.background
                           }
                         ]}
@@ -1450,7 +1453,7 @@ export default function BodyFrameProjectDetailScreen() {
                         <Text
                           style={[
                             styles.choiceText,
-                            { color: active ? palette.inverse : palette.text }
+                            { color: active ? accentText : palette.text }
                           ]}
                         >
                           {label}
@@ -1547,9 +1550,9 @@ export default function BodyFrameProjectDetailScreen() {
                           style={[
                             styles.choiceButton,
                             {
-                              borderColor: active ? palette.text : palette.line,
+                              borderColor: active ? accent : palette.line,
                               backgroundColor: active
-                                ? palette.text
+                                ? accent
                                 : palette.background,
                               opacity: reminderEnabledDraft ? 1 : 0.45
                             }
@@ -1559,7 +1562,7 @@ export default function BodyFrameProjectDetailScreen() {
                           <Text
                             style={[
                               styles.choiceText,
-                              { color: active ? palette.inverse : palette.text }
+                              { color: active ? accentText : palette.text }
                             ]}
                           >
                             {label}
@@ -1583,7 +1586,7 @@ export default function BodyFrameProjectDetailScreen() {
                             style={[
                               styles.reminderWeekdayButton,
                               {
-                                borderColor: active ? palette.text : palette.line,
+                                borderColor: active ? accent : palette.line,
                                 backgroundColor: active
                                   ? palette.text
                                   : palette.background,
@@ -1595,7 +1598,7 @@ export default function BodyFrameProjectDetailScreen() {
                             <Text
                               style={[
                                 styles.reminderWeekdayText,
-                                { color: active ? palette.inverse : palette.text }
+                                { color: active ? accentText : palette.text }
                               ]}
                             >
                               {label}
@@ -1612,22 +1615,12 @@ export default function BodyFrameProjectDetailScreen() {
                 </Text>
               </ScrollView>
 
-              <Pressable
+              <BodyFrameSheetFooter
+                onCancel={() => setReminderModalOpen(false)}
+                onConfirm={() => void saveReminderSettings()}
+                confirmLabel={reminderSaving ? "저장 중" : "알림 설정 저장"}
                 disabled={reminderSaving}
-                accessibilityRole="button"
-                style={[
-                  styles.saveButton,
-                  {
-                    backgroundColor: palette.text,
-                    opacity: reminderSaving ? 0.5 : 1
-                  }
-                ]}
-                onPress={() => void saveReminderSettings()}
-              >
-                <Text style={[styles.saveButtonText, { color: palette.inverse }]}>
-                  {reminderSaving ? "저장 중" : "알림 설정 저장"}
-                </Text>
-              </Pressable>
+              />
             </View>
           </View>
         </KeyboardAvoidingView>
@@ -1657,36 +1650,11 @@ export default function BodyFrameProjectDetailScreen() {
             ]}
           >
             <View style={styles.sheetHandle} />
-            <View style={styles.sheetHeader}>
-              <Text style={[styles.sheetTitle, { color: palette.text }]}>
-                프로젝트 설정
-              </Text>
-              <View style={styles.sheetActions}>
-                <Pressable
-                  disabled={saving}
-                  accessibilityRole="button"
-                  style={[
-                    styles.saveButton,
-                    {
-                      backgroundColor: palette.text,
-                      opacity: saving ? 0.5 : 1
-                    }
-                  ]}
-                  onPress={() => void saveBasicInfo()}
-                >
-                  <Text style={[styles.saveButtonText, { color: palette.inverse }]}>
-                    변경 저장
-                  </Text>
-                </Pressable>
-                <Pressable
-                  accessibilityRole="button"
-                  style={[styles.sheetCloseButton, { borderColor: palette.line }]}
-                  onPress={() => setSettingsOpen(false)}
-                >
-                  <Text style={[styles.sheetCloseText, { color: palette.text }]}>닫기</Text>
-                </Pressable>
-              </View>
-            </View>
+            <BodyFrameSheetHeader
+              title="프로젝트 설정"
+              onClose={() => setSettingsOpen(false)}
+              closeLabel="프로젝트 설정 닫기"
+            />
 
             <ScrollView
               style={styles.settingsScroll}
@@ -1776,15 +1744,15 @@ export default function BodyFrameProjectDetailScreen() {
                       style={[
                         styles.choiceButton,
                         {
-                          borderColor: active ? palette.text : palette.line,
-                          backgroundColor: active ? palette.text : palette.background
+                          borderColor: active ? accent : palette.line,
+                          backgroundColor: active ? accent : palette.background
                         }
                       ]}
                     >
                       <Text
                         style={[
                           styles.choiceText,
-                          { color: active ? palette.inverse : palette.text }
+                          { color: active ? accentText : palette.text }
                         ]}
                       >
                         {label}
@@ -1815,7 +1783,7 @@ export default function BodyFrameProjectDetailScreen() {
                       style={[
                         styles.choiceButton,
                         {
-                          borderColor: active ? palette.text : palette.line,
+                          borderColor: active ? accent : palette.line,
                           backgroundColor: active
                             ? palette.text
                             : palette.background
@@ -1826,7 +1794,7 @@ export default function BodyFrameProjectDetailScreen() {
                       <Text
                         style={[
                           styles.choiceText,
-                          { color: active ? palette.inverse : palette.text }
+                          { color: active ? accentText : palette.text }
                         ]}
                       >
                         {label}
@@ -1857,7 +1825,7 @@ export default function BodyFrameProjectDetailScreen() {
                       style={[
                         styles.choiceButton,
                         {
-                          borderColor: active ? palette.text : palette.line,
+                          borderColor: active ? accent : palette.line,
                           backgroundColor: active
                             ? palette.text
                             : palette.background
@@ -1868,7 +1836,7 @@ export default function BodyFrameProjectDetailScreen() {
                       <Text
                         style={[
                           styles.choiceText,
-                          { color: active ? palette.inverse : palette.text }
+                          { color: active ? accentText : palette.text }
                         ]}
                       >
                         {label}
@@ -1903,8 +1871,8 @@ export default function BodyFrameProjectDetailScreen() {
                       style={[
                         styles.choiceButton,
                         {
-                          borderColor: active ? palette.text : palette.line,
-                          backgroundColor: active ? palette.text : palette.background
+                          borderColor: active ? accent : palette.line,
+                          backgroundColor: active ? accent : palette.background
                         }
                       ]}
                       onPress={() =>
@@ -1914,7 +1882,7 @@ export default function BodyFrameProjectDetailScreen() {
                       <Text
                         style={[
                           styles.choiceText,
-                          { color: active ? palette.inverse : palette.text }
+                          { color: active ? accentText : palette.text }
                         ]}
                       >
                         {label}
@@ -1940,7 +1908,7 @@ export default function BodyFrameProjectDetailScreen() {
                             style={[
                               styles.metricChoice,
                               {
-                                borderColor: active ? palette.text : palette.line,
+                                borderColor: active ? accent : palette.line,
                                 backgroundColor: active
                                   ? palette.surfaceStrong
                                   : palette.background
@@ -1980,7 +1948,7 @@ export default function BodyFrameProjectDetailScreen() {
                             style={[
                               styles.metricChoice,
                               {
-                                borderColor: active ? palette.text : palette.line,
+                                borderColor: active ? accent : palette.line,
                                 backgroundColor: active
                                   ? palette.text
                                   : palette.background
@@ -1996,7 +1964,7 @@ export default function BodyFrameProjectDetailScreen() {
                             <Text
                               style={[
                                 styles.metricChoiceText,
-                                { color: active ? palette.inverse : palette.text }
+                                { color: active ? accentText : palette.text }
                               ]}
                             >
                               {bodyMeasurementMetricMeta[metric].label}
@@ -2022,8 +1990,8 @@ export default function BodyFrameProjectDetailScreen() {
                           style={[
                             styles.choiceButton,
                             {
-                              borderColor: active ? palette.text : palette.line,
-                              backgroundColor: active ? palette.text : palette.background
+                              borderColor: active ? accent : palette.line,
+                              backgroundColor: active ? accent : palette.background
                             }
                           ]}
                           onPress={() =>
@@ -2036,7 +2004,7 @@ export default function BodyFrameProjectDetailScreen() {
                           <Text
                             style={[
                               styles.choiceText,
-                              { color: active ? palette.inverse : palette.text }
+                              { color: active ? accentText : palette.text }
                             ]}
                           >
                             {label}
@@ -2067,6 +2035,14 @@ export default function BodyFrameProjectDetailScreen() {
                 </Text>
               </Pressable>
             </ScrollView>
+            <View style={styles.projectSettingsFooter}>
+              <BodyFrameSheetFooter
+                onCancel={() => setSettingsOpen(false)}
+                onConfirm={() => void saveBasicInfo()}
+                confirmLabel={saving ? "저장 중" : "변경 저장"}
+                disabled={saving}
+              />
+            </View>
           </View>
         </View>
       </Modal>
@@ -2212,11 +2188,20 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: bodyFrameDesign.buttonRadius,
-    marginBottom: 28
+    marginBottom: 16
   },
   primaryActionText: {
     fontSize: bodyFrameTypography.button,
     fontWeight: "700"
+  },
+  secondaryInfoSection: {
+    marginTop: 28,
+    gap: 12
+  },
+  emptyIllustration: {
+    width: 96,
+    height: 96,
+    alignSelf: "center"
   },
   recordsSection: {
     gap: 12
@@ -2316,6 +2301,7 @@ const styles = StyleSheet.create({
   },
   settingsSheet: {
     width: "100%",
+    gap: 10,
     maxHeight: "86%",
     paddingHorizontal: bodyFrameDesign.horizontalPadding,
     paddingTop: 10,
@@ -2448,6 +2434,7 @@ const styles = StyleSheet.create({
     fontSize: bodyFrameTypography.caption,
     fontWeight: "600"
   },
+  projectSettingsFooter: { paddingTop: 8 },
   settingsScroll: {
     flexShrink: 1
   },

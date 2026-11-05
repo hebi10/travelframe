@@ -16,7 +16,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { bodyFrameDesign, bodyFrameTypography } from "@/constants/app-theme";
+import { bodyFrameAccent, bodyFrameDesign, bodyFrameTypography } from "@/constants/app-theme";
 import { useAppAppearance } from "@/lib/app-appearance";
 import { deleteMadeVideo, getMadeVideos } from "@/lib/video-library";
 import type { MadeVideoItem } from "@/types/video";
@@ -38,7 +38,9 @@ const formatDate = (value: string) =>
 
 export default function BodyFrameVideoLibraryScreen() {
   const insets = useSafeAreaInsets();
-  const { palette } = useAppAppearance();
+  const { palette, effectiveThemeMode } = useAppAppearance();
+  const actionColor = effectiveThemeMode === "dark" ? bodyFrameAccent : palette.text;
+  const actionTextColor = effectiveThemeMode === "dark" ? "#0B0B0C" : palette.inverse;
   const [videos, setVideos] = useState<MadeVideoItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -227,7 +229,12 @@ export default function BodyFrameVideoLibraryScreen() {
           </View>
         ) : (
           <View style={[styles.emptyCard, { borderColor: palette.line }]}>
-            <Feather name="film" size={24} color={palette.muted} />
+            <Image
+              source={require("../../assets/ui/illustrations/empty-videos.png")}
+              style={styles.emptyArtwork}
+              contentFit="contain"
+              accessibilityLabel="저장한 영상이 없는 상태"
+            />
             <Text style={[styles.emptyTitle, { color: palette.text }]}>
               저장한 영상이 없습니다.
             </Text>
@@ -237,9 +244,9 @@ export default function BodyFrameVideoLibraryScreen() {
             <Pressable
               accessibilityRole="button"
               onPress={() => router.push("/video-create")}
-              style={[styles.createButton, { backgroundColor: palette.text }]}
+              style={[styles.createButton, { backgroundColor: actionColor }]}
             >
-              <Text style={[styles.createButtonText, { color: palette.inverse }]}>
+              <Text style={[styles.createButtonText, { color: actionTextColor }]}>
                 영상 만들기
               </Text>
             </Pressable>
@@ -370,6 +377,10 @@ const styles = StyleSheet.create({
   cardButtonText: {
     fontSize: bodyFrameTypography.button,
     fontWeight: "600"
+  },
+  emptyArtwork: {
+    width: 112,
+    height: 112
   },
   emptyCard: {
     alignItems: "center",

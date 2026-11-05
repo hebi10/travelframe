@@ -659,6 +659,12 @@ def replace_focused_input(device,value):
     raise RuntimeError(f'Project input did not exactly match the requested synthetic name: {actual!r}')
 
 
+def open_project_reminder(device):
+    # The photo-first project layout intentionally places secondary notification settings below the photo grid.
+    device.ready(['QA 데모', '기록'])
+    device.tap('프로젝트 촬영 알림 설정', search='below')
+
+
 def creation_keyboard(device):
     device.ready(['프로젝트별 몸의 변화를'])
     device.tap('새 프로젝트 만들기')
@@ -804,18 +810,22 @@ def no_export_side_effects(before, after):
     return dict(videosUnchanged=True, guestQuotaUnchanged=True)
 
 
-def wait_export_terminal(device, expected_error=None, seconds=180):
+def wait_export_terminal(device, expected_error=None, seconds=90):
+    """Wait for actual terminal evidence; the idle button may still be visible immediately after a tap."""
     deadline=time.monotonic()+seconds
+    last_strings=[]
     while time.monotonic()<deadline:
         xml=device.dump();strings=ui_strings(xml)
+        last_strings=strings
         running=any('영상 만드는 중' in value for value in strings)
         button=any(value.strip()=='영상 만들기' for value in strings)
-        if not running and button:
-            if expected_error and not any(any(marker in value for marker in expected_error) for value in strings):
-                raise RuntimeError(f'Export stopped without the expected real error: {strings}')
+        expected_visible=not expected_error or any(
+            any(marker in value for marker in expected_error) for value in strings
+        )
+        if not running and button and expected_visible:
             return strings
         time.sleep(1)
-    raise RuntimeError('Native export/encoder did not settle within180seconds')
+    raise RuntimeError(f'Native export did not show the expected terminal state within {seconds} seconds: {last_strings}')
 
 
 def set_interval(device, value):
@@ -950,7 +960,9 @@ def video_smoke(device, directory, restart=True):
             xml = device.dump()
             strings = ui_strings(xml)
             running = any('영상 만드는 중' in value for value in strings)
-            if not running and time.monotonic()-started > 2 and any(value.strip() == '영상 만들기' for value in strings):
+            if (not running and time.monotonic()-started > 2
+                    and any(value.strip() == '영상 만들기' for value in strings)
+                    and any('앨범에 저장했습니다.' in value for value in strings)):
                 break
             # Permission prompts are not bypassed. Their actual state is retained on timeout.
             time.sleep(2)
@@ -1016,7 +1028,15 @@ def video_smoke(device, directory, restart=True):
         result['status'] = 'captured'
     except Exception as error:
         result.update(status='failed', error=str(error))
-        records.append(capture(device, directory, 'video-export-result', 'video-create', [], open_route=False))
+        # The persisted-media audit intentionally force-stops the app. Preserve
+        # the original export failure rather than inventing a second capture failure.
+        activity=device.shell('dumpsys','activity','activities',check=False)
+        resumed='\n'.join(line for line in activity.splitlines()
+                          if 'ResumedActivity' in line or 'topResumedActivity' in line)
+        if PACKAGE in resumed:
+            records.append(capture(device, directory, 'video-export-result', 'video-create', [], open_route=False))
+        else:
+            result['captureSkippedReason']='App not foreground after inspection; original failure retained'
     (directory / 'video-native-export.json').write_text(json.dumps(result, indent=2, ensure_ascii=False))
     print(f"{directory.name}/video-native-export: {result['status']}", flush=True)
     records.append(result)
@@ -1085,7 +1105,7 @@ def main():
                 ('records', 'studio', ['QA 데모', '프로젝트별 몸의 변화를'], None),
                 ('project', f'project/{PROJECT}', ['QA 데모', '프로젝트 설정 열기'], None),
                 ('project-settings', f'project/{PROJECT}', ['프로젝트 설정', '변경 저장', '이름'], (['프로젝트 설정 열기'], '프로젝트 설정 열기')),
-                ('project-reminder', f'project/{PROJECT}', ['촬영 알림 설정 닫기', '촬영 알림', '요일'], (['프로젝트 촬영 알림 설정'], '프로젝트 촬영 알림 설정')),
+                ('project-reminder', f'project/{PROJECT}', ['촬영 알림 설정 닫기', '촬영 알림', '요일'], open_project_reminder),
                 ('photo', f'photo/{PHOTO}', ['기록 상세'], None),
                 ('photo-measurement', f'photo/{PHOTO}?measurement=1', ['몸무게', '체지방률', '저장'], None),
                 ('edit-login-required', 'edit?' + urlencode({'photoId': PHOTO}), ['로그인이 필요합니다', '사진 편집은 무료 로그인부터'], None),

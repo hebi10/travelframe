@@ -1,11 +1,12 @@
 import { AppText as Text } from "@/components/app-text";
+import { Image } from "expo-image";
 import {
   Pressable,
   StyleSheet,
   View
 } from "react-native";
 
-import { bodyFrameDesign, colors, controls, typography } from "@/constants/app-theme";
+import { bodyFrameAccent, bodyFrameDesign, colors, controls, typography } from "@/constants/app-theme";
 import type { AppGuideStep } from "@/constants/app-guide-steps";
 import { useAppAppearance } from "@/lib/app-appearance";
 
@@ -28,8 +29,22 @@ export function AppGuideCard({
   onNext,
   onSkip
 }: AppGuideCardProps) {
-  const { palette } = useAppAppearance();
+  const { palette, effectiveThemeMode } = useAppAppearance();
   const isLast = current === total;
+  const activeColor = effectiveThemeMode === "dark" ? bodyFrameAccent : palette.text;
+  const activeTextColor = effectiveThemeMode === "dark" ? "#0B0B0C" : palette.inverse;
+  const artwork =
+    step.id === "body-frame-project" || step.id === "body-frame-records"
+      ? require("../assets/ui/illustrations/feature-records.png")
+      : step.id === "body-frame-reference"
+        ? require("../assets/ui/illustrations/feature-compare.png")
+        : step.id === "body-frame-measurements"
+          ? require("../assets/ui/illustrations/empty-metrics.png")
+          : step.id === "body-frame-video"
+            ? require("../assets/ui/illustrations/feature-video.png")
+            : step.id === "body-frame-settings" || step.id === "body-frame-settings-backup"
+              ? require("../assets/ui/illustrations/feature-capture.png")
+              : null;
 
   return (
     <View style={[styles.card, { borderColor: palette.text, backgroundColor: palette.background }]}>
@@ -45,6 +60,10 @@ export function AppGuideCard({
           </View>
         ) : null}
       </View>
+
+      {artwork ? (
+        <Image source={artwork} style={styles.artwork} contentFit="contain" accessible={false} />
+      ) : null}
 
       <View style={styles.copy}>
         <Text selectable={false} style={[styles.textBase, styles.title, { color: palette.text }]}>
@@ -79,10 +98,10 @@ export function AppGuideCard({
           ) : null}
           <Pressable
             accessibilityRole="button"
-            style={[styles.primaryButton, { borderColor: palette.text, backgroundColor: palette.text }]}
+            style={[styles.primaryButton, { borderColor: activeColor, backgroundColor: activeColor }]}
             onPress={onNext}
           >
-            <Text selectable={false} style={[styles.textBase, styles.primaryButtonLabel, { color: palette.inverse }]}>
+            <Text selectable={false} style={[styles.textBase, styles.primaryButtonLabel, { color: activeTextColor }]}>
               {isLast ? "완료" : "다음"}
             </Text>
           </Pressable>
@@ -128,6 +147,11 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "600",
     letterSpacing: 0
+  },
+  artwork: {
+    width: "100%",
+    height: 112,
+    alignSelf: "center"
   },
   copy: {
     gap: 8

@@ -1,6 +1,6 @@
 import { StyleSheet } from "react-native";
 
-import { bodyFrameDarkColors, bodyFrameDesign, bodyFrameTypography, colors, controls, typography } from "@/constants/app-theme";
+import { bodyFrameAccent, bodyFrameDarkColors, bodyFrameDesign, bodyFrameTypography, colors, controls, typography } from "@/constants/app-theme";
 import {
   CAMERA_CONTROL_TRAY_HORIZONTAL_PADDING,
   CAMERA_FOCUS_INDICATOR_RADIUS,
@@ -363,7 +363,7 @@ export const styles = StyleSheet.create({
     justifyContent: "flex-end",
     paddingHorizontal: 14,
     paddingTop: 14,
-    backgroundColor: "rgba(0, 0, 0, 0.16)"
+    backgroundColor: "rgba(0, 0, 0, 0.62)"
   },
   guideModal: {
     gap: 16,
@@ -385,8 +385,8 @@ export const styles = StyleSheet.create({
     paddingBottom: 22,
     borderWidth: 1,
     borderColor: bodyFrameDarkColors.line,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    borderTopLeftRadius: bodyFrameDesign.bottomSheetRadius,
+    borderTopRightRadius: bodyFrameDesign.bottomSheetRadius,
     backgroundColor: "#101012",
     overflow: "hidden"
   },
@@ -399,7 +399,7 @@ export const styles = StyleSheet.create({
     backgroundColor: "#55555B"
   },
   cameraSettingsHeader: {
-    minHeight: 92,
+    minHeight: 64,
     flexDirection: "row",
     alignItems: "flex-start",
     justifyContent: "space-between",
@@ -414,14 +414,14 @@ export const styles = StyleSheet.create({
   },
   cameraSettingsTitle: {
     color: bodyFrameDarkColors.text,
-    fontSize: 30,
-    lineHeight: 36,
-    fontWeight: "800",
+    fontSize: bodyFrameTypography.sectionTitle,
+    lineHeight: 28,
+    fontWeight: "600",
     letterSpacing: -0.4
   },
   cameraSettingsCloseButton: {
-    minWidth: 64,
-    minHeight: 52,
+    minWidth: bodyFrameDesign.minTouchSize,
+    minHeight: bodyFrameDesign.minTouchSize,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 14,
@@ -500,7 +500,7 @@ export const styles = StyleSheet.create({
     backgroundColor: "#18181B"
   },
   cameraSettingsOptionButtonActive: {
-    borderColor: "#505058",
+    borderColor: bodyFrameAccent,
     backgroundColor: "#050506"
   },
   cameraSettingsOptionButtonText: {
@@ -539,7 +539,7 @@ export const styles = StyleSheet.create({
     backgroundColor: "#18181B"
   },
   cameraToolButtonActive: {
-    borderColor: "#5A5A62",
+    borderColor: bodyFrameAccent,
     backgroundColor: "#0A0A0C"
   },
   cameraToolText: {

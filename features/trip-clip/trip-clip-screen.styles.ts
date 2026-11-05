@@ -1,6 +1,6 @@
 import { StyleSheet } from "react-native";
 
-import { bodyFrameDesign, colors, controls, spacing, typography } from "@/constants/app-theme";
+import { bodyFrameAccent, bodyFrameDesign, colors, controls, spacing, typography } from "@/constants/app-theme";
 import { RECORDING_VIEW_WIDTH } from "@/features/trip-clip/trip-clip-screen.constants";
 
 export const styles = StyleSheet.create({
@@ -144,7 +144,7 @@ export const styles = StyleSheet.create({
   title: {
     color: colors.text,
     fontSize: typography.title,
-    fontWeight: "800",
+    fontWeight: "600",
     lineHeight: 35,
     letterSpacing: 0
   },
@@ -546,13 +546,13 @@ export const styles = StyleSheet.create({
   },
   primaryButton: {
     flex: 1,
-    minHeight: controls.height,
+    minHeight: bodyFrameDesign.primaryButtonHeight,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.text
+    backgroundColor: bodyFrameAccent
   },
   primaryButtonText: {
-    color: colors.inverse,
+    color: colors.text,
     fontSize: typography.button,
     fontWeight: "800",
     letterSpacing: 0
@@ -580,7 +580,7 @@ export const styles = StyleSheet.create({
   sectionTitle: {
     color: colors.text,
     fontSize: typography.section,
-    fontWeight: "800",
+    fontWeight: "600",
     letterSpacing: 0
   },
   loading: {

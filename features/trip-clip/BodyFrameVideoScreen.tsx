@@ -13,13 +13,14 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  useWindowDimensions,
   View
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { TripClipRecordingCanvas } from "@/components/trip-clip-recording-canvas";
 import { BodyFrameVideoOptionsSheet, type VideoOptionKind } from "@/features/trip-clip/BodyFrameVideoOptionsSheet";
-import { bodyFrameDesign, bodyFrameTypography } from "@/constants/app-theme";
+import { bodyFrameAccent, bodyFrameDesign, bodyFrameTypography } from "@/constants/app-theme";
 import {
   BODY_FRAME_VIDEO_FPS,
   DEFAULT_BODY_FRAME_VIDEO_OPTIONS,
@@ -110,7 +111,10 @@ const formatDuration = (seconds: number) =>
 
 export default function BodyFrameVideoScreen() {
   const insets = useSafeAreaInsets();
-  const { palette } = useAppAppearance();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const { palette, effectiveThemeMode } = useAppAppearance();
+  const actionColor = effectiveThemeMode === "dark" ? bodyFrameAccent : palette.text;
+  const actionTextColor = effectiveThemeMode === "dark" ? "#0B0B0C" : palette.inverse;
   const recorder = useOptionalViewRecorder();
   const recordingViewAvailable = isRecordingViewAvailable();
   const { isLoggedIn, subscription } = useAuth();
@@ -144,6 +148,7 @@ export default function BodyFrameVideoScreen() {
   );
   const outputSize = getBodyFrameVideoOutputSize(videoOptions.ratio, videoOptions.quality);
   const frameAspectRatio = outputSize.width / outputSize.height;
+  const previewDisplayWidth = Math.max(160, Math.min(320, windowWidth * 0.72, windowHeight * 0.38 * frameAspectRatio));
   const [isLoading, setIsLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
@@ -523,7 +528,7 @@ export default function BodyFrameVideoScreen() {
       <ScrollView
         contentContainerStyle={[
           styles.content,
-          { paddingTop: Math.max(insets.top + 18, 28), paddingBottom: insets.bottom + 32 }
+          { paddingTop: Math.max(insets.top + 18, 28), paddingBottom: 24 }
         ]}
         showsVerticalScrollIndicator={false}
       >
@@ -564,6 +569,7 @@ export default function BodyFrameVideoScreen() {
             {
               borderColor: palette.line,
               backgroundColor: palette.surface,
+              width: previewDisplayWidth,
               aspectRatio: frameAspectRatio
             }
           ]}
@@ -658,6 +664,37 @@ export default function BodyFrameVideoScreen() {
           </View>
         ) : null}
 
+        {!isExporting && albumRetryUri ? (
+          <SummaryRow label="앨범 저장" value="다시 시도" onPress={() => {
+            const uri = albumRetryUri;
+            setIsExporting(true);
+            void saveVideoToLibrary(uri).then(() => {
+              setAlbumRetryUri(null);
+              setMessage("앱에 저장한 영상을 Body Frame 앨범에 저장했습니다.");
+            }).catch(error => setMessage(getUserFacingErrorMessage(error, "앨범 저장을 다시 시도해 주세요.")))
+              .finally(() => setIsExporting(false));
+          }} />
+        ) : null}
+      </ScrollView>
+
+      <View
+        style={[
+          styles.exportFooter,
+          {
+            borderColor: palette.line,
+            backgroundColor: palette.chrome,
+            paddingBottom: Math.max(insets.bottom, 12)
+          }
+        ]}
+      >
+        {message ? (
+          <View
+            style={[styles.exportFeedback, { backgroundColor: palette.surface, borderColor: palette.line }]}
+            accessibilityLiveRegion="polite"
+          >
+            <Text style={[styles.message, { color: palette.text }]}>{message}</Text>
+          </View>
+        ) : null}
         <Pressable
           accessibilityRole="button"
           disabled={
@@ -669,7 +706,8 @@ export default function BodyFrameVideoScreen() {
           onPress={() => void createVideo()}
           style={({ pressed }) => [
             styles.primaryButton,
-            { backgroundColor: palette.text },
+            styles.exportFooterButton,
+            { backgroundColor: actionColor },
             (projectPhotos.length === 0 ||
               isExporting ||
               !videoLimitState.allowed ||
@@ -685,35 +723,32 @@ export default function BodyFrameVideoScreen() {
         >
           {isExporting ? (
             <View style={styles.buttonLoadingRow}>
-              <ActivityIndicator size="small" color={palette.inverse} />
-              <Text style={[styles.primaryButtonText, { color: palette.inverse }]}>
+              <ActivityIndicator size="small" color={actionTextColor} />
+              <Text style={[styles.primaryButtonText, { color: actionTextColor }]}>
                 영상 만드는 중 {exportProgress}%
               </Text>
             </View>
           ) : (
-            <Text style={[styles.primaryButtonText, { color: palette.inverse }]}>
+            <Text style={[styles.primaryButtonText, { color: actionTextColor }]}>
               영상 만들기
             </Text>
           )}
         </Pressable>
 
+
         {isExporting ? (
-          <SummaryRow label="취소" value="영상 만들기 취소" onPress={cancelExport} />
-        ) : albumRetryUri ? (
-          <SummaryRow label="앨범 저장" value="다시 시도" onPress={() => {
-            const uri = albumRetryUri;
-            setIsExporting(true);
-            void saveVideoToLibrary(uri).then(() => {
-              setAlbumRetryUri(null);
-              setMessage("앱에 저장한 영상을 Body Frame 앨범에 저장했습니다.");
-            }).catch(error => setMessage(getUserFacingErrorMessage(error, "앨범 저장을 다시 시도해 주세요.")))
-              .finally(() => setIsExporting(false));
-          }} />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="영상 만들기 취소"
+            onPress={cancelExport}
+            style={styles.cancelFooterButton}
+          >
+            <Text style={[styles.cancelFooterText, { color: palette.muted }]}>
+              영상 만들기 취소
+            </Text>
+          </Pressable>
         ) : null}
-        {message ? (
-          <Text style={[styles.message, { color: palette.muted }]}>{message}</Text>
-        ) : null}
-      </ScrollView>
+      </View>
 
       {optionKind ? (
         <BodyFrameVideoOptionsSheet
@@ -945,6 +980,32 @@ const styles = StyleSheet.create({
   limitPlanButtonText: {
     fontSize: 13,
     fontWeight: "600"
+  },
+  exportFooter: {
+    width: "100%",
+    maxWidth: bodyFrameDesign.contentMaxWidth,
+    alignSelf: "center",
+    paddingTop: 10,
+    paddingHorizontal: bodyFrameDesign.horizontalPadding,
+    borderWidth: bodyFrameDesign.borderWidth
+  },
+  exportFooterButton: {
+    marginTop: 0
+  },
+  exportFeedback: {
+    marginBottom: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderRadius: bodyFrameDesign.cardRadius
+  },
+  cancelFooterButton: {
+    minHeight: bodyFrameDesign.minTouchSize,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  cancelFooterText: {
+    fontSize: bodyFrameTypography.button
   },
   primaryButton: {
     minHeight: bodyFrameDesign.primaryButtonHeight,

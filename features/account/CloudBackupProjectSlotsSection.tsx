@@ -367,7 +367,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     gap: 10,
-    borderBottomWidth: bodyFrameDesign.borderWidth,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderRadius: bodyFrameDesign.cardRadius,
+    paddingHorizontal: 12,
     paddingVertical: 8
   },
   rowCopy: {

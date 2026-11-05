@@ -1,6 +1,6 @@
 import { StyleSheet } from "react-native";
 
-import { colors, controls, typography } from "@/constants/app-theme";
+import { bodyFrameAccent, colors, controls, typography } from "@/constants/app-theme";
 
 export const styles = StyleSheet.create({
   tabs: {
@@ -23,8 +23,8 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.background
   },
   tabActive: {
-    borderColor: colors.text,
-    backgroundColor: colors.text
+    borderColor: bodyFrameAccent,
+    backgroundColor: bodyFrameAccent
   },
   tabText: {
     color: colors.text,
@@ -33,7 +33,7 @@ export const styles = StyleSheet.create({
     letterSpacing: 0
   },
   tabTextActive: {
-    color: colors.inverse
+    color: colors.text
   },
   pageSizeBar: {
     minHeight: controls.compactHeight,

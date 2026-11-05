@@ -91,7 +91,7 @@ export function ScreenShell({
                 fontSize: Math.round(typography.body * fontSizeScale),
                 lineHeight: Math.round(21 * fontSizeScale),
                 fontFamily,
-                fontWeight: "700"
+                fontWeight: "400"
               }
             ]}
           >
@@ -115,7 +115,7 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.section * 2
   },
   header: {
-    gap: 12
+    gap: 8
   },
   backButton: {
     alignSelf: "flex-start",
@@ -162,6 +162,6 @@ const getTitleStyle = (
     fontSize: Math.round(bodyFrameTypography.pageTitle * scale),
     lineHeight: Math.round(32 * scale),
     fontFamily,
-    fontWeight: getFontWeightForStyle(fontStyle)
+    fontWeight: fontStyle === "noto_sans_kr" ? "600" : getFontWeightForStyle(fontStyle)
   };
 };

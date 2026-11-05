@@ -3,7 +3,8 @@ import { KeyboardAvoidingView, Modal, Pressable, ScrollView, StyleSheet, View } 
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppText as Text, AppTextInput as TextInput } from "@/components/app-text";
-import { bodyFrameDesign } from "@/constants/app-theme";
+import { BodyFrameSheetFooter, BodyFrameSheetHeader } from "@/components/body-frame-sheet";
+import { bodyFrameDesign, bodyFrameTypography } from "@/constants/app-theme";
 import { getPhotoPositionIndex } from "@/features/records/photo-order-accessibility";
 import { useAppAppearance } from "@/lib/app-appearance";
 
@@ -22,12 +23,28 @@ export function PhotoPositionSheet({ currentPosition, count, onClose, onMove }: 
   const targetIndex = getPhotoPositionIndex(position, count);
 
   return (
-    <Modal transparent visible={currentPosition !== null} onRequestClose={onClose}>
+    <Modal transparent animationType="slide" visible={currentPosition !== null} onRequestClose={onClose}>
       <KeyboardAvoidingView style={styles.root} behavior="height">
         <View style={[styles.backdrop, { paddingTop: Math.max(insets.top, 16) }]}>
-          <View style={[styles.sheet, { backgroundColor: palette.surface, borderColor: palette.line, paddingBottom: Math.max(insets.bottom, 16) }]}>
-            <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
-              <Text style={[styles.title, { color: palette.text }]}>사진 순번 이동</Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="사진 순번 이동 닫기"
+            style={StyleSheet.absoluteFill}
+            onPress={onClose}
+          />
+          <View
+            style={[
+              styles.sheet,
+              { backgroundColor: palette.surface, borderColor: palette.line, paddingBottom: Math.max(insets.bottom, 16) }
+            ]}
+          >
+            <View style={[styles.handle, { backgroundColor: palette.faint }]} />
+            <BodyFrameSheetHeader title="사진 순번 이동" onClose={onClose} />
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
+              contentContainerStyle={styles.content}
+            >
               <Text style={[styles.description, { color: palette.muted }]}>
                 현재 {currentPosition}번째 기록입니다. 이동할 순번을 1부터 {count}까지 입력하세요. 1은 첫 기록입니다.
               </Text>
@@ -39,19 +56,13 @@ export function PhotoPositionSheet({ currentPosition, count, onClose, onMove }: 
                 selectTextOnFocus
                 style={[styles.input, { color: palette.text, borderColor: palette.line, backgroundColor: palette.background }]}
               />
-              <Pressable
-                accessibilityRole="button"
-                accessibilityState={{ disabled: targetIndex === null }}
-                disabled={targetIndex === null}
-                style={[styles.button, { backgroundColor: palette.text, opacity: targetIndex === null ? 0.5 : 1 }]}
-                onPress={() => { if (targetIndex !== null) onMove(targetIndex); }}
-              >
-                <Text style={{ color: palette.inverse }}>이 순번으로 이동</Text>
-              </Pressable>
-              <Pressable accessibilityRole="button" style={styles.button} onPress={onClose}>
-                <Text style={{ color: palette.text }}>취소</Text>
-              </Pressable>
             </ScrollView>
+            <BodyFrameSheetFooter
+              onCancel={onClose}
+              onConfirm={() => { if (targetIndex !== null) onMove(targetIndex); }}
+              confirmLabel="이 순번으로 이동"
+              disabled={targetIndex === null}
+            />
           </View>
         </View>
       </KeyboardAvoidingView>
@@ -62,9 +73,24 @@ export function PhotoPositionSheet({ currentPosition, count, onClose, onMove }: 
 const styles = StyleSheet.create({
   root: { flex: 1 },
   backdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.62)" },
-  sheet: { width: "100%", maxWidth: bodyFrameDesign.contentMaxWidth, maxHeight: "100%", alignSelf: "center", padding: 16, borderWidth: bodyFrameDesign.borderWidth },
-  title: { fontSize: 20, fontWeight: "600", marginBottom: 12 },
-  description: { fontSize: 14, marginBottom: 16 },
-  input: { minHeight: bodyFrameDesign.primaryButtonHeight, borderWidth: bodyFrameDesign.borderWidth, padding: 12, marginBottom: 12 },
-  button: { minHeight: bodyFrameDesign.primaryButtonHeight, alignItems: "center", justifyContent: "center", padding: 12 }
+  sheet: {
+    width: "100%",
+    maxWidth: bodyFrameDesign.contentMaxWidth,
+    maxHeight: "86%",
+    alignSelf: "center",
+    padding: bodyFrameDesign.horizontalPadding,
+    gap: 12,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderRadius: bodyFrameDesign.bottomSheetRadius
+  },
+  handle: { alignSelf: "center", width: 36, height: 4, marginBottom: 2 },
+  content: { gap: 12, paddingBottom: 8 },
+  description: { fontSize: bodyFrameTypography.body, lineHeight: 20 },
+  input: {
+    minHeight: bodyFrameDesign.primaryButtonHeight,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderRadius: bodyFrameDesign.buttonRadius,
+    padding: 12,
+    fontSize: bodyFrameTypography.body
+  }
 });
