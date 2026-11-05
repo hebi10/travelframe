@@ -178,7 +178,7 @@ export const styles = StyleSheet.create({
   profileName: {
     color: colors.text,
     fontSize: 20,
-    fontWeight: "900",
+    fontWeight: "600",
     letterSpacing: 0
   },
   profileEmail: {
@@ -282,7 +282,7 @@ export const styles = StyleSheet.create({
   planTitle: {
     color: colors.text,
     fontSize: 20,
-    fontWeight: "900",
+    fontWeight: "600",
     lineHeight: 26,
     letterSpacing: 0,
     backgroundColor: "transparent"
@@ -291,7 +291,7 @@ export const styles = StyleSheet.create({
     color: colors.text,
     backgroundColor: "transparent",
     fontSize: typography.section,
-    fontWeight: "900",
+    fontWeight: "700",
     letterSpacing: 0
   },
   benefitList: {
@@ -316,13 +316,16 @@ export const styles = StyleSheet.create({
     backgroundColor: "rgba(0, 0, 0, 0.36)"
   },
   paymentModalPanel: {
+    width: "100%",
+    maxWidth: bodyFrameDesign.contentMaxWidth,
+    alignSelf: "center",
     gap: 12,
     minHeight: 0,
     flexGrow: 0,
     maxHeight: "86%",
-    padding: spacing.screen,
-    borderWidth: 1,
-    borderColor: colors.text,
+    padding: bodyFrameDesign.horizontalPadding,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderColor: colors.line,
     backgroundColor: colors.background
   },
   paymentModalScroll: { flexShrink: 1, minHeight: 0 },
@@ -358,13 +361,13 @@ export const styles = StyleSheet.create({
   statValue: {
     color: colors.text,
     fontSize: 26,
-    fontWeight: "900",
+    fontWeight: "600",
     letterSpacing: 0
   },
   statLabel: {
     color: colors.muted,
     fontSize: typography.small,
-    fontWeight: "800",
+    fontWeight: "600",
     letterSpacing: 0
   },
   musicPanel: {

@@ -1,6 +1,6 @@
 import { StyleSheet } from "react-native";
 
-import { colors, controls, spacing, typography } from "@/constants/app-theme";
+import { bodyFrameDesign, colors, controls, spacing, typography } from "@/constants/app-theme";
 import type { AppPalette } from "@/lib/app-appearance";
 
 export const createThemedStyles = (palette: AppPalette, fontFamily?: string) => {
@@ -17,7 +17,7 @@ export const createThemedStyles = (palette: AppPalette, fontFamily?: string) => 
       backgroundColor: palette.surface
     },
     modalPanel: {
-      borderTopColor: palette.line,
+      borderColor: palette.line,
       backgroundColor: palette.background
     },
     border: {
@@ -83,13 +83,15 @@ export const styles = StyleSheet.create({
     backgroundColor: "rgba(0, 0, 0, 0.42)"
   },
   modalPanel: {
-    gap: 18,
+    width: "100%",
+    maxWidth: bodyFrameDesign.contentMaxWidth,
+    alignSelf: "center",
+    gap: 14,
     flexGrow: 0,
     maxHeight: "86%",
-    padding: spacing.screen,
-    paddingBottom: spacing.section,
-    borderTopWidth: 1,
-    borderTopColor: colors.text,
+    padding: bodyFrameDesign.horizontalPadding,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderColor: colors.line,
     backgroundColor: colors.background
   },
   modalScroll: {
@@ -103,13 +105,13 @@ export const styles = StyleSheet.create({
   },
   modalTitle: {
     color: colors.text,
-    fontSize: 20,
-    fontWeight: "800",
+    fontSize: 18,
+    fontWeight: "600",
     lineHeight: 26,
     letterSpacing: 0
   },
   closeButton: {
-    minHeight: controls.compactHeight,
+    minHeight: bodyFrameDesign.minTouchSize,
     justifyContent: "center",
     paddingHorizontal: 12,
     borderWidth: 1,
