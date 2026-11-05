@@ -41,9 +41,11 @@ export function AppGuideCard({
           ? require("../assets/ui/illustrations/empty-metrics.png")
           : step.id === "body-frame-video"
             ? require("../assets/ui/illustrations/feature-video.png")
-            : step.id === "body-frame-settings" || step.id === "body-frame-settings-backup"
-              ? require("../assets/ui/illustrations/feature-capture.png")
-              : null;
+            : step.id === "body-frame-settings-backup"
+              ? require("../assets/ui/illustrations/feature-backup.png")
+              : step.id === "body-frame-settings"
+                ? require("../assets/ui/illustrations/feature-capture.png")
+                : null;
 
   return (
     <View style={[styles.card, { borderColor: palette.text, backgroundColor: palette.background }]}>
@@ -143,7 +145,7 @@ const styles = StyleSheet.create({
   },
   targetText: {
     color: colors.text,
-    fontSize: 11,
+    fontSize: bodyFrameTypography.caption,
     fontWeight: "600",
     letterSpacing: 0
   },
@@ -157,7 +159,7 @@ const styles = StyleSheet.create({
   },
   title: {
     color: colors.text,
-    fontSize: 23,
+    fontSize: bodyFrameTypography.projectTitle,
     fontWeight: "600",
     lineHeight: 29,
     letterSpacing: 0
@@ -192,7 +194,7 @@ const styles = StyleSheet.create({
   },
   textButtonLabel: {
     color: colors.muted,
-    fontSize: typography.button,
+    fontSize: bodyFrameTypography.button,
     fontWeight: "600",
     letterSpacing: 0
   },
@@ -207,7 +209,7 @@ const styles = StyleSheet.create({
   },
   secondaryButtonLabel: {
     color: colors.text,
-    fontSize: typography.button,
+    fontSize: bodyFrameTypography.button,
     fontWeight: "600",
     letterSpacing: 0
   },
