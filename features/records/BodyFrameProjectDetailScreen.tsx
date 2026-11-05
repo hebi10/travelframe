@@ -4,6 +4,7 @@ import {
 import * as ImagePicker from "expo-image-picker";
 import { Image } from "@/components/private-media-image";
 import { BodyMeasurementSummaryCard } from "@/components/body-measurement-summary-card";
+import { BodyFrameSheetFooter } from "@/components/body-frame-sheet";
 import { router,
   type Href,
   useFocusEffect,
@@ -1676,31 +1677,14 @@ export default function BodyFrameProjectDetailScreen() {
               <Text style={[styles.sheetTitle, { color: palette.text }]}>
                 프로젝트 설정
               </Text>
-              <View style={styles.sheetActions}>
-                <Pressable
-                  disabled={saving}
-                  accessibilityRole="button"
-                  style={[
-                    styles.saveButton,
-                    {
-                      backgroundColor: palette.text,
-                      opacity: saving ? 0.5 : 1
-                    }
-                  ]}
-                  onPress={() => void saveBasicInfo()}
-                >
-                  <Text style={[styles.saveButtonText, { color: palette.inverse }]}>
-                    변경 저장
-                  </Text>
-                </Pressable>
-                <Pressable
-                  accessibilityRole="button"
-                  style={[styles.sheetCloseButton, { borderColor: palette.line }]}
-                  onPress={() => setSettingsOpen(false)}
-                >
-                  <Text style={[styles.sheetCloseText, { color: palette.text }]}>닫기</Text>
-                </Pressable>
-              </View>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="프로젝트 설정 닫기"
+                style={[styles.sheetCloseButton, { borderColor: palette.line }]}
+                onPress={() => setSettingsOpen(false)}
+              >
+                <Text style={[styles.sheetCloseText, { color: palette.text }]}>닫기</Text>
+              </Pressable>
             </View>
 
             <ScrollView
@@ -2082,6 +2066,14 @@ export default function BodyFrameProjectDetailScreen() {
                 </Text>
               </Pressable>
             </ScrollView>
+            <View style={styles.projectSettingsFooter}>
+              <BodyFrameSheetFooter
+                onCancel={() => setSettingsOpen(false)}
+                onConfirm={() => void saveBasicInfo()}
+                confirmLabel={saving ? "저장 중" : "변경 저장"}
+                disabled={saving}
+              />
+            </View>
           </View>
         </View>
       </Modal>
@@ -2340,6 +2332,7 @@ const styles = StyleSheet.create({
   },
   settingsSheet: {
     width: "100%",
+    gap: 10,
     maxHeight: "86%",
     paddingHorizontal: bodyFrameDesign.horizontalPadding,
     paddingTop: 10,
@@ -2472,6 +2465,7 @@ const styles = StyleSheet.create({
     fontSize: bodyFrameTypography.caption,
     fontWeight: "600"
   },
+  projectSettingsFooter: { paddingTop: 8 },
   settingsScroll: {
     flexShrink: 1
   },
