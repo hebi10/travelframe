@@ -18,7 +18,9 @@ const cameraSettingsScrollStyle = readStyleBlock("cameraSettingsScroll");
 const cameraSettingsContentStyle = readStyleBlock("cameraSettingsContent");
 
 assert.ok(
-  navModalStyle.includes('maxHeight: "88%"') && navModalStyle.includes('overflow: "hidden"'),
+  navModalStyle.includes("maxHeight: bodyFrameSheetDesign.maxHeight") &&
+    navModalStyle.includes('overflow: "hidden"') &&
+    cameraSource.includes('maxHeight: "86%"'),
   "camera settings modal should clip content that exceeds the panel"
 );
 
