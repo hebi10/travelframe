@@ -18,7 +18,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { bodyFrameDesign, bodyFrameTypography } from "@/constants/app-theme";
+import { bodyFrameAccent, bodyFrameDesign, bodyFrameTypography } from "@/constants/app-theme";
 import { BodyMeasurementEditorSheet } from "@/features/records/BodyMeasurementEditorSheet";
 import { useAppAppearance } from "@/lib/app-appearance";
 import { useAuth } from "@/lib/auth-context";
@@ -70,7 +70,9 @@ export default function PhotoDetailScreen() {
     measurement?: string;
   }>();
   const { user } = useAuth();
-  const { palette } = useAppAppearance();
+  const { palette, effectiveThemeMode } = useAppAppearance();
+  const actionColor = effectiveThemeMode === "dark" ? bodyFrameAccent : palette.text;
+  const actionTextColor = effectiveThemeMode === "dark" ? "#0B0B0C" : palette.inverse;
   const insets = useSafeAreaInsets();
   const [photo, setPhoto] = useState<PhotoItem | null>(null);
   const [project, setProject] = useState<BodyProject | null>(null);
@@ -258,6 +260,20 @@ export default function PhotoDetailScreen() {
           <View style={styles.topBarSpacer} />
         </View>
 
+        <View style={styles.recordHeader}>
+          <Text style={[styles.projectName, { color: palette.muted }]}>
+            {projectLabel}
+          </Text>
+          <View style={styles.recordTitleRow}>
+            <Text style={[styles.recordSequence, { color: palette.text }]}>
+              {sequenceLabel}
+            </Text>
+            <Text style={[styles.recordDate, { color: palette.muted }]}>
+              {formatDate(measurementEntry?.recordedAt ?? photo.createdAt)}
+            </Text>
+          </View>
+        </View>
+
         <View
           style={[
             styles.heroFrame,
@@ -277,74 +293,6 @@ export default function PhotoDetailScreen() {
             ]}
             resizeMode="contain"
           />
-        </View>
-
-        <View style={styles.recordHeader}>
-          <Text style={[styles.projectName, { color: palette.muted }]}>
-            {projectLabel}
-          </Text>
-          <View style={styles.recordTitleRow}>
-            <Text style={[styles.recordSequence, { color: palette.text }]}>
-              {sequenceLabel}
-            </Text>
-            <Text style={[styles.recordDate, { color: palette.muted }]}>
-              {formatDate(measurementEntry?.recordedAt ?? photo.createdAt)}
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.recordSummary}>
-          <View
-            style={[
-              styles.infoCard,
-              { borderColor: palette.line, backgroundColor: palette.surface }
-            ]}
-          >
-            <MetaRow
-              label="프로젝트"
-              value={projectLabel}
-              textColor={palette.text}
-              mutedColor={palette.muted}
-            />
-            <MetaRow
-              label="기록 번호"
-              value={photo.sequence ? `${photo.sequence}번째` : "없음"}
-              textColor={palette.text}
-              mutedColor={palette.muted}
-            />
-            <MetaRow
-              label="촬영일"
-              value={formatDate(photo.createdAt)}
-              textColor={palette.text}
-              mutedColor={palette.muted}
-            />
-          </View>
-
-          <View
-            style={[
-              styles.infoCard,
-              { borderColor: palette.line, backgroundColor: palette.surface }
-            ]}
-          >
-            <MetaRow
-              label="비율"
-              value={photo.ratioLabel}
-              textColor={palette.text}
-              mutedColor={palette.muted}
-            />
-            <MetaRow
-              label="해상도"
-              value={`${photo.width} × ${photo.height}`}
-              textColor={palette.text}
-              mutedColor={palette.muted}
-            />
-            <MetaRow
-              label="사진 상태"
-              value={photo.edited ? "편집본" : "원본"}
-              textColor={palette.text}
-              mutedColor={palette.muted}
-            />
-          </View>
         </View>
 
         {photo.projectId ? (
@@ -428,6 +376,60 @@ export default function PhotoDetailScreen() {
           </View>
         ) : null}
 
+        <View style={styles.recordSummary}>
+          <View
+            style={[
+              styles.infoCard,
+              { borderColor: palette.line, backgroundColor: palette.surface }
+            ]}
+          >
+            <MetaRow
+              label="프로젝트"
+              value={projectLabel}
+              textColor={palette.text}
+              mutedColor={palette.muted}
+            />
+            <MetaRow
+              label="기록 번호"
+              value={photo.sequence ? `${photo.sequence}번째` : "없음"}
+              textColor={palette.text}
+              mutedColor={palette.muted}
+            />
+            <MetaRow
+              label="촬영일"
+              value={formatDate(photo.createdAt)}
+              textColor={palette.text}
+              mutedColor={palette.muted}
+            />
+          </View>
+
+          <View
+            style={[
+              styles.infoCard,
+              { borderColor: palette.line, backgroundColor: palette.surface }
+            ]}
+          >
+            <MetaRow
+              label="비율"
+              value={photo.ratioLabel}
+              textColor={palette.text}
+              mutedColor={palette.muted}
+            />
+            <MetaRow
+              label="해상도"
+              value={`${photo.width} × ${photo.height}`}
+              textColor={palette.text}
+              mutedColor={palette.muted}
+            />
+            <MetaRow
+              label="사진 상태"
+              value={photo.edited ? "편집본" : "원본"}
+              textColor={palette.text}
+              mutedColor={palette.muted}
+            />
+          </View>
+        </View>
+
         <View style={styles.actions}>
           <Pressable
             accessibilityRole="button"
@@ -435,13 +437,14 @@ export default function PhotoDetailScreen() {
             style={[
               styles.primaryButton,
               {
-                backgroundColor: palette.text,
-                opacity: isSavingToDevice ? 0.5 : 1
+                backgroundColor: actionColor,
+                 opacity: isSavingToDevice ? 0.5 : 1
               }
             ]}
             onPress={() => void saveToDevice()}
           >
-            <Text style={[styles.primaryButtonText, { color: palette.inverse }]}>
+            <Feather name="download" size={17} color={actionTextColor} />
+            <Text style={[styles.primaryButtonText, { color: actionTextColor }]}>
               {isSavingToDevice ? "저장 중" : "핸드폰 앨범에 저장"}
             </Text>
           </Pressable>
@@ -458,6 +461,7 @@ export default function PhotoDetailScreen() {
               router.push(`/edit?photoId=${photo.id}` as Href);
             }}
           >
+            <Feather name="edit-2" size={17} color={palette.text} />
             <Text style={[styles.secondaryButtonText, { color: palette.text }]}>
               사진 편집
             </Text>
@@ -617,8 +621,7 @@ const styles = StyleSheet.create({
   },
   recordHeader: {
     gap: 6,
-    marginTop: 18,
-    marginBottom: 18
+    marginBottom: 14
   },
   projectName: {
     fontSize: bodyFrameTypography.body,
@@ -641,7 +644,8 @@ const styles = StyleSheet.create({
     textAlign: "right"
   },
   recordSummary: {
-    gap: 10
+    gap: 10,
+    marginTop: 14
   },
   infoCard: {
     paddingHorizontal: 12,
@@ -734,6 +738,8 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     minHeight: bodyFrameDesign.primaryButtonHeight,
+    flexDirection: "row",
+    gap: 8,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 14,
@@ -745,6 +751,8 @@ const styles = StyleSheet.create({
   },
   secondaryButton: {
     minHeight: bodyFrameDesign.primaryButtonHeight,
+    flexDirection: "row",
+    gap: 8,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 14,
