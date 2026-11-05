@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import ts from "typescript";
+import { inflateSync } from "node:zlib";
 
 const read = (path) => fs.readFileSync(path, "utf8");
 const theme = read("constants/app-theme.ts");
@@ -9,6 +10,36 @@ const capture = read("scripts/capture-android-qa.py");
 const workflow = read(".github/workflows/body-frame-device-qa.yml");
 const checker = read("scripts/check-stage6-visual-artifacts.py");
 const assetReadme = read("assets/ui/README.md");
+
+const checkPngIntegrity = (buffer, filename) => {
+  let offset = 8;
+  const idatChunks = [];
+  let sawEnd = false;
+  const crc32 = (bytes) => {
+    let crc = 0xffffffff;
+    for (const byte of bytes) {
+      crc ^= byte;
+      for (let i = 0; i < 8; i += 1) {
+        crc = (crc >>> 1) ^ ((crc & 1) ? 0xedb88320 : 0);
+      }
+    }
+    return (crc ^ 0xffffffff) >>> 0;
+  };
+  while (offset + 12 <= buffer.length) {
+    const length = buffer.readUInt32BE(offset);
+    const end = offset + 12 + length;
+    assert.ok(end <= buffer.length, filename + " truncated PNG chunk");
+    const type = buffer.toString("ascii", offset + 4, offset + 8);
+    const chunk = buffer.subarray(offset + 4, offset + 8 + length);
+    assert.equal(buffer.readUInt32BE(offset + 8 + length), crc32(chunk), filename + " invalid " + type + " CRC");
+    if (type === "IDAT") idatChunks.push(buffer.subarray(offset + 8, offset + 8 + length));
+    offset = end;
+    if (type === "IEND") { sawEnd = true; break; }
+  }
+  assert.ok(sawEnd && offset === buffer.length, filename + " needs a complete IEND chunk");
+  assert.ok(idatChunks.length > 0, filename + " lacks IDAT pixels");
+  assert.ok(inflateSync(Buffer.concat(idatChunks)).length > 0, filename + " IDAT failed to inflate");
+};
 
 const imageFiles = [
   "empty-project", "empty-photos", "empty-videos", "empty-metrics",
@@ -19,6 +50,7 @@ for (const asset of imageFiles) {
   const buf = fs.readFileSync("assets/ui/illustrations/" + asset + ".png");
   assert.equal(buf.subarray(0, 8).toString("hex"), "89504e470d0a1a0a", asset + " must remain a real PNG");
   assert.equal(buf.subarray(12, 16).toString(), "IHDR");
+  checkPngIntegrity(buf, asset);
   assert.ok(buf.readUInt32BE(16) >= 64 && buf.readUInt32BE(20) >= 64, "artwork too small");
 }
 const optimizedBackup = fs.statSync("assets/ui/illustrations/feature-backup.png").size;
