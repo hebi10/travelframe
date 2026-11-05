@@ -1,9 +1,11 @@
+import { useMemo } from "react";
 import { StyleSheet } from "react-native";
 
-import { bodyFrameAccent, bodyFrameDesign, colors, controls, spacing, typography } from "@/constants/app-theme";
+import { bodyFrameDesign, bodyFrameSheetDesign, bodyFrameTypography, colors as legacyColors, controls, spacing, typography } from "@/constants/app-theme";
+import { useAppAppearance, type AppPalette } from "@/lib/app-appearance";
 import { RECORDING_VIEW_WIDTH } from "@/features/trip-clip/trip-clip-screen.constants";
 
-export const styles = StyleSheet.create({
+export const createTripClipStyles = (colors: AppPalette) => StyleSheet.create({
   screenRoot: {
     flex: 1,
     backgroundColor: colors.background
@@ -17,12 +19,12 @@ export const styles = StyleSheet.create({
   },
   recordingView: {
     overflow: "hidden",
-    backgroundColor: colors.ink
+    backgroundColor: legacyColors.ink
   },
   recordingCanvasInner: {
     flex: 1,
     overflow: "hidden",
-    backgroundColor: colors.ink
+    backgroundColor: legacyColors.ink
   },
   recordingCanvasFilm: {
     padding: 22
@@ -75,7 +77,7 @@ export const styles = StyleSheet.create({
     backgroundColor: "rgba(0, 0, 0, 0.52)"
   },
   recordingWatermarkText: {
-    color: colors.inverse,
+    color: legacyColors.inverse,
     fontSize: 12,
     fontWeight: "900",
     letterSpacing: 0
@@ -113,7 +115,7 @@ export const styles = StyleSheet.create({
   },
   headerBackButtonText: {
     color: colors.text,
-    fontSize: typography.button,
+    fontSize: bodyFrameTypography.button,
     fontWeight: "800",
     letterSpacing: 0
   },
@@ -143,7 +145,7 @@ export const styles = StyleSheet.create({
   },
   title: {
     color: colors.text,
-    fontSize: typography.title,
+    fontSize: bodyFrameTypography.pageTitle,
     fontWeight: "600",
     lineHeight: 35,
     letterSpacing: 0
@@ -231,7 +233,7 @@ export const styles = StyleSheet.create({
     overflow: "hidden",
     borderWidth: 1,
     borderColor: colors.text,
-    backgroundColor: colors.ink,
+    backgroundColor: legacyColors.ink,
     position: "relative"
   },
   previewGuideMoveLayer: {
@@ -243,7 +245,7 @@ export const styles = StyleSheet.create({
     backgroundColor: "rgba(17, 17, 17, 0.08)"
   },
   previewGuideMoveText: {
-    color: colors.inverse,
+    color: legacyColors.inverse,
     fontSize: typography.small,
     fontWeight: "800",
     lineHeight: 17,
@@ -270,7 +272,7 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.text
   },
   previewAdjustButtonText: {
-    color: colors.text,
+    color: legacyColors.text,
     fontSize: typography.button,
     fontWeight: "800",
     letterSpacing: 0
@@ -302,7 +304,7 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.text
   },
   frameFitInlineButtonText: {
-    color: colors.text,
+    color: legacyColors.text,
     fontSize: typography.button,
     fontWeight: "900",
     letterSpacing: 0
@@ -312,7 +314,7 @@ export const styles = StyleSheet.create({
   },
   previewInner: {
     flex: 1,
-    backgroundColor: colors.ink,
+    backgroundColor: legacyColors.ink,
     position: "relative"
   },
   previewInnerFilm: {
@@ -346,7 +348,7 @@ export const styles = StyleSheet.create({
     backgroundColor: "#161616"
   },
   emptyPreviewText: {
-    color: colors.inverse,
+    color: legacyColors.inverse,
     fontSize: typography.section,
     fontWeight: "800",
     maxWidth: "86%",
@@ -396,10 +398,13 @@ export const styles = StyleSheet.create({
     padding: 14,
     borderWidth: 1,
     borderColor: colors.line,
+    alignSelf: "center",
+    width: "100%",
+    maxWidth: bodyFrameDesign.contentMaxWidth,
     backgroundColor: colors.background
   },
   frameFitModalHeader: {
-    minHeight: 40,
+    minHeight: bodyFrameDesign.minTouchSize,
     flexDirection: "row",
     alignItems: "flex-start",
     justifyContent: "space-between",
@@ -435,7 +440,7 @@ export const styles = StyleSheet.create({
     overflow: "hidden",
     borderWidth: 1,
     borderColor: colors.text,
-    backgroundColor: colors.ink
+    backgroundColor: legacyColors.ink
   },
   frameFitModalActions: {
     minHeight: 40,
@@ -549,10 +554,10 @@ export const styles = StyleSheet.create({
     minHeight: bodyFrameDesign.primaryButtonHeight,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: bodyFrameAccent
+    backgroundColor: colors.text
   },
   primaryButtonText: {
-    color: colors.text,
+    color: colors.inverse,
     fontSize: typography.button,
     fontWeight: "800",
     letterSpacing: 0
@@ -579,7 +584,7 @@ export const styles = StyleSheet.create({
   },
   sectionTitle: {
     color: colors.text,
-    fontSize: typography.section,
+    fontSize: bodyFrameTypography.sectionTitle,
     fontWeight: "600",
     letterSpacing: 0
   },
@@ -710,8 +715,9 @@ export const styles = StyleSheet.create({
     alignItems: "center",
     gap: 12,
     paddingVertical: 10,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.line
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderColor: colors.line,
+    paddingHorizontal: 10
   },
   timelineThumb: {
     width: 48,
@@ -786,7 +792,7 @@ export const styles = StyleSheet.create({
   },
   timelineDurationKeyboardInput: {
     width: 76,
-    minHeight: 38,
+    minHeight: bodyFrameDesign.minTouchSize,
     paddingHorizontal: 10,
     borderWidth: 1,
     borderColor: colors.text,
@@ -800,7 +806,7 @@ export const styles = StyleSheet.create({
   },
   timelineDurationKeyboardDoneButton: {
     minWidth: 58,
-    minHeight: 38,
+    minHeight: bodyFrameDesign.minTouchSize,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 12,
@@ -831,7 +837,7 @@ export const styles = StyleSheet.create({
   },
   smallButton: {
     minWidth: 34,
-    minHeight: 30,
+    minHeight: bodyFrameDesign.minTouchSize,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
@@ -976,7 +982,7 @@ export const styles = StyleSheet.create({
     letterSpacing: 0
   },
   chip: {
-    minHeight: controls.compactHeight,
+    minHeight: bodyFrameDesign.minTouchSize,
     justifyContent: "center",
     paddingHorizontal: 12,
     borderWidth: 1,
@@ -997,8 +1003,7 @@ export const styles = StyleSheet.create({
   },
   musicList: {
     gap: 10,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.line
+    
   },
   musicModeRow: {
     flexDirection: "row",
@@ -1337,7 +1342,7 @@ export const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 18,
     paddingVertical: 24,
-    backgroundColor: "rgba(0, 0, 0, 0.36)"
+    backgroundColor: "rgba(0, 0, 0, 0.62)"
   },
   exportModalPanel: {
     width: "92%",
@@ -1444,16 +1449,16 @@ export const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingTop: 10,
     paddingBottom: 12,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.line,
+    
     backgroundColor: colors.background
   },
   bottomEditorTab: {
     width: "31.8%",
-    minHeight: 46,
+    minHeight: bodyFrameDesign.primaryButtonHeight,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderRadius: bodyFrameDesign.buttonRadius,
     borderColor: colors.line,
     backgroundColor: colors.background
   },
@@ -1474,3 +1479,10 @@ export const styles = StyleSheet.create({
     color: colors.inverse
   }
 });
+
+export const styles = createTripClipStyles(legacyColors);
+
+export function useTripClipStyles() {
+  const { palette } = useAppAppearance();
+  return useMemo(() => createTripClipStyles(palette), [palette]);
+}

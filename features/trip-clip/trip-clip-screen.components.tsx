@@ -9,10 +9,11 @@ import Reanimated, {
   useSharedValue
 } from "react-native-reanimated";
 
-import { colors } from "@/constants/app-theme";
-import { styles } from "@/features/trip-clip/trip-clip-screen.styles";
+import { useAppAppearance } from "@/lib/app-appearance";
+import { useTripClipStyles } from "@/features/trip-clip/trip-clip-screen.styles";
 
 export function Section({ title, children }: { title: string; children: ReactNode }) {
+  const styles = useTripClipStyles();
   return (
     <View style={styles.section}>
       <Text selectable style={styles.sectionTitle}>
@@ -24,6 +25,7 @@ export function Section({ title, children }: { title: string; children: ReactNod
 }
 
 export function OptionRow({ children }: { children: ReactNode }) {
+  const styles = useTripClipStyles();
   return <View style={styles.optionRow}>{children}</View>;
 }
 
@@ -36,8 +38,9 @@ export function Chip({
   active: boolean;
   onPress: () => void;
 }) {
+  const styles = useTripClipStyles();
   return (
-    <Pressable style={[styles.chip, active && styles.chipActive]} onPress={onPress}>
+    <Pressable accessibilityRole="radio" accessibilityLabel={label} accessibilityState={{ selected: active }} style={[styles.chip, active && styles.chipActive]} onPress={onPress}>
       <Text selectable={false} style={[styles.chipText, active && styles.chipTextActive]}>
         {label}
       </Text>
@@ -56,6 +59,7 @@ export function TimelineScrubber({
   totalDuration: number;
   onSeek: (seconds: number) => void;
 }) {
+  const styles = useTripClipStyles();
   const [trackWidth, setTrackWidth] = useState(0);
   const progressRatio =
     totalDuration > 0 ? Math.max(0, Math.min(1, progressSeconds / totalDuration)) : 0;
@@ -124,8 +128,9 @@ export function TimelineScrubber({
 }
 
 export function SmallButton({ label, onPress }: { label: string; onPress: () => void }) {
+  const styles = useTripClipStyles();
   return (
-    <Pressable style={styles.smallButton} onPress={onPress}>
+    <Pressable accessibilityRole="button" accessibilityLabel={label} style={styles.smallButton} onPress={onPress}>
       <Text selectable={false} style={styles.smallButtonText}>
         {label}
       </Text>
@@ -142,6 +147,8 @@ export function TimelineDurationControl({
   editing: boolean;
   onBeginEditing: () => void;
 }) {
+  const styles = useTripClipStyles();
+  const { palette } = useAppAppearance();
   return (
     <Pressable
       accessibilityRole="button"
@@ -149,7 +156,7 @@ export function TimelineDurationControl({
       hitSlop={8}
       style={{
         alignSelf: "flex-start",
-        minHeight: 30,
+        minHeight: 44,
         flexDirection: "row",
         alignItems: "center",
         gap: 5,
@@ -167,7 +174,7 @@ export function TimelineDurationControl({
       <Feather
         name="edit-2"
         size={13}
-        color={editing ? colors.text : colors.muted}
+        color={editing ? palette.text : palette.muted}
         style={{ marginTop: 1 }}
       />
     </Pressable>

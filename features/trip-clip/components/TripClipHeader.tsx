@@ -2,8 +2,8 @@ import { Feather } from "@expo/vector-icons";
 import type { Dispatch, SetStateAction } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
 
-import { colors } from "@/constants/app-theme";
-import { styles } from "@/features/trip-clip/trip-clip-screen.styles";
+import { useAppAppearance } from "@/lib/app-appearance";
+import { useTripClipStyles } from "@/features/trip-clip/trip-clip-screen.styles";
 import type { TripClipDraft } from "@/lib/trip-clip-draft";
 
 type TripClipHeaderProps = {
@@ -35,6 +35,8 @@ export function TripClipHeader({
   workTitle,
   setWorkTitle
 }: TripClipHeaderProps) {
+  const { palette: colors } = useAppAppearance();
+  const styles = useTripClipStyles();
   return (
       <View style={styles.header}>
         <View style={styles.headerActionRow}>

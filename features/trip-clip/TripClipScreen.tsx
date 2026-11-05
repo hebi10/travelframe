@@ -42,7 +42,8 @@ import { AppGuideOverlay } from "@/components/app-guide-overlay";
 import { InterstitialAdModal } from "@/components/interstitial-ad-modal";
 import { TripClipRecordingCanvas } from "@/components/trip-clip-recording-canvas";
 import { TripClipPreviewPlayer } from "@/components/trip-clip-preview-player";
-import { colors, spacing } from "@/constants/app-theme";
+import { spacing } from "@/constants/app-theme";
+import { useAppAppearance } from "@/lib/app-appearance";
 import {
   GUIDE_LABELS,
   GUIDE_TYPES,
@@ -169,7 +170,7 @@ import {
 import type { PhotoItem } from "@/types/photo";
 import { RECORDING_VIEW_WIDTH } from "@/features/trip-clip/trip-clip-screen.constants";
 import { getImageSaveFormatLabel, useTimelineDurationEditing } from "@/features/trip-clip/trip-clip-screen.helpers";
-import { styles } from "@/features/trip-clip/trip-clip-screen.styles";
+import { useTripClipStyles } from "@/features/trip-clip/trip-clip-screen.styles";
 import { TripClipExportTab } from "@/features/trip-clip/components/TripClipExportTab";
 import { TripClipGuideTab } from "@/features/trip-clip/components/TripClipGuideTab";
 import { TripClipHeader } from "@/features/trip-clip/components/TripClipHeader";
@@ -317,6 +318,8 @@ const formatDraftTime = (value: string) =>
   }).format(new Date(value));
 
 export default function TripClipScreen() {
+  const styles = useTripClipStyles();
+  const { palette: colors } = useAppAppearance();
   const { bundleId, videoId, returnTo, start } = useLocalSearchParams<{
     bundleId?: string;
     videoId?: string;
@@ -2409,7 +2412,7 @@ export default function TripClipScreen() {
       >
         <GestureHandlerRootView style={styles.frameFitModalGestureRoot}>
           <View style={styles.frameFitModalBackdrop}>
-            <View style={styles.frameFitModalPanel}>
+            <View style={styles.frameFitModalPanel} accessibilityViewIsModal>
             <View style={styles.frameFitModalHeader}>
               <View style={styles.frameFitModalCopy}>
                 <Text selectable={false} style={styles.frameFitModalTitle}>
@@ -2477,6 +2480,7 @@ export default function TripClipScreen() {
             </Text>
           </View>
           <TextInput
+            accessibilityLabel="노출 시간 (초)"
             autoFocus
             value={timelineDurationEditing.durationInputValue}
             keyboardType="decimal-pad"
@@ -2546,7 +2550,9 @@ export default function TripClipScreen() {
           const isActive = activeEditorTab === tab.value;
 
           return (
-            <Pressable accessibilityRole="button"
+            <Pressable accessibilityRole="tab"
+              accessibilityLabel={`${tab.label} 편집 탭`}
+              accessibilityState={{ selected: isActive, disabled: isLocked }}
               key={tab.value}
               disabled={isLocked}
               style={[
@@ -2583,6 +2589,7 @@ export default function TripClipScreen() {
       >
         <View style={[styles.exportModalBackdrop, modalSafeStyle]}>
           <View
+            accessibilityViewIsModal
             style={[
               styles.exportModalPanel,
               exportProgress.error && styles.exportModalPanelError
@@ -2618,7 +2625,7 @@ export default function TripClipScreen() {
                     ]}
                   />
                 </View>
-                <Text style={styles.exportProgressText}>
+                <Text accessibilityLiveRegion="polite" style={styles.exportProgressText}>
                   {Math.round(exportProgress.percent)}%
                 </Text>
               </>
