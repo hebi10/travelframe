@@ -11,7 +11,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppGuideCard } from "@/components/app-guide-card";
 import { AppGuideHighlight } from "@/components/app-guide-highlight";
-import { bodyFrameAccent, bodyFrameDesign } from "@/constants/app-theme";
+import { bodyFrameDesign, bodyFrameTypography, getBodyFrameControlColors } from "@/constants/app-theme";
 import type { AppGuideTabKey } from "@/constants/app-guide-steps";
 import { useAppGuide } from "@/hooks/use-app-guide";
 import { useAppAppearance } from "@/lib/app-appearance";
@@ -28,9 +28,8 @@ export function AppGuideOverlay({
   replaySignal = 0
 }: AppGuideOverlayProps) {
   const insets = useSafeAreaInsets();
-  const { palette, effectiveThemeMode } = useAppAppearance();
-  const actionColor = effectiveThemeMode === "dark" ? bodyFrameAccent : palette.text;
-  const actionTextColor = effectiveThemeMode === "dark" ? "#0B0B0C" : palette.inverse;
+  const { palette } = useAppAppearance();
+  const { primaryBackground: actionColor, primaryText: actionTextColor } = getBodyFrameControlColors(palette);
   const {
     visible,
     step,
@@ -154,7 +153,7 @@ const styles = StyleSheet.create({
     alignSelf: "center",
     overflow: "hidden",
     borderWidth: 1,
-    borderRadius: 10
+    borderRadius: bodyFrameDesign.modalRadius
   },
   contentScroll: { flexShrink: 1 },
   contentScrollContainer: { flexGrow: 1 },
@@ -170,7 +169,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1.2
   },
   brandTitle: {
-    fontSize: 26,
+    fontSize: bodyFrameTypography.pageTitle,
     fontWeight: "600"
   },
   brandDetail: {
@@ -191,7 +190,7 @@ const styles = StyleSheet.create({
     alignSelf: "center"
   },
   welcomeTitle: {
-    fontSize: 24,
+    fontSize: bodyFrameTypography.projectTitle,
     lineHeight: 31,
     fontWeight: "600"
   },
@@ -207,7 +206,7 @@ const styles = StyleSheet.create({
     borderRadius: bodyFrameDesign.buttonRadius
   },
   welcomeButtonText: {
-    fontSize: 14,
+    fontSize: bodyFrameTypography.button,
     fontWeight: "700"
   }
 });

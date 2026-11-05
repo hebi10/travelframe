@@ -2,14 +2,14 @@ import { Tabs } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { TabGlyph } from "@/components/tab-glyph";
-import { bodyFrameAccent, bodyFrameDesign } from "@/constants/app-theme";
+import { bodyFrameDesign, getBodyFrameControlColors } from "@/constants/app-theme";
 import { useAppAppearance } from "@/lib/app-appearance";
 
 
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
-  const { palette, effectiveThemeMode, fontSizeScale, layoutScale, emphasisWeight, fontFamily } = useAppAppearance();
-  const activeTabColor = effectiveThemeMode === "dark" ? bodyFrameAccent : palette.text;
+  const { palette, fontSizeScale, layoutScale, emphasisWeight, fontFamily } = useAppAppearance();
+  const { selected: activeTabColor, unselected: inactiveTabColor } = getBodyFrameControlColors(palette);
   const tabBarBottomPadding = Math.max(insets.bottom + 8, 16);
   const tabBarHeight = 58 + tabBarBottomPadding;
 
@@ -21,7 +21,7 @@ export default function TabsLayout() {
         headerStyle: { backgroundColor: palette.chrome },
         headerTintColor: palette.text,
         tabBarActiveTintColor: activeTabColor,
-        tabBarInactiveTintColor: palette.faint,
+        tabBarInactiveTintColor: inactiveTabColor,
         tabBarStyle: {
           height: tabBarHeight,
           width: "100%",

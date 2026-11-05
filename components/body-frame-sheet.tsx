@@ -2,7 +2,7 @@ import { Feather } from "@expo/vector-icons";
 import { Pressable, StyleSheet, View } from "react-native";
 
 import { AppText as Text } from "@/components/app-text";
-import { bodyFrameAccent, bodyFrameDesign, bodyFrameTypography } from "@/constants/app-theme";
+import { bodyFrameDesign, bodyFrameTypography, getBodyFrameControlColors } from "@/constants/app-theme";
 import { useAppAppearance } from "@/lib/app-appearance";
 
 type BodyFrameSheetHeaderProps = {
@@ -37,7 +37,7 @@ export function BodyFrameSheetHeader({
         onPress={onClose}
         style={[styles.close, { borderColor: palette.line }]}
       >
-        <Feather name="x" size={20} color={palette.text} />
+        <Feather name="x" size={bodyFrameDesign.iconSize} color={palette.text} />
       </Pressable>
     </View>
   );
@@ -58,16 +58,20 @@ export function BodyFrameSheetFooter({
   cancelLabel = "취소",
   disabled = false
 }: BodyFrameSheetFooterProps) {
-  const { palette, effectiveThemeMode } = useAppAppearance();
-  const primaryBackground = effectiveThemeMode === "dark" ? bodyFrameAccent : palette.text;
-  const primaryForeground = effectiveThemeMode === "dark" ? "#0B0B0C" : palette.inverse;
+  const { palette } = useAppAppearance();
+  const {
+    primaryBackground,
+    primaryText: primaryForeground,
+    secondaryBackground,
+    secondaryBorder
+  } = getBodyFrameControlColors(palette);
 
   return (
     <View style={styles.footer}>
       <Pressable
         accessibilityRole="button"
         onPress={onCancel}
-        style={[styles.footerButton, { borderColor: palette.line, backgroundColor: palette.surface }]}
+        style={[styles.footerButton, { borderColor: secondaryBorder, backgroundColor: secondaryBackground }]}
       >
         <Text style={[styles.footerText, { color: palette.text }]}>{cancelLabel}</Text>
       </Pressable>

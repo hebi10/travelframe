@@ -420,7 +420,7 @@ export const styles = StyleSheet.create({
   },
   musicDeleteButton: {
     minWidth: 64,
-    minHeight: 40,
+    minHeight: bodyFrameDesign.minTouchSize,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,

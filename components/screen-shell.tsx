@@ -1,3 +1,4 @@
+import { Feather } from "@expo/vector-icons";
 import type { ReactNode } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View, type TextStyle } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -58,10 +59,8 @@ export function ScreenShell({
             onPress={onBack}
             style={styles.backButton}
           >
-            <Text style={[styles.backButtonIcon, { color: palette.text, fontFamily }]}>
-              ‹
-            </Text>
-            <Text style={[styles.backButtonText, { color: palette.text, fontFamily }]}>
+            <Feather name="chevron-left" size={24} color={palette.text} />
+            <Text style={[styles.backButtonText, { color: palette.text, fontFamily, fontSize: Math.round(bodyFrameTypography.button * fontSizeScale) }]}>
               {backLabel}
             </Text>
           </Pressable>
@@ -91,7 +90,7 @@ export function ScreenShell({
                 fontSize: Math.round(typography.body * fontSizeScale),
                 lineHeight: Math.round(21 * fontSizeScale),
                 fontFamily,
-                fontWeight: "400"
+                fontWeight: settings.fontStyle === "noto_sans_kr" ? "700" : "400"
               }
             ]}
           >
@@ -119,20 +118,15 @@ const styles = StyleSheet.create({
   },
   backButton: {
     alignSelf: "flex-start",
-    minHeight: 44,
+    minHeight: bodyFrameDesign.minTouchSize,
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
     paddingRight: 12
   },
-  backButtonIcon: {
-    fontSize: 28,
-    lineHeight: 30,
-    fontWeight: "700"
-  },
   backButtonText: {
-    fontSize: typography.button,
-    fontWeight: "800"
+    fontSize: bodyFrameTypography.button,
+    fontWeight: "600"
   },
   eyebrow: {
     fontSize: typography.eyebrow,
@@ -141,14 +135,15 @@ const styles = StyleSheet.create({
     textTransform: "uppercase"
   },
   title: {
-    fontSize: typography.title,
-    fontWeight: "800",
-    lineHeight: 36,
+    fontSize: bodyFrameTypography.pageTitle,
+    fontWeight: "600",
+    lineHeight: 32,
     letterSpacing: 0
   },
   description: {
     fontSize: typography.body,
     lineHeight: 21,
+    fontWeight: "700",
     letterSpacing: 0
   }
 });

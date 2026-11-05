@@ -6,7 +6,7 @@ import {
   View
 } from "react-native";
 
-import { bodyFrameAccent, bodyFrameDesign, colors, controls, typography } from "@/constants/app-theme";
+import { bodyFrameDesign, bodyFrameTypography, colors, controls, getBodyFrameControlColors, typography } from "@/constants/app-theme";
 import type { AppGuideStep } from "@/constants/app-guide-steps";
 import { useAppAppearance } from "@/lib/app-appearance";
 
@@ -29,10 +29,9 @@ export function AppGuideCard({
   onNext,
   onSkip
 }: AppGuideCardProps) {
-  const { palette, effectiveThemeMode } = useAppAppearance();
+  const { palette } = useAppAppearance();
   const isLast = current === total;
-  const activeColor = effectiveThemeMode === "dark" ? bodyFrameAccent : palette.text;
-  const activeTextColor = effectiveThemeMode === "dark" ? "#0B0B0C" : palette.inverse;
+  const { primaryBackground: activeColor, primaryText: activeTextColor } = getBodyFrameControlColors(palette);
   const artwork =
     step.id === "body-frame-project" || step.id === "body-frame-records"
       ? require("../assets/ui/illustrations/feature-records.png")
@@ -214,7 +213,7 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     minWidth: 64,
-    minHeight: 44,
+    minHeight: bodyFrameDesign.primaryButtonHeight,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 14,
@@ -223,7 +222,7 @@ const styles = StyleSheet.create({
   },
   primaryButtonLabel: {
     color: colors.inverse,
-    fontSize: typography.button,
+    fontSize: bodyFrameTypography.button,
     fontWeight: "600",
     letterSpacing: 0
   }

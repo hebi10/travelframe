@@ -10,6 +10,7 @@ const defaultsSource = fs.readFileSync(
   "utf8"
 );
 const shellSource = fs.readFileSync("components/screen-shell.tsx", "utf8");
+const themeSource = fs.readFileSync("constants/app-theme.ts", "utf8");
 
 for (const token of [
   "InlineSettingKey",
@@ -74,13 +75,18 @@ assert.ok(
 for (const token of [
   "onBack?: () => void",
   "backLabel?: string",
-  'accessibilityRole="button"',
-  "minHeight: 44"
+  'accessibilityRole="button"'
 ]) {
   assert.ok(
     shellSource.includes(token),
     `ScreenShell back control should contain ${token}`
   );
 }
+
+assert.ok(
+  shellSource.includes("minHeight: bodyFrameDesign.minTouchSize") &&
+    themeSource.includes("minTouchSize: 44"),
+  "ScreenShell back control must use the shared 44dp minimum touch target"
+);
 
 console.log("ok - primary settings edit inline and default settings avoid duplicates");

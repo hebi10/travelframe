@@ -5,7 +5,7 @@ import {
   View
 } from "react-native";
 
-import { typography } from "@/constants/app-theme";
+import { bodyFrameTypography } from "@/constants/app-theme";
 import { useAppAppearance } from "@/lib/app-appearance";
 
 type SectionBlockProps = {
@@ -14,7 +14,7 @@ type SectionBlockProps = {
 };
 
 export function SectionBlock({ title, children }: SectionBlockProps) {
-  const { palette, fontSizeScale, layoutScale, emphasisWeight, fontFamily } = useAppAppearance();
+  const { palette, layoutScale } = useAppAppearance();
 
   return (
     <View style={[styles.section, { gap: Math.round(14 * layoutScale) }]}>
@@ -22,13 +22,7 @@ export function SectionBlock({ title, children }: SectionBlockProps) {
         selectable
         style={[
           styles.title,
-          {
-            color: palette.text,
-            fontSize: Math.round(typography.section * fontSizeScale),
-            lineHeight: Math.round(22 * fontSizeScale),
-            fontFamily,
-            fontWeight: emphasisWeight
-          }
+          { color: palette.text }
         ]}
       >
         {title}
@@ -43,9 +37,9 @@ const styles = StyleSheet.create({
     gap: 14
   },
   title: {
-    fontSize: typography.section,
-    fontWeight: "800",
-    lineHeight: 22,
+    fontSize: bodyFrameTypography.sectionTitle,
+    fontWeight: "600",
+    lineHeight: 24,
     letterSpacing: 0
   },
   body: {
