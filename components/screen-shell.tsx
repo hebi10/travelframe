@@ -90,7 +90,7 @@ export function ScreenShell({
                 fontSize: Math.round(typography.body * fontSizeScale),
                 lineHeight: Math.round(21 * fontSizeScale),
                 fontFamily,
-                fontWeight: "400"
+                fontWeight: settings.fontStyle === "noto_sans_kr" ? "700" : "400"
               }
             ]}
           >
@@ -143,6 +143,7 @@ const styles = StyleSheet.create({
   description: {
     fontSize: typography.body,
     lineHeight: 21,
+    fontWeight: "700",
     letterSpacing: 0
   }
 });

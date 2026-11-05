@@ -111,6 +111,7 @@ const styles = StyleSheet.create({
   },
   detail: {
     fontSize: bodyFrameTypography.caption,
+    fontWeight: "700",
     lineHeight: 18,
     letterSpacing: 0
   },
