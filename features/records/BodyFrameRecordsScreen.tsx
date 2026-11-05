@@ -20,7 +20,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppGuideOverlay } from "@/components/app-guide-overlay";
-import { bodyFrameDesign, bodyFrameTypography } from "@/constants/app-theme";
+import { bodyFrameAccent, bodyFrameDesign, bodyFrameTypography } from "@/constants/app-theme";
 import { BodyFrameProjectSwitcher } from "@/features/camera/BodyFrameProjectSwitcher";
 import { useAuth } from "@/lib/auth-context";
 import {
@@ -76,7 +76,9 @@ export default function BodyFrameRecordsScreen() {
   const { width: windowWidth } = useWindowDimensions();
   const contentWidth = Math.min(windowWidth, bodyFrameDesign.contentMaxWidth) - bodyFrameDesign.horizontalPadding * 2;
   const projectCardWidth = Math.max(0, (contentWidth - 12) / 2);
-  const { palette } = useAppAppearance();
+  const { palette, effectiveThemeMode } = useAppAppearance();
+  const highlightColor = effectiveThemeMode === "dark" ? bodyFrameAccent : palette.text;
+  const coverWidth = Math.min(160, Math.max(120, Math.round(contentWidth * 0.36)));
   const { isLoggedIn, subscription } = useAuth();
   const planEntitlements = useMemo(
     () => getPlanEntitlements({ isLoggedIn, subscription }),
@@ -262,6 +264,12 @@ export default function BodyFrameRecordsScreen() {
               }
             ]}
           >
+            <Image
+              source={require("../../assets/ui/illustrations/empty-project.png")}
+              style={styles.emptyArtwork}
+              contentFit="contain"
+              accessibilityLabel="새 프로젝트를 만드는 안내 아이콘"
+            />
             <Text style={[styles.emptyTitle, { color: palette.text }]}>
               아직 프로젝트가 없습니다.
             </Text>
@@ -290,6 +298,8 @@ export default function BodyFrameRecordsScreen() {
                   style={({ pressed }) => [
                     styles.projectCard,
                      { width: projectCardWidth },
+                    cards.length === 1 && { width: contentWidth },
+                    cards.length === 1 && styles.singleProjectCard,
                     {
                       backgroundColor: palette.surface,
                       borderColor: palette.line,
@@ -300,6 +310,7 @@ export default function BodyFrameRecordsScreen() {
                   <View
                     style={[
                       styles.coverFrame,
+                      cards.length === 1 && { width: coverWidth },
                       { backgroundColor: palette.surfaceStrong }
                     ]}
                   >
@@ -319,7 +330,7 @@ export default function BodyFrameRecordsScreen() {
                     )}
                   </View>
 
-                  <View style={styles.projectCopy}>
+                  <View style={[styles.projectCopy, cards.length === 1 && styles.singleProjectCopy]}>
                     <Text
                       numberOfLines={1}
                       style={[styles.projectName, { color: palette.text }]}
@@ -347,8 +358,8 @@ export default function BodyFrameRecordsScreen() {
                         style={[
                           styles.progressFill,
                           {
-                            backgroundColor: palette.text,
-                            width: `${progressPercent}%`
+                            backgroundColor: highlightColor,
+                             width: `${progressPercent}%`
                           }
                         ]}
                       />
@@ -477,6 +488,14 @@ const styles = StyleSheet.create({
     borderWidth: bodyFrameDesign.borderWidth,
     borderRadius: bodyFrameDesign.cardRadius
   },
+  singleProjectCard: {
+    flexDirection: "row"
+  },
+  singleProjectCopy: {
+    flex: 1,
+    justifyContent: "center",
+    padding: 16
+  },
   coverFrame: {
     width: "100%",
     aspectRatio: 3 / 4,
@@ -583,6 +602,11 @@ const styles = StyleSheet.create({
   restoreButtonText: {
     fontSize: 13,
     fontWeight: "600"
+  },
+  emptyArtwork: {
+    width: 108,
+    height: 108,
+    alignSelf: "center"
   },
   emptyCard: {
     gap: 12,

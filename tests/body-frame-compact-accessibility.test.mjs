@@ -177,7 +177,8 @@ check("creation and onboarding content can scroll inside bounded containers", ()
   assert.ok(create.includes('<ScrollView'));
   assert.ok(create.includes('keyboardShouldPersistTaps="handled"'));
   assert.ok(create.includes('keyboardDismissMode="on-drag"'));
-  assert.ok(create.indexOf("프로젝트 만들기") < create.indexOf("</ScrollView>"));
+  assert.ok(create.indexOf("프로젝트 만들기") > create.indexOf("</ScrollView>"));
+  assert.ok(create.includes("styles.createFooter"), "project creation action stays outside the scroll region");
   assert.ok(guide.includes("<ScrollView"));
   assert.ok(guide.includes('maxHeight: "100%"'));
   assert.ok(read("components/app-guide-card.tsx").includes('flexWrap: "wrap"'), "guide footer must wrap for large fonts");

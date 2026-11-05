@@ -14,7 +14,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { bodyFrameDesign, bodyFrameTypography } from "@/constants/app-theme";
+import { bodyFrameAccent, bodyFrameDesign, bodyFrameTypography } from "@/constants/app-theme";
 import { useAppAppearance } from "@/lib/app-appearance";
 import { getBodyProjectProgressSummary } from "@/lib/body-frame-camera-project";
 import {
@@ -65,7 +65,9 @@ export function BodyFrameProjectSwitcher({
   createOnly = false
 }: BodyFrameProjectSwitcherProps) {
   const insets = useSafeAreaInsets();
-  const { palette } = useAppAppearance();
+  const { palette, effectiveThemeMode } = useAppAppearance();
+  const actionColor = effectiveThemeMode === "dark" ? bodyFrameAccent : palette.text;
+  const actionTextColor = effectiveThemeMode === "dark" ? "#0B0B0C" : palette.inverse;
   const [pickerOpen, setPickerOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [name, setName] = useState("새 프로젝트");
@@ -428,18 +430,21 @@ export function BodyFrameProjectSwitcher({
               ) : null}
             </Pressable>
 
+
+            </ScrollView>
+            <View style={styles.createFooter}>
             <Pressable
               accessibilityRole="button"
               accessibilityState={{ disabled: submitting }}
               disabled={submitting}
-              style={[styles.primaryButton, { backgroundColor: palette.text }, submitting && styles.disabled]}
+              style={[styles.primaryButton, { backgroundColor: actionColor }, submitting && styles.disabled]}
               onPress={() => void submitProject()}
             >
-              <Text style={[styles.primaryButtonText, { color: palette.inverse }]}>
+              <Text style={[styles.primaryButtonText, { color: actionTextColor }]}>
                 {submitting ? "생성 중..." : "프로젝트 만들기"}
               </Text>
             </Pressable>
-            </ScrollView>
+            </View>
           </Pressable>
         </Pressable>
         </KeyboardAvoidingView>
@@ -454,6 +459,10 @@ const styles = StyleSheet.create({
   },
   createScroll: { flexShrink: 1 },
   createScrollContent: { paddingBottom: 16 },
+  createFooter: {
+    paddingTop: 8,
+    paddingBottom: 4
+  },
   headerButton: {
     minHeight: 54,
     borderWidth: bodyFrameDesign.borderWidth,
@@ -635,7 +644,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderRadius: 8,
     backgroundColor: "#F5F5F5",
-    marginTop: 14
+    marginTop: 0
   },
   primaryButtonText: { color: "#111111", fontSize: 15, fontWeight: "700" }
 });

@@ -35,6 +35,8 @@ export const controls = {
 } as const;
 
 
+export const bodyFrameAccent = "#C6FF4D" as const;
+
 export const bodyFrameDarkColors = {
   background: "#0B0B0C",
   chrome: "#0B0B0C",

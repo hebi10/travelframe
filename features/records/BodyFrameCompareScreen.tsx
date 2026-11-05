@@ -12,7 +12,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppText as Text } from "@/components/app-text";
 import { Image } from "@/components/private-media-image";
-import { bodyFrameDesign, bodyFrameTypography } from "@/constants/app-theme";
+import { bodyFrameAccent, bodyFrameDesign, bodyFrameTypography } from "@/constants/app-theme";
 import { getBodyFrameComparisonPhotos } from "@/lib/body-frame-photo-compare";
 import { getBodyProjectById } from "@/lib/body-project-library";
 import { getPhotos } from "@/lib/photo-library";
@@ -25,7 +25,9 @@ export default function BodyFrameCompareScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const projectId = typeof id === "string" ? id : "";
   const insets = useSafeAreaInsets();
-  const { palette } = useAppAppearance();
+  const { palette, effectiveThemeMode } = useAppAppearance();
+  const controlColor = effectiveThemeMode === "dark" ? bodyFrameAccent : palette.text;
+  const controlTextColor = effectiveThemeMode === "dark" ? "#0B0B0C" : palette.inverse;
   const [projectName, setProjectName] = useState<string | null>(null);
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -172,31 +174,53 @@ export default function BodyFrameCompareScreen() {
             <Text style={[styles.hint, { color: palette.muted }]}>
               화면을 좌우로 드래그하면 두 사진을 비교할 수 있습니다.
             </Text>
-            <View style={styles.positions}>
-              {[0.25, 0.5, 0.75].map((value) => (
+
+          </>
+        )}
+      </ScrollView>
+      {!loading && !error && comparison ? (
+        <View
+          style={[
+            styles.footer,
+            {
+              backgroundColor: palette.chrome,
+              borderColor: palette.line,
+              paddingBottom: Math.max(insets.bottom, 12)
+            }
+          ]}
+        >
+          <View style={styles.positions}>
+            {[0.25, 0.5, 0.75].map((value) => {
+              const selected = Math.abs(divider - value) < 0.01;
+              return (
                 <Pressable
                   key={value}
                   accessibilityRole="button"
                   accessibilityLabel={`첫 사진 표시 비율 ${Math.round(value * 100)}%`}
-                  accessibilityState={{ selected: Math.abs(divider - value) < 0.01 }}
+                  accessibilityState={{ selected }}
                   onPress={() => changeDivider(value)}
                   style={[
                     styles.positionButton,
                     {
-                      borderColor: Math.abs(divider - value) < 0.01 ? palette.text : palette.line,
-                      backgroundColor: palette.surface
+                      borderColor: selected ? controlColor : palette.line,
+                      backgroundColor: selected ? controlColor : palette.surface
                     }
                   ]}
                 >
-                  <Text style={[styles.positionText, { color: palette.text }]}>
+                  <Text
+                    style={[
+                      styles.positionText,
+                      { color: selected ? controlTextColor : palette.text }
+                    ]}
+                  >
                     {Math.round(value * 100)}%
                   </Text>
                 </Pressable>
-              ))}
-            </View>
-          </>
-        )}
-      </ScrollView>
+              );
+            })}
+          </View>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -235,7 +259,19 @@ const styles = StyleSheet.create({
   dateLabels: { flexDirection: "row", justifyContent: "space-between" },
   date: { fontSize: bodyFrameTypography.caption },
   hint: { textAlign: "center", fontSize: bodyFrameTypography.caption },
-  positions: { flexDirection: "row", gap: 8 },
+  footer: {
+    width: "100%",
+    borderWidth: bodyFrameDesign.borderWidth,
+    paddingTop: 10,
+    paddingHorizontal: bodyFrameDesign.horizontalPadding
+  },
+  positions: {
+    width: "100%",
+    maxWidth: bodyFrameDesign.contentMaxWidth - bodyFrameDesign.horizontalPadding * 2,
+    alignSelf: "center",
+    flexDirection: "row",
+    gap: 8
+  },
   positionButton: {
     flex: 1,
     minHeight: bodyFrameDesign.minTouchSize,
