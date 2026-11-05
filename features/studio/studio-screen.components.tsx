@@ -6,7 +6,7 @@ import { PrivateNativeImage as NativeImage } from "@/components/private-media-im
 import { SectionBlock } from "@/components/section-block";
 import { colors } from "@/constants/app-theme";
 import { PAGE_SIZE_OPTIONS, formatDate, formatDuration, type PageSize, type StudioTab, type StudioWorkItem } from "@/features/studio/studio-screen.model";
-import { styles } from "@/features/studio/studio-screen.styles";
+import { useStudioStyles } from "@/features/studio/studio-screen.styles";
 import { useAppAppearance } from "@/lib/app-appearance";
 import type { PhotoItem } from "@/types/photo";
 
@@ -23,6 +23,7 @@ function PhotoCard({
   onDelete: (photo: PhotoItem) => void;
   onRequireLoginForEdit: () => void;
 }) {
+  const styles = useStudioStyles();
   const { palette } = useAppAppearance();
   const isDark = palette.background !== colors.background;
   const filledButtonStyle = {
@@ -118,6 +119,7 @@ export function StudioIcon({
   kind: StudioTab | "upload";
   active?: boolean;
 }) {
+  const styles = useStudioStyles();
   const { palette } = useAppAppearance();
   const isDark = palette.background !== colors.background;
   const iconColor = active && !isDark ? palette.inverse : palette.text;
@@ -164,6 +166,7 @@ export function PageSizeSelector({
   value: PageSize;
   onChange: (value: PageSize) => void;
 }) {
+  const styles = useStudioStyles();
   const { palette } = useAppAppearance();
   const isDark = palette.background !== colors.background;
   const filledButtonStyle = {
@@ -244,6 +247,7 @@ export function PaginatedPhotoGrid({
   onRequireLoginForEdit: () => void;
   onPageChange: (page: number) => void;
 }) {
+  const styles = useStudioStyles();
   const result = getPaginatedItems(items, page, pageSize);
 
   return (
@@ -287,6 +291,7 @@ export function UsageBadge({
   count: number;
   limit?: number;
 }) {
+  const styles = useStudioStyles();
   return (
     <View style={styles.backupUsageBadge}>
       <Text selectable={false} style={styles.backupUsageText}>
@@ -325,6 +330,7 @@ export function WorkSection({
   onPageChange: (page: number) => void;
   usage?: { label: string; count: number; limit?: number } | null;
 }) {
+  const styles = useStudioStyles();
   const result = getPaginatedItems(items, page, pageSize);
 
   return (
@@ -373,6 +379,7 @@ function PaginationControls({
   totalItems: number;
   onPageChange: (page: number) => void;
 }) {
+  const styles = useStudioStyles();
   if (totalPages <= 1) {
     return (
       <Text selectable={false} style={styles.paginationMeta}>
@@ -428,6 +435,7 @@ function WorkCard({
   onRequireLoginForEdit: () => void;
   onRequireLoginForVideo: () => void;
 }) {
+  const styles = useStudioStyles();
   const { palette } = useAppAppearance();
   const pressedPanelStyle = {
     backgroundColor: palette.surfaceStrong
@@ -613,9 +621,11 @@ function WorkCard({
 }
 
 export function LoadingState() {
+  const styles = useStudioStyles();
+  const { palette } = useAppAppearance();
   return (
     <View style={styles.loading}>
-      <ActivityIndicator color={colors.text} />
+      <ActivityIndicator color={palette.text} />
     </View>
   );
 }
@@ -627,6 +637,7 @@ export function LibraryErrorState({
   message: string;
   onRetry: () => void;
 }) {
+  const styles = useStudioStyles();
   const { palette } = useAppAppearance();
   const retryButtonStyle = {
     borderColor: palette.text,
@@ -654,6 +665,7 @@ export function LibraryErrorState({
 }
 
 export function EmptyState({ title, detail }: { title: string; detail: string }) {
+  const styles = useStudioStyles();
   return (
     <View style={styles.emptyState}>
       <Text selectable={false} style={styles.emptyTitle}>
