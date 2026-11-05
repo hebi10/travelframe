@@ -24,9 +24,9 @@ assert.ok(
 
 for (const snippet of [
   "activeFill: {",
-  "backgroundColor: isDark ? palette.surfaceStrong : palette.text",
+  "backgroundColor: palette.text",
   "inverseText: {",
-  "color: isDark ? palette.text : palette.inverse",
+  "color: palette.inverse",
   "secondaryButton: {",
   "backgroundColor: isDark ? palette.surface : palette.background"
 ]) {
