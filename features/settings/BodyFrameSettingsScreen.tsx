@@ -1,4 +1,5 @@
 import { AppText as Text } from "@/components/app-text";
+import { Feather } from "@expo/vector-icons";
 import Constants from "expo-constants";
 import {
   router } from "expo-router";
@@ -17,7 +18,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppGuideOverlay } from "@/components/app-guide-overlay";
 import { SectionBlock } from "@/components/section-block";
 import { BodyFrameSheetHeader } from "@/components/body-frame-sheet";
-import { bodyFrameAccent, bodyFrameDesign, bodyFrameTypography } from "@/constants/app-theme";
+import { bodyFrameDesign, bodyFrameTypography, getBodyFrameControlColors } from "@/constants/app-theme";
 import { PRIVACY_POLICY_URL, TERMS_OF_SERVICE_URL } from "@/constants/legal-links";
 import {
   saveAppSettings,
@@ -68,6 +69,7 @@ function BodyFrameSettingRow({
     <Pressable
       disabled={!onPress}
       accessibilityRole={onPress ? "button" : undefined}
+      accessibilityLabel={onPress ? `${label}, ${mark}` : undefined}
       onPress={onPress}
       style={({ pressed }) => [
         styles.settingRow,
@@ -79,7 +81,7 @@ function BodyFrameSettingRow({
       ]}
     >
       <View style={styles.settingRowCopy}>
-        <Text numberOfLines={1} style={[styles.settingRowLabel, { color: palette.text }]}>
+        <Text numberOfLines={2} style={[styles.settingRowLabel, { color: palette.text }]}>
           {label}
         </Text>
         {detail ? (
@@ -91,15 +93,22 @@ function BodyFrameSettingRow({
           </Text>
         ) : null}
       </View>
-      <Text
-        numberOfLines={1}
-        style={[
-          styles.settingRowMark,
-          { color: onPress ? palette.text : palette.muted }
-        ]}
-      >
-        {mark}
-      </Text>
+      <View style={styles.settingRowValue}>
+        {mark !== "›" ? (
+          <Text
+            numberOfLines={2}
+            style={[
+              styles.settingRowMark,
+              { color: onPress ? palette.text : palette.muted }
+            ]}
+          >
+            {mark}
+          </Text>
+        ) : null}
+        {onPress ? (
+          <Feather name="chevron-right" size={bodyFrameDesign.iconSize} color={palette.muted} />
+        ) : null}
+      </View>
     </Pressable>
   );
 }
@@ -117,8 +126,8 @@ function SettingOptionRow({
   disabled?: boolean;
   onPress: () => void;
 }) {
-  const { palette, effectiveThemeMode } = useAppAppearance();
-  const selectedColor = effectiveThemeMode === "dark" ? bodyFrameAccent : palette.text;
+  const { palette } = useAppAppearance();
+  const { selected: selectedColor } = getBodyFrameControlColors(palette);
 
   return (
     <Pressable
@@ -559,19 +568,26 @@ const styles = StyleSheet.create({
     gap: 6
   },
   settingRow: {
-    minHeight: 64,
+    minHeight: 72,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: 12,
     paddingHorizontal: 14,
-    paddingVertical: 9,
+    paddingVertical: 12,
     borderWidth: bodyFrameDesign.borderWidth,
     borderRadius: bodyFrameDesign.cardRadius
   },
   settingRowCopy: {
     flex: 1,
-    gap: 3
+    minWidth: 0,
+    gap: 4
+  },
+  settingRowValue: {
+    maxWidth: "48%",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6
   },
   settingRowLabel: {
     fontSize: bodyFrameTypography.rowTitle,
@@ -582,7 +598,7 @@ const styles = StyleSheet.create({
     lineHeight: 17
   },
   settingRowMark: {
-    maxWidth: 118,
+    flexShrink: 1,
     fontSize: bodyFrameTypography.caption,
     fontWeight: "600",
     textAlign: "right"
@@ -654,7 +670,8 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    borderWidth: bodyFrameDesign.borderWidth
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderRadius: bodyFrameDesign.buttonRadius
   },
   optionCopy: {
     flex: 1,
