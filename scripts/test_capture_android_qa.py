@@ -19,6 +19,21 @@ class CaptureHelpersTest(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             qa.target_bounds(xml, '삭제')
 
+    def test_visual_profile_awaits_actual_screenshot_dimensions(self):
+        import struct
+        def png(width, height):
+            return b'\x89PNG\r\n\x1a\n' + b'\x00'*8 + struct.pack('>II', width, height)
+        device = Mock()
+        device.run.side_effect = [png(900, 1600), png(1125, 1800)]
+        with patch.object(qa.time, 'sleep'):
+            proof = qa.wait_for_visual_profile(device, '1125x1800', 240)
+        self.assertEqual(proof['observedPixels'], [1125, 1800])
+        self.assertEqual(device.run.call_count, 2)
+        device.run.side_effect = [png(900, 1600)]
+        with patch.object(qa.time, 'monotonic', side_effect=[0, 1]), patch.object(qa.time, 'sleep'):
+            with self.assertRaisesRegex(RuntimeError, 'Display viewport did not settle'):
+                qa.wait_for_visual_profile(device, '1125x1800', 240, timeout_seconds=.5)
+
     def test_versioned_rkstorage_fixture_has_no_cloud_owner_or_auth(self):
         import json
         values = qa.fixture_values('/data/user/0/' + qa.PACKAGE)
