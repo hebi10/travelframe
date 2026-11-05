@@ -72,7 +72,7 @@ test("manual keystore preflight verifies a real private key, expiry and pinned/C
     });
     assert.equal(fs.readdirSync(tempRoot).length, 0, "Temporary keystore and certificate requests must be removed");
     assert.equal(checkUploadCertificate({ ...configured, PLAY_CONSOLE_UPLOAD_CERT_SHA256: pin }).matchesSuppliedPlayConsoleFingerprint, true);
-    assert.throws(() => checkUploadCertificate({ ...configured, ANDROID_KEY_PASSWORD: "incorrect-private-key-pass" }), /Keytool certificate\/key verification failed/);
+    assert.throws(() => checkUploadCertificate({ ...configured, ANDROID_KEYSTORE_PASSWORD: "incorrect-store-pass" }), /Keytool certificate\/key verification failed/);
     assert.equal(fs.readdirSync(tempRoot).length, 0);
     assert.throws(() => checkUploadCertificate({ ...configured, ANDROID_UPLOAD_CERT_SHA256: "00".repeat(32) }), /configured upload-certificate/);
     assert.equal(fs.readdirSync(tempRoot).length, 0);
