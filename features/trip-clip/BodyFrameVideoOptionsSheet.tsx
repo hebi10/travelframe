@@ -14,8 +14,8 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { bodyFrameAccent, bodyFrameDesign } from "@/constants/app-theme";
-import { BodyFrameSheetFooter, BodyFrameSheetHeader } from "@/components/body-frame-sheet";
+import { bodyFrameDesign, bodyFrameSheetDesign, getBodyFrameControlColors } from "@/constants/app-theme";
+import { BodyFrameSheetFooter, BodyFrameSheetHandle, BodyFrameSheetHeader } from "@/components/body-frame-sheet";
 import { useAppAppearance } from "@/lib/app-appearance";
 import {
   BODY_FRAME_VIDEO_INTERVALS,
@@ -62,9 +62,9 @@ export function BodyFrameVideoOptionsSheet({
   onCancel: () => void;
   onApply: (options: BodyFrameVideoOptions, selectedIds: string[] | null) => void;
 }) {
-  const { palette, effectiveThemeMode } = useAppAppearance();
-  const selectedColor = effectiveThemeMode === "dark" ? bodyFrameAccent : palette.text;
-  const selectedTextColor = effectiveThemeMode === "dark" ? "#0B0B0C" : palette.inverse;
+  const { palette } = useAppAppearance();
+  const { selected: selectedColor, primaryText: selectedTextColor } =
+    getBodyFrameControlColors(palette);
   const insets = useSafeAreaInsets();
   const [draftOptions, setDraftOptions] = useState(options);
   const [draftIds, setDraftIds] = useState<string[] | null>(selectedIds);
@@ -94,8 +94,15 @@ export function BodyFrameVideoOptionsSheet({
         />
         <View
           style={[styles.sheet, { backgroundColor: palette.surface, borderColor: palette.line, paddingBottom: Math.max(insets.bottom, 16) }]}
+          accessibilityViewIsModal
         >
-          <BodyFrameSheetHeader title={titles[kind]} onClose={onCancel} closeLabel="영상 설정 닫기" />
+          <BodyFrameSheetHandle />
+          <BodyFrameSheetHeader
+            title={titles[kind]}
+            description={kind === "photos" ? `영상에 넣을 사진을 선택합니다. 현재 ${selectedCount}장` : undefined}
+            onClose={onCancel}
+            closeLabel="영상 설정 닫기"
+          />
           <OptionContent virtualized={kind === "photos"}>
           {kind === "photos" ? (
             <>
@@ -103,10 +110,10 @@ export function BodyFrameVideoOptionsSheet({
                 사진 선택에서는 포함할 사진만 고를 수 있습니다. 영상 순서는 프로젝트의 사진 순서를 따르며, 순서 변경은 프로젝트 상세의 순서 조정에서 해 주세요.
               </Text>
               <View style={styles.actions}>
-                <Pressable accessibilityRole="button" style={styles.action} onPress={() => setDraftIds(null)}>
+                <Pressable accessibilityRole="button" accessibilityLabel="영상 사진 전체 선택" style={styles.action} onPress={() => setDraftIds(null)}>
                   <Text style={{ color: palette.text }}>전체 선택</Text>
                 </Pressable>
-                <Pressable accessibilityRole="button" style={styles.action} onPress={() => setDraftIds([])}>
+                <Pressable accessibilityRole="button" accessibilityLabel="영상 사진 전체 해제" style={styles.action} onPress={() => setDraftIds([])}>
                   <Text style={{ color: palette.text }}>전체 해제</Text>
                 </Pressable>
               </View>
@@ -130,7 +137,7 @@ export function BodyFrameVideoOptionsSheet({
                         return ids.includes(item.id) ? ids.filter(id => id !== item.id) : [...ids, item.id];
                       })}
                     >
-                      <Image source={{ uri: item.previewUri ?? item.uri }} style={styles.photoImage} contentFit="cover" />
+                      <Image source={{ uri: item.previewUri ?? item.uri }} style={styles.photoImage} contentFit="cover" accessible={false} />
                       <Text style={styles.photoLabel}>{checked ? "✓ " : ""}#{item.sequence ?? ""}</Text>
                     </Pressable>
                   );
@@ -316,21 +323,22 @@ const styles = StyleSheet.create({
   keyboardAvoidingRoot: {
     flex: 1
   },
-  backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" },
+  backdrop: { flex: 1, backgroundColor: bodyFrameSheetDesign.backdropColor, justifyContent: "flex-end" },
   sheet: {
     width: "100%",
     borderWidth: bodyFrameDesign.borderWidth,
     maxWidth: bodyFrameDesign.contentMaxWidth,
     alignSelf: "center",
-    maxHeight: "90%",
-    padding: 16,
-    gap: 16,
+    maxHeight: bodyFrameSheetDesign.maxHeight,
+    paddingHorizontal: bodyFrameDesign.horizontalPadding,
+    paddingTop: 10,
+    gap: 12,
     borderTopLeftRadius: bodyFrameDesign.bottomSheetRadius,
     borderTopRightRadius: bodyFrameDesign.bottomSheetRadius
   },
   title: { fontSize: 20, fontWeight: "600" },
-  optionContent: { flexShrink: 1 },
-  optionScrollContent: { gap: 16 },
+  optionContent: { flexShrink: 1, minHeight: 0 },
+  optionScrollContent: { gap: 16, paddingBottom: 12 },
   orderNotice: { fontSize: 12, lineHeight: 18 },
   overlaySection: { gap: 10 },
   groupLabel: { marginTop: 4, fontSize: 12, fontWeight: "600" },
@@ -341,27 +349,27 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1,
-    borderRadius: 8,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderRadius: bodyFrameDesign.buttonRadius,
     paddingHorizontal: 10
   },
   overlayInput: {
     minHeight: bodyFrameDesign.primaryButtonHeight,
-    borderWidth: 1,
-    borderRadius: 8,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderRadius: bodyFrameDesign.buttonRadius,
     paddingHorizontal: 12,
     fontSize: 14
   },
   example: { fontSize: 12, lineHeight: 18 },
   actions: { flexDirection: "row", gap: 12 },
   action: { minHeight: bodyFrameDesign.minTouchSize, paddingHorizontal: 12, justifyContent: "center" },
-  photoList: { flexGrow: 0, flexShrink: 1 },
+  photoList: { flexGrow: 0, flexShrink: 1, minHeight: 0 },
   photoRow: { gap: 8 },
-  photo: { width: "31%", aspectRatio: 3 / 4, borderWidth: 2, borderRadius: 8, overflow: "hidden", marginBottom: 8 },
+  photo: { width: "31%", aspectRatio: 3 / 4, borderWidth: bodyFrameDesign.borderWidth, borderRadius: bodyFrameDesign.cardRadius, overflow: "hidden", marginBottom: 8 },
   photoImage: { width: "100%", height: "100%" },
   photoLabel: { position: "absolute", bottom: 0, left: 0, right: 0, padding: 6, color: "#FFFFFF", backgroundColor: "rgba(0,0,0,0.65)" },
   choices: { gap: 8 },
-  choice: { minHeight: bodyFrameDesign.primaryButtonHeight, borderWidth: 1, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+  choice: { minHeight: bodyFrameDesign.primaryButtonHeight, borderWidth: bodyFrameDesign.borderWidth, borderRadius: bodyFrameDesign.buttonRadius, alignItems: "center", justifyContent: "center" },
   summary: { fontSize: 14 },
   footerButton: { flex: 1, minHeight: bodyFrameDesign.primaryButtonHeight, borderWidth: 1, borderRadius: 8, justifyContent: "center", alignItems: "center" }
 });
