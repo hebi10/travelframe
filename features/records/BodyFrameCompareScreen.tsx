@@ -1,3 +1,4 @@
+import { Feather } from "@expo/vector-icons";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useMemo, useRef, useState } from "react";
 import {
@@ -12,7 +13,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppText as Text } from "@/components/app-text";
 import { Image } from "@/components/private-media-image";
-import { bodyFrameAccent, bodyFrameDesign, bodyFrameTypography } from "@/constants/app-theme";
+import { bodyFrameDesign, bodyFrameTypography, getBodyFrameControlColors } from "@/constants/app-theme";
 import { getBodyFrameComparisonPhotos } from "@/lib/body-frame-photo-compare";
 import { getBodyProjectById } from "@/lib/body-project-library";
 import { getPhotos } from "@/lib/photo-library";
@@ -25,9 +26,9 @@ export default function BodyFrameCompareScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const projectId = typeof id === "string" ? id : "";
   const insets = useSafeAreaInsets();
-  const { palette, effectiveThemeMode } = useAppAppearance();
-  const controlColor = effectiveThemeMode === "dark" ? bodyFrameAccent : palette.text;
-  const controlTextColor = effectiveThemeMode === "dark" ? "#0B0B0C" : palette.inverse;
+  const { palette } = useAppAppearance();
+  const { selected: controlColor, primaryText: controlTextColor } =
+    getBodyFrameControlColors(palette);
   const [projectName, setProjectName] = useState<string | null>(null);
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -110,7 +111,8 @@ export default function BodyFrameCompareScreen() {
             style={[styles.backButton, { borderColor: palette.line }]}
             onPress={() => router.back()}
           >
-            <Text style={{ color: palette.text }}>‹ 돌아가기</Text>
+            <Feather name="chevron-left" size={20} color={palette.text} />
+            <Text style={[styles.backButtonText, { color: palette.text }]}>돌아가기</Text>
           </Pressable>
           <Text style={[styles.heading, { color: palette.text }]}>전후 사진 비교</Text>
         </View>
@@ -137,6 +139,18 @@ export default function BodyFrameCompareScreen() {
             </View>
             <View
               style={[styles.comparison, { borderColor: palette.line, backgroundColor: palette.surface }]}
+              accessible
+              accessibilityRole="adjustable"
+              accessibilityLabel="첫 사진 표시 비율"
+              accessibilityValue={{ min: 10, max: 90, now: Math.round(divider * 100), text: `${Math.round(divider * 100)}%` }}
+              accessibilityActions={[
+                { name: "increment", label: "첫 사진 표시 비율 늘리기" },
+                { name: "decrement", label: "첫 사진 표시 비율 줄이기" }
+              ]}
+              onAccessibilityAction={({ nativeEvent }) => {
+                if (nativeEvent.actionName === "increment") changeDivider(divider + 0.1);
+                if (nativeEvent.actionName === "decrement") changeDivider(divider - 0.1);
+              }}
               onLayout={(event) => {
                 const nextWidth = event.nativeEvent.layout.width;
                 widthRef.current = nextWidth;
@@ -161,7 +175,12 @@ export default function BodyFrameCompareScreen() {
               <View
                 pointerEvents="none"
                 style={[styles.divider, { left: width * divider - 1 }]}
-              />
+              >
+                <View style={styles.dividerHandle}>
+                  <Feather name="chevron-left" size={16} color="#111111" />
+                  <Feather name="chevron-right" size={16} color="#111111" />
+                </View>
+              </View>
             </View>
             <View style={styles.dateLabels}>
               <Text style={[styles.date, { color: palette.muted }]}>
@@ -237,12 +256,15 @@ const styles = StyleSheet.create({
   header: { flexDirection: "row", alignItems: "center", gap: 12 },
   backButton: {
     minHeight: bodyFrameDesign.minTouchSize,
+    flexDirection: "row",
+    gap: 2,
     paddingHorizontal: 12,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: bodyFrameDesign.borderWidth,
     borderRadius: bodyFrameDesign.buttonRadius
   },
+  backButtonText: { fontSize: bodyFrameTypography.button, fontWeight: "600" },
   heading: { fontSize: bodyFrameTypography.sectionTitle, fontWeight: "600" },
   projectName: { fontSize: bodyFrameTypography.body },
   labels: { flexDirection: "row", justifyContent: "space-between", gap: 8 },
@@ -256,6 +278,21 @@ const styles = StyleSheet.create({
   },
   clippedBefore: { position: "absolute", top: 0, left: 0, height: "100%", overflow: "hidden" },
   divider: { position: "absolute", top: 0, width: 2, height: "100%", backgroundColor: "#FFFFFF" },
+  dividerHandle: {
+    position: "absolute",
+    left: -21,
+    top: "50%",
+    width: 44,
+    height: 44,
+    marginTop: -22,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#171717",
+    borderRadius: 22,
+    backgroundColor: "#FFFFFF"
+  },
   dateLabels: { flexDirection: "row", justifyContent: "space-between" },
   date: { fontSize: bodyFrameTypography.caption },
   hint: { textAlign: "center", fontSize: bodyFrameTypography.caption },

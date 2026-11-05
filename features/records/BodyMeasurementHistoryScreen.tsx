@@ -21,7 +21,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { BodyHealthConnectImportCard } from "@/components/body-health-connect-import-card";
 import { BodyMeasurementSummaryCard } from "@/components/body-measurement-summary-card";
-import { bodyFrameAccent, bodyFrameDesign, bodyFrameTypography } from "@/constants/app-theme";
+import { bodyFrameDesign, bodyFrameTypography, getBodyFrameControlColors } from "@/constants/app-theme";
+import { type BodyMeasurementPeriod, isBodyMeasurementInPeriod } from "@/features/records/body-measurement-period";
 import { BodyMeasurementEditorSheet } from "@/features/records/BodyMeasurementEditorSheet";
 import {
   getBodyMeasurements,
@@ -51,6 +52,13 @@ const formatDate = (value: string) =>
     day: "numeric"
   }).format(new Date(value));
 
+const PERIOD_OPTIONS: { value: BodyMeasurementPeriod; label: string }[] = [
+  { value: "1m", label: "1개월" },
+  { value: "3m", label: "3개월" },
+  { value: "6m", label: "6개월" },
+  { value: "all", label: "전체" }
+];
+
 const getEnabledMetrics = (settings: BodyMeasurementSettings) =>
   (Object.keys(bodyMeasurementMetricMeta) as BodyMeasurementMetric[]).filter(
     (metric) => settings.fields[metric]
@@ -64,9 +72,8 @@ export default function BodyMeasurementHistoryScreen() {
   const projectId = Array.isArray(id) ? id[0] : id;
   const addRequested = Array.isArray(add) ? add[0] : add;
   const insets = useSafeAreaInsets();
-  const { palette, effectiveThemeMode } = useAppAppearance();
-  const accent = effectiveThemeMode === "dark" ? bodyFrameAccent : palette.text;
-  const accentText = effectiveThemeMode === "dark" ? "#0B0B0C" : palette.inverse;
+  const { palette } = useAppAppearance();
+  const { selected: accent, primaryText: accentText } = getBodyFrameControlColors(palette);
   const [project, setProject] = useState<BodyProject | null | undefined>(undefined);
   const [settings, setSettings] = useState<BodyMeasurementSettings>(
     defaultBodyMeasurementSettings
@@ -74,6 +81,7 @@ export default function BodyMeasurementHistoryScreen() {
   const [entries, setEntries] = useState<BodyMeasurementEntry[]>([]);
   const [selectedMetric, setSelectedMetric] =
     useState<BodyMeasurementMetric>("weight");
+  const [selectedPeriod, setSelectedPeriod] = useState<BodyMeasurementPeriod>("all");
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<BodyMeasurementEntry | null>(
     null
@@ -128,9 +136,13 @@ export default function BodyMeasurementHistoryScreen() {
   );
 
   const enabledMetrics = useMemo(() => getEnabledMetrics(settings), [settings]);
+  const filteredEntries = useMemo(
+    () => entries.filter((entry) => isBodyMeasurementInPeriod(entry.recordedAt, selectedPeriod)),
+    [entries, selectedPeriod]
+  );
   const series = useMemo(
-    () => getBodyMeasurementSeries(entries, selectedMetric),
-    [entries, selectedMetric]
+    () => getBodyMeasurementSeries(filteredEntries, selectedMetric),
+    [filteredEntries, selectedMetric]
   );
   const seriesSummary = useMemo(
     () => getBodyMeasurementSeriesSummary(series),
@@ -138,7 +150,7 @@ export default function BodyMeasurementHistoryScreen() {
   );
   const visibleEntries = useMemo(
     () =>
-      [...entries]
+      [...filteredEntries]
         .filter(
           (entry) =>
             getBodyMeasurementMetricValue(entry, selectedMetric) !== undefined
@@ -147,7 +159,7 @@ export default function BodyMeasurementHistoryScreen() {
           (a, b) =>
             new Date(b.recordedAt).getTime() - new Date(a.recordedAt).getTime()
         ),
-    [entries, selectedMetric]
+    [filteredEntries, selectedMetric]
   );
 
   const openNewEntry = () => {
@@ -280,7 +292,9 @@ export default function BodyMeasurementHistoryScreen() {
             return (
               <Pressable
                 key={metric}
-                accessibilityRole="button"
+                accessibilityRole="radio"
+                accessibilityLabel={`${bodyMeasurementMetricMeta[metric].label} 기록 표시`}
+                accessibilityState={{ selected: active }}
                 style={[
                   styles.metricButton,
                   {
@@ -302,6 +316,38 @@ export default function BodyMeasurementHistoryScreen() {
             );
           })}
         </ScrollView>
+
+        <View style={styles.periodSelector} accessibilityLabel="기록 기간">
+          {PERIOD_OPTIONS.map((option) => {
+            const selected = selectedPeriod === option.value;
+            return (
+              <Pressable
+                key={option.value}
+                accessibilityRole="radio"
+                accessibilityLabel={`${option.label} 기간 기록 보기`}
+                accessibilityState={{ selected }}
+                onPress={() => setSelectedPeriod(option.value)}
+                style={[
+                  styles.periodButton,
+                  {
+                    borderColor: selected ? accent : palette.line,
+                    backgroundColor: selected ? accent : palette.surface
+                  }
+                ]}
+              >
+                <Text style={[styles.periodButtonText, { color: selected ? accentText : palette.text }]}>
+                  {option.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <BodyMeasurementSummaryCard
+          metric={selectedMetric}
+          series={series}
+          onAddMeasurement={openNewEntry}
+        />
 
         <View style={styles.overviewGrid}>
           <OverviewStat
@@ -352,11 +398,7 @@ export default function BodyMeasurementHistoryScreen() {
           />
         </View>
 
-        <BodyMeasurementSummaryCard
-          metric={selectedMetric}
-          series={series}
-          onAddMeasurement={openNewEntry}
-        />
+
 
         <View style={styles.historySection}>
           <View style={styles.sectionHeader}>
@@ -601,6 +643,24 @@ const styles = StyleSheet.create({
   },
   metricButtonText: {
     fontSize: bodyFrameTypography.button,
+    fontWeight: "600"
+  },
+  periodSelector: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 14
+  },
+  periodButton: {
+    flex: 1,
+    minHeight: bodyFrameDesign.minTouchSize,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 6,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderRadius: bodyFrameDesign.buttonRadius
+  },
+  periodButtonText: {
+    fontSize: bodyFrameTypography.caption,
     fontWeight: "600"
   },
   overviewGrid: {
