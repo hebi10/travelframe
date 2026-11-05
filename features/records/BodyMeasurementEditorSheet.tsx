@@ -15,8 +15,8 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { bodyFrameDesign, bodyFrameTypography } from "@/constants/app-theme";
-import { BodyFrameSheetFooter, BodyFrameSheetHeader } from "@/components/body-frame-sheet";
+import { bodyFrameDesign, bodyFrameSheetDesign, bodyFrameTypography } from "@/constants/app-theme";
+import { BodyFrameSheetFooter, BodyFrameSheetHandle, BodyFrameSheetHeader } from "@/components/body-frame-sheet";
 import {
   deleteBodyMeasurement,
   saveBodyMeasurement
@@ -273,7 +273,7 @@ export function BodyMeasurementEditorSheet({
             }
           ]}
         >
-          <View style={styles.handle} />
+          <BodyFrameSheetHandle />
           <BodyFrameSheetHeader
             title={allowRecordedAtEdit
               ? entry ? "기록 정보 수정" : "기록 정보"
@@ -283,8 +283,10 @@ export function BodyMeasurementEditorSheet({
           />
 
           <ScrollView
+            style={styles.contentScroll}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
             contentContainerStyle={styles.content}
           >
             {allowRecordedAtEdit ? (
@@ -300,6 +302,7 @@ export function BodyMeasurementEditorSheet({
                   ]}
                 >
                   <TextInput
+                    accessibilityLabel="기록 날짜"
                     value={recordedDateDraft}
                     onChangeText={setRecordedDateDraft}
                     placeholder="YYYY-MM-DD"
@@ -330,6 +333,7 @@ export function BodyMeasurementEditorSheet({
                     ]}
                   >
                     <TextInput
+                      accessibilityLabel={`${meta.label} 수치 입력`}
                       value={drafts[metric]}
                       onChangeText={(value) => updateDraft(metric, value)}
                       keyboardType="decimal-pad"
@@ -348,6 +352,7 @@ export function BodyMeasurementEditorSheet({
             <View style={styles.field}>
               <Text style={[styles.label, { color: palette.muted }]}>메모</Text>
               <TextInput
+                accessibilityLabel="수치 기록 메모"
                 value={note}
                 onChangeText={setNote}
                 multiline
@@ -377,6 +382,7 @@ export function BodyMeasurementEditorSheet({
               <Pressable
                 disabled={saving}
                 accessibilityRole="button"
+                accessibilityState={{ disabled: saving }}
                 style={[styles.deleteButton, { borderColor: palette.line }]}
                 onPress={confirmDelete}
               >
@@ -400,26 +406,18 @@ const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
     justifyContent: "flex-end",
-    backgroundColor: "rgba(0,0,0,0.62)"
+    backgroundColor: bodyFrameSheetDesign.backdropColor
   },
   sheet: {
     width: "100%",
     gap: 10,
     maxWidth: bodyFrameDesign.contentMaxWidth,
-    maxHeight: "86%",
+    maxHeight: bodyFrameSheetDesign.maxHeight,
     paddingHorizontal: bodyFrameDesign.horizontalPadding,
     paddingTop: 10,
     borderWidth: bodyFrameDesign.borderWidth,
     borderTopLeftRadius: bodyFrameDesign.bottomSheetRadius,
     borderTopRightRadius: bodyFrameDesign.bottomSheetRadius
-  },
-  handle: {
-    alignSelf: "center",
-    width: 36,
-    height: 4,
-    marginBottom: 14,
-    borderRadius: 2,
-    backgroundColor: "#3A3A3E"
   },
   header: {
     minHeight: bodyFrameDesign.minTouchSize,
@@ -455,6 +453,10 @@ const styles = StyleSheet.create({
   content: {
     gap: 14,
     paddingBottom: 12
+  },
+  contentScroll: {
+    flexShrink: 1,
+    minHeight: 0
   },
   actionFooter: {
     gap: 8,
