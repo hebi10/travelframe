@@ -316,7 +316,8 @@ export const styles = StyleSheet.create({
     backgroundColor: "rgba(0, 0, 0, 0.36)"
   },
   paymentModalPanel: {
-    gap: 16,
+    gap: 12,
+    minHeight: 0,
     flexGrow: 0,
     maxHeight: "86%",
     padding: spacing.screen,
@@ -324,6 +325,9 @@ export const styles = StyleSheet.create({
     borderColor: colors.text,
     backgroundColor: colors.background
   },
+  paymentModalScroll: { flexShrink: 1, minHeight: 0 },
+  paymentModalBody: { gap: 14, paddingBottom: 10 },
+  paymentModalAction: { paddingTop: 4 },
   modalHeader: {
     flexDirection: "row",
     alignItems: "flex-start",
