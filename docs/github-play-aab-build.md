@@ -1,5 +1,13 @@
 # GitHub Actions Play test releases
 
+> **출시 승인 보류 (2026-11-05)**  
+> 앱 업로드 인증서와 GitHub Actions의 서명키 일치 여부 및 Google Play 최신 릴리스 재검증 전에는 게시하지 않습니다. `main` 푸시는 자동으로 Play를 게시하지 않으며, 저장소 변수 `BODY_FRAME_PLAY_SIGNING_APPROVED_20261107`가 정확히 `true`일 때만 테스트 게시를 허용합니다. 2026-11-07 이후에 서명키 복구와 검증을 마친 뒤 이 변수를 활성화해야 합니다. 지금은 **활성화하지 마세요**. 읽기 전용 `inventory` 호출은 별도로 허용됩니다.
+>
+> Stage 8 소스의 표시버전 후보는 `1.0.32`이며 `app.json`, `package.json`, `package-lock.json` 루트의 3곳(잠금파일 내부 루트 포함 총 4개 필드)과 일치합니다. **현재 Google Play 실제 버전을 재조회하지 않았으므로 업로드 가능 버전을 확정한 것은 아닙니다.** 실제 `versionCode`는 게시 전 API 전체 트랙·미할당 AAB/APK 인벤토리의 최댓값보다 높은 미사용 값으로 계획합니다.
+>
+> 새 게시 안전 조건: Play 대상 테스트 트랙에 내용이 남은 draft, inProgress/halted, 알 수 없는 릴리스가 있으면 계획·업로드 이전에 중단하고 기존 작업물을 보존합니다. 수동 소스 지정은 해당 실행의 `main` 커밋 또는 조상 커밋이어야 하며, 체크아웃 SHA를 확인합니다. 실제 인증서와 서명키 검증은 이 소스 검증의 대체 항목이 아닙니다.
+
+
 `Android Play test release` builds a signed AAB and an installation APK, then uploads **only the AAB** and R8 mapping to Google Play. The package is fixed to `com.haebi.photoguide`. The default audience is internal testing; a manual run can select the existing closed `alpha` track. Production, custom tracks and other apps cannot be selected.
 
 ## Trigger and source
