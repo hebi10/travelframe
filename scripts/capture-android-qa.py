@@ -842,7 +842,7 @@ def wait_export_terminal(device, expected_error=None, seconds=90):
 def set_interval(device, value):
     device.tap('사진 간격',match='summary');device.ready(['사진 간격','적용'])
     device.tap(f'{value}초');device.tap('적용')
-    device.ready([f'사진 간격, {value}초'])
+    device.ready([f'사진 간격 설정, 현재 {value}초'])
 
 
 
