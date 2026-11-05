@@ -2589,11 +2589,11 @@ export default function TripClipScreen() {
       >
         <View style={[styles.exportModalBackdrop, modalSafeStyle]}>
           <View
-            accessibilityViewIsModal
             style={[
               styles.exportModalPanel,
               exportProgress.error && styles.exportModalPanelError
             ]}
+            accessibilityViewIsModal
           >
             <ScrollView
               style={styles.exportModalScroll}
