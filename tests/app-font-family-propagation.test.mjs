@@ -44,7 +44,7 @@ assert.ok(
   "settings screen should pass selected font family into local themed styles"
 );
 assert.ok(
-  accountScreenSource.includes("const { palette, fontFamily } = useAppAppearance();") &&
+  /const \\{ palette, fontFamily(?:, effectiveThemeMode)? \\} = useAppAppearance\\(\\);/.test(accountScreenSource) &&
     accountScreenSource.includes("createAccountThemedStyles(palette, fontFamily)") &&
     accountScreenSource.includes("[palette, fontFamily]"),
   "account screen should pass selected font family into local themed styles"
