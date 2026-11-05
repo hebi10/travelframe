@@ -14,7 +14,8 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { bodyFrameDesign } from "@/constants/app-theme";
+import { bodyFrameAccent, bodyFrameDesign } from "@/constants/app-theme";
+import { BodyFrameSheetFooter, BodyFrameSheetHeader } from "@/components/body-frame-sheet";
 import { useAppAppearance } from "@/lib/app-appearance";
 import {
   BODY_FRAME_VIDEO_INTERVALS,
@@ -61,7 +62,9 @@ export function BodyFrameVideoOptionsSheet({
   onCancel: () => void;
   onApply: (options: BodyFrameVideoOptions, selectedIds: string[] | null) => void;
 }) {
-  const { palette } = useAppAppearance();
+  const { palette, effectiveThemeMode } = useAppAppearance();
+  const selectedColor = effectiveThemeMode === "dark" ? bodyFrameAccent : palette.text;
+  const selectedTextColor = effectiveThemeMode === "dark" ? "#0B0B0C" : palette.inverse;
   const insets = useSafeAreaInsets();
   const [draftOptions, setDraftOptions] = useState(options);
   const [draftIds, setDraftIds] = useState<string[] | null>(selectedIds);
@@ -90,9 +93,9 @@ export function BodyFrameVideoOptionsSheet({
           onPress={onCancel}
         />
         <View
-          style={[styles.sheet, { backgroundColor: palette.surface, paddingBottom: Math.max(insets.bottom, 16) }]}
+          style={[styles.sheet, { backgroundColor: palette.surface, borderColor: palette.line, paddingBottom: Math.max(insets.bottom, 16) }]}
         >
-          <Text style={[styles.title, { color: palette.text }]}>{titles[kind]}</Text>
+          <BodyFrameSheetHeader title={titles[kind]} onClose={onCancel} closeLabel="영상 설정 닫기" />
           <OptionContent virtualized={kind === "photos"}>
           {kind === "photos" ? (
             <>
@@ -161,7 +164,7 @@ export function BodyFrameVideoOptionsSheet({
                       style={[
                         styles.overlayChoice,
                         {
-                          borderColor: active ? palette.text : palette.line,
+                          borderColor: active ? selectedColor : palette.line,
                           backgroundColor: active
                             ? palette.text
                             : palette.background
@@ -179,7 +182,7 @@ export function BodyFrameVideoOptionsSheet({
                     >
                       <Text
                         style={{
-                          color: active ? palette.inverse : palette.text
+                          color: active ? selectedTextColor : palette.text
                         }}
                       >
                         {label}
@@ -229,7 +232,7 @@ export function BodyFrameVideoOptionsSheet({
                       style={[
                         styles.overlayChoice,
                         {
-                          borderColor: active ? palette.text : palette.line,
+                          borderColor: active ? selectedColor : palette.line,
                           backgroundColor: active
                             ? palette.text
                             : palette.background
@@ -247,7 +250,7 @@ export function BodyFrameVideoOptionsSheet({
                     >
                       <Text
                         style={{
-                          color: active ? palette.inverse : palette.text
+                          color: active ? selectedTextColor : palette.text
                         }}
                       >
                         {position.label}
@@ -270,10 +273,10 @@ export function BodyFrameVideoOptionsSheet({
                     key={choice}
                     accessibilityRole="radio"
                     accessibilityState={{ selected: active }}
-                    style={[styles.choice, { borderColor: active ? palette.text : palette.line, backgroundColor: active ? palette.text : palette.background }]}
+                    style={[styles.choice, { borderColor: active ? selectedColor : palette.line, backgroundColor: active ? selectedColor : palette.background }]}
                     onPress={() => setDraftOptions(current => ({ ...current, [kind]: choice }))}
                   >
-                    <Text style={{ color: active ? palette.inverse : palette.text }}>
+                    <Text style={{ color: active ? selectedTextColor : palette.text }}>
                       {choice}{kind === "interval" ? "초" : kind === "quality" ? "p" : ""}
                     </Text>
                   </Pressable>
@@ -286,14 +289,7 @@ export function BodyFrameVideoOptionsSheet({
           </Text>
           {kind === "ratio" ? <Text style={{ color: palette.muted }}>사진은 선택한 화면 비율에 맞춰 잘릴 수 있습니다.</Text> : null}
           </OptionContent>
-          <View style={styles.actions}>
-            <Pressable accessibilityRole="button" style={[styles.footerButton, { borderColor: palette.line }]} onPress={onCancel}>
-              <Text style={{ color: palette.text }}>취소</Text>
-            </Pressable>
-            <Pressable accessibilityRole="button" style={[styles.footerButton, { backgroundColor: palette.text, borderColor: palette.text }]} onPress={() => onApply(draftOptions, draftIds)}>
-              <Text style={{ color: palette.inverse }}>적용</Text>
-            </Pressable>
-          </View>
+          <BodyFrameSheetFooter onCancel={onCancel} onConfirm={() => onApply(draftOptions, draftIds)} confirmLabel="적용" />
         </View>
       </View>
       </KeyboardAvoidingView>
@@ -323,6 +319,7 @@ const styles = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" },
   sheet: {
     width: "100%",
+    borderWidth: bodyFrameDesign.borderWidth,
     maxWidth: bodyFrameDesign.contentMaxWidth,
     alignSelf: "center",
     maxHeight: "90%",
