@@ -1,4 +1,5 @@
 import { AppText as Text } from "@/components/app-text";
+import { Feather } from "@expo/vector-icons";
 import * as FileSystem from "expo-file-system/legacy";
 import { router,
   useFocusEffect } from "expo-router";
@@ -20,7 +21,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { TripClipRecordingCanvas } from "@/components/trip-clip-recording-canvas";
 import { BodyFrameVideoOptionsSheet, type VideoOptionKind } from "@/features/trip-clip/BodyFrameVideoOptionsSheet";
-import { bodyFrameAccent, bodyFrameDesign, bodyFrameTypography } from "@/constants/app-theme";
+import { bodyFrameDesign, bodyFrameTypography, getBodyFrameControlColors } from "@/constants/app-theme";
 import {
   BODY_FRAME_VIDEO_FPS,
   DEFAULT_BODY_FRAME_VIDEO_OPTIONS,
@@ -112,9 +113,9 @@ const formatDuration = (seconds: number) =>
 export default function BodyFrameVideoScreen() {
   const insets = useSafeAreaInsets();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
-  const { palette, effectiveThemeMode } = useAppAppearance();
-  const actionColor = effectiveThemeMode === "dark" ? bodyFrameAccent : palette.text;
-  const actionTextColor = effectiveThemeMode === "dark" ? "#0B0B0C" : palette.inverse;
+  const { palette } = useAppAppearance();
+  const { primaryBackground: actionColor, primaryText: actionTextColor } =
+    getBodyFrameControlColors(palette);
   const recorder = useOptionalViewRecorder();
   const recordingViewAvailable = isRecordingViewAvailable();
   const { isLoggedIn, subscription } = useAuth();
@@ -540,7 +541,7 @@ export default function BodyFrameVideoScreen() {
             onPress={() => router.back()}
             style={[styles.backButton, { borderColor: palette.line }]}
           >
-            <Text style={[styles.backButtonText, { color: palette.text }]}>‹</Text>
+            <Feather name="chevron-left" size={24} color={palette.text} />
           </Pressable>
           <Text style={[styles.pageTitle, { color: palette.text }]}>변화 영상 만들기</Text>
           <Pressable
@@ -562,6 +563,13 @@ export default function BodyFrameVideoScreen() {
             비로그인 영상 출력 · 이번 주 {guestUsage?.count ?? 0}/1회
           </Text>
         ) : null}
+
+        <View style={styles.previewHeader}>
+          <Text style={[styles.sectionTitle, { color: palette.text }]}>미리보기</Text>
+          <Text style={[styles.previewMeta, { color: palette.muted }]}>
+            {projectPhotos.length}장 · {formatDuration(totalDuration)}
+          </Text>
+        </View>
 
         <View
           style={[
@@ -609,6 +617,9 @@ export default function BodyFrameVideoScreen() {
           )}
         </View>
 
+        <Text style={[styles.sectionTitle, styles.settingsTitle, { color: palette.text }]}>
+          영상 설정
+        </Text>
         <View
           style={[
             styles.summaryCard,
@@ -820,9 +831,21 @@ function SummaryRow({
   const { palette } = useAppAppearance();
 
   return (
-    <Pressable accessibilityRole={onPress ? "button" : undefined} disabled={disabled || !onPress} onPress={onPress} style={styles.summaryRow}>
+    <Pressable
+      accessibilityRole={onPress ? "button" : undefined}
+      accessibilityLabel={onPress ? `${label} 설정, 현재 ${value}` : undefined}
+      accessibilityState={onPress ? { disabled } : undefined}
+      disabled={disabled || !onPress}
+      onPress={onPress}
+      style={styles.summaryRow}
+    >
       <Text style={[styles.summaryLabel, { color: palette.muted }]}>{label}</Text>
-      <Text style={[styles.summaryValue, { color: palette.text }]}>{value}{onPress ? "  ›" : ""}</Text>
+      <View style={styles.summaryValueGroup}>
+        <Text numberOfLines={2} style={[styles.summaryValue, { color: palette.text }]}>
+          {value}
+        </Text>
+        {onPress ? <Feather name="chevron-right" size={bodyFrameDesign.iconSize} color={palette.muted} /> : null}
+      </View>
     </Pressable>
   );
 }
@@ -859,11 +882,6 @@ const styles = StyleSheet.create({
     borderWidth: bodyFrameDesign.borderWidth,
     borderRadius: bodyFrameDesign.buttonRadius
   },
-  backButtonText: {
-    fontSize: 30,
-    lineHeight: 30,
-    fontWeight: "500"
-  },
   pageTitle: {
     flex: 1,
     fontSize: bodyFrameTypography.sectionTitle,
@@ -884,7 +902,29 @@ const styles = StyleSheet.create({
   projectName: {
     marginTop: 14,
     marginBottom: 4,
-    fontSize: 14
+    fontSize: bodyFrameTypography.body
+  },
+  previewHeader: {
+    marginTop: 14,
+    marginBottom: 12,
+    minHeight: bodyFrameDesign.minTouchSize,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8
+  },
+  sectionTitle: {
+    fontSize: bodyFrameTypography.sectionTitle,
+    fontWeight: "600"
+  },
+  previewMeta: {
+    fontSize: bodyFrameTypography.caption,
+    fontVariant: ["tabular-nums"]
+  },
+  settingsTitle: {
+    marginTop: 24,
+    marginBottom: 12
   },
   guestLimitText: {
     marginBottom: 16,
@@ -935,23 +975,34 @@ const styles = StyleSheet.create({
     textAlign: "center"
   },
   summaryCard: {
-    marginTop: 24,
     borderWidth: bodyFrameDesign.borderWidth,
     borderRadius: bodyFrameDesign.cardRadius,
     paddingHorizontal: 14
   },
   summaryRow: {
-    minHeight: bodyFrameDesign.primaryButtonHeight,
+    minHeight: 56,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between"
+    justifyContent: "space-between",
+    gap: 12,
+    paddingVertical: 8
   },
   summaryLabel: {
-    fontSize: 14
+    flexShrink: 0,
+    fontSize: bodyFrameTypography.body
+  },
+  summaryValueGroup: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: 6
   },
   summaryValue: {
-    fontSize: 14,
-    fontWeight: "500"
+    flexShrink: 1,
+    fontSize: bodyFrameTypography.body,
+    fontWeight: "600",
+    textAlign: "right"
   },
   orderHint: {
     marginTop: 10,
@@ -1016,7 +1067,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16
   },
   primaryButtonText: {
-    fontSize: 15,
+    fontSize: bodyFrameTypography.button,
     fontWeight: "700"
   },
   buttonLoadingRow: {
