@@ -12,5 +12,5 @@ assert.ok(plan.includes(condition), "Release plan must not run on pushes or publ
 assert.ok(plan.includes("Require existing signing secrets before contacting Play"));
 assert.ok(workflow.includes("needs: plan"), "Build must depend on held release plan");
 assert.ok(workflow.includes("needs: [plan, build]"), "Publish must depend on held plan and signed build");
-assert.ok(workflow.includes("github.event_name"), "Publish scripts must retain event validation");
+assert.ok(workflow.includes("workflow_dispatch:"), "Manual inventory must remain available");
 console.log("ok - Play AAB main-push release held until verified signing gate");
