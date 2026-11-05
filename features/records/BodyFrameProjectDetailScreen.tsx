@@ -1442,9 +1442,9 @@ export default function BodyFrameProjectDetailScreen() {
                         style={[
                           styles.choiceButton,
                           {
-                            borderColor: active ? palette.text : palette.line,
+                            borderColor: active ? accent : palette.line,
                             backgroundColor: active
-                              ? palette.text
+                              ? accent
                               : palette.background
                           }
                         ]}
@@ -1453,7 +1453,7 @@ export default function BodyFrameProjectDetailScreen() {
                         <Text
                           style={[
                             styles.choiceText,
-                            { color: active ? palette.inverse : palette.text }
+                            { color: active ? accentText : palette.text }
                           ]}
                         >
                           {label}
@@ -1550,9 +1550,9 @@ export default function BodyFrameProjectDetailScreen() {
                           style={[
                             styles.choiceButton,
                             {
-                              borderColor: active ? palette.text : palette.line,
+                              borderColor: active ? accent : palette.line,
                               backgroundColor: active
-                                ? palette.text
+                                ? accent
                                 : palette.background,
                               opacity: reminderEnabledDraft ? 1 : 0.45
                             }
@@ -1562,7 +1562,7 @@ export default function BodyFrameProjectDetailScreen() {
                           <Text
                             style={[
                               styles.choiceText,
-                              { color: active ? palette.inverse : palette.text }
+                              { color: active ? accentText : palette.text }
                             ]}
                           >
                             {label}
@@ -1586,7 +1586,7 @@ export default function BodyFrameProjectDetailScreen() {
                             style={[
                               styles.reminderWeekdayButton,
                               {
-                                borderColor: active ? palette.text : palette.line,
+                                borderColor: active ? accent : palette.line,
                                 backgroundColor: active
                                   ? palette.text
                                   : palette.background,
@@ -1598,7 +1598,7 @@ export default function BodyFrameProjectDetailScreen() {
                             <Text
                               style={[
                                 styles.reminderWeekdayText,
-                                { color: active ? palette.inverse : palette.text }
+                                { color: active ? accentText : palette.text }
                               ]}
                             >
                               {label}
@@ -1744,15 +1744,15 @@ export default function BodyFrameProjectDetailScreen() {
                       style={[
                         styles.choiceButton,
                         {
-                          borderColor: active ? palette.text : palette.line,
-                          backgroundColor: active ? palette.text : palette.background
+                          borderColor: active ? accent : palette.line,
+                          backgroundColor: active ? accent : palette.background
                         }
                       ]}
                     >
                       <Text
                         style={[
                           styles.choiceText,
-                          { color: active ? palette.inverse : palette.text }
+                          { color: active ? accentText : palette.text }
                         ]}
                       >
                         {label}
@@ -1783,7 +1783,7 @@ export default function BodyFrameProjectDetailScreen() {
                       style={[
                         styles.choiceButton,
                         {
-                          borderColor: active ? palette.text : palette.line,
+                          borderColor: active ? accent : palette.line,
                           backgroundColor: active
                             ? palette.text
                             : palette.background
@@ -1794,7 +1794,7 @@ export default function BodyFrameProjectDetailScreen() {
                       <Text
                         style={[
                           styles.choiceText,
-                          { color: active ? palette.inverse : palette.text }
+                          { color: active ? accentText : palette.text }
                         ]}
                       >
                         {label}
@@ -1825,7 +1825,7 @@ export default function BodyFrameProjectDetailScreen() {
                       style={[
                         styles.choiceButton,
                         {
-                          borderColor: active ? palette.text : palette.line,
+                          borderColor: active ? accent : palette.line,
                           backgroundColor: active
                             ? palette.text
                             : palette.background
@@ -1836,7 +1836,7 @@ export default function BodyFrameProjectDetailScreen() {
                       <Text
                         style={[
                           styles.choiceText,
-                          { color: active ? palette.inverse : palette.text }
+                          { color: active ? accentText : palette.text }
                         ]}
                       >
                         {label}
@@ -1871,8 +1871,8 @@ export default function BodyFrameProjectDetailScreen() {
                       style={[
                         styles.choiceButton,
                         {
-                          borderColor: active ? palette.text : palette.line,
-                          backgroundColor: active ? palette.text : palette.background
+                          borderColor: active ? accent : palette.line,
+                          backgroundColor: active ? accent : palette.background
                         }
                       ]}
                       onPress={() =>
@@ -1882,7 +1882,7 @@ export default function BodyFrameProjectDetailScreen() {
                       <Text
                         style={[
                           styles.choiceText,
-                          { color: active ? palette.inverse : palette.text }
+                          { color: active ? accentText : palette.text }
                         ]}
                       >
                         {label}
@@ -1908,7 +1908,7 @@ export default function BodyFrameProjectDetailScreen() {
                             style={[
                               styles.metricChoice,
                               {
-                                borderColor: active ? palette.text : palette.line,
+                                borderColor: active ? accent : palette.line,
                                 backgroundColor: active
                                   ? palette.surfaceStrong
                                   : palette.background
@@ -1948,7 +1948,7 @@ export default function BodyFrameProjectDetailScreen() {
                             style={[
                               styles.metricChoice,
                               {
-                                borderColor: active ? palette.text : palette.line,
+                                borderColor: active ? accent : palette.line,
                                 backgroundColor: active
                                   ? palette.text
                                   : palette.background
@@ -1964,7 +1964,7 @@ export default function BodyFrameProjectDetailScreen() {
                             <Text
                               style={[
                                 styles.metricChoiceText,
-                                { color: active ? palette.inverse : palette.text }
+                                { color: active ? accentText : palette.text }
                               ]}
                             >
                               {bodyMeasurementMetricMeta[metric].label}
@@ -1990,8 +1990,8 @@ export default function BodyFrameProjectDetailScreen() {
                           style={[
                             styles.choiceButton,
                             {
-                              borderColor: active ? palette.text : palette.line,
-                              backgroundColor: active ? palette.text : palette.background
+                              borderColor: active ? accent : palette.line,
+                              backgroundColor: active ? accent : palette.background
                             }
                           ]}
                           onPress={() =>
@@ -2004,7 +2004,7 @@ export default function BodyFrameProjectDetailScreen() {
                           <Text
                             style={[
                               styles.choiceText,
-                              { color: active ? palette.inverse : palette.text }
+                              { color: active ? accentText : palette.text }
                             ]}
                           >
                             {label}
