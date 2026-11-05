@@ -37,6 +37,12 @@ export const controls = {
 
 export const bodyFrameAccent = "#C6FF4D" as const;
 
+export const bodyFrameStatusColors = {
+  success: bodyFrameAccent,
+  warning: "#F59E0B",
+  error: "#EF4444"
+} as const;
+
 export const bodyFrameDarkColors = {
   background: "#0B0B0C",
   chrome: "#0B0B0C",
@@ -51,12 +57,29 @@ export const bodyFrameDarkColors = {
   ink: "#F5F5F5"
 } as const;
 
+export const getBodyFrameControlColors = (palette: {
+  text: string;
+  inverse: string;
+  surface: string;
+  line: string;
+  faint: string;
+}) => ({
+  primaryBackground: palette.text,
+  primaryText: palette.inverse,
+  secondaryBackground: palette.surface,
+  secondaryText: palette.text,
+  secondaryBorder: palette.line,
+  selected: palette.text,
+  unselected: palette.faint
+});
+
 export const bodyFrameDesign = {
   horizontalPadding: 16,
   contentMaxWidth: 750,
   sectionGap: 28,
   controlGap: 10,
   minTouchSize: 44,
+  iconSize: 20,
   primaryButtonHeight: 48,
   cardRadius: 8,
   buttonRadius: 8,

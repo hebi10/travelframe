@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import { StyleSheet, View } from "react-native";
 
-import { bodyFrameAccent } from "@/constants/app-theme";
+import { bodyFrameDesign, getBodyFrameControlColors } from "@/constants/app-theme";
 import { useAppAppearance } from "@/lib/app-appearance";
 
 type TabGlyphProps = {
@@ -17,14 +17,13 @@ const iconNames = {
 } as const;
 
 export function TabGlyph({ kind, focused }: TabGlyphProps) {
-  const { palette, effectiveThemeMode } = useAppAppearance();
-  const color = focused
-    ? effectiveThemeMode === "dark" ? bodyFrameAccent : palette.text
-    : palette.faint;
+  const { palette } = useAppAppearance();
+  const { selected, unselected } = getBodyFrameControlColors(palette);
+  const color = focused ? selected : unselected;
 
   return (
     <View style={styles.glyph}>
-      <Feather name={iconNames[kind]} size={20} color={color} />
+      <Feather name={iconNames[kind]} size={bodyFrameDesign.iconSize} color={color} />
       {focused ? <View style={[styles.activeIndicator, { backgroundColor: color }]} /> : null}
     </View>
   );
