@@ -16,7 +16,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { bodyFrameDesign, bodyFrameTypography } from "@/constants/app-theme";
+import { bodyFrameAccent, bodyFrameDesign, bodyFrameTypography } from "@/constants/app-theme";
 import { useAppAppearance } from "@/lib/app-appearance";
 import { deleteMadeVideo, getMadeVideos } from "@/lib/video-library";
 import type { MadeVideoItem } from "@/types/video";
@@ -38,7 +38,9 @@ const formatDate = (value: string) =>
 
 export default function BodyFrameVideoLibraryScreen() {
   const insets = useSafeAreaInsets();
-  const { palette } = useAppAppearance();
+  const { palette, effectiveThemeMode } = useAppAppearance();
+  const actionColor = effectiveThemeMode === "dark" ? bodyFrameAccent : palette.text;
+  const actionTextColor = effectiveThemeMode === "dark" ? "#0B0B0C" : palette.inverse;
   const [videos, setVideos] = useState<MadeVideoItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -242,9 +244,9 @@ export default function BodyFrameVideoLibraryScreen() {
             <Pressable
               accessibilityRole="button"
               onPress={() => router.push("/video-create")}
-              style={[styles.createButton, { backgroundColor: palette.text }]}
+              style={[styles.createButton, { backgroundColor: actionColor }]}
             >
-              <Text style={[styles.createButtonText, { color: palette.inverse }]}>
+              <Text style={[styles.createButtonText, { color: actionTextColor }]}>
                 영상 만들기
               </Text>
             </Pressable>

@@ -23,6 +23,7 @@ import {
   type EditablePhotoCanvasHandle
 } from "@/components/editable-photo-canvas";
 import {
+  bodyFrameAccent,
   bodyFrameDarkColors,
   bodyFrameDesign,
   bodyFrameTypography,
@@ -852,12 +853,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 14,
     borderWidth: bodyFrameDesign.borderWidth,
-    borderColor: bodyFrameDarkColors.text,
+    borderColor: bodyFrameAccent,
     borderRadius: bodyFrameDesign.buttonRadius,
-    backgroundColor: bodyFrameDarkColors.text
+    backgroundColor: bodyFrameAccent
   },
   saveButtonText: {
-    color: bodyFrameDarkColors.inverse,
+    color: "#0B0B0C",
     fontSize: bodyFrameTypography.button,
     fontWeight: "700",
     letterSpacing: 0
@@ -1101,8 +1102,8 @@ const styles = StyleSheet.create({
     backgroundColor: bodyFrameDarkColors.surfaceStrong
   },
   ratioChipActive: {
-    borderColor: bodyFrameDarkColors.text,
-    backgroundColor: bodyFrameDarkColors.text
+    borderColor: bodyFrameAccent,
+    backgroundColor: bodyFrameAccent
   },
   ratioText: {
     color: bodyFrameDarkColors.text,
@@ -1111,7 +1112,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0
   },
   ratioTextActive: {
-    color: bodyFrameDarkColors.inverse
+    color: "#0B0B0C"
   },
   guidePanel: {
     gap: 10,
@@ -1306,7 +1307,7 @@ const styles = StyleSheet.create({
     backgroundColor: bodyFrameDarkColors.surfaceStrong
   },
   toolButtonActive: {
-    borderColor: colors.text
+    borderColor: bodyFrameAccent
   },
   toolButtonText: {
     color: bodyFrameDarkColors.text,
