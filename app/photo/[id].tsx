@@ -254,7 +254,7 @@ export default function PhotoDetailScreen() {
             style={[styles.iconButton, { borderColor: palette.line }]}
             onPress={returnToRecord}
           >
-            <Feather name="chevron-left" size={24} color={palette.text} />
+            <Feather name="chevron-left" size={bodyFrameDesign.iconSize} color={palette.text} />
           </Pressable>
           <Text style={[styles.pageTitle, { color: palette.text }]}>기록 상세</Text>
           <View style={styles.topBarSpacer} />

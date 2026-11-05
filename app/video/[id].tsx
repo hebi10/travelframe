@@ -156,7 +156,7 @@ export default function VideoDetailScreen() {
             onPress={() => router.back()}
             style={[styles.backButton, { borderColor: palette.line }]}
           >
-            <Feather name="chevron-left" size={24} color={palette.text} />
+            <Feather name="chevron-left" size={bodyFrameDesign.iconSize} color={palette.text} />
           </Pressable>
           <Text style={[styles.pageTitle, { color: palette.text }]}>영상 상세</Text>
           <View style={styles.topBarSpacer} />

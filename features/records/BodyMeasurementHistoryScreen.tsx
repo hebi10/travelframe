@@ -259,7 +259,7 @@ export default function BodyMeasurementHistoryScreen() {
             style={[styles.iconButton, { borderColor: palette.line }]}
             onPress={() => router.back()}
           >
-            <Feather name="chevron-left" size={24} color={palette.text} />
+            <Feather name="chevron-left" size={bodyFrameDesign.iconSize} color={palette.text} />
           </Pressable>
           <Text style={[styles.pageTitle, { color: palette.text }]}>
             수치 기록
