@@ -1,4 +1,5 @@
 import { AppText as Text } from "@/components/app-text";
+import { Image } from "@/components/private-media-image";
 import {
   Feather } from "@expo/vector-icons";
 import { router,
@@ -20,7 +21,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { BodyHealthConnectImportCard } from "@/components/body-health-connect-import-card";
 import { BodyMeasurementSummaryCard } from "@/components/body-measurement-summary-card";
-import { bodyFrameDesign, bodyFrameTypography } from "@/constants/app-theme";
+import { bodyFrameAccent, bodyFrameDesign, bodyFrameTypography } from "@/constants/app-theme";
 import { BodyMeasurementEditorSheet } from "@/features/records/BodyMeasurementEditorSheet";
 import {
   getBodyMeasurements,
@@ -63,7 +64,9 @@ export default function BodyMeasurementHistoryScreen() {
   const projectId = Array.isArray(id) ? id[0] : id;
   const addRequested = Array.isArray(add) ? add[0] : add;
   const insets = useSafeAreaInsets();
-  const { palette } = useAppAppearance();
+  const { palette, effectiveThemeMode } = useAppAppearance();
+  const accent = effectiveThemeMode === "dark" ? bodyFrameAccent : palette.text;
+  const accentText = effectiveThemeMode === "dark" ? "#0B0B0C" : palette.inverse;
   const [project, setProject] = useState<BodyProject | null | undefined>(undefined);
   const [settings, setSettings] = useState<BodyMeasurementSettings>(
     defaultBodyMeasurementSettings
@@ -267,12 +270,6 @@ export default function BodyMeasurementHistoryScreen() {
           </Text>
         </View>
 
-        <BodyHealthConnectImportCard
-          projectId={project.id}
-          settings={settings}
-          onImported={() => void reload()}
-        />
-
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -287,8 +284,8 @@ export default function BodyMeasurementHistoryScreen() {
                 style={[
                   styles.metricButton,
                   {
-                    borderColor: active ? palette.text : palette.line,
-                    backgroundColor: active ? palette.text : palette.surface
+                    borderColor: active ? accent : palette.line,
+                    backgroundColor: active ? accent : palette.surface
                   }
                 ]}
                 onPress={() => setSelectedMetric(metric)}
@@ -296,7 +293,7 @@ export default function BodyMeasurementHistoryScreen() {
                 <Text
                   style={[
                     styles.metricButtonText,
-                    { color: active ? palette.inverse : palette.text }
+                    { color: active ? accentText : palette.text }
                   ]}
                 >
                   {bodyMeasurementMetricMeta[metric].label}
@@ -446,6 +443,12 @@ export default function BodyMeasurementHistoryScreen() {
                 { borderColor: palette.line, backgroundColor: palette.surface }
               ]}
             >
+              <Image
+                source={require("../../assets/ui/illustrations/empty-metrics.png")}
+                style={styles.emptyIllustration}
+                contentFit="contain"
+                accessibilityLabel="수치 기록이 없는 상태"
+              />
               <Text style={[styles.emptyDetail, { color: palette.muted }]}>
                 아직 {metricMeta.label} 기록이 없습니다.
               </Text>
@@ -462,6 +465,15 @@ export default function BodyMeasurementHistoryScreen() {
               </Pressable>
             </View>
           )}
+        </View>
+        <View style={styles.healthConnectSection}>
+          <Text style={[styles.sectionTitle, { color: palette.text }]}>외부 데이터 가져오기</Text>
+        <BodyHealthConnectImportCard
+          projectId={project.id}
+          settings={settings}
+          onImported={() => void reload()}
+        />
+
         </View>
       </ScrollView>
 
@@ -617,6 +629,10 @@ const styles = StyleSheet.create({
   historySection: {
     gap: 12
   },
+  healthConnectSection: {
+    gap: 12,
+    marginTop: 26
+  },
   sectionHeader: {
     flexDirection: "row",
     alignItems: "center",
@@ -676,6 +692,7 @@ const styles = StyleSheet.create({
     fontSize: bodyFrameTypography.caption,
     fontWeight: "600"
   },
+  emptyIllustration: { width: 96, height: 96, alignSelf: "center" },
   emptyCard: {
     gap: 12,
     padding: 16,

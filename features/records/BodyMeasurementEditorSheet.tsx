@@ -16,6 +16,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { bodyFrameDesign, bodyFrameTypography } from "@/constants/app-theme";
+import { BodyFrameSheetFooter, BodyFrameSheetHeader } from "@/components/body-frame-sheet";
 import {
   deleteBodyMeasurement,
   saveBodyMeasurement
@@ -260,8 +261,9 @@ export function BodyMeasurementEditorSheet({
         style={styles.keyboardAvoidingRoot}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
-      <Pressable style={styles.backdrop} onPress={onClose}>
-        <Pressable
+      <View style={styles.backdrop}>
+        <Pressable accessibilityRole="button" accessibilityLabel="수치 기록 닫기" style={StyleSheet.absoluteFill} onPress={onClose} />
+        <View
           style={[
             styles.sheet,
             {
@@ -270,32 +272,15 @@ export function BodyMeasurementEditorSheet({
               paddingBottom: Math.max(insets.bottom, 16)
             }
           ]}
-          onPress={() => undefined}
         >
           <View style={styles.handle} />
-          <View style={styles.header}>
-            <View style={styles.headerCopy}>
-              <Text style={[styles.title, { color: palette.text }]}>
-                {allowRecordedAtEdit
-                  ? entry
-                    ? "기록 정보 수정"
-                    : "기록 정보"
-                  : entry
-                    ? "수치 기록 수정"
-                    : "수치 기록"}
-              </Text>
-              <Text style={[styles.detail, { color: palette.muted }]}>
-                입력한 값은 현재 기기에만 저장됩니다.
-              </Text>
-            </View>
-            <Pressable
-              accessibilityRole="button"
-              style={[styles.closeButton, { borderColor: palette.line }]}
-              onPress={onClose}
-            >
-              <Text style={[styles.closeText, { color: palette.text }]}>닫기</Text>
-            </Pressable>
-          </View>
+          <BodyFrameSheetHeader
+            title={allowRecordedAtEdit
+              ? entry ? "기록 정보 수정" : "기록 정보"
+              : entry ? "수치 기록 수정" : "수치 기록"}
+            description="입력한 값은 현재 기기에만 저장됩니다."
+            onClose={onClose}
+          />
 
           <ScrollView
             showsVerticalScrollIndicator={false}
@@ -380,23 +365,14 @@ export function BodyMeasurementEditorSheet({
               />
             </View>
 
-            <Pressable
+          </ScrollView>
+          <View style={styles.actionFooter}>
+            <BodyFrameSheetFooter
+              onCancel={onClose}
+              onConfirm={() => void submit()}
+              confirmLabel={saving ? "저장 중" : "저장"}
               disabled={saving}
-              accessibilityRole="button"
-              style={[
-                styles.primaryButton,
-                {
-                  backgroundColor: palette.text,
-                  opacity: saving ? 0.5 : 1
-                }
-              ]}
-              onPress={() => void submit()}
-            >
-              <Text style={[styles.primaryButtonText, { color: palette.inverse }]}>
-                {saving ? "저장 중" : "저장"}
-              </Text>
-            </Pressable>
-
+            />
             {entry ? (
               <Pressable
                 disabled={saving}
@@ -409,9 +385,9 @@ export function BodyMeasurementEditorSheet({
                 </Text>
               </Pressable>
             ) : null}
-          </ScrollView>
-        </Pressable>
-      </Pressable>
+          </View>
+        </View>
+      </View>
       </KeyboardAvoidingView>
     </Modal>
   );
@@ -428,6 +404,8 @@ const styles = StyleSheet.create({
   },
   sheet: {
     width: "100%",
+    gap: 10,
+    maxWidth: bodyFrameDesign.contentMaxWidth,
     maxHeight: "86%",
     paddingHorizontal: bodyFrameDesign.horizontalPadding,
     paddingTop: 10,
@@ -476,7 +454,11 @@ const styles = StyleSheet.create({
   },
   content: {
     gap: 14,
-    paddingBottom: 8
+    paddingBottom: 12
+  },
+  actionFooter: {
+    gap: 8,
+    paddingTop: 10
   },
   field: {
     gap: 7

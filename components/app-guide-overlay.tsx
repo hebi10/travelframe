@@ -1,4 +1,5 @@
 import { AppText as Text } from "@/components/app-text";
+import { Image } from "expo-image";
 import {
   Modal,
   Pressable,
@@ -10,7 +11,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppGuideCard } from "@/components/app-guide-card";
 import { AppGuideHighlight } from "@/components/app-guide-highlight";
-import { bodyFrameDesign } from "@/constants/app-theme";
+import { bodyFrameAccent, bodyFrameDesign } from "@/constants/app-theme";
 import type { AppGuideTabKey } from "@/constants/app-guide-steps";
 import { useAppGuide } from "@/hooks/use-app-guide";
 import { useAppAppearance } from "@/lib/app-appearance";
@@ -27,7 +28,9 @@ export function AppGuideOverlay({
   replaySignal = 0
 }: AppGuideOverlayProps) {
   const insets = useSafeAreaInsets();
-  const { palette } = useAppAppearance();
+  const { palette, effectiveThemeMode } = useAppAppearance();
+  const actionColor = effectiveThemeMode === "dark" ? bodyFrameAccent : palette.text;
+  const actionTextColor = effectiveThemeMode === "dark" ? "#0B0B0C" : palette.inverse;
   const {
     visible,
     step,
@@ -84,6 +87,12 @@ export function AppGuideOverlay({
           >
           {isWelcome ? (
             <View style={styles.welcomeContent}>
+              <Image
+                source={require("../assets/ui/illustrations/feature-capture.png")}
+                style={styles.welcomeArtwork}
+                contentFit="contain"
+                accessible={false}
+              />
               <Text style={[styles.welcomeTitle, { color: palette.text }]}>
                 {step.title}
               </Text>
@@ -92,10 +101,10 @@ export function AppGuideOverlay({
               </Text>
               <Pressable
                 accessibilityRole="button"
-                style={[styles.welcomeButton, { backgroundColor: palette.text }]}
+                style={[styles.welcomeButton, { backgroundColor: actionColor }]}
                 onPress={goNext}
               >
-                <Text style={[styles.welcomeButtonText, { color: palette.inverse }]}>
+                <Text style={[styles.welcomeButtonText, { color: actionTextColor }]}>
                   시작하기
                 </Text>
               </Pressable>
@@ -173,8 +182,13 @@ const styles = StyleSheet.create({
     paddingBottom: 10
   },
   welcomeContent: {
-    gap: 16,
+    gap: 14,
     padding: 22
+  },
+  welcomeArtwork: {
+    width: "100%",
+    height: 140,
+    alignSelf: "center"
   },
   welcomeTitle: {
     fontSize: 24,

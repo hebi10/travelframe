@@ -675,9 +675,6 @@ export default function BodyFrameVideoScreen() {
               .finally(() => setIsExporting(false));
           }} />
         ) : null}
-        {message ? (
-          <Text style={[styles.message, { color: palette.muted }]}>{message}</Text>
-        ) : null}
       </ScrollView>
 
       <View
@@ -690,6 +687,14 @@ export default function BodyFrameVideoScreen() {
           }
         ]}
       >
+        {message ? (
+          <View
+            style={[styles.exportFeedback, { backgroundColor: palette.surface, borderColor: palette.line }]}
+            accessibilityLiveRegion="polite"
+          >
+            <Text style={[styles.message, { color: palette.text }]}>{message}</Text>
+          </View>
+        ) : null}
         <Pressable
           accessibilityRole="button"
           disabled={
@@ -986,6 +991,13 @@ const styles = StyleSheet.create({
   },
   exportFooterButton: {
     marginTop: 0
+  },
+  exportFeedback: {
+    marginBottom: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderRadius: bodyFrameDesign.cardRadius
   },
   cancelFooterButton: {
     minHeight: bodyFrameDesign.minTouchSize,

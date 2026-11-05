@@ -16,7 +16,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { colors, controls, typography } from "@/constants/app-theme";
+import { bodyFrameAccent, bodyFrameDarkColors, bodyFrameDesign, bodyFrameTypography } from "@/constants/app-theme";
 import { useAuth } from "@/lib/auth-context";
 import { getPlanEntitlements } from "@/lib/plan-entitlements";
 import { recordBackupFailure } from "@/lib/backup-failure-queue";
@@ -184,7 +184,7 @@ export default function CapturePreviewScreen() {
     <View style={styles.screen}>
       {isLoading ? (
         <View style={styles.emptyState}>
-          <ActivityIndicator color={colors.inverse} />
+          <ActivityIndicator color={bodyFrameDarkColors.text} />
         </View>
       ) : previewUri ? (
         <View style={styles.previewArea}>
@@ -248,7 +248,7 @@ export default function CapturePreviewScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: colors.ink
+    backgroundColor: bodyFrameDarkColors.background
   },
   image: {
     width: "100%",
@@ -274,32 +274,34 @@ const styles = StyleSheet.create({
     justifyContent: "center"
   },
   emptyTitle: {
-    color: colors.inverse,
-    fontSize: typography.section,
+    color: bodyFrameDarkColors.text,
+    fontSize: bodyFrameTypography.sectionTitle,
     fontWeight: "800",
     letterSpacing: 0
   },
   footer: {
     gap: 10,
-    padding: 20,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: "rgba(255, 255, 255, 0.18)"
+    paddingHorizontal: bodyFrameDesign.horizontalPadding,
+    paddingTop: 16,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderColor: bodyFrameDarkColors.line,
+    backgroundColor: bodyFrameDarkColors.surface
   },
   title: {
-    color: colors.inverse,
-    fontSize: 20,
-    fontWeight: "800",
+    color: bodyFrameDarkColors.text,
+    fontSize: bodyFrameTypography.sectionTitle,
+    fontWeight: "600",
     letterSpacing: 0
   },
   detail: {
     color: "rgba(255, 255, 255, 0.72)",
-    fontSize: typography.small,
+    fontSize: bodyFrameTypography.caption,
     lineHeight: 19,
     letterSpacing: 0
   },
   message: {
-    color: colors.inverse,
-    fontSize: typography.small,
+    color: bodyFrameDarkColors.text,
+    fontSize: bodyFrameTypography.caption,
     lineHeight: 18,
     letterSpacing: 0
   },
@@ -310,30 +312,32 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     flex: 1,
-    minHeight: controls.height,
+    minHeight: bodyFrameDesign.primaryButtonHeight,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: colors.inverse,
-    backgroundColor: "transparent"
+    borderColor: bodyFrameAccent,
+    borderRadius: bodyFrameDesign.buttonRadius,
+    backgroundColor: bodyFrameAccent
   },
   primaryButtonText: {
-    color: colors.inverse,
-    fontSize: typography.button,
-    fontWeight: "800",
+    color: "#0B0B0C",
+    fontSize: bodyFrameTypography.button,
+    fontWeight: "700",
     letterSpacing: 0
   },
   secondaryButton: {
     flex: 1,
-    minHeight: controls.height,
+    minHeight: bodyFrameDesign.primaryButtonHeight,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.5)"
+    borderColor: bodyFrameDarkColors.line,
+    borderRadius: bodyFrameDesign.buttonRadius
   },
   secondaryButtonText: {
-    color: colors.inverse,
-    fontSize: typography.button,
+    color: bodyFrameDarkColors.text,
+    fontSize: bodyFrameTypography.button,
     fontWeight: "800",
     letterSpacing: 0
   },

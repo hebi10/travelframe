@@ -9,11 +9,13 @@ import {
   Modal,
   Platform,
   Pressable,
+  ScrollView,
   View
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ScreenShell } from "@/components/screen-shell";
+import { bodyFrameAccent } from "@/constants/app-theme";
 import { CloudBackupProjectSlotsSection } from "@/features/account/CloudBackupProjectSlotsSection";
 import { SectionBlock } from "@/components/section-block";
 import {
@@ -68,7 +70,9 @@ import { getPhotos } from "@/lib/photo-library";
 
 export default function AccountScreen() {
   const insets = useSafeAreaInsets();
-  const { palette, fontFamily } = useAppAppearance();
+  const { palette, fontFamily, effectiveThemeMode } = useAppAppearance();
+  const actionColor = effectiveThemeMode === "dark" ? bodyFrameAccent : palette.text;
+  const actionTextColor = effectiveThemeMode === "dark" ? "#0B0B0C" : palette.inverse;
   const themed = useMemo(
     () => createAccountThemedStyles(palette, fontFamily),
     [palette, fontFamily]
@@ -964,6 +968,13 @@ export default function AccountScreen() {
               </Pressable>
             </View>
 
+            <ScrollView
+              style={styles.paymentModalScroll}
+              contentContainerStyle={styles.paymentModalBody}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              nestedScrollEnabled
+            >
             <Text selectable={false} style={[styles.helpText, themed.mutedText]}>
               {selectedPaymentPlan?.summary}
             </Text>
@@ -979,27 +990,7 @@ export default function AccountScreen() {
               ))}
             </View>
 
-            <Pressable accessibilityRole="button"
-              disabled={
-                isSubmitting ||
-                !billingConnected ||
-                !selectedPaymentPlan ||
-                (selectedPaymentPlan ? getPaymentPlanStatus(selectedPaymentPlan).active : false)
-              }
-              style={[
-                styles.primaryButton,
-                themed.activeFill,
-                (isSubmitting ||
-                  !billingConnected ||
-                  (selectedPaymentPlan ? getPaymentPlanStatus(selectedPaymentPlan).active : false)) &&
-                  styles.disabledButton
-              ]}
-              onPress={handlePaymentPurchase}
-            >
-              <Text selectable={false} style={[styles.primaryButtonText, themed.inverseText]}>
-                {selectedPaymentPlan ? getPaymentActionLabel(selectedPaymentPlan) : "결제하기"}
-              </Text>
-            </Pressable>
+
 
             <Pressable
               accessibilityRole="link"
@@ -1034,6 +1025,31 @@ export default function AccountScreen() {
                   개인정보처리방침
                 </Text>
               </Pressable>
+            </View>
+            </ScrollView>
+            <View style={styles.paymentModalAction}>
+            <Pressable accessibilityRole="button"
+              disabled={
+                isSubmitting ||
+                !billingConnected ||
+                !selectedPaymentPlan ||
+                (selectedPaymentPlan ? getPaymentPlanStatus(selectedPaymentPlan).active : false)
+              }
+              style={[
+                styles.primaryButton,
+                themed.activeFill,
+                { backgroundColor: actionColor },
+                (isSubmitting ||
+                  !billingConnected ||
+                  (selectedPaymentPlan ? getPaymentPlanStatus(selectedPaymentPlan).active : false)) &&
+                  styles.disabledButton
+              ]}
+              onPress={handlePaymentPurchase}
+            >
+              <Text selectable={false} style={[styles.primaryButtonText, themed.inverseText, { color: actionTextColor }]}>
+                {selectedPaymentPlan ? getPaymentActionLabel(selectedPaymentPlan) : "결제하기"}
+              </Text>
+            </Pressable>
             </View>
           </View>
         </View>
