@@ -1,6 +1,6 @@
 import { StyleSheet } from "react-native";
 
-import { bodyFrameDesign, bodyFrameTypography, colors, controls, spacing, typography } from "@/constants/app-theme";
+import { bodyFrameDesign, bodyFrameSheetDesign, bodyFrameTypography, colors, controls, spacing, typography } from "@/constants/app-theme";
 import type { AppPalette } from "@/lib/app-appearance";
 
 export const createAccountThemedStyles = (palette: AppPalette, fontFamily?: string) => {
@@ -330,8 +330,8 @@ export const styles = StyleSheet.create({
   paymentModalBackdrop: {
     flex: 1,
     justifyContent: "flex-end",
-    padding: 14,
-    backgroundColor: "rgba(0, 0, 0, 0.36)"
+    paddingHorizontal: 14,
+    backgroundColor: bodyFrameSheetDesign.backdropColor
   },
   paymentModalPanel: {
     width: "100%",
@@ -340,15 +340,17 @@ export const styles = StyleSheet.create({
     gap: 12,
     minHeight: 0,
     flexGrow: 0,
-    maxHeight: "86%",
+    maxHeight: bodyFrameSheetDesign.maxHeight,
     padding: bodyFrameDesign.horizontalPadding,
     borderWidth: bodyFrameDesign.borderWidth,
+    borderTopLeftRadius: bodyFrameDesign.bottomSheetRadius,
+    borderTopRightRadius: bodyFrameDesign.bottomSheetRadius,
     borderColor: colors.line,
     backgroundColor: colors.background
   },
   paymentModalScroll: { flexShrink: 1, minHeight: 0 },
   paymentModalBody: { gap: 14, paddingBottom: 10 },
-  paymentModalAction: { paddingTop: 4 },
+  paymentModalAction: { paddingTop: 8 },
   modalHeader: {
     flexDirection: "row",
     alignItems: "flex-start",
