@@ -180,6 +180,8 @@ export function BodyFrameProjectSwitcher({
         }}
         accessibilityRole="button"
         accessibilityLabel={createOnly ? "새 프로젝트 만들기" : "프로젝트 선택"}
+        accessibilityState={{ disabled }}
+        accessibilityHint={createOnly ? "프로젝트 생성 설정을 엽니다." : "현재 촬영할 프로젝트를 변경합니다."}
         style={({ pressed }) => [
           styles.headerButton,
           compact && styles.headerButtonCompact,
@@ -257,7 +259,7 @@ export function BodyFrameProjectSwitcher({
                         {summary.photoCount}장 · {formatDuration(summary.durationSeconds)}초
                       </Text>
                     </View>
-                    {selected ? <Feather name="check" size={18} color={actionColor} /> : null}
+                    {selected ? <Feather name="check" size={18} color={palette.text} /> : null}
                   </Pressable>
                 );
               })}

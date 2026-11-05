@@ -75,7 +75,11 @@ export default function BodyFrameRecordsScreen() {
   const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
   const contentWidth = Math.min(windowWidth, bodyFrameDesign.contentMaxWidth) - bodyFrameDesign.horizontalPadding * 2;
-  const projectCardWidth = Math.max(0, (contentWidth - 12) / 2);
+  const projectColumnCount = contentWidth >= 560 ? 3 : 2;
+  const projectCardWidth = Math.max(
+    0,
+    (contentWidth - 12 * (projectColumnCount - 1)) / projectColumnCount
+  );
   const { palette, effectiveThemeMode } = useAppAppearance();
   const highlightColor = effectiveThemeMode === "dark" ? bodyFrameAccent : palette.text;
   const coverWidth = Math.min(160, Math.max(120, Math.round(contentWidth * 0.36)));
@@ -254,6 +258,13 @@ export default function BodyFrameRecordsScreen() {
           </Pressable>
         </View>
 
+        <View style={styles.projectsHeading}>
+          <Text style={[styles.projectsTitle, { color: palette.text }]}>내 프로젝트</Text>
+          <Text style={[styles.projectsCount, { color: palette.muted }]}>
+            {cards.length}개
+          </Text>
+        </View>
+
         {cards.length === 0 ? (
           <View
             style={[
@@ -323,7 +334,13 @@ export default function BodyFrameRecordsScreen() {
                       />
                     ) : (
                       <View style={styles.coverEmpty}>
-                        <Text style={[styles.coverEmptyText, { color: palette.faint }]}>
+                        <Image
+                          source={require("../../assets/ui/illustrations/empty-project.png")}
+                          style={styles.coverEmptyArtwork}
+                          contentFit="contain"
+                          accessible={false}
+                        />
+                        <Text style={[styles.coverEmptyText, { color: palette.muted }]}>
                           첫 기록 전
                         </Text>
                       </View>
@@ -349,6 +366,10 @@ export default function BodyFrameRecordsScreen() {
                       변화 영상 {formatDuration(summary.durationSeconds)}
                     </Text>
                     <View
+                      accessible
+                      accessibilityRole="progressbar"
+                      accessibilityLabel={`${project.name} 기록 진행률`}
+                      accessibilityValue={{ min: 0, max: 100, now: progressPercent }}
                       style={[
                         styles.progressTrack,
                         { backgroundColor: palette.surfaceStrong }
@@ -476,6 +497,21 @@ const styles = StyleSheet.create({
     fontSize: bodyFrameTypography.button,
     fontWeight: "600"
   },
+  projectsHeading: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    justifyContent: "space-between",
+    gap: 12,
+    marginBottom: 12
+  },
+  projectsTitle: {
+    fontSize: bodyFrameTypography.sectionTitle,
+    fontWeight: "600"
+  },
+  projectsCount: {
+    fontSize: bodyFrameTypography.caption,
+    fontVariant: ["tabular-nums"]
+  },
   projectGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -509,7 +545,12 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
+    gap: 6,
     paddingHorizontal: 8
+  },
+  coverEmptyArtwork: {
+    width: 64,
+    height: 64
   },
   coverEmptyText: {
     fontSize: bodyFrameTypography.caption,
@@ -520,7 +561,7 @@ const styles = StyleSheet.create({
     padding: 10
   },
   projectName: {
-    fontSize: 15,
+    fontSize: bodyFrameTypography.rowTitle,
     fontWeight: "600"
   },
   projectStatsRow: {
@@ -575,8 +616,8 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    borderWidth: 1,
-    borderRadius: 8
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderRadius: bodyFrameDesign.cardRadius
   },
   archivedCopy: {
     flex: 1,
@@ -596,8 +637,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 10,
-    borderWidth: 1,
-    borderRadius: 8
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderRadius: bodyFrameDesign.buttonRadius
   },
   restoreButtonText: {
     fontSize: 13,
