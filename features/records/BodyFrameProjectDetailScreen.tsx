@@ -4,7 +4,7 @@ import {
 import * as ImagePicker from "expo-image-picker";
 import { Image } from "@/components/private-media-image";
 import { BodyMeasurementSummaryCard } from "@/components/body-measurement-summary-card";
-import { BodyFrameSheetFooter } from "@/components/body-frame-sheet";
+import { BodyFrameSheetFooter, BodyFrameSheetHeader } from "@/components/body-frame-sheet";
 import { router,
   type Href,
   useFocusEffect,
@@ -1414,25 +1414,12 @@ export default function BodyFrameProjectDetailScreen() {
               ]}
             >
               <View style={styles.sheetHandle} />
-              <View style={styles.sheetHeader}>
-                <View style={styles.reminderSheetTitleWrap}>
-                  <Text style={[styles.sheetTitle, { color: palette.text }]}>
-                    촬영 알림
-                  </Text>
-                  <Text style={[styles.settingDetail, { color: palette.muted }]}>
-                    “{project.name}” 프로젝트의 촬영 시간과 요일을 설정합니다.
-                  </Text>
-                </View>
-                <Pressable
-                  accessibilityRole="button"
-                  style={[styles.sheetCloseButton, { borderColor: palette.line }]}
-                  onPress={() => setReminderModalOpen(false)}
-                >
-                  <Text style={[styles.sheetCloseText, { color: palette.text }]}>
-                    닫기
-                  </Text>
-                </Pressable>
-              </View>
+              <BodyFrameSheetHeader
+                title="촬영 알림"
+                description={`“${project.name}” 프로젝트의 촬영 시간과 요일을 설정합니다.`}
+                onClose={() => setReminderModalOpen(false)}
+                closeLabel="촬영 알림 설정 닫기"
+              />
 
               <ScrollView
                 style={styles.reminderScroll}
@@ -1628,22 +1615,12 @@ export default function BodyFrameProjectDetailScreen() {
                 </Text>
               </ScrollView>
 
-              <Pressable
+              <BodyFrameSheetFooter
+                onCancel={() => setReminderModalOpen(false)}
+                onConfirm={() => void saveReminderSettings()}
+                confirmLabel={reminderSaving ? "저장 중" : "알림 설정 저장"}
                 disabled={reminderSaving}
-                accessibilityRole="button"
-                style={[
-                  styles.saveButton,
-                  {
-                    backgroundColor: palette.text,
-                    opacity: reminderSaving ? 0.5 : 1
-                  }
-                ]}
-                onPress={() => void saveReminderSettings()}
-              >
-                <Text style={[styles.saveButtonText, { color: palette.inverse }]}>
-                  {reminderSaving ? "저장 중" : "알림 설정 저장"}
-                </Text>
-              </Pressable>
+              />
             </View>
           </View>
         </KeyboardAvoidingView>
@@ -1673,19 +1650,11 @@ export default function BodyFrameProjectDetailScreen() {
             ]}
           >
             <View style={styles.sheetHandle} />
-            <View style={styles.sheetHeader}>
-              <Text style={[styles.sheetTitle, { color: palette.text }]}>
-                프로젝트 설정
-              </Text>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="프로젝트 설정 닫기"
-                style={[styles.sheetCloseButton, { borderColor: palette.line }]}
-                onPress={() => setSettingsOpen(false)}
-              >
-                <Text style={[styles.sheetCloseText, { color: palette.text }]}>닫기</Text>
-              </Pressable>
-            </View>
+            <BodyFrameSheetHeader
+              title="프로젝트 설정"
+              onClose={() => setSettingsOpen(false)}
+              closeLabel="프로젝트 설정 닫기"
+            />
 
             <ScrollView
               style={styles.settingsScroll}
