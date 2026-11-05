@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
-import { requirePlayPublishWindow, EARLIEST_PLAY_PUBLISH_AT } from "../scripts/publish-play-release.mjs";
+import { requirePlayPublishWindow, EARLIEST_PLAY_PUBLISH_AT, inspectInventory } from "../scripts/publish-play-release.mjs";
 import { verifyUploadCertificateDer, checkUploadCertificate } from "../scripts/check-play-upload-certificate.mjs";
 
 const minTime = Date.parse(EARLIEST_PLAY_PUBLISH_AT);
@@ -102,4 +102,31 @@ test("Stage 9 preflight cannot publish and cannot automatically activate upload 
     'requirePlayPublishWindow("publish");'
   ]) assert.ok(publishScript.includes(marker), "All publishing entrypoints must respect the calendar gate");
   assert.ok(publishScript.includes("2026-11-06T15:00:00.000Z"));
+});
+
+test("Play inventory reports the configured internal target and blocks existing protected work without publishing", async () => {
+  const base = {
+    tracks: [
+      { track: "production", releases: [{ status: "completed", versionCodes: ["26092622"] }] },
+      { track: "internal", releases: [{ status: "draft", versionCodes: ["26092623"] }] },
+      { track: "alpha", releases: [] }
+    ],
+    bundles: [{ versionCode: 26092624 }],
+    apks: []
+  };
+  let snapshot = base;
+  const client = { snapshot: async () => snapshot };
+  const blocked = await inspectInventory(client, "internal");
+  assert.equal(blocked.operation, "inventory");
+  assert.equal(blocked.currentMaximumVersionCode, 26092624);
+  assert.equal(blocked.configuredInternalTrack, "internal");
+  assert.deepEqual(blocked.internalTrackReleaseStatuses, ["draft"]);
+  assert.equal(blocked.hasBlockingRelease, true);
+  snapshot = { ...base, tracks: base.tracks.map((track) => track.track === "internal"
+    ? { track: "internal", releases: [{ status: "completed", versionCodes: ["26092623"] }] }
+    : track) };
+  const allowed = await inspectInventory(client, "internal");
+  assert.equal(allowed.hasBlockingRelease, false);
+  assert.deepEqual(allowed.internalTrackReleaseStatuses, ["completed"]);
+  await assert.rejects(inspectInventory(client, "qa"), /absent or ambiguous/);
 });
