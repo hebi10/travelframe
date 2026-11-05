@@ -1061,7 +1061,7 @@ def wait_for_visual_profile(device, size, density, timeout_seconds=25):
     observed = None
     while True:
         screenshot = device.run('exec-out', 'screencap', '-p', binary=True)
-        if screenshot[:8] != b'\\x89PNG\\r\\n\\x1a\\n' or len(screenshot) < 24:
+        if screenshot[:8] != b'\x89PNG\r\n\x1a\n' or len(screenshot) < 24:
             raise RuntimeError('Native screenshot surface did not return a valid PNG')
         observed = struct.unpack('>II', screenshot[16:24])
         if observed == expected:
