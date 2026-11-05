@@ -13,7 +13,6 @@ import {
 import { AppGuideOverlay } from "@/components/app-guide-overlay";
 import { ScreenShell } from "@/components/screen-shell";
 import { SectionBlock } from "@/components/section-block";
-import { colors } from "@/constants/app-theme";
 import { useAppAppearance } from "@/lib/app-appearance";
 import { getAppSettings } from "@/lib/app-settings";
 import { useAuth } from "@/lib/auth-context";
@@ -40,9 +39,10 @@ import type { MadeVideoItem } from "@/types/video";
 import type { ImageBundleWorkItem } from "@/types/work";
 import { EmptyState, LibraryErrorState, LoadingState, PageSizeSelector, PaginatedPhotoGrid, StudioIcon, UsageBadge, WorkSection } from "@/features/studio/studio-screen.components";
 import { initialBackupOverview, isSyncedPhoto, tabs, type DeleteProgress, type ImportProgress, type PageSize, type StudioTab, type StudioWorkItem } from "@/features/studio/studio-screen.model";
-import { styles } from "@/features/studio/studio-screen.styles";
+import { useStudioStyles } from "@/features/studio/studio-screen.styles";
 
 export default function StudioScreen() {
+  const styles = useStudioStyles();
   const router = useRouter();
   const { palette } = useAppAppearance();
   const { user, subscription } = useAuth();
@@ -383,13 +383,12 @@ export default function StudioScreen() {
   const videoUsage = shouldShowBackupUsage
     ? { label: "클라우드 백업", count: backupOverview.videoCount, limit: videoBackupLimit }
     : { label: "영상 보관함", count: videos.length, limit: planEntitlements.localVideoLimit };
-  const isDark = palette.background !== colors.background;
   const filledButtonStyle = {
     borderColor: palette.text,
-    backgroundColor: isDark ? "transparent" : palette.text
+    backgroundColor: palette.text
   };
   const filledButtonTextStyle = {
-    color: isDark ? palette.text : palette.inverse
+    color: palette.inverse
   };
   const panelStyle = {
     borderColor: palette.text,
@@ -670,7 +669,7 @@ export default function StudioScreen() {
         onRequestClose={() => undefined}
       >
         <View style={styles.importProgressBackdrop}>
-          <View style={[styles.importProgressPanel, panelStyle]}>
+          <View style={[styles.importProgressPanel, panelStyle]} accessibilityViewIsModal>
             {importProgress ? (
               <>
                 <View style={styles.importProgressHeader}>
@@ -695,7 +694,7 @@ export default function StudioScreen() {
                     ]}
                   />
                 </View>
-                <Text selectable={false} style={styles.importProgressText}>
+                <Text selectable={false} accessibilityLiveRegion="polite" style={styles.importProgressText}>
                   {Math.round(importProgress.percent)}%
                 </Text>
               </>
@@ -710,7 +709,7 @@ export default function StudioScreen() {
         onRequestClose={() => undefined}
       >
         <View style={styles.importProgressBackdrop}>
-          <View style={[styles.importProgressPanel, panelStyle]}>
+          <View style={[styles.importProgressPanel, panelStyle]} accessibilityViewIsModal>
             {deleteProgress ? (
               <View style={styles.importProgressHeader}>
                 <ActivityIndicator color={palette.text} />

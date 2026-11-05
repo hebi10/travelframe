@@ -5,7 +5,7 @@ import { readStudioSource } from "./studio-test-source.mjs";
 const source = readStudioSource();
 const paginatedGridStart = source.indexOf("export function PaginatedPhotoGrid");
 const paginatedGridEnd = source.indexOf("export function UsageBadge", paginatedGridStart);
-const stylesStart = source.indexOf("export const styles = StyleSheet.create({");
+const stylesStart = source.indexOf("export const createStudioStyles = (colors: AppPalette) => StyleSheet.create({");
 
 assert.ok(
   paginatedGridStart >= 0 && paginatedGridEnd > paginatedGridStart,

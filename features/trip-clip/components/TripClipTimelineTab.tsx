@@ -2,7 +2,7 @@ import { Image } from "@/components/private-media-image";
 import { Text, View } from "react-native";
 
 import { Section, SmallButton, TimelineDurationControl } from "@/features/trip-clip/trip-clip-screen.components";
-import { styles } from "@/features/trip-clip/trip-clip-screen.styles";
+import { useTripClipStyles } from "@/features/trip-clip/trip-clip-screen.styles";
 import type { PhotoItem } from "@/types/photo";
 
 type TimelineDurationEditing = {
@@ -26,6 +26,7 @@ export function TripClipTimelineTab({
   timelineDurationEditing,
   movePhoto
 }: TripClipTimelineTabProps) {
+  const styles = useTripClipStyles();
   return (
       <Section title="타임라인">
         {selectedPhotos.length > 0 ? (

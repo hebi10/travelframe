@@ -2,7 +2,7 @@ import { Text } from "react-native";
 
 import { TRIP_CLIP_RATIOS, TRIP_CLIP_TRANSITIONS, type TripClipRatio, type TripClipTransition } from "@/constants/trip-clip";
 import { Chip, OptionRow, Section } from "@/features/trip-clip/trip-clip-screen.components";
-import { styles } from "@/features/trip-clip/trip-clip-screen.styles";
+import { useTripClipStyles } from "@/features/trip-clip/trip-clip-screen.styles";
 
 type FadeOption = {
   label: string;
@@ -28,6 +28,7 @@ export function TripClipVideoTab({
   setTransition,
   setTransitionDuration
 }: TripClipVideoTabProps) {
+  const styles = useTripClipStyles();
   return (
       <Section title="영상 설정">
         <OptionRow>

@@ -23,7 +23,6 @@ import {
   type EditablePhotoCanvasHandle
 } from "@/components/editable-photo-canvas";
 import {
-  bodyFrameAccent,
   bodyFrameDarkColors,
   bodyFrameDesign,
   bodyFrameTypography,
@@ -575,6 +574,7 @@ export default function EditScreen() {
         <Pressable accessibilityRole="button"
           android_disableSound
           disabled={isSaving || !source}
+          accessibilityState={{ disabled: isSaving || !source }}
           style={[styles.saveButton, (!source || isSaving) && styles.disabledButton]}
           onPress={confirmSaveEdit}
         >
@@ -745,7 +745,9 @@ export default function EditScreen() {
               const isActive = ratio === item;
 
               return (
-                <Pressable accessibilityRole="button"
+                <Pressable accessibilityRole="radio"
+                  accessibilityLabel={`${ratioDisplayLabel(item)} 화면 비율`}
+                  accessibilityState={{ selected: isActive }}
                   key={item}
                   style={[styles.ratioChip, isActive && styles.ratioChipActive]}
                   onPress={() => setRatio(item)}
@@ -803,7 +805,7 @@ export default function EditScreen() {
           </View>
 
           {message ? (
-            <Text selectable style={styles.message}>
+            <Text selectable accessibilityLiveRegion="polite" style={styles.message}>
               {message}
             </Text>
           ) : null}
@@ -831,13 +833,13 @@ const styles = StyleSheet.create({
   },
   title: {
     color: bodyFrameDarkColors.text,
-    fontSize: bodyFrameTypography.sectionTitle,
+    fontSize: bodyFrameTypography.pageTitle,
     fontWeight: "700",
     letterSpacing: -0.2
   },
   ghostButton: {
     minWidth: 68,
-    minHeight: controls.compactHeight,
+    minHeight: bodyFrameDesign.minTouchSize,
     justifyContent: "center"
   },
   ghostButtonText: {
@@ -853,9 +855,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 14,
     borderWidth: bodyFrameDesign.borderWidth,
-    borderColor: bodyFrameAccent,
+    borderColor: bodyFrameDarkColors.text,
     borderRadius: bodyFrameDesign.buttonRadius,
-    backgroundColor: bodyFrameAccent
+    backgroundColor: bodyFrameDarkColors.text
   },
   saveButtonText: {
     color: "#0B0B0C",
@@ -1102,8 +1104,8 @@ const styles = StyleSheet.create({
     backgroundColor: bodyFrameDarkColors.surfaceStrong
   },
   ratioChipActive: {
-    borderColor: bodyFrameAccent,
-    backgroundColor: bodyFrameAccent
+    borderColor: bodyFrameDarkColors.text,
+    backgroundColor: bodyFrameDarkColors.text
   },
   ratioText: {
     color: bodyFrameDarkColors.text,
@@ -1158,7 +1160,7 @@ const styles = StyleSheet.create({
     gap: 6
   },
   guideChip: {
-    minHeight: 34,
+    minHeight: bodyFrameDesign.minTouchSize,
     justifyContent: "center",
     paddingHorizontal: 10,
     borderWidth: 1,
@@ -1244,7 +1246,7 @@ const styles = StyleSheet.create({
   },
   guideColorOption: {
     flex: 1,
-    minHeight: 42,
+    minHeight: bodyFrameDesign.minTouchSize,
     minWidth: 0,
     alignItems: "center",
     justifyContent: "center",
@@ -1269,7 +1271,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0
   },
   guideVisibilityButton: {
-    minHeight: controls.compactHeight,
+    minHeight: bodyFrameDesign.minTouchSize,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
@@ -1307,7 +1309,7 @@ const styles = StyleSheet.create({
     backgroundColor: bodyFrameDarkColors.surfaceStrong
   },
   toolButtonActive: {
-    borderColor: bodyFrameAccent
+    borderColor: bodyFrameDarkColors.text
   },
   toolButtonText: {
     color: bodyFrameDarkColors.text,

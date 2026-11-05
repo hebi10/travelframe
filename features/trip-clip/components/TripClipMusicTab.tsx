@@ -1,9 +1,9 @@
 import type { AudioSource } from "expo-audio";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
 
-import { colors } from "@/constants/app-theme";
+import { useAppAppearance } from "@/lib/app-appearance";
 import { Section } from "@/features/trip-clip/trip-clip-screen.components";
-import { styles } from "@/features/trip-clip/trip-clip-screen.styles";
+import { useTripClipStyles } from "@/features/trip-clip/trip-clip-screen.styles";
 import type { UserMusicTrack } from "@/lib/user-music";
 
 type MusicMode = "none" | "device";
@@ -41,6 +41,8 @@ export function TripClipMusicTab({
   stopPlayback,
   playClip
 }: TripClipMusicTabProps) {
+  const { palette: colors } = useAppAppearance();
+  const styles = useTripClipStyles();
   return (
       <Section title="음악">
         <View style={styles.musicList}>

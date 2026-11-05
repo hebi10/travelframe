@@ -5,7 +5,7 @@ import { IMAGE_QUALITY_DESCRIPTION, IMAGE_QUALITY_OPTIONS, type ImageQuality } f
 import { VIDEO_QUALITY_DESCRIPTION, VIDEO_QUALITY_OPTIONS, type VideoQualityId } from "@/constants/video";
 import { Chip, OptionRow, Section } from "@/features/trip-clip/trip-clip-screen.components";
 import { IMAGE_SAVE_FORMAT_OPTIONS } from "@/features/trip-clip/trip-clip-screen.constants";
-import { styles } from "@/features/trip-clip/trip-clip-screen.styles";
+import { useTripClipStyles } from "@/features/trip-clip/trip-clip-screen.styles";
 import type { ImageSaveFormat } from "@/lib/trip-clip-export";
 import type { WeeklyVideoExportUsage } from "@/lib/video-export-quota";
 
@@ -79,6 +79,7 @@ export function TripClipExportTab({
   shareSelectedExport,
   exportMessage
 }: TripClipExportTabProps) {
+  const styles = useTripClipStyles();
   return (
       <Section title="핸드폰에 저장">
         <View style={styles.exportPanel}>

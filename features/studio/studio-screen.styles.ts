@@ -1,8 +1,10 @@
+import { useMemo } from "react";
 import { StyleSheet } from "react-native";
 
-import { bodyFrameAccent, colors, controls, typography } from "@/constants/app-theme";
+import { bodyFrameDesign, bodyFrameSheetDesign, bodyFrameTypography, colors as legacyColors, controls, typography } from "@/constants/app-theme";
+import { useAppAppearance, type AppPalette } from "@/lib/app-appearance";
 
-export const styles = StyleSheet.create({
+export const createStudioStyles = (colors: AppPalette) => StyleSheet.create({
   tabs: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -23,8 +25,8 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.background
   },
   tabActive: {
-    borderColor: bodyFrameAccent,
-    backgroundColor: bodyFrameAccent
+    borderColor: colors.text,
+    backgroundColor: colors.text
   },
   tabText: {
     color: colors.text,
@@ -33,7 +35,7 @@ export const styles = StyleSheet.create({
     letterSpacing: 0
   },
   tabTextActive: {
-    color: colors.text
+    color: colors.inverse
   },
   pageSizeBar: {
     minHeight: controls.compactHeight,
@@ -55,7 +57,7 @@ export const styles = StyleSheet.create({
   },
   pageSizeButton: {
     minWidth: 58,
-    minHeight: 40,
+    minHeight: bodyFrameDesign.minTouchSize,
     justifyContent: "center",
     paddingHorizontal: 12,
     borderWidth: 1,
@@ -219,11 +221,14 @@ export const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     paddingHorizontal: 18,
-    backgroundColor: "rgba(0, 0, 0, 0.38)"
+    backgroundColor: bodyFrameSheetDesign.backdropColor
   },
   importProgressPanel: {
+    width: "100%",
+    maxWidth: 500,
+    alignSelf: "center",
     gap: 14,
-    padding: 18,
+    padding: bodyFrameDesign.horizontalPadding,
     borderWidth: 1,
     borderColor: colors.text,
     backgroundColor: colors.background
@@ -239,7 +244,7 @@ export const styles = StyleSheet.create({
   },
   importProgressTitle: {
     color: colors.text,
-    fontSize: typography.body,
+    fontSize: bodyFrameTypography.sectionTitle,
     fontWeight: "900",
     letterSpacing: 0
   },
@@ -409,7 +414,7 @@ export const styles = StyleSheet.create({
     alignItems: "center",
     gap: 14,
     paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderWidth: bodyFrameDesign.borderWidth,
     borderBottomColor: colors.line
   },
   videoThumb: {
@@ -514,3 +519,10 @@ export const styles = StyleSheet.create({
     letterSpacing: 0
   }
 });
+
+export const styles = createStudioStyles(legacyColors);
+
+export function useStudioStyles() {
+  const { palette } = useAppAppearance();
+  return useMemo(() => createStudioStyles(palette), [palette]);
+}

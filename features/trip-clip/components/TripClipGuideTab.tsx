@@ -2,7 +2,7 @@ import { Pressable, Text, TextInput, View } from "react-native";
 
 import { GUIDE_LABELS, GUIDE_TYPES, type GuideType } from "@/constants/camera-guides";
 import { Chip, OptionRow, Section } from "@/features/trip-clip/trip-clip-screen.components";
-import { styles } from "@/features/trip-clip/trip-clip-screen.styles";
+import { useTripClipStyles } from "@/features/trip-clip/trip-clip-screen.styles";
 import type { PhotoItem } from "@/types/photo";
 
 type GuideSizeBounds = {
@@ -59,6 +59,7 @@ export function TripClipGuideTab({
   updatePreviewGuideStrokeWidth,
   updatePreviewGuideColor
 }: TripClipGuideTabProps) {
+  const styles = useTripClipStyles();
   return (
       <Section title="가이드 설정">
         <View style={styles.guideSummaryPanel}>

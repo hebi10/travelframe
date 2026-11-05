@@ -2,9 +2,9 @@ import { Image } from "@/components/private-media-image";
 import type { ReactNode } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
 
-import { colors } from "@/constants/app-theme";
+import { useAppAppearance } from "@/lib/app-appearance";
 import { Section } from "@/features/trip-clip/trip-clip-screen.components";
-import { styles } from "@/features/trip-clip/trip-clip-screen.styles";
+import { useTripClipStyles } from "@/features/trip-clip/trip-clip-screen.styles";
 import type { PhotoItem } from "@/types/photo";
 
 type TripClipPhotoTabProps = {
@@ -28,6 +28,8 @@ export function TripClipPhotoTab({
   deselectPickerPhoto,
   renderAddPhotoTile
 }: TripClipPhotoTabProps) {
+  const { palette: colors } = useAppAppearance();
+  const styles = useTripClipStyles();
   return (
       <Section title="사진 선택">
         {isLoading ? (

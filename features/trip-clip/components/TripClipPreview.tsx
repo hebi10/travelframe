@@ -8,7 +8,7 @@ import type { TripClipRatio, TripClipTransition } from "@/constants/trip-clip";
 import { VIDEO_DURATION_LIMIT_MESSAGE } from "@/constants/video";
 import { TimelineScrubber } from "@/features/trip-clip/trip-clip-screen.components";
 import { transitionLabel } from "@/features/trip-clip/trip-clip-screen.helpers";
-import { styles } from "@/features/trip-clip/trip-clip-screen.styles";
+import { useTripClipStyles } from "@/features/trip-clip/trip-clip-screen.styles";
 import { formatVideoDuration } from "@/lib/video-utils";
 import type { PhotoItem } from "@/types/photo";
 
@@ -74,6 +74,7 @@ export function TripClipPreview({
   playbackProgress,
   seekPreview
 }: TripClipPreviewProps) {
+  const styles = useTripClipStyles();
   return (
       <View style={styles.previewSection}>
         <View

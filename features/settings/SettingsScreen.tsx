@@ -16,6 +16,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppGuideOverlay } from "@/components/app-guide-overlay";
+import { BodyFrameSheetHandle } from "@/components/body-frame-sheet";
 import { ActionRow } from "@/components/action-row";
 import { CameraGuideOverlay } from "@/components/camera-guide-overlay";
 import { ScreenShell } from "@/components/screen-shell";
@@ -1454,12 +1455,15 @@ export default function SettingsScreen() {
         onRequestClose={() => setShowDeleteRequestInfo(false)}
       >
         <View style={[styles.modalBackdrop, modalSafeStyle]}>
-          <View style={[styles.modalPanel, themed.modalPanel]}>
+          <View style={[styles.modalPanel, themed.modalPanel]} accessibilityViewIsModal>
+            <BodyFrameSheetHandle />
             <View style={styles.modalHeader}>
               <Text selectable={false} style={[styles.modalTitle, themed.text]}>
                 계정 및 데이터 삭제 요청
               </Text>
               <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="설정 안내 닫기"
                 style={[styles.closeButton, themed.secondaryButton]}
                 onPress={() => setShowDeleteRequestInfo(false)}
               >
@@ -1469,6 +1473,7 @@ export default function SettingsScreen() {
               </Pressable>
             </View>
 
+            <ScrollView style={styles.modalScroll} contentContainerStyle={styles.optionList} showsVerticalScrollIndicator={false}>
             <Text selectable style={[styles.optionDetail, themed.mutedText]}>
               백업 데이터는 설정 화면의 클라우드 백업에서 백업 데이터 삭제를 누르면 계정에서 제거됩니다.
             </Text>
@@ -1476,7 +1481,9 @@ export default function SettingsScreen() {
               계정 삭제 요청과 추가 데이터 삭제 안내는 별도 안내 페이지에서 확인하실 수 있습니다. 관련 안내 페이지로 이동하시겠습니까?
             </Text>
 
+            </ScrollView>
             <Pressable
+              accessibilityRole="button"
               style={[styles.deleteRequestPrimaryButton, themed.activeFill]}
               onPress={openDeleteRequestPage}
             >
@@ -1495,12 +1502,15 @@ export default function SettingsScreen() {
         onRequestClose={() => setActiveSetting(null)}
       >
         <View style={[styles.modalBackdrop, modalSafeStyle]}>
-          <View style={[styles.modalPanel, themed.modalPanel]}>
+          <View style={[styles.modalPanel, themed.modalPanel]} accessibilityViewIsModal>
+            <BodyFrameSheetHandle />
             <View style={styles.modalHeader}>
               <Text selectable={false} style={[styles.modalTitle, themed.text]}>
                 {modalTitle}
               </Text>
               <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="설정 안내 닫기"
                 style={[styles.closeButton, themed.secondaryButton]}
                 onPress={() => setActiveSetting(null)}
               >
@@ -1512,6 +1522,8 @@ export default function SettingsScreen() {
 
             <ScrollView
               style={styles.modalScroll}
+              keyboardShouldPersistTaps="handled"
+              nestedScrollEnabled
               contentContainerStyle={styles.optionList}
               showsVerticalScrollIndicator={false}
             >
@@ -1869,7 +1881,8 @@ export default function SettingsScreen() {
         onRequestClose={() => undefined}
       >
         <View style={[styles.modalBackdrop, modalSafeStyle]}>
-          <View style={[styles.modalPanel, styles.backupProgressPanel, themed.modalPanel]}>
+          <View style={[styles.modalPanel, styles.backupProgressPanel, themed.modalPanel]} accessibilityViewIsModal>
+            <BodyFrameSheetHandle />
             <View style={styles.backupProgressHeader}>
               <ActivityIndicator color={palette.text} />
               <View style={styles.backupProgressCopy}>
@@ -1892,12 +1905,15 @@ export default function SettingsScreen() {
         onRequestClose={() => setShowBackupConfirm(false)}
       >
         <View style={[styles.modalBackdrop, modalSafeStyle]}>
-          <View style={[styles.modalPanel, themed.modalPanel]}>
+          <View style={[styles.modalPanel, themed.modalPanel]} accessibilityViewIsModal>
+            <BodyFrameSheetHandle />
             <View style={styles.modalHeader}>
               <Text selectable={false} style={[styles.modalTitle, themed.text]}>
                 기존 작업을 백업할까요?
               </Text>
               <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="설정 안내 닫기"
                 style={[styles.closeButton, themed.secondaryButton]}
                 onPress={() => setShowBackupConfirm(false)}
               >
@@ -1908,6 +1924,8 @@ export default function SettingsScreen() {
             </View>
             <ScrollView
               style={styles.modalScroll}
+              keyboardShouldPersistTaps="handled"
+              nestedScrollEnabled
               contentContainerStyle={styles.optionList}
               showsVerticalScrollIndicator={false}
             >
@@ -1920,7 +1938,10 @@ export default function SettingsScreen() {
               <Text selectable style={[styles.optionDetail, themed.mutedText]}>
                 구독 기간이 끝나면 새 백업은 중단됩니다. 기존 백업 데이터 삭제는 이 화면에서 직접 요청할 수 있습니다.
               </Text>
+            </ScrollView>
               <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ disabled: isBackupSubmitting }}
                 disabled={isBackupSubmitting}
                 style={[
                   styles.authPrimaryButton,
@@ -1937,7 +1958,6 @@ export default function SettingsScreen() {
                   </Text>
                 )}
               </Pressable>
-            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -1948,7 +1968,8 @@ export default function SettingsScreen() {
         onRequestClose={() => undefined}
       >
         <View style={[styles.modalBackdrop, modalSafeStyle]}>
-          <View style={[styles.modalPanel, styles.backupProgressPanel, themed.modalPanel]}>
+          <View style={[styles.modalPanel, styles.backupProgressPanel, themed.modalPanel]} accessibilityViewIsModal>
+            <BodyFrameSheetHandle />
             {backupProgress ? (
               <>
                 <View style={styles.backupProgressHeader}>
@@ -1973,7 +1994,7 @@ export default function SettingsScreen() {
                     ]}
                   />
                 </View>
-                <Text selectable style={[styles.backupProgressText, themed.text]}>
+                <Text selectable accessibilityLiveRegion="polite" style={[styles.backupProgressText, themed.text]}>
                   {Math.round(backupProgress.percent)}%
                 </Text>
               </>
