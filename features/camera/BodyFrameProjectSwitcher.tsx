@@ -1,5 +1,5 @@
 import { AppText as Text, AppTextInput as TextInput } from "@/components/app-text";
-import { BodyFrameSheetHeader } from "@/components/body-frame-sheet";
+import { BodyFrameSheetHandle, BodyFrameSheetHeader } from "@/components/body-frame-sheet";
 import {
   Feather } from "@expo/vector-icons";
 import { useMemo,
@@ -15,7 +15,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { bodyFrameAccent, bodyFrameDesign, bodyFrameTypography } from "@/constants/app-theme";
+import { bodyFrameDesign, bodyFrameSheetDesign, bodyFrameTypography, getBodyFrameControlColors } from "@/constants/app-theme";
 import { useAppAppearance } from "@/lib/app-appearance";
 import { getBodyProjectProgressSummary } from "@/lib/body-frame-camera-project";
 import {
@@ -66,9 +66,9 @@ export function BodyFrameProjectSwitcher({
   createOnly = false
 }: BodyFrameProjectSwitcherProps) {
   const insets = useSafeAreaInsets();
-  const { palette, effectiveThemeMode } = useAppAppearance();
-  const actionColor = effectiveThemeMode === "dark" ? bodyFrameAccent : palette.text;
-  const actionTextColor = effectiveThemeMode === "dark" ? "#0B0B0C" : palette.inverse;
+  const { palette } = useAppAppearance();
+  const { primaryBackground: actionColor, primaryText: actionTextColor } =
+    getBodyFrameControlColors(palette);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [name, setName] = useState("새 프로젝트");
@@ -225,14 +225,20 @@ export function BodyFrameProjectSwitcher({
         visible={pickerOpen}
         onRequestClose={() => setPickerOpen(false)}
       >
-        <Pressable style={styles.backdrop} onPress={() => setPickerOpen(false)}>
+        <View style={styles.backdrop}>
           <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="프로젝트 선택 닫기"
+            style={StyleSheet.absoluteFill}
+            onPress={() => setPickerOpen(false)}
+          />
+          <View
             style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16), backgroundColor: palette.surface, borderColor: palette.line }]}
-            onPress={() => undefined}
+            accessibilityViewIsModal
           >
-            <View style={[styles.sheetHandle, { backgroundColor: palette.faint }]} />
+            <BodyFrameSheetHandle />
             <BodyFrameSheetHeader title="프로젝트 선택" onClose={() => setPickerOpen(false)} />
-            <ScrollView style={styles.projectList} showsVerticalScrollIndicator={false}>
+            <ScrollView style={styles.projectList} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" nestedScrollEnabled>
               {visibleProjects.map((project) => {
                 const summary = getBodyProjectProgressSummary(photos, project);
                 const selected = project.id === activeProject?.id;
@@ -240,9 +246,9 @@ export function BodyFrameProjectSwitcher({
                   <Pressable
                     key={project.id}
                     disabled={disabled}
-                     accessibilityRole="radio"
-                     accessibilityLabel={`${project.name} 프로젝트`}
-                     accessibilityState={{ selected, disabled }}
+                    accessibilityRole="radio"
+                    accessibilityLabel={`${project.name} 프로젝트`}
+                    accessibilityState={{ selected, disabled }}
                     style={({ pressed }) => [
                       styles.projectRow,
                       { backgroundColor: selected ? palette.surfaceStrong : palette.surface },
@@ -279,8 +285,8 @@ export function BodyFrameProjectSwitcher({
                 <Text style={[styles.actionTextSecondary, { color: palette.muted }]}>프로젝트 관리</Text>
               </Pressable>
             </View>
-          </Pressable>
-        </Pressable>
+          </View>
+        </View>
       </Modal>
 
       <Modal
@@ -293,12 +299,18 @@ export function BodyFrameProjectSwitcher({
           style={styles.keyboardAvoidingRoot}
           behavior={Platform.OS === "ios" ? "padding" : "height"}
         >
-        <Pressable style={styles.backdrop} onPress={() => setCreateOpen(false)}>
+        <View style={styles.backdrop}>
           <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="새 프로젝트 닫기"
+            style={StyleSheet.absoluteFill}
+            onPress={() => setCreateOpen(false)}
+          />
+          <View
             style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16), backgroundColor: palette.surface, borderColor: palette.line }]}
-            onPress={() => undefined}
+            accessibilityViewIsModal
           >
-            <View style={[styles.sheetHandle, { backgroundColor: palette.faint }]} />
+            <BodyFrameSheetHandle />
             <BodyFrameSheetHeader title="새 프로젝트" onClose={() => setCreateOpen(false)} />
             <ScrollView
               style={styles.createScroll}
@@ -448,8 +460,8 @@ export function BodyFrameProjectSwitcher({
               </Text>
             </Pressable>
             </View>
-          </Pressable>
-        </Pressable>
+          </View>
+        </View>
         </KeyboardAvoidingView>
       </Modal>
     </>
@@ -460,7 +472,7 @@ const styles = StyleSheet.create({
   keyboardAvoidingRoot: {
     flex: 1
   },
-  createScroll: { flexShrink: 1 },
+  createScroll: { flexShrink: 1, minHeight: 0 },
   createScrollContent: { paddingBottom: 16 },
   createFooter: {
     paddingTop: 8,
@@ -529,28 +541,20 @@ const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
     justifyContent: "flex-end",
-    backgroundColor: "rgba(0,0,0,0.62)"
+    backgroundColor: bodyFrameSheetDesign.backdropColor
   },
   sheet: {
     width: "100%",
     maxWidth: bodyFrameDesign.contentMaxWidth,
     alignSelf: "center",
-    maxHeight: "82%",
+    maxHeight: bodyFrameSheetDesign.maxHeight,
     backgroundColor: "#131315",
     borderTopLeftRadius: bodyFrameDesign.bottomSheetRadius,
     borderTopRightRadius: bodyFrameDesign.bottomSheetRadius,
     borderWidth: bodyFrameDesign.borderWidth,
     borderColor: "#2A2A2E",
-    paddingHorizontal: 16,
+    paddingHorizontal: bodyFrameDesign.horizontalPadding,
     paddingTop: 10
-  },
-  sheetHandle: {
-    alignSelf: "center",
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: "#3A3A3E",
-    marginBottom: 14
   },
   sheetTitle: {
     color: "#F5F5F5",
@@ -558,9 +562,9 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     marginBottom: 14
   },
-  projectList: { maxHeight: 360 },
+  projectList: { flexShrink: 1, minHeight: 0, maxHeight: 360 },
   projectRow: {
-    minHeight: 62,
+    minHeight: 64,
     flexDirection: "row",
     alignItems: "center"
   },
