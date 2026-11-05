@@ -15,7 +15,6 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ScreenShell } from "@/components/screen-shell";
-import { bodyFrameAccent } from "@/constants/app-theme";
 import { CloudBackupProjectSlotsSection } from "@/features/account/CloudBackupProjectSlotsSection";
 import { SectionBlock } from "@/components/section-block";
 import {
@@ -70,9 +69,7 @@ import { getPhotos } from "@/lib/photo-library";
 
 export default function AccountScreen() {
   const insets = useSafeAreaInsets();
-  const { palette, fontFamily, effectiveThemeMode } = useAppAppearance();
-  const actionColor = effectiveThemeMode === "dark" ? bodyFrameAccent : palette.text;
-  const actionTextColor = effectiveThemeMode === "dark" ? "#0B0B0C" : palette.inverse;
+  const { palette, fontFamily } = useAppAppearance();
   const themed = useMemo(
     () => createAccountThemedStyles(palette, fontFamily),
     [palette, fontFamily]
@@ -483,6 +480,7 @@ export default function AccountScreen() {
               return (
                 <Pressable accessibilityRole="button"
                   key={item.value}
+                  accessibilityState={{ selected: isActive }}
                   style={[
                     styles.segmentButton,
                     themed.secondaryButton,
@@ -540,12 +538,12 @@ export default function AccountScreen() {
               disabled={isSubmitting || isAuthLoading}
               style={[
                 styles.primaryButton,
-                themed.activeFill,
+                themed.primaryFill,
                 (isSubmitting || isAuthLoading) && styles.disabledButton
               ]}
               onPress={handlePrimaryAuth}
             >
-              <Text selectable={false} style={[styles.primaryButtonText, themed.inverseText]}>
+              <Text selectable={false} style={[styles.primaryButtonText, themed.primaryContrastText]}>
                 {mode === "signIn"
                   ? "이메일로 로그인"
                   : mode === "signUp"
@@ -630,10 +628,10 @@ export default function AccountScreen() {
               <View style={styles.form}>
                 <Pressable accessibilityRole="button"
                   disabled={isSubmitting}
-                  style={[styles.primaryButton, themed.activeFill, isSubmitting && styles.disabledButton]}
+                  style={[styles.secondaryButton, themed.secondaryButton, isSubmitting && styles.disabledButton]}
                   onPress={() => runAuthAction(logOut, "로그아웃했습니다.")}
                 >
-                  <Text selectable={false} style={[styles.primaryButtonText, themed.inverseText]}>
+                  <Text selectable={false} style={[styles.secondaryButtonText, themed.text]}>
                     로그아웃
                   </Text>
                 </Pressable>
@@ -767,6 +765,12 @@ export default function AccountScreen() {
             </View>
           </SectionBlock>
 
+          <CloudBackupProjectSlotsSection
+            user={user}
+            maxSlots={planEntitlements.maxCloudBackupProjects}
+            maxPhotosPerProject={planEntitlements.maxCloudPhotosPerProject}
+          />
+
           <SectionBlock title="플랜 및 결제">
             <View style={[styles.planCard, themed.panelStrong]}>
               <View style={styles.planHeader}>
@@ -808,6 +812,7 @@ export default function AccountScreen() {
               {paymentPlans.map((plan) => (
                 <Pressable accessibilityRole="button"
                   key={plan.id}
+                  accessibilityLabel={`${plan.title} 플랜 자세히 보기`}
                   style={[styles.paymentPlan, themed.panel]}
                   onPress={() => setSelectedPaymentPlan(plan)}
                 >
@@ -831,8 +836,8 @@ export default function AccountScreen() {
                   <Text selectable={false} style={[styles.benefitText, themed.mutedText]}>
                     {plan.summary}
                   </Text>
-                  <View style={[styles.paymentOpenButton, themed.activeFill]}>
-                    <Text selectable={false} style={[styles.primaryButtonText, themed.inverseText]}>
+                  <View style={[styles.paymentOpenButton, themed.primaryFill]}>
+                    <Text selectable={false} style={[styles.primaryButtonText, themed.primaryContrastText]}>
                       안내 보기
                     </Text>
                   </View>
@@ -868,12 +873,6 @@ export default function AccountScreen() {
               월 구독의 변경·취소는 Google Play 정기 결제 화면에서 관리할 수 있습니다.
             </Text>
           </SectionBlock>
-
-          <CloudBackupProjectSlotsSection
-            user={user}
-            maxSlots={planEntitlements.maxCloudBackupProjects}
-            maxPhotosPerProject={planEntitlements.maxCloudPhotosPerProject}
-          />
 
         </>
       ) : null}
@@ -924,10 +923,10 @@ export default function AccountScreen() {
             </Text>
 
             <Pressable accessibilityRole="button"
-              style={[styles.primaryButton, themed.activeFill]}
+              style={[styles.primaryButton, themed.primaryFill]}
               onPress={openDeleteRequestPage}
             >
-              <Text selectable={false} style={[styles.primaryButtonText, themed.inverseText]}>
+              <Text selectable={false} style={[styles.primaryButtonText, themed.primaryContrastText]}>
                 안내 페이지로 이동
               </Text>
             </Pressable>
@@ -1037,8 +1036,7 @@ export default function AccountScreen() {
               }
               style={[
                 styles.primaryButton,
-                themed.activeFill,
-                { backgroundColor: actionColor },
+                themed.primaryFill,
                 (isSubmitting ||
                   !billingConnected ||
                   (selectedPaymentPlan ? getPaymentPlanStatus(selectedPaymentPlan).active : false)) &&
@@ -1046,7 +1044,7 @@ export default function AccountScreen() {
               ]}
               onPress={handlePaymentPurchase}
             >
-              <Text selectable={false} style={[styles.primaryButtonText, themed.inverseText, { color: actionTextColor }]}>
+              <Text selectable={false} style={[styles.primaryButtonText, themed.primaryContrastText]}>
                 {selectedPaymentPlan ? getPaymentActionLabel(selectedPaymentPlan) : "결제하기"}
               </Text>
             </Pressable>
