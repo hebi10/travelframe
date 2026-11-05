@@ -1,4 +1,5 @@
 import { AppText as Text } from "@/components/app-text";
+import { Feather } from "@expo/vector-icons";
 import {
   Image } from "@/components/private-media-image";
 import { Stack,
@@ -21,10 +22,9 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AdBanner } from "@/components/ad-banner";
-import { colors, controls, spacing, typography } from "@/constants/app-theme";
+import { bodyFrameAccent, bodyFrameDesign, colors, controls, spacing, typography } from "@/constants/app-theme";
 import { useAuth } from "@/lib/auth-context";
 import { useAppAppearance } from "@/lib/app-appearance";
-import { bodyFrameDesign } from "@/constants/app-theme";
 import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 import { getMadeVideoById } from "@/lib/video-library";
 import { getVideoAspectRatio } from "@/lib/video-utils";
@@ -62,7 +62,9 @@ const formatDuration = (seconds: number) => {
 export default function VideoDetailScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
   const { user } = useAuth();
-  const { palette } = useAppAppearance();
+  const { palette, effectiveThemeMode } = useAppAppearance();
+  const actionColor = effectiveThemeMode === "dark" ? bodyFrameAccent : palette.text;
+  const actionTextColor = effectiveThemeMode === "dark" ? "#0B0B0C" : palette.inverse;
   const insets = useSafeAreaInsets();
   const bottomSafePadding = Math.max(insets.bottom + spacing.screen, spacing.screen);
   const [video, setVideo] = useState<MadeVideoItem | null>(null);
@@ -147,6 +149,18 @@ export default function VideoDetailScreen() {
         contentContainerStyle={[styles.content, { paddingBottom: bottomSafePadding }]}
         contentInsetAdjustmentBehavior="automatic"
       >
+        <View style={styles.topBar}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="영상 목록으로 돌아가기"
+            onPress={() => router.back()}
+            style={[styles.backButton, { borderColor: palette.line }]}
+          >
+            <Feather name="chevron-left" size={24} color={palette.text} />
+          </Pressable>
+          <Text style={[styles.pageTitle, { color: palette.text }]}>영상 상세</Text>
+          <View style={styles.topBarSpacer} />
+        </View>
         <View
           style={[styles.videoFrame, { aspectRatio: getVideoAspectRatio(video.ratio), borderColor: palette.line }]}
         >
@@ -217,7 +231,7 @@ export default function VideoDetailScreen() {
         <View style={styles.actions}>
           <Pressable
             accessibilityRole="button"
-            style={[styles.darkButton, { backgroundColor: palette.text }]}
+            style={[styles.darkButton, { backgroundColor: actionColor }]}
             onPress={() => {
               if (!user) {
                 showLoginRequiredForVideoCreation();
@@ -230,7 +244,8 @@ export default function VideoDetailScreen() {
               } as Href);
             }}
           >
-            <Text selectable={false} style={[styles.darkButtonText, { color: palette.inverse }]}>
+            <Feather name="edit-2" size={16} color={actionTextColor} />
+            <Text selectable={false} style={[styles.darkButtonText, { color: actionTextColor }]}>
               다시 편집하기
             </Text>
           </Pressable>
@@ -357,7 +372,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background
   },
   content: {
-    gap: spacing.section,
+    gap: 16,
     padding: spacing.screen,
     width: "100%",
     maxWidth: bodyFrameDesign.contentMaxWidth,
@@ -371,6 +386,22 @@ const styles = StyleSheet.create({
     padding: spacing.screen,
     backgroundColor: colors.background
   },
+  topBar: {
+    minHeight: bodyFrameDesign.primaryButtonHeight,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between"
+  },
+  backButton: {
+    width: bodyFrameDesign.minTouchSize,
+    height: bodyFrameDesign.minTouchSize,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderRadius: bodyFrameDesign.buttonRadius
+  },
+  topBarSpacer: { width: bodyFrameDesign.minTouchSize },
+  pageTitle: { fontSize: 18, fontWeight: "600" },
   videoFrame: {
     width: "100%",
     overflow: "hidden",
@@ -437,8 +468,8 @@ const styles = StyleSheet.create({
   },
   title: {
     color: colors.text,
-    fontSize: typography.title,
-    fontWeight: "800",
+    fontSize: 24,
+    fontWeight: "600",
     lineHeight: 34,
     letterSpacing: 0
   },
@@ -483,7 +514,9 @@ const styles = StyleSheet.create({
     gap: 10
   },
   darkButton: {
-    minHeight: controls.height,
+    minHeight: bodyFrameDesign.primaryButtonHeight,
+    flexDirection: "row",
+    gap: 8,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.text
@@ -495,7 +528,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0
   },
   lightButton: {
-    minHeight: controls.height,
+    minHeight: bodyFrameDesign.primaryButtonHeight,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
