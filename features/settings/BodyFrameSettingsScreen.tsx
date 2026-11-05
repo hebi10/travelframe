@@ -17,8 +17,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppGuideOverlay } from "@/components/app-guide-overlay";
 import { SectionBlock } from "@/components/section-block";
-import { BodyFrameSheetHeader } from "@/components/body-frame-sheet";
-import { bodyFrameDesign, bodyFrameTypography, getBodyFrameControlColors } from "@/constants/app-theme";
+import { BodyFrameSheetHandle, BodyFrameSheetHeader } from "@/components/body-frame-sheet";
+import { bodyFrameDesign, bodyFrameSheetDesign, bodyFrameTypography, getBodyFrameControlColors } from "@/constants/app-theme";
 import { PRIVACY_POLICY_URL, TERMS_OF_SERVICE_URL } from "@/constants/legal-links";
 import {
   saveAppSettings,
@@ -374,11 +374,14 @@ export default function BodyFrameSettingsScreen() {
         visible={Boolean(activeSetting)}
         onRequestClose={() => setActiveSetting(null)}
       >
-        <Pressable accessibilityRole="button"
-          style={[styles.modalBackdrop, modalSafeStyle]}
-          onPress={() => setActiveSetting(null)}
-        >
+        <View style={[styles.modalBackdrop, modalSafeStyle]}>
           <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="설정 닫기"
+            style={StyleSheet.absoluteFill}
+            onPress={() => setActiveSetting(null)}
+          />
+          <View
             style={[
               styles.modalPanel,
               {
@@ -386,17 +389,19 @@ export default function BodyFrameSettingsScreen() {
                 backgroundColor: palette.surface
               }
             ]}
-            onPress={() => undefined}
+            accessibilityViewIsModal
           >
-            <View style={styles.modalHandle} />
+            <BodyFrameSheetHandle />
             <BodyFrameSheetHeader
               title={modalTitle}
               onClose={() => setActiveSetting(null)}
               closeLabel="설정 닫기"
             />
             <ScrollView
+              style={styles.optionScroll}
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
+              nestedScrollEnabled
               contentContainerStyle={styles.optionList}
             >
               {activeSetting === "referencePhotoVisible" ? (
@@ -540,12 +545,12 @@ export default function BodyFrameSettingsScreen() {
             </ScrollView>
 
             {saving ? (
-              <Text style={[styles.savingText, { color: palette.muted }]}>
+              <Text accessibilityLiveRegion="polite" style={[styles.savingText, { color: palette.muted }]}>
                 설정을 저장하는 중입니다.
               </Text>
             ) : null}
-          </Pressable>
-        </Pressable>
+          </View>
+        </View>
       </Modal>
 
       <AppGuideOverlay tabKey="camera" replaySignal={guideReplaySignal} />
@@ -614,13 +619,13 @@ const styles = StyleSheet.create({
   modalBackdrop: {
     flex: 1,
     justifyContent: "flex-end",
-    backgroundColor: "rgba(0,0,0,0.62)"
+    backgroundColor: bodyFrameSheetDesign.backdropColor
   },
   modalPanel: {
     width: "100%",
     maxWidth: bodyFrameDesign.contentMaxWidth,
     alignSelf: "center",
-    maxHeight: "82%",
+    maxHeight: bodyFrameSheetDesign.maxHeight,
     paddingHorizontal: bodyFrameDesign.horizontalPadding,
     paddingTop: 10,
     paddingBottom: 8,
@@ -628,13 +633,6 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: bodyFrameDesign.bottomSheetRadius,
     borderTopRightRadius: bodyFrameDesign.bottomSheetRadius,
     gap: 12
-  },
-  modalHandle: {
-    alignSelf: "center",
-    width: 36,
-    height: 4,
-    marginBottom: 14,
-    backgroundColor: "#3A3A3E"
   },
   modalHeader: {
     minHeight: bodyFrameDesign.minTouchSize,
@@ -659,9 +657,13 @@ const styles = StyleSheet.create({
     fontSize: bodyFrameTypography.button,
     fontWeight: "600"
   },
+  optionScroll: {
+    flexShrink: 1,
+    minHeight: 0
+  },
   optionList: {
     gap: 8,
-    paddingBottom: 8
+    paddingBottom: 12
   },
   optionRow: {
     minHeight: 66,
