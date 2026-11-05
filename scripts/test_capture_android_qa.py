@@ -75,6 +75,23 @@ class CaptureHelpersTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 qa.validate_video_probe({'streams':[dict(stream,nb_read_frames=frames)],'format':{'duration':duration}})
 
+    def test_export_terminal_waits_for_real_feedback_instead_of_accepting_initial_idle_button(self):
+        idle='<hierarchy><node text="영상 만들기"/></hierarchy>'
+        busy='<hierarchy><node text="영상 만드는 중 5%"/></hierarchy>'
+        terminal='<hierarchy><node text="사진 원본을 확인하지 못했습니다"/><node text="영상 만들기"/></hierarchy>'
+        device=Mock()
+        device.dump.side_effect=[idle,busy,terminal]
+        with patch.object(qa.time,'monotonic',side_effect=[0,1,2,3]),patch.object(qa.time,'sleep'):
+            result=qa.wait_export_terminal(device,['사진 원본을 확인하지 못했습니다'],seconds=10)
+        self.assertIn('사진 원본을 확인하지 못했습니다',result)
+        self.assertEqual(device.dump.call_count,3)
+
+    def test_project_reminder_requires_scroll_to_real_control_not_an_initial_visible_marker(self):
+        device=Mock()
+        qa.open_project_reminder(device)
+        device.ready.assert_called_once_with(['QA 데모','기록'])
+        device.tap.assert_called_once_with('프로젝트 촬영 알림 설정',search='below')
+
     def test_expected_native_failures_must_not_change_videos_or_guest_quota(self):
         before={'travel-frame.videos.v1':'[]'}
         self.assertTrue(qa.no_export_side_effects(before,dict(before))['guestQuotaUnchanged'])
