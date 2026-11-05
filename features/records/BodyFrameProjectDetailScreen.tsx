@@ -32,7 +32,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { bodyFrameAccent, bodyFrameDesign, bodyFrameTypography } from "@/constants/app-theme";
+import { bodyFrameAccent, bodyFrameDesign, bodyFrameTypography, getBodyFrameControlColors } from "@/constants/app-theme";
 import {
   getBodyProjectPhotos,
   getBodyProjectProgressSummary,
@@ -496,6 +496,8 @@ export default function BodyFrameProjectDetailScreen() {
   const { palette, effectiveThemeMode } = useAppAppearance();
   const accent = effectiveThemeMode === "dark" ? bodyFrameAccent : palette.text;
   const accentText = effectiveThemeMode === "dark" ? "#0B0B0C" : palette.inverse;
+  const { primaryBackground: primaryColor, primaryText: primaryTextColor } =
+    getBodyFrameControlColors(palette);
   const { isLoggedIn, subscription, user } = useAuth();
   const planEntitlements = useMemo(
     () => getPlanEntitlements({ isLoggedIn, subscription }),
@@ -1045,6 +1047,8 @@ export default function BodyFrameProjectDetailScreen() {
     summary.photoCount / Math.max(1, summary.targetPhotoCount)
   );
   const progressPercent = Math.round(progress * 100);
+  const firstPhoto = projectPhotos[projectPhotos.length - 1];
+  const latestPhoto = projectPhotos[0];
 
   return (
     <View style={[styles.screen, { backgroundColor: palette.background }]}>
@@ -1097,6 +1101,10 @@ export default function BodyFrameProjectDetailScreen() {
             </Text>
           </View>
           <View
+            accessible
+            accessibilityRole="progressbar"
+            accessibilityLabel="프로젝트 사진 기록 진행률"
+            accessibilityValue={{ min: 0, max: 100, now: progressPercent }}
             style={[styles.progressTrack, { backgroundColor: palette.surfaceStrong }]}
           >
             <View
@@ -1113,30 +1121,48 @@ export default function BodyFrameProjectDetailScreen() {
 
         <Pressable
           accessibilityRole="button"
-          style={[styles.primaryAction, { backgroundColor: accent }]}
+          style={[styles.primaryAction, { backgroundColor: primaryColor }]}
           onPress={() => void openCamera()}
         >
-          <Text style={[styles.primaryActionText, { color: accentText }]}>
+          <Text style={[styles.primaryActionText, { color: primaryTextColor }]}>
             오늘 사진 찍기
           </Text>
         </Pressable>
 
-        {projectPhotos.length > 1 ? (
+        {projectPhotos.length > 1 && firstPhoto && latestPhoto ? (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="프로젝트 첫 사진과 마지막 사진 비교"
-            style={[styles.videoAction, { borderColor: palette.line, marginTop: 12 }]}
             onPress={() => router.push(`/project/${project.id}/compare` as Href)}
+            style={[styles.comparePreviewCard, { borderColor: palette.line, backgroundColor: palette.surface }]}
           >
-            <Text style={[styles.videoActionText, { color: palette.text }]}>
-              전후 사진 비교
-            </Text>
+            <View style={styles.comparePreviewHeading}>
+              <Text style={[styles.comparePreviewTitle, { color: palette.text }]}>
+                전후 사진 비교
+              </Text>
+              <Feather name="chevron-right" size={bodyFrameDesign.iconSize} color={palette.text} />
+            </View>
+            <View style={styles.comparePreviewPair}>
+              {[{ label: "시작", photo: firstPhoto }, { label: "최근", photo: latestPhoto }].map(({ label, photo }) => (
+                <View key={photo.id} style={[styles.comparePreviewItem, { backgroundColor: palette.surfaceStrong }]}>
+                  <Image
+                    source={{ uri: photo.previewUri ?? photo.uri }}
+                    style={styles.comparePreviewImage}
+                    contentFit="contain"
+                    accessible={false}
+                  />
+                  <View style={styles.comparePreviewMeta}>
+                    <Text style={styles.comparePreviewMetaText}>{label}</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
           </Pressable>
         ) : null}
 
         <View style={styles.recordsSection}>
           <View style={styles.sectionHeader}>
-            <View>
+            <View style={styles.recordsHeadingCopy}>
               <Text style={[styles.sectionTitle, { color: palette.text }]}>기록</Text>
               <Text style={[styles.sectionCount, { color: palette.muted }]}>
                 {projectPhotos.length}장
@@ -1275,6 +1301,35 @@ export default function BodyFrameProjectDetailScreen() {
           <Text style={[styles.sectionTitle, { color: palette.text }]}>
             기록 정보
           </Text>
+        {measurementSettings.enabled ? (
+          <BodyMeasurementSummaryCard
+            metric={measurementSettings.primaryMetric}
+            series={measurementSeries}
+            onOpenHistory={() =>
+              router.push({
+                pathname: "/project/[id]/measurements",
+                params: { id: project.id }
+              })
+            }
+            onAddMeasurement={
+              projectPhotos[0]
+                ? () =>
+                    router.push({
+                      pathname: "/photo/[id]",
+                      params: {
+                        id: projectPhotos[0].id,
+                        measurement: "1"
+                      }
+                    })
+                : () =>
+                    router.push({
+                      pathname: "/project/[id]/measurements",
+                      params: { id: project.id, add: "1" }
+                    })
+            }
+          />
+        ) : null}
+
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="프로젝트 촬영 알림 설정"
@@ -1314,35 +1369,6 @@ export default function BodyFrameProjectDetailScreen() {
           </View>
           <Feather name="chevron-right" size={18} color={palette.muted} />
         </Pressable>
-
-        {measurementSettings.enabled ? (
-          <BodyMeasurementSummaryCard
-            metric={measurementSettings.primaryMetric}
-            series={measurementSeries}
-            onOpenHistory={() =>
-              router.push({
-                pathname: "/project/[id]/measurements",
-                params: { id: project.id }
-              })
-            }
-            onAddMeasurement={
-              projectPhotos[0]
-                ? () =>
-                    router.push({
-                      pathname: "/photo/[id]",
-                      params: {
-                        id: projectPhotos[0].id,
-                        measurement: "1"
-                      }
-                    })
-                : () =>
-                    router.push({
-                      pathname: "/project/[id]/measurements",
-                      params: { id: project.id, add: "1" }
-                    })
-            }
-          />
-        ) : null}
 
         <View style={styles.statGrid}>
           <View
@@ -2103,6 +2129,51 @@ const styles = StyleSheet.create({
     gap: 12,
     marginBottom: 20
   },
+  comparePreviewCard: {
+    gap: 12,
+    padding: 12,
+    marginBottom: 20,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderRadius: bodyFrameDesign.cardRadius
+  },
+  comparePreviewHeading: {
+    minHeight: bodyFrameDesign.minTouchSize,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8
+  },
+  comparePreviewTitle: {
+    fontSize: bodyFrameTypography.sectionTitle,
+    fontWeight: "600"
+  },
+  comparePreviewPair: {
+    flexDirection: "row",
+    gap: 8
+  },
+  comparePreviewItem: {
+    flex: 1,
+    minWidth: 0,
+    height: 190,
+    overflow: "hidden"
+  },
+  comparePreviewImage: {
+    width: "100%",
+    height: "100%"
+  },
+  comparePreviewMeta: {
+    position: "absolute",
+    left: 6,
+    bottom: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: "rgba(0,0,0,0.72)"
+  },
+  comparePreviewMetaText: {
+    color: "#F5F5F5",
+    fontSize: bodyFrameTypography.caption,
+    fontWeight: "600"
+  },
   reminderCard: {
     minHeight: 72,
     flexDirection: "row",
@@ -2210,7 +2281,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    flexWrap: "wrap",
     gap: 10
+  },
+  recordsHeadingCopy: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    gap: 8
   },
   sectionActions: {
     flexDirection: "row",
