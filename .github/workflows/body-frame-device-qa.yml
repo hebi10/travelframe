@@ -190,6 +190,9 @@ jobs:
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back emulated -camera-front none
           script: python3 scripts/capture-android-qa.py --scenario visual --apk artifacts/apk/app-qaRelease.apk --output artifacts/stage6-visual
+      - name: Audit visual matrix completeness and Android evidence
+        if: always()
+        run: python3 scripts/check-stage6-visual-artifacts.py --output artifacts/stage6-visual
       - name: Preserve all visual captures and explicit failed scenarios
         if: always()
         uses: actions/upload-artifact@v4

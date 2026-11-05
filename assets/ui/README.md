@@ -25,3 +25,5 @@ The complete 142-file design source package is maintained separately. This commi
 - `illustrations/feature-video.png`: progress video creation
 
 The illustrations are rendered as static local UI resources. These images must never replace project photographs or the approved launcher artwork.
+
+- `illustrations/feature-backup.png`: onboarding for cloud backup, from the supplied CC BY 4.0 asset pack; 474×300 optimized transparent PNG. The approved launcher icon is unchanged.
