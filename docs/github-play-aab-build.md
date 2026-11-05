@@ -1,5 +1,16 @@
 # GitHub Actions Play test releases
 
+## Stage 9: preflight before enabling automatic Play publishing
+
+The separate **Body Frame Play release preflight (no publish)** manual workflow on `main` checks the configured upload keystore certificate and (if supplied) the *Upload key certificate* SHA-256 copied from Play Console. It can also inspect current Play tracks/bundles/APKs through a temporary Publisher edit that is deleted without committing, uploading or changing a track.
+
+Select `certificate`, `inventory` or `both`. The optional SHA-256 is the **upload certificate**, not the *app signing* certificate. If it is omitted, only the local keystore and configured pin are compared; this is **not** proof of equality with the current Play Console upload key.
+
+In addition to the existing approval variable, the publishing CLI refuses `publish` before **2026-11-07 00:00 Asia/Seoul** (2026-11-06 15:00 UTC), including if the variable is accidentally enabled early. Inventory-only queries are not time blocked. Approval, keystore updates, AAB upload and Play track publication are separate from preflight.
+
+See [Stage 9 runbook](design/body-frame-stage9-play-preflight-20261105.md) for sign-in, evidence, and the remaining manual certificate/ARM64/install steps.
+
+
 > **출시 승인 보류 (2026-11-05)**  
 > 앱 업로드 인증서와 GitHub Actions의 서명키 일치 여부 및 Google Play 최신 릴리스 재검증 전에는 게시하지 않습니다. `main` 푸시는 자동으로 Play를 게시하지 않으며, 저장소 변수 `BODY_FRAME_PLAY_SIGNING_APPROVED_20261107`가 정확히 `true`일 때만 테스트 게시를 허용합니다. 2026-11-07 이후에 서명키 복구와 검증을 마친 뒤 이 변수를 활성화해야 합니다. 지금은 **활성화하지 마세요**. 읽기 전용 `inventory` 호출은 별도로 허용됩니다.
 >

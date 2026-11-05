@@ -15,6 +15,16 @@ const MAXIMUM = 2100000000;
 const BUNDLETOOL_SHA256 = "a099cfa1543f55593bc2ed16a70a7c67fe54b1747bb7301f37fdfd6d91028e29";
 const sha256 = (file) => crypto.createHash("sha256").update(fs.readFileSync(file)).digest("hex");
 
+export const EARLIEST_PLAY_PUBLISH_AT = "2026-11-06T15:00:00.000Z"; // 2026-11-07 00:00 Asia/Seoul
+
+export function requirePlayPublishWindow(operation, now = Date.now()) {
+  if (operation === "inventory") return;
+  if (operation !== "publish" || !Number.isFinite(now) || now < Date.parse(EARLIEST_PLAY_PUBLISH_AT)) {
+    throw new Error("Play publishing is unavailable before 2026-11-07 00:00 KST; read-only inventory remains available");
+  }
+}
+
+
 export function resolveRequest(environment) {
   if (environment.GITHUB_REPOSITORY !== "hebi10/travelframe" || environment.GITHUB_REF !== "refs/heads/main") throw new Error("Play releases must run from this repository's main workflow");
   if (!["push", "workflow_dispatch"].includes(environment.GITHUB_EVENT_NAME)) throw new Error("Unsupported release event");
@@ -127,9 +137,25 @@ export async function planRelease(client, request) {
   return { ...inputs, logicalTrack: request.logicalTrack, apiTrack };
 }
 
-export async function inspectInventory(client) {
+export async function inspectInventory(client, internalTrack) {
   const snapshot = await client.snapshot();
-  return { packageId: PACKAGE, operation: "inventory", apiTracks: snapshot.tracks.map((track) => track.track), currentMaximumVersionCode: maximumVersion(snapshot), bundleCount: snapshot.bundles.length, apkCount: snapshot.apks.length };
+  const summary = {
+    packageId: PACKAGE, operation: "inventory",
+    apiTracks: snapshot.tracks.map((track) => track.track),
+    currentMaximumVersionCode: maximumVersion(snapshot),
+    bundleCount: snapshot.bundles.length, apkCount: snapshot.apks.length
+  };
+  if (!internalTrack) return summary;
+  const target = resolveTrack("internal", internalTrack, snapshot.tracks);
+  let hasBlockingRelease = false;
+  try { requireReplaceableTarget(snapshot.tracks, target); }
+  catch { hasBlockingRelease = true; }
+  return {
+    ...summary, configuredInternalTrack: target,
+    internalTrackReleaseStatuses: (snapshot.tracks.find((track) => track.track === target).releases ?? [])
+      .map((release) => typeof release?.status === "string" ? release.status : "unknown"),
+    hasBlockingRelease
+  };
 }
 
 function requireRelease(track, apiTrack, code) {
@@ -220,8 +246,9 @@ function verifyArtifact(plan) {
 async function main() {
   const command = process.argv[2];
   if (command === "resolve") {
-    authConfiguration();
     const request = resolveRequest(process.env);
+    requirePlayPublishWindow(request.operation);
+    authConfiguration();
     fs.appendFileSync(process.env.GITHUB_OUTPUT, `source_sha=${request.sourceSha}\nlogical_track=${request.logicalTrack}\noperation=${request.operation}\n`);
   } else if (command === "check-source") {
     const request = resolveRequest(process.env);
@@ -229,9 +256,10 @@ async function main() {
     console.log(`Verified release source ${request.sourceSha} belongs to the run's main history`);
   } else if (command === "plan") {
     const request = resolveRequest(process.env);
+    requirePlayPublishWindow(request.operation);
     const client = createPublisher(process.env.PLAY_ACCESS_TOKEN);
     if (request.operation === "inventory") {
-      console.log(JSON.stringify(await inspectInventory(client)));
+      console.log(JSON.stringify(await inspectInventory(client, process.env.PLAY_INTERNAL_TRACK)));
       return;
     }
     const app = JSON.parse(fs.readFileSync(path.join(process.env.SOURCE_DIR, "app.json"), "utf8"));
@@ -244,6 +272,7 @@ async function main() {
     verifyArtifact(plan);
     console.log(`Verified downloaded AAB for ${PACKAGE}, ${plan.apiTrack}, version ${plan.versionCode}, source ${plan.sourceSha}`);
   } else if (command === "publish") {
+    requirePlayPublishWindow("publish");
     const plan = expectedPlan();
     const files = verifyArtifactMetadata(process.env.AAB_ARTIFACT_DIR, plan);
     const receiptPath = path.join(process.env.PLAY_RECEIPT_DIR, "play-release-receipt.json");
