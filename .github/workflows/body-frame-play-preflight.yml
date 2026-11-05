@@ -1,0 +1,87 @@
+name: Body Frame Play release preflight (no publish)
+
+on:
+  workflow_dispatch:
+    inputs:
+      scope:
+        description: Check configured keystore, current Play inventory or both without deploying
+        required: true
+        default: both
+        type: choice
+        options: [both, certificate, inventory]
+      play_upload_certificate_sha256:
+        description: Optional SHA-256 from Play Console App integrity > Upload key certificate (not App signing key)
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-play-aab
+  cancel-in-progress: false
+
+jobs:
+  certificate:
+    name: Verify existing upload certificate and private key without signing an app
+    if: github.repository == 'hebi10/travelframe' && github.ref == 'refs/heads/main' && (inputs.scope == 'both' || inputs.scope == 'certificate')
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      ANDROID_UPLOAD_CERT_SHA256: ${{ vars.ANDROID_UPLOAD_CERT_SHA256 }}
+      PLAY_CONSOLE_UPLOAD_CERT_SHA256: ${{ inputs.play_upload_certificate_sha256 }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Confirm the local signing key matches configured fingerprint and optional Console fingerprint
+        run: node scripts/check-play-upload-certificate.mjs
+      - name: Record safe preflight scope
+        run: echo 'Verified only a configured upload key. The actual Play certificate must be supplied from Play Console for a three-way comparison; no app was uploaded.' >> "$GITHUB_STEP_SUMMARY"
+
+  inventory:
+    name: Inspect current Play release inventory without any AAB/APK upload
+    if: github.repository == 'hebi10/travelframe' && github.ref == 'refs/heads/main' && (inputs.scope == 'both' || inputs.scope == 'inventory')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      INPUT_OPERATION: inventory
+      INPUT_TRACK: internal
+      PLAY_INTERNAL_TRACK: ${{ vars.PLAY_INTERNAL_TRACK }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Acquire short-lived Publisher token for temporary edit inspection only
+        id: auth
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        with:
+          workload_identity_provider: ${{ vars.PLAY_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.PLAY_SERVICE_ACCOUNT }}
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/androidpublisher
+          create_credentials_file: false
+          export_environment_variables: false
+      - name: Read tracks and reserved versionCodes via temporary edit, then delete edit
+        env:
+          PLAY_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+        run: node scripts/publish-play-release.mjs plan
+      - name: Record inventory-only limitations
+        run: echo 'Inventory operation created and deleted a temporary Publisher edit without uploading bundles, changing tracks or committing a release. App integrity upload certificate is not exposed by this inventory API.' >> "$GITHUB_STEP_SUMMARY"
