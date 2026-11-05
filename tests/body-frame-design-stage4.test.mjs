@@ -80,8 +80,11 @@ assert.ok(measurement.includes('keyboardDismissMode="on-drag"'));
 assert.ok(measurement.includes('accessibilityState={{ disabled: saving }}'));
 assert.ok(measurement.includes("BodyFrameSheetFooter"));
 assert.ok(measurement.includes("saveBodyMeasurement") && measurement.includes("deleteBodyMeasurement"));
-assert.ok(measurement.indexOf("styles.contentScroll") < measurement.indexOf("BodyFrameSheetFooter"),
-  "sheet content should scroll independently of save/delete actions");
+assert.ok(
+  measurement.indexOf("style={styles.contentScroll}") <
+    measurement.indexOf("<BodyFrameSheetFooter"),
+  "sheet content should scroll independently of save/delete actions"
+);
 
 const videoOptions = source("features/trip-clip/BodyFrameVideoOptionsSheet.tsx");
 assert.ok(videoOptions.includes("BodyFrameSheetHandle"));
