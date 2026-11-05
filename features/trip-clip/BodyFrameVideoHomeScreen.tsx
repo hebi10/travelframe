@@ -16,8 +16,9 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { bodyFrameAccent, bodyFrameDesign, bodyFrameTypography } from "@/constants/app-theme";
+import { bodyFrameDesign, bodyFrameTypography, getBodyFrameControlColors } from "@/constants/app-theme";
 import {
+  getBodyProjectPhotos,
   getBodyProjectProgressSummary,
   selectActiveBodyProject
 } from "@/lib/body-frame-camera-project";
@@ -51,9 +52,9 @@ const formatDate = (value: string) =>
 
 export default function BodyFrameVideoHomeScreen() {
   const insets = useSafeAreaInsets();
-  const { palette, effectiveThemeMode } = useAppAppearance();
-  const primaryColor = effectiveThemeMode === "dark" ? bodyFrameAccent : palette.text;
-  const primaryTextColor = effectiveThemeMode === "dark" ? "#0B0B0C" : palette.inverse;
+  const { palette } = useAppAppearance();
+  const { primaryBackground: primaryColor, primaryText: primaryTextColor } =
+    getBodyFrameControlColors(palette);
   const { isLoggedIn, subscription } = useAuth();
   const planEntitlements = useMemo(
     () => getPlanEntitlements({ isLoggedIn, subscription }),
@@ -178,6 +179,7 @@ export default function BodyFrameVideoHomeScreen() {
           <Pressable
             accessibilityRole="button"
             disabled={!activeProject}
+            accessibilityState={{ disabled: !activeProject }}
             onPress={() => void startVideo()}
             style={[
               styles.primaryButton,
@@ -234,10 +236,18 @@ export default function BodyFrameVideoHomeScreen() {
               {projects.map((project) => {
                 const summary = getBodyProjectProgressSummary(photos, project);
                 const selected = project.id === activeProject?.id;
+                const projectPhotos = getBodyProjectPhotos(photos, project.id);
+                const coverPhoto =
+                  projectPhotos.find((photo) => photo.id === project.coverPhotoId) ??
+                  [...projectPhotos].sort(
+                    (first, second) => (second.sequence ?? 0) - (first.sequence ?? 0)
+                  )[0];
                 return (
                   <Pressable
                     key={project.id}
                     accessibilityRole="button"
+                    accessibilityLabel={`${project.name} 프로젝트로 영상 만들기`}
+                    accessibilityState={{ selected }}
                     onPress={() => void startVideo(project)}
                     style={({ pressed }) => [
                       styles.projectRow,
@@ -248,8 +258,17 @@ export default function BodyFrameVideoHomeScreen() {
                       }
                     ]}
                   >
-                    <View style={styles.projectIcon}>
-                      <Feather name="folder" size={18} color={palette.text} />
+                    <View style={[styles.projectIcon, { backgroundColor: palette.surfaceStrong }]}>
+                      {coverPhoto ? (
+                        <Image
+                          source={{ uri: coverPhoto.previewUri ?? coverPhoto.uri }}
+                          style={styles.projectCoverImage}
+                          contentFit="contain"
+                          accessible={false}
+                        />
+                      ) : (
+                        <Feather name="folder" size={20} color={palette.muted} />
+                      )}
                     </View>
                     <View style={styles.rowCopy}>
                       <Text
@@ -335,11 +354,15 @@ export default function BodyFrameVideoHomeScreen() {
                       <Image
                         source={{ uri: video.coverUri }}
                         style={styles.videoCoverImage}
-                        contentFit="cover"
+                        contentFit="contain"
+                        accessible={false}
                       />
                     ) : (
                       <Feather name="film" size={20} color={palette.muted} />
                     )}
+                    <View pointerEvents="none" style={styles.videoPlayIndicator}>
+                      <Feather name="play" size={14} color="#FFFFFF" />
+                    </View>
                   </View>
                   <View style={styles.rowCopy}>
                     <Text
@@ -415,8 +438,8 @@ const styles = StyleSheet.create({
     lineHeight: 20
   },
   heroCard: {
-    gap: 10,
-    padding: 16,
+    gap: 12,
+    padding: 18,
     borderWidth: bodyFrameDesign.borderWidth,
     borderRadius: bodyFrameDesign.cardRadius
   },
@@ -445,7 +468,7 @@ const styles = StyleSheet.create({
     fontWeight: "700"
   },
   secondaryButton: {
-    minHeight: bodyFrameDesign.primaryButtonHeight,
+    minHeight: bodyFrameDesign.minTouchSize,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -502,7 +525,7 @@ const styles = StyleSheet.create({
     gap: 8
   },
   projectRow: {
-    minHeight: 68,
+    minHeight: 88,
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
@@ -512,10 +535,16 @@ const styles = StyleSheet.create({
     borderRadius: bodyFrameDesign.cardRadius
   },
   projectIcon: {
-    width: 36,
-    height: 36,
+    width: 58,
+    height: 72,
+    overflow: "hidden",
     alignItems: "center",
-    justifyContent: "center"
+    justifyContent: "center",
+    borderRadius: bodyFrameDesign.cardRadius
+  },
+  projectCoverImage: {
+    width: "100%",
+    height: "100%"
   },
   rowCopy: {
     flex: 1,
@@ -539,7 +568,7 @@ const styles = StyleSheet.create({
     fontWeight: "600"
   },
   videoRow: {
-    minHeight: 76,
+    minHeight: 94,
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
@@ -549,12 +578,23 @@ const styles = StyleSheet.create({
     borderRadius: bodyFrameDesign.cardRadius
   },
   videoCover: {
-    width: 46,
-    height: 58,
+    width: 60,
+    height: 78,
     overflow: "hidden",
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 6
+    borderRadius: bodyFrameDesign.cardRadius
+  },
+  videoPlayIndicator: {
+    position: "absolute",
+    right: 4,
+    bottom: 4,
+    width: 24,
+    height: 24,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.72)",
+    borderRadius: 12
   },
   videoCoverImage: {
     width: "100%",

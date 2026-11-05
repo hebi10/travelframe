@@ -16,7 +16,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { bodyFrameAccent, bodyFrameDesign, bodyFrameTypography } from "@/constants/app-theme";
+import { bodyFrameDesign, bodyFrameTypography, getBodyFrameControlColors } from "@/constants/app-theme";
 import { useAppAppearance } from "@/lib/app-appearance";
 import { deleteMadeVideo, getMadeVideos } from "@/lib/video-library";
 import type { MadeVideoItem } from "@/types/video";
@@ -38,9 +38,9 @@ const formatDate = (value: string) =>
 
 export default function BodyFrameVideoLibraryScreen() {
   const insets = useSafeAreaInsets();
-  const { palette, effectiveThemeMode } = useAppAppearance();
-  const actionColor = effectiveThemeMode === "dark" ? bodyFrameAccent : palette.text;
-  const actionTextColor = effectiveThemeMode === "dark" ? "#0B0B0C" : palette.inverse;
+  const { palette } = useAppAppearance();
+  const { primaryBackground: actionColor, primaryText: actionTextColor } =
+    getBodyFrameControlColors(palette);
   const [videos, setVideos] = useState<MadeVideoItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -148,6 +148,7 @@ export default function BodyFrameVideoLibraryScreen() {
               >
                 <Pressable
                   accessibilityRole="button"
+                  accessibilityLabel={`${video.title} 영상 상세 보기`}
                   onPress={() =>
                     router.push({
                       pathname: "/video/[id]",
@@ -169,11 +170,15 @@ export default function BodyFrameVideoLibraryScreen() {
                       <Image
                         source={{ uri: video.coverUri }}
                         style={styles.videoCoverImage}
-                        contentFit="cover"
+                        contentFit="contain"
+                        accessible={false}
                       />
                     ) : (
                       <Feather name="film" size={22} color={palette.muted} />
                     )}
+                    <View pointerEvents="none" style={styles.videoPlayIndicator}>
+                      <Feather name="play" size={16} color="#FFFFFF" />
+                    </View>
                   </View>
                   <View style={styles.videoCopy}>
                     <Text
@@ -210,6 +215,8 @@ export default function BodyFrameVideoLibraryScreen() {
                   <Pressable
                     accessibilityRole="button"
                     disabled={deletingId === video.id}
+                    accessibilityLabel={`${video.title} 영상 삭제`}
+                    accessibilityState={{ disabled: deletingId === video.id }}
                     onPress={() => confirmDelete(video)}
                     style={[
                       styles.cardButton,
@@ -327,7 +334,7 @@ const styles = StyleSheet.create({
     borderRadius: bodyFrameDesign.cardRadius
   },
   videoMain: {
-    minHeight: 86,
+    minHeight: 106,
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
@@ -337,12 +344,23 @@ const styles = StyleSheet.create({
     opacity: 0.82
   },
   videoCover: {
-    width: 52,
-    height: 68,
+    width: 72,
+    height: 90,
     overflow: "hidden",
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 6
+    borderRadius: bodyFrameDesign.cardRadius
+  },
+  videoPlayIndicator: {
+    position: "absolute",
+    right: 5,
+    bottom: 5,
+    width: 28,
+    height: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 14,
+    backgroundColor: "rgba(0,0,0,0.72)"
   },
   videoCoverImage: {
     width: "100%",
@@ -350,7 +368,8 @@ const styles = StyleSheet.create({
   },
   videoCopy: {
     flex: 1,
-    gap: 3
+    minWidth: 0,
+    gap: 5
   },
   videoTitle: {
     fontSize: bodyFrameTypography.rowTitle,
@@ -368,7 +387,7 @@ const styles = StyleSheet.create({
   },
   cardButton: {
     flex: 1,
-    minHeight: bodyFrameDesign.minTouchSize,
+    minHeight: bodyFrameDesign.primaryButtonHeight,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: bodyFrameDesign.borderWidth,

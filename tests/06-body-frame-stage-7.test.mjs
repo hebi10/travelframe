@@ -179,13 +179,13 @@ assert.equal(
 
 for (const token of [
   "function BodyFrameSettingRow",
-  "minHeight: 64",
+  "minHeight: 72",
   'flexDirection: "row"',
   'justifyContent: "space-between"'
 ]) {
   assert.ok(
     settingsSource.includes(token),
-    `Body Frame settings should use compact horizontal rows via ${token}`
+    `Body Frame settings should keep legible horizontal rows via ${token}`
   );
 }
 
