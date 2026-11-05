@@ -13,3 +13,6 @@ License: https://fontawesome.com/license/free
 License text: https://creativecommons.org/licenses/by/4.0/
 
 The complete 142-file design source package is maintained separately. This commit intentionally bundles only the optimized illustrations used by the React Native screens.
+
+- `illustrations/empty-photos.png`: no photos recorded in a project
+- `illustrations/empty-metrics.png`: no body measurements recorded

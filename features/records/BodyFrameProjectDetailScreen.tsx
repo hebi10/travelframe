@@ -1245,7 +1245,7 @@ export default function BodyFrameProjectDetailScreen() {
               ]}
             >
               <Image
-                source={require("../../assets/ui/illustrations/empty-project.png")}
+                source={require("../../assets/ui/illustrations/empty-photos.png")}
                 style={styles.emptyIllustration}
                 contentFit="contain"
                 accessibilityLabel="첫 사진 기록을 시작하는 안내 이미지"

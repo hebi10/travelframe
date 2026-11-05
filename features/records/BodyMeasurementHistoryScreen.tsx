@@ -1,4 +1,5 @@
 import { AppText as Text } from "@/components/app-text";
+import { Image } from "@/components/private-media-image";
 import {
   Feather } from "@expo/vector-icons";
 import { router,
@@ -442,6 +443,12 @@ export default function BodyMeasurementHistoryScreen() {
                 { borderColor: palette.line, backgroundColor: palette.surface }
               ]}
             >
+              <Image
+                source={require("../../assets/ui/illustrations/empty-metrics.png")}
+                style={styles.emptyIllustration}
+                contentFit="contain"
+                accessibilityLabel="수치 기록이 없는 상태"
+              />
               <Text style={[styles.emptyDetail, { color: palette.muted }]}>
                 아직 {metricMeta.label} 기록이 없습니다.
               </Text>
@@ -685,6 +692,7 @@ const styles = StyleSheet.create({
     fontSize: bodyFrameTypography.caption,
     fontWeight: "600"
   },
+  emptyIllustration: { width: 96, height: 96, alignSelf: "center" },
   emptyCard: {
     gap: 12,
     padding: 16,
