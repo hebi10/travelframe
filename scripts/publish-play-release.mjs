@@ -137,9 +137,25 @@ export async function planRelease(client, request) {
   return { ...inputs, logicalTrack: request.logicalTrack, apiTrack };
 }
 
-export async function inspectInventory(client) {
+export async function inspectInventory(client, internalTrack) {
   const snapshot = await client.snapshot();
-  return { packageId: PACKAGE, operation: "inventory", apiTracks: snapshot.tracks.map((track) => track.track), currentMaximumVersionCode: maximumVersion(snapshot), bundleCount: snapshot.bundles.length, apkCount: snapshot.apks.length };
+  const summary = {
+    packageId: PACKAGE, operation: "inventory",
+    apiTracks: snapshot.tracks.map((track) => track.track),
+    currentMaximumVersionCode: maximumVersion(snapshot),
+    bundleCount: snapshot.bundles.length, apkCount: snapshot.apks.length
+  };
+  if (!internalTrack) return summary;
+  const target = resolveTrack("internal", internalTrack, snapshot.tracks);
+  let hasBlockingRelease = false;
+  try { requireReplaceableTarget(snapshot.tracks, target); }
+  catch { hasBlockingRelease = true; }
+  return {
+    ...summary, configuredInternalTrack: target,
+    internalTrackReleaseStatuses: (snapshot.tracks.find((track) => track.track === target).releases ?? [])
+      .map((release) => typeof release?.status === "string" ? release.status : "unknown"),
+    hasBlockingRelease
+  };
 }
 
 function requireRelease(track, apiTrack, code) {
@@ -243,7 +259,7 @@ async function main() {
     requirePlayPublishWindow(request.operation);
     const client = createPublisher(process.env.PLAY_ACCESS_TOKEN);
     if (request.operation === "inventory") {
-      console.log(JSON.stringify(await inspectInventory(client)));
+      console.log(JSON.stringify(await inspectInventory(client, process.env.PLAY_INTERNAL_TRACK)));
       return;
     }
     const app = JSON.parse(fs.readFileSync(path.join(process.env.SOURCE_DIR, "app.json"), "utf8"));
