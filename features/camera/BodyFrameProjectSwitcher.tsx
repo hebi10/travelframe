@@ -1,4 +1,5 @@
 import { AppText as Text, AppTextInput as TextInput } from "@/components/app-text";
+import { BodyFrameSheetHeader } from "@/components/body-frame-sheet";
 import {
   Feather } from "@expo/vector-icons";
 import { useMemo,
@@ -228,7 +229,7 @@ export function BodyFrameProjectSwitcher({
             onPress={() => undefined}
           >
             <View style={[styles.sheetHandle, { backgroundColor: palette.faint }]} />
-            <Text style={[styles.sheetTitle, { color: palette.text }]}>프로젝트 선택</Text>
+            <BodyFrameSheetHeader title="프로젝트 선택" onClose={() => setPickerOpen(false)} />
             <ScrollView style={styles.projectList} showsVerticalScrollIndicator={false}>
               {visibleProjects.map((project) => {
                 const summary = getBodyProjectProgressSummary(photos, project);
@@ -256,7 +257,7 @@ export function BodyFrameProjectSwitcher({
                         {summary.photoCount}장 · {formatDuration(summary.durationSeconds)}초
                       </Text>
                     </View>
-                    {selected ? <Feather name="check" size={18} color={palette.text} /> : null}
+                    {selected ? <Feather name="check" size={18} color={actionColor} /> : null}
                   </Pressable>
                 );
               })}
@@ -296,7 +297,7 @@ export function BodyFrameProjectSwitcher({
             onPress={() => undefined}
           >
             <View style={[styles.sheetHandle, { backgroundColor: palette.faint }]} />
-            <Text style={[styles.sheetTitle, { color: palette.text }]}>새 프로젝트</Text>
+            <BodyFrameSheetHeader title="새 프로젝트" onClose={() => setCreateOpen(false)} />
             <ScrollView
               style={styles.createScroll}
               contentContainerStyle={styles.createScrollContent}
@@ -400,7 +401,7 @@ export function BodyFrameProjectSwitcher({
               accessibilityState={{ selected: referenceMode === "latest" }}
               style={[
                 styles.referenceChoice,
-                { borderColor: referenceMode === "latest" ? palette.text : palette.line }
+                { borderColor: referenceMode === "latest" ? actionColor : palette.line }
               ]}
               onPress={() => setReferenceMode("latest")}
             >
@@ -409,7 +410,7 @@ export function BodyFrameProjectSwitcher({
                 <Text style={[styles.referenceMeta, { color: palette.muted }]}>바로 전 사진과 맞춥니다.</Text>
               </View>
               {referenceMode === "latest" ? (
-                <Feather name="check" size={18} color={palette.text} />
+                <Feather name="check" size={18} color={actionColor} />
               ) : null}
             </Pressable>
             <Pressable
@@ -417,7 +418,7 @@ export function BodyFrameProjectSwitcher({
               accessibilityState={{ selected: referenceMode === "first" }}
               style={[
                 styles.referenceChoice,
-                { borderColor: referenceMode === "first" ? palette.text : palette.line }
+                { borderColor: referenceMode === "first" ? actionColor : palette.line }
               ]}
               onPress={() => setReferenceMode("first")}
             >
@@ -426,7 +427,7 @@ export function BodyFrameProjectSwitcher({
                 <Text style={[styles.referenceMeta, { color: palette.muted }]}>첫 번째 사진과 계속 맞춥니다.</Text>
               </View>
               {referenceMode === "first" ? (
-                <Feather name="check" size={18} color={palette.text} />
+                <Feather name="check" size={18} color={actionColor} />
               ) : null}
             </Pressable>
 
