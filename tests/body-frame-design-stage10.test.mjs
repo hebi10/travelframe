@@ -75,4 +75,11 @@ for (const source of [records, detail]) {
   assert.ok(!/border(?:Top|Bottom|Left|Right)Width\s*:/.test(source), "no one-sided decorative borders");
   assert.ok(!/shadowOpacity|shadowColor|elevation:|LinearGradient/.test(source), "no extra decoration");
 }
+const nativeQa = read("scripts/capture-android-qa.py");
+assert.ok(!nativeQa.includes("프로젝트별 몸의 변화를"), "native QA must not wait for removed header description");
+assert.ok(nativeQa.includes("('project-metrics', f'project/{PROJECT}'"), "real Android metrics tab screenshot is required");
+assert.ok(nativeQa.includes("('project-stats', f'project/{PROJECT}'"), "real Android statistics tab screenshot is required");
+assert.ok(nativeQa.includes("device.tap('통계')"), "reminder capture must navigate to the statistics tab");
+assert.ok(nativeQa.includes("('empty-projects', 'studio'"), "empty project QA must remain available");
+
 console.log("ok - Stage 10 photo-led records and record/metric/stat navigation preserve existing actions");
