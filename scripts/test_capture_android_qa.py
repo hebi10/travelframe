@@ -104,8 +104,8 @@ class CaptureHelpersTest(unittest.TestCase):
     def test_project_reminder_requires_scroll_to_real_control_not_an_initial_visible_marker(self):
         device=Mock()
         qa.open_project_reminder(device)
-        device.ready.assert_called_once_with(['QA 데모','기록'])
-        device.tap.assert_called_once_with('프로젝트 촬영 알림 설정',search='below')
+        self.assertEqual(device.ready.call_args_list, [call(['QA 데모','기록']), call(['기록 달성률', '촬영 알림'])])
+        self.assertEqual(device.tap.call_args_list, [call('통계'),call('프로젝트 촬영 알림 설정',search='below')])
 
     def test_expected_native_failures_must_not_change_videos_or_guest_quota(self):
         before={'travel-frame.videos.v1':'[]'}
