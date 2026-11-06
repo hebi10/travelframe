@@ -512,6 +512,7 @@ export default function BodyFrameProjectDetailScreen() {
   const [targetDraft, setTargetDraft] = useState("");
   const [saving, setSaving] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [detailTab, setDetailTab] = useState<"records" | "metrics" | "stats">("records");
   const [measurementSettings, setMeasurementSettings] =
     useState<BodyMeasurementSettings>(defaultBodyMeasurementSettings);
   const [measurementDraft, setMeasurementDraft] =
@@ -1075,7 +1076,7 @@ export default function BodyFrameProjectDetailScreen() {
           >
             <Feather name="chevron-left" size={bodyFrameDesign.iconSize} color={palette.text} />
           </Pressable>
-          <Text style={[styles.pageTitle, { color: palette.text }]}>프로젝트</Text>
+          <Text numberOfLines={1} style={[styles.pageTitle, { color: palette.text }]}>{project.name}</Text>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="프로젝트 설정 열기"
@@ -1091,47 +1092,34 @@ export default function BodyFrameProjectDetailScreen() {
           </Pressable>
         </View>
 
-        <View style={styles.projectHeader}>
-          <Text style={[styles.projectName, { color: palette.text }]}>
-            {project.name}
-          </Text>
-          <View style={styles.progressHeading}>
-            <Text style={[styles.progressCount, { color: palette.text }]}>
-              {summary.photoCount} / {summary.targetPhotoCount}
-            </Text>
-            <Text style={[styles.progressPercent, { color: palette.muted }]}>
-              {progressPercent}% 진행
-            </Text>
-          </View>
-          <View
-            accessible
-            accessibilityRole="progressbar"
-            accessibilityLabel="프로젝트 사진 기록 진행률"
-            accessibilityValue={{ min: 0, max: 100, now: progressPercent }}
-            style={[styles.progressTrack, { backgroundColor: palette.surfaceStrong }]}
-          >
-            <View
-              style={[
-                styles.progressFill,
-                {
-                  width: `${progressPercent}%`,
-                  backgroundColor: accent
-                }
-              ]}
-            />
-          </View>
+        <View style={[styles.projectTabs, { backgroundColor: palette.background }]} accessibilityLabel="프로젝트 상세 메뉴">
+          {([
+            { id: "records", label: "기록" },
+            { id: "metrics", label: "수치" },
+            { id: "stats", label: "통계" }
+          ] as const).map((tab) => {
+            const selected = detailTab === tab.id;
+            return (
+              <Pressable
+                key={tab.id}
+                accessibilityRole="tab"
+                accessibilityLabel={tab.label}
+                accessibilityState={{ selected, disabled: isPhotoDragging || photoOrderSaving }}
+                disabled={isPhotoDragging || photoOrderSaving}
+                style={[styles.projectTab, selected && { backgroundColor: palette.surface }]}
+                onPress={() => setDetailTab(tab.id)}
+              >
+                <Text style={[styles.projectTabLabel, { color: selected ? palette.text : palette.muted }]}>
+                  {tab.label}
+                </Text>
+                {selected ? <View style={[styles.projectTabMarker, { backgroundColor: palette.text }]} /> : null}
+              </Pressable>
+            );
+          })}
         </View>
 
-        <Pressable
-          accessibilityRole="button"
-          style={[styles.primaryAction, { backgroundColor: primaryColor }]}
-          onPress={() => void openCamera()}
-        >
-          <Text style={[styles.primaryActionText, { color: primaryTextColor }]}>
-            오늘 사진 찍기
-          </Text>
-        </Pressable>
-
+        {detailTab === "records" ? (
+          <>
         {projectPhotos.length > 1 && firstPhoto && latestPhoto ? (
           <Pressable
             accessibilityRole="button"
@@ -1162,6 +1150,47 @@ export default function BodyFrameProjectDetailScreen() {
             </View>
           </Pressable>
         ) : null}
+
+
+        <View style={styles.projectHeader}>
+          <View style={styles.progressHeading}>
+            <Text style={[styles.progressCount, { color: palette.text }]}>
+              {summary.photoCount} / {summary.targetPhotoCount}
+            </Text>
+            <Text style={[styles.progressPercent, { color: palette.muted }]}>
+              {progressPercent}% 진행
+            </Text>
+          </View>
+          <View
+            accessible
+            accessibilityRole="progressbar"
+            accessibilityLabel="프로젝트 사진 기록 진행률"
+            accessibilityValue={{ min: 0, max: 100, now: progressPercent }}
+            style={[styles.progressTrack, { backgroundColor: palette.surfaceStrong }]}
+          >
+            <View
+              style={[
+                styles.progressFill,
+                {
+                  width: `${progressPercent}%`,
+                  backgroundColor: accent
+                }
+              ]}
+            />
+          </View>
+        </View>
+
+
+        <Pressable
+          accessibilityRole="button"
+          style={[styles.primaryAction, { backgroundColor: primaryColor }]}
+          onPress={() => void openCamera()}
+        >
+          <Text style={[styles.primaryActionText, { color: primaryTextColor }]}>
+            오늘 사진 찍기
+          </Text>
+        </Pressable>
+
 
         <View style={styles.recordsSection}>
           <View style={styles.sectionHeader}>
@@ -1290,6 +1319,7 @@ export default function BodyFrameProjectDetailScreen() {
           )}
         </View>
 
+
         <Pressable
           accessibilityRole="button"
           style={[styles.videoAction, { borderColor: palette.text }]}
@@ -1300,10 +1330,13 @@ export default function BodyFrameProjectDetailScreen() {
           </Text>
         </Pressable>
 
-        <View style={styles.secondaryInfoSection}>
-          <Text style={[styles.sectionTitle, { color: palette.text }]}>
-            기록 정보
-          </Text>
+
+          </>
+        ) : null}
+
+        {detailTab === "metrics" ? (
+          <View style={styles.detailTabContent}>
+            <Text style={[styles.sectionTitle, { color: palette.text }]}>수치 기록</Text>
         {measurementSettings.enabled ? (
           <BodyMeasurementSummaryCard
             metric={measurementSettings.primaryMetric}
@@ -1332,6 +1365,69 @@ export default function BodyFrameProjectDetailScreen() {
             }
           />
         ) : null}
+
+
+            {!measurementSettings.enabled ? (
+              <View style={[styles.emptyRecords, { borderColor: palette.line, backgroundColor: palette.surface }]}>
+                <Text style={[styles.emptyTitle, { color: palette.text }]}>수치 기록을 사용하지 않는 프로젝트입니다.</Text>
+                <Text style={[styles.emptyDetail, { color: palette.muted }]}>
+                  프로젝트 설정에서 수치 기록을 켜면 변화 추이를 확인할 수 있습니다.
+                </Text>
+                <Pressable
+                  accessibilityRole="button"
+                  style={[styles.detailTabAction, { borderColor: palette.line }]}
+                  onPress={() => { setMeasurementDraft(measurementSettings); setSettingsOpen(true); }}
+                >
+                  <Text style={[styles.sectionActionText, { color: palette.text }]}>프로젝트 설정 열기</Text>
+                </Pressable>
+              </View>
+            ) : (
+              <Pressable
+                accessibilityRole="button"
+                style={[styles.detailTabAction, { borderColor: palette.line }]}
+                onPress={() => router.push({ pathname: "/project/[id]/measurements", params: { id: project.id } })}
+              >
+                <Text style={[styles.sectionActionText, { color: palette.text }]}>전체 수치 기록 보기</Text>
+                <Feather name="chevron-right" size={bodyFrameDesign.iconSize} color={palette.text} />
+              </Pressable>
+            )}
+          </View>
+        ) : null}
+
+        {detailTab === "stats" ? (
+          <View style={styles.detailTabContent}>
+            <Text style={[styles.sectionTitle, { color: palette.text }]}>통계</Text>
+            <View style={[styles.statCard, { borderColor: palette.line, backgroundColor: palette.surface }]}>
+              <Text style={[styles.statLabel, { color: palette.muted }]}>기록 달성률</Text>
+              <Text style={[styles.statValue, { color: palette.text }]}>
+                {summary.photoCount} / {summary.targetPhotoCount}장 · {progressPercent}%
+              </Text>
+            </View>
+        <View style={styles.statGrid}>
+          <View
+            style={[
+              styles.statCard,
+              { borderColor: palette.line, backgroundColor: palette.surface }
+            ]}
+          >
+            <Text style={[styles.statLabel, { color: palette.muted }]}>시작일</Text>
+            <Text style={[styles.statValue, { color: palette.text }]}>
+              {formatDate(project.createdAt)}
+            </Text>
+          </View>
+          <View
+            style={[
+              styles.statCard,
+              { borderColor: palette.line, backgroundColor: palette.surface }
+            ]}
+          >
+            <Text style={[styles.statLabel, { color: palette.muted }]}>변화 영상</Text>
+            <Text style={[styles.statValue, { color: palette.text }]}>
+              {formatDuration(summary.durationSeconds)}
+            </Text>
+          </View>
+        </View>
+
 
         <Pressable
           accessibilityRole="button"
@@ -1373,33 +1469,10 @@ export default function BodyFrameProjectDetailScreen() {
           <Feather name="chevron-right" size={18} color={palette.muted} />
         </Pressable>
 
-        <View style={styles.statGrid}>
-          <View
-            style={[
-              styles.statCard,
-              { borderColor: palette.line, backgroundColor: palette.surface }
-            ]}
-          >
-            <Text style={[styles.statLabel, { color: palette.muted }]}>시작일</Text>
-            <Text style={[styles.statValue, { color: palette.text }]}>
-              {formatDate(project.createdAt)}
-            </Text>
-          </View>
-          <View
-            style={[
-              styles.statCard,
-              { borderColor: palette.line, backgroundColor: palette.surface }
-            ]}
-          >
-            <Text style={[styles.statLabel, { color: palette.muted }]}>변화 영상</Text>
-            <Text style={[styles.statValue, { color: palette.text }]}>
-              {formatDuration(summary.durationSeconds)}
-            </Text>
-          </View>
-        </View>
 
+          </View>
+        ) : null}
 
-        </View>
       </ScrollView>
 
       <PhotoPositionSheet
