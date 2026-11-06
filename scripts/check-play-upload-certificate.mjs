@@ -34,7 +34,15 @@ export function verifyUploadCertificateDer(certificateDer, pinnedSha256, playCon
   };
 }
 
-function runKeytool(arguments_, environment) {
+const KEYTOOL_STAGE_MESSAGE = Object.freeze({
+  "keystore-open": "Upload keystore cannot be opened: check the stored keystore file and store password",
+  "alias-lookup": "Upload alias not found or inaccessible in the opened keystore: check the configured key alias",
+  "certificate-export": "Upload certificate could not be exported from the configured key alias",
+  "private-key-check": "Upload private key could not produce a certificate request: check private-key access and key password"
+});
+
+function runKeytool(arguments_, environment, stage) {
+  if (!Object.hasOwn(KEYTOOL_STAGE_MESSAGE, stage)) throw new Error("Unknown signing preflight stage");
   const result = spawnSync("keytool", arguments_, {
     encoding: null,
     env: environment,
@@ -42,7 +50,8 @@ function runKeytool(arguments_, environment) {
     maxBuffer: 2 * 1024 * 1024
   });
   if (result.error || result.status !== 0) {
-    throw new Error("Keytool certificate/key verification failed; inspect keystore, alias and passwords without logging sensitive output");
+    // Never print keytool stdout/stderr, the alias, certificate bytes, or secret values.
+    throw new Error(KEYTOOL_STAGE_MESSAGE[stage]);
   }
   return result.stdout;
 }
@@ -64,13 +73,18 @@ export function checkUploadCertificate(environment = process.env) {
       "-keystore", keystore,
       "-storepass:env", "ANDROID_KEYSTORE_PASSWORD"
     ];
-    const certificate = runKeytool(["-exportcert", ...base], environment);
+    runKeytool(
+      ["-list", "-keystore", keystore, "-storepass:env", "ANDROID_KEYSTORE_PASSWORD"],
+      environment, "keystore-open"
+    );
+    runKeytool(["-list", ...base], environment, "alias-lookup");
+    const certificate = runKeytool(["-exportcert", ...base], environment, "certificate-export");
     const verified = verifyUploadCertificateDer(
       certificate,
       environment.ANDROID_UPLOAD_CERT_SHA256,
       environment.PLAY_CONSOLE_UPLOAD_CERT_SHA256
     );
-    runKeytool(["-certreq", ...base, "-keypass:env", "ANDROID_KEY_PASSWORD", "-file", csr], environment);
+    runKeytool(["-certreq", ...base, "-keypass:env", "ANDROID_KEY_PASSWORD", "-file", csr], environment, "private-key-check");
     if (!fs.existsSync(csr) || fs.statSync(csr).size <= 0) {
       throw new Error("Keystore private key could not produce a certificate request");
     }
