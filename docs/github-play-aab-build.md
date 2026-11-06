@@ -6,7 +6,7 @@ The separate **Body Frame Play release preflight (no publish)** manual workflow 
 
 Select `certificate`, `inventory` or `both`. The optional SHA-256 is the **upload certificate**, not the *app signing* certificate. If it is omitted, only the local keystore and configured pin are compared; this is **not** proof of equality with the current Play Console upload key.
 
-In addition to the existing approval variable, the publishing CLI refuses `publish` before **2026-11-07 00:00 Asia/Seoul** (2026-11-06 15:00 UTC), including if the variable is accidentally enabled early. Inventory-only queries are not time blocked. Approval, keystore updates, AAB upload and Play track publication are separate from preflight.
+In addition to the existing approval variable, the publishing CLI refuses `publish` before **2026-11-07 11:01 Asia/Seoul** (2026-11-07 02:01 UTC), including if the variable is accidentally enabled early. Inventory-only queries are not time blocked. Approval, keystore updates, AAB upload and Play track publication are separate from preflight.
 
 See [Stage 9 runbook](design/body-frame-stage9-play-preflight-20261105.md) for sign-in, evidence, and the remaining manual certificate/ARM64/install steps.
 
@@ -68,7 +68,7 @@ Configure repository **variables**:
 | `PLAY_SERVICE_ACCOUNT` | App-specific release service-account email |
 | `PLAY_INTERNAL_TRACK` | Explicitly confirmed API name `internal` or `qa`; no implicit alias fallback |
 
-The upload keystore certificate must match the configured public fingerprint, be currently valid and not be Android Debug. No missing key can be replaced by a new/debug key. Publish runs fail before contacting Play until the existing four signing secrets are available. Read-only inventory runs do not require signing material.
+Before requesting a Play token or starting an Android build, publish runs open the configured keystore, verify its certificate and check private-key access. The certificate must match the configured public fingerprint, be currently valid and not be Android Debug. Read-only inventory runs do not require signing material.
 
 ## Keyless Play authentication
 

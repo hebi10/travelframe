@@ -15,12 +15,12 @@ const MAXIMUM = 2100000000;
 const BUNDLETOOL_SHA256 = "a099cfa1543f55593bc2ed16a70a7c67fe54b1747bb7301f37fdfd6d91028e29";
 const sha256 = (file) => crypto.createHash("sha256").update(fs.readFileSync(file)).digest("hex");
 
-export const EARLIEST_PLAY_PUBLISH_AT = "2026-11-06T15:00:00.000Z"; // 2026-11-07 00:00 Asia/Seoul
+export const EARLIEST_PLAY_PUBLISH_AT = "2026-11-07T02:01:00.000Z"; // 2026-11-07 11:01 Asia/Seoul
 
 export function requirePlayPublishWindow(operation, now = Date.now()) {
   if (operation === "inventory") return;
   if (operation !== "publish" || !Number.isFinite(now) || now < Date.parse(EARLIEST_PLAY_PUBLISH_AT)) {
-    throw new Error("Play publishing is unavailable before 2026-11-07 00:00 KST; read-only inventory remains available");
+    throw new Error("Play publishing is unavailable before 2026-11-07 11:01 KST; read-only inventory remains available");
   }
 }
 

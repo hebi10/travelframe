@@ -10,9 +10,9 @@ import { verifyUploadCertificateDer, checkUploadCertificate } from "../scripts/c
 
 const minTime = Date.parse(EARLIEST_PLAY_PUBLISH_AT);
 
-test("Play publish is blocked before 2026-11-07 00:00 KST even with an approval variable", () => {
-  assert.equal(EARLIEST_PLAY_PUBLISH_AT, "2026-11-06T15:00:00.000Z");
-  assert.throws(() => requirePlayPublishWindow("publish", minTime - 1), /2026-11-07/);
+test("Play publish is blocked before the replacement upload key activates at 2026-11-07 11:01 KST", () => {
+  assert.equal(EARLIEST_PLAY_PUBLISH_AT, "2026-11-07T02:01:00.000Z");
+  assert.throws(() => requirePlayPublishWindow("publish", minTime - 1), /2026-11-07 11:01 KST/);
   assert.doesNotThrow(() => requirePlayPublishWindow("publish", minTime));
   assert.doesNotThrow(() => requirePlayPublishWindow("publish", minTime + 86400000));
   assert.doesNotThrow(() => requirePlayPublishWindow("inventory", minTime - 86400000));
@@ -103,7 +103,6 @@ test("Stage 9 preflight cannot publish and cannot automatically activate upload 
     'requirePlayPublishWindow(request.operation);',
     'requirePlayPublishWindow("publish");'
   ]) assert.ok(publishScript.includes(marker), "All publishing entrypoints must respect the calendar gate");
-  assert.ok(publishScript.includes("2026-11-06T15:00:00.000Z"));
 });
 
 test("Play inventory reports the configured internal target and blocks existing protected work without publishing", async () => {

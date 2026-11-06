@@ -6,7 +6,7 @@
 
 - 표시버전 후보는 `1.0.32`, 패키지 ID는 `com.haebi.photoguide`. 실제 새 `versionCode`는 배포 직전 Google Play의 전체 트랙·미할당 APK/AAB 인벤토리에서 결정.
 - `BODY_FRAME_PLAY_SIGNING_APPROVED_20261107` 승인 변수가 정확히 `true`가 아니면 기존 자동 Play 계획/빌드/게시를 **건너뜀**.
-- Stage 9부터 CLI도 `2026-11-07 00:00 KST` (`2026-11-06T15:00:00Z`) 이전에는 **publish를 무조건 거부**. 승인 변수가 실수로 조기 활성화되어도 게시 계획 또는 업로드가 진행되지 않도록 fail-closed 처리. `inventory`는 날짜 제한 없이 조회 가능.
+- CLI는 교체 업로드 키의 적용 시각인 `2026-11-07 11:01 KST` (`2026-11-07T02:01:00Z`) 이전에는 **publish를 무조건 거부**. 승인 변수가 실수로 조기 활성화되어도 게시 계획 또는 업로드가 진행되지 않도록 fail-closed 처리. `inventory`는 날짜 제한 없이 조회 가능.
 - 이번 PR로 인증/배포 승인을 하지 않으며 서명키·인증서·Play Console 트랙 값을 변경하거나 AAB를 업로드하지 않음.
 
 ## 새 수동 사전점검 워크플로
@@ -47,7 +47,7 @@ GitHub Actions → **Body Frame Play release preflight (no publish)** → **Run 
 
 ## 내부 테스트 실제 출시 전 필수 조건
 
-- [ ] 2026-11-07 00:00 KST 이후
+- [ ] 2026-11-07 11:01 KST 이후
 - [ ] Play Console **현재 업로드 키 인증서**와 CI keystore·pin 세 값 일치(필요한 경우 reset 처리 완료)
 - [ ] 현재 Play 트랙/미완료 릴리스 확인 및 최신 versionCode 계획
 - [ ] Android signed release AAB, R8 mapping, app package/version/minification/ARM64 검사 및 보관

@@ -27,7 +27,7 @@ assert.ok(
   "Play AAB build/publish must remain gated until upload signing is verified"
 );
 assert.ok(plan.includes("inputs.operation == 'inventory'"), "Read-only inventory must remain available");
-assert.ok(plan.includes("Require existing signing secrets before contacting Play"));
+assert.ok(plan.includes("run: node build-tools/scripts/check-play-upload-certificate.mjs"));
 assert.ok(plan.includes("fetch-depth: 0"), "Release ancestry check needs full Git history");
 assert.ok(plan.includes("scripts/publish-play-release.mjs check-source"));
 assert.ok(plan.includes("tests/play-release-state.test.mjs"));
