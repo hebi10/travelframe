@@ -10,9 +10,11 @@
 - [기존 Android 성공 스냅샷 80개 · Stage 10~12 이전 베이스라인](https://drive.google.com/file/d/1Tuw8PKXONbnaltEZ4sYzcSaRebbV3cy5/view)
   - 기준 성공 run: [42152791027](https://github.com/hebi10/travelframe/actions/runs/42152791027)
   - 이 스냅샷은 **현재 Stage 13 앱 결과가 아닌 이전 버전**이다. 합성 카드 1/2/3은 실제 인물 사진의 크롭·합성 품질을 대표하지 않는다.
+- [Stage 12 최신 Android 실제 캡처 84개 · PASS 84/84](https://drive.google.com/file/d/1JYfgY7rslj2Wuz-fSW5e6lVAS9eY2lVj/view) ([run #42171196778](https://github.com/hebi10/travelframe/actions/runs/42171196778)): Stage 13 변경 직전의 가장 정확한 시각 비교 기준.
 
 ## Stage 13 코드 변경
 
+- **영상 만들기 화면 밀도:** Stage 12 Android 모바일 스크린샷에서 사진 미리보기가 화면의 많은 높이를 차지하여 첫 번째 설정행만 보이던 상태를 확인. `BodyFrameVideoScreen`의 상단·프로젝트명·비로그인 제한·미리보기 제목·설정 제목 간격을 축소하고 미리보기 최대 화면 높이 계수 0.42→0.39로 조정. 사진 중심 82% 너비 정책과 영상 인코딩/원본 비율은 유지.
 1. \`app/capture-preview.tsx\`: 촬영 직후 **사진 사용** Primary CTA를 라임 \`#C6FF4D\`에서 디자인 토큰의 흰색 Primary / 어두운 반전 글자로 변경. 저장·다시 촬영·로딩·Safe Area 동작은 유지.
 2. \`scripts/capture-stage13-android.py\`: 실제 Android 에뮬레이터 스크린샷을 매 화면 PNG와 UI 구조 XML, 텍스트·버튼 탐색 결과 JSON으로 저장. CSV 인덱스와 로컬에서 열 수 있는 \`gallery.html\`을 생성한다.
 3. \`.github/workflows/body-frame-device-qa.yml\`: 기존 독립 QA APK 빌드 결과를 재사용하여 **4개 화면 폭 별 병렬 스냅샷**. 모바일 360/412dp, 태블릿·폴더블 크기 600/750dp.
@@ -46,7 +48,7 @@
 | 전후 비교 | 중앙 핸들, 25·50·75% | Stage 12 헤더·이미지 정렬 보정, 촬영 각도 일치 확인 필요 |
 | 수치 기록 | 차트·기간 필터·값·기록 목록 | 코드 적용, 차트 숫자/레이블 잘림·모달 확인 필요 |
 | 영상 홈 | 일러스트/목록/CTA | Stage 11 보정, 실제 영상 썸네일 비교 필요 |
-| 영상 만들기 | 큰 사진 미리보기와 옵션 정보 | Stage 11 보정, 4크기 화면 옵션 높이/레이아웃 점검 |
+| 영상 만들기 | 큰 사진 미리보기와 옵션 정보 | **Stage 13 상단·미리보기·설정 밀도 추가 보정**, 4크기 실제 캡처 검수 필요 |
 | 새 프로젝트 | 이름/목표/사진 선택 | 모달 시각 밀도와 키보드 대응 재확인 필요 |
 | 설정/계정 | 6개 그룹, 일관된 기능 아이콘 | Stage 11 보정, TalkBack·130/150%·모달 확인 |
 | 촬영 미리보기 | 검정·회색 바탕, 흰 Primary CTA | **Stage 13 수정**, 신규 APK에서 실제 색상 캡처 검증 필요 |
