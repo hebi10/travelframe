@@ -16,7 +16,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { bodyFrameAccent, bodyFrameDarkColors, bodyFrameDesign, bodyFrameTypography } from "@/constants/app-theme";
+import { bodyFrameDarkColors, bodyFrameDesign, bodyFrameTypography } from "@/constants/app-theme";
 import { useAuth } from "@/lib/auth-context";
 import { getPlanEntitlements } from "@/lib/plan-entitlements";
 import { recordBackupFailure } from "@/lib/backup-failure-queue";
@@ -316,12 +316,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: bodyFrameAccent,
+    borderColor: bodyFrameDarkColors.text,
     borderRadius: bodyFrameDesign.buttonRadius,
-    backgroundColor: bodyFrameAccent
+    backgroundColor: bodyFrameDarkColors.text
   },
   primaryButtonText: {
-    color: "#0B0B0C",
+    color: bodyFrameDarkColors.inverse,
     fontSize: bodyFrameTypography.button,
     fontWeight: "700",
     letterSpacing: 0
