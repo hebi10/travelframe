@@ -4,10 +4,10 @@ import fs from "node:fs";
 const packageJson = JSON.parse(fs.readFileSync("functions/package.json", "utf8"));
 const packageLock = JSON.parse(fs.readFileSync("functions/package-lock.json", "utf8"));
 
-assert.equal(
-  Object.hasOwn(packageJson, "overrides"),
-  false,
-  "Functions should not force incompatible Google Cloud dependency majors through overrides"
+assert.deepEqual(
+  packageJson.overrides ?? {},
+  { "body-parser": "1.20.9", qs: "6.16.1" },
+  "Only compatible security patch overrides are allowed; Google Cloud dependencies must not be forced to incompatible majors"
 );
 
 const packages = packageLock.packages ?? {};
