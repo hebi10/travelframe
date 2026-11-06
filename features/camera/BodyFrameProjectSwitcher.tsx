@@ -560,7 +560,7 @@ const styles = StyleSheet.create({
     color: "#F5F5F5",
     fontSize: 20,
     fontWeight: "600",
-    marginBottom: 14
+    marginBottom: 10
   },
   projectList: { flexShrink: 1, minHeight: 0, maxHeight: 360 },
   projectRow: {
@@ -576,7 +576,7 @@ const styles = StyleSheet.create({
   actionRow: { minHeight: bodyFrameDesign.primaryButtonHeight, justifyContent: "center" },
   actionText: { color: "#F5F5F5", fontSize: 15, fontWeight: "600" },
   actionTextSecondary: { color: "#A0A0A6", fontSize: 14 },
-  label: { color: "#A0A0A6", fontSize: 12, marginTop: 12, marginBottom: 8 },
+  label: { color: "#A0A0A6", fontSize: 12, marginTop: 8, marginBottom: 6 },
   planLimitText: {
     marginBottom: 8,
     color: "#A0A0A6",
@@ -604,14 +604,14 @@ const styles = StyleSheet.create({
   choiceSelected: { borderColor: "#F5F5F5" },
   choiceText: { color: "#F5F5F5", fontSize: bodyFrameTypography.caption },
   referenceChoice: {
-    minHeight: 64,
+    minHeight: 60,
     flexDirection: "row",
     alignItems: "center",
     borderWidth: 1,
     borderColor: "#2A2A2E",
     borderRadius: 8,
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 8,
     marginBottom: 8
   },
   referenceChoiceSelected: { borderColor: "#F5F5F5" },
