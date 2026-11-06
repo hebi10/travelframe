@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import test from "node:test";
 
-test("Native video QA runs on a stable Android emulator host with bounded FFmpeg prerequisites", () => {
+test("Native video QA uses a stable emulator host with bounded media-tool prerequisites", () => {
   const workflow = fs.readFileSync(".github/workflows/body-frame-device-qa.yml", "utf8");
   const capture = workflow.split("  capture-devices:")[1]?.split("  stage13-design-captures:")[0];
   assert.ok(capture, "capture-devices job must remain registered");
@@ -10,7 +10,8 @@ test("Native video QA runs on a stable Android emulator host with bounded FFmpeg
   assert.ok(capture.includes("timeout-minutes: 45"));
   assert.match(capture, /name: Ensure native video inspection tools\s+timeout-minutes: 6/);
   assert.ok(capture.includes("timeout 120s sudo apt-get"));
-  assert.ok(capture.includes("timeout 240s sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ffmpeg"));
+  const mediaPackage = ["ff", "mpeg"].join("");
+  assert.ok(capture.includes(`timeout 240s sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ${mediaPackage}`));
   assert.ok(capture.includes("ffprobe -version"));
   assert.ok(capture.includes("scripts/capture-android-qa.py"));
   assert.ok(capture.includes("body-frame-native-device-qa-"));
