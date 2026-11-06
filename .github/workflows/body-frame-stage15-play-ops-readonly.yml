@@ -5,6 +5,10 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/body-frame-stage15-play-ops-readonly.yml"
+      - "scripts/inspect-play-catalog-readonly.mjs"
+      - "scripts/inspect-play-inventory-readonly.mjs"
+      - "tests/body-frame-stage15-play-catalog-readonly.test.mjs"
+      - "tests/body-frame-stage15-play-inventory-readonly.test.mjs"
   workflow_dispatch:
 
 permissions:

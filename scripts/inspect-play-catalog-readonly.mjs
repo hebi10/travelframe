@@ -37,7 +37,7 @@ export async function inspectStoreCatalog(accessToken, fetchImpl = fetch) {
   let page = "";
   const seen = new Set();
   for (let i = 0; i < 10; i++) {
-    const url = new URL(ROOT + PACKAGE + "/monetization/subscriptions");
+    const url = new URL(ROOT + PACKAGE + "/subscriptions");
     url.searchParams.set("pageSize", "100");
     if (page) url.searchParams.set("pageToken", page);
     const data = await requestJson(fetchImpl, url.href, accessToken);
