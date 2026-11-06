@@ -22,6 +22,7 @@ assert.ok(workflow.includes("Save every screenshot, gallery, UI XML and failure 
 assert.ok(workflow.includes("retention-days: 90"));
 const stage13Job = workflow.split("  stage13-design-captures:")[1]?.split("  stage6-design-matrix:")[0];
 assert.ok(stage13Job && stage13Job.includes("target: google_apis"));
+assert.ok(stage13Job.includes("fix/body-frame-stage13-"));
 assert.ok(stage13Job.includes("swiftshader_indirect"));
 assert.ok(!stage13Job.includes("target: google_atd"));
 
