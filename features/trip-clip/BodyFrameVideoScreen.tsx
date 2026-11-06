@@ -149,7 +149,7 @@ export default function BodyFrameVideoScreen() {
   );
   const outputSize = getBodyFrameVideoOutputSize(videoOptions.ratio, videoOptions.quality);
   const frameAspectRatio = outputSize.width / outputSize.height;
-  const previewDisplayWidth = Math.max(160, Math.min(320, windowWidth * 0.72, windowHeight * 0.38 * frameAspectRatio));
+  const previewDisplayWidth = Math.max(160, Math.min(360, windowWidth * 0.82, windowHeight * 0.42 * frameAspectRatio));
   const [isLoading, setIsLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
@@ -905,8 +905,8 @@ const styles = StyleSheet.create({
     fontSize: bodyFrameTypography.body
   },
   previewHeader: {
-    marginTop: 14,
-    marginBottom: 12,
+    marginTop: 10,
+    marginBottom: 8,
     minHeight: bodyFrameDesign.minTouchSize,
     flexDirection: "row",
     flexWrap: "wrap",
@@ -923,8 +923,8 @@ const styles = StyleSheet.create({
     fontVariant: ["tabular-nums"]
   },
   settingsTitle: {
-    marginTop: 24,
-    marginBottom: 12
+    marginTop: 16,
+    marginBottom: 10
   },
   guestLimitText: {
     marginBottom: 16,
@@ -948,8 +948,8 @@ const styles = StyleSheet.create({
   },
   previewFrame: {
     alignSelf: "center",
-    width: "72%",
-    maxWidth: 320,
+    width: "82%",
+    maxWidth: 360,
     overflow: "hidden",
     borderWidth: bodyFrameDesign.borderWidth,
     borderRadius: bodyFrameDesign.cardRadius,
@@ -980,7 +980,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14
   },
   summaryRow: {
-    minHeight: 56,
+    minHeight: bodyFrameDesign.primaryButtonHeight,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",

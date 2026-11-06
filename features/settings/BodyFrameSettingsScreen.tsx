@@ -567,26 +567,26 @@ const styles = StyleSheet.create({
     maxWidth: bodyFrameDesign.contentMaxWidth,
     alignSelf: "center",
     paddingHorizontal: bodyFrameDesign.horizontalPadding,
-    gap: 22
+    gap: 16
   },
   header: {
     gap: 6
   },
   settingRow: {
-    minHeight: 72,
+    minHeight: 64,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: 12,
+    gap: 10,
     paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingVertical: 9,
     borderWidth: bodyFrameDesign.borderWidth,
     borderRadius: bodyFrameDesign.cardRadius
   },
   settingRowCopy: {
     flex: 1,
     minWidth: 0,
-    gap: 4
+    gap: 3
   },
   settingRowValue: {
     maxWidth: "48%",
@@ -600,7 +600,7 @@ const styles = StyleSheet.create({
   },
   settingRowDetail: {
     fontSize: bodyFrameTypography.caption,
-    lineHeight: 17
+    lineHeight: 16
   },
   settingRowMark: {
     flexShrink: 1,
@@ -666,12 +666,12 @@ const styles = StyleSheet.create({
     paddingBottom: 12
   },
   optionRow: {
-    minHeight: 66,
+    minHeight: 56,
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: 10,
     paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingVertical: 8,
     borderWidth: bodyFrameDesign.borderWidth,
     borderRadius: bodyFrameDesign.buttonRadius
   },
