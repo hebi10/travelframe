@@ -83,8 +83,8 @@ for (const path of [
 assert.ok(records.includes("useWindowDimensions"));
 assert.ok(records.includes("width: projectCardWidth"));
 assert.ok(!records.includes('width: "48%"'));
-assert.ok(videoCreate.includes('width: "72%"'));
-assert.ok(videoCreate.includes("maxWidth: 320"));
+assert.ok(videoCreate.includes('width: "82%"'));
+assert.ok(videoCreate.includes("maxWidth: 360"));
 assert.ok(videoSettings.includes("bodyFrameDesign.contentMaxWidth"));
 
 assert.ok(settings.includes('accessibilityRole="radio"'));
