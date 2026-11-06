@@ -2181,7 +2181,42 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 22
+    marginBottom: 12
+  },
+  projectTabs: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 20
+  },
+  projectTab: {
+    flex: 1,
+    minHeight: bodyFrameDesign.minTouchSize,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: bodyFrameDesign.buttonRadius
+  },
+  projectTabLabel: {
+    fontSize: bodyFrameTypography.body,
+    fontWeight: "600"
+  },
+  projectTabMarker: {
+    position: "absolute",
+    bottom: 0,
+    width: 40,
+    height: 2
+  },
+  detailTabContent: {
+    gap: 14,
+    marginBottom: 20
+  },
+  detailTabAction: {
+    minHeight: bodyFrameDesign.primaryButtonHeight,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 14,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderRadius: bodyFrameDesign.buttonRadius
   },
   iconButton: {
     width: bodyFrameDesign.minTouchSize,
@@ -2192,6 +2227,10 @@ const styles = StyleSheet.create({
     borderRadius: bodyFrameDesign.buttonRadius
   },
   pageTitle: {
+    flex: 1,
+    minWidth: 0,
+    paddingHorizontal: 8,
+    textAlign: "center",
     fontSize: bodyFrameTypography.sectionTitle,
     fontWeight: "600"
   },
