@@ -152,6 +152,59 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+  stage13-design-captures:
+    needs: build-apk
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.head_ref, 'feat/body-frame-design-stage13-')
+    runs-on: ubuntu-latest
+    timeout-minutes: 65
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: [phone-360dp, phone-412dp, tablet-600dp, tablet-750dp]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: body-frame-native-qa-apk
+          path: artifacts/apk
+      - name: Check Stage 13 scripts and synthetic fixture
+        run: |
+          python3 -m py_compile scripts/capture-stage13-android.py
+          python3 scripts/test_capture_android_qa.py
+          python3 scripts/test_capture_stage13_qa.py
+      - name: Install screenshot fixture encoder
+        run: |
+          if ! command -v ffmpeg >/dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y ffmpeg
+          fi
+      - name: Enable KVM access
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Capture page screenshots with automated-test Android emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_atd
+          arch: x86_64
+          profile: pixel_2
+          ram-size: 3072M
+          heap-size: 512M
+          disk-size: 6000M
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -camera-back emulated -camera-front none
+          script: python3 scripts/capture-stage13-android.py --profile ${{ matrix.profile }} --apk artifacts/apk/app-qaRelease.apk --output artifacts/stage13
+      - name: Save every screenshot, gallery, UI XML and failure report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: body-frame-stage13-${{ matrix.profile }}-${{ github.run_id }}
+          path: artifacts/stage13/
+          if-no-files-found: warn
+          retention-days: 90
+
   stage6-design-matrix:
     needs: build-apk
     if: github.event_name == 'workflow_dispatch' || (startsWith(github.head_ref, 'feat/body-frame-design-stage6-') || startsWith(github.head_ref, 'fix/body-frame-stage7-'))
