@@ -80,6 +80,6 @@ assert.ok(!nativeQa.includes("프로젝트별 몸의 변화를"), "native QA mus
 assert.ok(nativeQa.includes("('project-metrics', f'project/{PROJECT}'"), "real Android metrics tab screenshot is required");
 assert.ok(nativeQa.includes("('project-stats', f'project/{PROJECT}'"), "real Android statistics tab screenshot is required");
 assert.ok(nativeQa.includes("device.tap('통계')"), "reminder capture must navigate to the statistics tab");
-assert.ok(nativeQa.includes("('empty-projects', 'studio'"), "empty project QA must remain available");
+assert.ok(nativeQa.includes("capture(device, directory, 'empty-projects', 'studio'"), "empty project QA must remain available");
 
 console.log("ok - Stage 10 photo-led records and record/metric/stat navigation preserve existing actions");
