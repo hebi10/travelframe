@@ -468,14 +468,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24
   },
   header: {
-    gap: 6,
-    marginBottom: 14
+    marginBottom: 20
   },
   quickActions: {
+    width: 184,
+    minHeight: bodyFrameDesign.primaryButtonHeight,
     flexDirection: "row",
     alignItems: "stretch",
-    gap: 8,
-    marginBottom: 24
+    gap: 8
   },
   pageTitle: {
     fontSize: bodyFrameTypography.pageTitle,
@@ -486,13 +486,10 @@ const styles = StyleSheet.create({
     lineHeight: 20
   },
   captureButton: {
-    flex: 1,
+    width: bodyFrameDesign.primaryButtonHeight,
     minHeight: bodyFrameDesign.primaryButtonHeight,
-    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 7,
-    paddingHorizontal: 14,
     borderRadius: bodyFrameDesign.buttonRadius
   },
   captureButtonText: {
@@ -501,10 +498,16 @@ const styles = StyleSheet.create({
   },
   projectsHeading: {
     flexDirection: "row",
-    alignItems: "baseline",
+    alignItems: "center",
     justifyContent: "space-between",
+    flexWrap: "wrap",
     gap: 12,
     marginBottom: 12
+  },
+  projectsHeadingCopy: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    gap: 8
   },
   projectsTitle: {
     fontSize: bodyFrameTypography.sectionTitle,
@@ -522,17 +525,11 @@ const styles = StyleSheet.create({
     gap: 12
   },
   projectCard: {
+    minHeight: 136,
+    flexDirection: "row",
     overflow: "hidden",
     borderWidth: bodyFrameDesign.borderWidth,
     borderRadius: bodyFrameDesign.cardRadius
-  },
-  singleProjectCard: {
-    flexDirection: "row"
-  },
-  singleProjectCopy: {
-    flex: 1,
-    justifyContent: "center",
-    padding: 16
   },
   coverFrame: {
     width: "100%",
@@ -559,12 +556,25 @@ const styles = StyleSheet.create({
     textAlign: "center"
   },
   projectCopy: {
+    flex: 1,
+    minWidth: 0,
     gap: 6,
-    padding: 10
+    padding: 12,
+    justifyContent: "space-between"
+  },
+  projectNameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6
   },
   projectName: {
+    flex: 1,
     fontSize: bodyFrameTypography.rowTitle,
     fontWeight: "600"
+  },
+  projectDate: {
+    fontSize: bodyFrameTypography.caption,
+    lineHeight: 16
   },
   projectStatsRow: {
     flexDirection: "row",
