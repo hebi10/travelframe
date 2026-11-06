@@ -10,6 +10,12 @@ on:
       - "functions/package.json"
       - "functions/package-lock.json"
       - "scripts/summarize-npm-audit.mjs"
+      - "scripts/report-stage15-release-readiness.mjs"
+      - "tests/body-frame-stage15-release-readiness.test.mjs"
+      - "docs/design/body-frame-stage15-release-readiness-20261106.md"
+      - "docs/body-frame-release-checklist.md"
+      - ".github/workflows/android-play-aab.yml"
+      - ".github/workflows/body-frame-play-preflight.yml"
 
 permissions:
   contents: read
@@ -30,6 +36,8 @@ jobs:
         run: npm ci
       - name: Install Functions dependencies
         run: npm ci --prefix functions
+      - name: Record offline release-source guard and external verification blockers
+        run: node scripts/report-stage15-release-readiness.mjs
       - name: Collect audits
         shell: bash
         run: |
@@ -47,4 +55,6 @@ jobs:
             app-prod-audit.json
             functions-prod-audit.json
             audit-summary.md
+            stage15-release-readiness.json
+            stage15-release-readiness.md
           retention-days: 14
