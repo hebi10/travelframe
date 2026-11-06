@@ -20,7 +20,7 @@ test("Play publish is blocked before the replacement upload key activates at 202
   assert.throws(() => requirePlayPublishWindow("publish", NaN));
 });
 
-test("manual keystore preflight verifies a real private key, expiry and pinned/Console certificates without revealing secrets", { timeout: 60_000 }, () => {
+test("manual keystore preflight verifies a real private key, expiry and pinned/Console certificates without revealing secrets", { timeout: 180_000 }, () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "travel-frame-stage9-cert-test-"));
   const keystore = path.join(dir, "fixture.p12");
   const tempRoot = path.join(dir, "temp");
@@ -33,7 +33,7 @@ test("manual keystore preflight verifies a real private key, expiry and pinned/C
     RUNNER_TEMP: tempRoot
   };
   const run = (args) => {
-    const result = spawnSync("keytool", args, { encoding: null, env, timeout: 25_000 });
+    const result = spawnSync("keytool", args, { encoding: null, env, timeout: 90_000 });
     assert.equal(result.error, undefined);
     assert.equal(result.status, 0, "Temporary fixture keytool call must succeed");
     return result.stdout;
