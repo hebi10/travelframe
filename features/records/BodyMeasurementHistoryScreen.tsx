@@ -591,7 +591,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 20
+    marginBottom: 12
   },
   iconButton: {
     width: bodyFrameDesign.minTouchSize,
@@ -620,7 +620,7 @@ const styles = StyleSheet.create({
   },
   projectHeader: {
     gap: 5,
-    marginBottom: 16
+    marginBottom: 10
   },
   projectName: {
     fontSize: bodyFrameTypography.projectTitle,
@@ -632,7 +632,7 @@ const styles = StyleSheet.create({
   },
   metricSelector: {
     gap: 8,
-    paddingBottom: 14
+    paddingBottom: 10
   },
   metricButton: {
     minHeight: bodyFrameDesign.minTouchSize,
@@ -648,7 +648,7 @@ const styles = StyleSheet.create({
   periodSelector: {
     flexDirection: "row",
     gap: 8,
-    marginBottom: 14
+    marginBottom: 10
   },
   periodButton: {
     flex: 1,
