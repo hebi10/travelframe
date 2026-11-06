@@ -29,6 +29,7 @@ jobs:
       ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
       ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
       ANDROID_UPLOAD_CERT_SHA256: ${{ vars.ANDROID_UPLOAD_CERT_SHA256 }}
+      PLAY_CONSOLE_UPLOAD_CERT_SHA256: ${{ vars.PLAY_CONSOLE_UPLOAD_CERT_SHA256 }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -42,9 +43,14 @@ jobs:
           java-version: "21"
       - name: Verify configured upload certificate and private key, without signing any app
         run: node scripts/check-play-upload-certificate.mjs
-      - name: Record boundary
+      - name: Record certificate verification boundary
+        shell: bash
         run: |
-          echo 'Uploaded certificate vs Play Console Upload key certificate remains UNVERIFIED without the real Console SHA-256.' >> "$GITHUB_STEP_SUMMARY"
+          if [[ -n "$PLAY_CONSOLE_UPLOAD_CERT_SHA256" ]]; then
+            echo 'Three-way comparison succeeded: supplied Play Console Upload key certificate SHA-256, configured pin and keystore certificate agree.' >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'Play Console Upload key certificate SHA-256 not configured: three-way comparison remains UNVERIFIED.' >> "$GITHUB_STEP_SUMMARY"
+          fi
           echo 'No AAB or APK was signed, uploaded or published.' >> "$GITHUB_STEP_SUMMARY"
 
   play-readonly-metadata:

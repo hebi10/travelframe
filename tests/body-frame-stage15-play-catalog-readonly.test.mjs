@@ -75,6 +75,10 @@ test("Play operational workflow has no publishing, signing or auto-release privi
   assert.ok(yaml.includes("github.ref == 'refs/heads/main'"));
   assert.ok(yaml.includes("scripts/inspect-play-inventory-readonly.mjs"));
   assert.ok(yaml.includes("scripts/check-play-upload-certificate.mjs"));
+  assert.ok(yaml.includes("PLAY_CONSOLE_UPLOAD_CERT_SHA256: ${{ vars.PLAY_CONSOLE_UPLOAD_CERT_SHA256 }}"));
+  assert.ok(yaml.includes('if [[ -n "$PLAY_CONSOLE_UPLOAD_CERT_SHA256" ]]'));
+  assert.ok(yaml.includes("three-way comparison remains UNVERIFIED"));
+  assert.ok(yaml.includes("Three-way comparison succeeded"));
   assert.ok(yaml.includes("scripts/inspect-play-catalog-readonly.mjs"));
   assert.ok(yaml.includes("stage15-play-inventory.json"));
   assert.ok(!yaml.includes("scripts/publish-play-release.mjs plan"));
