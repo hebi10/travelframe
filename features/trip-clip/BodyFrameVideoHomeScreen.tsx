@@ -434,7 +434,7 @@ const styles = StyleSheet.create({
     maxWidth: bodyFrameDesign.contentMaxWidth,
     alignSelf: "center",
     paddingHorizontal: bodyFrameDesign.horizontalPadding,
-    gap: 18
+    gap: 12
   },
   header: {
     gap: 6
@@ -448,8 +448,8 @@ const styles = StyleSheet.create({
     lineHeight: 20
   },
   heroCard: {
-    gap: 10,
-    padding: 14,
+    gap: 8,
+    padding: 12,
     borderWidth: bodyFrameDesign.borderWidth,
     borderRadius: bodyFrameDesign.cardRadius
   },
@@ -459,16 +459,16 @@ const styles = StyleSheet.create({
     gap: 12
   },
   heroIllustrationFrame: {
-    width: 76,
-    height: 88,
+    width: 72,
+    height: 72,
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
     borderRadius: bodyFrameDesign.cardRadius
   },
   heroIllustration: {
-    width: 72,
-    height: 76
+    width: 64,
+    height: 64
   },
   heroCopy: {
     flex: 1,
@@ -553,7 +553,7 @@ const styles = StyleSheet.create({
     gap: 8
   },
   projectRow: {
-    minHeight: 88,
+    minHeight: 80,
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
@@ -563,8 +563,8 @@ const styles = StyleSheet.create({
     borderRadius: bodyFrameDesign.cardRadius
   },
   projectIcon: {
-    width: 58,
-    height: 72,
+    width: 54,
+    height: 64,
     overflow: "hidden",
     alignItems: "center",
     justifyContent: "center",
