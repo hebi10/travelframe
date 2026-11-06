@@ -93,6 +93,7 @@
       "metro": "0.83.8",
       "metro-config": "0.83.8",
       "metro-core": "0.83.8"
-    }
+    },
+    "compression": "1.8.2"
   }
 }
