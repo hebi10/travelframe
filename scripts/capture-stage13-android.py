@@ -159,6 +159,8 @@ def main():
                 record.update(profile=args.profile, variant=variant, label=label)
                 manifest["captures"].append(record)
                 (directory / f"{name}.json").write_text(json.dumps(record, indent=2, ensure_ascii=False), encoding="utf-8")
+                if "isn't responding" in record.get("error", ""):
+                    raise RuntimeError("Android emulator System UI is not responding; review failure screenshot before retry")
             if variant == "dark-100":
                 device.seed(False, font, theme_mode=theme)
                 for name, label, route, expected, action in ADDITIONAL[:2]:
