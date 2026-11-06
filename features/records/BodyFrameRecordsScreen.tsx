@@ -287,10 +287,7 @@ export default function BodyFrameRecordsScreen() {
               아직 프로젝트가 없습니다.
             </Text>
             <Text style={[styles.emptyDetail, { color: palette.muted }]}>
-              촬영 화면에서 첫 프로젝트를 만들고 같은 위치와 자세로 기록을 시작하세요.
-            </Text>
-            <Text style={[styles.emptyDetail, { color: palette.faint }]}>
-              위의 새 프로젝트 버튼으로 프로젝트를 만든 뒤 바로 촬영할 수 있습니다.
+              새 프로젝트를 만들면 사진 기록이 여기에 표시됩니다.
             </Text>
           </View>
         ) : (

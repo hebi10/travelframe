@@ -166,15 +166,25 @@ export default function BodyFrameVideoHomeScreen() {
             }
           ]}
         >
-          <View style={styles.heroCopy}>
-            <Text style={[styles.heroTitle, { color: palette.text }]}>
-              변화 영상 만들기
-            </Text>
-            <Text style={[styles.heroDetail, { color: palette.muted }]}>
-              {activeProject
-                ? `${activeProject.name} 프로젝트로 바로 시작할 수 있습니다.`
-                : "먼저 기록 탭에서 프로젝트를 만들어 주세요."}
-            </Text>
+          <View style={styles.heroHeader}>
+            <View style={[styles.heroIllustrationFrame, { backgroundColor: palette.surfaceStrong }]}>
+              <Image
+                source={require("../../assets/ui/illustrations/feature-video.png")}
+                style={styles.heroIllustration}
+                contentFit="contain"
+                accessible={false}
+              />
+            </View>
+            <View style={styles.heroCopy}>
+              <Text style={[styles.heroTitle, { color: palette.text }]}>
+                변화 영상 만들기
+              </Text>
+              <Text style={[styles.heroDetail, { color: palette.muted }]}>
+                {activeProject
+                  ? `${activeProject.name} 프로젝트의 기록으로 영상을 만듭니다.`
+                  : "먼저 프로젝트를 만들어 주세요."}
+              </Text>
+            </View>
           </View>
           <Pressable
             accessibilityRole="button"
@@ -424,7 +434,7 @@ const styles = StyleSheet.create({
     maxWidth: bodyFrameDesign.contentMaxWidth,
     alignSelf: "center",
     paddingHorizontal: bodyFrameDesign.horizontalPadding,
-    gap: bodyFrameDesign.sectionGap
+    gap: 18
   },
   header: {
     gap: 6
@@ -438,14 +448,32 @@ const styles = StyleSheet.create({
     lineHeight: 20
   },
   heroCard: {
-    gap: 12,
-    padding: 18,
+    gap: 10,
+    padding: 14,
     borderWidth: bodyFrameDesign.borderWidth,
     borderRadius: bodyFrameDesign.cardRadius
   },
+  heroHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12
+  },
+  heroIllustrationFrame: {
+    width: 76,
+    height: 88,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+    borderRadius: bodyFrameDesign.cardRadius
+  },
+  heroIllustration: {
+    width: 72,
+    height: 76
+  },
   heroCopy: {
-    gap: 5,
-    marginBottom: 2
+    flex: 1,
+    minWidth: 0,
+    gap: 5
   },
   heroTitle: {
     fontSize: bodyFrameTypography.sectionTitle,

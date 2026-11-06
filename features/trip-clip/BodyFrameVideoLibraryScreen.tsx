@@ -246,7 +246,7 @@ export default function BodyFrameVideoLibraryScreen() {
               저장한 영상이 없습니다.
             </Text>
             <Text style={[styles.emptyDetail, { color: palette.muted }]}>
-              영상 화면에서 프로젝트를 선택해 첫 변화 영상을 만들어 보세요.
+              프로젝트 사진으로 첫 변화 영상을 만들어 보세요.
             </Text>
             <Pressable
               accessibilityRole="button"
