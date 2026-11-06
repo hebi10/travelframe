@@ -8,6 +8,7 @@ const project = read("features/records/BodyFrameProjectDetailScreen.tsx");
 const videoHome = read("features/trip-clip/BodyFrameVideoHomeScreen.tsx");
 const videoCreate = read("features/trip-clip/BodyFrameVideoScreen.tsx");
 const settings = read("features/settings/BodyFrameSettingsScreen.tsx");
+const tabs = read("components/tab-glyph.tsx");
 
 for (const file of [
   "features/records/BodyFrameRecordsScreen.tsx",
@@ -22,7 +23,7 @@ for (const file of [
 
 assert.ok(records.includes("contentWidth >= 560 ? 2 : 1"), "mobile project list must use full-width photo-first rows");
 assert.ok(records.includes("const coverWidth = contentWidth >= 560 ? 104 : 92"), "project covers must remain readable");
-assert.ok(records.includes("cards.length === 0 ? (") && records.includes("프로젝트를 만들고 같은 구도의 사진을 기록하세요."));
+assert.ok(records.includes("cards.length === 0 ? (") && records.includes("프로젝트를 만들고 몸의 변화를 기록하세요."));
 assert.ok(records.includes("프로젝트 열기") && records.includes('name="chevron-right"'));
 assert.ok(records.includes('accessibilityRole="progressbar"'));
 assert.ok(records.includes('aspectRatio: 3 / 4'));
@@ -51,6 +52,11 @@ assert.ok(videoCreate.includes("TripClipRecordingCanvas"));
 assert.ok(videoCreate.includes("saveMadeVideo("));
 
 assert.ok(settings.includes("minHeight: 64") && settings.includes("minHeight: 56"));
+assert.ok(tabs.includes('studio: "image"') && tabs.includes('video: "youtube"'));
+assert.ok(settings.includes("const settingRowIcons: Record<string, keyof typeof Feather.glyphMap>"));
+assert.ok(settings.includes("size={18} color={palette.muted}"));
+assert.ok(records.includes("새 프로젝트를 만들면 촬영 기록이 여기에 표시됩니다."));
+assert.ok(!records.includes("위의 새 프로젝트 버튼으로"), "no repeated empty-state instructions");
 for(const group of ["촬영","저장 및 백업","변화 영상","화면","계정 및 플랜","정보 및 개인정보"]) {
   assert.ok(settings.includes('SectionBlock title="' + group + '"'));
 }
