@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import fs from "node:fs";
 import { PACKAGE, EXPECTED_SUBSCRIPTIONS, inspectStoreCatalog } from "../scripts/inspect-play-catalog-readonly.mjs";
 
 const token = "fixture-only-short-lived-token-12345";
@@ -66,4 +67,17 @@ test("Pagination includes expected products and rejects loops", async () => {
     return ok({ subscriptions: [], nextPageToken: "same" });
   }), /Repeated monetization page token/);
   await assert.rejects(inspectStoreCatalog("", mock), /short-lived/);
+});
+
+test("Play operational workflow has no publishing, signing or auto-release privilege", () => {
+  const yaml = fs.readFileSync(".github/workflows/body-frame-stage15-play-ops-readonly.yml", "utf8");
+  assert.ok(yaml.includes("branches: [main]"));
+  assert.ok(yaml.includes("github.ref == 'refs/heads/main'"));
+  assert.ok(yaml.includes("INPUT_OPERATION: inventory"));
+  assert.ok(yaml.includes("scripts/check-play-upload-certificate.mjs"));
+  assert.ok(yaml.includes("scripts/inspect-play-catalog-readonly.mjs"));
+  assert.ok(yaml.includes("scripts/publish-play-release.mjs plan"));
+  assert.ok(!yaml.includes("scripts/publish-play-release.mjs publish"));
+  assert.ok(!yaml.includes(":app:bundleRelease"));
+  assert.ok(!yaml.includes("prepare-play-aab.mjs signing"));
 });
