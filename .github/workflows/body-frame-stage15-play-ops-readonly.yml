@@ -1,0 +1,94 @@
+name: Stage 15 Play operations read-only verification (no publish)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/body-frame-stage15-play-ops-readonly.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: body-frame-stage15-play-readonly
+  cancel-in-progress: false
+
+jobs:
+  keystore-preflight:
+    if: github.repository == 'hebi10/travelframe' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      ANDROID_UPLOAD_CERT_SHA256: ${{ vars.ANDROID_UPLOAD_CERT_SHA256 }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Verify configured upload certificate and private key, without signing any app
+        run: node scripts/check-play-upload-certificate.mjs
+      - name: Record boundary
+        run: |
+          echo 'Uploaded certificate vs Play Console Upload key certificate remains UNVERIFIED without the real Console SHA-256.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'No AAB or APK was signed, uploaded or published.' >> "$GITHUB_STEP_SUMMARY"
+
+  play-readonly-metadata:
+    if: github.repository == 'hebi10/travelframe' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      INPUT_OPERATION: inventory
+      INPUT_TRACK: internal
+      PLAY_INTERNAL_TRACK: ${{ vars.PLAY_INTERNAL_TRACK }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Verify Play read-only regression tests locally
+        run: node --test tests/body-frame-stage15-play-catalog-readonly.test.mjs tests/body-frame-stage9-play-preflight.test.mjs
+      - name: Acquire scoped Publisher credential for metadata queries only
+        id: auth
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        with:
+          workload_identity_provider: ${{ vars.PLAY_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.PLAY_SERVICE_ACCOUNT }}
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/androidpublisher
+          create_credentials_file: false
+          export_environment_variables: false
+      - name: Inspect existing tracks, bundles and maximum versionCode without uploading
+        env:
+          PLAY_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+        run: node scripts/publish-play-release.mjs plan
+      - name: Read subscription catalog without purchases/orders or mutations
+        env:
+          PLAY_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+        run: node scripts/inspect-play-catalog-readonly.mjs
+      - name: Preserve only sanitized product status report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: body-frame-stage15-play-readonly-catalog
+          path: stage15-play-catalog.json
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Confirm no app publication was attempted
+        if: always()
+        run: echo 'All requests in this workflow are read-only metadata checks, except the Publisher temporary edit created and deleted for inventory. No release or tracked version was changed.' >> "$GITHUB_STEP_SUMMARY"
