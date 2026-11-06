@@ -52,6 +52,29 @@ type InlineSettingKey =
 
 const overlayOpacityOptions = [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8] as const;
 
+const settingRowIcons: Record<string, keyof typeof Feather.glyphMap> = {
+  "기준 사진 표시": "image",
+  "기준 사진 투명도": "eye",
+  "촬영 비율": "crop",
+  "촬영 세부 설정": "sliders",
+  "저장 방식": "save",
+  "클라우드 백업": "cloud",
+  "저장·백업 세부 설정": "archive",
+  "사진 간격": "clock",
+  "출력 규격": "film",
+  "화면 모드": "moon",
+  "폰트 스타일": "type",
+  "글자 크기": "align-left",
+  "사용 가이드": "help-circle",
+  "내 계정": "user",
+  "로그인": "user",
+  "플랜 및 Google Play 결제": "credit-card",
+  "바디 프레임": "info",
+  "개인정보처리방침": "shield",
+  "이용약관": "file-text"
+};
+
+
 function BodyFrameSettingRow({
   label,
   detail,
@@ -64,6 +87,7 @@ function BodyFrameSettingRow({
   onPress?: () => void;
 }) {
   const { palette } = useAppAppearance();
+  const iconName = settingRowIcons[label];
 
   return (
     <Pressable
@@ -80,6 +104,11 @@ function BodyFrameSettingRow({
         }
       ]}
     >
+      {iconName ? (
+        <View style={styles.settingRowIcon} pointerEvents="none" accessibilityElementsHidden>
+          <Feather name={iconName} size={18} color={palette.muted} />
+        </View>
+      ) : null}
       <View style={styles.settingRowCopy}>
         <Text numberOfLines={2} style={[styles.settingRowLabel, { color: palette.text }]}>
           {label}
@@ -567,26 +596,32 @@ const styles = StyleSheet.create({
     maxWidth: bodyFrameDesign.contentMaxWidth,
     alignSelf: "center",
     paddingHorizontal: bodyFrameDesign.horizontalPadding,
-    gap: 22
+    gap: 16
   },
   header: {
     gap: 6
   },
   settingRow: {
-    minHeight: 72,
+    minHeight: 64,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: 12,
+    gap: 10,
     paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingVertical: 9,
     borderWidth: bodyFrameDesign.borderWidth,
     borderRadius: bodyFrameDesign.cardRadius
+  },
+  settingRowIcon: {
+    width: 24,
+    minHeight: 24,
+    alignItems: "center",
+    justifyContent: "center"
   },
   settingRowCopy: {
     flex: 1,
     minWidth: 0,
-    gap: 4
+    gap: 3
   },
   settingRowValue: {
     maxWidth: "48%",
@@ -600,7 +635,7 @@ const styles = StyleSheet.create({
   },
   settingRowDetail: {
     fontSize: bodyFrameTypography.caption,
-    lineHeight: 17
+    lineHeight: 16
   },
   settingRowMark: {
     flexShrink: 1,
@@ -666,12 +701,12 @@ const styles = StyleSheet.create({
     paddingBottom: 12
   },
   optionRow: {
-    minHeight: 66,
+    minHeight: 56,
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: 10,
     paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingVertical: 8,
     borderWidth: bodyFrameDesign.borderWidth,
     borderRadius: bodyFrameDesign.buttonRadius
   },
