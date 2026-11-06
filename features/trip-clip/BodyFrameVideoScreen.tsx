@@ -149,7 +149,7 @@ export default function BodyFrameVideoScreen() {
   );
   const outputSize = getBodyFrameVideoOutputSize(videoOptions.ratio, videoOptions.quality);
   const frameAspectRatio = outputSize.width / outputSize.height;
-  const previewDisplayWidth = Math.max(160, Math.min(360, windowWidth * 0.82, windowHeight * 0.42 * frameAspectRatio));
+  const previewDisplayWidth = Math.max(160, Math.min(360, windowWidth * 0.82, windowHeight * 0.39 * frameAspectRatio));
   const [isLoading, setIsLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
@@ -529,7 +529,7 @@ export default function BodyFrameVideoScreen() {
       <ScrollView
         contentContainerStyle={[
           styles.content,
-          { paddingTop: Math.max(insets.top + 18, 28), paddingBottom: 24 }
+          { paddingTop: Math.max(insets.top + 12, 20), paddingBottom: 24 }
         ]}
         showsVerticalScrollIndicator={false}
       >
@@ -900,14 +900,14 @@ const styles = StyleSheet.create({
     fontWeight: "600"
   },
   projectName: {
-    marginTop: 14,
-    marginBottom: 4,
+    marginTop: 8,
+    marginBottom: 2,
     fontSize: bodyFrameTypography.body
   },
   previewHeader: {
-    marginTop: 10,
-    marginBottom: 8,
-    minHeight: bodyFrameDesign.minTouchSize,
+    marginTop: 6,
+    marginBottom: 6,
+    minHeight: 36,
     flexDirection: "row",
     flexWrap: "wrap",
     alignItems: "center",
@@ -923,11 +923,11 @@ const styles = StyleSheet.create({
     fontVariant: ["tabular-nums"]
   },
   settingsTitle: {
-    marginTop: 16,
-    marginBottom: 10
+    marginTop: 10,
+    marginBottom: 8
   },
   guestLimitText: {
-    marginBottom: 16,
+    marginBottom: 8,
     fontSize: bodyFrameTypography.caption,
     lineHeight: 17
   },
