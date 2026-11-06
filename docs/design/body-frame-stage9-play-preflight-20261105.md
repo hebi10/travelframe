@@ -59,3 +59,17 @@ GitHub Actions → **Body Frame Play release preflight (no publish)** → **Run 
 ## 완료 기준
 
 Stage 9 코드와 테스트/병합 성공은 *배포 준비 코드 완료*에 해당. Play Console 인증서 실측/인벤토리, signed AAB 실설치, 내부 테스트 배포 성공은 상기 인증과 11월 7일 제한 충족 뒤에만 완료 처리.
+
+## 인증서 검사 오류 유형 (2026-11-06 추가)
+
+읽기 전용 사전점검의 `inventory` 잡은 별도로 성공할 수 있습니다. `certificate` 잡의 실패를 Play 트랙 오류로 간주하지 않습니다.
+
+- `Upload keystore cannot be opened`: GitHub 저장소의 서명 keystore 파일/스토어 비밀번호가 서로 맞지 않거나 키 파일이 유효하지 않음.
+- `Upload alias not found or inaccessible`: 저장소 keystore의 키 별칭이 설정된 값과 다름. 첫 번째 keystore 열기 검사는 통과했음을 의미.
+- `Upload certificate could not be exported`: 별칭이 확인되었으나 인증서 추출 실패.
+- `Keystore certificate does not match the configured upload-certificate fingerprint`: 추출한 인증서와 저장소의 SHA-256 pin이 다름. Play Console 실제 인증서와의 일치 여부는 별도.
+- `Upload private key could not produce a certificate request`: 인증서 조회 이후 개인키 요청 단계에서 오류. 키 비밀번호, 개인키 존재/유형 또는 접근 권한 확인 필요.
+
+원인별 실패 문구는 **단계 이름만 표시**하며 실제 `keytool` stdout/stderr, 별칭, 키·비밀번호·인증서 원문을 출력하지 않습니다. 해당 값을 채팅이나 Git 저장소에 게시하지 마세요. 기존 저장값을 임의로 변경하지 말고 원인이 확인된 후 검증된 업로드 키 복구 절차를 사용하세요.
+
+2026-11-06T02:22:16Z의 [사전점검 #42149882497](https://github.com/hebi10/travelframe/actions/runs/42149882497): inventory PASS (최대 versionCode 26092622, internal completed, blocker 없음), certificate FAIL. 구버전 검사 코드에서는 `Keytool certificate/key verification failed`로만 표시되어 실패 단계의 상세 위치는 아직 구분할 수 없었습니다.
