@@ -149,7 +149,7 @@ export default function BodyFrameVideoScreen() {
   );
   const outputSize = getBodyFrameVideoOutputSize(videoOptions.ratio, videoOptions.quality);
   const frameAspectRatio = outputSize.width / outputSize.height;
-  const previewDisplayWidth = Math.max(160, Math.min(360, windowWidth * 0.82, windowHeight * 0.39 * frameAspectRatio));
+  const previewDisplayWidth = Math.max(160, Math.min(360, windowWidth * 0.82, windowHeight * 0.35 * frameAspectRatio));
   const [isLoading, setIsLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
