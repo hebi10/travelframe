@@ -179,7 +179,7 @@ assert.equal(
 
 for (const token of [
   "function BodyFrameSettingRow",
-  "minHeight: 72",
+  "minHeight: 64",
   'flexDirection: "row"',
   'justifyContent: "space-between"'
 ]) {
