@@ -8,6 +8,7 @@ const project = read("features/records/BodyFrameProjectDetailScreen.tsx");
 const videoHome = read("features/trip-clip/BodyFrameVideoHomeScreen.tsx");
 const videoCreate = read("features/trip-clip/BodyFrameVideoScreen.tsx");
 const settings = read("features/settings/BodyFrameSettingsScreen.tsx");
+const visualQa = read(".github/workflows/body-frame-device-qa.yml");
 const tabs = read("components/tab-glyph.tsx");
 
 for (const file of [
@@ -51,6 +52,8 @@ assert.ok(videoCreate.includes("minHeight: bodyFrameDesign.primaryButtonHeight")
 assert.ok(videoCreate.includes("TripClipRecordingCanvas"));
 assert.ok(videoCreate.includes("saveMadeVideo("));
 
+assert.ok(visualQa.includes("startsWith(github.head_ref, 'feat/body-frame-visual-polish-' )") || visualQa.includes("startsWith(github.head_ref, 'feat/body-frame-visual-polish-')"));
+assert.ok(visualQa.includes("--scenario visual") && visualQa.includes("scripts/check-stage6-visual-artifacts.py"));
 assert.ok(settings.includes("minHeight: 64") && settings.includes("minHeight: 56"));
 assert.ok(tabs.includes('studio: "image"') && tabs.includes('video: "youtube"'));
 assert.ok(settings.includes("const settingRowIcons: Record<string, keyof typeof Feather.glyphMap>"));

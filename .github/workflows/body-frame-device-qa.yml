@@ -154,7 +154,7 @@ jobs:
 
   stage6-design-matrix:
     needs: build-apk
-    if: github.event_name == 'workflow_dispatch' || (startsWith(github.head_ref, 'feat/body-frame-design-stage6-') || startsWith(github.head_ref, 'fix/body-frame-stage7-'))
+    if: github.event_name == 'workflow_dispatch' || (startsWith(github.head_ref, 'feat/body-frame-design-stage6-') || startsWith(github.head_ref, 'fix/body-frame-stage7-') || startsWith(github.head_ref, 'feat/body-frame-visual-polish-'))
     runs-on: ubuntu-latest
     timeout-minutes: 75
     steps:
