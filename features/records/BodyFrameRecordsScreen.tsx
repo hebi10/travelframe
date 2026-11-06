@@ -65,6 +65,13 @@ const formatDuration = (seconds: number) =>
     ? `${seconds.toFixed(1)}초`
     : `${Math.floor(seconds / 60)}분 ${Math.round(seconds % 60)}초`;
 
+const formatProjectDate = (createdAt: string) => {
+  const date = new Date(createdAt);
+  return Number.isFinite(date.getTime())
+    ? `${date.getFullYear()}. ${date.getMonth() + 1}. ${date.getDate()}.`
+    : "";
+};
+
 type CreateProjectInput = {
   name: string;
   targetPhotoCount: number;
@@ -75,14 +82,14 @@ export default function BodyFrameRecordsScreen() {
   const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
   const contentWidth = Math.min(windowWidth, bodyFrameDesign.contentMaxWidth) - bodyFrameDesign.horizontalPadding * 2;
-  const projectColumnCount = contentWidth >= 560 ? 3 : 2;
+  const projectColumnCount = contentWidth >= 560 ? 2 : 1;
   const projectCardWidth = Math.max(
     0,
     (contentWidth - 12 * (projectColumnCount - 1)) / projectColumnCount
   );
   const { palette, effectiveThemeMode } = useAppAppearance();
   const highlightColor = effectiveThemeMode === "dark" ? bodyFrameAccent : palette.text;
-  const coverWidth = Math.min(160, Math.max(120, Math.round(contentWidth * 0.36)));
+  const coverWidth = Math.min(116, Math.max(96, Math.round(projectCardWidth * 0.32)));
   const { isLoggedIn, subscription } = useAuth();
   const planEntitlements = useMemo(
     () => getPlanEntitlements({ isLoggedIn, subscription }),
@@ -226,43 +233,38 @@ export default function BodyFrameRecordsScreen() {
       >
         <View style={styles.header}>
           <Text style={[styles.pageTitle, { color: palette.text }]}>기록</Text>
-          <Text style={[styles.pageDetail, { color: palette.muted }]}>
-            프로젝트별 몸의 변화를 한눈에 확인합니다.
-          </Text>
-        </View>
-
-        <View style={styles.quickActions}>
-          <BodyFrameProjectSwitcher
-            createOnly
-            disabled={restoringProjectId !== null}
-            compact
-            projects={projects}
-            photos={photos}
-            activeProject={null}
-            maxProgressPhotos={planEntitlements.maxProgressPhotos}
-            maxProjectCount={planEntitlements.maxProjectCount}
-            upgradePlanLabel={upgradePlanLabel}
-            onSelectProject={() => undefined}
-            onCreateProject={handleCreateProject}
-            onUpgrade={() => router.push("/account")}
-          />
-          <Pressable
-            accessibilityRole="button"
-            style={[styles.captureButton, { backgroundColor: palette.text }]}
-            onPress={() => router.push("/camera")}
-          >
-            <Feather name="camera" size={17} color={palette.inverse} />
-            <Text style={[styles.captureButtonText, { color: palette.inverse }]}>
-              바로 촬영
-            </Text>
-          </Pressable>
         </View>
 
         <View style={styles.projectsHeading}>
-          <Text style={[styles.projectsTitle, { color: palette.text }]}>내 프로젝트</Text>
-          <Text style={[styles.projectsCount, { color: palette.muted }]}>
-            {cards.length}개
-          </Text>
+          <View style={styles.projectsHeadingCopy}>
+            <Text style={[styles.projectsTitle, { color: palette.text }]}>내 프로젝트</Text>
+            <Text style={[styles.projectsCount, { color: palette.muted }]}>{cards.length}개</Text>
+          </View>
+          <View style={styles.quickActions}>
+            <BodyFrameProjectSwitcher
+              createOnly
+              disabled={restoringProjectId !== null}
+              compact
+              projects={projects}
+              photos={photos}
+              activeProject={null}
+              maxProgressPhotos={planEntitlements.maxProgressPhotos}
+              maxProjectCount={planEntitlements.maxProjectCount}
+              upgradePlanLabel={upgradePlanLabel}
+              onSelectProject={() => undefined}
+              onCreateProject={handleCreateProject}
+              onUpgrade={() => router.push("/account")}
+            />
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="바로 촬영"
+              accessibilityHint="촬영 화면으로 이동합니다."
+              style={[styles.captureButton, { backgroundColor: palette.text }]}
+              onPress={() => router.push("/camera")}
+            >
+              <Feather name="camera" size={bodyFrameDesign.iconSize} color={palette.inverse} />
+            </Pressable>
+          </View>
         </View>
 
         {cards.length === 0 ? (
@@ -308,9 +310,7 @@ export default function BodyFrameRecordsScreen() {
                   onPress={() => void openProject(project)}
                   style={({ pressed }) => [
                     styles.projectCard,
-                     { width: projectCardWidth },
-                    cards.length === 1 && { width: contentWidth },
-                    cards.length === 1 && styles.singleProjectCard,
+                    { width: projectCardWidth },
                     {
                       backgroundColor: palette.surface,
                       borderColor: palette.line,
@@ -321,8 +321,7 @@ export default function BodyFrameRecordsScreen() {
                   <View
                     style={[
                       styles.coverFrame,
-                      cards.length === 1 && { width: coverWidth },
-                      { backgroundColor: palette.surfaceStrong }
+                      { width: coverWidth, backgroundColor: palette.surfaceStrong }
                     ]}
                   >
                     {cover ? (
@@ -347,12 +346,15 @@ export default function BodyFrameRecordsScreen() {
                     )}
                   </View>
 
-                  <View style={[styles.projectCopy, cards.length === 1 && styles.singleProjectCopy]}>
-                    <Text
-                      numberOfLines={1}
-                      style={[styles.projectName, { color: palette.text }]}
-                    >
-                      {project.name}
+                  <View style={styles.projectCopy}>
+                    <View style={styles.projectNameRow}>
+                      <Text numberOfLines={2} style={[styles.projectName, { color: palette.text }]}>
+                        {project.name}
+                      </Text>
+                      <Feather name="chevron-right" size={16} color={palette.muted} />
+                    </View>
+                    <Text style={[styles.projectDate, { color: palette.muted }]}>
+                      {formatProjectDate(project.createdAt)}
                     </Text>
                     <View style={styles.projectStatsRow}>
                       <Text style={[styles.projectMeta, { color: palette.muted }]}>
@@ -466,14 +468,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24
   },
   header: {
-    gap: 6,
-    marginBottom: 14
+    marginBottom: 20
   },
   quickActions: {
+    width: 184,
+    minHeight: bodyFrameDesign.primaryButtonHeight,
     flexDirection: "row",
     alignItems: "stretch",
-    gap: 8,
-    marginBottom: 24
+    gap: 8
   },
   pageTitle: {
     fontSize: bodyFrameTypography.pageTitle,
@@ -484,13 +486,10 @@ const styles = StyleSheet.create({
     lineHeight: 20
   },
   captureButton: {
-    flex: 1,
+    width: bodyFrameDesign.primaryButtonHeight,
     minHeight: bodyFrameDesign.primaryButtonHeight,
-    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 7,
-    paddingHorizontal: 14,
     borderRadius: bodyFrameDesign.buttonRadius
   },
   captureButtonText: {
@@ -499,10 +498,16 @@ const styles = StyleSheet.create({
   },
   projectsHeading: {
     flexDirection: "row",
-    alignItems: "baseline",
+    alignItems: "center",
     justifyContent: "space-between",
+    flexWrap: "wrap",
     gap: 12,
     marginBottom: 12
+  },
+  projectsHeadingCopy: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    gap: 8
   },
   projectsTitle: {
     fontSize: bodyFrameTypography.sectionTitle,
@@ -520,17 +525,11 @@ const styles = StyleSheet.create({
     gap: 12
   },
   projectCard: {
+    minHeight: 136,
+    flexDirection: "row",
     overflow: "hidden",
     borderWidth: bodyFrameDesign.borderWidth,
     borderRadius: bodyFrameDesign.cardRadius
-  },
-  singleProjectCard: {
-    flexDirection: "row"
-  },
-  singleProjectCopy: {
-    flex: 1,
-    justifyContent: "center",
-    padding: 16
   },
   coverFrame: {
     width: "100%",
@@ -557,12 +556,25 @@ const styles = StyleSheet.create({
     textAlign: "center"
   },
   projectCopy: {
+    flex: 1,
+    minWidth: 0,
     gap: 6,
-    padding: 10
+    padding: 12,
+    justifyContent: "space-between"
+  },
+  projectNameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6
   },
   projectName: {
+    flex: 1,
     fontSize: bodyFrameTypography.rowTitle,
     fontWeight: "600"
+  },
+  projectDate: {
+    fontSize: bodyFrameTypography.caption,
+    lineHeight: 16
   },
   projectStatsRow: {
     flexDirection: "row",
