@@ -465,7 +465,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24
   },
   header: {
-    marginBottom: 20
+    marginBottom: 12
   },
   quickActions: {
     width: 184,
@@ -498,8 +498,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     flexWrap: "wrap",
-    gap: 12,
-    marginBottom: 12
+    gap: 10,
+    marginBottom: 8
   },
   projectsHeadingCopy: {
     flexDirection: "row",
@@ -555,8 +555,8 @@ const styles = StyleSheet.create({
   projectCopy: {
     flex: 1,
     minWidth: 0,
-    gap: 6,
-    padding: 12,
+    gap: 5,
+    padding: 10,
     justifyContent: "space-between"
   },
   projectNameRow: {
