@@ -101,7 +101,7 @@ export default function BodyFrameCompareScreen() {
       <ScrollView
         contentContainerStyle={[
           styles.content,
-          { paddingTop: Math.max(insets.top + 16, 24), paddingBottom: insets.bottom + 28 }
+          { paddingTop: Math.max(insets.top + 8, 16), paddingBottom: insets.bottom + 28 }
         ]}
       >
         <View style={styles.header}>
@@ -112,7 +112,6 @@ export default function BodyFrameCompareScreen() {
             onPress={() => router.back()}
           >
             <Feather name="chevron-left" size={20} color={palette.text} />
-            <Text style={[styles.backButtonText, { color: palette.text }]}>돌아가기</Text>
           </Pressable>
           <Text style={[styles.heading, { color: palette.text }]}>전후 사진 비교</Text>
         </View>
@@ -251,26 +250,40 @@ const styles = StyleSheet.create({
     maxWidth: bodyFrameDesign.contentMaxWidth,
     alignSelf: "center",
     paddingHorizontal: bodyFrameDesign.horizontalPadding,
-    gap: 16
+    gap: 12
   },
-  header: { flexDirection: "row", alignItems: "center", gap: 12 },
-  backButton: {
+  header: {
     minHeight: bodyFrameDesign.minTouchSize,
     flexDirection: "row",
-    gap: 2,
-    paddingHorizontal: 12,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  backButton: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    width: bodyFrameDesign.minTouchSize,
+    minHeight: bodyFrameDesign.minTouchSize,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: bodyFrameDesign.borderWidth,
     borderRadius: bodyFrameDesign.buttonRadius
   },
-  backButtonText: { fontSize: bodyFrameTypography.button, fontWeight: "600" },
-  heading: { fontSize: bodyFrameTypography.sectionTitle, fontWeight: "600" },
-  projectName: { fontSize: bodyFrameTypography.body },
-  labels: { flexDirection: "row", justifyContent: "space-between", gap: 8 },
+  heading: { fontSize: bodyFrameTypography.sectionTitle, fontWeight: "600", textAlign: "center" },
+  projectName: { fontSize: bodyFrameTypography.caption, textAlign: "center" },
+  labels: {
+    width: "100%",
+    maxWidth: 520,
+    alignSelf: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 8
+  },
   label: { fontSize: bodyFrameTypography.caption },
   comparison: {
     width: "100%",
+    maxWidth: 520,
+    alignSelf: "center",
     aspectRatio: 3 / 4,
     overflow: "hidden",
     borderWidth: bodyFrameDesign.borderWidth,
@@ -293,7 +306,13 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     backgroundColor: "#FFFFFF"
   },
-  dateLabels: { flexDirection: "row", justifyContent: "space-between" },
+  dateLabels: {
+    width: "100%",
+    maxWidth: 520,
+    alignSelf: "center",
+    flexDirection: "row",
+    justifyContent: "space-between"
+  },
   date: { fontSize: bodyFrameTypography.caption },
   hint: { textAlign: "center", fontSize: bodyFrameTypography.caption },
   footer: {
@@ -304,7 +323,7 @@ const styles = StyleSheet.create({
   },
   positions: {
     width: "100%",
-    maxWidth: bodyFrameDesign.contentMaxWidth - bodyFrameDesign.horizontalPadding * 2,
+    maxWidth: 520,
     alignSelf: "center",
     flexDirection: "row",
     gap: 8
