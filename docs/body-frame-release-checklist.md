@@ -128,3 +128,19 @@ Use `docs/manual-device-qa.md` together with the current policy below.
 - [ ] Permission declarations match generated release manifest, including Health Connect read permissions.
 
 Release/store artwork is not uploaded to Firebase.
+
+## Stage 15 — 현재 출시 판정 (2026-11-06 KST)
+
+- [x] Stage 14 `main@cdad09e74f8f116f141ff8149c1e6bbd2e23e1d0` Quality/Secret Scan 성공. Stage 14 x86_64 Android QA/기능 smoke 및 232개 실제 스크린샷 검증 성공. 테스트 APK는 Play 서명된 AAB가 아님.
+- [x] `2026-11-07 11:01 KST` 새 업로드 키 게시 시간 게이트·승인 조건을 소스 테스트로 검증. 게시 승인 스위치를 Stage 15에서 변경하지 않음.
+- [x] 2026-11-06 무게시 preflight에서 저장된 키스토어/개인키 및 기존 Play 릴리스 목록 조회 성공. Play Console 업로드 인증서의 외부 SHA-256 지문 대조는 아직 별도 필요.
+- [ ] Stage 15 후보 PR의 전체 CI/별도 Dependency Audit 보고서 확인 및 패키지별 영향 분석.
+- [ ] **Play Console 업로드 인증서 ↔ 등록된 인증서 SHA-256 ↔ 보유 업로드 키** 3자 대조 완료.
+- [ ] 현재 전체 Play 트랙 및 `versionCode` 재조회, 보호 상태 릴리스 확인. 운영/공개 트랙 자동 게시 금지.
+- [ ] signed ARM64 release AAB와 R8 mapping을 실제 검사하고 서명된 설치 아티팩트를 보존.
+- [ ] ARM64 실기기 촬영/사진 저장/전후 비교/수치/포즈/MP4 저장·재편집·백그라운드/복구 수동 검수.
+- [ ] Google Play 테스트 결제/복원·6개 구독 변경·취소/환불·RTDN 및 서버 권한 검증.
+- [ ] 프로덕션 Firebase/Storage/AdMob UMP·Privacy/Health Connect/Data Safety/스토어 정책 검증.
+- [ ] 실제 테스트 트랙 배포 후 Play pre-launch report/기기 설치·테스트 계정 QA 확인.
+
+Stage 15 상세 분리표와 자동 회귀 범위: `docs/design/body-frame-stage15-release-readiness-20261106.md`. 코드 CI 성공만으로 출시 승인하지 않으며, 결제 토큰·인증값·실사용자 사진을 공개 CI에 기록하지 않는다.
