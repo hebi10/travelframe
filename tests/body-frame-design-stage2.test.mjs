@@ -38,7 +38,7 @@ assert.ok(camera.includes("captureBlockedReason") && camera.includes("measuremen
 assert.ok(switcher.includes("accessibilityHint={createOnly"));
 assert.ok(switcher.includes("onCreateProject") && switcher.includes("onSelectProject"));
 
-assert.ok(records.includes("contentWidth >= 560 ? 3 : 2"), "tablet layout must have three photo columns");
+assert.ok(records.includes("contentWidth >= 560 ? 2 : 1"), "phone projects use photo-first rows while tablets show two columns");
 assert.ok(records.includes("width: projectCardWidth"), "responsive card widths must remain measured");
 assert.ok(records.includes("cards.length === 1 && { width: contentWidth }"));
 assert.ok(records.includes("styles.projectGrid") && records.includes("styles.coverFrame"));

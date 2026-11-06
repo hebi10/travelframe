@@ -1075,7 +1075,7 @@ export default function BodyFrameProjectDetailScreen() {
           >
             <Feather name="chevron-left" size={bodyFrameDesign.iconSize} color={palette.text} />
           </Pressable>
-          <Text style={[styles.pageTitle, { color: palette.text }]}>프로젝트</Text>
+          <Text numberOfLines={1} style={[styles.pageTitle, { color: palette.text }]}>{project.name}</Text>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="프로젝트 설정 열기"
@@ -1092,9 +1092,6 @@ export default function BodyFrameProjectDetailScreen() {
         </View>
 
         <View style={styles.projectHeader}>
-          <Text style={[styles.projectName, { color: palette.text }]}>
-            {project.name}
-          </Text>
           <View style={styles.progressHeading}>
             <Text style={[styles.progressCount, { color: palette.text }]}>
               {summary.photoCount} / {summary.targetPhotoCount}
@@ -2108,7 +2105,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 22
+    gap: 8,
+    marginBottom: 12
   },
   iconButton: {
     width: bodyFrameDesign.minTouchSize,
@@ -2119,8 +2117,11 @@ const styles = StyleSheet.create({
     borderRadius: bodyFrameDesign.buttonRadius
   },
   pageTitle: {
+    flex: 1,
+    minWidth: 0,
     fontSize: bodyFrameTypography.sectionTitle,
-    fontWeight: "600"
+    fontWeight: "700",
+    textAlign: "center"
   },
   settingsButton: {
     minWidth: 54,
@@ -2136,13 +2137,13 @@ const styles = StyleSheet.create({
     fontWeight: "600"
   },
   projectHeader: {
-    gap: 12,
-    marginBottom: 20
+    gap: 8,
+    marginBottom: 12
   },
   comparePreviewCard: {
-    gap: 12,
-    padding: 12,
-    marginBottom: 20,
+    gap: 8,
+    padding: 10,
+    marginBottom: 14,
     borderWidth: bodyFrameDesign.borderWidth,
     borderRadius: bodyFrameDesign.cardRadius
   },
@@ -2164,7 +2165,7 @@ const styles = StyleSheet.create({
   comparePreviewItem: {
     flex: 1,
     minWidth: 0,
-    height: 190,
+    height: 148,
     overflow: "hidden"
   },
   comparePreviewImage: {
@@ -2227,8 +2228,8 @@ const styles = StyleSheet.create({
     gap: 12
   },
   progressCount: {
-    fontSize: bodyFrameTypography.metric,
-    fontWeight: "600",
+    fontSize: bodyFrameTypography.sectionTitle,
+    fontWeight: "700",
     fontVariant: ["tabular-nums"]
   },
   progressPercent: {
@@ -2269,7 +2270,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: bodyFrameDesign.buttonRadius,
-    marginBottom: 16
+    marginBottom: 12
   },
   primaryActionText: {
     fontSize: bodyFrameTypography.button,
@@ -2285,7 +2286,7 @@ const styles = StyleSheet.create({
     alignSelf: "center"
   },
   recordsSection: {
-    gap: 12
+    gap: 10
   },
   sectionHeader: {
     flexDirection: "row",

@@ -75,14 +75,14 @@ export default function BodyFrameRecordsScreen() {
   const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
   const contentWidth = Math.min(windowWidth, bodyFrameDesign.contentMaxWidth) - bodyFrameDesign.horizontalPadding * 2;
-  const projectColumnCount = contentWidth >= 560 ? 3 : 2;
+  const projectColumnCount = contentWidth >= 560 ? 2 : 1;
   const projectCardWidth = Math.max(
     0,
     (contentWidth - 12 * (projectColumnCount - 1)) / projectColumnCount
   );
   const { palette, effectiveThemeMode } = useAppAppearance();
   const highlightColor = effectiveThemeMode === "dark" ? bodyFrameAccent : palette.text;
-  const coverWidth = Math.min(160, Math.max(120, Math.round(contentWidth * 0.36)));
+  const coverWidth = contentWidth >= 560 ? 104 : 92;
   const { isLoggedIn, subscription } = useAuth();
   const planEntitlements = useMemo(
     () => getPlanEntitlements({ isLoggedIn, subscription }),
@@ -226,9 +226,11 @@ export default function BodyFrameRecordsScreen() {
       >
         <View style={styles.header}>
           <Text style={[styles.pageTitle, { color: palette.text }]}>기록</Text>
-          <Text style={[styles.pageDetail, { color: palette.muted }]}>
-            프로젝트별 몸의 변화를 한눈에 확인합니다.
-          </Text>
+          {cards.length === 0 ? (
+            <Text style={[styles.pageDetail, { color: palette.muted }]}>
+              프로젝트를 만들고 같은 구도의 사진을 기록하세요.
+            </Text>
+          ) : null}
         </View>
 
         <View style={styles.quickActions}>
@@ -308,7 +310,7 @@ export default function BodyFrameRecordsScreen() {
                   onPress={() => void openProject(project)}
                   style={({ pressed }) => [
                     styles.projectCard,
-                     { width: projectCardWidth },
+                    { width: projectCardWidth },
                     cards.length === 1 && { width: contentWidth },
                     cards.length === 1 && styles.singleProjectCard,
                     {
@@ -321,8 +323,7 @@ export default function BodyFrameRecordsScreen() {
                   <View
                     style={[
                       styles.coverFrame,
-                      cards.length === 1 && { width: coverWidth },
-                      { backgroundColor: palette.surfaceStrong }
+                      { width: coverWidth, backgroundColor: palette.surfaceStrong }
                     ]}
                   >
                     {cover ? (
@@ -385,6 +386,9 @@ export default function BodyFrameRecordsScreen() {
                         ]}
                       />
                     </View>
+                  </View>
+                  <View style={styles.cardChevron} pointerEvents="none" accessibilityElementsHidden>
+                    <Feather name="chevron-right" size={bodyFrameDesign.iconSize} color={palette.muted} />
                   </View>
                 </Pressable>
               );
@@ -466,14 +470,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24
   },
   header: {
-    gap: 6,
-    marginBottom: 14
+    gap: 4,
+    marginBottom: 10
   },
   quickActions: {
     flexDirection: "row",
     alignItems: "stretch",
     gap: 8,
-    marginBottom: 24
+    marginBottom: 16
   },
   pageTitle: {
     fontSize: bodyFrameTypography.pageTitle,
@@ -502,7 +506,7 @@ const styles = StyleSheet.create({
     alignItems: "baseline",
     justifyContent: "space-between",
     gap: 12,
-    marginBottom: 12
+    marginBottom: 10
   },
   projectsTitle: {
     fontSize: bodyFrameTypography.sectionTitle,
@@ -517,9 +521,12 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     alignItems: "flex-start",
     justifyContent: "flex-start",
-    gap: 12
+    gap: 10
   },
   projectCard: {
+    minHeight: 118,
+    flexDirection: "row",
+    alignItems: "center",
     overflow: "hidden",
     borderWidth: bodyFrameDesign.borderWidth,
     borderRadius: bodyFrameDesign.cardRadius
@@ -529,8 +536,7 @@ const styles = StyleSheet.create({
   },
   singleProjectCopy: {
     flex: 1,
-    justifyContent: "center",
-    padding: 16
+    justifyContent: "center"
   },
   coverFrame: {
     width: "100%",
@@ -557,12 +563,20 @@ const styles = StyleSheet.create({
     textAlign: "center"
   },
   projectCopy: {
-    gap: 6,
-    padding: 10
+    flex: 1,
+    minWidth: 0,
+    justifyContent: "center",
+    gap: 7,
+    paddingHorizontal: 12,
+    paddingVertical: 8
+  },
+  cardChevron: {
+    justifyContent: "center",
+    paddingRight: 10
   },
   projectName: {
     fontSize: bodyFrameTypography.rowTitle,
-    fontWeight: "600"
+    fontWeight: "700"
   },
   projectStatsRow: {
     flexDirection: "row",
@@ -650,8 +664,8 @@ const styles = StyleSheet.create({
     alignSelf: "center"
   },
   emptyCard: {
-    gap: 12,
-    padding: 18,
+    gap: 10,
+    padding: 16,
     borderWidth: 1,
     borderRadius: 8
   },
