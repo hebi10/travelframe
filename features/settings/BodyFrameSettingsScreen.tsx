@@ -91,7 +91,7 @@ function BodyFrameSettingRow({
 
   return (
     <Pressable
-      disabled={!onPress>
+      disabled={!onPress}
       accessibilityRole={onPress ? "button" : undefined}
       accessibilityLabel={onPress ? `${label}, ${mark}` : undefined}
       onPress={onPress}
