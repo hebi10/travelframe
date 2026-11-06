@@ -94,6 +94,7 @@ function BodyFrameSettingRow({
       disabled={!onPress}
       accessibilityRole={onPress ? "button" : undefined}
       accessibilityLabel={onPress ? `${label}, ${mark}` : undefined}
+      accessibilityHint={onPress ? detail : undefined}
       onPress={onPress}
       style={({ pressed }) => [
         styles.settingRow,
@@ -115,7 +116,7 @@ function BodyFrameSettingRow({
         </Text>
         {detail ? (
           <Text
-            numberOfLines={2}
+            numberOfLines={1}
             style={[styles.settingRowDetail, { color: palette.muted }]}
           >
             {detail}
@@ -596,7 +597,7 @@ const styles = StyleSheet.create({
     maxWidth: bodyFrameDesign.contentMaxWidth,
     alignSelf: "center",
     paddingHorizontal: bodyFrameDesign.horizontalPadding,
-    gap: 16
+    gap: 12
   },
   header: {
     gap: 6
@@ -608,7 +609,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: 10,
     paddingHorizontal: 14,
-    paddingVertical: 9,
+    paddingVertical: 8,
     borderWidth: bodyFrameDesign.borderWidth,
     borderRadius: bodyFrameDesign.cardRadius
   },
