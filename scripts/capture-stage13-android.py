@@ -14,6 +14,7 @@ import json
 import os
 from pathlib import Path
 import struct
+import subprocess
 import sys
 
 BASE = Path(__file__).resolve().with_name("capture-android-qa.py")
@@ -70,6 +71,41 @@ ADDITIONAL = [
     ("onboarding-welcome", "온보딩 첫 화면", "settings", ["바디 프레임에 오신 것을 환영합니다.", "시작하기"], qa.onboarding_welcome),
     ("onboarding-next", "온보딩 다음 화면", "settings", ["프로젝트로 기록을 나눕니다", "다음"], qa.onboarding_scrolled),
 ]
+
+
+def rgb_preview_is_reviewable(pixels):
+    """Reject a solid black/monochrome emulator frame even if UI hierarchy is valid."""
+    if len(pixels) != 32 * 32 * 3:
+        return False
+    return max(pixels) - min(pixels) >= 18
+
+
+def verified_capture(device, directory, name, route, expected, action=None):
+    """Keep failed screenshots and never claim that a blank PNG verifies the UI."""
+    record = qa.capture(device, directory, name, route, expected, action)
+    if record.get("status") != "captured":
+        return record
+    screenshot = directory / f"{name}.png"
+    try:
+        result = subprocess.run(
+            ["ffmpeg", "-hide_banner", "-loglevel", "error", "-i", str(screenshot),
+             "-vf", "scale=32:32,format=rgb24", "-frames:v", "1",
+             "-f", "rawvideo", "pipe:1"],
+            capture_output=True, check=True, timeout=20
+        )
+        if not rgb_preview_is_reviewable(result.stdout):
+            raise ValueError("screen pixels are blank or uniform")
+    except Exception as error:
+        failed_screenshot = directory / f"{name}.failure.png"
+        screenshot.replace(failed_screenshot)
+        record.update(
+            status="failed",
+            error=f"Unusable Android screenshot: {error}. Check emulator GPU/target; UI text alone is not visual proof.",
+            pixelEvidenceValid=False,
+        )
+    else:
+        record["pixelEvidenceValid"] = True
+    return record
 
 def write_report(output, manifest):
     records = manifest["captures"]
@@ -155,22 +191,24 @@ def main():
             else:
                 cases = [case for case in CASES if case[0] in LARGE_TEXT]
             for name, label, route, expected, action in cases:
-                record = qa.capture(device, directory, name, route, expected, action)
+                record = verified_capture(device, directory, name, route, expected, action)
                 record.update(profile=args.profile, variant=variant, label=label)
                 manifest["captures"].append(record)
                 (directory / f"{name}.json").write_text(json.dumps(record, indent=2, ensure_ascii=False), encoding="utf-8")
                 if "isn't responding" in record.get("error", ""):
                     raise RuntimeError("Android emulator System UI is not responding; review failure screenshot before retry")
+                if record.get("pixelEvidenceValid") is False:
+                    raise RuntimeError("Aborting because the Android emulator produced a blank screenshot; see the failed PNG.")
             if variant == "dark-100":
                 device.seed(False, font, theme_mode=theme)
                 for name, label, route, expected, action in ADDITIONAL[:2]:
-                    record = qa.capture(device, directory, name, route, expected, action)
+                    record = verified_capture(device, directory, name, route, expected, action)
                     record.update(profile=args.profile, variant=variant, label=label)
                     manifest["captures"].append(record)
                     (directory / f"{name}.json").write_text(json.dumps(record, indent=2, ensure_ascii=False), encoding="utf-8")
                 device.seed(True, font, theme_mode=theme)
                 for name, label, route, expected, action in ADDITIONAL[2:]:
-                    record = qa.capture(device, directory, name, route, expected, action)
+                    record = verified_capture(device, directory, name, route, expected, action)
                     record.update(profile=args.profile, variant=variant, label=label)
                     manifest["captures"].append(record)
                     (directory / f"{name}.json").write_text(json.dumps(record, indent=2, ensure_ascii=False), encoding="utf-8")

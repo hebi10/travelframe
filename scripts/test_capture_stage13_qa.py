@@ -5,6 +5,8 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from types import SimpleNamespace
+from unittest.mock import patch
 
 SCRIPT = Path(__file__).resolve().with_name("capture-stage13-android.py")
 SPEC = importlib.util.spec_from_file_location("body_frame_stage13_test_target", SCRIPT)
@@ -64,6 +66,29 @@ class Stage13CaptureTest(unittest.TestCase):
             data = json.loads((out / "capture-manifest.json").read_text(encoding="utf-8"))
             self.assertEqual(data["captures"][1]["status"], "failed")
             self.assertEqual(len((out / "screen-index.csv").read_text(encoding="utf-8-sig").splitlines()), 3)
+
+    def test_black_or_uniform_frame_cannot_pass_visual_capture(self):
+        self.assertFalse(stage13.rgb_preview_is_reviewable(bytes(32 * 32 * 3)))
+        self.assertFalse(stage13.rgb_preview_is_reviewable(bytes([18]) * (32 * 32 * 3)))
+        self.assertFalse(stage13.rgb_preview_is_reviewable(bytes(50)))
+        self.assertTrue(stage13.rgb_preview_is_reviewable(
+            bytes([0]) * (32 * 32) + bytes([220]) * (32 * 32 * 2)
+        ))
+
+    def test_blank_capture_is_preserved_as_failed_evidence(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            screenshot = folder / "records.png"
+            screenshot.write_bytes(b"PNG test content")
+            with patch.object(stage13.qa, "capture", return_value={"status": "captured"}), \
+                    patch.object(stage13.subprocess, "run",
+                                 return_value=SimpleNamespace(stdout=bytes(32 * 32 * 3))):
+                result = stage13.verified_capture(None, folder, "records", "studio", [])
+            self.assertEqual(result["status"], "failed")
+            self.assertIs(result["pixelEvidenceValid"], False)
+            self.assertIn("Unusable Android screenshot", result["error"])
+            self.assertTrue((folder / "records.failure.png").exists())
+            self.assertFalse(screenshot.exists())
 
     def test_script_rejects_physical_devices_and_disables_network(self):
         contents = SCRIPT.read_text(encoding="utf-8")
