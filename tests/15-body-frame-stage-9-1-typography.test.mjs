@@ -57,9 +57,10 @@ assert.ok(
     "projectName: {\n    fontSize: bodyFrameTypography.projectTitle"
   ) &&
     detailSource.includes(
-      "progressCount: {\n    fontSize: bodyFrameTypography.metric"
-    ),
-  "project detail should use the compact project-title and metric tokens"
+      "progressCount: {\n    fontSize: bodyFrameTypography.sectionTitle"
+    ) &&
+    detailSource.includes(">{project.name}</Text>"),
+  "project detail should show the project title once and use compact progress typography"
 );
 
 assert.ok(
