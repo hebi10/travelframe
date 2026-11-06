@@ -671,13 +671,15 @@ def replace_focused_input(device,value):
 
 
 def open_project_reminder(device):
-    # The photo-first project layout intentionally places secondary notification settings below the photo grid.
+    # The Stage 10 project layout keeps reminder settings under the dedicated statistics tab.
     device.ready(['QA 데모', '기록'])
+    device.tap('통계')
+    device.ready(['기록 달성률', '촬영 알림'])
     device.tap('프로젝트 촬영 알림 설정', search='below')
 
 
 def creation_keyboard(device):
-    device.ready(['프로젝트별 몸의 변화를'])
+    device.ready(['내 프로젝트'])
     device.tap('새 프로젝트 만들기')
     device.shell('settings', 'put', 'secure', 'show_ime_with_hard_keyboard', '1')
     xml = device.ready(['프로젝트 이름', '목표 기록 수'])
@@ -1075,7 +1077,7 @@ def capture_design_matrix(device, output, records, manifest):
     """Capture actual Android UI on disposable offline guest fixtures at four dp widths."""
     screens = [
         ('camera', 'camera', ['프로젝트 선택', '사진 촬영'], None),
-        ('records', 'studio', ['QA 데모', '프로젝트별 몸의 변화를'], None),
+        ('records', 'studio', ['QA 데모', '내 프로젝트'], None),
         ('project', f'project/{PROJECT}', ['QA 데모', '프로젝트 설정 열기'], None),
         ('compare', f'project/{PROJECT}/compare', ['전후 사진 비교', '첫 사진', '마지막 사진'], None),
         ('measurements', f'project/{PROJECT}/measurements', ['수치 기록', 'QA 데모'], None),
@@ -1128,7 +1130,7 @@ def capture_design_matrix(device, output, records, manifest):
             if variant == 'dark-100':
                 device.seed(False, app_font, theme_mode=theme)
                 record = capture(device, directory, 'empty-projects', 'studio',
-                                 ['프로젝트별 몸의 변화를'], None)
+                                 ['내 프로젝트'], None)
                 record.update(profile=profile, variant=variant, theme=theme, fontScale=system_scale)
                 records.append(record)
         (output / profile / 'device.txt').write_text(
@@ -1183,7 +1185,7 @@ def main():
                 if args.scenario == 'all':
                     device.seed(False)
                     record = capture(device, directory, 'create-project', 'studio', ['프로젝트 이름', '목표 기록 수'],
-                                     (['프로젝트별 몸의 변화를'], '새 프로젝트 만들기'))
+                                     (['내 프로젝트'], '새 프로젝트 만들기'))
                     record['profile'] = profile
                     records.append(record)
                 device.seed(False, 'large')
@@ -1199,8 +1201,10 @@ def main():
                 device.seed(True)
                 screens = [
                     ('camera', 'camera', ['프로젝트 선택', '사진 촬영'], None),
-                    ('records', 'studio', ['QA 데모', '프로젝트별 몸의 변화를'], None),
+                    ('records', 'studio', ['QA 데모', '내 프로젝트'], None),
                     ('project', f'project/{PROJECT}', ['QA 데모', '프로젝트 설정 열기'], None),
+                    ('project-metrics', f'project/{PROJECT}', ['QA 데모', '수치 기록', '전체 수치 기록 보기'], (['QA 데모'], '수치')),
+                    ('project-stats', f'project/{PROJECT}', ['QA 데모', '기록 달성률', '촬영 알림'], (['QA 데모'], '통계')),
                     ('project-settings', f'project/{PROJECT}', ['프로젝트 설정', '변경 저장', '이름'], (['프로젝트 설정 열기'], '프로젝트 설정 열기')),
                     ('project-reminder', f'project/{PROJECT}', ['촬영 알림 설정 닫기', '촬영 알림', '요일'], open_project_reminder),
                     ('photo', f'photo/{PHOTO}', ['기록 상세'], None),
