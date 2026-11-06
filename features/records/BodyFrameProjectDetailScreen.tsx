@@ -1376,7 +1376,12 @@ export default function BodyFrameProjectDetailScreen() {
                 <Pressable
                   accessibilityRole="button"
                   style={[styles.detailTabAction, { borderColor: palette.line }]}
-                  onPress={() => { setMeasurementDraft(measurementSettings); setSettingsOpen(true); }}
+                  onPress={() => {
+                    setMeasurementDraft(measurementSettings);
+                    setRememberCaptureContextDraft(rememberCaptureContext);
+                    setPoseAlignmentDraft(poseAlignmentEnabled);
+                    setSettingsOpen(true);
+                  }}
                 >
                   <Text style={[styles.sectionActionText, { color: palette.text }]}>프로젝트 설정 열기</Text>
                 </Pressable>
@@ -1397,7 +1402,7 @@ export default function BodyFrameProjectDetailScreen() {
         {detailTab === "stats" ? (
           <View style={styles.detailTabContent}>
             <Text style={[styles.sectionTitle, { color: palette.text }]}>통계</Text>
-            <View style={[styles.statCard, { borderColor: palette.line, backgroundColor: palette.surface }]}>
+            <View style={[styles.statSummaryCard, { borderColor: palette.line, backgroundColor: palette.surface }]}>
               <Text style={[styles.statLabel, { color: palette.muted }]}>기록 달성률</Text>
               <Text style={[styles.statValue, { color: palette.text }]}>
                 {summary.photoCount} / {summary.targetPhotoCount}장 · {progressPercent}%
@@ -2355,6 +2360,13 @@ const styles = StyleSheet.create({
   progressFill: {
     height: "100%",
     borderRadius: 3
+  },
+  statSummaryCard: {
+    minHeight: 76,
+    justifyContent: "space-between",
+    padding: 12,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderRadius: bodyFrameDesign.cardRadius
   },
   statGrid: {
     flexDirection: "row",
