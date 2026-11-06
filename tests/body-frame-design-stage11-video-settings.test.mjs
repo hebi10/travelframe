@@ -43,6 +43,8 @@ assert.ok(videoCreate.includes("TripClipRecordingCanvas"));
 assert.ok(videoCreate.includes("saveMadeVideo("));
 
 assert.ok(records.includes("contentWidth >= 560 ? 2 : 1"), "preserve the merged Stage 10 photo-first project list");
+assert.ok(records.includes("새 프로젝트를 만든 후 같은 구도로 사진을 기록해 보세요."));
+assert.ok(!records.includes("위의 새 프로젝트 버튼으로"), "empty state must avoid duplicate directions");
 assert.ok(detail.includes('id: "metrics", label: "수치"') && detail.includes('id: "stats", label: "통계"'), "preserve Stage 10 project tabs");
 assert.ok(detail.includes("styles.projectTabs"));
 for (const source of [tabs,settings,videoHome,videoCreate]) {
