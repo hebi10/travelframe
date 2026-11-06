@@ -14,8 +14,8 @@ test("Play catalog read-only tool uses only GET and never releases, orders or wr
     assert.equal(options.method, "GET");
     assert.equal(options.redirect, "error");
     assert.ok(u.pathname.includes("/applications/" + PACKAGE + "/"));
-    assert.ok(!/orders|edits|bundles|commit|purchases/i.test(u.pathname));
-    if (u.pathname.endsWith("/monetization/subscriptions")) return ok({
+    assert.ok(!/orders|edits|bundles|commit|purchases|monetization/i.test(u.pathname));
+    if (u.pathname.endsWith("/subscriptions")) return ok({
       subscriptions: EXPECTED_SUBSCRIPTIONS.map((productId) => ({
         productId, basePlans: [{ basePlanId: "monthly", state: "ACTIVE" }]
       }))
@@ -40,7 +40,7 @@ test("Play catalog read-only tool uses only GET and never releases, orders or wr
 test("Missing base plans and catalog errors cannot be reported as release approval", async () => {
   const d = await inspectStoreCatalog(token, async (url) => {
     const path = new URL(url).pathname;
-    if (path.endsWith("/monetization/subscriptions"))
+    if (path.endsWith("/subscriptions"))
       return ok({ subscriptions: [{ productId: "creator_monthly", basePlans: [] }] });
     return { ok: false, status: 403 };
   });
