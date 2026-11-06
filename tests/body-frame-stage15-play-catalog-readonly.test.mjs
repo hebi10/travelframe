@@ -73,10 +73,11 @@ test("Play operational workflow has no publishing, signing or auto-release privi
   const yaml = fs.readFileSync(".github/workflows/body-frame-stage15-play-ops-readonly.yml", "utf8");
   assert.ok(yaml.includes("branches: [main]"));
   assert.ok(yaml.includes("github.ref == 'refs/heads/main'"));
-  assert.ok(yaml.includes("INPUT_OPERATION: inventory"));
+  assert.ok(yaml.includes("scripts/inspect-play-inventory-readonly.mjs"));
   assert.ok(yaml.includes("scripts/check-play-upload-certificate.mjs"));
   assert.ok(yaml.includes("scripts/inspect-play-catalog-readonly.mjs"));
-  assert.ok(yaml.includes("scripts/publish-play-release.mjs plan"));
+  assert.ok(yaml.includes("stage15-play-inventory.json"));
+  assert.ok(!yaml.includes("scripts/publish-play-release.mjs plan"));
   assert.ok(!yaml.includes("scripts/publish-play-release.mjs publish"));
   assert.ok(!yaml.includes(":app:bundleRelease"));
   assert.ok(!yaml.includes("prepare-play-aab.mjs signing"));

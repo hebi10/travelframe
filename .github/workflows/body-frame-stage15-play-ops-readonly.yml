@@ -51,8 +51,6 @@ jobs:
       contents: read
       id-token: write
     env:
-      INPUT_OPERATION: inventory
-      INPUT_TRACK: internal
       PLAY_INTERNAL_TRACK: ${{ vars.PLAY_INTERNAL_TRACK }}
     steps:
       - uses: actions/checkout@v4
@@ -80,7 +78,7 @@ jobs:
       - name: Inspect existing tracks, bundles and maximum versionCode without uploading
         env:
           PLAY_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
-        run: node scripts/publish-play-release.mjs plan
+        run: node scripts/inspect-play-inventory-readonly.mjs
       - name: Read subscription catalog without purchases/orders or mutations
         env:
           PLAY_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
@@ -90,7 +88,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: body-frame-stage15-play-readonly-catalog
-          path: stage15-play-catalog.json
+          path: |
+            stage15-play-inventory.json
+            stage15-play-catalog.json
           if-no-files-found: warn
           retention-days: 14
       - name: Confirm no app publication was attempted
