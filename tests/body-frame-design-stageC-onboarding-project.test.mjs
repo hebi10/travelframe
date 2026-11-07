@@ -31,6 +31,9 @@ test("Stage C first-run welcome is immersive but replay remains a guide", () => 
   assert.ok(guideHook.includes("shouldShowInitialAppGuide()"));
   assert.ok(guideHook.includes("markAppGuideIntroSeen()"));
   assert.ok(guideHook.includes("replaySignal <= 0"));
+  assert.ok(guideHook.includes("!autoShowFirstRun"));
+  const settings = fs.readFileSync("features/settings/BodyFrameSettingsScreen.tsx", "utf8");
+  assert.ok(settings.includes("autoShowFirstRun={false}"));
 });
 
 test("Stage C project sheet clarifies policy and reference mode without changing creation semantics", () => {
