@@ -20,12 +20,14 @@ type AppGuideOverlayProps = {
   tabKey: AppGuideTabKey;
   transparentBackdrop?: boolean;
   replaySignal?: number;
+  autoShowFirstRun?: boolean;
 };
 
 export function AppGuideOverlay({
   tabKey,
   transparentBackdrop = false,
-  replaySignal = 0
+  replaySignal = 0,
+  autoShowFirstRun = true
 }: AppGuideOverlayProps) {
   const insets = useSafeAreaInsets();
   const { palette } = useAppAppearance();
@@ -39,7 +41,7 @@ export function AppGuideOverlay({
     goBack,
     goNext,
     skip
-  } = useAppGuide(tabKey, replaySignal);
+  } = useAppGuide(tabKey, replaySignal, autoShowFirstRun);
 
   if (!step) {
     return null;
