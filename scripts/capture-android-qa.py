@@ -106,7 +106,7 @@ def inspect_native_frames(path, directory):
     return evidence
 
 
-def fixture_values(app_dir, populated=True, font_size='medium', theme_mode='dark'):
+def fixture_values(app_dir, populated=True, font_size='medium', theme_mode='dark', intro_seen=True):
     """Mirror the versioned schemas in lib/*-library.ts; all values are synthetic."""
     photos = []
     measurements = []
@@ -134,7 +134,7 @@ def fixture_values(app_dir, populated=True, font_size='medium', theme_mode='dark
             fields=dict(weight=True, bodyFat=True, skeletalMuscle=True, waist=True),
             primaryMetric='weight', promptAfterCapture=False)} if populated else {},
         'travel-frame.videos.v1': [],
-        'travel-frame.guide-progress.v1': dict(seenGuideVersion=4, seenIntro=True,
+        'travel-frame.guide-progress.v1': dict(seenGuideVersion=4, seenIntro=intro_seen,
             seenTabs={tab: True for tab in ['camera', 'studio', 'tripClip', 'account', 'settings']}),
         'travel-frame.settings.v1': dict(storageMode='local_only', cloudBackupEnabled=False,
             themeMode=theme_mode, cameraFacing='back', referencePhotoVisible=True, fontSize=font_size),
@@ -584,7 +584,7 @@ class Device:
                 if attempt:raise
         raise RuntimeError('Control did not open its expected modal')
 
-    def seed(self, populated, font_size='medium', theme_mode='dark'):
+    def seed(self, populated, font_size='medium', theme_mode='dark', intro_seen=True):
         self.shell('am', 'force-stop', PACKAGE)
         app_dir = self.shell('run-as', PACKAGE, 'pwd').strip()
         if not re.fullmatch(r'/data/(?:user/\d+|data)/com\.haebi\.photoguide', app_dir):
@@ -597,7 +597,7 @@ class Device:
                     self.shell('run-as', PACKAGE, 'sh', '-c', f'cat > {relative}', data=fixture_jpeg(index,folder=='photo-previews'))
         with tempfile.TemporaryDirectory() as temporary:
             db = Path(temporary) / 'RKStorage'
-            write_storage(db, fixture_values(app_dir, populated, font_size, theme_mode))
+            write_storage(db, fixture_values(app_dir, populated, font_size, theme_mode, intro_seen=intro_seen))
             self.shell('run-as', PACKAGE, 'rm', '-f', 'databases/RKStorage-wal', 'databases/RKStorage-shm', 'databases/RKStorage-journal')
             self.shell('run-as', PACKAGE, 'sh', '-c', 'cat > databases/RKStorage', data=db.read_bytes())
         return app_dir
@@ -700,12 +700,12 @@ def onboarding_welcome(device):
     device.ready(['기준 사진 표시'])
     device.tap('사용 가이드',match='summary')
     device.ready(['바디 프레임에 오신 것을 환영합니다.'])
-    device.find_control('시작하기')  # Scroll inside the real guide when large text pushes it below the fold.
+    device.find_control('다음')  # Scroll inside the real guide when large text pushes it below the fold.
 
 
 def onboarding_scrolled(device):
     onboarding_welcome(device)
-    device.tap('시작하기')
+    device.tap('다음')
     device.ready(['프로젝트로 기록을 나눕니다'])
     device.find_control('다음')  # Verify the footer is reachable without advancing the step.
 
@@ -1122,7 +1122,7 @@ def capture_design_matrix(device, output, records, manifest):
                 records.append(record)
             if variant == 'dark-150':
                 record = capture(device, directory, 'onboarding-large-font', 'settings',
-                                 ['바디 프레임에 오신 것을 환영합니다.', '시작하기'],
+                                 ['바디 프레임에 오신 것을 환영합니다.', '다음'],
                                  onboarding_welcome)
                 record.update(profile=profile, variant=variant, theme=theme,
                               fontScale=system_scale, appFont=app_font)
@@ -1235,7 +1235,7 @@ def main():
                 device.seed(True, 'large')
                 device.shell('settings', 'put', 'system', 'font_scale', '1.3')
                 records.append(capture(device, directory, 'onboarding-welcome-large-font', 'settings',
-                                       ['바디 프레임에 오신 것을 환영합니다.', '시작하기'], onboarding_welcome))
+                                       ['바디 프레임에 오신 것을 환영합니다.', '다음'], onboarding_welcome))
                 records.append(capture(device, directory, 'onboarding-scroll-large-font', 'settings',
                                        ['다음', '스킵'], onboarding_scrolled))
                 device.shell('settings', 'put', 'system', 'font_scale', '1.0')
