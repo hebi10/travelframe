@@ -138,187 +138,7 @@ export default function BodyFrameVideoHomeScreen() {
     );
   }
 
-  return (
-    <View style={[styles.screen, { backgroundColor: palette.background }]}>
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={[
-          styles.content,
-          {
-            paddingTop: Math.max(insets.top + 20, 28),
-            paddingBottom: insets.bottom + 36
-          }
-        ]}
-      >
-        <View style={styles.header}>
-          <Text style={[styles.pageTitle, { color: palette.text }]}>영상</Text>
-          <Text style={[styles.pageDetail, { color: palette.muted }]}>
-            프로젝트로 변화 영상을 만들고 저장한 영상을 관리합니다.
-          </Text>
-        </View>
-
-        <View
-          style={[
-            styles.heroCard,
-            {
-              borderColor: palette.line,
-              backgroundColor: palette.surface
-            }
-          ]}
-        >
-          <View style={styles.heroHeader}>
-            <View style={[styles.heroIllustrationFrame, { backgroundColor: palette.surfaceStrong }]}>
-              <Image
-                source={require("../../assets/ui/illustrations/feature-video.png")}
-                style={styles.heroIllustration}
-                contentFit="contain"
-                accessible={false}
-              />
-            </View>
-            <View style={styles.heroCopy}>
-              <Text style={[styles.heroTitle, { color: palette.text }]}>
-                변화 영상 만들기
-              </Text>
-              <Text style={[styles.heroDetail, { color: palette.muted }]}>
-                {activeProject
-                  ? `${activeProject.name} 프로젝트의 기록으로 영상을 만듭니다.`
-                  : "먼저 프로젝트를 만들어 주세요."}
-              </Text>
-            </View>
-          </View>
-          <Pressable
-            accessibilityRole="button"
-            disabled={!activeProject}
-            accessibilityState={{ disabled: !activeProject }}
-            onPress={() => void startVideo()}
-            style={[
-              styles.primaryButton,
-              {
-                backgroundColor: primaryColor,
-                opacity: activeProject ? 1 : 0.4
-              }
-            ]}
-          >
-            <Feather name="play" size={16} color={primaryTextColor} />
-            <Text style={[styles.primaryButtonText, { color: primaryTextColor }]}>
-              영상 만들기
-            </Text>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => router.push("/video-library")}
-            style={[styles.secondaryButton, { borderColor: palette.line }]}
-          >
-            <Feather name="film" size={16} color={palette.text} />
-            <Text style={[styles.secondaryButtonText, { color: palette.text }]}>
-              영상 관리
-            </Text>
-          </Pressable>
-        </View>
-
-        <View
-          style={[
-            styles.policyRow,
-            {
-              borderColor: palette.line,
-              backgroundColor: palette.background
-            }
-          ]}
-        >
-          <Feather name="info" size={16} color={palette.muted} />
-          <Text style={[styles.policyText, { color: palette.muted }]}>
-            {isLoggedIn
-              ? "로그인 사용자는 영상 출력 횟수 제한이 없습니다."
-              : `비로그인 사용자는 주 1회 출력할 수 있습니다. 이번 주 ${guestUsage?.count ?? 0}/1회 사용`}
-          </Text>
-        </View>
-
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: palette.text }]}>프로젝트</Text>
-            <Text style={[styles.sectionCount, { color: palette.muted }]}>
-              {projects.length}개
-            </Text>
-          </View>
-
-          {projects.length > 0 ? (
-            <View style={styles.list}>
-              {projects.map((project) => {
-                const summary = getBodyProjectProgressSummary(photos, project);
-                const selected = project.id === activeProject?.id;
-                const projectPhotos = getBodyProjectPhotos(photos, project.id);
-                const coverPhoto =
-                  projectPhotos.find((photo) => photo.id === project.coverPhotoId) ??
-                  [...projectPhotos].sort(
-                    (first, second) => (second.sequence ?? 0) - (first.sequence ?? 0)
-                  )[0];
-                return (
-                  <Pressable
-                    key={project.id}
-                    accessibilityRole="button"
-                    accessibilityLabel={`${project.name} 프로젝트로 영상 만들기`}
-                    accessibilityState={{ selected }}
-                    onPress={() => void startVideo(project)}
-                    style={({ pressed }) => [
-                      styles.projectRow,
-                      {
-                        borderColor: selected ? palette.text : palette.line,
-                        backgroundColor: palette.surface,
-                        opacity: pressed ? 0.82 : 1
-                      }
-                    ]}
-                  >
-                    <View style={[styles.projectIcon, { backgroundColor: palette.surfaceStrong }]}>
-                      {coverPhoto ? (
-                        <Image
-                          source={{ uri: coverPhoto.previewUri ?? coverPhoto.uri }}
-                          style={styles.projectCoverImage}
-                          contentFit="contain"
-                          accessible={false}
-                        />
-                      ) : (
-                        <Feather name="folder" size={20} color={palette.muted} />
-                      )}
-                    </View>
-                    <View style={styles.rowCopy}>
-                      <Text
-                        numberOfLines={1}
-                        style={[styles.rowTitle, { color: palette.text }]}
-                      >
-                        {project.name}
-                      </Text>
-                      <Text style={[styles.rowDetail, { color: palette.muted }]}>
-                        기록 {summary.photoCount}개 · 예상 {formatDuration(summary.durationSeconds)}
-                      </Text>
-                    </View>
-                    <View style={styles.rowAction}>
-                      <Text style={[styles.rowActionText, { color: palette.text }]}>
-                        만들기
-                      </Text>
-                      <Feather name="chevron-right" size={16} color={palette.muted} />
-                    </View>
-                  </Pressable>
-                );
-              })}
-            </View>
-          ) : (
-            <View style={[styles.emptyCard, { borderColor: palette.line }]}>
-              <Image
-                source={require("../../assets/ui/illustrations/empty-project.png")}
-                style={styles.emptyArtwork}
-                contentFit="contain"
-                accessibilityLabel="프로젝트가 없는 상태"
-              />
-              <Text style={[styles.emptyTitle, { color: palette.text }]}>
-                프로젝트가 없습니다.
-              </Text>
-              <Text style={[styles.emptyDetail, { color: palette.muted }]}>
-                기록 탭에서 프로젝트를 만든 뒤 영상 제작을 시작할 수 있습니다.
-              </Text>
-            </View>
-          )}
-        </View>
-
+  const savedVideosSection = (
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionTitle, { color: palette.text }]}>저장한 영상</Text>
@@ -406,6 +226,182 @@ export default function BodyFrameVideoHomeScreen() {
             </View>
           )}
         </View>
+  );
+
+  return (
+    <View style={[styles.screen, { backgroundColor: palette.background }]}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[
+          styles.content,
+          {
+            paddingTop: Math.max(insets.top + 20, 28),
+            paddingBottom: insets.bottom + 36
+          }
+        ]}
+      >
+        <View style={styles.header}>
+          <Text style={[styles.pageTitle, { color: palette.text }]}>영상</Text>
+          <Text style={[styles.pageDetail, { color: palette.muted }]}>
+            프로젝트 기록을 영상으로 만들고 보관합니다.
+          </Text>
+        </View>
+
+        <View
+          style={[
+            styles.heroCard,
+            {
+              borderColor: palette.line,
+              backgroundColor: palette.surface
+            }
+          ]}
+        >
+          <View style={styles.heroHeader}>
+            <View style={[styles.heroIllustrationFrame, { backgroundColor: palette.surfaceStrong }]}>
+              <Image
+                source={require("../../assets/ui/illustrations/feature-video.png")}
+                style={styles.heroIllustration}
+                contentFit="contain"
+                accessible={false}
+              />
+            </View>
+            <View style={styles.heroCopy}>
+              <Text style={[styles.heroTitle, { color: palette.text }]}>
+                변화 영상 만들기
+              </Text>
+              <Text style={[styles.heroDetail, { color: palette.muted }]}>
+                {activeProject
+                  ? `${activeProject.name} 프로젝트의 기록으로 영상을 만듭니다.`
+                  : "먼저 프로젝트를 만들어 주세요."}
+              </Text>
+            </View>
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            disabled={!activeProject}
+            accessibilityState={{ disabled: !activeProject }}
+            onPress={() => void startVideo()}
+            style={[
+              styles.primaryButton,
+              {
+                backgroundColor: primaryColor,
+                opacity: activeProject ? 1 : 0.4
+              }
+            ]}
+          >
+            <Feather name="play" size={16} color={primaryTextColor} />
+            <Text style={[styles.primaryButtonText, { color: primaryTextColor }]}>
+              영상 만들기
+            </Text>
+          </Pressable>
+        </View>
+
+        <View
+          style={[
+            styles.policyRow,
+            {
+              borderColor: palette.line,
+              backgroundColor: palette.background
+            }
+          ]}
+        >
+          <Feather name="info" size={16} color={palette.muted} />
+          <Text style={[styles.policyText, { color: palette.muted }]}>
+            {isLoggedIn
+              ? "로그인 사용자는 영상 출력 횟수 제한이 없습니다."
+              : `비로그인 사용자는 주 1회 출력할 수 있습니다. 이번 주 ${guestUsage?.count ?? 0}/1회 사용`}
+          </Text>
+        </View>
+
+        {recentVideos.length > 0 ? savedVideosSection : null}
+
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionTitle, { color: palette.text }]}>프로젝트</Text>
+            <Text style={[styles.sectionCount, { color: palette.muted }]}>
+              {projects.length}개
+            </Text>
+          </View>
+
+          {projects.length > 0 ? (
+            <View style={styles.list}>
+              {projects.map((project) => {
+                const summary = getBodyProjectProgressSummary(photos, project);
+                const selected = project.id === activeProject?.id;
+                const projectPhotos = getBodyProjectPhotos(photos, project.id);
+                const coverPhoto =
+                  projectPhotos.find((photo) => photo.id === project.coverPhotoId) ??
+                  [...projectPhotos].sort(
+                    (first, second) => (second.sequence ?? 0) - (first.sequence ?? 0)
+                  )[0];
+                return (
+                  <Pressable
+                    key={project.id}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${project.name} 프로젝트로 영상 만들기`}
+                    accessibilityState={{ selected }}
+                    onPress={() => void startVideo(project)}
+                    style={({ pressed }) => [
+                      styles.projectRow,
+                      {
+                        borderColor: selected ? palette.text : palette.line,
+                        backgroundColor: palette.surface,
+                        opacity: pressed ? 0.82 : 1
+                      }
+                    ]}
+                  >
+                    <View style={[styles.projectIcon, { backgroundColor: palette.surfaceStrong }]}>
+                      {coverPhoto ? (
+                        <Image
+                          source={{ uri: coverPhoto.previewUri ?? coverPhoto.uri }}
+                          style={styles.projectCoverImage}
+                          contentFit="contain"
+                          accessible={false}
+                        />
+                      ) : (
+                        <Feather name="folder" size={20} color={palette.muted} />
+                      )}
+                    </View>
+                    <View style={styles.rowCopy}>
+                      <Text
+                        numberOfLines={1}
+                        style={[styles.rowTitle, { color: palette.text }]}
+                      >
+                        {project.name}
+                      </Text>
+                      <Text style={[styles.rowDetail, { color: palette.muted }]}>
+                        기록 {summary.photoCount}개 · 예상 {formatDuration(summary.durationSeconds)}
+                      </Text>
+                    </View>
+                    <View style={styles.rowAction}>
+                      <Text style={[styles.rowActionText, { color: palette.text }]}>
+                        만들기
+                      </Text>
+                      <Feather name="chevron-right" size={16} color={palette.muted} />
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </View>
+          ) : (
+            <View style={[styles.emptyCard, { borderColor: palette.line }]}>
+              <Image
+                source={require("../../assets/ui/illustrations/empty-project.png")}
+                style={styles.emptyArtwork}
+                contentFit="contain"
+                accessibilityLabel="프로젝트가 없는 상태"
+              />
+              <Text style={[styles.emptyTitle, { color: palette.text }]}>
+                프로젝트가 없습니다.
+              </Text>
+              <Text style={[styles.emptyDetail, { color: palette.muted }]}>
+                기록 탭에서 프로젝트를 만든 뒤 영상 제작을 시작할 수 있습니다.
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {recentVideos.length === 0 ? savedVideosSection : null}
 
         {message ? (
           <Text style={[styles.message, { color: palette.muted }]}>{message}</Text>
@@ -459,16 +455,16 @@ const styles = StyleSheet.create({
     gap: 12
   },
   heroIllustrationFrame: {
-    width: 72,
-    height: 72,
+    width: 80,
+    height: 80,
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
     borderRadius: bodyFrameDesign.cardRadius
   },
   heroIllustration: {
-    width: 64,
-    height: 64
+    width: 74,
+    height: 74
   },
   heroCopy: {
     flex: 1,
@@ -495,26 +491,13 @@ const styles = StyleSheet.create({
     fontSize: bodyFrameTypography.button,
     fontWeight: "700"
   },
-  secondaryButton: {
-    minHeight: bodyFrameDesign.minTouchSize,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 7,
-    borderWidth: bodyFrameDesign.borderWidth,
-    borderRadius: bodyFrameDesign.buttonRadius
-  },
-  secondaryButtonText: {
-    fontSize: bodyFrameTypography.button,
-    fontWeight: "600"
-  },
   policyRow: {
     minHeight: bodyFrameDesign.minTouchSize,
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 6,
     borderWidth: bodyFrameDesign.borderWidth,
     borderRadius: bodyFrameDesign.cardRadius
   },
@@ -524,7 +507,7 @@ const styles = StyleSheet.create({
     lineHeight: 17
   },
   section: {
-    gap: 12
+    gap: 8
   },
   sectionHeader: {
     minHeight: bodyFrameDesign.minTouchSize,
