@@ -68,7 +68,7 @@ LARGE_TEXT = {
 ADDITIONAL = [
     ("empty-projects", "기록 빈 상태", "studio", ["내 프로젝트"], None),
     ("new-project", "새 프로젝트 생성", "studio", ["프로젝트 이름", "목표 기록 수"], (["내 프로젝트"], "새 프로젝트 만들기")),
-    ("onboarding-welcome", "온보딩 첫 화면", "settings", ["바디 프레임에 오신 것을 환영합니다.", "시작하기"], qa.onboarding_welcome),
+    ("onboarding-welcome", "설정에서 여는 가이드", "settings", ["바디 프레임에 오신 것을 환영합니다.", "다음"], qa.onboarding_welcome),
     ("onboarding-next", "온보딩 다음 화면", "settings", ["프로젝트로 기록을 나눕니다", "다음"], qa.onboarding_scrolled),
 ]
 
@@ -206,6 +206,16 @@ def main():
                     record.update(profile=args.profile, variant=variant, label=label)
                     manifest["captures"].append(record)
                     (directory / f"{name}.json").write_text(json.dumps(record, indent=2, ensure_ascii=False), encoding="utf-8")
+                device.seed(True, font, theme_mode=theme, intro_seen=False)
+                first_run = verified_capture(
+                    device, directory, "onboarding-first-run", "camera",
+                    ["바디 프레임에 오신 것을 환영합니다.", "시작하기", "나중에 보기"]
+                )
+                first_run.update(profile=args.profile, variant=variant, label="최초 실행 환영 화면")
+                manifest["captures"].append(first_run)
+                (directory / "onboarding-first-run.json").write_text(
+                    json.dumps(first_run, indent=2, ensure_ascii=False), encoding="utf-8"
+                )
                 device.seed(True, font, theme_mode=theme)
                 for name, label, route, expected, action in ADDITIONAL[2:]:
                     record = verified_capture(device, directory, name, route, expected, action)
