@@ -41,7 +41,7 @@ CASES = [
     ("compare", "전후 사진 비교", f"project/{P}/compare", ["전후 사진 비교", "첫 사진", "마지막 사진"], None),
     ("measurements", "전체 수치 기록", f"project/{P}/measurements", ["수치 기록", "QA 데모"], None),
     ("measurement-create", "수치 추가 시트", f"project/{P}/measurements?add=1", ["몸무게", "저장"], None),
-    ("video-home", "영상 홈", "trip-clip", ["프로젝트로 변화 영상을"], None),
+    ("video-home", "영상 홈", "trip-clip", ["변화 영상 만들기"], None),
     ("video-create", "영상 만들기", "video-create", ["변화 영상 만들기", "QA 데모"], None),
     ("video-photos", "영상 사진 선택", "video-create", ["사진 선택", "전체 선택"], (["변화 영상 만들기"], "사진 수", "summary")),
     ("video-interval", "영상 간격 옵션", "video-create", ["사진 간격", "적용"], (["변화 영상 만들기"], "사진 간격", "summary")),
