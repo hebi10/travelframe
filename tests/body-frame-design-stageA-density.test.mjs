@@ -17,7 +17,7 @@ test("Stage A four screens and optional chart layout parse without changing app 
   for (let i = 0; i < files.length; i += 1) {
     const source = ts.createSourceFile(files[i], read(files[i]), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
     assert.equal(source.parseDiagnostics.length, 0, files[i] + " must parse");
-    assert.doesNotMatch(read(files[i]), /border(?:Top|Bottom|Left|Right)Width\\s*:|shadowOpacity|shadowColor|elevation\\s*:|LinearGradient/);
+    assert.doesNotMatch(read(files[i]), /border(?:Top|Bottom|Left|Right)Width\s*:|shadowOpacity|shadowColor|elevation\s*:|LinearGradient/);
   }
 });
 
@@ -25,8 +25,8 @@ test("Stage A settings keep six groups and accessible full details with denser r
   for (const section of ["촬영", "저장 및 백업", "변화 영상", "화면", "계정 및 플랜", "정보 및 개인정보"]) {
     assert.ok(settings.includes('SectionBlock title="' + section + '"'));
   }
-  assert.match(settings, /settingRow:\\s*\\{[^}]*minHeight:\\s*52/);
-  assert.match(settings, /settingRow:\\s*\\{[^}]*paddingVertical:\\s*6/);
+  assert.match(settings, /settingRow:\s*\{[^}]*minHeight:\s*52/);
+  assert.match(settings, /settingRow:\s*\{[^}]*paddingVertical:\s*6/);
   assert.ok(settings.includes("showDetail && detail"));
   assert.ok(settings.includes("accessibilityHint={onPress ? detail : undefined}"));
   assert.ok(settings.includes("showDetail={!planEntitlements.canBackupToCloud}"));
@@ -37,11 +37,11 @@ test("Stage A settings keep six groups and accessible full details with denser r
 
 test("Stage A measurements show recorded chart dates and retain data/filter/edit coverage", () => {
   assert.ok(metrics.includes("<BodyMeasurementSummaryCard"));
-  assert.ok(metrics.includes("          compact\\n"));
+  assert.ok(metrics.includes("          compact\n"));
   assert.ok(chart.includes("compact && styles.compactCard"));
   assert.ok(chart.includes("formatRangeDate(summary.first.recordedAt)"));
   assert.ok(chart.includes("formatRangeDate(summary.latest.recordedAt)"));
-  assert.match(metrics, /overviewStat:\\s*\\{[^}]*minHeight:\\s*60/);
+  assert.match(metrics, /overviewStat:\s*\{[^}]*minHeight:\s*60/);
   assert.ok(metrics.includes('accessibilityLabel="기록 지표 선택, 좌우로 이동"'));
   for (const token of [
     "setSelectedMetric(metric)", "setSelectedPeriod(option.value)",
@@ -59,15 +59,15 @@ test("Stage A video home prioritizes existing saves without breaking empty proje
   assert.ok(videos.includes("startVideo(project)"));
   assert.ok(videos.includes("getGuestWeeklyVideoExportUsage"));
   assert.ok(videos.includes("비로그인 사용자는 주 1회 출력"));
-  assert.match(videos, /heroIllustrationFrame:\\s*\\{[^}]*height:\\s*80/);
-  assert.equal((videos.match(/<Text style=\\{\\[styles.emptyTitle/g) ?? []).length >= 1, true);
+  assert.match(videos, /heroIllustrationFrame:\s*\{[^}]*height:\s*80/);
+  assert.equal((videos.match(/<Text style=\{\[styles.emptyTitle/g) ?? []).length >= 1, true);
 });
 
 test("Stage A project cards increase photo/record prominence with original ownership and touch contracts", () => {
   assert.ok(records.includes("Math.round(projectCardWidth * 0.36)"));
   assert.ok(records.includes("Math.min(128, Math.max(108"));
   assert.ok(records.includes("기록 {summary.photoCount} / {summary.targetPhotoCount}장"));
-  assert.match(records, /progressTrack:\\s*\\{[^}]*height:\\s*6/);
+  assert.match(records, /progressTrack:\s*\{[^}]*height:\s*6/);
   for (const token of [
     "cover.previewUri ?? cover.uri", "accessibilityRole=\"progressbar\"",
     "width: projectCardWidth", "getBodyFrameProjectCreationLimitState",
