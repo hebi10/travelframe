@@ -284,7 +284,8 @@ export default function BodyMeasurementHistoryScreen() {
 
         <ScrollView
           horizontal
-          showsHorizontalScrollIndicator={false}
+          showsHorizontalScrollIndicator
+          accessibilityLabel="기록 지표 선택, 좌우로 이동"
           contentContainerStyle={styles.metricSelector}
         >
           {enabledMetrics.map((metric) => {
@@ -346,6 +347,7 @@ export default function BodyMeasurementHistoryScreen() {
         <BodyMeasurementSummaryCard
           metric={selectedMetric}
           series={series}
+          compact
           onAddMeasurement={openNewEntry}
         />
 
@@ -591,7 +593,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 12
+    marginBottom: 8
   },
   iconButton: {
     width: bodyFrameDesign.minTouchSize,
@@ -619,8 +621,8 @@ const styles = StyleSheet.create({
     fontWeight: "600"
   },
   projectHeader: {
-    gap: 5,
-    marginBottom: 10
+    gap: 3,
+    marginBottom: 6
   },
   projectName: {
     fontSize: bodyFrameTypography.projectTitle,
@@ -631,8 +633,8 @@ const styles = StyleSheet.create({
     lineHeight: 17
   },
   metricSelector: {
-    gap: 8,
-    paddingBottom: 10
+    gap: 6,
+    paddingBottom: 8
   },
   metricButton: {
     minHeight: bodyFrameDesign.minTouchSize,
@@ -647,8 +649,8 @@ const styles = StyleSheet.create({
   },
   periodSelector: {
     flexDirection: "row",
-    gap: 8,
-    marginBottom: 10
+    gap: 6,
+    marginBottom: 8
   },
   periodButton: {
     flex: 1,
@@ -667,14 +669,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-between",
-    gap: 8,
-    marginBottom: 12
+    gap: 6,
+    marginBottom: 8
   },
   overviewStat: {
     width: "48%",
-    minHeight: 72,
+    minHeight: 60,
     justifyContent: "space-between",
-    padding: 12,
+    padding: 8,
     borderWidth: bodyFrameDesign.borderWidth,
     borderRadius: bodyFrameDesign.cardRadius
   },
@@ -687,11 +689,11 @@ const styles = StyleSheet.create({
     fontVariant: ["tabular-nums"]
   },
   historySection: {
-    gap: 12
+    gap: 8
   },
   healthConnectSection: {
     gap: 12,
-    marginTop: 26
+    marginTop: 20
   },
   sectionHeader: {
     flexDirection: "row",

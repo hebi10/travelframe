@@ -78,11 +78,13 @@ const settingRowIcons: Record<string, keyof typeof Feather.glyphMap> = {
 function BodyFrameSettingRow({
   label,
   detail,
+  showDetail = false,
   mark = "›",
   onPress
 }: {
   label: string;
   detail?: string;
+  showDetail?: boolean;
   mark?: string;
   onPress?: () => void;
 }) {
@@ -114,7 +116,7 @@ function BodyFrameSettingRow({
         <Text numberOfLines={2} style={[styles.settingRowLabel, { color: palette.text }]}>
           {label}
         </Text>
-        {detail ? (
+        {showDetail && detail ? (
           <Text
             numberOfLines={1}
             style={[styles.settingRowDetail, { color: palette.muted }]}
@@ -256,15 +258,15 @@ export default function BodyFrameSettingsScreen() {
         contentContainerStyle={[
           styles.content,
           {
-            paddingTop: Math.max(insets.top + 20, 28),
+            paddingTop: Math.max(insets.top + 12, 20),
             paddingBottom: insets.bottom + 36
           }
         ]}
       >
         <View style={styles.header}>
           <Text style={[styles.pageTitle, { color: palette.text }]}>설정</Text>
-          <Text style={[styles.pageDetail, { color: palette.muted }]}>
-            바디 프레임의 촬영, 저장, 영상과 계정 설정을 관리합니다.
+          <Text numberOfLines={1} style={[styles.pageDetail, { color: palette.muted }]}>
+            촬영·저장·영상·계정 설정
           </Text>
         </View>
 
@@ -304,6 +306,7 @@ export default function BodyFrameSettingsScreen() {
           />
           <BodyFrameSettingRow
             label="클라우드 백업"
+            showDetail={!planEntitlements.canBackupToCloud}
             detail={
               planEntitlements.canBackupToCloud
                 ? "현재 플랜에서 백업을 사용할 수 있습니다."
@@ -597,19 +600,19 @@ const styles = StyleSheet.create({
     maxWidth: bodyFrameDesign.contentMaxWidth,
     alignSelf: "center",
     paddingHorizontal: bodyFrameDesign.horizontalPadding,
-    gap: 12
+    gap: 10
   },
   header: {
-    gap: 6
+    gap: 2
   },
   settingRow: {
-    minHeight: 64,
+    minHeight: 52,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderWidth: bodyFrameDesign.borderWidth,
     borderRadius: bodyFrameDesign.cardRadius
   },
@@ -625,7 +628,7 @@ const styles = StyleSheet.create({
     gap: 3
   },
   settingRowValue: {
-    maxWidth: "48%",
+    maxWidth: "46%",
     flexDirection: "row",
     alignItems: "center",
     gap: 6
