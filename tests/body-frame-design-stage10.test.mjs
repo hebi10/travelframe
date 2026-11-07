@@ -20,7 +20,7 @@ for (const [file, source] of [
 
 assert.ok(records.includes("contentWidth >= 560 ? 2 : 1"), "mobile project list is one column, tablets two");
 assert.ok(records.includes("width: projectCardWidth"));
-assert.ok(records.includes("Math.round(projectCardWidth * 0.32)"), "thumbnail is width-bounded");
+assert.ok(records.includes("Math.round(projectCardWidth * 0.36)"), "thumbnail is width-bounded");
 assert.ok(records.includes('projectCard: {\n    minHeight: 136,\n    flexDirection: "row"'), "every card is a photo-led row");
 assert.ok(records.includes("formatProjectDate(project.createdAt)"));
 assert.ok(!records.includes("singleProjectCard") && !records.includes("singleProjectCopy"));
