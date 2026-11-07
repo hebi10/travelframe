@@ -2191,7 +2191,7 @@ const styles = StyleSheet.create({
   projectTabs: {
     flexDirection: "row",
     gap: 8,
-    marginBottom: 12
+    marginBottom: 8
   },
   projectTab: {
     flex: 1,
@@ -2253,16 +2253,16 @@ const styles = StyleSheet.create({
     fontWeight: "600"
   },
   projectHeader: {
-    gap: 10,
-    marginBottom: 14
+    gap: 8,
+    marginBottom: 10
   },
   comparePreviewCard: {
     width: "100%",
     maxWidth: 560,
     alignSelf: "center",
-    gap: 8,
-    padding: 10,
-    marginBottom: 12,
+    gap: 6,
+    padding: 8,
+    marginBottom: 8,
     borderWidth: bodyFrameDesign.borderWidth,
     borderRadius: bodyFrameDesign.cardRadius
   },
@@ -2284,7 +2284,7 @@ const styles = StyleSheet.create({
   comparePreviewItem: {
     flex: 1,
     minWidth: 0,
-    height: 172,
+    height: 156,
     overflow: "hidden"
   },
   comparePreviewImage: {
@@ -2396,7 +2396,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: bodyFrameDesign.buttonRadius,
-    marginBottom: 16
+    marginBottom: 10
   },
   primaryActionText: {
     fontSize: bodyFrameTypography.button,
