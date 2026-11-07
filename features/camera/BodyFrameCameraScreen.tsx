@@ -416,9 +416,9 @@ const styles = StyleSheet.create({
   captureHintPanel: {
     alignSelf: "center",
     maxWidth: "100%",
-    marginTop: 7,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    marginTop: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
     backgroundColor: "rgba(11,11,12,0.78)"
   },
   captureHint: {
