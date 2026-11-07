@@ -154,7 +154,7 @@ jobs:
 
   stage13-design-captures:
     needs: build-apk
-    if: github.event_name == 'workflow_dispatch' || startsWith(github.head_ref, 'feat/body-frame-design-stage13-') || startsWith(github.head_ref, 'feat/body-frame-design-stage14-') || startsWith(github.head_ref, 'feat/body-frame-design-stageA-') || startsWith(github.head_ref, 'feat/body-frame-design-stageB-') || startsWith(github.head_ref, 'fix/body-frame-stage13-')
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.head_ref, 'feat/body-frame-design-stage13-') || startsWith(github.head_ref, 'feat/body-frame-design-stage14-') || startsWith(github.head_ref, 'feat/body-frame-design-stageA-') || startsWith(github.head_ref, 'feat/body-frame-design-stageB-') || startsWith(github.head_ref, 'feat/body-frame-design-stageC-') || startsWith(github.head_ref, 'fix/body-frame-stage13-')
     runs-on: ubuntu-latest
     timeout-minutes: 65
     strategy:
