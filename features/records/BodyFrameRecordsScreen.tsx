@@ -89,7 +89,7 @@ export default function BodyFrameRecordsScreen() {
   );
   const { palette, effectiveThemeMode } = useAppAppearance();
   const highlightColor = effectiveThemeMode === "dark" ? bodyFrameAccent : palette.text;
-  const coverWidth = Math.min(116, Math.max(96, Math.round(projectCardWidth * 0.32)));
+  const coverWidth = Math.min(128, Math.max(108, Math.round(projectCardWidth * 0.36)));
   const { isLoggedIn, subscription } = useAuth();
   const planEntitlements = useMemo(
     () => getPlanEntitlements({ isLoggedIn, subscription }),
@@ -355,9 +355,9 @@ export default function BodyFrameRecordsScreen() {
                     </Text>
                     <View style={styles.projectStatsRow}>
                       <Text style={[styles.projectMeta, { color: palette.muted }]}>
-                        {summary.photoCount} / {summary.targetPhotoCount}장
+                        기록 {summary.photoCount} / {summary.targetPhotoCount}장
                       </Text>
-                      <Text style={[styles.projectPercent, { color: palette.faint }]}>
+                      <Text style={[styles.projectPercent, { color: palette.text }]}>
                         {progressPercent}%
                       </Text>
                     </View>
@@ -465,7 +465,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24
   },
   header: {
-    marginBottom: 12
+    marginBottom: 8
   },
   quickActions: {
     width: 184,
@@ -498,8 +498,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     flexWrap: "wrap",
-    gap: 10,
-    marginBottom: 8
+    gap: 8,
+    marginBottom: 6
   },
   projectsHeadingCopy: {
     flexDirection: "row",
@@ -586,7 +586,7 @@ const styles = StyleSheet.create({
   },
   projectPercent: {
     fontSize: bodyFrameTypography.caption,
-    fontWeight: "600",
+    fontWeight: "700",
     fontVariant: ["tabular-nums"]
   },
   projectDuration: {
@@ -594,7 +594,7 @@ const styles = StyleSheet.create({
     lineHeight: 17
   },
   progressTrack: {
-    height: 4,
+    height: 6,
     overflow: "hidden",
     borderRadius: 2
   },
