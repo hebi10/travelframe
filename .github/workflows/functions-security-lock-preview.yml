@@ -1,0 +1,43 @@
+name: Temporary Functions Admin SDK 14 lockfile preview
+
+on:
+  pull_request:
+    paths:
+      - "functions/package.json"
+      - "functions/package-lock.json"
+      - "tests/body-frame-stage15-functions-parser-security.test.mjs"
+      - ".github/workflows/functions-security-lock-preview.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  regenerate-lock:
+    name: Regenerate and assess Functions-only lockfile (no deployment)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Generate lockfile without lifecycle scripts
+        run: npm install --prefix functions --package-lock-only --ignore-scripts --no-audit --no-fund
+      - name: Verify lockfile dependencies install exactly
+        run: npm ci --prefix functions --ignore-scripts --no-audit --no-fund
+      - name: Validate Firebase Functions runtime dependencies
+        run: npm --prefix functions run quality
+      - name: Collect updated advisory report without forcing updates
+        shell: bash
+        run: npm audit --prefix functions --omit=dev --json > functions-new-audit.json || true
+      - name: Report selected Admin SDK version
+        run: |
+          node -e "const l=require('./functions/package-lock.json');console.log('firebase-admin',l.packages['node_modules/firebase-admin'].version)"
+      - name: Export regenerated lock and advisory evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: stage17-functions-admin14-regenerated-lock
+          path: |
+            functions/package-lock.json
+            functions-new-audit.json
+          retention-days: 3
