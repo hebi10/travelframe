@@ -408,6 +408,9 @@ export default function BodyFrameCompareScreen() {
                 </Pressable>
               ))}
             </View>
+            <Text style={{ color: palette.muted, fontSize: bodyFrameTypography.caption }}>
+              이전 사진보다 촬영 순번이 뒤인 사진을 현재 사진으로 선택해 주세요.
+            </Text>
             <FlatList
               style={styles.pickerListViewport}
               data={candidates}
