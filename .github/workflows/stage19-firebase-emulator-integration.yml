@@ -1,0 +1,65 @@
+name: Stage 19 Firebase SDK integration (emulators)
+
+on:
+  pull_request:
+    paths:
+      - "functions/**"
+      - "scripts/test-stage19-firebase-emulators.mjs"
+      - ".github/workflows/stage19-firebase-emulator-integration.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  actual-sdk-emulators:
+    name: Admin 14 / Functions 7 / Firestore / Storage / Auth integration
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      CI: "true"
+      STAGE19_PROJECT_ID: "demo-travelframe-stage19"
+      FIRESTORE_EMULATOR_HOST: "127.0.0.1:8080"
+      FIREBASE_STORAGE_EMULATOR_HOST: "127.0.0.1:9199"
+      FIREBASE_AUTH_EMULATOR_HOST: "127.0.0.1:9099"
+      FUNCTIONS_EMULATOR_HOST: "127.0.0.1:5001"
+      FUNCTIONS_ENABLE_ADMIN_BACKUP_DELETION: "false"
+      FUNCTIONS_ENABLE_ADMIN_FULL_BACKUP_DELETION: "false"
+      FUNCTIONS_ENFORCE_APP_CHECK: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Install exact Admin 14 / Functions 7 dependencies
+        run: npm ci --prefix functions --ignore-scripts --no-fund
+      - name: Verify real SDK registration and startup
+        run: npm --prefix functions run quality
+      - name: Install Firebase Emulator CLI
+        run: npm install --global firebase-tools@15.18.0
+      - name: Require isolated demo project and no cloud credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$STAGE19_PROJECT_ID" == demo-* ]]
+          [[ "$STAGE19_PROJECT_ID" != "travelframe-4e1fb" ]]
+          [[ -z "${GOOGLE_APPLICATION_CREDENTIALS:-}" ]]
+          [[ -z "${FIREBASE_TOKEN:-}" ]]
+          [[ -z "${GOOGLE_OAUTH_ACCESS_TOKEN:-}" ]]
+      - name: Execute actual Functions, Firestore, Storage and Auth emulators
+        timeout-minutes: 20
+        run: firebase emulators:exec --project demo-travelframe-stage19 --only auth,firestore,storage,functions,pubsub "node scripts/test-stage19-firebase-emulators.mjs"
+      - name: Upload isolated integration results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stage19-firebase-sdk-emulator-integration
+          path: reports/stage19-firebase-emulator-integration.json
+          retention-days: 14
+          if-no-files-found: warn
