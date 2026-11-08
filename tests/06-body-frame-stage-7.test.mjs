@@ -191,9 +191,9 @@ for (const token of [
 
 for (const token of [
   "#0B0B0C",
-  "#131315",
   "#1A1A1D",
-  "#2A2A2E",
+  "#292D31",
+  "#323437",
   "#F5F5F5",
   "#A0A0A6",
   "#88888F"
