@@ -11,3 +11,11 @@
 - Do not interpret this file or a started workflow as successful Google Play deployment until the `publish` job succeeds and the `closed` (`alpha`) Play track readback confirms the release.
 - No Firebase server deployment, production Play release, subscription/price change, photo manipulation, or app source change is authorized by this commit.
 - Closed testing is for the user's follow-on interactive Android QA, which remains unverified until tested.
+
+## Retry after R8 heap exhaustion (2026-11-09 KST)
+
+- First build-only run [#39](https://github.com/hebi10/travelframe/actions/runs/42493143291) failed in `app:minifyReleaseWithR8` from `java.lang.OutOfMemoryError: Java heap space`; no Play upload was attempted.
+- First closed-deploy run [#40](https://github.com/hebi10/travelframe/actions/runs/42493396271) failed at the same R8 task before `Publish AAB`; no Play upload was attempted.
+- [PR #133](https://github.com/hebi10/travelframe/pull/133) was validated and merged in `9890fe0bde0775541be81981a8b078f1e7453d59`, raising release Gradle daemon heap 2 GiB → 4 GiB and metaspace 512 MiB → 1 GiB without changing the application, signing key or Play track.
+- Re-run **only Google Play closed testing** via the existing protected `main` push gate; the explicit `[deploy-closed]` marker in this commit authorizes another attempt after the R8 memory fix.
+- Completion is contingent on successful signed AAB build, same-run artifact verification, Play API track commit and subsequent readback. Do not claim published until all succeed.
