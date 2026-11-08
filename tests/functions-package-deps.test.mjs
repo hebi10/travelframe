@@ -28,11 +28,21 @@ assert.ok(
   functionsPackage.scripts?.syntax,
   "Functions package should expose a syntax verification command"
 );
-assert.ok(
-  functionsPackage.scripts?.["runtime:deps"]?.includes(
-    "google-gax/build/src/fallback"
-  ),
-  "Functions package should smoke-test the Google Cloud fallback import"
+for (const modulePath of [
+  "firebase-admin/app",
+  "firebase-admin/firestore",
+  "firebase-admin/storage",
+  "google-gax"
+]) {
+  assert.ok(
+    functionsPackage.scripts?.["runtime:deps"]?.includes(`require('${modulePath}')`),
+    `Functions runtime smoke test must import public entry point: ${modulePath}`
+  );
+}
+assert.equal(
+  functionsPackage.scripts?.["runtime:deps"]?.includes("google-gax/build/src/fallback"),
+  false,
+  "Functions should not depend on private Google Gax paths"
 );
 
 for (const fileName of functionJsFiles) {
