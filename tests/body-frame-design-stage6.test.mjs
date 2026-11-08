@@ -85,7 +85,7 @@ assert.ok(read("components/tab-glyph.tsx").includes("size={bodyFrameDesign.iconS
 for (const token of [
   "DESIGN_PROFILES = [", "'phone-360dp'", "'phone-412dp'",
   "'tablet-600dp'", "'tablet-750dp'", "DESIGN_VARIANTS = [",
-  "'dark-100'", "'light-130'", "'dark-150'",
+  "'dark-100'", "'light-130'", "'dark-150'", "'light-150'",
   "def capture_design_matrix(", "scenario == 'visual'",
   "themeMode=theme_mode", "system_scale",
   "device.shell('svc', 'wifi', 'disable')",
