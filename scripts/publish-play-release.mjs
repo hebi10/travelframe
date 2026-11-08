@@ -41,6 +41,10 @@ export function resolveRequest(environment) {
     throw new Error("source_sha must be a full 40-character commit SHA");
   }
 
+  if (manual && environment.INPUT_OPERATION &&
+      !["inventory", "publish"].includes(environment.INPUT_OPERATION)) {
+    throw new Error("Unsupported legacy Play operation");
+  }
   const legacyMode = environment.INPUT_OPERATION === "inventory" ? "check"
     : environment.INPUT_OPERATION === "publish" ? "deploy" : null;
   const mode = manual ? (environment.INPUT_MODE || legacyMode || "build") : "deploy";
