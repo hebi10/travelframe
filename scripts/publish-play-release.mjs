@@ -26,16 +26,47 @@ export function requirePlayPublishWindow(operation, now = Date.now()) {
 
 
 export function resolveRequest(environment) {
-  if (environment.GITHUB_REPOSITORY !== "hebi10/travelframe" || environment.GITHUB_REF !== "refs/heads/main") throw new Error("Play releases must run from this repository's main workflow");
-  if (!["push", "workflow_dispatch"].includes(environment.GITHUB_EVENT_NAME)) throw new Error("Unsupported release event");
+  if (environment.GITHUB_REPOSITORY !== "hebi10/travelframe" ||
+      environment.GITHUB_REF !== "refs/heads/main") {
+    throw new Error("Play releases must run from this repository's main workflow");
+  }
+  if (!["push", "workflow_dispatch"].includes(environment.GITHUB_EVENT_NAME)) {
+    throw new Error("Unsupported release event");
+  }
+
   const manual = environment.GITHUB_EVENT_NAME === "workflow_dispatch";
-  const sourceSha = String(manual && environment.INPUT_SOURCE_SHA ? environment.INPUT_SOURCE_SHA : environment.GITHUB_SHA || "").toLowerCase();
-  if (!/^[a-f0-9]{40}$/.test(sourceSha)) throw new Error("source_sha must be a full 40-character commit SHA");
-  const logicalTrack = manual ? environment.INPUT_TRACK || "internal" : "internal";
-  if (!["internal", "closed"].includes(logicalTrack)) throw new Error("Only internal and closed testing are allowed");
-  const operation = manual ? environment.INPUT_OPERATION || "publish" : "publish";
-  if (!["publish", "inventory"].includes(operation)) throw new Error("Only publish and read-only inventory operations are allowed");
-  return { sourceSha, logicalTrack, operation };
+  const sourceSha = String(manual && environment.INPUT_SOURCE_SHA
+    ? environment.INPUT_SOURCE_SHA : environment.GITHUB_SHA || "").toLowerCase();
+  if (!/^[a-f0-9]{40}$/.test(sourceSha)) {
+    throw new Error("source_sha must be a full 40-character commit SHA");
+  }
+
+  const legacyMode = environment.INPUT_OPERATION === "inventory" ? "check"
+    : environment.INPUT_OPERATION === "publish" ? "deploy" : null;
+  const mode = manual ? (environment.INPUT_MODE || legacyMode || "build") : "deploy";
+  if (!["check", "build", "deploy"].includes(mode)) {
+    throw new Error("Only check, build and deploy are allowed");
+  }
+
+  const commitMessage = String(environment.RELEASE_COMMIT_MESSAGE || "");
+  const internalMarker = commitMessage.includes("[deploy-internal]");
+  const closedMarker = commitMessage.includes("[deploy-closed]");
+  if (!manual && internalMarker === closedMarker) {
+    throw new Error("Automatic Play deployment requires exactly one explicit testing-track commit marker");
+  }
+  const logicalTrack = manual
+    ? environment.INPUT_TRACK || "internal"
+    : closedMarker ? "closed" : "internal";
+  if (!["internal", "closed"].includes(logicalTrack)) {
+    throw new Error("Only internal and closed testing are allowed");
+  }
+
+  return {
+    sourceSha,
+    logicalTrack,
+    mode,
+    operation: mode === "check" ? "inventory" : "publish"
+  };
 }
 
 export function resolveTrack(logicalTrack, internalTrack, tracks) {
@@ -249,7 +280,7 @@ async function main() {
     const request = resolveRequest(process.env);
     requirePlayPublishWindow(request.operation);
     authConfiguration();
-    fs.appendFileSync(process.env.GITHUB_OUTPUT, `source_sha=${request.sourceSha}\nlogical_track=${request.logicalTrack}\noperation=${request.operation}\n`);
+    fs.appendFileSync(process.env.GITHUB_OUTPUT, `source_sha=${request.sourceSha}\nlogical_track=${request.logicalTrack}\noperation=${request.operation}\nmode=${request.mode}\n`);
   } else if (command === "check-source") {
     const request = resolveRequest(process.env);
     verifySourceAncestry(process.env.SOURCE_DIR, request.sourceSha, process.env.GITHUB_SHA);
