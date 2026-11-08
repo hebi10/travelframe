@@ -36,11 +36,17 @@ Functions의 `body-parser@1.20.9` 및 `qs@6.16.1` 패치는 PR #107에 이미 �
 
 ## 오래된 PR·저장소 설정 연계
 
-- [PR #72](https://github.com/hebi10/travelframe/pull/72)의 레거시 편집 접근성 및 [PR #111](https://github.com/hebi10/travelframe/pull/111)의 FFmpeg QA 러너 개선은 최신 `main` 기준 [PR #121](https://github.com/hebi10/travelframe/pull/121)에 **선별 이관해 검증 중**. PR #121 녹색 검사 및 적용 확인 전 원 PR들을 무작정 병합/삭제하지 않는다.
-- [PR #75](https://github.com/hebi10/travelframe/pull/75) 마케팅 캡처는 이전 테스트 APK ID/SHA가 고정되어 있으므로 최신 빌드와 증거를 먼저 대조한다. 그대로 `main`에 병합하지 않는다.
+- [PR #72](https://github.com/hebi10/travelframe/pull/72)·[PR #111](https://github.com/hebi10/travelframe/pull/111)은 **미병합 종료 및 기록 보존**하고 필요한 레거시 접근성/QA 제한만 최신 [PR #121](https://github.com/hebi10/travelframe/pull/121)로 이관해 검증 중이다. 원 PR 소스는 직접 병합하거나 삭제하지 않는다.
+- [PR #75](https://github.com/hebi10/travelframe/pull/75) 예시 사진 캡처도 **미병합 종료**했으며 최신 APK/소스 SHA 기반 재구성은 [이슈 #123](https://github.com/hebi10/travelframe/issues/123)로 이관했다.
 - 확인 시점 `main`은 `protected:false`, 적용 중인 repository rulesets `[]`. PR 승인·필수 Quality/Secret Scan·게시 게이트를 강제할 branch protection 설정이 필요하지만 **현재 연결 권한의 branch-protection 관리 API는 403**이므로 이 문서는 보호 설정을 완료했다고 주장하지 않는다.
 - `.github/workflows/android-play-aab.yml`은 `main` push에서 승인 변수 조건이 참이면 테스트 트랙 빌드/게시를 진행할 수 있다. 별도 출시 승인 없이 `main`에 보통 커밋을 넣어서는 안 된다.
 
 ## 현재 판정
 
 **출시 승인: 보류 / 보안 이슈 #106: OPEN.** 고위험 패키지 9개는 아직 lockfile에서 제거되지 않았으며, 안전한 수정은 SDK 호환성 및 실제 Android/운영 회귀 결과에 따라 별도 PR로 진행한다. 이 문서 자체는 코드·잠금 파일·Play·Firebase·서명키를 변경하지 않는다.
+
+## Functions 14.x 후보의 실제 호환성 시험 (2026-11-08)
+- [PR #122](https://github.com/hebi10/travelframe/pull/122)는 **미병합 종료한 시험 브랜치**다. `firebase-admin@14.5.0` 단독 업데이트는 현행 `firebase-functions@6.6.0`의 peer 범위(`^11 || ^12 || ^13`) 때문에 npm ci ERESOLVE.
+- `firebase-functions@7.4.0 + firebase-admin@14.5.0`을 함께 사용하면 npm ci는 성공하고 생성된 lock은 Firestore 9.4.0 / Storage 8.4.0 / gRPC 1.14.7. Functions production audit high 0, moderate **7**로 감소하지만 기존 `google-gax/build/src/fallback` 비공개 경로에서 `ERR_PACKAGE_PATH_NOT_EXPORTED`가 발생해 런타임 호환 검증에 실패.
+- Admin SDK 14에서 기존 `functions/index.js`의 namespace 형태(`admin.initializeApp()`/`admin.firestore()`/`admin.storage()`)를 공식 모듈형 import로 마이그레이션하는 일이 필요하다. 결제/RTDN/백업/Firestore/Storage 운영 QA를 포함한 작업을 [이슈 #125](https://github.com/hebi10/travelframe/issues/125)로 분리.
+- 격리 잠금 파일·감사 원본: [GitHub Actions artifact](https://github.com/hebi10/travelframe/actions/runs/42451483725/artifacts/13606091069). **이 수치는 운영 Functions 업데이트 효과가 아니다. 운영 변경 0.**
