@@ -199,6 +199,30 @@ def main():
                     raise RuntimeError("Android emulator System UI is not responding; review failure screenshot before retry")
                 if record.get("pixelEvidenceValid") is False:
                     raise RuntimeError("Aborting because the Android emulator produced a blank screenshot; see the failed PNG.")
+            if variant == "light-150":
+                device.seed(False, font, theme_mode=theme)
+                large_creation = verified_capture(
+                    device, directory, "new-project-light-large", "studio",
+                    ["프로젝트 이름", "목표 기록 수", "프로젝트 만들기"],
+                    (["내 프로젝트"], "새 프로젝트 만들기")
+                )
+                large_creation.update(profile=args.profile, variant=variant,
+                                      label="라이트 테마 글자 150% 새 프로젝트")
+                manifest["captures"].append(large_creation)
+                (directory / "new-project-light-large.json").write_text(
+                    json.dumps(large_creation, indent=2, ensure_ascii=False), encoding="utf-8"
+                )
+                device.seed(True, font, theme_mode=theme, intro_seen=False)
+                large_welcome = verified_capture(
+                    device, directory, "onboarding-first-run-light-large", "camera",
+                    ["바디 프레임에 오신 것을 환영합니다.", "시작하기", "나중에 보기"]
+                )
+                large_welcome.update(profile=args.profile, variant=variant,
+                                     label="라이트 테마 글자 150% 최초 실행")
+                manifest["captures"].append(large_welcome)
+                (directory / "onboarding-first-run-light-large.json").write_text(
+                    json.dumps(large_welcome, indent=2, ensure_ascii=False), encoding="utf-8"
+                )
             if variant == "dark-100":
                 device.seed(False, font, theme_mode=theme)
                 for name, label, route, expected, action in ADDITIONAL[:2]:
