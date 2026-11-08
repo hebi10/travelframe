@@ -1,4 +1,6 @@
 import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 const ID_PATTERN = /^[a-z][a-z0-9-]{4,28}[a-z0-9]$/;
 
@@ -33,7 +35,7 @@ export const verifyStagingTarget = ({
   return { projectId, storageBucket };
 };
 
-if (process.argv[1] && new URL(import.meta.url).pathname === process.argv[1]) {
+if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
   try {
     const rc = JSON.parse(fs.readFileSync(".firebaserc", "utf8"));
     const config = verifyStagingTarget({
