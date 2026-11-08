@@ -50,5 +50,7 @@ export const selectBodyFrameComparisonPhotos = <T extends Pick<PhotoItem, "id" |
   const candidates = getBodyFrameComparisonCandidates(photos, projectId);
   const before = candidates.find(photo => photo.id === beforeId);
   const after = candidates.find(photo => photo.id === afterId);
-  return before && after ? { before, after } : null;
+  return before && after && (before.sequence ?? 0) < (after.sequence ?? 0)
+    ? { before, after }
+    : null;
 };
