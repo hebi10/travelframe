@@ -51,6 +51,13 @@ class CaptureHelpersTest(unittest.TestCase):
         device.dump.assert_not_called()
         device.run.assert_not_called()
 
+    def test_launcher_anr_in_screen_readiness_fails_fast_with_system_reason(self):
+        device = qa.Device()
+        device.dump = Mock(return_value='<hierarchy><node text="Pixel Launcher isn&#39;t responding" /></hierarchy>')
+        with self.assertRaisesRegex(RuntimeError, 'system Pixel Launcher ANR'):
+            device.ready(['프로젝트 이름'], seconds=2)
+        device.dump.assert_called_once()
+
     def test_launcher_anr_preflight_does_not_hide_other_app_or_persistent_anr(self):
         device = Mock()
         device.shell.side_effect = lambda *args, **kwargs: '1' if args == ('getprop', 'ro.kernel.qemu') else ''
