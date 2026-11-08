@@ -168,7 +168,7 @@ export default function BodyFrameCompareScreen() {
             onPress={openPicker}
             style={[styles.pickPhotosButton, { borderColor: palette.line, backgroundColor: palette.surface }]}
           >
-            <Feather name="images" size={bodyFrameDesign.iconSize} color={palette.text} />
+            <Feather name="image" size={bodyFrameDesign.iconSize} color={palette.text} />
             <Text style={{ color: palette.text }}>비교 사진 선택</Text>
           </Pressable>
         ) : null}
