@@ -41,6 +41,7 @@ DESIGN_VARIANTS = [
     ('dark-100', 'dark', 'medium', 1.0),
     ('light-130', 'light', 'large', 1.3),
     ('dark-150', 'dark', 'large', 1.5),
+    ('light-150', 'light', 'large', 1.5),
 ]
 
 
