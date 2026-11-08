@@ -234,14 +234,14 @@ export default function BodyFrameCompareScreen() {
               <Image
                 source={{ uri: comparison.after.uri }}
                 style={StyleSheet.absoluteFill}
-                contentFit="cover"
+                contentFit="contain"
                 accessibilityLabel="마지막 사진"
               />
               <View style={[styles.clippedBefore, { width: width * divider }]}>
                 <Image
                   source={{ uri: comparison.before.uri }}
                   style={{ width, height: "100%" }}
-                  contentFit="cover"
+                  contentFit="contain"
                   accessibilityLabel="첫 사진"
                 />
               </View>
