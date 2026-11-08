@@ -107,10 +107,10 @@ try {
   const cleanup = await Promise.allSettled([
     ...(docCreated ? [doc.delete()] : []),
     ...(fileCreated ? [file.delete({ ignoreNotFound: true })] : []),
-    ...(userCreated ? [auth.deleteUser(testUid)] : []),
-    deleteApp(app)
+    ...(userCreated ? [auth.deleteUser(testUid)] : [])
   ]);
-  const unsuccessful = cleanup.filter((item) => item.status === "rejected");
+  const deletedApp = await Promise.allSettled([deleteApp(app)]);
+  const unsuccessful = [...cleanup, ...deletedApp].filter((item) => item.status === "rejected");
   report.cleanup = unsuccessful.length ? "FAILED" : "PASS";
   if (unsuccessful.length) {
     report.passed = false;
