@@ -1120,6 +1120,14 @@ export default function BodyFrameProjectDetailScreen() {
 
         {detailTab === "records" ? (
           <>
+        {projectPhotos.length < 2 ? (
+          <View style={[styles.comparePreviewCard, { borderColor: palette.line, backgroundColor: palette.surface }]}>
+            <Text style={[styles.comparePreviewTitle, { color: palette.text }]}>전후 사진 비교</Text>
+            <Text style={{ color: palette.muted, fontSize: bodyFrameTypography.caption }}>
+              사진을 2장 이상 기록하면 전후 비교와 사진 선택 기능을 사용할 수 있습니다.
+            </Text>
+          </View>
+        ) : null}
         {projectPhotos.length > 1 && firstPhoto && latestPhoto ? (
           <Pressable
             accessibilityRole="button"
@@ -1133,6 +1141,10 @@ export default function BodyFrameProjectDetailScreen() {
               </Text>
               <Feather name="chevron-right" size={bodyFrameDesign.iconSize} color={palette.text} />
             </View>
+              <Text style={{ color: palette.muted, fontSize: bodyFrameTypography.caption }}>
+                첫 사진·최근 사진으로 시작하고 원하는 사진 두 장을 직접 고를 수 있습니다.
+              </Text>
+
             <View style={styles.comparePreviewPair}>
               {[{ label: "시작", photo: firstPhoto }, { label: "최근", photo: latestPhoto }].map(({ label, photo }) => (
                 <View key={photo.id} style={[styles.comparePreviewItem, { backgroundColor: palette.surfaceStrong }]}>

@@ -41,3 +41,40 @@ test("comparison route uses the existing account-aware image component", () => {
   assert.ok(detail.includes("전후 사진 비교"));
   assert.ok(layout.includes('name="project/[id]/compare"'));
 });
+
+test("R3 comparison selection accepts different valid photos from the same project", () => {
+  const source = [
+    { id: "first", uri: "file:///one.jpg", projectId: "a", sequence: 1, createdAt: "2026-01-01" },
+    { id: "second", uri: "file:///two.jpg", projectId: "a", sequence: 2, createdAt: "2026-02-01" },
+    { id: "third", uri: "file:///three.jpg", projectId: "a", sequence: 3, createdAt: "2026-03-01" },
+    { id: "foreign", uri: "file:///foreign.jpg", projectId: "b", sequence: 1, createdAt: "2026-01-01" },
+    { id: "no-file", uri: "", projectId: "a", sequence: 4, createdAt: "2026-04-01" },
+    { id: "no-sequence", uri: "file:///no.jpg", projectId: "a", sequence: 0, createdAt: "2026-04-02" }
+  ];
+  const candidates = context.exports.getBodyFrameComparisonCandidates(source, "a");
+  assert.equal(candidates.map(photo => photo.id).join(","), "first,second,third");
+  const chosen = context.exports.selectBodyFrameComparisonPhotos(source, "a", "second", "third");
+  assert.equal(chosen.before.id, "second");
+  assert.equal(chosen.after.id, "third");
+  assert.equal(source[0].id, "first");
+  for (const [before, after] of [
+    ["first", "first"], ["third", "first"], ["first", "foreign"], ["foreign", "second"],
+    ["first", "no-file"], ["first", "no-sequence"], ["", "second"]
+  ]) {
+    assert.equal(context.exports.selectBodyFrameComparisonPhotos(source, "a", before, after), null);
+  }
+});
+
+test("R3 screen supports photo picker, three view modes and original slider accessibility", () => {
+  const screen = fs.readFileSync("features/records/BodyFrameCompareScreen.tsx", "utf8");
+  const detail = fs.readFileSync("features/records/BodyFrameProjectDetailScreen.tsx", "utf8");
+  assert.ok(screen.includes('comparisonMode === "slider"'));
+  assert.ok(screen.includes('comparisonMode === "side-by-side"'));
+  assert.ok(screen.includes('"overlay"'));
+  assert.ok(screen.includes("selectBodyFrameComparisonPhotos"));
+  assert.ok(screen.includes("draftBeforeId") && screen.includes("draftAfterId"));
+  assert.ok(screen.includes("FlatList"));
+  assert.ok(screen.includes('accessibilityRole="adjustable"'));
+  assert.ok(screen.includes("[0.25, 0.5, 0.75]"));
+  assert.ok(detail.includes("사진을 2장 이상 기록하면 전후 비교"));
+});

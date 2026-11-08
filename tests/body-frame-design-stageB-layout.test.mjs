@@ -69,6 +69,6 @@ test("Stage B comparison keeps adjustable divider, 25/50/75 presets and accessib
     "PanResponder.create", 'accessibilityRole="adjustable"',
     "onAccessibilityAction", "[0.25, 0.5, 0.75]",
     "changeDivider(divider + 0.1)", "changeDivider(divider - 0.1)",
-    "styles.dividerHandle", 'contentFit="cover"'
+    "styles.dividerHandle", 'contentFit="contain"'
   ]) assert.ok(source.compare.includes(token), token);
 });
