@@ -1,6 +1,8 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { onMessagePublished } = require("firebase-functions/v2/pubsub");
-const admin = require("firebase-admin");
+const { initializeApp } = require("firebase-admin/app");
+const { getFirestore, FieldValue, Timestamp } = require("firebase-admin/firestore");
+const { getStorage } = require("firebase-admin/storage");
 const {
   assertBackupUploadAllowed,
   getBackupQuotaLimits,
@@ -40,14 +42,11 @@ const {
   releaseWeeklyVideoExportReservation
 } = require("./video-export-quota");
 
-admin.initializeApp();
-
-const db = admin.firestore();
-const bucket = admin.storage().bucket();
-const FieldValue = admin.firestore.FieldValue;
+const app = initializeApp();
+const db = getFirestore(app);
+const bucket = getStorage(app).bucket();
 const { createGooglePlayBillingService } = require("./google-play-billing");
 const googlePlayBilling = createGooglePlayBillingService({
-  admin,
   db,
   FieldValue,
   HttpsError
@@ -1358,7 +1357,7 @@ exports.reserveBackupUpload = secureOnCall(async (request) => {
         quotaLimits,
         status: "reserved",
         createdAt: FieldValue.serverTimestamp(),
-        expiresAt: admin.firestore.Timestamp.fromMillis(Date.now() + BACKUP_UPLOAD_SESSION_TTL_MS)
+        expiresAt: Timestamp.fromMillis(Date.now() + BACKUP_UPLOAD_SESSION_TTL_MS)
       });
       transaction.set(
         usageRef,
@@ -1864,7 +1863,7 @@ exports.reserveMusicUpload = secureOnCall(async (request) => {
         musicTrackLimit,
         status: "reserved",
         createdAt: FieldValue.serverTimestamp(),
-        expiresAt: admin.firestore.Timestamp.fromMillis(Date.now() + MUSIC_UPLOAD_SESSION_TTL_MS)
+        expiresAt: Timestamp.fromMillis(Date.now() + MUSIC_UPLOAD_SESSION_TTL_MS)
       });
     });
 
@@ -2773,7 +2772,7 @@ exports.reserveAdminBackupUpload = secureOnCall(async (request) => {
         storagePath,
         status: "reserved",
         createdAt: FieldValue.serverTimestamp(),
-        expiresAt: admin.firestore.Timestamp.fromMillis(Date.now() + BACKUP_UPLOAD_SESSION_TTL_MS)
+        expiresAt: Timestamp.fromMillis(Date.now() + BACKUP_UPLOAD_SESSION_TTL_MS)
       });
       if (itemKind === "image") {
         tx.set(usageRef, { updatedAt: FieldValue.serverTimestamp() }, { merge: true });
