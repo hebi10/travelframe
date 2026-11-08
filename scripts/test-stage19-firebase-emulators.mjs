@@ -6,7 +6,7 @@ import path from "node:path";
 
 const projectId = "demo-travelframe-stage19";
 const appId = "stage19-functions-emulator-integration";
-const requiredHosts = ["FIRESTORE_EMULATOR_HOST", "FIREBASE_STORAGE_EMULATOR_HOST", "FIREBASE_AUTH_EMULATOR_HOST", "FUNCTIONS_EMULATOR_HOST"];
+const requiredHosts = ["FIRESTORE_EMULATOR_HOST", "FIREBASE_STORAGE_EMULATOR_HOST", "FIREBASE_AUTH_EMULATOR_HOST", "FUNCTIONS_EMULATOR_HOST", "PUBSUB_EMULATOR_HOST"];
 assert.equal(process.env.STAGE19_PROJECT_ID, projectId, "Only the isolated demo test project may be used");
 for (const name of requiredHosts) {
   assert.ok(process.env[name] && /^(127\.0\.0\.1|localhost):\d+$/.test(process.env[name]), name + " must target a loopback emulator");
@@ -30,6 +30,9 @@ const owner = db.doc("users/" + uid);
 const audit = db.doc("users/" + uid + "/backupUsage/current");
 const name = "users/" + uid + "/backups/stage19-qa/integration.txt";
 const file = storage.file(name);
+const fakeRtdnToken = "stage19-nonreal-purchase-" + suffix;
+const fakeRtdnHash = crypto.createHash("sha256").update(fakeRtdnToken).digest("hex");
+const fakeRtdnRef = db.doc("unresolvedGooglePlayNotifications/" + fakeRtdnHash);
 const evidence = { projectId, node: process.version, mode: "Firebase Emulator Suite only", cases: [], liveCloudTouched: false };
 
 const mark = (name, status) => evidence.cases.push({ name, status });
@@ -113,10 +116,51 @@ try {
   assert.equal((await audit.get()).data()?.count, 1, "Denied calls must not alter usage");
   mark("Existing Firestore data intact after rejected callables", "pass");
 
+  const topicUrl = "http://" + process.env.PUBSUB_EMULATOR_HOST + "/v1/projects/" + projectId + "/topics/body-frame-play-billing";
+  const createTopic = await fetch(topicUrl, { method: "PUT", headers: { "Content-Type": "application/json" }, body: "{}" });
+  assert.ok([200, 409].includes(createTopic.status),
+    "RTDN Pub/Sub emulator topic setup failed: HTTP " + createTopic.status);
+  const fakeRtdn = {
+    version: "1.0",
+    packageName: "com.haebi.photoguide",
+    eventTimeMillis: String(Date.now()),
+    subscriptionNotification: {
+      version: "1.0",
+      notificationType: 2,
+      purchaseToken: fakeRtdnToken,
+      subscriptionId: "creator_monthly"
+    }
+  };
+  assert.equal((await fakeRtdnRef.get()).exists, false);
+  const published = await fetch(topicUrl + ":publish", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ messages: [{ data: Buffer.from(JSON.stringify(fakeRtdn)).toString("base64") }] })
+  });
+  assert.ok(published.ok, "RTDN Pub/Sub emulator publish failed: HTTP " + published.status);
+  const receipt = await published.json();
+  assert.ok(Array.isArray(receipt.messageIds) && receipt.messageIds.length === 1,
+    "RTDN publish must return one message ID");
+  let record = null;
+  for (let attempt = 0; attempt < 40; attempt++) {
+    const result = await fakeRtdnRef.get();
+    if (result.exists) {
+      record = result.data();
+      break;
+    }
+    await sleep(500);
+  }
+  assert.ok(record, "RTDN Pub/Sub function did not persist unresolved synthetic purchase event");
+  assert.equal(record.tokenHash, fakeRtdnHash);
+  assert.equal(record.kind, "subs");
+  assert.equal(record.packageName, "com.haebi.photoguide");
+  assert.equal(record.notificationType, 2);
+  mark("RTDN Pub/Sub emulator delivery through actual Functions 7 and Firestore", "pass");
+
   await auth.deleteUser(credential.localId);
   mark("Auth emulator identity removal", "pass");
 } finally {
-  await Promise.allSettled([file.delete({ ignoreNotFound: true }), audit.delete(), owner.delete()]);
+  await Promise.allSettled([file.delete({ ignoreNotFound: true }), audit.delete(), owner.delete(), fakeRtdnRef.delete()]);
   await deleteApp(app);
 }
 fs.mkdirSync("reports", { recursive: true });
