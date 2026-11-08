@@ -178,7 +178,7 @@ def main():
         device.shell("wm", "size", size)
         device.shell("wm", "density", density)
         manifest["displayEvidence"] = qa.wait_for_visual_profile(device, size, density)
-        for variant in ("dark-100", "light-130", "dark-150"):
+        for variant in ("dark-100", "light-130", "dark-150", "light-150"):
             theme, font, scale = ALL_VARIANTS[variant]
             directory = output / variant
             directory.mkdir(exist_ok=True)
