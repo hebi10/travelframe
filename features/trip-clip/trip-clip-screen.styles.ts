@@ -977,7 +977,7 @@ export const createTripClipStyles = (colors: AppPalette) => StyleSheet.create({
   },
   guideColorLabel: {
     color: colors.text,
-    fontSize: 9,
+    fontSize: typography.small,
     fontWeight: "800",
     letterSpacing: 0
   },
@@ -1082,7 +1082,7 @@ export const createTripClipStyles = (colors: AppPalette) => StyleSheet.create({
   },
   musicPickButton: {
     minWidth: 58,
-    minHeight: 34,
+    minHeight: bodyFrameDesign.minTouchSize,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.text
