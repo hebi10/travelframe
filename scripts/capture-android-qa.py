@@ -623,7 +623,7 @@ def recover_launcher_anr(device, output):
     output.mkdir(parents=True, exist_ok=True)
     (output / 'launcher-anr.before.xml').write_text(current, encoding='utf-8')
     image = device.run('exec-out', 'screencap', '-p', binary=True)
-    if image[:8] != b'\\x89PNG\\r\\n\\x1a\\n':
+    if image[:8] != b'\x89PNG\r\n\x1a\n':
         raise RuntimeError('Launcher ANR screenshot is not a PNG; refusing unverified recovery')
     (output / 'launcher-anr.before.png').write_bytes(image)
     device.shell('am', 'force-stop', 'com.google.android.apps.nexuslauncher')
