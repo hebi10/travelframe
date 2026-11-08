@@ -31,12 +31,12 @@ assert.ok(
 for (const darkColor of [
   'background: "#0B0B0C"',
   'chrome: "#0B0B0C"',
-  'surface: "#131315"',
-  'surfaceStrong: "#1A1A1D"',
+  'surface: "#1A1A1D"',
+  'surfaceStrong: "#292D31"',
   'text: "#F5F5F5"',
   'muted: "#A0A0A6"',
   'faint: "#88888F"',
-  'line: "#2A2A2E"',
+  'line: "#323437"',
   'inverse: "#111111"',
   'ink: "#F5F5F5"'
 ]) {
