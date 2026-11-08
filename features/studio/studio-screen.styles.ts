@@ -342,7 +342,7 @@ export const createStudioStyles = (colors: AppPalette) => StyleSheet.create({
   },
   cardButton: {
     flex: 1,
-    minHeight: 32,
+    minHeight: bodyFrameDesign.minTouchSize,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.text
@@ -355,7 +355,7 @@ export const createStudioStyles = (colors: AppPalette) => StyleSheet.create({
   },
   cardLightButton: {
     flex: 1,
-    minHeight: 32,
+    minHeight: bodyFrameDesign.minTouchSize,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
@@ -377,14 +377,14 @@ export const createStudioStyles = (colors: AppPalette) => StyleSheet.create({
     gap: 10
   },
   paginationBar: {
-    minHeight: 34,
+    minHeight: bodyFrameDesign.minTouchSize,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: 10
   },
   paginationButton: {
-    minHeight: 32,
+    minHeight: bodyFrameDesign.minTouchSize,
     minWidth: 58,
     alignItems: "center",
     justifyContent: "center",
@@ -452,7 +452,7 @@ export const createStudioStyles = (colors: AppPalette) => StyleSheet.create({
     gap: 6
   },
   workEditButton: {
-    minHeight: 34,
+    minHeight: bodyFrameDesign.minTouchSize,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
@@ -465,8 +465,8 @@ export const createStudioStyles = (colors: AppPalette) => StyleSheet.create({
     letterSpacing: 0
   },
   workDeleteButton: {
-    minWidth: 42,
-    minHeight: 34,
+    minWidth: bodyFrameDesign.minTouchSize,
+    minHeight: bodyFrameDesign.minTouchSize,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
@@ -486,7 +486,7 @@ export const createStudioStyles = (colors: AppPalette) => StyleSheet.create({
     paddingBottom: 10
   },
   retryButton: {
-    minHeight: 36,
+    minHeight: bodyFrameDesign.minTouchSize,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 14,
