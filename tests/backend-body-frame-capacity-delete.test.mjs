@@ -103,9 +103,12 @@ const harness = () => {
     require: (name) => {
       if (name === "firebase-functions/v2/https") return { onCall: (_, handler) => handler, HttpsError };
       if (name === "firebase-functions/v2/pubsub") return { onMessagePublished: () => null };
-      if (name === "firebase-admin") return {
-        initializeApp() {}, firestore,
-        storage: () => ({ bucket: () => ({ file: (path) => ({
+      if (name === "firebase-admin/app") return { initializeApp: () => ({}) };
+      if (name === "firebase-admin/firestore") return {
+        getFirestore: firestore, FieldValue: firestore.FieldValue, Timestamp: firestore.Timestamp
+      };
+      if (name === "firebase-admin/storage") return {
+        getStorage: () => ({ bucket: () => ({ file: (path) => ({
           getMetadata: async () => {
             if (!objects.has(path)) throw Object.assign(new Error("missing"), { code: 404 });
             const hook = metadataHook; metadataHook = null;

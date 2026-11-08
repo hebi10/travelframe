@@ -38,8 +38,13 @@ assert.equal(
 );
 
 assert.ok(
+  packageJson.scripts?.["runtime:deps"]?.includes("require('google-gax')"),
+  "Functions quality should use the public Google Gax entry point"
+);
+assert.equal(
   packageJson.scripts?.["runtime:deps"]?.includes("google-gax/build/src/fallback"),
-  "Functions quality should smoke-test the fallback import that previously failed in production"
+  false,
+  "Functions must not require a private Google Gax implementation path"
 );
 assert.ok(
   packageJson.scripts?.quality?.includes("npm run runtime:deps"),

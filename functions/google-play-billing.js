@@ -58,7 +58,6 @@ const createFreeSubscription = () => ({
 });
 
 const createGooglePlayBillingService = ({
-  admin,
   db,
   FieldValue,
   HttpsError
