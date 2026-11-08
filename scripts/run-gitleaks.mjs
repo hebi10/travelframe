@@ -147,6 +147,25 @@ function download(url, destination) {
   });
 }
 
+async function downloadWithRetry(url, destination) {
+  const maxAttempts = 5;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      await download(url, destination);
+      return;
+    } catch (error) {
+      fs.rmSync(destination, { force: true });
+      const reason = error instanceof Error ? error.message : String(error);
+      const transient = /HTTP (?:408|429|5\d\d)|ETIMEDOUT|ECONNRESET|EAI_AGAIN|timed out/i.test(reason);
+      if (!transient || attempt === maxAttempts) {
+        throw error;
+      }
+      console.warn(`Gitleaks download attempt ${attempt}/${maxAttempts} failed; retrying after a transient network error.`);
+      await new Promise((resolve) => setTimeout(resolve, Math.min(12000, 1500 * 2 ** (attempt - 1))));
+    }
+  }
+}
+
 function extractArchive(archivePath, destination) {
   fs.rmSync(destination, { recursive: true, force: true });
   fs.mkdirSync(destination, { recursive: true });
@@ -194,7 +213,7 @@ async function installGitleaks() {
   }
 
   console.log(`Installing gitleaks v${GITLEAKS_VERSION} into ${path.relative(PROJECT_ROOT, CACHE_ROOT)}...`);
-  await download(`${RELEASE_BASE_URL}/${asset.name}`, archivePath);
+  await downloadWithRetry(`${RELEASE_BASE_URL}/${asset.name}`, archivePath);
 
   const actualSha256 = sha256(archivePath);
   if (actualSha256 !== asset.sha256) {
