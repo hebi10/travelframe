@@ -27,6 +27,17 @@ jobs:
         run: npm ci --prefix functions --ignore-scripts --no-audit --no-fund
       - name: Validate Firebase Functions runtime dependencies
         run: npm --prefix functions run quality
+      - name: Check actual Admin namespace use is compatible before deployment
+        shell: bash
+        run: |
+          node - <<'NODE'
+          const admin = require('./functions/node_modules/firebase-admin');
+          console.log('Admin SDK legacy namespace initializeApp:', typeof admin.initializeApp);
+          if (typeof admin.initializeApp !== 'function') {
+            console.error('BREAKING: functions/index.js still invokes require("firebase-admin").initializeApp(); migrate to firebase-admin/app before production.');
+            process.exitCode = 1;
+          }
+          NODE
       - name: Collect updated advisory report without forcing updates
         shell: bash
         run: npm audit --prefix functions --omit=dev --json > functions-new-audit.json || true
