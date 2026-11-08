@@ -457,6 +457,8 @@ class Device:
             try:
                 last = self.dump()
                 strings = ui_strings(last)
+                if "Pixel Launcher isn't responding" in strings:
+                    raise RuntimeError('Android system Pixel Launcher ANR is covering the app; not an app UI failure')
                 fatal = ['Unmatched Route', 'Render Error', 'Unable to load script', 'Something went wrong']
                 if any(marker in text for text in strings for marker in fatal):
                     raise RuntimeError('Native app displays a JavaScript/navigation error')
