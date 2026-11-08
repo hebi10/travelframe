@@ -1,18 +1,19 @@
 name: Android Play test release
+run-name: TravelFrame Play ${{ inputs.mode || 'push-gate' }} · ${{ inputs.track || (contains(github.event.head_commit.message, '[deploy-closed]') && 'closed') || 'internal' }} · ${{ github.ref_name }}
 
 on:
   push:
     branches: [main]
   workflow_dispatch:
     inputs:
-      operation:
-        description: Publish a test release or inspect current Play inventory without signing/upload
+      mode:
+        description: Read-only check, signed AAB/APK build, or publish to the chosen test track
         required: true
-        default: publish
+        default: build
         type: choice
-        options: [publish, inventory]
+        options: [check, build, deploy]
       track:
-        description: Test audience (closed uses the existing alpha track)
+        description: Testing audience; closed uses the existing alpha track
         required: true
         default: internal
         type: choice
@@ -26,9 +27,9 @@ on:
         required: false
         type: string
       version_name:
-        description: Build-only version name override; automatic pushes use source app.json
+        description: Optional display version; blank uses the version in app.json
         required: false
-        default: '1.0.32'
+        default: ''
         type: string
 
 permissions:
@@ -41,7 +42,15 @@ concurrency:
 jobs:
   plan:
     name: Plan exact source and test release from Play inventory
-    if: github.repository == 'hebi10/travelframe' && github.ref == 'refs/heads/main' && (inputs.operation == 'inventory' || vars.BODY_FRAME_PLAY_SIGNING_APPROVED_20261107 == 'true')
+    if: >-
+      github.repository == 'hebi10/travelframe' &&
+      github.ref == 'refs/heads/main' &&
+      ((github.event_name == 'workflow_dispatch' &&
+        (inputs.mode == 'check' || vars.BODY_FRAME_PLAY_SIGNING_APPROVED_20261107 == 'true')) ||
+       (github.event_name == 'push' &&
+        vars.BODY_FRAME_PLAY_SIGNING_APPROVED_20261107 == 'true' &&
+        (contains(github.event.head_commit.message, '[deploy-internal]') ||
+         contains(github.event.head_commit.message, '[deploy-closed]'))))
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -49,6 +58,7 @@ jobs:
       id-token: write
     outputs:
       operation: ${{ steps.resolve.outputs.operation }}
+      mode: ${{ steps.resolve.outputs.mode }}
       source_sha: ${{ steps.resolve.outputs.source_sha }}
       logical_track: ${{ steps.resolve.outputs.logical_track }}
       api_track: ${{ steps.plan.outputs.api_track }}
@@ -61,7 +71,8 @@ jobs:
       PLAY_INTERNAL_TRACK: ${{ vars.PLAY_INTERNAL_TRACK }}
       ANDROID_UPLOAD_CERT_SHA256: ${{ vars.ANDROID_UPLOAD_CERT_SHA256 }}
       INPUT_SOURCE_SHA: ${{ inputs.source_sha }}
-      INPUT_OPERATION: ${{ inputs.operation }}
+      INPUT_MODE: ${{ inputs.mode }}
+      RELEASE_COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
       INPUT_TRACK: ${{ inputs.track }}
       INPUT_VERSION_CODE: ${{ inputs.version_code }}
       INPUT_VERSION_NAME: ${{ inputs.version_name }}
@@ -127,7 +138,7 @@ jobs:
   build:
     name: Build and verify signed AAB and installation APK
     needs: plan
-    if: needs.plan.outputs.operation == 'publish'
+    if: needs.plan.outputs.mode == 'build' || needs.plan.outputs.mode == 'deploy'
     runs-on: ubuntu-latest
     timeout-minutes: 120
     outputs:
@@ -252,6 +263,7 @@ jobs:
   publish:
     name: Publish AAB to the selected test track and verify committed state
     needs: [plan, build]
+    if: needs.plan.outputs.mode == 'deploy'
     runs-on: ubuntu-latest
     timeout-minutes: 40
     permissions:

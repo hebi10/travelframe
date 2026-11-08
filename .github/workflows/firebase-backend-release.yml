@@ -1,0 +1,109 @@
+name: Firebase backend release (manual approval)
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Validate backend without deployment, or explicitly deploy approved Functions'
+        required: true
+        default: check
+        type: choice
+        options: [check, deploy]
+      confirmation:
+        description: 'Required only for deploy: DEPLOY_TRAVELFRAME_FIREBASE_BACKEND'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: travelframe-firebase-backend-production
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Verify backend without deploying
+    if: github.repository == 'hebi10/travelframe' && github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
+      - name: Install exact Firebase backend dependencies
+        run: npm ci --prefix functions --ignore-scripts --no-audit --no-fund
+      - name: Check Firebase Functions runtime and exports
+        run: npm --prefix functions run quality
+      - name: Verify the main-only deployment guard
+        run: node --test tests/firebase-backend-release-guard.test.mjs
+      - name: Verify no Firebase backend deploy in check mode
+        if: inputs.mode == 'check'
+        run: echo 'Read-only validation completed. Firebase was not deployed.'
+
+  deploy:
+    name: Deploy Firebase Functions only after independent approval
+    needs: verify
+    if: >-
+      github.repository == 'hebi10/travelframe' &&
+      github.ref == 'refs/heads/main' &&
+      github.event_name == 'workflow_dispatch' &&
+      needs.verify.result == 'success' &&
+      inputs.mode == 'deploy' &&
+      inputs.confirmation == 'DEPLOY_TRAVELFRAME_FIREBASE_BACKEND' &&
+      vars.TRAVELFRAME_FIREBASE_BACKEND_APPROVED == 'true'
+    runs-on: ubuntu-24.04
+    environment: travelframe-firebase-backend-production
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      FIREBASE_BACKEND_DEPLOY_MODE: ${{ inputs.mode }}
+      FIREBASE_BACKEND_CONFIRM: ${{ inputs.confirmation }}
+      FIREBASE_BACKEND_RELEASE_APPROVED: ${{ vars.TRAVELFRAME_FIREBASE_BACKEND_APPROVED }}
+      FIREBASE_BACKEND_PROJECT_ID: 'travelframe-4e1fb'
+      FIREBASE_BACKEND_SERVICE_ACCOUNT: ${{ vars.TRAVELFRAME_FIREBASE_BACKEND_SERVICE_ACCOUNT }}
+      FIREBASE_BACKEND_WIF_PROVIDER: ${{ vars.TRAVELFRAME_FIREBASE_BACKEND_WIF_PROVIDER }}
+      FUNCTIONS_ENABLE_ADMIN_BACKUP_DELETION: 'false'
+      FUNCTIONS_ENABLE_ADMIN_FULL_BACKUP_DELETION: 'false'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
+      - name: Validate exact target, independent approval and short-lived identity
+        run: node scripts/verify-firebase-backend-release.mjs
+      - name: Authenticate using Firebase backend-only Workload Identity Federation
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        with:
+          workload_identity_provider: ${{ vars.TRAVELFRAME_FIREBASE_BACKEND_WIF_PROVIDER }}
+          service_account: ${{ vars.TRAVELFRAME_FIREBASE_BACKEND_SERVICE_ACCOUNT }}
+          create_credentials_file: true
+          export_environment_variables: true
+      - name: Install exact Firebase backend dependencies
+        run: npm ci --prefix functions --ignore-scripts --no-audit --no-fund
+      - name: Reverify the deployable Functions code
+        run: npm --prefix functions run quality
+      - name: Install pinned Firebase CLI
+        run: npm install --global firebase-tools@15.18.0
+      - name: Deploy Functions only to the explicitly reviewed project
+        timeout-minutes: 65
+        run: |
+          node scripts/verify-firebase-backend-release.mjs
+          firebase deploy --only functions --project travelframe-4e1fb --non-interactive
+      - name: Read back deployed Functions configuration
+        run: firebase functions:list --project travelframe-4e1fb
+      - name: Record deployment scope
+        run: echo 'Functions-only Firebase production deployment completed; Play tracks, Hosting, Firestore Rules and Storage Rules were not deployed.' >> "$GITHUB_STEP_SUMMARY"

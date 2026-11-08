@@ -10,8 +10,17 @@ const request = { sourceSha: sha, logicalTrack: "internal", internalTrack: "inte
 const snapshot = { tracks: [{ track: "production", releases: [{ status: "completed", versionCodes: ["26092620"] }] }, { track: "internal", releases: [{ status: "completed", versionCodes: ["26092622"] }] }, { track: "alpha", releases: [] }], bundles: [{ versionCode: 26092624 }], apks: [{ versionCode: 26092623 }] };
 
 test("automatic builds use the triggering main commit; only manual runs accept a full source SHA", () => {
-  const environment = { GITHUB_REPOSITORY: "hebi10/travelframe", GITHUB_REF: "refs/heads/main", GITHUB_SHA: sha, GITHUB_EVENT_NAME: "push" };
+  const environment = { GITHUB_REPOSITORY: "hebi10/travelframe", GITHUB_REF: "refs/heads/main", GITHUB_SHA: sha, GITHUB_EVENT_NAME: "push", RELEASE_COMMIT_MESSAGE: "Release internal [deploy-internal]" };
   assert.equal(resolveRequest(environment).sourceSha, sha);
+  assert.equal(resolveRequest(environment).mode, "deploy");
+  assert.equal(resolveRequest(environment).logicalTrack, "internal");
+  assert.equal(resolveRequest({ ...environment, RELEASE_COMMIT_MESSAGE: "Review [deploy-closed]" }).logicalTrack, "closed");
+  assert.throws(() => resolveRequest({ ...environment, RELEASE_COMMIT_MESSAGE: "Ordinary main merge" }), /explicit/);
+  assert.throws(() => resolveRequest({ ...environment, RELEASE_COMMIT_MESSAGE: "[deploy-internal] [deploy-closed]" }), /exactly one/);
+  assert.equal(resolveRequest({ ...environment, GITHUB_EVENT_NAME: "workflow_dispatch", RELEASE_COMMIT_MESSAGE: "", INPUT_MODE: "check" }).operation, "inventory");
+  assert.equal(resolveRequest({ ...environment, GITHUB_EVENT_NAME: "workflow_dispatch", RELEASE_COMMIT_MESSAGE: "", INPUT_MODE: "build" }).mode, "build");
+  assert.equal(resolveRequest({ ...environment, GITHUB_EVENT_NAME: "workflow_dispatch", RELEASE_COMMIT_MESSAGE: "", INPUT_MODE: "deploy", INPUT_TRACK: "closed" }).logicalTrack, "closed");
+  assert.throws(() => resolveRequest({ ...environment, GITHUB_EVENT_NAME: "workflow_dispatch", RELEASE_COMMIT_MESSAGE: "", INPUT_MODE: "production" }), /check, build and deploy/);
   assert.equal(resolveRequest({ ...environment, INPUT_SOURCE_SHA: "c".repeat(40) }).sourceSha, sha);
   assert.equal(resolveRequest({ ...environment, INPUT_OPERATION: "inventory" }).operation, "publish");
   assert.equal(resolveRequest({ ...environment, GITHUB_EVENT_NAME: "workflow_dispatch", INPUT_OPERATION: "inventory" }).operation, "inventory");

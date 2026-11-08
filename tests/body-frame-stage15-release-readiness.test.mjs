@@ -51,7 +51,7 @@ test("Play inventory remains read-only before new upload key starts, publishing 
     INPUT_TRACK: "internal"
   };
   assert.deepEqual(resolveRequest(fixture), {
-    sourceSha: "a".repeat(40), logicalTrack: "internal", operation: "inventory"
+    sourceSha: "a".repeat(40), logicalTrack: "internal", operation: "inventory", mode: "check"
   });
   assert.equal(resolveRequest({ ...fixture, INPUT_TRACK: "closed" }).logicalTrack, "closed");
   for(const bad of [
