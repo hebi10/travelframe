@@ -58,7 +58,7 @@ test("R3 comparison selection accepts different valid photos from the same proje
   assert.equal(chosen.after.id, "third");
   assert.equal(source[0].id, "first");
   for (const [before, after] of [
-    ["first", "first"], ["first", "foreign"], ["foreign", "second"],
+    ["first", "first"], ["third", "first"], ["first", "foreign"], ["foreign", "second"],
     ["first", "no-file"], ["first", "no-sequence"], ["", "second"]
   ]) {
     assert.equal(context.exports.selectBodyFrameComparisonPhotos(source, "a", before, after), null);
