@@ -586,7 +586,7 @@ export default function BodyFrameSettingsScreen() {
         </View>
       </Modal>
 
-      <AppGuideOverlay tabKey="camera" replaySignal={guideReplaySignal} />
+      <AppGuideOverlay tabKey="camera" replaySignal={guideReplaySignal} autoShowFirstRun={false} />
     </View>
   );
 }

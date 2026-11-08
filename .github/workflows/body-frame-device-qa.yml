@@ -22,8 +22,6 @@ on:
       - 'tsconfig.json'
       - '.npmrc'
       - 'scripts/**'
-      - '!scripts/capture-android-qa.py'
-      - '!scripts/test_capture_android_qa.py'
       - '!scripts/verify-android-qa-apk.py'
       - '!scripts/test_verify_android_qa_apk.py'
       - '!scripts/android-qa-apk-selection.json'
@@ -154,7 +152,7 @@ jobs:
 
   stage13-design-captures:
     needs: build-apk
-    if: github.event_name == 'workflow_dispatch' || startsWith(github.head_ref, 'feat/body-frame-design-stage13-') || startsWith(github.head_ref, 'feat/body-frame-design-stage14-') || startsWith(github.head_ref, 'feat/body-frame-design-stageA-') || startsWith(github.head_ref, 'feat/body-frame-design-stageB-') || startsWith(github.head_ref, 'fix/body-frame-stage13-')
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.head_ref, 'feat/body-frame-design-stage13-') || startsWith(github.head_ref, 'feat/body-frame-design-stage14-') || startsWith(github.head_ref, 'feat/body-frame-design-stageA-') || startsWith(github.head_ref, 'feat/body-frame-design-stageB-') || startsWith(github.head_ref, 'feat/body-frame-design-stageC-') || startsWith(github.head_ref, 'fix/body-frame-stage13-')
     runs-on: ubuntu-latest
     timeout-minutes: 65
     strategy:

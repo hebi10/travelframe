@@ -106,7 +106,7 @@ def inspect_native_frames(path, directory):
     return evidence
 
 
-def fixture_values(app_dir, populated=True, font_size='medium', theme_mode='dark'):
+def fixture_values(app_dir, populated=True, font_size='medium', theme_mode='dark', intro_seen=True):
     """Mirror the versioned schemas in lib/*-library.ts; all values are synthetic."""
     photos = []
     measurements = []
@@ -134,7 +134,7 @@ def fixture_values(app_dir, populated=True, font_size='medium', theme_mode='dark
             fields=dict(weight=True, bodyFat=True, skeletalMuscle=True, waist=True),
             primaryMetric='weight', promptAfterCapture=False)} if populated else {},
         'travel-frame.videos.v1': [],
-        'travel-frame.guide-progress.v1': dict(seenGuideVersion=4, seenIntro=True,
+        'travel-frame.guide-progress.v1': dict(seenGuideVersion=4, seenIntro=intro_seen,
             seenTabs={tab: True for tab in ['camera', 'studio', 'tripClip', 'account', 'settings']}),
         'travel-frame.settings.v1': dict(storageMode='local_only', cloudBackupEnabled=False,
             themeMode=theme_mode, cameraFacing='back', referencePhotoVisible=True, fontSize=font_size),
@@ -457,6 +457,8 @@ class Device:
             try:
                 last = self.dump()
                 strings = ui_strings(last)
+                if "Pixel Launcher isn't responding" in strings:
+                    raise RuntimeError('Android system Pixel Launcher ANR is covering the app; not an app UI failure')
                 fatal = ['Unmatched Route', 'Render Error', 'Unable to load script', 'Something went wrong']
                 if any(marker in text for text in strings for marker in fatal):
                     raise RuntimeError('Native app displays a JavaScript/navigation error')
@@ -584,7 +586,7 @@ class Device:
                 if attempt:raise
         raise RuntimeError('Control did not open its expected modal')
 
-    def seed(self, populated, font_size='medium', theme_mode='dark'):
+    def seed(self, populated, font_size='medium', theme_mode='dark', intro_seen=True):
         self.shell('am', 'force-stop', PACKAGE)
         app_dir = self.shell('run-as', PACKAGE, 'pwd').strip()
         if not re.fullmatch(r'/data/(?:user/\d+|data)/com\.haebi\.photoguide', app_dir):
@@ -597,10 +599,43 @@ class Device:
                     self.shell('run-as', PACKAGE, 'sh', '-c', f'cat > {relative}', data=fixture_jpeg(index,folder=='photo-previews'))
         with tempfile.TemporaryDirectory() as temporary:
             db = Path(temporary) / 'RKStorage'
-            write_storage(db, fixture_values(app_dir, populated, font_size, theme_mode))
+            write_storage(db, fixture_values(app_dir, populated, font_size, theme_mode, intro_seen=intro_seen))
             self.shell('run-as', PACKAGE, 'rm', '-f', 'databases/RKStorage-wal', 'databases/RKStorage-shm', 'databases/RKStorage-journal')
             self.shell('run-as', PACKAGE, 'sh', '-c', 'cat > databases/RKStorage', data=db.read_bytes())
         return app_dir
+
+
+def recover_launcher_anr(device, output):
+    """Recover only the Pixel Launcher ANR on a disposable Android emulator.
+
+    Do not dismiss an app or unrelated system crash as a QA pass. The recovery
+    is bounded to one attempt and preserves a screenshot and XML evidence.
+    """
+    if device.shell('getprop', 'ro.kernel.qemu').strip() != '1':
+        raise RuntimeError('Launcher recovery is restricted to a disposable Android emulator')
+    current = device.dump()
+    visible = ui_strings(current)
+    launcher_message = "Pixel Launcher isn't responding"
+    if launcher_message not in visible:
+        return dict(status='healthy', recovered=False)
+    if 'Close app' not in visible or 'Wait' not in visible:
+        raise RuntimeError('Unrecognized launcher ANR; preserve the failure without tapping another app')
+    output.mkdir(parents=True, exist_ok=True)
+    (output / 'launcher-anr.before.xml').write_text(current, encoding='utf-8')
+    image = device.run('exec-out', 'screencap', '-p', binary=True)
+    if image[:8] != b'\x89PNG\r\n\x1a\n':
+        raise RuntimeError('Launcher ANR screenshot is not a PNG; refusing unverified recovery')
+    (output / 'launcher-anr.before.png').write_bytes(image)
+    device.shell('am', 'force-stop', 'com.google.android.apps.nexuslauncher')
+    device.shell('input', 'keyevent', 'KEYCODE_BACK')
+    time.sleep(2)
+    after = device.dump()
+    (output / 'launcher-anr.after.xml').write_text(after, encoding='utf-8')
+    if launcher_message in ui_strings(after):
+        raise RuntimeError('Pixel Launcher ANR persisted after one bounded emulator-only recovery')
+    return dict(status='recovered', recovered=True,
+                reason='Pixel Launcher ANR before first app capture',
+                originalDialog=launcher_message)
 
 
 def capture(device, directory, name, route, expected, action=None, open_route=True):
@@ -700,12 +735,12 @@ def onboarding_welcome(device):
     device.ready(['기준 사진 표시'])
     device.tap('사용 가이드',match='summary')
     device.ready(['바디 프레임에 오신 것을 환영합니다.'])
-    device.find_control('시작하기')  # Scroll inside the real guide when large text pushes it below the fold.
+    device.find_control('다음')  # Scroll inside the real guide when large text pushes it below the fold.
 
 
 def onboarding_scrolled(device):
     onboarding_welcome(device)
-    device.tap('시작하기')
+    device.tap('다음')
     device.ready(['프로젝트로 기록을 나눕니다'])
     device.find_control('다음')  # Verify the footer is reachable without advancing the step.
 
@@ -1122,7 +1157,7 @@ def capture_design_matrix(device, output, records, manifest):
                 records.append(record)
             if variant == 'dark-150':
                 record = capture(device, directory, 'onboarding-large-font', 'settings',
-                                 ['바디 프레임에 오신 것을 환영합니다.', '시작하기'],
+                                 ['바디 프레임에 오신 것을 환영합니다.', '다음'],
                                  onboarding_welcome)
                 record.update(profile=profile, variant=variant, theme=theme,
                               fontScale=system_scale, appFont=app_font)
@@ -1172,6 +1207,7 @@ def main():
         device.shell('svc', 'data', 'disable')
         device.shell('input', 'keyevent', 'KEYCODE_WAKEUP')
         device.shell('wm', 'dismiss-keyguard')
+        manifest['systemLauncherHealth'] = recover_launcher_anr(device, args.output / 'system-diagnostics')
         if args.scenario == 'visual':
             capture_design_matrix(device, args.output, records, manifest)
         else:
@@ -1235,7 +1271,7 @@ def main():
                 device.seed(True, 'large')
                 device.shell('settings', 'put', 'system', 'font_scale', '1.3')
                 records.append(capture(device, directory, 'onboarding-welcome-large-font', 'settings',
-                                       ['바디 프레임에 오신 것을 환영합니다.', '시작하기'], onboarding_welcome))
+                                       ['바디 프레임에 오신 것을 환영합니다.', '다음'], onboarding_welcome))
                 records.append(capture(device, directory, 'onboarding-scroll-large-font', 'settings',
                                        ['다음', '스킵'], onboarding_scrolled))
                 device.shell('settings', 'put', 'system', 'font_scale', '1.0')
