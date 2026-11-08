@@ -41,7 +41,7 @@ CASES = [
     ("compare", "전후 사진 비교", f"project/{P}/compare", ["전후 사진 비교", "첫 사진", "마지막 사진"], None),
     ("measurements", "전체 수치 기록", f"project/{P}/measurements", ["수치 기록", "QA 데모"], None),
     ("measurement-create", "수치 추가 시트", f"project/{P}/measurements?add=1", ["몸무게", "저장"], None),
-    ("video-home", "영상 홈", "trip-clip", ["프로젝트로 변화 영상을"], None),
+    ("video-home", "영상 홈", "trip-clip", ["변화 영상 만들기"], None),
     ("video-create", "영상 만들기", "video-create", ["변화 영상 만들기", "QA 데모"], None),
     ("video-photos", "영상 사진 선택", "video-create", ["사진 선택", "전체 선택"], (["변화 영상 만들기"], "사진 수", "summary")),
     ("video-interval", "영상 간격 옵션", "video-create", ["사진 간격", "적용"], (["변화 영상 만들기"], "사진 간격", "summary")),
@@ -68,7 +68,7 @@ LARGE_TEXT = {
 ADDITIONAL = [
     ("empty-projects", "기록 빈 상태", "studio", ["내 프로젝트"], None),
     ("new-project", "새 프로젝트 생성", "studio", ["프로젝트 이름", "목표 기록 수"], (["내 프로젝트"], "새 프로젝트 만들기")),
-    ("onboarding-welcome", "온보딩 첫 화면", "settings", ["바디 프레임에 오신 것을 환영합니다.", "시작하기"], qa.onboarding_welcome),
+    ("onboarding-welcome", "설정에서 여는 가이드", "settings", ["바디 프레임에 오신 것을 환영합니다.", "다음"], qa.onboarding_welcome),
     ("onboarding-next", "온보딩 다음 화면", "settings", ["프로젝트로 기록을 나눕니다", "다음"], qa.onboarding_scrolled),
 ]
 
@@ -178,7 +178,7 @@ def main():
         device.shell("wm", "size", size)
         device.shell("wm", "density", density)
         manifest["displayEvidence"] = qa.wait_for_visual_profile(device, size, density)
-        for variant in ("dark-100", "light-130", "dark-150"):
+        for variant in ("dark-100", "light-130", "dark-150", "light-150"):
             theme, font, scale = ALL_VARIANTS[variant]
             directory = output / variant
             directory.mkdir(exist_ok=True)
@@ -199,6 +199,30 @@ def main():
                     raise RuntimeError("Android emulator System UI is not responding; review failure screenshot before retry")
                 if record.get("pixelEvidenceValid") is False:
                     raise RuntimeError("Aborting because the Android emulator produced a blank screenshot; see the failed PNG.")
+            if variant == "light-150":
+                device.seed(False, font, theme_mode=theme)
+                large_creation = verified_capture(
+                    device, directory, "new-project-light-large", "studio",
+                    ["프로젝트 이름", "목표 기록 수", "프로젝트 만들기"],
+                    (["내 프로젝트"], "새 프로젝트 만들기")
+                )
+                large_creation.update(profile=args.profile, variant=variant,
+                                      label="라이트 테마 글자 150% 새 프로젝트")
+                manifest["captures"].append(large_creation)
+                (directory / "new-project-light-large.json").write_text(
+                    json.dumps(large_creation, indent=2, ensure_ascii=False), encoding="utf-8"
+                )
+                device.seed(True, font, theme_mode=theme, intro_seen=False)
+                large_welcome = verified_capture(
+                    device, directory, "onboarding-first-run-light-large", "camera",
+                    ["바디 프레임에 오신 것을 환영합니다.", "시작하기", "나중에 보기"]
+                )
+                large_welcome.update(profile=args.profile, variant=variant,
+                                     label="라이트 테마 글자 150% 최초 실행")
+                manifest["captures"].append(large_welcome)
+                (directory / "onboarding-first-run-light-large.json").write_text(
+                    json.dumps(large_welcome, indent=2, ensure_ascii=False), encoding="utf-8"
+                )
             if variant == "dark-100":
                 device.seed(False, font, theme_mode=theme)
                 for name, label, route, expected, action in ADDITIONAL[:2]:
@@ -206,6 +230,16 @@ def main():
                     record.update(profile=args.profile, variant=variant, label=label)
                     manifest["captures"].append(record)
                     (directory / f"{name}.json").write_text(json.dumps(record, indent=2, ensure_ascii=False), encoding="utf-8")
+                device.seed(True, font, theme_mode=theme, intro_seen=False)
+                first_run = verified_capture(
+                    device, directory, "onboarding-first-run", "camera",
+                    ["바디 프레임에 오신 것을 환영합니다.", "시작하기", "나중에 보기"]
+                )
+                first_run.update(profile=args.profile, variant=variant, label="최초 실행 환영 화면")
+                manifest["captures"].append(first_run)
+                (directory / "onboarding-first-run.json").write_text(
+                    json.dumps(first_run, indent=2, ensure_ascii=False), encoding="utf-8"
+                )
                 device.seed(True, font, theme_mode=theme)
                 for name, label, route, expected, action in ADDITIONAL[2:]:
                     record = verified_capture(device, directory, name, route, expected, action)

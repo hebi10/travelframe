@@ -351,8 +351,9 @@ export function BodyFrameProjectSwitcher({
                   <Pressable
                     key={value}
                     disabled={locked}
-                     accessibilityRole="radio"
-                     accessibilityState={{ selected: targetPreset === value, disabled: locked }}
+                    accessibilityRole="radio"
+                    accessibilityLabel={value === "custom" ? "목표 기록 수 직접 입력" : `목표 ${value}장`}
+                    accessibilityState={{ selected: targetPreset === value, disabled: locked }}
                     style={[
                       styles.choice,
                       { borderColor: palette.line },
@@ -368,8 +369,8 @@ export function BodyFrameProjectSwitcher({
                       {value === "custom"
                         ? "직접 입력"
                         : locked
-                          ? `${value} · ${upgradePlanLabel ?? "상위 플랜"}`
-                          : value}
+                          ? `${value}장 · ${upgradePlanLabel ?? "상위 플랜"}`
+                          : `${value}장`}
                     </Text>
                   </Pressable>
                 );
@@ -409,19 +410,27 @@ export function BodyFrameProjectSwitcher({
               </View>
             ) : null}
 
-            <Text style={[styles.label, { color: palette.muted }]}>기준 사진</Text>
+            <Text style={[styles.label, { color: palette.text }]}>촬영 기준 사진 방식</Text>
+            <Text style={[styles.referenceHint, { color: palette.muted }]}>
+              두 번째 촬영부터 겹쳐 볼 사진을 선택합니다.
+            </Text>
             <Pressable
               accessibilityRole="radio"
+              accessibilityLabel="최근 사진을 기준으로 촬영"
+              accessibilityHint="바로 전 촬영 사진을 겹쳐 자세를 맞춥니다."
               accessibilityState={{ selected: referenceMode === "latest" }}
               style={[
                 styles.referenceChoice,
-                { borderColor: referenceMode === "latest" ? actionColor : palette.line }
+                {
+                  borderColor: referenceMode === "latest" ? actionColor : palette.line,
+                  backgroundColor: referenceMode === "latest" ? palette.surfaceStrong : palette.surface
+                }
               ]}
               onPress={() => setReferenceMode("latest")}
             >
               <View style={styles.referenceText}>
                 <Text style={[styles.referenceTitle, { color: palette.text }]}>최근 사진</Text>
-                <Text style={[styles.referenceMeta, { color: palette.muted }]}>바로 전 사진과 맞춥니다.</Text>
+                <Text style={[styles.referenceMeta, { color: palette.muted }]}>직전 촬영 사진을 반투명하게 표시</Text>
               </View>
               {referenceMode === "latest" ? (
                 <Feather name="check" size={18} color={actionColor} />
@@ -429,16 +438,21 @@ export function BodyFrameProjectSwitcher({
             </Pressable>
             <Pressable
               accessibilityRole="radio"
+              accessibilityLabel="첫 번째 사진을 기준으로 촬영"
+              accessibilityHint="첫 번째 촬영 사진을 이후 촬영마다 겹쳐 자세를 맞춥니다."
               accessibilityState={{ selected: referenceMode === "first" }}
               style={[
                 styles.referenceChoice,
-                { borderColor: referenceMode === "first" ? actionColor : palette.line }
+                {
+                  borderColor: referenceMode === "first" ? actionColor : palette.line,
+                  backgroundColor: referenceMode === "first" ? palette.surfaceStrong : palette.surface
+                }
               ]}
               onPress={() => setReferenceMode("first")}
             >
               <View style={styles.referenceText}>
                 <Text style={[styles.referenceTitle, { color: palette.text }]}>첫 번째 사진</Text>
-                <Text style={[styles.referenceMeta, { color: palette.muted }]}>첫 번째 사진과 계속 맞춥니다.</Text>
+                <Text style={[styles.referenceMeta, { color: palette.muted }]}>첫 촬영 사진을 기준으로 계속 표시</Text>
               </View>
               {referenceMode === "first" ? (
                 <Feather name="check" size={18} color={actionColor} />
@@ -602,9 +616,14 @@ const styles = StyleSheet.create({
     borderRadius: 8
   },
   choiceSelected: { borderColor: "#F5F5F5" },
-  choiceText: { color: "#F5F5F5", fontSize: bodyFrameTypography.caption },
+  choiceText: { color: "#F5F5F5", fontSize: bodyFrameTypography.caption, textAlign: "center" },
+  referenceHint: {
+    fontSize: bodyFrameTypography.caption,
+    lineHeight: 18,
+    marginBottom: 6
+  },
   referenceChoice: {
-    minHeight: 60,
+    minHeight: 56,
     flexDirection: "row",
     alignItems: "center",
     borderWidth: 1,
@@ -612,7 +631,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    marginBottom: 8
+    marginBottom: 6
   },
   referenceChoiceSelected: { borderColor: "#F5F5F5" },
   referenceText: { flex: 1 },

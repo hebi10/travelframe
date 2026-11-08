@@ -57,7 +57,7 @@ function PhotoCard({
 
   return (
     <View style={[styles.photoCard, { borderColor: palette.line, backgroundColor: palette.background }]}>
-      <Pressable onPress={() => router.push(`/photo/${photo.id}` as Href)}>
+      <Pressable accessibilityRole="button" accessibilityLabel={`${formatDate(photo.createdAt)} 사진 상세 보기`} onPress={() => router.push(`/photo/${photo.id}` as Href)}>
         <NativeImage
           source={{ uri: photo.uri }}
           style={[styles.thumbnail, thumbnailStyle]}
@@ -74,6 +74,8 @@ function PhotoCard({
       </View>
       <View style={styles.cardActions}>
         <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`${formatDate(photo.createdAt)} 사진 편집`}
           style={[styles.cardButton, filledButtonStyle]}
           onPress={() => {
             if (!canEditLibraryItems) {
@@ -89,6 +91,8 @@ function PhotoCard({
           </Text>
         </Pressable>
         <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`${formatDate(photo.createdAt)} 사진 보기`}
           style={[styles.cardLightButton, secondaryButtonStyle]}
           onPress={() => router.push(`/photo/${photo.id}` as Href)}
         >
@@ -97,6 +101,8 @@ function PhotoCard({
           </Text>
         </Pressable>
         <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`${formatDate(photo.createdAt)} 사진 삭제`}
           style={[styles.cardLightButton, secondaryButtonStyle]}
           onPress={() => onDelete(photo)}
         >

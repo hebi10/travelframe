@@ -73,6 +73,15 @@ test("Stage 16 limits external link/query size and argument explosion before Rou
   assert.equal(guard.sanitizeIncomingNativePath("/account?state=" + "x".repeat(1500)), "/account?state=" + "x".repeat(1500));
 });
 
+test("Stage 16 bounds percent-encoded runs before Router decode (DoS defense)", () => {
+  const valid = "/camera?name=" + "%ED%95%9C".repeat(20);
+  assert.equal(guard.sanitizeIncomingNativePath(valid), valid);
+  assert.equal(guard.MAX_NATIVE_PERCENT_ESCAPES, 96);
+  const malicious = "/camera?data=" + "%41".repeat(guard.MAX_NATIVE_PERCENT_ESCAPES + 1);
+  assert.equal(nativeIntent.redirectSystemPath({ initial: true, path: malicious }), "/");
+  assert.equal(nativeIntent.redirectSystemPath({ initial: false, path: malicious }), "/");
+});
+
 test("Stage 16 leaves legacy SDK dependencies untouched and does not bypass Play release safeguards", () => {
   const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
   const lock = JSON.parse(fs.readFileSync("package-lock.json", "utf8"));

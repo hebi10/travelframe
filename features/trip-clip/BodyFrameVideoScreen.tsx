@@ -149,7 +149,7 @@ export default function BodyFrameVideoScreen() {
   );
   const outputSize = getBodyFrameVideoOutputSize(videoOptions.ratio, videoOptions.quality);
   const frameAspectRatio = outputSize.width / outputSize.height;
-  const previewDisplayWidth = Math.max(160, Math.min(360, windowWidth * 0.82, windowHeight * 0.35 * frameAspectRatio));
+  const previewDisplayWidth = Math.max(160, Math.min(360, windowWidth * 0.82, windowHeight * 0.30 * frameAspectRatio));
   const [isLoading, setIsLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
@@ -900,14 +900,14 @@ const styles = StyleSheet.create({
     fontWeight: "600"
   },
   projectName: {
-    marginTop: 8,
+    marginTop: 6,
     marginBottom: 2,
     fontSize: bodyFrameTypography.body
   },
   previewHeader: {
-    marginTop: 6,
-    marginBottom: 6,
-    minHeight: 36,
+    marginTop: 4,
+    marginBottom: 4,
+    minHeight: 32,
     flexDirection: "row",
     flexWrap: "wrap",
     alignItems: "center",
@@ -923,11 +923,11 @@ const styles = StyleSheet.create({
     fontVariant: ["tabular-nums"]
   },
   settingsTitle: {
-    marginTop: 10,
-    marginBottom: 8
+    marginTop: 6,
+    marginBottom: 6
   },
   guestLimitText: {
-    marginBottom: 8,
+    marginBottom: 6,
     fontSize: bodyFrameTypography.caption,
     lineHeight: 17
   },

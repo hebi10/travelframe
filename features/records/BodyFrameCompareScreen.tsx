@@ -190,7 +190,7 @@ export default function BodyFrameCompareScreen() {
               </Text>
             </View>
             <Text style={[styles.hint, { color: palette.muted }]}>
-              화면을 좌우로 드래그하면 두 사진을 비교할 수 있습니다.
+              구분선을 좌우로 움직여 전후 사진을 비교하세요.
             </Text>
 
           </>
@@ -250,7 +250,7 @@ const styles = StyleSheet.create({
     maxWidth: bodyFrameDesign.contentMaxWidth,
     alignSelf: "center",
     paddingHorizontal: bodyFrameDesign.horizontalPadding,
-    gap: 12
+    gap: 8
   },
   header: {
     minHeight: bodyFrameDesign.minTouchSize,

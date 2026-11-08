@@ -25,3 +25,12 @@
 개발자용 CI 통과만으로 취약점 수정이나 Google Play 출시 승인을 주장하지 않습니다.
 
 추가 주의: `decode-uri-component@0.5.0`도 2026년 10월 공개된 quadratic replacement DoS (GHSA-qr28-fpjm-wq7f)에 영향받으므로, 패치 호환성 평가 시 0.5.1 이상을 기준으로 삼아야 합니다. 기존 CommonJS 기반 query-string 7에 단독 오버라이드하지 않습니다.
+
+## 최신 main 통합 및 추가 DoS 완화 (2026-11-08)
+- 기준 main: `271064567d3b6ab6836d95ca90d59e3eae93a112`. 이 PR은 보안 파일 5개만 최신 A/B/C/D 디자인/QA 코드 위에 재적용하여 기존 변경을 보존합니다.
+- 외부 시스템 URL 최대 4096자·쿼리 2048자/64 필드 외에 **'%' 인코딩 구간 개수 96개 상한**을 추가했습니다. Native Router에 넘기기 전에 선형 시간으로 검사하고 초과 시 '/'로 대체합니다. 일반 한글 인코딩 및 Google 로그인 콜백을 유지합니다.
+- 2026-11-06 `npm audit` 기준 앱 high 9 패키지(Expo Router/Query-string/decoder, Firestore/gRPC, Expo CLI/Zod), Functions moderate 9개는 **패키지 자체의 미수정 경고**입니다. 본 PR은 URL 유입 공격면 완화이며 `npm audit` 개수 감소를 의미하지 않습니다.
+- `decode-uri-component`는 최신 GitHub Advisory `GHSA-qr28-fpjm-wq7f`상 0.5.1 이상 필요하지만 Expo Router 55가 요구하는 `query-string@^7.1.3`의 CommonJS API와 일괄 오버라이드의 호환성이 검증되지 않았습니다. 기존 Expo SDK 55/React Native 0.83/Google OAuth 코드를 임의 변경하지 않습니다.
+- `@grpc/grpc-js@1.9.16`의 인증 컨텍스트 advisory(`GHSA-m9gg-hp2v-232j`)는 Node **gRPC 서버의 `getAuthContext` 사용 조건**을 설명합니다. Android Metro 번들/실제 서버 노출이 입증되지 않았고 Firestore의 의존 범위는 `~1.9.0`이므로 강제 1.13.6은 보류합니다.
+- Expo CLI의 `zod@3.25.76`은 4.6.6 이상 변경 시 메이저 API 호환성이 검증되지 않아 강제 수정하지 않습니다. Functions 잔여 moderate는 firebase-admin 13.x/fn 6.x 범위 밖 상위 SDK 업그레이드·운영 결제/백업 회귀가 필요합니다.
+- 호환 가능한 라이브러리 패치만 별도 검토/검증 후 적용합니다. **출시 차단 이슈 #106은 OPEN**입니다.

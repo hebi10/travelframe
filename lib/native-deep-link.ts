@@ -6,10 +6,23 @@
 export const MAX_NATIVE_LINK_LENGTH = 4096;
 export const MAX_NATIVE_QUERY_LENGTH = 2048;
 export const MAX_NATIVE_QUERY_FIELDS = 64;
+export const MAX_NATIVE_PERCENT_ESCAPES = 96;
 
 export function sanitizeIncomingNativePath(path: unknown): string {
   if (typeof path !== "string" || !path || path.length > MAX_NATIVE_LINK_LENGTH) {
     return "/";
+  }
+
+  // Limit percent-encoded runs before any decoder or router work.
+  // Malformed streams of repeated encodings are a known DoS input.
+  let percentEscapes = 0;
+  for (const char of path) {
+    if (char === "%") {
+      percentEscapes += 1;
+      if (percentEscapes > MAX_NATIVE_PERCENT_ESCAPES) {
+        return "/";
+      }
+    }
   }
 
   let decoded: string;

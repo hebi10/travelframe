@@ -32,7 +32,7 @@ for (const label of [
   "project-metrics", "project-stats", "project-reminder", "compare",
   "photo-measurement", "video-photos", "video-interval",
   "video-quality", "video-ratio", "video-overlay",
-  "empty-projects", "onboarding-welcome",
+  "empty-projects", "onboarding-welcome", "onboarding-first-run",
 ]) {
   assert.ok(capture.includes(label), label);
 }

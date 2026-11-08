@@ -24,7 +24,7 @@ const detail = read("features/records/BodyFrameProjectDetailScreen.tsx");
 assert.ok(tabs.includes('studio: "image"') && tabs.includes('video: "youtube"'));
 assert.ok(settings.includes("const settingRowIcons: Record<string, keyof typeof Feather.glyphMap>"));
 assert.ok(settings.includes("styles.settingRowIcon") && settings.includes("size={18} color={palette.muted}"));
-assert.ok(settings.includes("minHeight: 64") && settings.includes("minHeight: 56"));
+assert.ok(settings.includes("minHeight: 52") && settings.includes("minHeight: 56"));
 for (const group of ["촬영", "저장 및 백업", "변화 영상", "화면", "계정 및 플랜", "정보 및 개인정보"]) {
   assert.ok(settings.includes('SectionBlock title="' + group + '"'));
 }

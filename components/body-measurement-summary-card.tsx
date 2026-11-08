@@ -23,6 +23,17 @@ const CHART_HEIGHT = 92;
 const POINT_SIZE = 6;
 const LINE_HEIGHT = 2;
 
+const formatRangeDate = (recordedAt: string) => {
+  const date = new Date(recordedAt);
+  return Number.isFinite(date.getTime())
+    ? new Intl.DateTimeFormat("ko-KR", {
+        timeZone: "Asia/Seoul",
+        month: "numeric",
+        day: "numeric"
+      }).format(date)
+    : "";
+};
+
 function Sparkline({
   series,
   lineColor,
@@ -95,12 +106,14 @@ export function BodyMeasurementSummaryCard({
   metric,
   series,
   onAddMeasurement,
-  onOpenHistory
+  onOpenHistory,
+  compact = false
 }: {
   metric: BodyMeasurementMetric;
   series: BodyMeasurementSeriesPoint[];
   onAddMeasurement?: () => void;
   onOpenHistory?: () => void;
+  compact?: boolean;
 }) {
   const { palette } = useAppAppearance();
   const meta = bodyMeasurementMetricMeta[metric];
@@ -116,6 +129,7 @@ export function BodyMeasurementSummaryCard({
     <View
       style={[
         styles.card,
+        compact && styles.compactCard,
         {
           borderColor: palette.line,
           backgroundColor: palette.surface
@@ -167,10 +181,14 @@ export function BodyMeasurementSummaryCard({
           />
           <View style={styles.rangeRow}>
             <Text style={[styles.rangeText, { color: palette.faint }]}>
-              시작
+              {compact && summary.first
+                ? `시작 ${formatRangeDate(summary.first.recordedAt)}`
+                : "시작"}
             </Text>
             <Text style={[styles.rangeText, { color: palette.faint }]}>
-              최근
+              {compact && summary.latest
+                ? `최근 ${formatRangeDate(summary.latest.recordedAt)}`
+                : "최근"}
             </Text>
           </View>
         </>
@@ -209,6 +227,11 @@ const styles = StyleSheet.create({
     padding: 14,
     borderWidth: bodyFrameDesign.borderWidth,
     borderRadius: bodyFrameDesign.cardRadius
+  },
+  compactCard: {
+    gap: 8,
+    marginBottom: 8,
+    padding: 12
   },
   header: {
     minHeight: bodyFrameDesign.minTouchSize,

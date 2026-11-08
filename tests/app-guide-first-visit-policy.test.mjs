@@ -47,7 +47,7 @@ for (const snippet of [
 }
 
 assert.ok(
-  overlaySource.includes("useAppGuide(tabKey, replaySignal)") &&
+  overlaySource.includes("useAppGuide(tabKey, replaySignal, autoShowFirstRun)") &&
     overlaySource.includes("isWelcome") &&
     overlaySource.includes("시작하기"),
   "guide overlay should keep the shared first-run/replay policy"

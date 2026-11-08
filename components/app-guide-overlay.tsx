@@ -20,12 +20,14 @@ type AppGuideOverlayProps = {
   tabKey: AppGuideTabKey;
   transparentBackdrop?: boolean;
   replaySignal?: number;
+  autoShowFirstRun?: boolean;
 };
 
 export function AppGuideOverlay({
   tabKey,
   transparentBackdrop = false,
-  replaySignal = 0
+  replaySignal = 0,
+  autoShowFirstRun = true
 }: AppGuideOverlayProps) {
   const insets = useSafeAreaInsets();
   const { palette } = useAppAppearance();
@@ -39,13 +41,13 @@ export function AppGuideOverlay({
     goBack,
     goNext,
     skip
-  } = useAppGuide(tabKey, replaySignal);
+  } = useAppGuide(tabKey, replaySignal, autoShowFirstRun);
 
   if (!step) {
     return null;
   }
 
-  const isWelcome = tabKey === "camera" && step.id === "body-frame-welcome";
+  const isWelcome = tabKey === "camera" && step.id === "body-frame-welcome" && replaySignal === 0;
 
   return (
     <Modal
@@ -58,11 +60,12 @@ export function AppGuideOverlay({
       <View
         style={[
           styles.backdrop,
+          isWelcome && styles.welcomeBackdrop,
           {
-            paddingTop: Math.max(insets.top + 20, 28),
-            paddingBottom: Math.max(insets.bottom + 20, 28),
+            paddingTop: isWelcome ? Math.max(insets.top, 16) : Math.max(insets.top + 20, 28),
+            paddingBottom: isWelcome ? Math.max(insets.bottom, 16) : Math.max(insets.bottom + 20, 28),
             backgroundColor: isWelcome
-              ? "rgba(0,0,0,0.72)"
+              ? palette.background
               : transparentBackdrop
                 ? "transparent"
                 : "rgba(0,0,0,0.68)"
@@ -72,8 +75,9 @@ export function AppGuideOverlay({
         <View
           style={[
             styles.modal,
+            isWelcome && styles.welcomeModal,
             {
-              backgroundColor: palette.surface,
+              backgroundColor: isWelcome ? palette.background : palette.surface,
               borderColor: palette.line
             }
           ]}
@@ -81,12 +85,18 @@ export function AppGuideOverlay({
         >
           <ScrollView
             style={styles.contentScroll}
-            contentContainerStyle={styles.contentScrollContainer}
+            contentContainerStyle={[styles.contentScrollContainer, isWelcome && styles.welcomeScrollContainer]}
             showsVerticalScrollIndicator
             keyboardShouldPersistTaps="handled"
           >
           {isWelcome ? (
             <View style={styles.welcomeContent}>
+              <View style={styles.welcomeTopRow}>
+                <Text style={[styles.eyebrow, { color: palette.muted }]}>BODY FRAME</Text>
+                <Text style={[styles.welcomeProgress, { color: palette.muted }]}>
+                  {stepIndex + 1} / {totalSteps}
+                </Text>
+              </View>
               <Image
                 source={require("../assets/ui/illustrations/feature-capture.png")}
                 style={styles.welcomeArtwork}
@@ -99,15 +109,22 @@ export function AppGuideOverlay({
               <Text style={[styles.welcomeDescription, { color: palette.muted }]}>
                 {step.description}
               </Text>
-              <Pressable
-                accessibilityRole="button"
-                style={[styles.welcomeButton, { backgroundColor: actionColor }]}
-                onPress={goNext}
-              >
-                <Text style={[styles.welcomeButtonText, { color: actionTextColor }]}>
-                  시작하기
-                </Text>
-              </Pressable>
+              <View style={styles.welcomeActions}>
+                <Pressable
+                  accessibilityRole="button"
+                  style={[styles.welcomeButton, { backgroundColor: actionColor }]}
+                  onPress={goNext}
+                >
+                  <Text style={[styles.welcomeButtonText, { color: actionTextColor }]}>
+                    시작하기
+                  </Text>
+                </Pressable>
+                <Pressable accessibilityRole="button" style={styles.welcomeSkipButton} onPress={skip}>
+                  <Text style={[styles.welcomeSkipText, { color: palette.muted }]}>
+                    나중에 보기
+                  </Text>
+                </Pressable>
+              </View>
             </View>
           ) : (
             <>
@@ -147,6 +164,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 18
   },
+  welcomeBackdrop: {
+    paddingHorizontal: 0
+  },
   modal: {
     width: "100%",
     maxHeight: "100%",
@@ -156,8 +176,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: bodyFrameDesign.modalRadius
   },
+  welcomeModal: {
+    flex: 1,
+    maxWidth: "100%",
+    borderWidth: 0,
+    borderRadius: 0
+  },
   contentScroll: { flexShrink: 1, minHeight: 0 },
   contentScrollContainer: { flexGrow: 1 },
+  welcomeScrollContainer: { flexGrow: 1 },
   brandBlock: {
     gap: 6,
     paddingHorizontal: 18,
@@ -182,12 +209,25 @@ const styles = StyleSheet.create({
     paddingBottom: 10
   },
   welcomeContent: {
-    gap: 14,
-    padding: 22
+    flexGrow: 1,
+    gap: 16,
+    justifyContent: "center",
+    paddingHorizontal: 24,
+    paddingVertical: 28
+  },
+  welcomeTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    minHeight: bodyFrameDesign.minTouchSize
+  },
+  welcomeProgress: {
+    fontSize: bodyFrameTypography.caption,
+    fontVariant: ["tabular-nums"]
   },
   welcomeArtwork: {
     width: "100%",
-    height: 140,
+    height: 220,
     alignSelf: "center"
   },
   welcomeTitle: {
@@ -198,6 +238,16 @@ const styles = StyleSheet.create({
   welcomeDescription: {
     fontSize: 14,
     lineHeight: 21
+  },
+  welcomeActions: { gap: 8, marginTop: 12 },
+  welcomeSkipButton: {
+    minHeight: bodyFrameDesign.minTouchSize,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  welcomeSkipText: {
+    fontSize: bodyFrameTypography.button,
+    fontWeight: "600"
   },
   welcomeButton: {
     minHeight: bodyFrameDesign.primaryButtonHeight,
