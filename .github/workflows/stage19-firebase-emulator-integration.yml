@@ -52,9 +52,24 @@ jobs:
           [[ -z "${GOOGLE_APPLICATION_CREDENTIALS:-}" ]]
           [[ -z "${FIREBASE_TOKEN:-}" ]]
           [[ -z "${GOOGLE_OAUTH_ACCESS_TOKEN:-}" ]]
+      - name: Generate temporary emulator config without changing production Firebase settings
+        shell: bash
+        run: |
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const config = JSON.parse(fs.readFileSync('firebase.json', 'utf8'));
+          config.emulators = {
+            auth: { host: '127.0.0.1', port: 9099 },
+            firestore: { host: '127.0.0.1', port: 8080 },
+            storage: { host: '127.0.0.1', port: 9199 },
+            functions: { host: '127.0.0.1', port: 5001 },
+            pubsub: { host: '127.0.0.1', port: 8085 }
+          };
+          fs.writeFileSync('firebase.stage19-emulators.json', JSON.stringify(config), 'utf8');
+          NODE
       - name: Execute actual Functions, Firestore, Storage and Auth emulators
         timeout-minutes: 20
-        run: firebase emulators:exec --project demo-travelframe-stage19 --only auth,firestore,storage,functions,pubsub "node scripts/test-stage19-firebase-emulators.mjs"
+        run: firebase --config firebase.stage19-emulators.json emulators:exec --project demo-travelframe-stage19 --only auth,firestore,storage,functions,pubsub "node scripts/test-stage19-firebase-emulators.mjs"
       - name: Upload isolated integration results
         if: always()
         uses: actions/upload-artifact@v4
