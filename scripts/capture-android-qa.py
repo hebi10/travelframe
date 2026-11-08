@@ -603,6 +603,39 @@ class Device:
         return app_dir
 
 
+def recover_launcher_anr(device, output):
+    """Recover only the Pixel Launcher ANR on a disposable Android emulator.
+
+    Do not dismiss an app or unrelated system crash as a QA pass. The recovery
+    is bounded to one attempt and preserves a screenshot and XML evidence.
+    """
+    if device.shell('getprop', 'ro.kernel.qemu').strip() != '1':
+        raise RuntimeError('Launcher recovery is restricted to a disposable Android emulator')
+    current = device.dump()
+    visible = ui_strings(current)
+    launcher_message = "Pixel Launcher isn't responding"
+    if launcher_message not in visible:
+        return dict(status='healthy', recovered=False)
+    if 'Close app' not in visible or 'Wait' not in visible:
+        raise RuntimeError('Unrecognized launcher ANR; preserve the failure without tapping another app')
+    output.mkdir(parents=True, exist_ok=True)
+    (output / 'launcher-anr.before.xml').write_text(current, encoding='utf-8')
+    image = device.run('exec-out', 'screencap', '-p', binary=True)
+    if image[:8] != b'\\x89PNG\\r\\n\\x1a\\n':
+        raise RuntimeError('Launcher ANR screenshot is not a PNG; refusing unverified recovery')
+    (output / 'launcher-anr.before.png').write_bytes(image)
+    device.shell('am', 'force-stop', 'com.google.android.apps.nexuslauncher')
+    device.shell('input', 'keyevent', 'KEYCODE_BACK')
+    time.sleep(2)
+    after = device.dump()
+    (output / 'launcher-anr.after.xml').write_text(after, encoding='utf-8')
+    if launcher_message in ui_strings(after):
+        raise RuntimeError('Pixel Launcher ANR persisted after one bounded emulator-only recovery')
+    return dict(status='recovered', recovered=True,
+                reason='Pixel Launcher ANR before first app capture',
+                originalDialog=launcher_message)
+
+
 def capture(device, directory, name, route, expected, action=None, open_route=True):
     record = dict(profile=directory.name, screen=name, route=route, expected=expected, startedAt=datetime.now(timezone.utc).isoformat())
     device.capture_directory=directory
@@ -1172,6 +1205,7 @@ def main():
         device.shell('svc', 'data', 'disable')
         device.shell('input', 'keyevent', 'KEYCODE_WAKEUP')
         device.shell('wm', 'dismiss-keyguard')
+        manifest['systemLauncherHealth'] = recover_launcher_anr(device, args.output / 'system-diagnostics')
         if args.scenario == 'visual':
             capture_design_matrix(device, args.output, records, manifest)
         else:
