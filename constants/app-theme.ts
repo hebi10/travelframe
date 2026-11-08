@@ -1,15 +1,15 @@
 export const colors = {
-  background: "#ffffff",
-  chrome: "#ffffff",
-  surface: "#f8f8f8",
-  surfaceStrong: "#f1f1f1",
-  text: "#111111",
-  muted: "#444444",
-  faint: "#707070",
-  line: "#e5e5e5",
-  darkLine: "#2a2a2a",
-  inverse: "#ffffff",
-  ink: "#0f0f0f"
+  background: "#F7F8FA",
+  chrome: "#F7F8FA",
+  surface: "#FFFFFF",
+  surfaceStrong: "#ECEEF1",
+  text: "#181A1D",
+  muted: "#5D6269",
+  faint: "#5D6269",
+  line: "#DDE1E5",
+  darkLine: "#3D454E",
+  inverse: "#FFFFFF",
+  ink: "#181A1D"
 } as const;
 
 export const spacing = {
@@ -46,13 +46,13 @@ export const bodyFrameStatusColors = {
 export const bodyFrameDarkColors = {
   background: "#0B0B0C",
   chrome: "#0B0B0C",
-  surface: "#131315",
-  surfaceStrong: "#1A1A1D",
+  surface: "#1A1A1D",
+  surfaceStrong: "#292D31",
   text: "#F5F5F5",
   muted: "#A0A0A6",
   faint: "#88888F",
-  line: "#2A2A2E",
-  darkLine: "#2A2A2E",
+  line: "#323437",
+  darkLine: "#D5D9DE",
   inverse: "#111111",
   ink: "#F5F5F5"
 } as const;
