@@ -37,6 +37,17 @@ class Stage13CaptureTest(unittest.TestCase):
         self.assertIn("new-project", [item[0] for item in stage13.ADDITIONAL])
         self.assertIn("empty-projects", [item[0] for item in stage13.ADDITIONAL])
 
+    def test_stage_d_light_150_still_separates_first_install_and_replayed_guide(self):
+        self.assertEqual(stage13.ALL_VARIANTS["light-150"], ("light", "large", 1.5))
+        source = SCRIPT.read_text(encoding="utf-8")
+        self.assertIn('"light-150"', source)
+        self.assertIn('"onboarding-first-run-light-large"', source)
+        self.assertIn('"new-project-light-large"', source)
+        self.assertIn("intro_seen=False", source)
+        self.assertIn("device.seed(False, font, theme_mode=theme)", source)
+        self.assertIn("qa.onboarding_welcome", source)
+        self.assertIn("emulator-only", source)
+
     def test_gallery_captures_success_and_failure_without_claiming_visual_pass(self):
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp)
