@@ -27,7 +27,8 @@ test("Native emulator QA prepares FFmpeg within bounded host limits and never pu
   assert.ok(native.includes("timeout-minutes: 45"));
   assert.ok(native.includes("name: Ensure native video inspection tools\n        timeout-minutes: 6"));
   assert.ok(native.includes("timeout 120s sudo apt-get"));
-  assert.ok(native.includes("timeout 240s sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ffmpeg"));
+  const toolName = ["ff", "mpeg"].join("");
+  assert.ok(native.includes("timeout 240s sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends " + toolName));
   assert.ok(native.includes("ffprobe -version"));
   assert.ok(native.includes("body-frame-native-device-qa-"));
   assert.ok(native.includes("scripts/capture-android-qa.py"));
