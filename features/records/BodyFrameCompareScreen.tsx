@@ -177,7 +177,9 @@ export default function BodyFrameCompareScreen() {
           <ActivityIndicator color={palette.text} />
         ) : error || !comparison ? (
           <Text style={[styles.emptyText, { color: palette.muted }]}>
-            {error ?? "비교할 사진이 2장 이상 필요합니다."}
+            {error ?? (chosenBeforeId && chosenAfterId
+              ? "선택한 사진을 찾을 수 없습니다. 다른 사진을 선택하세요."
+              : "비교할 사진이 2장 이상 필요합니다.")}
           </Text>
         ) : (
           <>
@@ -407,6 +409,7 @@ export default function BodyFrameCompareScreen() {
               ))}
             </View>
             <FlatList
+              style={styles.pickerListViewport}
               data={candidates}
               keyExtractor={item => item.id}
               numColumns={2}
@@ -575,6 +578,7 @@ const styles = StyleSheet.create({
   pickerTitle: { fontSize: 18, fontWeight: "600" },
   pickerClose: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
   pickerList: { paddingBottom: 12, gap: 8 },
+  pickerListViewport: { flexGrow: 0, flexShrink: 1 },
   pickerRow: { gap: 8 },
   pickerItem: { flex: 1, borderWidth: 1, borderRadius: 8, padding: 6, minWidth: 0 },
   pickerImage: { width: "100%", aspectRatio: 3 / 4 },
