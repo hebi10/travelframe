@@ -13,6 +13,55 @@ spec.loader.exec_module(qa)
 
 
 class CaptureHelpersTest(unittest.TestCase):
+    def test_launcher_anr_preflight_ignores_healthy_emulator(self):
+        device = Mock()
+        device.shell.side_effect = lambda *args, **kwargs: '1' if args == ('getprop', 'ro.kernel.qemu') else ''
+        device.dump.return_value = '<hierarchy><node text="BODY FRAME" /></hierarchy>'
+        with tempfile.TemporaryDirectory() as tmp:
+            evidence = qa.recover_launcher_anr(device, Path(tmp))
+        self.assertEqual(evidence['status'], 'healthy')
+        self.assertFalse(evidence['recovered'])
+        device.run.assert_not_called()
+        self.assertNotIn(call('am', 'force-stop', 'com.google.android.apps.nexuslauncher'), device.shell.call_args_list)
+
+    def test_launcher_anr_preflight_preserves_evidence_and_recovers_only_once(self):
+        device = Mock()
+        dialog = '<hierarchy><node text="Pixel Launcher isn&#39;t responding"/><node text="Close app"/><node text="Wait"/></hierarchy>'
+        device.shell.side_effect = lambda *args, **kwargs: '1' if args == ('getprop', 'ro.kernel.qemu') else ''
+        device.dump.side_effect = [dialog, '<hierarchy><node text="Home"/></hierarchy>']
+        png = b'\x89PNG\r\n\x1a\n' + bytes(35)
+        device.run.return_value = png
+        with tempfile.TemporaryDirectory() as tmp, patch.object(qa.time, 'sleep') as sleep:
+            folder = Path(tmp)
+            evidence = qa.recover_launcher_anr(device, folder)
+            self.assertEqual((folder / 'launcher-anr.before.png').read_bytes(), png)
+            self.assertIn('Pixel Launcher', (folder / 'launcher-anr.before.xml').read_text())
+            self.assertTrue((folder / 'launcher-anr.after.xml').exists())
+        self.assertEqual(evidence['status'], 'recovered')
+        device.shell.assert_any_call('am', 'force-stop', 'com.google.android.apps.nexuslauncher')
+        device.shell.assert_any_call('input', 'keyevent', 'KEYCODE_BACK')
+        self.assertEqual(device.dump.call_count, 2)
+        sleep.assert_called_once_with(2)
+
+    def test_launcher_anr_preflight_never_modifies_physical_device(self):
+        device = Mock()
+        device.shell.return_value = '0'
+        with self.assertRaisesRegex(RuntimeError, 'disposable Android emulator'):
+            qa.recover_launcher_anr(device, Path('/tmp/unused'))
+        device.dump.assert_not_called()
+        device.run.assert_not_called()
+
+    def test_launcher_anr_preflight_does_not_hide_other_app_or_persistent_anr(self):
+        device = Mock()
+        device.shell.side_effect = lambda *args, **kwargs: '1' if args == ('getprop', 'ro.kernel.qemu') else ''
+        dialog = '<hierarchy><node text="Pixel Launcher isn&#39;t responding"/><node text="Close app"/><node text="Wait"/></hierarchy>'
+        device.dump.side_effect = [dialog, dialog]
+        device.run.return_value = b'\x89PNG\r\n\x1a\n' + bytes(35)
+        with tempfile.TemporaryDirectory() as tmp, patch.object(qa.time, 'sleep'):
+            with self.assertRaisesRegex(RuntimeError, 'persisted after one bounded'):
+                qa.recover_launcher_anr(device, Path(tmp))
+        self.assertEqual(device.dump.call_count, 2)
+
     def test_click_uses_clickable_parent_bounds_and_ignores_disabled_control(self):
         xml = '''<hierarchy><node clickable="true" enabled="false" bounds="[0,0][100,100]" content-desc="사진 수"/><node clickable="true" enabled="true" bounds="[10,40][310,100]"><node text="사진 수" enabled="true" bounds="[20,50][70,80]"/></node></hierarchy>'''
         self.assertEqual(qa.target_bounds(xml, '사진 수'), (160, 70))
@@ -239,6 +288,7 @@ class CaptureScenarioTest(unittest.TestCase):
         import json
         device=Mock()
         device.shell.side_effect=lambda *args,**kwargs:'1' if args==('getprop','ro.kernel.qemu') else ''
+        device.dump.return_value='<hierarchy />'
         device.run.return_value=''
         calls=[]
         def capture(_device,directory,name,route,expected,action=None,open_route=True):
