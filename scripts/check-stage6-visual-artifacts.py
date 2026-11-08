@@ -27,7 +27,7 @@ def inspect(root):
     if len(profiles) != 4 or sorted(p["widthDp"] for p in profiles) != [360, 412, 600, 750]:
         problems.append("expected exact 360/412/600/750dp profiles")
     if [(v.get("theme"), v.get("systemFontScale")) for v in variants] != [
-        ("dark", 1.0), ("light", 1.3), ("dark", 1.5)
+        ("dark", 1.0), ("light", 1.3), ("dark", 1.5), ("light", 1.5)
     ]:
         problems.append("expected dark100/light130/dark150 variants")
     expected_keys = {
