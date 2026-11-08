@@ -19,6 +19,6 @@
 
 ## 보안 판단
 
-이 선행 전환만으로 npm audit 앱 high 9개 또는 Functions moderate 8개가 **줄었다고 주장하지 않는다**. 실제 의존성 버전을 바꾸지 않았으므로 보안 이슈 [#106](https://github.com/hebi10/travelframe/issues/106), SDK 업그레이드 이슈 [#125](https://github.com/hebi10/travelframe/issues/125), 출시 차단 이슈 [#63](https://github.com/hebi10/travelframe/issues/63)는 모두 열린 상태를 유지한다.
+이번 PR의 [Dependency Audit #42454622746](https://github.com/hebi10/travelframe/actions/runs/42454622746) 기준 **앱 high 9개, Functions moderate 9개**가 남아 있다. 직전 [#42448053580](https://github.com/hebi10/travelframe/actions/runs/42448053580)의 Functions moderate 8개와 집계 차이는 있으나, package/lockfile 버전 변경 없이 발생했으므로 이 PR에 따른 보안 패치 효과나 신규 취약점의 실제 악용 가능성으로 단정하지 않는다. 이 선행 전환만으로 취약 패키지가 제거되었다고 주장하지 않는다. 실제 의존성 버전을 바꾸지 않았으므로 보안 이슈 [#106](https://github.com/hebi10/travelframe/issues/106), SDK 업그레이드 이슈 [#125](https://github.com/hebi10/travelframe/issues/125), 출시 차단 이슈 [#63](https://github.com/hebi10/travelframe/issues/63)는 모두 열린 상태를 유지한다.
 
 개발·CI 코드 검증을 통과해도 Firebase 운영 배포·Play 테스트 업로드 또는 실제 결제·기기 검증을 자동 수행하지 않는다.
