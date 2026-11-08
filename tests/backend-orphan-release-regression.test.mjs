@@ -27,6 +27,7 @@ const db = {
 };
 const firestore = () => db;
 firestore.FieldValue = { serverTimestamp: () => "now" };
+firestore.Timestamp = { fromMillis: (millis) => ({ toMillis: () => millis }) };
 class HttpsError extends Error { constructor(code, message) { super(message); this.code = code; } }
 const output = {};
 vm.runInNewContext(`${source}\nexports.testRefreshOverview = refreshAdminBackupOverview;`, {
@@ -34,7 +35,9 @@ vm.runInNewContext(`${source}\nexports.testRefreshOverview = refreshAdminBackupO
   require: (name) => {
     if (name === "firebase-functions/v2/https") return { onCall: (_, handler) => handler, HttpsError };
     if (name === "firebase-functions/v2/pubsub") return { onMessagePublished: () => null };
-    if (name === "firebase-admin") return { initializeApp() {}, firestore, storage: () => ({ bucket: () => ({ file: (path) => ({ getMetadata: async () => [{ metadata: { backupSessionId: "session" }, generation: "1" }], delete: async () => {
+    if (name === "firebase-admin/app") return { initializeApp: () => ({}) };
+    if (name === "firebase-admin/firestore") return { getFirestore: firestore, FieldValue: firestore.FieldValue, Timestamp: firestore.Timestamp };
+    if (name === "firebase-admin/storage") return { getStorage: () => ({ bucket: () => ({ file: (path) => ({ getMetadata: async () => [{ metadata: { backupSessionId: "session" }, generation: "1" }], delete: async () => {
       if (deleteFailures > 0) { deleteFailures--; throw new Error("Temporary Storage failure"); }
       deleted.push(path);
     } }) }) }) };
