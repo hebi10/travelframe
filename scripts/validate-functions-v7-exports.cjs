@@ -1,6 +1,9 @@
 "use strict";
 
 const assert = require("node:assert/strict");
+const { createRequire } = require("node:module");
+const { resolve } = require("node:path");
+const requireFunctions = createRequire(resolve(__dirname, "../functions/index.js"));
 
 const expected = [
   "verifyGooglePlayPurchase",
@@ -39,9 +42,9 @@ process.env.FUNCTIONS_ENFORCE_APP_CHECK = "false";
 process.env.FUNCTIONS_ENABLE_ADMIN_BACKUP_DELETION = "false";
 process.env.FUNCTIONS_ENABLE_ADMIN_FULL_BACKUP_DELETION = "false";
 
-const { getApps, deleteApp } = require("firebase-admin/app");
-const { FieldValue, Timestamp } = require("firebase-admin/firestore");
-const exportsMap = require("../functions/index.js");
+const { getApps, deleteApp } = requireFunctions("firebase-admin/app");
+const { FieldValue, Timestamp } = requireFunctions("firebase-admin/firestore");
+const exportsMap = requireFunctions("./index.js");
 
 for (const name of expected) {
   assert.equal(typeof exportsMap[name], "function", name + " is not registered as a callable/event function");
