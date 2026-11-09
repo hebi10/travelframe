@@ -79,7 +79,12 @@ def project_create_button_text_height_dp(xml, density_dpi, label="프로젝트 �
         raise ValueError(f"{label} text has no native bounds")
     _, top, _, bottom = map(int, match.groups())
     height_dp = (bottom - top) * 160 / density_dpi
-    if height_dp > 44:
+    # The Records control occupies a taller React Native accessibility text frame,
+    # even when glyphs render on one line. 360/412dp native 150% screenshots:
+    # one line ~66.5dp; previous two-line regression ~99.5dp.
+    # The project sheet confirmation uses a compact single-line frame (~34.5dp).
+    max_single_line_dp = 80 if label == "새 프로젝트" else 44
+    if height_dp > max_single_line_dp:
         raise ValueError(f"{label} label still wraps at enlarged font: {height_dp:.1f}dp high")
     return round(height_dp, 1)
 
