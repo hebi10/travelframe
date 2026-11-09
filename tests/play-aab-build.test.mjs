@@ -34,10 +34,32 @@ test("rejects malformed or empty keystore base64 before creating a file", () => 
   for (const value of ["", "not base64!", "abc", "===="]) assert.throws(() => decodeKeystore(value));
 });
 
-test("install APK signer inspection rejects absent, wrong and additional signers", () => {
+test("install APK signer inspection accepts legacy and versioned apksigner certificate lines", () => {
   const fingerprint = "ab".repeat(32);
-  assert.doesNotThrow(() => verifyApkSigner(`Signer #1 certificate SHA-256 digest: ${fingerprint}\n`, fingerprint));
-  for (const output of ["", `Signer #1 certificate SHA-256 digest: ${"cd".repeat(32)}`, `Signer #1 certificate SHA-256 digest: ${fingerprint}\nSigner #2 certificate SHA-256 digest: ${fingerprint}\n`]) assert.throws(() => verifyApkSigner(output, fingerprint));
+  for (const output of [
+    `Signer #1 certificate SHA-256 digest: ${fingerprint}\n`,
+    `Verifies\nNumber of signers: 1\nV2 Signer: certificate SHA-256 digest: ${fingerprint}\n`,
+    `Verifies\nNumber of signers: 1\nV3.0 Signer: certificate SHA-256 digest: ${fingerprint.toUpperCase()}\n`,
+    `Number of signers: 1\r\nV2 Signer: certificate SHA-256 digest: ${fingerprint}\r\nV3.0 Signer: certificate SHA-256 digest: ${fingerprint}\r\n`,
+    `Signer (minSdkVersion=24, maxSdkVersion=32) certificate SHA-256 digest: ${fingerprint}\n`
+  ]) assert.doesNotThrow(() => verifyApkSigner(output, fingerprint));
+});
+
+test("install APK signer inspection fails closed on absent, foreign and ambiguous certificates", () => {
+  const fingerprint = "ab".repeat(32);
+  const foreign = "cd".repeat(32);
+  for (const output of [
+    "",
+    "Verifies\nNumber of signers: 1\n",
+    `Signer #1 certificate SHA-256 digest: ${foreign}\n`,
+    `V3.0 Signer: certificate SHA-256 digest: ${foreign}\n`,
+    `V2 Signer: certificate SHA-256 digest: ${fingerprint}\nV3.0 Signer: certificate SHA-256 digest: ${foreign}\n`,
+    `Number of signers: 2\nV2 Signer: certificate SHA-256 digest: ${fingerprint}\n`,
+    `Signer #1 certificate SHA-256 digest: ${fingerprint}\nSigner #2 certificate SHA-256 digest: ${fingerprint}\n`,
+    `Unknown Signer: certificate SHA-256 digest: ${fingerprint}\n`,
+    `V2 Signer: certificate SHA-256 digest: ${fingerprint.slice(0, 63)}\n`,
+    `Signer #1 public key SHA-256 digest: ${fingerprint}\n`
+  ]) assert.throws(() => verifyApkSigner(output, fingerprint));
 });
 
 test("rejects missing production Firebase and Android sign-in settings without leaking values", () => {
