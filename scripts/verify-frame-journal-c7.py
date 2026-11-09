@@ -24,9 +24,11 @@ PRIMARY = (
 FULL_EXTRA = (
     "camera-project-picker", "camera-new-project", "camera-settings", "camera-settings-storage",
     "camera-guide-settings", "camera-reference-adjust", "camera-color-panel", "camera-zoom-panel",
-    "camera-light-panel", "project-stats", "video-photos", "video-quality",
-    "empty-projects", "new-project", "onboarding-welcome", "onboarding-next",
-    "onboarding-first-run"
+    "camera-light-panel", "project-metrics", "project-stats", "project-settings", "project-reminder",
+    "photo", "photo-measurement", "edit-login-required", "measurement-create",
+    "video-photos", "video-interval", "video-quality", "video-ratio", "video-overlay", "video-library",
+    "settings-reference", "legacy-studio", "legacy-advanced-settings", "capture-preview",
+    "empty-projects", "new-project", "onboarding-first-run", "onboarding-welcome", "onboarding-next"
 )
 ACTION_REQUIREMENTS = {
     "camera-color-panel": ("색감 조절값 초기화", "선택한 색감 슬롯에 현재 설정 저장"),
