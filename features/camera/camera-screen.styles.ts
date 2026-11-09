@@ -1619,6 +1619,9 @@ export const styles = StyleSheet.create({
   permissionActions: {
     width: "100%",
     maxWidth: 480,
+    alignSelf: "center",
+    paddingHorizontal: bodyFrameDesign.horizontalPadding,
+    paddingTop: 12,
     gap: bodyFrameDesign.controlGap
   },
   permissionButton: {
