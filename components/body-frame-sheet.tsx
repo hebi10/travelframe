@@ -60,6 +60,7 @@ type BodyFrameSheetFooterProps = {
   confirmLabel: string;
   cancelLabel?: string;
   disabled?: boolean;
+  confirmFlex?: number;
 };
 
 export function BodyFrameSheetFooter({
@@ -67,7 +68,8 @@ export function BodyFrameSheetFooter({
   onConfirm,
   confirmLabel,
   cancelLabel = "취소",
-  disabled = false
+  disabled = false,
+  confirmFlex = 1
 }: BodyFrameSheetFooterProps) {
   const { palette } = useAppAppearance();
   const {
@@ -93,7 +95,7 @@ export function BodyFrameSheetFooter({
         onPress={onConfirm}
         style={[
           styles.footerButton,
-          { borderColor: primaryBackground, backgroundColor: primaryBackground, opacity: disabled ? 0.5 : 1 }
+          { flex: confirmFlex, borderColor: primaryBackground, backgroundColor: primaryBackground, opacity: disabled ? 0.5 : 1 }
         ]}
       >
         <Text numberOfLines={2} style={[styles.footerText, { color: primaryForeground }]}>{confirmLabel}</Text>

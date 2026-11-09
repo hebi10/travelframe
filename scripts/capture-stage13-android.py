@@ -24,6 +24,11 @@ SPEC.loader.exec_module(qa)
 
 ALL_PROFILES = {name: (size, dpi) for name, size, dpi in qa.DESIGN_PROFILES}
 ALL_VARIANTS = {name: (theme, font, scale) for name, theme, font, scale in qa.DESIGN_VARIANTS}
+ALL_VARIANTS.update({
+    "light-100": ("light", "medium", 1.0),
+    "dark-130": ("dark", "large", 1.3),
+})
+C7_VARIANTS = ("dark-100", "light-100", "dark-130", "light-130", "dark-150", "light-150")
 
 P = qa.PROJECT
 F = qa.PHOTO
@@ -159,6 +164,15 @@ LARGE_TEXT = {
     "camera", "camera-new-project", "camera-settings", "camera-guide-settings", "camera-color-panel", "records", "project", "project-metrics", "project-stats", "compare",
     "video-home", "video-create", "settings", "account", "project-settings", "video-photos",
 }
+# Cover the same primary navigation pages in all 24 theme/font/device combinations.
+C7_PRIMARY = {
+    "camera", "records", "project", "compare", "measurements",
+    "video-home", "video-create", "settings", "account"
+}
+if not C7_PRIMARY.issubset(CORE):
+    raise RuntimeError("C7 primary routes must be present in the core screenshot list")
+LARGE_TEXT.update(C7_PRIMARY)
+
 ADDITIONAL = [
     ("empty-projects", "기록 빈 상태", "studio", ["내 프로젝트"], None),
     ("new-project", "새 프로젝트 생성", "studio", ["프로젝트 이름", "목표 기록 수"], (["내 프로젝트"], "새 프로젝트 만들기")),
@@ -252,6 +266,9 @@ def main():
         "pixelSize": size,
         "densityDpi": density,
         "sourceCommit": os.environ.get("GITHUB_SHA", "local"),
+        "prHeadCommit": os.environ.get("C7_HEAD_SHA", "unknown"),
+        "captureMatrix": list(C7_VARIANTS),
+        "integrationStage": "Frame Journal C7 — 24 theme/font/width combinations",
         "apkSha256": hashlib.sha256(args.apk.read_bytes()).hexdigest(),
         "capturedAt": datetime.now(timezone.utc).isoformat(),
         "syntheticData": "Local-only offline sample; cards 1/2/3; no production login, purchase, cloud or private media",
@@ -272,15 +289,15 @@ def main():
         device.shell("wm", "size", size)
         device.shell("wm", "density", density)
         manifest["displayEvidence"] = qa.wait_for_visual_profile(device, size, density)
-        for variant in ("dark-100", "light-130", "dark-150", "light-150"):
+        for variant in C7_VARIANTS:
             theme, font, scale = ALL_VARIANTS[variant]
             directory = output / variant
             directory.mkdir(exist_ok=True)
             device.shell("settings", "put", "system", "font_scale", scale)
             device.seed(True, font, theme_mode=theme)
-            if variant == "dark-100":
+            if variant in ("dark-100", "light-100"):
                 cases = CASES
-            elif variant == "light-130":
+            elif variant in ("light-130", "dark-130"):
                 cases = [case for case in CASES if case[0] in CORE]
             else:
                 cases = [case for case in CASES if case[0] in LARGE_TEXT]
@@ -317,7 +334,7 @@ def main():
                 (directory / "onboarding-first-run-light-large.json").write_text(
                     json.dumps(large_welcome, indent=2, ensure_ascii=False), encoding="utf-8"
                 )
-            if variant == "dark-100":
+            if variant in ("dark-100", "light-100"):
                 device.seed(False, font, theme_mode=theme)
                 for name, label, route, expected, action in ADDITIONAL[:2]:
                     record = verified_capture(device, directory, name, route, expected, action)
