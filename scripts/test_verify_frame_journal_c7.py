@@ -52,6 +52,14 @@ class FrameJournalC7Test(unittest.TestCase):
             '<hierarchy><node class="android.widget.TextView" text="새 프로젝트" '
             'bounds="[80,461][284,660]"/></hierarchy>'
         )
+        records_one_line_xml = (
+            '<hierarchy><node class="android.widget.TextView" text="새 프로젝트" '
+            'bounds="[120,461][340,594]"/></hierarchy>'
+        )
+        self.assertEqual(
+            c7.project_create_button_text_height_dp(records_one_line_xml, 320, "새 프로젝트"),
+            66.5,
+        )
         with self.assertRaisesRegex(ValueError, "still wraps"):
             c7.project_create_button_text_height_dp(records_xml, 320, "새 프로젝트")
         with self.assertRaisesRegex(ValueError, "text node"):
