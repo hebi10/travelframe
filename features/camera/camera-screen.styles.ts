@@ -1558,7 +1558,13 @@ export const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 16,
     padding: 24,
-    backgroundColor: colors.background
+    backgroundColor: bodyFrameDarkColors.background
+  },
+  cameraUnavailableText: {
+    color: bodyFrameDarkColors.muted,
+    fontSize: bodyFrameTypography.body,
+    lineHeight: 22,
+    textAlign: "center"
   },
   permissionScreen: {
     flex: 1,
