@@ -4,3 +4,7 @@
 4e7ae056670274cba4150d0fbc44df078c4fac13:firebase-debug.log:generic-api-key:577
 4e7ae056670274cba4150d0fbc44df078c4fac13:firebase-debug.log:generic-api-key:579
 4e7ae056670274cba4150d0fbc44df078c4fac13:firebase-debug.log:generic-api-key:581
+
+# Exact public APK checksum false positive in the historical release QA report.
+# This exception applies only to this committed file, rule, and line.
+7cdddd0ab2cf48b23ab4b56c7f8030faa6529dc9:docs/design/camera-ui-v2/release-qa-20261110/summary.md:generic-api-key:11

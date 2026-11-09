@@ -8,7 +8,7 @@
 - 제출 소스: `6ebe3874c0e9545a97682f7d694ce9be36f04a39`.
 - [서명 AAB·동일 번들 APK 빌드 및 alpha 게시 실행](https://github.com/hebi10/travelframe/actions/runs/42659941219).
 - GitHub artifact `13694723865` ZIP SHA-256: `d84631b78f8eeb624d2f87b179682984a56814b54d4cca1f24ad4bc737fa65e6`.
-- 실제 설치한 upload-key APK SHA-256: `f25f36aa4fab7b595a480e2f44225d461aca1c48e8b86df360f1787f7c79ec68`. 추출 후 해시와 aapt manifest, 설치 후 dumpsys 버전을 재확인했다.
+- 실제 설치한 APK의 SHA-256: `f25f36aa4fab7b595a480e2f44225d461aca1c48e8b86df360f1787f7c79ec68`. 추출 후 해시와 aapt manifest, 설치 후 dumpsys 버전을 재확인했다.
 - 완전히 새 `BodyFrame_Release_QA_20261110_26092625`, emulator-5558, API36/google_apis_playstore/x86_64, Pixel9, 1080×2424/420dpi/글꼴100%.
 - APK 자체의 번들로 실행했다. 기존 Metro와 사용자 기기5554에 앱을 덮어쓰지 않았다. 기존5554 및 이전5556의 AVD 설정과 초기 repositories.json 보존은 환경 담당자가 전후 해시로 확인했다.
 - 새 QA 기기에만 프로젝트1개·에뮬레이터 아바타 사진3장을 만들었다. 계정 로그인·몸무게·체지방률·메모 입력이나 영상 내보내기는 하지 않았다. 검증 뒤5558만 종료하고 AVD 파일·QA 데이터를 보존했다. 기존5554와 Metro8081은 실행 상태다.
