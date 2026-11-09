@@ -53,7 +53,7 @@ assert.ok(settings.includes("saveAppSettings("));
 assert.ok(settings.includes("setActiveSetting(\"fontStyle\")"));
 
 assert.match(switcher, /referenceChoice:\s*\{[^}]*minHeight:\s*56/);
-assert.match(switcher, /label:\s*\{[^}]*marginTop:\s*8/);
+assert.match(switcher, /label:\s*\{[^}]*marginTop:\s*10/);
 assert.ok(switcher.includes("onCreateProject"));
 assert.ok(switcher.includes("bodyFrameDesign.minTouchSize"));
 
