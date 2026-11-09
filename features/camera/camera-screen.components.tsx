@@ -35,6 +35,7 @@ export type GuideSizeSliderProps = {
   min?: number;
   max?: number;
   compact?: boolean;
+  dark?: boolean;
   onChange: (value: number) => void;
   onCommit: (value: number) => void;
 };
@@ -44,6 +45,7 @@ export function GuideSizeSlider({
   min = GUIDE_SIZE_MIN,
   max = GUIDE_SIZE_MAX,
   compact = false,
+  dark = false,
   onChange,
   onCommit
 }: GuideSizeSliderProps) {
@@ -53,6 +55,7 @@ export function GuideSizeSlider({
       min={min}
       max={max}
       compact={compact}
+      dark={dark}
       label="미세 조정"
       onChange={onChange}
       onCommit={onCommit}
