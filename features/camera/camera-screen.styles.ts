@@ -1092,11 +1092,12 @@ export const styles = StyleSheet.create({
     minHeight: 0
   },
   cameraColorFloatingScroll: {
-    flex: 1
+    flex: 1,
+    minHeight: 0
   },
   cameraColorFloatingScrollContent: {
-    flexGrow: 1,
-    justifyContent: "flex-start"
+    gap: 12,
+    paddingBottom: 8
   },
   cameraControlPanelViewport: {
     width: "100%",
@@ -1110,23 +1111,26 @@ export const styles = StyleSheet.create({
   },
   cameraColorPanel: {
     width: "100%",
-    gap: 14,
-    padding: 14,
+    flex: 1,
+    minHeight: 0,
+    gap: 10,
+    padding: 12,
     borderWidth: bodyFrameDesign.borderWidth,
-    borderColor: "#303035",
+    borderColor: "#35353A",
     borderRadius: bodyFrameDesign.modalRadius,
     backgroundColor: "#101012"
   },
   cameraColorHeaderRow: {
     minHeight: bodyFrameDesign.minTouchSize,
     flexDirection: "row",
-    alignItems: "flex-start",
+    alignItems: "center",
     justifyContent: "space-between",
-    gap: 12
+    gap: 10
   },
   cameraColorHeader: {
     flex: 1,
-    gap: 5
+    minWidth: 0,
+    gap: 4
   },
   cameraColorTitleRow: {
     flexDirection: "row",
@@ -1219,8 +1223,8 @@ export const styles = StyleSheet.create({
   },
   cameraColorSliderList: {
     gap: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     borderWidth: bodyFrameDesign.borderWidth,
     borderColor: "#303035",
     borderRadius: bodyFrameDesign.buttonRadius,
