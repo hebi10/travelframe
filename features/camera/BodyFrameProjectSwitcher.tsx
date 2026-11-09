@@ -249,52 +249,102 @@ export function BodyFrameProjectSwitcher({
             accessibilityViewIsModal
           >
             <BodyFrameSheetHandle />
-            <BodyFrameSheetHeader title="프로젝트 선택" onClose={() => setPickerOpen(false)} />
-            <ScrollView style={styles.projectList} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" nestedScrollEnabled>
-              {visibleProjects.map((project) => {
-                const summary = getBodyProjectProgressSummary(photos, project);
-                const selected = project.id === activeProject?.id;
-                return (
-                  <Pressable
-                    key={project.id}
-                    disabled={disabled}
-                    accessibilityRole="radio"
-                    accessibilityLabel={`${project.name} 프로젝트`}
-                    accessibilityState={{ selected, disabled }}
-                    style={({ pressed }) => [
-                      styles.projectRow,
-                      { backgroundColor: selected ? palette.surfaceStrong : palette.surface },
-                      pressed && styles.projectRowPressed
-                    ]}
-                    onPress={() => {
-                      onSelectProject(project);
-                      setPickerOpen(false);
-                    }}
-                  >
-                    <View style={styles.projectTextWrap}>
-                      <Text style={[styles.projectName, { color: palette.text }]}>{project.name}</Text>
-                      <Text style={[styles.projectMeta, { color: palette.muted }]}>
-                        {summary.photoCount}장 · {formatDuration(summary.durationSeconds)}초
-                      </Text>
-                    </View>
-                    {selected ? <Feather name="check" size={18} color={palette.text} /> : null}
-                  </Pressable>
-                );
-              })}
+            <BodyFrameSheetHeader
+              title="프로젝트 선택"
+              description="촬영할 프로젝트를 선택하세요."
+              onClose={() => setPickerOpen(false)}
+            />
+            <View style={styles.pickerSummaryRow}>
+              <Text style={[styles.pickerSectionTitle, { color: palette.text }]}>
+                내 프로젝트
+              </Text>
+              <Text style={[styles.pickerSectionCount, { color: palette.muted }]}>
+                {visibleProjects.length}개
+              </Text>
+            </View>
+            <ScrollView
+              style={styles.projectList}
+              contentContainerStyle={styles.projectListContent}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              nestedScrollEnabled
+            >
+              {visibleProjects.length === 0 ? (
+                <View style={[styles.emptyProjectState, { backgroundColor: palette.background, borderColor: palette.line }]}>
+                  <Feather name="folder" size={24} color={palette.muted} />
+                  <Text style={[styles.emptyProjectTitle, { color: palette.text }]}>
+                    진행 중인 프로젝트가 없습니다.
+                  </Text>
+                  <Text style={[styles.emptyProjectDescription, { color: palette.muted }]}>
+                    새 프로젝트를 만들고 첫 사진부터 기록하세요.
+                  </Text>
+                </View>
+              ) : (
+                visibleProjects.map((project) => {
+                  const summary = getBodyProjectProgressSummary(photos, project);
+                  const selected = project.id === activeProject?.id;
+                  return (
+                    <Pressable
+                      key={project.id}
+                      disabled={disabled}
+                      accessibilityRole="radio"
+                      accessibilityLabel={`${project.name} 프로젝트`}
+                      accessibilityHint={selected ? "현재 촬영 중인 프로젝트입니다." : "선택하면 이 프로젝트로 촬영합니다."}
+                      accessibilityState={{ selected, disabled }}
+                      style={({ pressed }) => [
+                        styles.projectRow,
+                        {
+                          borderColor: selected ? palette.text : palette.line,
+                          backgroundColor: selected ? palette.surfaceStrong : palette.surface
+                        },
+                        pressed && styles.projectRowPressed
+                      ]}
+                      onPress={() => {
+                        onSelectProject(project);
+                        setPickerOpen(false);
+                      }}
+                    >
+                      <View style={styles.projectTextWrap}>
+                        <Text numberOfLines={2} style={[styles.projectName, { color: palette.text }]}>
+                          {project.name}
+                        </Text>
+                        <Text numberOfLines={2} style={[styles.projectMeta, { color: palette.muted }]}>
+                          {summary.photoCount} / {summary.targetPhotoCount}장 · {formatDuration(summary.durationSeconds)}초
+                        </Text>
+                      </View>
+                      {selected ? (
+                        <View style={styles.selectedProjectMarker}>
+                          <Text style={[styles.selectedProjectText, { color: palette.text }]}>촬영 중</Text>
+                          <Feather name="check" size={18} color={palette.text} />
+                        </View>
+                      ) : null}
+                    </Pressable>
+                  );
+                })
+              )}
             </ScrollView>
 
             <View style={styles.sheetActions}>
-              <Pressable accessibilityRole="button" style={styles.actionRow} onPress={openCreateSheet}>
-                <Text style={[styles.actionText, { color: palette.text }]}>+ 새 프로젝트</Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="+ 새 프로젝트"
+                style={[styles.pickerCreateAction, { backgroundColor: actionColor }]}
+                onPress={openCreateSheet}
+              >
+                <Text numberOfLines={2} style={[styles.actionText, { color: actionTextColor }]}>+ 새 프로젝트</Text>
               </Pressable>
-              <Pressable accessibilityRole="button"
-                style={styles.actionRow}
+              <Pressable
+                accessibilityRole="button"
+                style={[styles.pickerManageAction, { borderColor: palette.line }]}
                 onPress={() => {
                   setPickerOpen(false);
                   onManageProjects?.();
                 }}
               >
-                <Text style={[styles.actionTextSecondary, { color: palette.muted }]}>프로젝트 관리</Text>
+                <Text numberOfLines={2} style={[styles.actionTextSecondary, { color: palette.text }]}>
+                  프로젝트 관리
+                </Text>
+                <Feather name="chevron-right" size={18} color={palette.muted} />
               </Pressable>
             </View>
           </View>
