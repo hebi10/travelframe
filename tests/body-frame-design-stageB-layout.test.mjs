@@ -51,15 +51,15 @@ test("Stage B detail exposes records sooner without cropping or mutating photo o
   ]) assert.ok(source.project.includes(token), token);
 });
 
-test("Stage B camera hint remains non-interactive and preserves camera project/session logic", () => {
-  assert.ok(source.camera.includes("styles.captureHintPanel"));
-  assert.ok(source.camera.includes('pointerEvents="none"'));
-  assert.ok(source.camera.includes("marginTop: 4"));
-  assert.ok(source.camera.includes("paddingVertical: 4"));
+test("Stage B camera preserves project/session semantics after C1 status relocation", () => {
+  assert.ok(source.camera.includes("footerStatus={"));
+  assert.ok(source.camera.includes("styles.captureStatusRow"));
+  assert.ok(!source.camera.includes("styles.captureHintWrap"));
   for (const token of [
     "<CameraScreen", "<BodyFrameProjectSwitcher", "captureBlockedReason",
     "automaticReferenceUri", "getNextBodyProjectSequence",
-    "getBodyFrameCaptureLimitState", "clearBodyFrameCameraSession"
+    "getBodyFrameCaptureLimitState", "clearBodyFrameCameraSession",
+    "measurementPromptPhotoId", "플랜 보기 · {upgradePlanLabel}"
   ]) assert.ok(source.camera.includes(token), token);
 });
 
