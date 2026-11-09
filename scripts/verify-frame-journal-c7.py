@@ -61,6 +61,29 @@ def native_action_bounds(xml, label, width, height):
             return [x1, y1, x2, y2]
     raise ValueError(f"Enabled on-screen control not found: {label}")
 
+def project_create_button_text_height_dp(xml, density_dpi):
+    """Reject the C7 regression where '프로젝트 만들기' wraps within a 150% CTA."""
+    import re
+    if not isinstance(density_dpi, (int, float)) or density_dpi <= 0:
+        raise ValueError("Missing Android display density for create button")
+    root = ET.fromstring(xml)
+    matches = [
+        node for node in root.iter("node")
+        if node.get("class") == "android.widget.TextView"
+        and node.get("text") == "프로젝트 만들기"
+    ]
+    if len(matches) != 1:
+        raise ValueError(f"Expected one visible create-project text node, got {len(matches)}")
+    match = re.fullmatch(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]", matches[0].get("bounds", ""))
+    if not match:
+        raise ValueError("Create-project text has no native bounds")
+    _, top, _, bottom = map(int, match.groups())
+    height_dp = (bottom - top) * 160 / density_dpi
+    if height_dp > 44:
+        raise ValueError(f"Create-project label still wraps at enlarged font: {height_dp:.1f}dp high")
+    return round(height_dp, 1)
+
+
 def settings_surface_brightness(image_path):
     """Measure actual pixel colour in the margin of the Settings screen, not its label."""
     result = subprocess.run(
@@ -149,6 +172,11 @@ def analyze_profile(directory, problems):
                 native_action_bounds(hierarchy, label, width, height)
         except (ValueError, ET.ParseError) as error:
             problems.append(f"{key}: action bounds/XML failed: {error}")
+        if screen == "camera-new-project" and variant.endswith("-150"):
+            try:
+                project_create_button_text_height_dp(hierarchy, data.get("densityDpi"))
+            except (ValueError, ET.ParseError) as error:
+                problems.append(f"{key}: create CTA wrap verification failed: {error}")
         if screen == "settings":
             try:
                 value = settings_surface_brightness(png)
