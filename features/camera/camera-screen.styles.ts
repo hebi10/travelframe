@@ -1092,11 +1092,12 @@ export const styles = StyleSheet.create({
     minHeight: 0
   },
   cameraColorFloatingScroll: {
-    flex: 1
+    flex: 1,
+    minHeight: 0
   },
   cameraColorFloatingScrollContent: {
-    flexGrow: 1,
-    justifyContent: "flex-start"
+    gap: 12,
+    paddingBottom: 8
   },
   cameraControlPanelViewport: {
     width: "100%",
@@ -1108,25 +1109,60 @@ export const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center"
   },
+  cameraQuickPanel: {
+    width: "100%",
+    gap: 9,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderColor: "#3A3A40",
+    borderRadius: bodyFrameDesign.buttonRadius,
+    backgroundColor: "#101012"
+  },
+  cameraQuickPanelHeader: {
+    width: "100%",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8
+  },
+  cameraQuickPanelTitle: {
+    color: bodyFrameDarkColors.text,
+    fontSize: bodyFrameTypography.rowTitle,
+    fontWeight: "600"
+  },
+  cameraQuickPanelValue: {
+    color: bodyFrameDarkColors.muted,
+    fontSize: bodyFrameTypography.caption,
+    fontWeight: "600",
+    fontVariant: ["tabular-nums"]
+  },
+  cameraZoomPresetRow: {
+    flexWrap: "wrap"
+  },
   cameraColorPanel: {
     width: "100%",
-    gap: 14,
-    padding: 14,
+    flex: 1,
+    minHeight: 0,
+    gap: 10,
+    padding: 12,
     borderWidth: bodyFrameDesign.borderWidth,
-    borderColor: "#303035",
+    borderColor: "#35353A",
     borderRadius: bodyFrameDesign.modalRadius,
     backgroundColor: "#101012"
   },
   cameraColorHeaderRow: {
     minHeight: bodyFrameDesign.minTouchSize,
     flexDirection: "row",
-    alignItems: "flex-start",
+    alignItems: "center",
     justifyContent: "space-between",
-    gap: 12
+    gap: 10
   },
   cameraColorHeader: {
     flex: 1,
-    gap: 5
+    minWidth: 0,
+    gap: 4
   },
   cameraColorTitleRow: {
     flexDirection: "row",
@@ -1219,8 +1255,8 @@ export const styles = StyleSheet.create({
   },
   cameraColorSliderList: {
     gap: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     borderWidth: bodyFrameDesign.borderWidth,
     borderColor: "#303035",
     borderRadius: bodyFrameDesign.buttonRadius,
@@ -1297,11 +1333,13 @@ export const styles = StyleSheet.create({
   },
 
   quickButtonRow: {
+    width: "100%",
     minHeight: bodyFrameDesign.minTouchSize,
     flexDirection: "row",
+    flexWrap: "wrap",
     alignItems: "center",
     justifyContent: "center",
-    gap: 10
+    gap: 8
   },
   quickPillButton: {
     minWidth: 48,
@@ -1309,22 +1347,23 @@ export const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.36)",
-    backgroundColor: "rgba(0, 0, 0, 0.28)"
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderColor: "#55555B",
+    borderRadius: bodyFrameDesign.buttonRadius,
+    backgroundColor: "#18181B"
   },
   quickPillButtonActive: {
-    borderColor: colors.inverse,
-    backgroundColor: colors.inverse
+    borderColor: "#F5F5F5",
+    backgroundColor: "#F5F5F5"
   },
   quickPillText: {
-    color: colors.inverse,
-    fontSize: typography.button,
-    fontWeight: "900",
+    color: bodyFrameDarkColors.text,
+    fontSize: bodyFrameTypography.button,
+    fontWeight: "600",
     letterSpacing: 0
   },
   quickPillTextActive: {
-    color: colors.text
+    color: "#111111"
   },
   cameraControlBottomTray: {
     width: "100%",

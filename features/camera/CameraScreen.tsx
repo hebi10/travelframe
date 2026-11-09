@@ -2682,13 +2682,7 @@ export default function CameraScreen({
             entering={FadeIn.duration(140)}
             style={styles.cameraColorFloatingCard}
           >
-            <ScrollView
-              style={styles.cameraColorFloatingScroll}
-              contentContainerStyle={styles.cameraColorFloatingScrollContent}
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-            >
-                                    <View style={styles.cameraColorPanel}>
+            <View style={styles.cameraColorPanel}>
                                       <View style={styles.cameraColorHeaderRow}>
                                         <View style={styles.cameraColorHeader}>
                                           <View style={styles.cameraColorTitleRow}>
@@ -2702,7 +2696,7 @@ export default function CameraScreen({
                                             </Text>
                                           </View>
                                           <Text selectable={false} style={styles.cameraColorHint}>
-                                            촬영 전에 원하는 색감을 조정하고 자주 쓰는 값은 슬롯에 저장할 수 있습니다.
+                                            색감을 조절한 뒤 아래 버튼에서 현재 슬롯에 저장하세요.
                                           </Text>
                                         </View>
                                         <Pressable
@@ -2719,6 +2713,13 @@ export default function CameraScreen({
                                         </Pressable>
                                       </View>
               
+              <ScrollView
+                style={styles.cameraColorFloatingScroll}
+                contentContainerStyle={styles.cameraColorFloatingScrollContent}
+                showsVerticalScrollIndicator
+                nestedScrollEnabled
+                keyboardShouldPersistTaps="handled"
+              >
                                       <View style={styles.cameraColorPresetSection}>
                                         <View style={styles.cameraColorPresetHeader}>
                                           <Text selectable={false} style={styles.cameraColorPresetTitle}>
@@ -2829,10 +2830,12 @@ export default function CameraScreen({
                                         />
                                       </View>
               
+              </ScrollView>
                                       <View style={styles.cameraColorActions}>
                                         <Pressable accessibilityRole="button"
                                           style={styles.cameraColorSecondaryButton}
                                           onPress={resetCameraColorSettings}
+                                          accessibilityLabel="색감 조절값 초기화"
                                         >
                                           <Feather
                                             name="refresh-ccw"
@@ -2849,6 +2852,7 @@ export default function CameraScreen({
                                         <Pressable accessibilityRole="button"
                                           style={styles.cameraColorPrimaryButton}
                                           onPress={saveCameraColorSettings}
+                                          accessibilityLabel="선택한 색감 슬롯에 현재 설정 저장"
                                         >
                                           <Feather
                                             name="save"
@@ -2863,8 +2867,7 @@ export default function CameraScreen({
                                           </Text>
                                         </Pressable>
                                       </View>
-                                    </View>
-            </ScrollView>
+            </View>
           </Animated.View>
         </View>
       ) : null}
@@ -3511,9 +3514,16 @@ export default function CameraScreen({
                     <Animated.View
                       key={activeCameraControlPanel}
                       entering={FadeIn.duration(140)}
-                      style={styles.cameraControlPage}
+                      style={[styles.cameraControlPage, styles.cameraQuickPanel]}
                     >
-                      <View style={styles.quickButtonRow}>
+                      
+                      <View style={styles.cameraQuickPanelHeader}>
+                        <Text selectable={false} style={styles.cameraQuickPanelTitle}>확대</Text>
+                        <Text selectable={false} style={styles.cameraQuickPanelValue}>
+                          {cameraZoomFactor.toFixed(1)}x
+                        </Text>
+                      </View>
+                      <View style={[styles.quickButtonRow, styles.cameraZoomPresetRow]}>
                         {cameraZoomPresets.map((preset) => {
                           const presetFactor = getCameraZoomPresetFactor(preset, cameraDevice);
                           const isActive =
@@ -3526,6 +3536,8 @@ export default function CameraScreen({
                                 isActive && styles.quickPillButtonActive
                               ]}
                               onPress={() => setZoomPreset(preset)}
+                              accessibilityLabel={`확대 ${preset.label}`}
+                              accessibilityState={{ selected: isActive }}
                             >
                               <Text
                                 selectable={false}
@@ -3554,8 +3566,17 @@ export default function CameraScreen({
                     <Animated.View
                       key={activeCameraControlPanel}
                       entering={FadeIn.duration(140)}
-                      style={styles.cameraControlPage}
+                      style={[styles.cameraControlPage, styles.cameraQuickPanel]}
                     >
+                      
+                      <View style={styles.cameraQuickPanelHeader}>
+                        <Text selectable={false} style={styles.cameraQuickPanelTitle}>조명</Text>
+                        <Text selectable={false} style={styles.cameraQuickPanelValue}>
+                          {cameraLightAvailable
+                            ? visibleTorchEnabled ? "손전등 켜짐" : "손전등 꺼짐"
+                            : "후면 카메라에서 사용 가능"}
+                        </Text>
+                      </View>
                       <View style={styles.quickButtonRow}>
                         <Pressable accessibilityRole="button"
                           disabled={!cameraLightAvailable}
@@ -3565,6 +3586,8 @@ export default function CameraScreen({
                             !cameraLightAvailable && styles.shutterDisabled
                           ]}
                           onPress={() => setLightEnabled(false)}
+                          accessibilityLabel="손전등 끄기"
+                          accessibilityState={{ disabled: !cameraLightAvailable, selected: !visibleTorchEnabled }}
                         >
                           <Text
                             selectable={false}
@@ -3584,6 +3607,8 @@ export default function CameraScreen({
                             !cameraLightAvailable && styles.shutterDisabled
                           ]}
                           onPress={() => setLightEnabled(true)}
+                          accessibilityLabel="손전등 켜기"
+                          accessibilityState={{ disabled: !cameraLightAvailable, selected: visibleTorchEnabled }}
                         >
                           <Text
                             selectable={false}
