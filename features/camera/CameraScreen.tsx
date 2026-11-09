@@ -2525,7 +2525,7 @@ export default function CameraScreen({
           onError={handleCameraSessionError}
         />
       ) : (
-        <View style={styles.permissionScreen}>
+        <View style={styles.cameraUnavailableScreen}>
           <ActivityIndicator color={colors.inverse} />
           <Text selectable style={styles.permissionText}>
             사용할 수 있는 카메라를 찾는 중입니다.
