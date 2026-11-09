@@ -191,8 +191,17 @@ function verifyBundle() {
 }
 
 export function verifyApkSigner(output, expectedFingerprint) {
-  const certificates = [...output.matchAll(/^Signer #\d+ certificate SHA-256 digest:\s*([a-f0-9]+)\s*$/gim)];
-  if (certificates.length !== 1 || certificates[0][1].toLowerCase() !== expectedFingerprint) throw new Error("APK signer does not match the existing Play upload certificate");
+  const lines = output.split(/\r?\n/).map((line) => line.trim()).filter((line) => /certificate SHA-256 digest:/i.test(line));
+  const signers = lines.map((line) => {
+    const match = line.match(/^(?:Signer #\d+|Signer \(minSdkVersion=\d+,\s*maxSdkVersion=\d+\)|V\d+(?:\.\d+)? Signer:)\s+certificate SHA-256 digest:\s*([a-f0-9]{64})$/i);
+    if (!match) throw new Error("Unrecognized APK signing certificate output");
+    return match[1].toLowerCase();
+  });
+  const count = output.match(/^Number of signers:\s*(\d+)\s*$/m);
+  const legacySignerIds = new Set([...output.matchAll(/^Signer #(\d+) certificate SHA-256 digest:/gim)].map((match) => match[1]));
+  if (!signers.length || legacySignerIds.size > 1 || (count && Number(count[1]) !== 1) || signers.some((fingerprint) => fingerprint !== expectedFingerprint)) {
+    throw new Error("APK signer does not match the existing Play upload certificate");
+  }
 }
 
 function buildInstallApk() {
