@@ -2526,8 +2526,8 @@ export default function CameraScreen({
         />
       ) : (
         <View style={styles.cameraUnavailableScreen}>
-          <ActivityIndicator color={colors.inverse} />
-          <Text selectable style={styles.permissionText}>
+          <ActivityIndicator color={bodyFrameDarkColors.text} />
+          <Text selectable style={styles.cameraUnavailableText}>
             사용할 수 있는 카메라를 찾는 중입니다.
           </Text>
         </View>
