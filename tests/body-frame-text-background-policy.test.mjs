@@ -19,19 +19,19 @@ const getStyleBlock = (source, styleName) => {
   return source.slice(start, end);
 };
 
-const captureHint = getStyleBlock(cameraSource, "captureHint");
+const captureStatusText = getStyleBlock(cameraSource, "captureStatusText");
 assert.equal(
-  captureHint.includes("backgroundColor"),
+  captureStatusText.includes("backgroundColor"),
   false,
   "plain camera hint text should not have its own background color"
 );
 assert.equal(
-  captureHint.includes("paddingHorizontal") || captureHint.includes("paddingVertical"),
+  captureStatusText.includes("paddingHorizontal") || captureStatusText.includes("paddingVertical"),
   false,
   "plain camera hint text should not be styled as a pill"
 );
 assert.equal(
-  captureHint.includes("borderRadius"),
+  captureStatusText.includes("borderRadius"),
   false,
   "plain camera hint text should not use a badge radius"
 );
