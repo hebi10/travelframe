@@ -39,6 +39,18 @@ class FrameJournalC7Test(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Enabled on-screen"):
             c7.native_action_bounds(offscreen, "시작하기", 360, 640)
 
+    def test_large_font_create_project_button_must_not_split_into_two_lines(self):
+        def text_node(top, bottom):
+            return (
+                '<hierarchy><node class="android.widget.TextView" text="프로젝트 만들기" '
+                f'enabled="true" bounds="[396,{top}][660,{bottom}]"/></hierarchy>'
+            )
+        self.assertEqual(c7.project_create_button_text_height_dp(text_node(1400, 1452), 320), 26)
+        with self.assertRaisesRegex(ValueError, "still wraps"):
+            c7.project_create_button_text_height_dp(text_node(1386, 1524), 320)
+        with self.assertRaisesRegex(ValueError, "text node"):
+            c7.project_create_button_text_height_dp('<hierarchy/>', 320)
+
     def test_missing_profile_fails_and_preserves_failure_report(self):
         with tempfile.TemporaryDirectory() as tmp:
             root, output = Path(tmp) / "capture", Path(tmp) / "reports"
