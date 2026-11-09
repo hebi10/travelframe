@@ -198,7 +198,8 @@ export function verifyApkSigner(output, expectedFingerprint) {
     return match[1].toLowerCase();
   });
   const count = output.match(/^Number of signers:\s*(\d+)\s*$/m);
-  if (!signers.length || (count && Number(count[1]) !== 1) || signers.some((fingerprint) => fingerprint !== expectedFingerprint)) {
+  const legacySignerIds = new Set([...output.matchAll(/^Signer #(\d+) certificate SHA-256 digest:/gim)].map((match) => match[1]));
+  if (!signers.length || legacySignerIds.size > 1 || (count && Number(count[1]) !== 1) || signers.some((fingerprint) => fingerprint !== expectedFingerprint)) {
     throw new Error("APK signer does not match the existing Play upload certificate");
   }
 }
