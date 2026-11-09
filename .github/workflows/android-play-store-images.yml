@@ -1,0 +1,133 @@
+name: TravelFrame Play Store screenshots
+
+run-name: TravelFrame store images ${{ github.event_name == 'workflow_dispatch' && inputs.mode || 'push-gate' }} · ko-KR phone · ${{ github.ref_name }}
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/android-play-store-images.yml'
+      - 'docs/release-assets/play-phone-six-20261109.json'
+      - 'scripts/publish-play-store-images.mjs'
+      - 'scripts/prepare-play-store-images.py'
+      - 'tests/play-store-images.test.mjs'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/android-play-store-images.yml'
+      - 'docs/release-assets/play-phone-six-20261109.json'
+      - 'scripts/publish-play-store-images.mjs'
+      - 'scripts/prepare-play-store-images.py'
+      - 'tests/play-store-images.test.mjs'
+      - 'docs/release-requests/2026-11-09-store-screenshots.md'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Inspect-only build or publish the exactly reviewed six Korean phone screenshots
+        required: true
+        default: check
+        type: choice
+        options: [check, publish]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: travelframe-play-store-screenshots
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Validate screenshot manifest and transactional Publisher guards
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify exact six-image scope, digest guards, mock Play transaction
+        run: node --test tests/play-store-images.test.mjs
+      - name: Compile image processor
+        run: python3 -m py_compile scripts/prepare-play-store-images.py
+
+  publish:
+    name: Verify Drive screenshots and update Play ko-KR phone listing only
+    needs: validate
+    if: >-
+      github.repository == 'hebi10/travelframe' &&
+      github.ref == 'refs/heads/main' &&
+      vars.BODY_FRAME_PLAY_SIGNING_APPROVED_20261107 == 'true' &&
+      ((github.event_name == 'workflow_dispatch' && inputs.mode == 'publish') ||
+       (github.event_name == 'push' &&
+        contains(github.event.head_commit.message, '[publish-store-shots]')))
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      STORE_MANIFEST: ${{ github.workspace }}/docs/release-assets/play-phone-six-20261109.json
+      STORE_INPUT_DIR: ${{ github.workspace }}/.store-screenshot-input
+      STORE_OUTPUT_DIR: ${{ github.workspace }}/.store-screenshot-output
+      STORE_RECEIPT_PATH: ${{ github.workspace }}/.store-play-receipt.json
+    steps:
+      - name: Checkout reviewed store listing pipeline
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Get Drive read-only access token using the existing Play release identity
+        id: driveauth
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        with:
+          workload_identity_provider: ${{ vars.PLAY_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.PLAY_SERVICE_ACCOUNT }}
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/drive.readonly
+          create_credentials_file: false
+          export_environment_variables: false
+      - name: Download and SHA-256 verify exactly six shared store images
+        env:
+          DRIVE_ACCESS_TOKEN: ${{ steps.driveauth.outputs.access_token }}
+        run: node scripts/publish-play-store-images.mjs download
+      - name: Set up isolated Pillow image conversion
+        shell: bash
+        run: |
+          python3 -m venv "$RUNNER_TEMP/store-venv"
+          "$RUNNER_TEMP/store-venv/bin/pip" install --disable-pip-version-check Pillow==12.0.0
+      - name: Prepare verified 1080x1920 RGB PNGs from the reviewed originals
+        shell: bash
+        run: |
+          "$RUNNER_TEMP/store-venv/bin/python" scripts/prepare-play-store-images.py \
+            --manifest "$STORE_MANIFEST" \
+            --source-dir "$STORE_INPUT_DIR" \
+            --output-dir "$STORE_OUTPUT_DIR"
+          node scripts/publish-play-store-images.mjs verify
+      - name: Get Google Play Publisher token for the existing release identity
+        id: playauth
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        with:
+          workload_identity_provider: ${{ vars.PLAY_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.PLAY_SERVICE_ACCOUNT }}
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/androidpublisher
+          create_credentials_file: false
+          export_environment_variables: false
+      - name: Commit only Korean phone screenshots and independently verify Play readback
+        if: github.event_name == 'push' || inputs.mode == 'publish'
+        env:
+          PLAY_ACCESS_TOKEN: ${{ steps.playauth.outputs.access_token }}
+        run: node scripts/publish-play-store-images.mjs publish
+      - name: Preserve exact six screenshots and any Play commit/readback receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: body-frame-store-phone-screenshots-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ env.STORE_OUTPUT_DIR }}/
+            ${{ env.STORE_RECEIPT_PATH }}
+          if-no-files-found: warn
+          retention-days: 30
