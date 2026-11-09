@@ -6,6 +6,8 @@ const stage13 = fs.readFileSync("scripts/capture-stage13-android.py", "utf8");
 const validator = fs.readFileSync("scripts/verify-frame-journal-c7.py", "utf8");
 const workflow = fs.readFileSync(".github/workflows/body-frame-device-qa.yml", "utf8");
 const records = fs.readFileSync("features/records/BodyFrameRecordsScreen.tsx", "utf8");
+const sheets = fs.readFileSync("components/body-frame-sheet.tsx", "utf8");
+const projectSwitcher = fs.readFileSync("features/camera/BodyFrameProjectSwitcher.tsx", "utf8");
 
 test("C7 captures complete light/dark 100, 130, 150 percent matrix on four widths", () => {
   for (const variant of [
@@ -56,4 +58,15 @@ test("C7 corrects the confirmed 360dp 150% Records create-project word break", (
   assert.match(records, /quickActions:\s*\{\s*width:\s*184/);
   assert.match(records, /quickActionsLargeFont:\s*\{\s*width:\s*232/);
   assert.ok(records.includes("<BodyFrameProjectSwitcher"));
+});
+
+test("C7 expands only the create-project confirmation CTA and checks native single-line text", () => {
+  assert.ok(sheets.includes("confirmFlex?: number;"));
+  assert.ok(sheets.includes("confirmFlex = 1"));
+  assert.ok(sheets.includes("{ flex: confirmFlex, borderColor: primaryBackground"));
+  assert.ok(projectSwitcher.includes("confirmFlex={1.6}"));
+  assert.ok(projectSwitcher.includes('confirmLabel={submitting ? "생성 중..." : "프로젝트 만들기"}'));
+  assert.ok(validator.includes("def project_create_button_text_height_dp("));
+  assert.ok(validator.includes('screen == "camera-new-project" and variant.endswith("-150")'));
+  assert.ok(validator.includes("if height_dp > 44:"));
 });
