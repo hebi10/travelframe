@@ -68,5 +68,6 @@ test("C7 expands only the create-project confirmation CTA and checks native sing
   assert.ok(projectSwitcher.includes('confirmLabel={submitting ? "생성 중..." : "프로젝트 만들기"}'));
   assert.ok(validator.includes("def project_create_button_text_height_dp("));
   assert.ok(validator.includes('variant.endswith("-150") and screen in ("camera-new-project", "records")'));
-  assert.ok(validator.includes("if height_dp > 44:"));
+  assert.ok(validator.includes('max_single_line_dp = 80 if label == "새 프로젝트" else 44'));
+  assert.ok(validator.includes("if height_dp > max_single_line_dp:"));
 });
