@@ -109,21 +109,19 @@ export function AppGuideOverlay({
               <Text style={[styles.welcomeDescription, { color: palette.muted }]}>
                 {step.description}
               </Text>
-              <View style={styles.welcomeActions}>
-                <Pressable
-                  accessibilityRole="button"
-                  style={[styles.welcomeButton, { backgroundColor: actionColor }]}
-                  onPress={goNext}
-                >
-                  <Text style={[styles.welcomeButtonText, { color: actionTextColor }]}>
-                    시작하기
-                  </Text>
-                </Pressable>
-                <Pressable accessibilityRole="button" style={styles.welcomeSkipButton} onPress={skip}>
-                  <Text style={[styles.welcomeSkipText, { color: palette.muted }]}>
-                    나중에 보기
-                  </Text>
-                </Pressable>
+              <View style={[styles.welcomeSummary, { backgroundColor: palette.surface, borderColor: palette.line }]}>
+                <Text style={[styles.welcomeSummaryTitle, { color: palette.text }]}>
+                  기록 시작 순서
+                </Text>
+                <Text style={[styles.welcomeSummaryItem, { color: palette.muted }]}>
+                  01  프로젝트 만들기
+                </Text>
+                <Text style={[styles.welcomeSummaryItem, { color: palette.muted }]}>
+                  02  첫 사진 촬영하기
+                </Text>
+                <Text style={[styles.welcomeSummaryItem, { color: palette.muted }]}>
+                  03  같은 구도로 변화 기록하기
+                </Text>
               </View>
             </View>
           ) : (
@@ -152,6 +150,24 @@ export function AppGuideOverlay({
             </>
           )}
           </ScrollView>
+          {isWelcome ? (
+            <View style={[styles.welcomeActions, { backgroundColor: palette.background }]}>
+              <Pressable
+                accessibilityRole="button"
+                style={[styles.welcomeButton, { backgroundColor: actionColor }]}
+                onPress={goNext}
+              >
+                <Text style={[styles.welcomeButtonText, { color: actionTextColor }]}>
+                  시작하기
+                </Text>
+              </Pressable>
+              <Pressable accessibilityRole="button" style={styles.welcomeSkipButton} onPress={skip}>
+                <Text style={[styles.welcomeSkipText, { color: palette.muted }]}>
+                  나중에 보기
+                </Text>
+              </Pressable>
+            </View>
+          ) : null}
         </View>
       </View>
     </Modal>
@@ -227,7 +243,7 @@ const styles = StyleSheet.create({
   },
   welcomeArtwork: {
     width: "100%",
-    height: 220,
+    height: 192,
     alignSelf: "center"
   },
   welcomeTitle: {
@@ -239,7 +255,28 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 21
   },
-  welcomeActions: { gap: 8, marginTop: 12 },
+  welcomeSummary: {
+    gap: 8,
+    borderWidth: 1,
+    borderRadius: bodyFrameDesign.cardRadius,
+    padding: 14
+  },
+  welcomeSummaryTitle: {
+    fontSize: bodyFrameTypography.rowTitle,
+    fontWeight: "600",
+    marginBottom: 4
+  },
+  welcomeSummaryItem: {
+    fontSize: bodyFrameTypography.body,
+    lineHeight: 21
+  },
+  welcomeActions: {
+    flexShrink: 0,
+    gap: 8,
+    paddingHorizontal: 24,
+    paddingTop: 12,
+    paddingBottom: 8
+  },
   welcomeSkipButton: {
     minHeight: bodyFrameDesign.minTouchSize,
     alignItems: "center",

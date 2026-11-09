@@ -132,6 +132,7 @@ import {
   type CameraZoomPreset
 } from "@/features/camera/camera-screen.model";
 import { styles } from "@/features/camera/camera-screen.styles";
+import { useAppAppearance } from "@/lib/app-appearance";
 import { useAuth } from "@/lib/auth-context";
 import { recordBackupFailure } from "@/lib/backup-failure-queue";
 import { requestPhotoSavePermission } from "@/lib/trip-clip-export";
@@ -207,6 +208,7 @@ export default function CameraScreen({
   const [isReferenceModeChanging, setIsReferenceModeChanging] = useState(false);
   const referenceModeChangeInProgressRef = useRef(false);
   const { user, subscription } = useAuth();
+  const { palette } = useAppAppearance();
   const planEntitlements = useMemo(
     () => getPlanEntitlements({ isLoggedIn: Boolean(user), subscription }),
     [subscription, user]
@@ -2391,31 +2393,91 @@ export default function CameraScreen({
     void Linking.openSettings();
   }, []);
 
+  const retryCameraConnection = useCallback(() => {
+    if (cameraRecoveryTimeout.current) {
+      clearTimeout(cameraRecoveryTimeout.current);
+      cameraRecoveryTimeout.current = null;
+    }
+    isCameraReadyRef.current = false;
+    setIsCameraReady(false);
+    setCameraRecoveryPending(false);
+    setErrorMessage(null);
+    setCameraSessionRestartKey((value) => value + 1);
+  }, []);
+  const cameraConnectionError =
+    errorMessage === "카메라 연결이 불안정해 다시 시작합니다." ||
+    errorMessage === CAMERA_CAPTURE_TIMEOUT_MESSAGE;
+  const albumPermissionError = errorMessage ? isDeviceAlbumPermissionError(errorMessage) : false;
+
   if (!hasCameraPermission) {
     return (
-      <View style={styles.permissionScreen}>
-        <Text selectable style={styles.permissionTitle}>
-          카메라 접근 권한이 필요합니다.
-        </Text>
-        <Text selectable style={styles.permissionText}>
-          실시간 카메라 화면을 보여주고 구도 가이드 촬영을 하려면 카메라 권한이 필요합니다.
-        </Text>
-        <Pressable accessibilityRole="button"
-          style={styles.permissionButton}
-          onPress={canRequestCameraPermission ? requestCameraPermission : openPermissionSettings}
+      <View style={[styles.permissionScreen, { backgroundColor: palette.background }]}>
+        <ScrollView
+          style={styles.permissionScroll}
+          contentContainerStyle={[
+            styles.permissionContent,
+            {
+              paddingTop: Math.max(insets.top + 20, 32),
+              paddingBottom: Math.max(insets.bottom + 20, 32)
+            }
+          ]}
+          showsVerticalScrollIndicator={false}
         >
-          <Text selectable={false} style={styles.permissionButtonText}>
-            {canRequestCameraPermission ? "카메라 권한 허용" : "앱 설정에서 권한 허용"}
-          </Text>
-        </Pressable>
-        <Pressable accessibilityRole="button"
-          style={[styles.permissionButton, styles.permissionSecondaryButton]}
-          onPress={returnFromPermissionScreen}
-        >
-          <Text selectable={false} style={styles.permissionSecondaryButtonText}>
-            뒤로가기
-          </Text>
-        </Pressable>
+          <View style={styles.permissionPanel}>
+            <View style={[styles.permissionIconFrame, { borderColor: palette.line, backgroundColor: palette.surface }]}>
+              <Feather name="camera" size={24} color={palette.text} />
+            </View>
+            <Text selectable={false} style={[styles.permissionEyebrow, { color: palette.muted }]}>
+              촬영 준비
+            </Text>
+            <Text selectable style={[styles.permissionTitle, { color: palette.text }]}>
+              카메라 접근 권한이 필요합니다.
+            </Text>
+            <Text selectable style={[styles.permissionText, { color: palette.muted }]}>
+              실시간 촬영 화면과 구도 가이드를 사용하려면 카메라 권한이 필요합니다.
+            </Text>
+            <View style={[styles.permissionDetail, { borderColor: palette.line, backgroundColor: palette.surface }]}>
+              <Text style={[styles.permissionDetailTitle, { color: palette.text }]}>권한 사용 목적</Text>
+              <Text style={[styles.permissionDetailText, { color: palette.muted }]}>
+                촬영 화면을 표시하고 사진을 찍을 때만 카메라를 사용합니다.
+              </Text>
+              <Text style={[styles.permissionDetailText, { color: palette.muted }]}>
+                권한을 허용하지 않아도 기록 탭에서 저장된 사진을 확인할 수 있습니다.
+              </Text>
+            </View>
+            {!canRequestCameraPermission ? (
+              <Text style={[styles.permissionHelp, { color: palette.muted }]}>
+                권한 요청이 차단되어 있습니다. 앱 설정에서 카메라 권한을 허용한 다음 돌아와 주세요.
+              </Text>
+            ) : null}
+          </View>
+        </ScrollView>
+        <View style={[
+          styles.permissionActions,
+          {
+            backgroundColor: palette.background,
+            paddingBottom: Math.max(insets.bottom + 12, 16)
+          }
+        ]}>
+          <Pressable
+            accessibilityRole="button"
+            style={[styles.permissionButton, { backgroundColor: palette.text }]}
+            onPress={canRequestCameraPermission ? requestCameraPermission : openPermissionSettings}
+          >
+            <Text selectable={false} style={[styles.permissionButtonText, { color: palette.inverse }]}>
+              {canRequestCameraPermission ? "카메라 권한 허용" : "앱 설정에서 권한 허용"}
+            </Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            style={[styles.permissionButton, styles.permissionSecondaryButton, { borderColor: palette.line, backgroundColor: palette.surface }]}
+            onPress={returnFromPermissionScreen}
+          >
+            <Text selectable={false} style={[styles.permissionSecondaryButtonText, { color: palette.text }]}>
+              기록으로 이동
+            </Text>
+          </Pressable>
+        </View>
       </View>
     );
   }
@@ -2463,9 +2525,9 @@ export default function CameraScreen({
           onError={handleCameraSessionError}
         />
       ) : (
-        <View style={styles.permissionScreen}>
-          <ActivityIndicator color={colors.inverse} />
-          <Text selectable style={styles.permissionText}>
+        <View style={styles.cameraUnavailableScreen}>
+          <ActivityIndicator color={bodyFrameDarkColors.text} />
+          <Text selectable style={styles.cameraUnavailableText}>
             사용할 수 있는 카메라를 찾는 중입니다.
           </Text>
         </View>
@@ -3435,7 +3497,42 @@ export default function CameraScreen({
 
       {!isCameraModalOpen && !isGuidePositionAdjusting && !isGridLineControlAdjusting ? (
         <View style={controlsStyle}>
-          {errorMessage ? <Text selectable style={styles.errorText}>{errorMessage}</Text> : null}
+          {errorMessage ? (
+            <View style={styles.cameraErrorNotice} accessibilityLiveRegion="polite">
+              <View style={styles.cameraErrorHeading}>
+                <Feather name="alert-circle" size={18} color={bodyFrameDarkColors.text} />
+                <Text style={styles.cameraErrorHeadingText}>촬영 안내</Text>
+              </View>
+              <Text selectable style={styles.errorText}>{errorMessage}</Text>
+              <View style={styles.cameraErrorActions}>
+                {cameraConnectionError ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    style={styles.cameraErrorAction}
+                    onPress={retryCameraConnection}
+                  >
+                    <Text style={styles.cameraErrorActionText}>다시 연결</Text>
+                  </Pressable>
+                ) : null}
+                {albumPermissionError ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    style={styles.cameraErrorAction}
+                    onPress={openPermissionSettings}
+                  >
+                    <Text style={styles.cameraErrorActionText}>권한 설정</Text>
+                  </Pressable>
+                ) : null}
+                <Pressable
+                  accessibilityRole="button"
+                  style={styles.cameraErrorDismiss}
+                  onPress={() => setErrorMessage(null)}
+                >
+                  <Text style={styles.cameraErrorActionText}>닫기</Text>
+                </Pressable>
+              </View>
+            </View>
+          ) : null}
 
           {overlaySetupActive && hasReferenceOverlay ? (
             <View style={styles.captureRow}>

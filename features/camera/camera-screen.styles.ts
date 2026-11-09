@@ -1494,57 +1494,174 @@ export const styles = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: colors.inverse
   },
+  cameraErrorNotice: {
+    width: "100%",
+    maxWidth: 520,
+    alignSelf: "center",
+    gap: 10,
+    padding: 12,
+    borderWidth: 1,
+    borderRadius: bodyFrameDesign.cardRadius,
+    borderColor: bodyFrameDarkColors.line,
+    backgroundColor: bodyFrameDarkColors.surface
+  },
+  cameraErrorHeading: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8
+  },
+  cameraErrorHeadingText: {
+    color: bodyFrameDarkColors.text,
+    fontSize: bodyFrameTypography.rowTitle,
+    fontWeight: "700"
+  },
   errorText: {
-    color: colors.inverse,
-    fontSize: typography.small,
-    lineHeight: 17,
-    textAlign: "center",
+    color: bodyFrameDarkColors.muted,
+    fontSize: bodyFrameTypography.caption,
+    lineHeight: 19,
     letterSpacing: 0
   },
-  permissionScreen: {
+  cameraErrorActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "flex-end",
+    gap: 8
+  },
+  cameraErrorAction: {
+    minHeight: bodyFrameDesign.minTouchSize,
+    minWidth: 86,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderRadius: bodyFrameDesign.buttonRadius,
+    borderColor: bodyFrameDarkColors.darkLine
+  },
+  cameraErrorDismiss: {
+    minHeight: bodyFrameDesign.minTouchSize,
+    minWidth: 68,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderRadius: bodyFrameDesign.buttonRadius,
+    borderColor: bodyFrameDarkColors.line
+  },
+  cameraErrorActionText: {
+    color: bodyFrameDarkColors.text,
+    fontSize: bodyFrameTypography.caption,
+    fontWeight: "600"
+  },
+  cameraUnavailableScreen: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
     gap: 16,
     padding: 24,
+    backgroundColor: bodyFrameDarkColors.background
+  },
+  cameraUnavailableText: {
+    color: bodyFrameDarkColors.muted,
+    fontSize: bodyFrameTypography.body,
+    lineHeight: 22,
+    textAlign: "center"
+  },
+  permissionScreen: {
+    flex: 1,
     backgroundColor: colors.background
+  },
+  permissionScroll: {
+    width: "100%",
+    flex: 1
+  },
+  permissionContent: {
+    flexGrow: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: bodyFrameDesign.horizontalPadding,
+    gap: 24
+  },
+  permissionPanel: {
+    width: "100%",
+    maxWidth: 480,
+    gap: 12
+  },
+  permissionIconFrame: {
+    width: 56,
+    height: 56,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderRadius: bodyFrameDesign.cardRadius
+  },
+  permissionEyebrow: {
+    fontSize: bodyFrameTypography.caption,
+    fontWeight: "600",
+    letterSpacing: 1
   },
   permissionTitle: {
     color: colors.text,
-    fontSize: 22,
-    fontWeight: "800",
-    lineHeight: 28,
-    textAlign: "center",
+    fontSize: bodyFrameTypography.projectTitle,
+    fontWeight: "700",
+    lineHeight: 32,
     letterSpacing: 0
   },
   permissionText: {
     color: colors.muted,
-    fontSize: typography.body,
+    fontSize: bodyFrameTypography.body,
     lineHeight: 22,
-    textAlign: "center",
     letterSpacing: 0
   },
+  permissionDetail: {
+    gap: 10,
+    padding: 16,
+    borderWidth: 1,
+    borderRadius: bodyFrameDesign.cardRadius
+  },
+  permissionDetailTitle: {
+    fontSize: bodyFrameTypography.rowTitle,
+    fontWeight: "700"
+  },
+  permissionDetailText: {
+    fontSize: bodyFrameTypography.body,
+    lineHeight: 21
+  },
+  permissionHelp: {
+    fontSize: bodyFrameTypography.caption,
+    lineHeight: 20
+  },
+  permissionActions: {
+    width: "100%",
+    maxWidth: 480,
+    alignSelf: "center",
+    paddingHorizontal: bodyFrameDesign.horizontalPadding,
+    paddingTop: 12,
+    gap: bodyFrameDesign.controlGap
+  },
   permissionButton: {
-    minHeight: controls.height,
+    minHeight: bodyFrameDesign.primaryButtonHeight,
+    width: "100%",
+    alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 18,
+    borderRadius: bodyFrameDesign.buttonRadius,
     backgroundColor: colors.text
   },
   permissionSecondaryButton: {
-    backgroundColor: colors.background,
-    borderWidth: controls.borderWidth,
-    borderColor: colors.line
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.surface
   },
   permissionButtonText: {
     color: colors.inverse,
-    fontSize: typography.button,
-    fontWeight: "800",
+    fontSize: bodyFrameTypography.button,
+    fontWeight: "700",
     letterSpacing: 0
   },
   permissionSecondaryButtonText: {
     color: colors.text,
-    fontSize: typography.button,
-    fontWeight: "800",
+    fontSize: bodyFrameTypography.button,
+    fontWeight: "600",
     letterSpacing: 0
   }
 });
