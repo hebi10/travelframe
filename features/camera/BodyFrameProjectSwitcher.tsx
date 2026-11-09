@@ -385,23 +385,30 @@ export function BodyFrameProjectSwitcher({
               keyboardDismissMode="on-drag"
               showsVerticalScrollIndicator
             >
-            <Text style={[styles.label, { color: palette.muted }]}>프로젝트 이름</Text>
+            <Text style={[styles.label, { color: palette.text }]}>프로젝트 이름</Text>
             <TextInput
               value={name}
-              onChangeText={setName}
+              onChangeText={(value) => {
+                setName(value);
+                setCreateError(null);
+              }}
               placeholder="새 프로젝트"
               placeholderTextColor={palette.faint}
               style={[styles.input, { backgroundColor: palette.background, color: palette.text, borderColor: palette.line }]}
               maxLength={40}
               accessibilityLabel="프로젝트 이름"
+              editable={!submitting}
+              returnKeyType="done"
             />
 
-            <Text style={[styles.label, { color: palette.muted }]}>목표 기록 수</Text>
-            {maxProgressPhotos !== null ? (
-              <Text style={[styles.planLimitText, { color: palette.muted }]}>
-                현재 플랜 최대 {maxProgressPhotos}장
-              </Text>
-            ) : null}
+            <View style={styles.formSectionHeader}>
+              <Text style={[styles.label, { color: palette.text }]}>목표 기록 수</Text>
+              {maxProgressPhotos !== null ? (
+                <Text style={[styles.planLimitText, { color: palette.muted }]}>
+                  현재 플랜 최대 {maxProgressPhotos}장
+                </Text>
+              ) : null}
+            </View>
             <View style={styles.choiceRow}>
               {(["100", "365", "custom"] as const).map((value) => {
                 const presetTarget =
@@ -431,7 +438,7 @@ export function BodyFrameProjectSwitcher({
                       setCreateError(null);
                     }}
                   >
-                    <Text style={[styles.choiceText, { color: palette.text }]}>
+                    <Text numberOfLines={2} style={[styles.choiceText, { color: palette.text }]}>
                       {value === "custom"
                         ? "직접 입력"
                         : locked
@@ -451,14 +458,18 @@ export function BodyFrameProjectSwitcher({
                 }}
                 keyboardType="number-pad"
                 accessibilityLabel="목표 기록 수 직접 입력"
-                style={[styles.input, { backgroundColor: palette.background, color: palette.text, borderColor: palette.line }]}
+                style={[styles.input, styles.customTargetInput, { backgroundColor: palette.background, color: palette.text, borderColor: palette.line }]}
                 placeholder="100"
                 placeholderTextColor={palette.faint}
+                editable={!submitting}
               />
             ) : null}
             {createError ? (
-              <View style={[styles.limitNotice, { backgroundColor: palette.background, borderColor: palette.line }]}>
-                <Text style={[styles.limitNoticeText, { color: palette.muted }]}>{createError}</Text>
+              <View
+                style={[styles.limitNotice, { backgroundColor: palette.background, borderColor: palette.line }]}
+                accessibilityLiveRegion="polite"
+              >
+                <Text style={[styles.limitNoticeText, { color: palette.text }]}>{createError}</Text>
                 {upgradePlanLabel && onUpgrade ? (
                   <Pressable
                     accessibilityRole="button"
@@ -476,10 +487,12 @@ export function BodyFrameProjectSwitcher({
               </View>
             ) : null}
 
-            <Text style={[styles.label, { color: palette.text }]}>촬영 기준 사진 방식</Text>
-            <Text style={[styles.referenceHint, { color: palette.muted }]}>
-              두 번째 촬영부터 겹쳐 볼 사진을 선택합니다.
-            </Text>
+            <View style={styles.referenceSectionHeader}>
+              <Text style={[styles.label, { color: palette.text }]}>촬영 기준 사진 방식</Text>
+              <Text style={[styles.referenceHint, { color: palette.muted }]}>
+                두 번째 촬영부터 겹쳐 볼 사진을 선택합니다.
+              </Text>
+            </View>
             <Pressable
               accessibilityRole="radio"
               accessibilityLabel="최근 사진을 기준으로 촬영"
