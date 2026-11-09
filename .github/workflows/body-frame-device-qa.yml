@@ -37,6 +37,7 @@ concurrency:
 
 jobs:
   build-apk:
+    if: "!startsWith(github.head_ref, 'feat/r3-frame-journal-c0-')"
     runs-on: ubuntu-latest
     timeout-minutes: 75
     env:
@@ -211,7 +212,9 @@ jobs:
 
   camera-c0-baseline:
     name: C0 Camera Before · ${{ matrix.profile }}
-    needs: build-apk
+    permissions:
+      contents: read
+      actions: read
     if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'feat/r3-frame-journal-c0-')
     runs-on: ubuntu-latest
     timeout-minutes: 65
@@ -227,13 +230,26 @@ jobs:
         with:
           name: body-frame-native-qa-apk
           path: artifacts/apk
+          run-id: 42557776721
+          github-token: ${{ github.token }}
+      - name: Verify pinned C0 QA APK from successful same-source build
+        run: |
+          printf '%s  %s\n' 5a73debb0ceb30903f0f876bdc5c9784cf700031398dd5b1151cb0e13722ffb4 artifacts/apk/app-qaRelease.apk | sha256sum --check --status
+          unzip -Z1 artifacts/apk/app-qaRelease.apk | grep -Fx 'assets/index.android.bundle'
       - name: Validate camera baseline capture script
         run: |
           python3 -m py_compile scripts/capture-camera-c0-android.py
           python3 scripts/test_capture_android_qa.py
           python3 scripts/test_capture_stage13_qa.py
-      - name: Verify screenshot encoder
+      - name: Install screenshot fixture encoder if missing
+        timeout-minutes: 6
+        shell: bash
         run: |
+          set -euo pipefail
+          if ! command -v ffmpeg >/dev/null; then
+            timeout 120s sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=20 update
+            timeout 240s sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ffmpeg
+          fi
           command -v ffmpeg
           ffmpeg -version | head -1
       - name: Enable KVM access
