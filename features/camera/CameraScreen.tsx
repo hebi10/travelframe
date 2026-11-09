@@ -2682,13 +2682,7 @@ export default function CameraScreen({
             entering={FadeIn.duration(140)}
             style={styles.cameraColorFloatingCard}
           >
-            <ScrollView
-              style={styles.cameraColorFloatingScroll}
-              contentContainerStyle={styles.cameraColorFloatingScrollContent}
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-            >
-                                    <View style={styles.cameraColorPanel}>
+            <View style={styles.cameraColorPanel}>
                                       <View style={styles.cameraColorHeaderRow}>
                                         <View style={styles.cameraColorHeader}>
                                           <View style={styles.cameraColorTitleRow}>
@@ -2702,7 +2696,7 @@ export default function CameraScreen({
                                             </Text>
                                           </View>
                                           <Text selectable={false} style={styles.cameraColorHint}>
-                                            촬영 전에 원하는 색감을 조정하고 자주 쓰는 값은 슬롯에 저장할 수 있습니다.
+                                            색감을 조절한 뒤 아래 버튼에서 현재 슬롯에 저장하세요.
                                           </Text>
                                         </View>
                                         <Pressable
@@ -2719,6 +2713,13 @@ export default function CameraScreen({
                                         </Pressable>
                                       </View>
               
+              <ScrollView
+                style={styles.cameraColorFloatingScroll}
+                contentContainerStyle={styles.cameraColorFloatingScrollContent}
+                showsVerticalScrollIndicator
+                nestedScrollEnabled
+                keyboardShouldPersistTaps="handled"
+              >
                                       <View style={styles.cameraColorPresetSection}>
                                         <View style={styles.cameraColorPresetHeader}>
                                           <Text selectable={false} style={styles.cameraColorPresetTitle}>
@@ -2829,10 +2830,12 @@ export default function CameraScreen({
                                         />
                                       </View>
               
+              </ScrollView>
                                       <View style={styles.cameraColorActions}>
                                         <Pressable accessibilityRole="button"
                                           style={styles.cameraColorSecondaryButton}
                                           onPress={resetCameraColorSettings}
+                                          accessibilityLabel="색감 조절값 초기화"
                                         >
                                           <Feather
                                             name="refresh-ccw"
@@ -2849,6 +2852,7 @@ export default function CameraScreen({
                                         <Pressable accessibilityRole="button"
                                           style={styles.cameraColorPrimaryButton}
                                           onPress={saveCameraColorSettings}
+                                          accessibilityLabel="선택한 색감 슬롯에 현재 설정 저장"
                                         >
                                           <Feather
                                             name="save"
@@ -2863,8 +2867,7 @@ export default function CameraScreen({
                                           </Text>
                                         </Pressable>
                                       </View>
-                                    </View>
-            </ScrollView>
+            </View>
           </Animated.View>
         </View>
       ) : null}
