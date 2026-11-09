@@ -32,7 +32,7 @@ const detail = read("features/records/BodyFrameProjectDetailScreen.tsx");
 const compare = read("features/records/BodyFrameCompareScreen.tsx");
 const history = read("features/records/BodyMeasurementHistoryScreen.tsx");
 
-assert.ok(camera.includes("pointerEvents=\"none\"") && camera.includes("styles.captureHintPanel"));
+assert.ok(camera.includes("footerStatus={") && camera.includes("styles.captureStatusRow"));
 assert.ok(camera.includes("accessibilityLiveRegion=\"polite\""));
 assert.ok(camera.includes("captureBlockedReason") && camera.includes("measurementPromptPhotoId"));
 assert.ok(switcher.includes("accessibilityHint={createOnly"));
