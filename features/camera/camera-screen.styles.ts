@@ -275,11 +275,11 @@ export const styles = StyleSheet.create({
   },
   overlaySetupPanel: {
     width: "100%",
-    gap: 12,
+    gap: 10,
     padding: 12,
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.32)",
-    backgroundColor: "rgba(0, 0, 0, 0.42)"
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderColor: "#414148",
+    backgroundColor: "rgba(11, 11, 12, 0.96)"
   },
   overlaySetupHeader: {
     flexDirection: "row",
@@ -287,16 +287,21 @@ export const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: 12
   },
+  overlaySetupHeaderCopy: {
+    flex: 1,
+    minWidth: 0,
+    gap: 4
+  },
   overlaySetupTitle: {
     color: colors.inverse,
-    fontSize: typography.button,
-    fontWeight: "800",
+    fontSize: bodyFrameTypography.rowTitle,
+    fontWeight: "600",
     letterSpacing: 0
   },
   overlaySetupHint: {
-    color: "rgba(255, 255, 255, 0.64)",
+    color: "rgba(255, 255, 255, 0.78)",
     fontSize: bodyFrameTypography.caption,
-    lineHeight: 16,
+    lineHeight: 18,
     letterSpacing: 0
   },
   overlaySetupValue: {
@@ -308,44 +313,54 @@ export const styles = StyleSheet.create({
   },
   overlaySetupActions: {
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: 8
   },
   overlayOpacityControl: {
     paddingTop: 2
   },
   overlayCompactButton: {
+    minWidth: 70,
     minHeight: bodyFrameDesign.minTouchSize,
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.42)"
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderColor: "rgba(255, 255, 255, 0.42)",
+    backgroundColor: "#18181B"
   },
   overlayRemoveButton: {
-    borderColor: "rgba(255, 90, 95, 0.8)"
+    borderColor: "rgba(255, 255, 255, 0.42)"
   },
   overlayCompactText: {
     color: colors.inverse,
-    fontSize: typography.button,
-    fontWeight: "800",
+    fontSize: bodyFrameTypography.button,
+    fontWeight: "600",
+    lineHeight: 18,
+    textAlign: "center",
     letterSpacing: 0
   },
   overlayRemoveText: {
-    color: "#FFB3B6"
+    color: colors.inverse
   },
   overlayConfirmButton: {
+    minWidth: 70,
     minHeight: bodyFrameDesign.minTouchSize,
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1,
-    borderColor: colors.inverse,
-    backgroundColor: "transparent"
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderColor: "#F5F5F5",
+    backgroundColor: "#F5F5F5"
   },
   overlayConfirmText: {
-    color: colors.inverse,
-    fontSize: typography.button,
-    fontWeight: "800",
+    color: "#111111",
+    fontSize: bodyFrameTypography.button,
+    fontWeight: "700",
     letterSpacing: 0
   },
   modalBackdrop: {
@@ -353,7 +368,7 @@ export const styles = StyleSheet.create({
     justifyContent: "flex-end",
     paddingHorizontal: 14,
     paddingTop: 14,
-    backgroundColor: "transparent"
+    backgroundColor: "rgba(0, 0, 0, 0.62)"
   },
   modalGestureRoot: {
     flex: 1
@@ -366,14 +381,16 @@ export const styles = StyleSheet.create({
     backgroundColor: "rgba(0, 0, 0, 0.62)"
   },
   guideModal: {
-    gap: 16,
+    gap: 12,
     flexGrow: 0,
     maxHeight: bodyFrameSheetDesign.maxHeight,
-    padding: 18,
+    padding: 16,
     paddingBottom: 22,
-    borderWidth: 1,
-    borderColor: colors.darkLine,
-    backgroundColor: "rgba(255, 255, 255, 0.5)",
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderColor: bodyFrameDarkColors.line,
+    borderTopLeftRadius: bodyFrameDesign.bottomSheetRadius,
+    borderTopRightRadius: bodyFrameDesign.bottomSheetRadius,
+    backgroundColor: "#101012",
     overflow: "hidden"
   },
   navModal: {
@@ -711,30 +728,41 @@ export const styles = StyleSheet.create({
     gap: 4
   },
   modalEyebrow: {
-    color: colors.faint,
+    color: bodyFrameDarkColors.muted,
     fontSize: bodyFrameTypography.caption,
-    fontWeight: "800",
-    letterSpacing: 0,
-    textTransform: "uppercase"
+    fontWeight: "600",
+    letterSpacing: 0.3
   },
   modalTitle: {
-    color: colors.text,
-    fontSize: 22,
-    fontWeight: "800",
+    color: bodyFrameDarkColors.text,
+    fontSize: bodyFrameTypography.sectionTitle,
+    fontWeight: "600",
     lineHeight: 28,
     letterSpacing: 0
+  },
+  guideModalDescription: {
+    color: bodyFrameDarkColors.muted,
+    fontSize: bodyFrameTypography.caption,
+    lineHeight: 18
+  },
+  guideSectionHint: {
+    color: bodyFrameDarkColors.muted,
+    fontSize: bodyFrameTypography.caption,
+    lineHeight: 18
   },
   modalCloseButton: {
     minHeight: bodyFrameDesign.minTouchSize,
     justifyContent: "center",
     paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: colors.line
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderColor: "#3A3A40",
+    borderRadius: bodyFrameDesign.buttonRadius,
+    backgroundColor: "#18181B"
   },
   modalCloseText: {
-    color: colors.text,
-    fontSize: typography.button,
-    fontWeight: "800",
+    color: bodyFrameDarkColors.text,
+    fontSize: bodyFrameTypography.button,
+    fontWeight: "600",
     letterSpacing: 0
   },
   modalSection: {
@@ -744,14 +772,14 @@ export const styles = StyleSheet.create({
     paddingTop: 8
   },
   modalSectionTitle: {
-    color: colors.text,
-    fontSize: typography.body,
-    fontWeight: "800",
+    color: bodyFrameDarkColors.text,
+    fontSize: bodyFrameTypography.rowTitle,
+    fontWeight: "700",
     letterSpacing: 0
   },
   modalSectionDetail: {
-    color: colors.muted,
-    fontSize: typography.small,
+    color: bodyFrameDarkColors.muted,
+    fontSize: bodyFrameTypography.caption,
     lineHeight: 18,
     letterSpacing: 0
   },
@@ -760,30 +788,50 @@ export const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: 8
   },
+  guideTypeGrid: { gap: 8 },
+  guideTypeOption: {
+    flexBasis: "30%",
+    flexGrow: 1,
+    minWidth: 0,
+    minHeight: 64,
+    alignItems: "center",
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 7
+  },
   optionRow: {
     flexDirection: "row",
     gap: 8
   },
+  guideSegmentRow: {
+    flexWrap: "wrap",
+    gap: 6
+  },
   optionButton: {
     minHeight: bodyFrameDesign.minTouchSize,
+    flexGrow: 1,
+    alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.background
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderColor: "#35353A",
+    borderRadius: bodyFrameDesign.buttonRadius,
+    backgroundColor: "#18181B"
   },
   optionButtonActive: {
-    borderColor: colors.text,
-    backgroundColor: colors.text
+    borderColor: bodyFrameDarkColors.text,
+    backgroundColor: "#292D31"
   },
   optionButtonText: {
-    color: colors.text,
-    fontSize: typography.button,
-    fontWeight: "800",
+    color: bodyFrameDarkColors.text,
+    fontSize: bodyFrameTypography.button,
+    fontWeight: "600",
+    textAlign: "center",
     letterSpacing: 0
   },
   optionButtonTextActive: {
-    color: colors.inverse
+    color: bodyFrameDarkColors.text
   },
   sizeFineControl: {
     minHeight: 44,
@@ -862,82 +910,95 @@ export const styles = StyleSheet.create({
     width: 58,
     minHeight: controls.height,
     paddingHorizontal: 8,
-    borderWidth: 1,
-    borderColor: colors.text,
-    color: colors.text,
-    fontSize: typography.body,
-    fontWeight: "800",
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderColor: "#5A5A62",
+    borderRadius: bodyFrameDesign.buttonRadius,
+    backgroundColor: "#18181B",
+    color: bodyFrameDarkColors.text,
+    fontSize: bodyFrameTypography.button,
+    fontWeight: "600",
     textAlign: "center"
   },
   colorRow: {
     flexDirection: "row",
-    flexWrap: "nowrap",
-    justifyContent: "space-between",
-    gap: 4
+    flexWrap: "wrap",
+    gap: 8
   },
   colorOption: {
-    minHeight: 44,
-    flex: 1,
+    flexBasis: "30%",
+    flexGrow: 1,
     minWidth: 0,
+    minHeight: 64,
     alignItems: "center",
     justifyContent: "center",
-    gap: 5,
-    paddingHorizontal: 4,
-    borderWidth: 1,
-    borderColor: colors.line
+    gap: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 7,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderColor: "#35353A",
+    borderRadius: bodyFrameDesign.buttonRadius,
+    backgroundColor: "#18181B"
   },
   colorOptionActive: {
-    borderColor: colors.text
+    borderColor: bodyFrameDarkColors.text,
+    backgroundColor: "#292D31"
   },
   colorSwatch: {
     width: 18,
     height: 18,
-    borderWidth: 1,
-    borderColor: colors.darkLine
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderColor: "#6B6B72"
   },
   colorLabel: {
-    color: colors.text,
+    color: bodyFrameDarkColors.text,
     fontSize: bodyFrameTypography.caption,
-    fontWeight: "800",
+    fontWeight: "600",
     letterSpacing: 0
   },
   visibilityButton: {
     minHeight: controls.height,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1,
-    borderColor: colors.text
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderColor: "#5A5A62",
+    borderRadius: bodyFrameDesign.buttonRadius,
+    backgroundColor: "#18181B"
   },
   visibilityButtonActive: {
-    backgroundColor: colors.text
+    borderColor: bodyFrameDarkColors.text,
+    backgroundColor: "#292D31"
   },
   visibilityButtonText: {
-    color: colors.text,
-    fontSize: typography.button,
-    fontWeight: "800",
+    color: bodyFrameDarkColors.text,
+    fontSize: bodyFrameTypography.button,
+    fontWeight: "600",
     letterSpacing: 0
   },
   visibilityButtonTextActive: {
-    color: colors.inverse
+    color: bodyFrameDarkColors.text
   },
   guidePositionButton: {
     minHeight: controls.height,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1,
-    borderColor: colors.text,
-    backgroundColor: colors.background
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderColor: bodyFrameDarkColors.text,
+    borderRadius: bodyFrameDesign.buttonRadius,
+    backgroundColor: "#18181B"
   },
   guidePositionButtonText: {
-    color: colors.text,
-    fontSize: typography.button,
-    fontWeight: "800",
+    color: bodyFrameDarkColors.text,
+    fontSize: bodyFrameTypography.button,
+    fontWeight: "600",
     letterSpacing: 0
   },
   guidePositionActionGroup: {
     position: "absolute",
     zIndex: 30,
+    maxWidth: "94%",
     flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "flex-end",
     gap: 8
   },
   guidePositionSecondaryButton: {
