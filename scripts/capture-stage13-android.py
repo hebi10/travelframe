@@ -79,6 +79,31 @@ def open_camera_light_panel(device):
     open_camera_settings(device)
     device.open_control("라이트 설정 열기", ["조명", "끄기", "켜기"])
 
+def capture_camera_permission_denied(device, directory):
+    """Capture an actual Android permission-denied state; restore emulator permission afterward."""
+    device.shell("am", "force-stop", qa.PACKAGE)
+    device.shell("pm", "revoke", qa.PACKAGE, "android.permission.CAMERA")
+    try:
+        record = verified_capture(
+            device, directory, "camera-permission-denied", "camera",
+            ["카메라 접근 권한이 필요합니다.", "기록으로 이동"]
+        )
+        xml = device.dump()
+        controls = qa.ui_strings(xml)
+        primary = (
+            "카메라 권한 허용"
+            if any("카메라 권한 허용" in item for item in controls)
+            else "앱 설정에서 권한 허용"
+        )
+        qa.target_bounds(xml, primary, viewport=device.viewport())
+        qa.target_bounds(xml, "기록으로 이동", viewport=device.viewport())
+        record["permissionActionEvidence"] = {"primary": primary, "fixedActionsVisible": True}
+        return record
+    finally:
+        device.shell("pm", "grant", qa.PACKAGE, "android.permission.CAMERA", check=False)
+        device.shell("am", "force-stop", qa.PACKAGE, check=False)
+
+
 CASES = [
     ("camera", "촬영", "camera", ["프로젝트 선택", "사진 촬영"], None),
     ("camera-project-picker", "촬영 프로젝트 선택", "camera",
@@ -315,6 +340,14 @@ def main():
                     record.update(profile=args.profile, variant=variant, label=label)
                     manifest["captures"].append(record)
                     (directory / f"{name}.json").write_text(json.dumps(record, indent=2, ensure_ascii=False), encoding="utf-8")
+            if variant in ("dark-100", "light-150"):
+                device.seed(True, font, theme_mode=theme)
+                permission = capture_camera_permission_denied(device, directory)
+                permission.update(profile=args.profile, variant=variant, label="Android 카메라 권한 거절")
+                manifest["captures"].append(permission)
+                (directory / "camera-permission-denied.json").write_text(
+                    json.dumps(permission, indent=2, ensure_ascii=False), encoding="utf-8"
+                )
     except Exception as error:
         manifest["fatalError"] = str(error)
     finally:
