@@ -1109,6 +1109,38 @@ export const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center"
   },
+  cameraQuickPanel: {
+    width: "100%",
+    gap: 9,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderColor: "#3A3A40",
+    borderRadius: bodyFrameDesign.buttonRadius,
+    backgroundColor: "#101012"
+  },
+  cameraQuickPanelHeader: {
+    width: "100%",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8
+  },
+  cameraQuickPanelTitle: {
+    color: bodyFrameDarkColors.text,
+    fontSize: bodyFrameTypography.rowTitle,
+    fontWeight: "600"
+  },
+  cameraQuickPanelValue: {
+    color: bodyFrameDarkColors.muted,
+    fontSize: bodyFrameTypography.caption,
+    fontWeight: "600",
+    fontVariant: ["tabular-nums"]
+  },
+  cameraZoomPresetRow: {
+    flexWrap: "wrap"
+  },
   cameraColorPanel: {
     width: "100%",
     flex: 1,
@@ -1301,11 +1333,13 @@ export const styles = StyleSheet.create({
   },
 
   quickButtonRow: {
+    width: "100%",
     minHeight: bodyFrameDesign.minTouchSize,
     flexDirection: "row",
+    flexWrap: "wrap",
     alignItems: "center",
     justifyContent: "center",
-    gap: 10
+    gap: 8
   },
   quickPillButton: {
     minWidth: 48,
@@ -1313,22 +1347,23 @@ export const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.36)",
-    backgroundColor: "rgba(0, 0, 0, 0.28)"
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderColor: "#55555B",
+    borderRadius: bodyFrameDesign.buttonRadius,
+    backgroundColor: "#18181B"
   },
   quickPillButtonActive: {
-    borderColor: colors.inverse,
-    backgroundColor: colors.inverse
+    borderColor: "#F5F5F5",
+    backgroundColor: "#F5F5F5"
   },
   quickPillText: {
-    color: colors.inverse,
-    fontSize: typography.button,
-    fontWeight: "900",
+    color: bodyFrameDarkColors.text,
+    fontSize: bodyFrameTypography.button,
+    fontWeight: "600",
     letterSpacing: 0
   },
   quickPillTextActive: {
-    color: colors.text
+    color: "#111111"
   },
   cameraControlBottomTray: {
     width: "100%",
