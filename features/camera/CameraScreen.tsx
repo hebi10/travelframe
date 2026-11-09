@@ -2451,27 +2451,33 @@ export default function CameraScreen({
               </Text>
             ) : null}
           </View>
-          <View style={styles.permissionActions}>
-            <Pressable
-              accessibilityRole="button"
-              style={[styles.permissionButton, { backgroundColor: palette.text }]}
-              onPress={canRequestCameraPermission ? requestCameraPermission : openPermissionSettings}
-            >
-              <Text selectable={false} style={[styles.permissionButtonText, { color: palette.inverse }]}>
-                {canRequestCameraPermission ? "카메라 권한 허용" : "앱 설정에서 권한 허용"}
-              </Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              style={[styles.permissionButton, styles.permissionSecondaryButton, { borderColor: palette.line, backgroundColor: palette.surface }]}
-              onPress={returnFromPermissionScreen}
-            >
-              <Text selectable={false} style={[styles.permissionSecondaryButtonText, { color: palette.text }]}>
-                기록으로 이동
-              </Text>
-            </Pressable>
-          </View>
         </ScrollView>
+        <View style={[
+          styles.permissionActions,
+          {
+            backgroundColor: palette.background,
+            paddingBottom: Math.max(insets.bottom + 12, 16)
+          }
+        ]}>
+          <Pressable
+            accessibilityRole="button"
+            style={[styles.permissionButton, { backgroundColor: palette.text }]}
+            onPress={canRequestCameraPermission ? requestCameraPermission : openPermissionSettings}
+          >
+            <Text selectable={false} style={[styles.permissionButtonText, { color: palette.inverse }]}>
+              {canRequestCameraPermission ? "카메라 권한 허용" : "앱 설정에서 권한 허용"}
+            </Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            style={[styles.permissionButton, styles.permissionSecondaryButton, { borderColor: palette.line, backgroundColor: palette.surface }]}
+            onPress={returnFromPermissionScreen}
+          >
+            <Text selectable={false} style={[styles.permissionSecondaryButtonText, { color: palette.text }]}>
+              기록으로 이동
+            </Text>
+          </Pressable>
+        </View>
       </View>
     );
   }
