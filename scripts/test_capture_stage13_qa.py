@@ -94,6 +94,59 @@ class Stage13CaptureTest(unittest.TestCase):
             stage13.open_camera_reference_setup(device)
         device.open_control.assert_not_called()
 
+    def test_c5_color_save_and_reset_are_visible_without_scrolling(self):
+        device = Mock()
+        device.viewport.return_value = (0, 24, 720, 1500)
+        device.dump.return_value = (
+            '<hierarchy>'
+            '<node content-desc="선택한 색감 슬롯에 현재 설정 저장" clickable="true" '
+            'enabled="true" bounds="[12,1400][280,1460]"/>'
+            '<node content-desc="색감 조절값 초기화" clickable="true" '
+            'enabled="true" bounds="[300,1400][520,1460]"/>'
+            '<node class="android.widget.ScrollView"/>'
+            '</hierarchy>'
+        )
+        stage13.open_camera_color_panel(device)
+        self.assertEqual(device.open_control.call_args_list, [
+            call("촬영 설정 열기", ["촬영 도구", "촬영 옵션"]),
+            call("색감 설정 열기", ["색감", "저장 슬롯", "설정 저장"]),
+        ])
+        device.viewport.assert_called()
+        self.assertIn("camera-color-panel", stage13.CORE)
+        self.assertIn("camera-color-panel", stage13.LARGE_TEXT)
+
+    def test_c5_color_footer_outside_viewport_is_rejected(self):
+        device = Mock()
+        device.viewport.return_value = (0, 24, 720, 1500)
+        device.dump.return_value = (
+            '<hierarchy>'
+            '<node content-desc="선택한 색감 슬롯에 현재 설정 저장" clickable="true" '
+            'enabled="true" bounds="[12,1510][280,1560]"/>'
+            '<node content-desc="색감 조절값 초기화" clickable="true" '
+            'enabled="true" bounds="[300,1400][520,1460]"/>'
+            '<node class="android.widget.ScrollView"/>'
+            '</hierarchy>'
+        )
+        with self.assertRaisesRegex(RuntimeError, "outside the usable viewport"):
+            stage13.open_camera_color_panel(device)
+
+    def test_c5_zoom_and_light_open_from_camera_tools(self):
+        zoom = Mock()
+        stage13.open_camera_zoom_panel(zoom)
+        self.assertEqual(zoom.open_control.call_args_list, [
+            call("촬영 설정 열기", ["촬영 도구", "촬영 옵션"]),
+            call("확대 설정 열기", ["확대", "1x"]),
+        ])
+        light = Mock()
+        stage13.open_camera_light_panel(light)
+        self.assertEqual(light.open_control.call_args_list, [
+            call("촬영 설정 열기", ["촬영 도구", "촬영 옵션"]),
+            call("라이트 설정 열기", ["조명", "끄기", "켜기"]),
+        ])
+        names = [case[0] for case in stage13.CASES]
+        self.assertIn("camera-zoom-panel", names)
+        self.assertIn("camera-light-panel", names)
+
     def test_stage_d_light_150_still_separates_first_install_and_replayed_guide(self):
         self.assertEqual(stage13.ALL_VARIANTS["light-150"], ("light", "large", 1.5))
         source = SCRIPT.read_text(encoding="utf-8")
