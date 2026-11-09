@@ -5,6 +5,7 @@ import test from "node:test";
 const stage13 = fs.readFileSync("scripts/capture-stage13-android.py", "utf8");
 const validator = fs.readFileSync("scripts/verify-frame-journal-c7.py", "utf8");
 const workflow = fs.readFileSync(".github/workflows/body-frame-device-qa.yml", "utf8");
+const records = fs.readFileSync("features/records/BodyFrameRecordsScreen.tsx", "utf8");
 
 test("C7 captures complete light/dark 100, 130, 150 percent matrix on four widths", () => {
   for (const variant of [
@@ -47,4 +48,12 @@ test("C7 actions upload a consolidated report only after inspecting native evide
   assert.ok(workflow.includes("scripts/test_verify_frame_journal_c7.py"));
   assert.ok(!workflow.includes("[deploy-closed]"));
   assert.ok(!workflow.includes("[publish-store-shots]"));
+});
+
+test("C7 corrects the confirmed 360dp 150% Records create-project word break", () => {
+  assert.ok(records.includes("const { width: windowWidth, fontScale } = useWindowDimensions();"));
+  assert.ok(records.includes("fontScale >= 1.3 && styles.quickActionsLargeFont"));
+  assert.match(records, /quickActions:\\s*\\{\\s*width:\\s*184/);
+  assert.match(records, /quickActionsLargeFont:\\s*\\{\\s*width:\\s*232/);
+  assert.ok(records.includes("<BodyFrameProjectSwitcher"));
 });
