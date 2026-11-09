@@ -1,6 +1,6 @@
 import { StyleSheet } from "react-native";
 
-import { bodyFrameAccent, bodyFrameDarkColors, bodyFrameDesign, bodyFrameSheetDesign, bodyFrameTypography, colors, controls, typography } from "@/constants/app-theme";
+import { bodyFrameDarkColors, bodyFrameDesign, bodyFrameSheetDesign, bodyFrameTypography, colors, controls, typography } from "@/constants/app-theme";
 import {
   CAMERA_CONTROL_TRAY_HORIZONTAL_PADDING,
   CAMERA_FOCUS_INDICATOR_RADIUS,
