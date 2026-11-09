@@ -320,8 +320,8 @@ export const styles = StyleSheet.create({
     paddingTop: 2
   },
   overlayCompactButton: {
-    minWidth: 70,
     minHeight: bodyFrameDesign.minTouchSize,
+    minWidth: 70,
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
@@ -346,8 +346,8 @@ export const styles = StyleSheet.create({
     color: colors.inverse
   },
   overlayConfirmButton: {
-    minWidth: 70,
     minHeight: bodyFrameDesign.minTouchSize,
+    minWidth: 70,
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
