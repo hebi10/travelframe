@@ -59,6 +59,26 @@ def open_camera_reference_setup(device):
         raise RuntimeError("Exactly one reference photo opacity control must be visible")
     device.open_control(labels[0], ["사진 가이드", "확인"])
 
+def open_camera_color_panel(device):
+    open_camera_settings(device)
+    device.open_control("색감 설정 열기", ["색감", "저장 슬롯", "설정 저장"])
+    xml = device.dump()
+    qa.target_bounds(
+        xml, "선택한 색감 슬롯에 현재 설정 저장", viewport=device.viewport()
+    )
+    qa.target_bounds(xml, "색감 조절값 초기화", viewport=device.viewport())
+    root = qa.ET.fromstring(xml)
+    if not any("ScrollView" in node.get("class", "") for node in root.iter("node")):
+        raise RuntimeError("Color panel must keep a native scroll area above the pinned footer")
+
+def open_camera_zoom_panel(device):
+    open_camera_settings(device)
+    device.open_control("확대 설정 열기", ["확대", "1x"])
+
+def open_camera_light_panel(device):
+    open_camera_settings(device)
+    device.open_control("라이트 설정 열기", ["조명", "끄기", "켜기"])
+
 CASES = [
     ("camera", "촬영", "camera", ["프로젝트 선택", "사진 촬영"], None),
     ("camera-project-picker", "촬영 프로젝트 선택", "camera",
@@ -72,6 +92,12 @@ CASES = [
      ["가이드 설정", "가이드라인"], open_camera_guide_settings),
     ("camera-reference-adjust", "촬영 기준 사진 위치·투명도", "camera",
      ["사진 가이드", "확인"], open_camera_reference_setup),
+    ("camera-color-panel", "촬영 색감·슬롯·고정 저장", "camera",
+     ["색감", "저장 슬롯", "설정 저장"], open_camera_color_panel),
+    ("camera-zoom-panel", "촬영 확대 배율", "camera",
+     ["확대", "1x"], open_camera_zoom_panel),
+    ("camera-light-panel", "촬영 손전등 선택", "camera",
+     ["조명", "끄기", "켜기"], open_camera_light_panel),
     ("records", "기록·프로젝트 목록", "studio", ["QA 데모", "내 프로젝트"], None),
     ("project", "프로젝트 상세·기록", f"project/{P}", ["QA 데모", "프로젝트 설정 열기"], None),
     ("project-metrics", "프로젝트 상세·수치 탭", f"project/{P}", ["QA 데모", "수치 기록", "전체 수치 기록 보기"], (["QA 데모"], "수치")),
@@ -100,12 +126,12 @@ CASES = [
     ("capture-preview", "촬영 후 미리보기", f"capture-preview?id={F}", ["촬영 미리보기", "다시 촬영"], None),
 ]
 CORE = {
-    "camera", "camera-project-picker", "camera-new-project", "camera-settings", "camera-settings-storage", "camera-guide-settings", "camera-reference-adjust", "records", "project", "project-metrics", "project-stats", "compare",
+    "camera", "camera-project-picker", "camera-new-project", "camera-settings", "camera-settings-storage", "camera-guide-settings", "camera-reference-adjust", "camera-color-panel", "camera-zoom-panel", "camera-light-panel", "records", "project", "project-metrics", "project-stats", "compare",
     "measurements", "video-home", "video-create", "video-library",
     "settings", "account", "project-settings", "video-photos", "video-quality",
 }
 LARGE_TEXT = {
-    "camera", "camera-new-project", "camera-settings", "camera-guide-settings", "records", "project", "project-metrics", "project-stats", "compare",
+    "camera", "camera-new-project", "camera-settings", "camera-guide-settings", "camera-color-panel", "records", "project", "project-metrics", "project-stats", "compare",
     "video-home", "video-create", "settings", "account", "project-settings", "video-photos",
 }
 ADDITIONAL = [
