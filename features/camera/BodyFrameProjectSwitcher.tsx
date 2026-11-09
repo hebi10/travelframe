@@ -429,8 +429,8 @@ export function BodyFrameProjectSwitcher({
                     accessibilityState={{ selected: targetPreset === value, disabled: locked }}
                     style={[
                       styles.choice,
-                      { borderColor: palette.line },
-                      targetPreset === value && { borderColor: palette.text },
+                      { borderColor: palette.line, backgroundColor: palette.surface },
+                      targetPreset === value && { borderColor: palette.text, backgroundColor: palette.surfaceStrong },
                       locked && styles.disabled
                     ]}
                     onPress={() => {
@@ -655,26 +655,93 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     marginBottom: 10
   },
-  projectList: { flexShrink: 1, minHeight: 0, maxHeight: 360 },
-  projectRow: {
-    minHeight: 64,
+  pickerSummaryRow: {
     flexDirection: "row",
-    alignItems: "center"
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+    marginTop: 16,
+    marginBottom: 6
+  },
+  pickerSectionTitle: {
+    fontSize: bodyFrameTypography.rowTitle,
+    fontWeight: "600"
+  },
+  pickerSectionCount: { fontSize: bodyFrameTypography.caption },
+  projectList: { flexShrink: 1, minHeight: 0, maxHeight: 360 },
+  projectListContent: { gap: 8, paddingVertical: 8 },
+  projectRow: {
+    minHeight: 72,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderRadius: bodyFrameDesign.cardRadius
   },
   projectRowPressed: { opacity: 0.7 },
-  projectTextWrap: { flex: 1 },
-  projectName: { color: "#F5F5F5", fontSize: 15, fontWeight: "500" },
-  projectMeta: { color: "#A0A0A6", fontSize: 12, marginTop: 4 },
-  sheetActions: { marginTop: 8 },
-  actionRow: { minHeight: bodyFrameDesign.primaryButtonHeight, justifyContent: "center" },
-  actionText: { color: "#F5F5F5", fontSize: 15, fontWeight: "600" },
-  actionTextSecondary: { color: "#A0A0A6", fontSize: 14 },
-  label: { color: "#A0A0A6", fontSize: 12, marginTop: 8, marginBottom: 6 },
-  planLimitText: {
-    marginBottom: 8,
-    color: "#A0A0A6",
-    fontSize: 12
+  projectTextWrap: { flex: 1, minWidth: 0 },
+  projectName: { fontSize: 15, fontWeight: "600", lineHeight: 21 },
+  projectMeta: { fontSize: 12, marginTop: 4, lineHeight: 18 },
+  selectedProjectMarker: { flexDirection: "row", alignItems: "center", gap: 5 },
+  selectedProjectText: { fontSize: bodyFrameTypography.caption, fontWeight: "600" },
+  emptyProjectState: {
+    minHeight: 152,
+    padding: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderRadius: bodyFrameDesign.cardRadius
   },
+  emptyProjectTitle: {
+    fontSize: bodyFrameTypography.rowTitle,
+    fontWeight: "600",
+    textAlign: "center"
+  },
+  emptyProjectDescription: {
+    fontSize: bodyFrameTypography.caption,
+    lineHeight: 18,
+    textAlign: "center"
+  },
+  sheetActions: { flexDirection: "row", gap: 8, marginTop: 8, paddingTop: 8 },
+  pickerCreateAction: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: bodyFrameDesign.primaryButtonHeight,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    borderRadius: bodyFrameDesign.buttonRadius
+  },
+  pickerManageAction: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: bodyFrameDesign.primaryButtonHeight,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderRadius: bodyFrameDesign.buttonRadius
+  },
+  actionText: { fontSize: bodyFrameTypography.button, fontWeight: "600", textAlign: "center" },
+  actionTextSecondary: { fontSize: bodyFrameTypography.button, fontWeight: "600", textAlign: "center" },
+  label: { fontSize: bodyFrameTypography.rowTitle, fontWeight: "600", marginTop: 10, marginBottom: 8 },
+  formSectionHeader: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 6,
+    marginTop: 8,
+    marginBottom: 4
+  },
+  planLimitText: { fontSize: bodyFrameTypography.caption, lineHeight: 18 },
   input: {
     minHeight: bodyFrameDesign.primaryButtonHeight,
     borderWidth: bodyFrameDesign.borderWidth,
@@ -684,38 +751,41 @@ const styles = StyleSheet.create({
     backgroundColor: "#0B0B0C",
     paddingHorizontal: 12
   },
-  choiceRow: { flexDirection: "row", gap: 8 },
+  choiceRow: { flexDirection: "row", gap: 8, marginBottom: 4 },
   choice: {
     flex: 1,
-    minHeight: bodyFrameDesign.minTouchSize,
+    minWidth: 0,
+    minHeight: 52,
+    paddingHorizontal: 5,
+    paddingVertical: 8,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: bodyFrameDesign.borderWidth,
-    borderColor: "#2A2A2E",
-    borderRadius: 8
+    borderRadius: bodyFrameDesign.buttonRadius
   },
-  choiceSelected: { borderColor: "#F5F5F5" },
-  choiceText: { color: "#F5F5F5", fontSize: bodyFrameTypography.caption, textAlign: "center" },
-  referenceHint: {
+  choiceText: {
     fontSize: bodyFrameTypography.caption,
     lineHeight: 18,
-    marginBottom: 6
+    fontWeight: "600",
+    textAlign: "center"
   },
+  customTargetInput: { marginTop: 8 },
+  referenceSectionHeader: { marginTop: 14, marginBottom: 10 },
+  referenceHint: { fontSize: bodyFrameTypography.caption, lineHeight: 18 },
   referenceChoice: {
     minHeight: 56,
     flexDirection: "row",
     alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#2A2A2E",
-    borderRadius: 8,
+    gap: 8,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderRadius: bodyFrameDesign.buttonRadius,
     paddingHorizontal: 12,
-    paddingVertical: 8,
-    marginBottom: 6
+    paddingVertical: 10,
+    marginBottom: 8
   },
-  referenceChoiceSelected: { borderColor: "#F5F5F5" },
-  referenceText: { flex: 1 },
-  referenceTitle: { color: "#F5F5F5", fontSize: bodyFrameTypography.rowTitle, fontWeight: "500" },
-  referenceMeta: { color: "#A0A0A6", fontSize: 12, marginTop: 3 },
+  referenceText: { flex: 1, minWidth: 0 },
+  referenceTitle: { fontSize: bodyFrameTypography.rowTitle, fontWeight: "600" },
+  referenceMeta: { fontSize: bodyFrameTypography.caption, lineHeight: 18, marginTop: 3 },
   limitNotice: {
     marginTop: 10,
     padding: 12,
@@ -744,12 +814,10 @@ const styles = StyleSheet.create({
     fontWeight: "600"
   },
   primaryButton: {
-    minHeight: 48,
+    minHeight: bodyFrameDesign.primaryButtonHeight,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 8,
-    backgroundColor: "#F5F5F5",
-    marginTop: 0
+    borderRadius: bodyFrameDesign.buttonRadius
   },
-  primaryButtonText: { color: "#111111", fontSize: 15, fontWeight: "700" }
+  primaryButtonText: { fontSize: bodyFrameTypography.button, fontWeight: "700" }
 });
