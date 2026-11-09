@@ -2880,7 +2880,7 @@ export default function CameraScreen({
             <View style={styles.cameraSettingsHandle} />
             <View style={styles.cameraSettingsHeader}>
               <View style={styles.modalTitleGroup}>
-                <Text selectable={false} style={styles.cameraSettingsEyebrow}>FRAME JOURNAL</Text>
+                <Text selectable={false} style={styles.cameraSettingsEyebrow}>BODY FRAME</Text>
                 <Text selectable={false} style={styles.cameraSettingsTitle}>촬영 설정</Text>
               </View>
               <Pressable accessibilityRole="button" accessibilityLabel="촬영 설정 닫기" style={styles.cameraSettingsCloseButton} onPress={() => setCameraSettingsOpen(false)}>
