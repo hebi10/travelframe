@@ -52,8 +52,51 @@ jobs:
       - name: Compile image processor
         run: python3 -m py_compile scripts/prepare-play-store-images.py
 
+  archive:
+    name: Package verified ko-KR phone screenshots for download
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    env:
+      STORE_MANIFEST: ${{ github.workspace }}/docs/release-assets/play-phone-six-20261109.json
+      STORE_EMBEDDED_DIR: ${{ github.workspace }}/assets/play-store/2026-11-09
+      STORE_INPUT_DIR: ${{ github.workspace }}/.store-screenshot-input
+      STORE_OUTPUT_DIR: ${{ github.workspace }}/.store-screenshot-output
+    steps:
+      - name: Checkout approved six-image source
+        uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify original source SHA-256 digests
+        run: node scripts/publish-play-store-images.mjs download-bundled
+      - name: Install pinned Pillow dependency
+        shell: bash
+        run: |
+          python3 -m venv "$RUNNER_TEMP/store-archive-venv"
+          "$RUNNER_TEMP/store-archive-venv/bin/pip" install --disable-pip-version-check Pillow==12.0.0
+      - name: Prepare and validate six 1080x1920 RGB PNGs
+        shell: bash
+        run: |
+          "$RUNNER_TEMP/store-archive-venv/bin/python" scripts/prepare-play-store-images.py \
+            --manifest "$STORE_MANIFEST" \
+            --source-dir "$STORE_INPUT_DIR" \
+            --output-dir "$STORE_OUTPUT_DIR"
+          node scripts/publish-play-store-images.mjs verify
+      - name: Archive six PNGs and checksum manifest without Play mutations
+        uses: actions/upload-artifact@v4
+        with:
+          name: travelframe-ko-KR-phone-images-${{ github.run_id }}
+          path: ${{ env.STORE_OUTPUT_DIR }}/
+          if-no-files-found: error
+          retention-days: 30
+          include-hidden-files: true
+
   publish:
-    name: Verify Drive screenshots and update Play ko-KR phone listing only
+    name: Verify bundled screenshots and update Play ko-KR phone listing only
     needs: validate
     if: >-
       github.repository == 'hebi10/travelframe' &&
@@ -122,3 +165,4 @@ jobs:
             ${{ env.STORE_RECEIPT_PATH }}
           if-no-files-found: warn
           retention-days: 30
+          include-hidden-files: true
