@@ -26,7 +26,7 @@ stage = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(stage)
 qa = stage.qa
 
-PROFILES = dict(qa.DESIGN_PROFILES)
+PROFILES = {name: (size, dpi) for name, size, dpi in qa.DESIGN_PROFILES}
 VARIANTS = dict((name, (theme, font, scale)) for name, theme, font, scale in qa.DESIGN_VARIANTS)
 
 def open_camera_settings(device):
