@@ -233,7 +233,7 @@ assert.equal(
   false,
   "new onboarding should not use old travel slide images"
 );
-for (const token of ["바디 프레임에 오신 것을 환영합니다.", "같은 위치와 자세", "변화 영상"]) {
+for (const token of ["첫 사진을 남겨 보세요", "기준 사진을 겹쳐 볼 수 있어요.", "변화 영상"]) {
   assert.ok(
     guideSource.includes(token) || guideStepsSource.includes(token),
     `onboarding should contain ${token}`

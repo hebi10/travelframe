@@ -7,7 +7,7 @@ const pkg = JSON.parse(read("package.json"));
 const lock = JSON.parse(read("package-lock.json"));
 const publisher = read("scripts/publish-play-release.mjs");
 const workflow = read(".github/workflows/android-play-aab.yml");
-const versionName = "1.0.32";
+const versionName = "1.0.33";
 
 assert.equal(app.expo.version, versionName, "Expo display version must match the reviewed candidate");
 assert.equal(pkg.version, versionName, "package.json must carry the same display version");

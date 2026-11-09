@@ -27,16 +27,21 @@ for (const snippet of [
   "const cameraTorchAppliedRef = useRef(false);",
   "if (!enabled && !cameraTorchAppliedRef.current) {",
   "cameraTorchAppliedRef.current = true;",
-  "const cameraNativeZoom = isCameraSessionActive ? cameraZoomFactor : undefined;",
-  "const cameraNativeExposure = cameraNativeControlsReady ? cameraExposureBias : undefined;",
+  "createCameraZoomSession",
+  "cameraZoomSession.setZoom(cameraZoomFactor);",
+  "cameraZoomSession.start(controller);",
+  "cameraZoomSession.stop();",
+  "createCameraExposureSession",
+  "cameraExposureSession.setExposureBias(cameraExposureBias);",
+  "cameraExposureSession.start(controller);",
+  "cameraExposureSession.stop();",
   "const runCameraFocusAction = useCallback(",
   "try {",
   "result.catch(handleError);",
   "options?.onError?.();",
   "handleCameraFocusError(error);",
   "disabled={!cameraLightAvailable}",
-  "zoom={cameraNativeZoom}",
-  "exposure={cameraNativeExposure}"
+  "cameraZoomReadySessionKeyRef.current !== cameraSessionKey"
 ]) {
   assert.ok(cameraSource.includes(snippet), `camera native control guard missing: ${snippet}`);
 }
@@ -51,7 +56,10 @@ for (const unsafeSnippet of [
   ".focusTo(tap, {",
   ".resetFocus().catch(handleCameraFocusError)",
   "zoom={cameraZoomFactor}",
-  "exposure={cameraExposureBias}"
+  "zoom={cameraNativeZoom}",
+  "exposure={cameraExposureBias}",
+  "exposure={cameraNativeExposure}",
+  "getInitialExposureBias={() => cameraExposureBias}"
 ]) {
   assert.ok(
     !cameraRenderSource.includes(unsafeSnippet),
@@ -64,4 +72,4 @@ assert.ok(
   "camera should not force ready=false from a device-id effect because VisionCamera owns lifecycle start/stop events"
 );
 
-console.log("ok - camera zoom restores with the active session while exposure and torch remain readiness-guarded");
+console.log("ok - camera zoom and exposure use lifecycle drivers while torch remains readiness-guarded");

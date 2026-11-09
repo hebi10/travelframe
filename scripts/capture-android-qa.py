@@ -735,14 +735,14 @@ def creation_keyboard(device):
 def onboarding_welcome(device):
     device.ready(['기준 사진 표시'])
     device.tap('사용 가이드',match='summary')
-    device.ready(['바디 프레임에 오신 것을 환영합니다.'])
-    device.find_control('다음')  # Scroll inside the real guide when large text pushes it below the fold.
+    device.ready(['첫 사진을 남겨 보세요'])
+    device.find_control('다음')  # Verify the pinned guide footer is reachable at large text sizes.
 
 
 def onboarding_scrolled(device):
     onboarding_welcome(device)
     device.tap('다음')
-    device.ready(['프로젝트로 기록을 나눕니다'])
+    device.ready(['프로젝트별 기록'])
     device.find_control('다음')  # Verify the footer is reachable without advancing the step.
 
 
@@ -1158,7 +1158,7 @@ def capture_design_matrix(device, output, records, manifest):
                 records.append(record)
             if variant == 'dark-150':
                 record = capture(device, directory, 'onboarding-large-font', 'settings',
-                                 ['바디 프레임에 오신 것을 환영합니다.', '다음'],
+                                 ['첫 사진을 남겨 보세요', '다음'],
                                  onboarding_welcome)
                 record.update(profile=profile, variant=variant, theme=theme,
                               fontScale=system_scale, appFont=app_font)
@@ -1272,9 +1272,9 @@ def main():
                 device.seed(True, 'large')
                 device.shell('settings', 'put', 'system', 'font_scale', '1.3')
                 records.append(capture(device, directory, 'onboarding-welcome-large-font', 'settings',
-                                       ['바디 프레임에 오신 것을 환영합니다.', '다음'], onboarding_welcome))
+                                       ['첫 사진을 남겨 보세요', '다음'], onboarding_welcome))
                 records.append(capture(device, directory, 'onboarding-scroll-large-font', 'settings',
-                                       ['다음', '스킵'], onboarding_scrolled))
+                                       ['다음', '닫기'], onboarding_scrolled))
                 device.shell('settings', 'put', 'system', 'font_scale', '1.0')
                 device.seed(True)
                 records.extend(video_failure_and_background_smoke(device,directory))

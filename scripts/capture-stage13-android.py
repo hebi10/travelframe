@@ -176,8 +176,8 @@ LARGE_TEXT.update(C7_PRIMARY)
 ADDITIONAL = [
     ("empty-projects", "기록 빈 상태", "studio", ["내 프로젝트"], None),
     ("new-project", "새 프로젝트 생성", "studio", ["프로젝트 이름", "목표 기록 수"], (["내 프로젝트"], "새 프로젝트 만들기")),
-    ("onboarding-welcome", "설정에서 여는 가이드", "settings", ["바디 프레임에 오신 것을 환영합니다.", "다음"], qa.onboarding_welcome),
-    ("onboarding-next", "온보딩 다음 화면", "settings", ["프로젝트로 기록을 나눕니다", "다음"], qa.onboarding_scrolled),
+    ("onboarding-welcome", "설정에서 여는 가이드", "settings", ["첫 사진을 남겨 보세요", "다음"], qa.onboarding_welcome),
+    ("onboarding-next", "온보딩 다음 화면", "settings", ["프로젝트별 기록", "다음"], qa.onboarding_scrolled),
 ]
 
 
@@ -326,7 +326,7 @@ def main():
                 device.seed(True, font, theme_mode=theme, intro_seen=False)
                 large_welcome = verified_capture(
                     device, directory, "onboarding-first-run-light-large", "camera",
-                    ["바디 프레임에 오신 것을 환영합니다.", "시작하기", "나중에 보기"]
+                    ["첫 사진을 남겨 보세요", "시작하기", "나중에 보기"]
                 )
                 large_welcome.update(profile=args.profile, variant=variant,
                                      label="라이트 테마 글자 150% 최초 실행")
@@ -344,7 +344,7 @@ def main():
                 device.seed(True, font, theme_mode=theme, intro_seen=False)
                 first_run = verified_capture(
                     device, directory, "onboarding-first-run", "camera",
-                    ["바디 프레임에 오신 것을 환영합니다.", "시작하기", "나중에 보기"]
+                    ["첫 사진을 남겨 보세요", "시작하기", "나중에 보기"]
                 )
                 first_run.update(profile=args.profile, variant=variant, label="최초 실행 환영 화면")
                 manifest["captures"].append(first_run)

@@ -21,22 +21,24 @@ type BodyFrameSheetHeaderProps = {
   description?: string;
   onClose: () => void;
   closeLabel?: string;
+  compactTypography?: boolean;
 };
 
 export function BodyFrameSheetHeader({
   title,
   description,
   onClose,
-  closeLabel = "닫기"
+  closeLabel = "닫기",
+  compactTypography = false
 }: BodyFrameSheetHeaderProps) {
   const { palette } = useAppAppearance();
 
   return (
     <View style={styles.header}>
       <View style={styles.headerCopy}>
-        <Text style={[styles.title, { color: palette.text }]}>{title}</Text>
+        <Text style={[styles.title, compactTypography && styles.compactTitle, { color: palette.text }]}>{title}</Text>
         {description ? (
-          <Text style={[styles.description, { color: palette.muted }]}>
+          <Text style={[styles.description, compactTypography && styles.compactDescription, { color: palette.muted }]}>
             {description}
           </Text>
         ) : null}
@@ -46,7 +48,7 @@ export function BodyFrameSheetHeader({
         accessibilityLabel={closeLabel}
         hitSlop={8}
         onPress={onClose}
-        style={[styles.close, { borderColor: palette.line }]}
+        style={[styles.close, compactTypography && styles.compactClose, { borderColor: palette.line }]}
       >
         <Feather name="x" size={bodyFrameDesign.iconSize} color={palette.text} />
       </Pressable>
@@ -61,6 +63,7 @@ type BodyFrameSheetFooterProps = {
   cancelLabel?: string;
   disabled?: boolean;
   confirmFlex?: number;
+  compactTypography?: boolean;
 };
 
 export function BodyFrameSheetFooter({
@@ -69,7 +72,8 @@ export function BodyFrameSheetFooter({
   confirmLabel,
   cancelLabel = "취소",
   disabled = false,
-  confirmFlex = 1
+  confirmFlex = 1,
+  compactTypography = false
 }: BodyFrameSheetFooterProps) {
   const { palette } = useAppAppearance();
   const {
@@ -84,9 +88,9 @@ export function BodyFrameSheetFooter({
       <Pressable
         accessibilityRole="button"
         onPress={onCancel}
-        style={[styles.footerButton, { borderColor: secondaryBorder, backgroundColor: secondaryBackground }]}
+        style={[styles.footerButton, compactTypography && styles.compactFooterButton, { borderColor: secondaryBorder, backgroundColor: secondaryBackground }]}
       >
-        <Text numberOfLines={2} style={[styles.footerText, { color: palette.text }]}>{cancelLabel}</Text>
+        <Text numberOfLines={2} style={[styles.footerText, compactTypography && styles.compactFooterText, { color: palette.text }]}>{cancelLabel}</Text>
       </Pressable>
       <Pressable
         accessibilityRole="button"
@@ -95,10 +99,11 @@ export function BodyFrameSheetFooter({
         onPress={onConfirm}
         style={[
           styles.footerButton,
+          compactTypography && styles.compactFooterButton,
           { flex: confirmFlex, borderColor: primaryBackground, backgroundColor: primaryBackground, opacity: disabled ? 0.5 : 1 }
         ]}
       >
-        <Text numberOfLines={2} style={[styles.footerText, { color: primaryForeground }]}>{confirmLabel}</Text>
+        <Text numberOfLines={2} style={[styles.footerText, compactTypography && styles.compactFooterText, { color: primaryForeground }]}>{confirmLabel}</Text>
       </Pressable>
     </View>
   );
@@ -115,6 +120,9 @@ const styles = StyleSheet.create({
   headerCopy: { flex: 1, minWidth: 0, gap: 4 },
   title: { fontSize: bodyFrameTypography.sectionTitle, fontWeight: "600" },
   description: { fontSize: bodyFrameTypography.caption, lineHeight: 18 },
+  compactTitle: { fontSize: 20, lineHeight: 28, fontWeight: "700", includeFontPadding: false },
+  compactDescription: { includeFontPadding: false },
+  compactClose: { flexShrink: 0, borderRadius: 12 },
   close: {
     width: bodyFrameDesign.minTouchSize,
     height: bodyFrameDesign.minTouchSize,
@@ -145,5 +153,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center"
   },
-  footerText: { fontSize: bodyFrameTypography.button, fontWeight: "700", textAlign: "center" }
+  footerText: { fontSize: bodyFrameTypography.button, fontWeight: "700", textAlign: "center" },
+  compactFooterButton: { borderRadius: 12 },
+  compactFooterText: { lineHeight: 20, includeFontPadding: false }
 });

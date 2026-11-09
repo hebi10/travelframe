@@ -1,5 +1,6 @@
 import {
   defaultAppSettings,
+  normalizeCameraZoomPercent,
   type AppSettings
 } from "@/lib/app-settings";
 import { localStorageAdapter } from "@/lib/local-storage";
@@ -52,9 +53,7 @@ export const createBodyCaptureContextFromAppSettings = (
   cameraRatio: cameraRatios.includes(settings.cameraRatio)
     ? settings.cameraRatio
     : defaultAppSettings.cameraRatio,
-  cameraZoomPercent: Math.round(
-    clamp(settings.cameraZoomPercent, 0, 100, defaultAppSettings.cameraZoomPercent)
-  ),
+  cameraZoomPercent: normalizeCameraZoomPercent(settings.cameraZoomPercent),
   cameraExposureBias: Number(
     clamp(
       settings.cameraExposureBias,

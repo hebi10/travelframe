@@ -1,0 +1,49 @@
+{
+  "avd": "BodyFrame_Camera_QA_20261110\r\r\nOK",
+  "nodes": [
+    {
+      "text": "Allow 바디 프레임 to take pictures and record video?",
+      "content-desc": "",
+      "class": "android.widget.TextView",
+      "bounds": "[133,975][947,1115]",
+      "clickable": "false",
+      "enabled": "true",
+      "selected": "false",
+      "checked": "false",
+      "focused": "false"
+    },
+    {
+      "text": "While using the app",
+      "content-desc": "",
+      "class": "android.widget.Button",
+      "bounds": "[133,1183][947,1330]",
+      "clickable": "true",
+      "enabled": "true",
+      "selected": "false",
+      "checked": "false",
+      "focused": "false"
+    },
+    {
+      "text": "Only this time",
+      "content-desc": "",
+      "class": "android.widget.Button",
+      "bounds": "[133,1340][947,1487]",
+      "clickable": "true",
+      "enabled": "true",
+      "selected": "false",
+      "checked": "false",
+      "focused": "false"
+    },
+    {
+      "text": "Don’t allow",
+      "content-desc": "",
+      "class": "android.widget.Button",
+      "bounds": "[133,1497][947,1644]",
+      "clickable": "true",
+      "enabled": "true",
+      "selected": "false",
+      "checked": "false",
+      "focused": "false"
+    }
+  ]
+}

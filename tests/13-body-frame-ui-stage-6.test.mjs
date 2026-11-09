@@ -93,7 +93,7 @@ assert.ok(
     guideStepsSource.includes('id: "body-frame-measurements"') &&
     guideStepsSource.includes('id: "body-frame-video"') &&
     guideStepsSource.includes('id: "body-frame-settings-backup"') &&
-    guideStepsSource.includes("바디 프레임에 오신 것을 환영합니다."),
+    guideStepsSource.includes("첫 사진을 남겨 보세요"),
   "first-run guide should explain the complete current Body Frame flow"
 );
 assert.ok(

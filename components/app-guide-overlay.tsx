@@ -1,5 +1,6 @@
 import { AppText as Text } from "@/components/app-text";
 import { Image } from "expo-image";
+import { Feather } from "@expo/vector-icons";
 import {
   Modal,
   Pressable,
@@ -9,10 +10,10 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { AppGuideCard } from "@/components/app-guide-card";
-import { AppGuideHighlight } from "@/components/app-guide-highlight";
+import { AppGuideCard, AppGuideNavigation } from "@/components/app-guide-card";
 import { bodyFrameDesign, bodyFrameTypography, getBodyFrameControlColors } from "@/constants/app-theme";
 import type { AppGuideTabKey } from "@/constants/app-guide-steps";
+import { getAppGuideArtwork } from "@/constants/app-guide-artwork";
 import { useAppGuide } from "@/hooks/use-app-guide";
 import { useAppAppearance } from "@/lib/app-appearance";
 
@@ -82,8 +83,41 @@ export function AppGuideOverlay({
             }
           ]}
           accessibilityViewIsModal
+          testID={isWelcome ? "app-guide-welcome" : "app-guide-popup"}
         >
+          {!isWelcome ? (
+            <View>
+            <View style={styles.guideHeader}>
+              <Text style={[styles.guideLabel, { color: palette.text }]}>사용 가이드</Text>
+              <Text
+                accessibilityLabel={`${totalSteps}단계 중 ${stepIndex + 1}단계`}
+                accessibilityLiveRegion="polite"
+                style={[styles.guideProgress, { color: palette.text }]}
+              >
+                {stepIndex + 1} / {totalSteps}
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="닫기"
+                accessibilityHint="사용 가이드를 닫습니다."
+                style={styles.guideClose}
+                onPress={skip}
+              >
+                <Feather name="x" size={bodyFrameDesign.iconSize} color={palette.text} accessible={false} />
+              </Pressable>
+            </View>
+            <View style={styles.progressTrack} importantForAccessibility="no-hide-descendants">
+              {Array.from({ length: totalSteps }, (_, index) => (
+                <View
+                  key={index}
+                  style={[styles.progressSegment, { backgroundColor: index <= stepIndex ? palette.text : palette.muted }]}
+                />
+              ))}
+            </View>
+            </View>
+          ) : null}
           <ScrollView
+            key={step.id}
             style={styles.contentScroll}
             contentContainerStyle={[styles.contentScrollContainer, isWelcome && styles.welcomeScrollContainer]}
             showsVerticalScrollIndicator
@@ -98,7 +132,8 @@ export function AppGuideOverlay({
                 </Text>
               </View>
               <Image
-                source={require("../assets/ui/illustrations/feature-capture.png")}
+                source={getAppGuideArtwork(step.id)}
+                recyclingKey={step.id}
                 style={styles.welcomeArtwork}
                 contentFit="contain"
                 accessible={false}
@@ -125,29 +160,7 @@ export function AppGuideOverlay({
               </View>
             </View>
           ) : (
-            <>
-              <View style={styles.brandBlock}>
-                <Text style={[styles.eyebrow, { color: palette.muted }]}>BODY FRAME</Text>
-                <Text style={[styles.brandTitle, { color: palette.text }]}>바디 프레임</Text>
-                <Text style={[styles.brandDetail, { color: palette.muted }]}>
-                  같은 위치와 자세로 몸의 변화를 기록합니다.
-                </Text>
-              </View>
-
-              <View style={styles.highlightWrap}>
-                <AppGuideHighlight label={step.targetLabel ?? "현재 기능"} />
-              </View>
-
-              <AppGuideCard
-                step={step}
-                current={stepIndex + 1}
-                total={totalSteps}
-                canGoBack={canGoBack}
-                onBack={goBack}
-                onNext={goNext}
-                onSkip={skip}
-              />
-            </>
+            <AppGuideCard step={step} />
           )}
           </ScrollView>
           {isWelcome ? (
@@ -167,7 +180,15 @@ export function AppGuideOverlay({
                 </Text>
               </Pressable>
             </View>
-          ) : null}
+          ) : (
+            <AppGuideNavigation
+              current={stepIndex + 1}
+              total={totalSteps}
+              canGoBack={canGoBack}
+              onBack={goBack}
+              onNext={goNext}
+            />
+          )}
         </View>
       </View>
     </Modal>
@@ -201,28 +222,51 @@ const styles = StyleSheet.create({
   contentScroll: { flexShrink: 1, minHeight: 0 },
   contentScrollContainer: { flexGrow: 1 },
   welcomeScrollContainer: { flexGrow: 1 },
-  brandBlock: {
-    gap: 6,
-    paddingHorizontal: 18,
-    paddingTop: 20,
-    paddingBottom: 16
+  guideHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 8,
+    paddingLeft: 20,
+    paddingRight: 8,
+    paddingTop: 12,
+    paddingBottom: 4
+  },
+  guideClose: {
+    width: bodyFrameDesign.minTouchSize,
+    height: bodyFrameDesign.minTouchSize,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  progressTrack: {
+    flexDirection: "row",
+    gap: 4,
+    paddingHorizontal: 20,
+    paddingBottom: 20
+  },
+  progressSegment: {
+    flex: 1,
+    height: 4,
+    borderRadius: 2
   },
   eyebrow: {
     fontSize: 11,
     fontWeight: "600",
     letterSpacing: 1.2
   },
-  brandTitle: {
-    fontSize: bodyFrameTypography.pageTitle,
-    fontWeight: "600"
+  guideLabel: {
+    flex: 1,
+    fontSize: bodyFrameTypography.caption,
+    fontWeight: "700",
+    lineHeight: 18,
+    includeFontPadding: false
   },
-  brandDetail: {
-    fontSize: 14,
-    lineHeight: 20
-  },
-  highlightWrap: {
-    paddingHorizontal: 18,
-    paddingBottom: 10
+  guideProgress: {
+    fontSize: bodyFrameTypography.caption,
+    fontWeight: "700",
+    lineHeight: 18,
+    fontVariant: ["tabular-nums"],
+    includeFontPadding: false
   },
   welcomeContent: {
     flexGrow: 1,

@@ -19,10 +19,52 @@ test("C6 onboarding and camera screen parse without TSX errors", () => {
   }
 });
 
-test("C6 first-run welcome scrolls independently from pinned start and skip", () => {
-  const scrollEnd = guide.indexOf("          </ScrollView>\n          {isWelcome ? (");
-  const footer = guide.indexOf("<View style={[styles.welcomeActions", scrollEnd);
-  assert.ok(scrollEnd > 0 && footer > scrollEnd, "welcome footer must live outside ScrollView");
+test("C6 first-run actions, replay navigation and close stay outside the scrolling content", () => {
+  const ast = ts.createSourceFile("components/app-guide-overlay.tsx", guide, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const pinnedControls = new Map();
+  function attributeValue(opening, name) {
+    const attribute = opening.attributes.properties.find((entry) => ts.isJsxAttribute(entry) && entry.name.getText(ast) === name);
+    const value = attribute?.initializer;
+    return value && ts.isJsxExpression(value) ? value.expression : value;
+  }
+  function visit(node) {
+    const opening = ts.isJsxElement(node) ? node.openingElement : ts.isJsxSelfClosingElement(node) ? node : null;
+    if (opening) {
+      const tag = opening.tagName.getText(ast);
+      const isWelcomeFooter = tag === "View" && opening.attributes.getText(ast).includes("styles.welcomeActions");
+      const closeLabel = attributeValue(opening, "accessibilityLabel");
+      const isReplayClose = tag === "Pressable" && closeLabel && ts.isStringLiteral(closeLabel) && closeLabel.text === "닫기";
+      if (isWelcomeFooter || tag === "AppGuideNavigation" || isReplayClose) {
+        const label = isWelcomeFooter ? "welcome footer" : isReplayClose ? "replay close" : "replay navigation";
+        pinnedControls.set(label, node);
+        for (let parent = node.parent; parent; parent = parent.parent) {
+          assert.equal(
+            ts.isJsxElement(parent) && parent.openingElement.tagName.getText(ast) === "ScrollView",
+            false,
+            `${label} must live outside ScrollView`
+          );
+        }
+        if (isReplayClose) {
+          const handler = attributeValue(opening, "onPress");
+          assert.ok(handler && ts.isIdentifier(handler) && handler.text === "skip", "replay close must call the shared skip handler");
+          const hint = attributeValue(opening, "accessibilityHint");
+          assert.ok(hint && ts.isStringLiteral(hint) && hint.text === "사용 가이드를 닫습니다.", "replay close must explain its action accessibly");
+        }
+        if (tag === "AppGuideNavigation") {
+          for (const [prop, expected] of [["onNext", "goNext"], ["onBack", "goBack"]]) {
+            const handler = attributeValue(opening, prop);
+            assert.ok(handler && ts.isIdentifier(handler) && handler.text === expected, `replayed guide must retain ${prop}={${expected}}`);
+          }
+          assert.equal(attributeValue(opening, "onSkip"), undefined, "replay close belongs in the fixed header, not the navigation footer");
+        }
+      }
+    }
+    ts.forEachChild(node, visit);
+  }
+  visit(ast);
+  assert.ok(pinnedControls.has("welcome footer"), "first-run actions must remain pinned");
+  assert.ok(pinnedControls.has("replay navigation"), "replayed guide actions must remain pinned");
+  assert.ok(pinnedControls.has("replay close"), "replayed guide must retain an accessible fixed close control");
   for (const label of [
     "기록 시작 순서",
     "프로젝트 만들기",
@@ -36,7 +78,7 @@ test("C6 first-run welcome scrolls independently from pinned start and skip", ()
   assert.ok(guide.includes("onPress={goNext}"));
   assert.ok(guide.includes("onPress={skip}"));
   assert.ok(guide.includes("step.id === \"body-frame-welcome\" && replaySignal === 0"));
-  assert.ok(guide.includes("<AppGuideCard"), "replayed guide must retain its original step navigation");
+  assert.ok(guide.includes("<AppGuideCard"), "replayed guide must retain its step content");
 });
 
 test("C6 camera permission is explicit, theme-aware and keeps a fixed recovery footer", () => {

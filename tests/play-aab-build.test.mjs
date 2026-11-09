@@ -4,10 +4,11 @@ import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { test } from "node:test";
+import { pathToFileURL } from "node:url";
 
 const scriptPath = path.resolve("scripts/prepare-play-aab.mjs");
 assert.ok(fs.existsSync(scriptPath), "Play AAB input/signing preparation is not implemented");
-const { validateBuildInputs, validateAppConfiguration, patchBuildGradle, configureSourceVersion, decodeKeystore, verifyApkSigner } = await import(scriptPath);
+const { validateBuildInputs, validateAppConfiguration, patchBuildGradle, configureSourceVersion, decodeKeystore, verifyApkSigner } = await import(pathToFileURL(scriptPath).href);
 const valid = {
   sourceSha: "9103b26b94e19f40c2302873e2dd0d4c39c9db25",
   versionCode: "26092623",

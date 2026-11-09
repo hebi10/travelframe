@@ -94,9 +94,7 @@ for (const token of [
   "overlayButton: {\n    minHeight: bodyFrameDesign.minTouchSize",
   "overlayCompactButton: {\n    minHeight: bodyFrameDesign.minTouchSize",
   "overlayConfirmButton: {\n    minHeight: bodyFrameDesign.minTouchSize",
-  "modalCloseButton: {\n    minHeight: bodyFrameDesign.minTouchSize",
   "optionButton: {\n    minHeight: bodyFrameDesign.minTouchSize",
-  "cameraColorCloseButton: {\n    width: bodyFrameDesign.minTouchSize",
   "height: bodyFrameDesign.minTouchSize",
   "quickPillButton: {\n    minWidth: 48,\n    minHeight: bodyFrameDesign.minTouchSize",
   "opacityStepButton: {\n    width: bodyFrameDesign.minTouchSize"
@@ -105,6 +103,17 @@ for (const token of [
     cameraStyles.includes(token),
     `camera touch-target contract should contain ${token}`
   );
+}
+
+for (const [name, properties] of [
+  ["modalCloseButton", ["minHeight", "minWidth"]],
+  ["cameraColorCloseButton", ["width", "height"]]
+]) {
+  const block = cameraStyles.match(new RegExp(`${name}: \\{([^}]+)\\}`))?.[1];
+  assert.ok(block, `${name} touch target must exist`);
+  for (const property of properties) {
+    assert.match(block, new RegExp(`${property}: bodyFrameDesign\\.minTouchSize`), `${name}.${property}`);
+  }
 }
 
 const accountStyles = fs.readFileSync(

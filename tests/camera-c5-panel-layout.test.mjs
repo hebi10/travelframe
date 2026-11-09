@@ -77,11 +77,13 @@ test("C5 preserves five persistent color slots and all six editing sliders", () 
 test("C5 zoom panel retains real device-based presets and marks active magnification", () => {
   for (const token of [
     "styles.cameraQuickPanel", "styles.cameraQuickPanelHeader", "styles.cameraZoomPresetRow",
-    "cameraZoomPresets.map", "getCameraZoomPresetFactor(preset, cameraDevice)",
-    "setZoomPreset(preset)", "cameraZoomFactor.toFixed(1)", "Math.abs(cameraZoomFactor - presetFactor)",
+    "cameraZoomPresets.map", "presetIndex === activeCameraZoomPresetIndex",
+    "setZoomPreset(preset)", "cameraZoomFactor.toFixed(1)",
     "accessibilityState={{ selected: isActive }}"
   ]) assert.ok(zoom.includes(token), token);
   assert.ok(zoom.includes('accessibilityLabel={`확대 ${preset.label}`}'));
+  assert.ok(source.includes("cameraZoomPresets.findIndex("));
+  assert.ok(source.includes("getCameraZoomPercentFromFactor(preset.factor, cameraDevice) === zoomPercent"));
 });
 
 test("C5 torch uses actual camera capability and visible selected state", () => {

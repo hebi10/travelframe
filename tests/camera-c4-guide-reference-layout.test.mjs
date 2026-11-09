@@ -52,7 +52,7 @@ test("C4 guide size, position, grid and visibility callbacks stay connected", ()
   assert.ok(guide.includes("GUIDE_SIZE_OPTIONS.map"));
   assert.ok(guide.includes("GUIDE_STROKE_WIDTH_OPTIONS.map"));
   assert.ok(guide.includes("<GuideSizeSlider"));
-  assert.ok(guide.includes("compact\n                      dark\n                      value={guideSize}"));
+  assert.match(guide, /compact\s+dark\s+value=\{guideSize\}/);
   assert.ok(guide.includes("min={guideSizeBounds.min}"));
   assert.ok(guide.includes("max={guideSizeBounds.max}"));
   assert.ok(guide.includes('accessibilityLabel="가이드 크기 직접 입력"'));

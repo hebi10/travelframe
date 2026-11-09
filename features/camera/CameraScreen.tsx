@@ -138,6 +138,8 @@ import { recordBackupFailure } from "@/lib/backup-failure-queue";
 import { requestPhotoSavePermission } from "@/lib/trip-clip-export";
 import { calculateGuidePositionDragOffset, clampGuidePositionOffset } from "@/lib/camera-guide-position";
 import { getNormalizedCameraFocusPoint, getTapExposureControlPosition } from "@/lib/camera-focus-controls";
+import { createCameraZoomSession } from "@/lib/camera-zoom-session";
+import { createCameraExposureSession } from "@/lib/camera-exposure-session";
 import { backupPhotoIfEnabled } from "@/lib/cloud-backup";
 import {
   GUIDE_STROKE_WIDTH_MAX,
@@ -149,6 +151,7 @@ import {
   getAppSettings,
   getCameraSaveScopeTargets,
   getGuideSizeBounds,
+  normalizeCameraZoomPercent,
   updateAppSettings,
   type CameraColorSlot,
   type CameraColorValues,
@@ -283,6 +286,7 @@ export default function CameraScreen({
   const [selectedCameraColorSlot, setSelectedCameraColorSlot] =
     useState(defaultAppSettings.selectedCameraColorSlot);
   const [isCameraReady, setIsCameraReady] = useState(false);
+  const [cameraStartedRevision, setCameraStartedRevision] = useState(0);
   const [isCameraScreenFocused, setIsCameraScreenFocused] = useState(false);
   const [appState, setAppState] = useState<AppStateStatus>(AppState.currentState);
   const [cameraRecoveryPending, setCameraRecoveryPending] = useState(false);
@@ -306,6 +310,7 @@ export default function CameraScreen({
   const [cameraPreviewViewport, setCameraPreviewViewport] = useState({ width: 0, height: 0 });
   const [cameraTopBarHeight, setCameraTopBarHeight] = useState(0);
   const [cameraControlsHeight, setCameraControlsHeight] = useState(0);
+  const [referencePanelHeight, setReferencePanelHeight] = useState(0);
   const guideOffsetXValue = useSharedValue(0);
   const guideOffsetYValue = useSharedValue(0);
   const guideDragStartX = useSharedValue(0);
@@ -332,6 +337,25 @@ export default function CameraScreen({
   const isTimedCapturePendingRef = useRef(false);
   const isCameraReadyRef = useRef(false);
   const isCameraSessionActiveRef = useRef(false);
+  const cameraZoomReadySessionKeyRef = useRef<string | null>(null);
+  const cameraZoomSession = useMemo(() => createCameraZoomSession((error) => {
+    if (__DEV__) {
+      console.warn("[camera] zoom update failed", error);
+    }
+    setErrorMessage("카메라 확대를 적용하지 못했습니다. 다시 시도해 주세요.");
+  }), []);
+  const cameraExposureSession = useMemo(() => createCameraExposureSession((error) => {
+    if (__DEV__) {
+      console.warn("[camera] exposure update failed", error);
+    }
+    setErrorMessage("카메라 노출을 적용하지 못했습니다. 다시 시도해 주세요.");
+  }), []);
+  const stopCameraZoomSession = useCallback(() => {
+    // Both native control promises belong to the current started camera session.
+    cameraZoomReadySessionKeyRef.current = null;
+    cameraZoomSession.stop();
+    cameraExposureSession.stop();
+  }, [cameraExposureSession, cameraZoomSession]);
   const cameraNativeCaptureInProgressRef = useRef(false);
   const captureSaveQueueTailRef = useRef<Promise<void>>(Promise.resolve());
   const poseAnalysisBusyRef = useRef(false);
@@ -417,6 +441,9 @@ export default function CameraScreen({
     () => getPreferredCameraDevice(cameraDevices, cameraFacing),
     [cameraDevices, cameraFacing]
   );
+  const cameraSessionKey = `${cameraDevice?.id ?? "none"}-${cameraSessionRestartKey}`;
+  const currentCameraSessionKeyRef = useRef(cameraSessionKey);
+  currentCameraSessionKeyRef.current = cameraSessionKey;
   const availableCameraLenses = useMemo(
     () => getCameraDeviceLensTypes(cameraDevice),
     [cameraDevice]
@@ -428,6 +455,9 @@ export default function CameraScreen({
   const cameraZoomFactor = useMemo(
     () => getCameraZoomFactorFromPercent(zoomPercent, cameraDevice),
     [cameraDevice, zoomPercent]
+  );
+  const activeCameraZoomPresetIndex = cameraZoomPresets.findIndex(
+    (preset) => getCameraZoomPercentFromFactor(preset.factor, cameraDevice) === zoomPercent
   );
   const photoOutputQuality =
     CAMERA_QUALITY_OPTIONS.find((option) => option.value === photoQuality)?.quality ?? 0.92;
@@ -453,8 +483,6 @@ export default function CameraScreen({
   const cameraNativeControlsReady = isCameraSessionActive && isCameraReady;
   const cameraLightAvailable = cameraFacing === "back" && Boolean(cameraDevice);
   const visibleTorchEnabled = cameraLightAvailable && torchEnabled;
-  const cameraNativeZoom = isCameraSessionActive ? cameraZoomFactor : undefined;
-  const cameraNativeExposure = cameraNativeControlsReady ? cameraExposureBias : undefined;
   const cameraColorOverlayStyle = useMemo(
     () => [
       styles.cameraColorOverlay,
@@ -558,7 +586,9 @@ export default function CameraScreen({
     ? CAMERA_PREVIEW_OVERLAY_SETUP_BOTTOM_RESERVED
     : CAMERA_PREVIEW_BOTTOM_RESERVED;
   const cameraPreviewBottomOffset = overlaySetupActive
-    ? bottomSafePadding + cameraPreviewBottomReserved
+    ? referencePanelHeight > 0
+      ? referencePanelHeight + bottomSafePadding + CAMERA_PREVIEW_CONTROL_GAP
+      : bottomSafePadding + cameraPreviewBottomReserved
     : cameraControlsHeight > 0
       ? cameraControlsHeight + CAMERA_PREVIEW_CONTROL_GAP
       : bottomSafePadding + cameraPreviewBottomReserved;
@@ -619,6 +649,7 @@ export default function CameraScreen({
       setIsCameraScreenFocused(true);
 
       return () => {
+        stopCameraZoomSession();
         cameraFocusActionTokenRef.current += 1;
         isCameraSessionActiveRef.current = false;
         isCameraReadyRef.current = false;
@@ -626,7 +657,7 @@ export default function CameraScreen({
         setIsCameraScreenFocused(false);
         setIsCameraReady(false);
       };
-    }, [cancelPendingTimedCapture])
+    }, [cancelPendingTimedCapture, stopCameraZoomSession])
   );
 
   useEffect(() => {
@@ -910,14 +941,40 @@ export default function CameraScreen({
   useEffect(() => {
     isCameraSessionActiveRef.current = isCameraSessionActive;
     if (!isCameraSessionActive) {
+      stopCameraZoomSession();
       cancelPendingTimedCapture();
     }
-  }, [cancelPendingTimedCapture, isCameraSessionActive]);
+  }, [cancelPendingTimedCapture, isCameraSessionActive, stopCameraZoomSession]);
+
+  useEffect(() => {
+    cameraZoomSession.setZoom(cameraZoomFactor);
+  }, [cameraZoomFactor, cameraZoomSession]);
+
+  useEffect(() => {
+    cameraExposureSession.setExposureBias(cameraExposureBias);
+  }, [cameraExposureBias, cameraExposureSession]);
+
+  useEffect(() => {
+    // A configured controller can exist before CameraX has started its camera.
+    if (!cameraNativeControlsReady || cameraZoomReadySessionKeyRef.current !== cameraSessionKey) {
+      return;
+    }
+    const controller = cameraRef.current?.controller;
+    if (controller) {
+      cameraZoomSession.start(controller);
+      cameraExposureSession.start(controller);
+    }
+    return () => {
+      cameraZoomSession.stop();
+      cameraExposureSession.stop();
+    };
+  }, [cameraExposureSession, cameraNativeControlsReady, cameraSessionKey, cameraStartedRevision, cameraZoomSession]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (nextState) => {
       setAppState(nextState);
       if (nextState !== "active") {
+        stopCameraZoomSession();
         isCameraSessionActiveRef.current = false;
         isCameraReadyRef.current = false;
         cancelPendingTimedCapture();
@@ -926,7 +983,7 @@ export default function CameraScreen({
     });
 
     return () => subscription.remove();
-  }, [cancelPendingTimedCapture]);
+  }, [cancelPendingTimedCapture, stopCameraZoomSession]);
 
   const triggerFeedback = useCallback(async () => {
     if (!hapticEnabled) {
@@ -1045,7 +1102,7 @@ export default function CameraScreen({
   );
 
   const applyZoomPercent = useCallback((value: number) => {
-    const nextZoom = Math.round(Math.max(CAMERA_ZOOM_MIN, Math.min(CAMERA_ZOOM_MAX, value)));
+    const nextZoom = normalizeCameraZoomPercent(value);
     setZoomPercent(nextZoom);
   }, []);
 
@@ -1449,6 +1506,10 @@ export default function CameraScreen({
     void triggerFeedback();
   }, [cameraDevice, cameraFocusTap, cameraNativeControlsReady, cancelFocusControlsDismiss, runCameraFocusAction, scheduleFocusControlsDismiss, triggerFeedback]);
   const changeCameraFacing = useCallback((value: CameraFacing) => {
+    if (value === cameraFacing) {
+      return;
+    }
+    stopCameraZoomSession();
     cameraFocusActionTokenRef.current += 1;
     setCameraFacing(value);
     setIsCameraReady(false);
@@ -1462,7 +1523,7 @@ export default function CameraScreen({
     }
 
     queueAppSettingsUpdate({ cameraFacing: value });
-  }, [queueAppSettingsUpdate]);
+  }, [cameraFacing, queueAppSettingsUpdate, stopCameraZoomSession]);
   const updateCameraRatio = (nextRatio: PhotoRatioLabel) => {
     setCameraRatio(nextRatio);
     queueAppSettingsUpdate({ cameraRatio: nextRatio });
@@ -1517,6 +1578,7 @@ export default function CameraScreen({
   }, [cameraFacing, changeCameraFacing, triggerFeedback]);
 
   const handleCameraSessionError = useCallback((error: Error) => {
+    stopCameraZoomSession();
     cameraFocusActionTokenRef.current += 1;
     if (__DEV__) {
       console.warn("[camera] VisionCamera session error", error);
@@ -1536,7 +1598,7 @@ export default function CameraScreen({
       setCameraSessionRestartKey((value) => value + 1);
       setCameraRecoveryPending(false);
     }, CAMERA_SESSION_RECOVERY_DELAY_MS);
-  }, []);
+  }, [stopCameraZoomSession]);
 
   const pickReferencePhoto = useCallback(async () => {
     try {
@@ -2394,6 +2456,7 @@ export default function CameraScreen({
   }, []);
 
   const retryCameraConnection = useCallback(() => {
+    stopCameraZoomSession();
     if (cameraRecoveryTimeout.current) {
       clearTimeout(cameraRecoveryTimeout.current);
       cameraRecoveryTimeout.current = null;
@@ -2403,7 +2466,7 @@ export default function CameraScreen({
     setCameraRecoveryPending(false);
     setErrorMessage(null);
     setCameraSessionRestartKey((value) => value + 1);
-  }, []);
+  }, [stopCameraZoomSession]);
   const cameraConnectionError =
     errorMessage === "카메라 연결이 불안정해 다시 시작합니다." ||
     errorMessage === CAMERA_CAPTURE_TIMEOUT_MESSAGE;
@@ -2500,17 +2563,18 @@ export default function CameraScreen({
         >
       {cameraDevice ? (
         <Camera
-          key={`${cameraDevice.id}-${cameraSessionRestartKey}`}
+          key={cameraSessionKey}
           ref={cameraRef}
           style={styles.camera}
           device={cameraDevice}
           isActive={isCameraSessionActive}
           outputs={cameraOutputs} orientationSource="interface"
-          zoom={cameraNativeZoom}
-          exposure={cameraNativeExposure}
-          getInitialZoom={() => cameraZoomFactor}
-          getInitialExposureBias={() => cameraExposureBias}
           onStarted={() => {
+            if (currentCameraSessionKeyRef.current !== cameraSessionKey || !isCameraSessionActiveRef.current) {
+              return;
+            }
+            cameraZoomReadySessionKeyRef.current = cameraSessionKey;
+            setCameraStartedRevision((value) => value + 1);
             isCameraReadyRef.current = true;
             setIsCameraReady(true);
             if (errorMessage === "카메라 연결이 불안정해 다시 시작합니다." || errorMessage === CAMERA_CAPTURE_TIMEOUT_MESSAGE) {
@@ -2518,6 +2582,10 @@ export default function CameraScreen({
             }
           }}
           onStopped={() => {
+            if (currentCameraSessionKeyRef.current !== cameraSessionKey) {
+              return;
+            }
+            stopCameraZoomSession();
             isCameraReadyRef.current = false;
             cancelPendingTimedCapture();
             setIsCameraReady(false);
@@ -2949,7 +3017,7 @@ export default function CameraScreen({
                 <Text selectable={false} style={styles.cameraSettingsTitle}>촬영 설정</Text>
               </View>
               <Pressable accessibilityRole="button" accessibilityLabel="촬영 설정 닫기" style={styles.cameraSettingsCloseButton} onPress={() => setCameraSettingsOpen(false)}>
-                <Text selectable={false} style={styles.cameraSettingsCloseText}>닫기</Text>
+                <Feather name="x" size={20} color={bodyFrameDarkColors.text} />
               </Pressable>
             </View>
 
@@ -3316,7 +3384,7 @@ export default function CameraScreen({
                   </Text>
                 </View>
                 <Pressable accessibilityRole="button" accessibilityLabel="가이드 설정 닫기" style={styles.modalCloseButton} onPress={() => setGuideSettingsOpen(false)}>
-                  <Text selectable={false} style={styles.modalCloseText}>닫기</Text>
+                  <Feather name="x" size={20} color={bodyFrameDarkColors.text} />
                 </Pressable>
               </View>
 
@@ -3383,15 +3451,17 @@ export default function CameraScreen({
                     ))}
                   </View>
                   <View style={styles.sizeFineControl}>
-                    <GuideSizeSlider
-                      compact
-                      dark
-                      value={guideSize}
-                      min={guideSizeBounds.min}
-                      max={guideSizeBounds.max}
-                      onChange={previewGuideSize}
-                      onCommit={applyGuideSize}
-                    />
+                    <View style={styles.guideSizeSliderWrap}>
+                      <GuideSizeSlider
+                        compact
+                        dark
+                        value={guideSize}
+                        min={guideSizeBounds.min}
+                        max={guideSizeBounds.max}
+                        onChange={previewGuideSize}
+                        onCommit={applyGuideSize}
+                      />
+                    </View>
                     <TextInput
                       value={guideSizeInput}
                       keyboardType="number-pad"
@@ -3535,8 +3605,17 @@ export default function CameraScreen({
           ) : null}
 
           {overlaySetupActive && hasReferenceOverlay ? (
-            <View style={styles.captureRow}>
-              <View style={styles.overlaySetupPanel}>
+            <View
+              style={[styles.overlaySetupViewport, { maxHeight: Math.max(200, cameraPreviewViewport.height * 0.62) }]}
+              onLayout={(event) => setReferencePanelHeight(Math.ceil(event.nativeEvent.layout.height))}
+            >
+              <ScrollView
+                style={styles.overlaySetupScroll}
+                contentContainerStyle={styles.overlaySetupPanel}
+                showsVerticalScrollIndicator
+                keyboardShouldPersistTaps="handled"
+                nestedScrollEnabled
+              >
                 <View style={styles.overlaySetupHeader}>
                   <View style={styles.overlaySetupHeaderCopy}>
                     <Text selectable={false} style={styles.overlaySetupTitle}>사진 가이드</Text>
@@ -3550,6 +3629,7 @@ export default function CameraScreen({
                 </View>
                 <View style={styles.overlayOpacityControl}>
                   <SmoothValueSlider
+                    dark
                     value={Math.round(overlayOpacity * 100)}
                     min={OVERLAY_OPACITY_MIN}
                     max={OVERLAY_OPACITY_MAX}
@@ -3598,7 +3678,7 @@ export default function CameraScreen({
                     </Pressable>
                   ) : null}
                 </View>
-              </View>
+              </ScrollView>
             </View>
           ) : (
             <View collapsable={false} style={styles.cameraControlDeck}>
@@ -3616,15 +3696,16 @@ export default function CameraScreen({
                       
                       <View style={styles.cameraQuickPanelHeader}>
                         <Text selectable={false} style={styles.cameraQuickPanelTitle}>확대</Text>
-                        <Text selectable={false} style={styles.cameraQuickPanelValue}>
-                          {cameraZoomFactor.toFixed(1)}x
-                        </Text>
+                        <View style={styles.cameraQuickPanelHeaderActions}>
+                          <Text selectable={false} style={styles.cameraQuickPanelValue}>{cameraZoomFactor.toFixed(1)}x</Text>
+                          <Pressable accessibilityRole="button" accessibilityLabel="확대 설정 닫기" style={styles.cameraColorCloseButton} onPress={() => setActiveCameraControlPanel(null)}>
+                            <Feather name="x" size={20} color={bodyFrameDarkColors.text} />
+                          </Pressable>
+                        </View>
                       </View>
                       <View style={[styles.quickButtonRow, styles.cameraZoomPresetRow]}>
-                        {cameraZoomPresets.map((preset) => {
-                          const presetFactor = getCameraZoomPresetFactor(preset, cameraDevice);
-                          const isActive =
-                            Math.abs(cameraZoomFactor - presetFactor) < 0.08;
+                        {cameraZoomPresets.map((preset, presetIndex) => {
+                          const isActive = presetIndex === activeCameraZoomPresetIndex;
                           return (
                             <Pressable accessibilityRole="button"
                               key={preset.label}
@@ -3668,11 +3749,16 @@ export default function CameraScreen({
                       
                       <View style={styles.cameraQuickPanelHeader}>
                         <Text selectable={false} style={styles.cameraQuickPanelTitle}>조명</Text>
-                        <Text selectable={false} style={styles.cameraQuickPanelValue}>
+                        <View style={styles.cameraQuickPanelHeaderActions}>
+                          <Text selectable={false} style={[styles.cameraQuickPanelValue, styles.cameraQuickPanelStatus]}>
                           {cameraLightAvailable
                             ? visibleTorchEnabled ? "손전등 켜짐" : "손전등 꺼짐"
                             : "후면 카메라에서 사용 가능"}
-                        </Text>
+                          </Text>
+                          <Pressable accessibilityRole="button" accessibilityLabel="조명 설정 닫기" style={styles.cameraColorCloseButton} onPress={() => setActiveCameraControlPanel(null)}>
+                            <Feather name="x" size={20} color={bodyFrameDarkColors.text} />
+                          </Pressable>
+                        </View>
                       </View>
                       <View style={styles.quickButtonRow}>
                         <Pressable accessibilityRole="button"
@@ -3763,7 +3849,7 @@ export default function CameraScreen({
                     accessibilityRole="button"
                     accessibilityLabel="사진 촬영"
                     accessibilityState={{
-                      disabled: !isCameraReady || isCapturing || !cameraDevice,
+                      disabled: !isCameraReady || isCapturing || !cameraDevice || !bodyFrameCaptureAllowed,
                       busy: isCapturing
                     }}
                   >

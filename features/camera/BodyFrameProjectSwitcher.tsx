@@ -250,6 +250,7 @@ export function BodyFrameProjectSwitcher({
           >
             <BodyFrameSheetHandle />
             <BodyFrameSheetHeader
+              compactTypography={compact}
               title="프로젝트 선택"
               description="촬영할 프로젝트를 선택하세요."
               onClose={() => setPickerOpen(false)}
@@ -360,6 +361,7 @@ export function BodyFrameProjectSwitcher({
         <KeyboardAvoidingView
           style={styles.keyboardAvoidingRoot}
           behavior={Platform.OS === "ios" ? "padding" : "height"}
+          keyboardVerticalOffset={Platform.OS === "android" ? insets.top : 0}
         >
         <View style={styles.backdrop}>
           <Pressable
@@ -374,6 +376,7 @@ export function BodyFrameProjectSwitcher({
           >
             <BodyFrameSheetHandle />
             <BodyFrameSheetHeader
+              compactTypography={compact}
               title="새 프로젝트"
               description="프로젝트별로 같은 구도의 변화를 기록하세요."
               onClose={dismissCreateSheet}
@@ -542,6 +545,7 @@ export function BodyFrameProjectSwitcher({
             </ScrollView>
             <View style={styles.createFooter}>
               <BodyFrameSheetFooter
+                compactTypography={compact}
                 onCancel={dismissCreateSheet}
                 onConfirm={() => void submitProject()}
                 confirmLabel={submitting ? "생성 중..." : "프로젝트 만들기"}
@@ -564,14 +568,14 @@ const styles = StyleSheet.create({
   createScroll: { flexShrink: 1, minHeight: 0 },
   createScrollContent: { paddingBottom: 16 },
   createFooter: {
-    paddingTop: 8,
+    paddingTop: 12,
     paddingBottom: 4
   },
   headerButton: {
     minHeight: 54,
     borderWidth: bodyFrameDesign.borderWidth,
     borderColor: "#2A2A2E",
-    borderRadius: bodyFrameDesign.buttonRadius,
+    borderRadius: 12,
     backgroundColor: "rgba(11,11,12,0.88)",
     paddingHorizontal: 14,
     paddingVertical: 8,
@@ -599,7 +603,9 @@ const styles = StyleSheet.create({
   createOnlyText: {
     color: "#F5F5F5",
     fontSize: 13,
-    fontWeight: "600"
+    lineHeight: 18,
+    includeFontPadding: false,
+    fontWeight: "700"
   },
   headerMainRow: {
     flexDirection: "row",
@@ -614,20 +620,26 @@ const styles = StyleSheet.create({
     flex: 1,
     color: "#F5F5F5",
     fontSize: 15,
-    fontWeight: "600"
+    lineHeight: 21,
+    includeFontPadding: false,
+    fontWeight: "700"
   },
   headerTitleCompact: {
     fontSize: 14,
+    lineHeight: 18,
     textAlign: "center"
   },
   headerStatus: {
     marginTop: 3,
     color: "#A0A0A6",
-    fontSize: 12
+    fontSize: 12,
+    lineHeight: 18,
+    includeFontPadding: false
   },
   headerStatusCompact: {
     marginTop: 2,
     fontSize: 11,
+    lineHeight: 14,
     textAlign: "center"
   },
   disabled: { opacity: 0.5 },
@@ -653,7 +665,9 @@ const styles = StyleSheet.create({
   sheetTitle: {
     color: "#F5F5F5",
     fontSize: 20,
-    fontWeight: "600",
+    lineHeight: 28,
+    includeFontPadding: false,
+    fontWeight: "700",
     marginBottom: 10
   },
   pickerSummaryRow: {
@@ -666,9 +680,11 @@ const styles = StyleSheet.create({
   },
   pickerSectionTitle: {
     fontSize: bodyFrameTypography.rowTitle,
-    fontWeight: "600"
+    lineHeight: 20,
+    includeFontPadding: false,
+    fontWeight: "700"
   },
-  pickerSectionCount: { fontSize: bodyFrameTypography.caption },
+  pickerSectionCount: { fontSize: bodyFrameTypography.caption, lineHeight: 18, includeFontPadding: false },
   projectList: { flexShrink: 1, minHeight: 0, maxHeight: 360 },
   projectListContent: { gap: 8, paddingVertical: 8 },
   projectRow: {
@@ -679,14 +695,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderWidth: bodyFrameDesign.borderWidth,
-    borderRadius: bodyFrameDesign.cardRadius
+    borderRadius: 12
   },
   projectRowPressed: { opacity: 0.7 },
   projectTextWrap: { flex: 1, minWidth: 0 },
-  projectName: { fontSize: 15, fontWeight: "600", lineHeight: 21 },
-  projectMeta: { fontSize: 12, marginTop: 4, lineHeight: 18 },
+  projectName: { fontSize: 15, fontWeight: "700", lineHeight: 21, includeFontPadding: false },
+  projectMeta: { fontSize: 12, marginTop: 4, lineHeight: 18, includeFontPadding: false },
   selectedProjectMarker: { flexDirection: "row", alignItems: "center", gap: 5 },
-  selectedProjectText: { fontSize: bodyFrameTypography.caption, fontWeight: "600" },
+  selectedProjectText: { fontSize: bodyFrameTypography.caption, lineHeight: 18, fontWeight: "700", includeFontPadding: false },
   emptyProjectState: {
     minHeight: 152,
     padding: 18,
@@ -694,19 +710,22 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 8,
     borderWidth: bodyFrameDesign.borderWidth,
-    borderRadius: bodyFrameDesign.cardRadius
+    borderRadius: 12
   },
   emptyProjectTitle: {
     fontSize: bodyFrameTypography.rowTitle,
-    fontWeight: "600",
+    lineHeight: 20,
+    includeFontPadding: false,
+    fontWeight: "700",
     textAlign: "center"
   },
   emptyProjectDescription: {
     fontSize: bodyFrameTypography.caption,
     lineHeight: 18,
+    includeFontPadding: false,
     textAlign: "center"
   },
-  sheetActions: { flexDirection: "row", gap: 8, marginTop: 8, paddingTop: 8 },
+  sheetActions: { flexDirection: "row", gap: 10, marginTop: 12, paddingTop: 8 },
   pickerCreateAction: {
     flex: 1,
     minWidth: 0,
@@ -715,7 +734,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 8,
     paddingVertical: 8,
-    borderRadius: bodyFrameDesign.buttonRadius
+    borderRadius: 12
   },
   pickerManageAction: {
     flex: 1,
@@ -728,11 +747,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 8,
     borderWidth: bodyFrameDesign.borderWidth,
-    borderRadius: bodyFrameDesign.buttonRadius
+    borderRadius: 12
   },
-  actionText: { fontSize: bodyFrameTypography.button, fontWeight: "600", textAlign: "center" },
-  actionTextSecondary: { fontSize: bodyFrameTypography.button, fontWeight: "600", textAlign: "center" },
-  label: { fontSize: bodyFrameTypography.rowTitle, fontWeight: "600", marginTop: 10, marginBottom: 8 },
+  actionText: { fontSize: bodyFrameTypography.button, lineHeight: 20, fontWeight: "700", includeFontPadding: false, textAlign: "center" },
+  actionTextSecondary: { fontSize: bodyFrameTypography.button, lineHeight: 20, fontWeight: "700", includeFontPadding: false, textAlign: "center" },
+  label: { fontSize: bodyFrameTypography.rowTitle, lineHeight: 20, fontWeight: "700", includeFontPadding: false, marginTop: 10, marginBottom: 8 },
   formSectionHeader: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -742,15 +761,19 @@ const styles = StyleSheet.create({
     marginTop: 8,
     marginBottom: 4
   },
-  planLimitText: { fontSize: bodyFrameTypography.caption, lineHeight: 18 },
+  planLimitText: { fontSize: bodyFrameTypography.caption, lineHeight: 18, includeFontPadding: false },
   input: {
     minHeight: bodyFrameDesign.primaryButtonHeight,
     borderWidth: bodyFrameDesign.borderWidth,
     borderColor: "#2A2A2E",
-    borderRadius: bodyFrameDesign.buttonRadius,
+    borderRadius: 12,
     color: "#F5F5F5",
     backgroundColor: "#0B0B0C",
-    paddingHorizontal: 12
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    fontSize: bodyFrameTypography.body,
+    lineHeight: 20,
+    includeFontPadding: false
   },
   choiceRow: { flexDirection: "row", gap: 8, marginBottom: 4 },
   choice: {
@@ -762,63 +785,69 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderWidth: bodyFrameDesign.borderWidth,
-    borderRadius: bodyFrameDesign.buttonRadius
+    borderRadius: 12
   },
   choiceText: {
     fontSize: bodyFrameTypography.caption,
     lineHeight: 18,
-    fontWeight: "600",
+    fontWeight: "700",
+    includeFontPadding: false,
     textAlign: "center"
   },
   customTargetInput: { marginTop: 8 },
   referenceSectionHeader: { marginTop: 14, marginBottom: 10 },
-  referenceHint: { fontSize: bodyFrameTypography.caption, lineHeight: 18 },
+  referenceHint: { fontSize: bodyFrameTypography.caption, lineHeight: 18, includeFontPadding: false },
   referenceChoice: {
     minHeight: 56,
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
     borderWidth: bodyFrameDesign.borderWidth,
-    borderRadius: bodyFrameDesign.buttonRadius,
+    borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 10,
     marginBottom: 8
   },
   referenceText: { flex: 1, minWidth: 0 },
-  referenceTitle: { fontSize: bodyFrameTypography.rowTitle, fontWeight: "600" },
-  referenceMeta: { fontSize: bodyFrameTypography.caption, lineHeight: 18, marginTop: 3 },
+  referenceTitle: { fontSize: bodyFrameTypography.rowTitle, lineHeight: 20, fontWeight: "700", includeFontPadding: false },
+  referenceMeta: { fontSize: bodyFrameTypography.caption, lineHeight: 18, includeFontPadding: false, marginTop: 4 },
   limitNotice: {
     marginTop: 10,
     padding: 12,
     borderWidth: 1,
     borderColor: "#2A2A2E",
-    borderRadius: 8,
+    borderRadius: 12,
     backgroundColor: "#0B0B0C"
   },
   limitNoticeText: {
     color: "#D7D7DB",
     fontSize: 12,
-    lineHeight: 18
+    lineHeight: 18,
+    includeFontPadding: false
   },
   limitUpgradeButton: {
     minHeight: 44,
     marginTop: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: bodyFrameDesign.borderWidth,
     borderColor: "#F5F5F5",
-    borderRadius: 8
+    borderRadius: 12
   },
   limitUpgradeButtonText: {
     color: "#F5F5F5",
     fontSize: 13,
-    fontWeight: "600"
+    lineHeight: 18,
+    includeFontPadding: false,
+    fontWeight: "700"
   },
   primaryButton: {
     minHeight: bodyFrameDesign.primaryButtonHeight,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: bodyFrameDesign.buttonRadius
+    borderRadius: 12
   },
-  primaryButtonText: { fontSize: bodyFrameTypography.button, fontWeight: "700" }
+  primaryButtonText: { fontSize: bodyFrameTypography.button, lineHeight: 20, fontWeight: "700", includeFontPadding: false }
 });

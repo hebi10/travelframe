@@ -413,13 +413,13 @@ const normalizeGuideShapePoints = (value: unknown): GuideShapePoints => {
   };
 };
 
-const normalizeCameraZoomPercent = (value: unknown) => {
+export const normalizeCameraZoomPercent = (value: unknown) => {
   const parsedValue = Number(value);
   if (!Number.isFinite(parsedValue)) {
     return defaultAppSettings.cameraZoomPercent;
   }
 
-  return Math.round(Math.max(0, Math.min(100, parsedValue)));
+  return Number(Math.max(0, Math.min(100, parsedValue)).toFixed(4));
 };
 
 const normalizeGuideLineOpacity = (value: unknown) => {
