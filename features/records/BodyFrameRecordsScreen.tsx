@@ -80,7 +80,7 @@ type CreateProjectInput = {
 
 export default function BodyFrameRecordsScreen() {
   const insets = useSafeAreaInsets();
-  const { width: windowWidth } = useWindowDimensions();
+  const { width: windowWidth, fontScale } = useWindowDimensions();
   const contentWidth = Math.min(windowWidth, bodyFrameDesign.contentMaxWidth) - bodyFrameDesign.horizontalPadding * 2;
   const projectColumnCount = contentWidth >= 560 ? 2 : 1;
   const projectCardWidth = Math.max(
@@ -240,7 +240,7 @@ export default function BodyFrameRecordsScreen() {
             <Text style={[styles.projectsTitle, { color: palette.text }]}>내 프로젝트</Text>
             <Text style={[styles.projectsCount, { color: palette.muted }]}>{cards.length}개</Text>
           </View>
-          <View style={styles.quickActions}>
+          <View style={[styles.quickActions, fontScale >= 1.3 && styles.quickActionsLargeFont]}>
             <BodyFrameProjectSwitcher
               createOnly
               disabled={restoringProjectId !== null}
@@ -473,6 +473,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "stretch",
     gap: 8
+  },
+  quickActionsLargeFont: {
+    width: 232
   },
   pageTitle: {
     fontSize: bodyFrameTypography.pageTitle,
