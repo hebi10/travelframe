@@ -1,5 +1,5 @@
 import { AppText as Text, AppTextInput as TextInput } from "@/components/app-text";
-import { BodyFrameSheetHandle, BodyFrameSheetHeader } from "@/components/body-frame-sheet";
+import { BodyFrameSheetFooter, BodyFrameSheetHandle, BodyFrameSheetHeader } from "@/components/body-frame-sheet";
 import {
   Feather } from "@expo/vector-icons";
 import { useMemo,
@@ -104,6 +104,12 @@ export function BodyFrameProjectSwitcher({
     setCreateOpen(false);
   };
 
+  const dismissCreateSheet = () => {
+    if (!submitting) {
+      setCreateOpen(false);
+    }
+  };
+
   const openCreateSheet = () => {
     setPickerOpen(false);
     setCreateOpen(true);
@@ -162,6 +168,12 @@ export function BodyFrameProjectSwitcher({
       setCustomTarget("100");
       setReferenceMode("latest");
       setCreateError(null);
+    } catch (error) {
+      setCreateError(
+        error instanceof Error && error.message
+          ? error.message
+          : "프로젝트를 만들지 못했습니다. 다시 시도해 주세요."
+      );
     } finally {
       setSubmitting(false);
     }
@@ -293,7 +305,7 @@ export function BodyFrameProjectSwitcher({
         transparent
         animationType="slide"
         visible={createOpen}
-        onRequestClose={() => setCreateOpen(false)}
+        onRequestClose={dismissCreateSheet}
       >
         <KeyboardAvoidingView
           style={styles.keyboardAvoidingRoot}
@@ -304,14 +316,18 @@ export function BodyFrameProjectSwitcher({
             accessibilityRole="button"
             accessibilityLabel="새 프로젝트 닫기"
             style={StyleSheet.absoluteFill}
-            onPress={() => setCreateOpen(false)}
+            onPress={dismissCreateSheet}
           />
           <View
             style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16), backgroundColor: palette.surface, borderColor: palette.line }]}
             accessibilityViewIsModal
           >
             <BodyFrameSheetHandle />
-            <BodyFrameSheetHeader title="새 프로젝트" onClose={() => setCreateOpen(false)} />
+            <BodyFrameSheetHeader
+              title="새 프로젝트"
+              description="프로젝트별로 같은 구도의 변화를 기록하세요."
+              onClose={dismissCreateSheet}
+            />
             <ScrollView
               style={styles.createScroll}
               contentContainerStyle={styles.createScrollContent}
@@ -462,17 +478,12 @@ export function BodyFrameProjectSwitcher({
 
             </ScrollView>
             <View style={styles.createFooter}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ disabled: submitting }}
-              disabled={submitting}
-              style={[styles.primaryButton, { backgroundColor: actionColor }, submitting && styles.disabled]}
-              onPress={() => void submitProject()}
-            >
-              <Text style={[styles.primaryButtonText, { color: actionTextColor }]}>
-                {submitting ? "생성 중..." : "프로젝트 만들기"}
-              </Text>
-            </Pressable>
+              <BodyFrameSheetFooter
+                onCancel={dismissCreateSheet}
+                onConfirm={() => void submitProject()}
+                confirmLabel={submitting ? "생성 중..." : "프로젝트 만들기"}
+                disabled={submitting}
+              />
             </View>
           </View>
         </View>
