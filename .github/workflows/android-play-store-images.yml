@@ -7,6 +7,7 @@ on:
     paths:
       - '.github/workflows/android-play-store-images.yml'
       - 'docs/release-assets/play-phone-six-20261109.json'
+      - 'assets/play-store/2026-11-09/**'
       - 'scripts/publish-play-store-images.mjs'
       - 'scripts/prepare-play-store-images.py'
       - 'tests/play-store-images.test.mjs'
@@ -15,6 +16,7 @@ on:
     paths:
       - '.github/workflows/android-play-store-images.yml'
       - 'docs/release-assets/play-phone-six-20261109.json'
+      - 'assets/play-store/2026-11-09/**'
       - 'scripts/publish-play-store-images.mjs'
       - 'scripts/prepare-play-store-images.py'
       - 'tests/play-store-images.test.mjs'
@@ -67,6 +69,7 @@ jobs:
       id-token: write
     env:
       STORE_MANIFEST: ${{ github.workspace }}/docs/release-assets/play-phone-six-20261109.json
+      STORE_EMBEDDED_DIR: ${{ github.workspace }}/assets/play-store/2026-11-09
       STORE_INPUT_DIR: ${{ github.workspace }}/.store-screenshot-input
       STORE_OUTPUT_DIR: ${{ github.workspace }}/.store-screenshot-output
       STORE_RECEIPT_PATH: ${{ github.workspace }}/.store-play-receipt.json
@@ -79,20 +82,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Get Drive read-only access token using the existing Play release identity
-        id: driveauth
-        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
-        with:
-          workload_identity_provider: ${{ vars.PLAY_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ vars.PLAY_SERVICE_ACCOUNT }}
-          token_format: access_token
-          access_token_scopes: https://www.googleapis.com/auth/drive.readonly
-          create_credentials_file: false
-          export_environment_variables: false
-      - name: Download and SHA-256 verify exactly six shared store images
-        env:
-          DRIVE_ACCESS_TOKEN: ${{ steps.driveauth.outputs.access_token }}
-        run: node scripts/publish-play-store-images.mjs download
+      - name: Decode and SHA-256 verify six immutable repository screenshot assets
+        run: node scripts/publish-play-store-images.mjs download-bundled
       - name: Set up isolated Pillow image conversion
         shell: bash
         run: |

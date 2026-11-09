@@ -3,7 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
-import { validateStoreManifest, validateRgbPng, replaceStoreImages, verifyPreparedStoreImages } from "../scripts/publish-play-store-images.mjs";
+import { validateStoreManifest, validateRgbPng, replaceStoreImages, verifyPreparedStoreImages, decodeBundledStoreImages } from "../scripts/publish-play-store-images.mjs";
 
 const manifest = JSON.parse(fs.readFileSync("docs/release-assets/play-phone-six-20261109.json", "utf8"));
 const png = (width=1080, height=1920) => {
@@ -104,4 +104,19 @@ test("publisher does not commit when Korean listing is absent", async () => {
     assert.ok(!calls.some(c=>c.url.includes(":commit")));
     assert.ok(calls.some(c=>c.method==="DELETE"));
   }finally{fs.rmSync(dir,{recursive:true,force:true});}
+});
+
+
+test("six repository screenshot assets decode to exactly the approved Drive source checksums", () => {
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),"body-frame-approved-shots-"));
+  try {
+    decodeBundledStoreImages(manifest,dir,"assets/play-store/2026-11-09");
+    assert.equal(fs.readdirSync(dir).filter(name=>name.endsWith(".png")).length,6);
+    for(const a of manifest.assets) {
+      const file=path.join(dir,String(a.index).padStart(2,"0")+".png");
+      const raw=fs.readFileSync(file);
+      validateRgbPng(raw,a.sourceWidth,a.sourceHeight);
+      assert.equal(requireSha(raw),a.sourceSha256);
+    }
+  } finally { fs.rmSync(dir,{recursive:true,force:true}); }
 });
