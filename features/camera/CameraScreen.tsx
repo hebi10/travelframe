@@ -3514,9 +3514,16 @@ export default function CameraScreen({
                     <Animated.View
                       key={activeCameraControlPanel}
                       entering={FadeIn.duration(140)}
-                      style={styles.cameraControlPage}
+                      style={[styles.cameraControlPage, styles.cameraQuickPanel]}
                     >
-                      <View style={styles.quickButtonRow}>
+                      
+                      <View style={styles.cameraQuickPanelHeader}>
+                        <Text selectable={false} style={styles.cameraQuickPanelTitle}>확대</Text>
+                        <Text selectable={false} style={styles.cameraQuickPanelValue}>
+                          {cameraZoomFactor.toFixed(1)}x
+                        </Text>
+                      </View>
+                      <View style={[styles.quickButtonRow, styles.cameraZoomPresetRow]}>
                         {cameraZoomPresets.map((preset) => {
                           const presetFactor = getCameraZoomPresetFactor(preset, cameraDevice);
                           const isActive =
@@ -3529,6 +3536,8 @@ export default function CameraScreen({
                                 isActive && styles.quickPillButtonActive
                               ]}
                               onPress={() => setZoomPreset(preset)}
+                              accessibilityLabel={`확대 ${preset.label}`}
+                              accessibilityState={{ selected: isActive }}
                             >
                               <Text
                                 selectable={false}
@@ -3557,8 +3566,17 @@ export default function CameraScreen({
                     <Animated.View
                       key={activeCameraControlPanel}
                       entering={FadeIn.duration(140)}
-                      style={styles.cameraControlPage}
+                      style={[styles.cameraControlPage, styles.cameraQuickPanel]}
                     >
+                      
+                      <View style={styles.cameraQuickPanelHeader}>
+                        <Text selectable={false} style={styles.cameraQuickPanelTitle}>조명</Text>
+                        <Text selectable={false} style={styles.cameraQuickPanelValue}>
+                          {cameraLightAvailable
+                            ? visibleTorchEnabled ? "손전등 켜짐" : "손전등 꺼짐"
+                            : "후면 카메라에서 사용 가능"}
+                        </Text>
+                      </View>
                       <View style={styles.quickButtonRow}>
                         <Pressable accessibilityRole="button"
                           disabled={!cameraLightAvailable}
@@ -3568,6 +3586,8 @@ export default function CameraScreen({
                             !cameraLightAvailable && styles.shutterDisabled
                           ]}
                           onPress={() => setLightEnabled(false)}
+                          accessibilityLabel="손전등 끄기"
+                          accessibilityState={{ disabled: !cameraLightAvailable, selected: !visibleTorchEnabled }}
                         >
                           <Text
                             selectable={false}
@@ -3587,6 +3607,8 @@ export default function CameraScreen({
                             !cameraLightAvailable && styles.shutterDisabled
                           ]}
                           onPress={() => setLightEnabled(true)}
+                          accessibilityLabel="손전등 켜기"
+                          accessibilityState={{ disabled: !cameraLightAvailable, selected: visibleTorchEnabled }}
                         >
                           <Text
                             selectable={false}
