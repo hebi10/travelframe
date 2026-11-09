@@ -545,6 +545,7 @@ export function BodyFrameProjectSwitcher({
                 onCancel={dismissCreateSheet}
                 onConfirm={() => void submitProject()}
                 confirmLabel={submitting ? "생성 중..." : "프로젝트 만들기"}
+                confirmFlex={1.6}
                 disabled={submitting}
               />
             </View>
