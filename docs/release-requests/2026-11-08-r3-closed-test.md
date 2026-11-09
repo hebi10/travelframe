@@ -19,3 +19,10 @@
 - [PR #133](https://github.com/hebi10/travelframe/pull/133) was validated and merged in `9890fe0bde0775541be81981a8b078f1e7453d59`, raising release Gradle daemon heap 2 GiB → 4 GiB and metaspace 512 MiB → 1 GiB without changing the application, signing key or Play track.
 - Re-run **only Google Play closed testing** via the existing protected `main` push gate; the explicit `[deploy-closed]` marker in this commit authorizes another attempt after the R8 memory fix.
 - Completion is contingent on successful signed AAB build, same-run artifact verification, Play API track commit and subsequent readback. Do not claim published until all succeed.
+
+## Retry after APK signer-output parsing (2026-11-09 KST)
+
+- Closed test run [#42](https://github.com/hebi10/travelframe/actions/runs/42495930021) built and independently verified the signed release AAB, but stopped before publishing when the derived universal APK verifier rejected the `apksigner` certificate-output format; **no Play upload occurred**.
+- [PR #134](https://github.com/hebi10/travelframe/pull/134) fixed legacy and versioned APK signer-output parsing, kept exact existing Play upload-certificate verification, and added positive/negative regression fixtures. Quality and Secret Scan passed on the exact reviewed PR head; the change merged to `main` as `a0d6039dab1ec13ac7f9b4d8e116b35ffaed85d8`.
+- This new **[deploy-closed]** request retries only the existing `alpha` Google Play closed-test track for `com.haebi.photoguide` from the merged `main` source. No production, Firebase backend or paid-plan change is requested.
+- Treat only successful same-run AAB, APK, provenance checks, signed upload and **committed Google Play alpha readback** as deployment success. Do not interpret workflow creation or AAB build success alone as publication.
