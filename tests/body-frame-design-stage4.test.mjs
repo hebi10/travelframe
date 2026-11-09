@@ -82,7 +82,7 @@ assert.ok(chooser.includes("accessibilityViewIsModal"));
 assert.ok(chooser.includes("createScroll: { flexShrink: 1, minHeight: 0 }"));
 assert.ok(chooser.includes("bodyFrameSheetDesign.maxHeight"));
 assert.ok(!chooser.includes("onPress={() => undefined}"), "sheet body must not rely on no-op press to stop backdrop close");
-assert.ok(chooser.includes('onPress={() => void submitProject()}'));
+assert.ok(chooser.includes('onConfirm={() => void submitProject()}') && chooser.includes("<BodyFrameSheetFooter"), "project creation must preserve an accessible pinned submit action");
 assert.ok(chooser.includes("onCreateProject") && chooser.includes("onSelectProject"));
 
 const position = source("features/records/PhotoPositionSheet.tsx");

@@ -6,7 +6,7 @@ from pathlib import Path
 import tempfile
 import unittest
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import Mock, call, patch
 
 SCRIPT = Path(__file__).resolve().with_name("capture-stage13-android.py")
 SPEC = importlib.util.spec_from_file_location("body_frame_stage13_test_target", SCRIPT)
@@ -36,6 +36,20 @@ class Stage13CaptureTest(unittest.TestCase):
         self.assertTrue(stage13.LARGE_TEXT.issubset(set(names)))
         self.assertIn("new-project", [item[0] for item in stage13.ADDITIONAL])
         self.assertIn("empty-projects", [item[0] for item in stage13.ADDITIONAL])
+        self.assertIn("camera-project-picker", names)
+        self.assertIn("camera-new-project", names)
+        self.assertIn("camera-new-project", stage13.CORE)
+        self.assertIn("camera-new-project", stage13.LARGE_TEXT)
+
+
+    def test_c2_camera_project_sheet_actions_follow_native_controls(self):
+        device = Mock()
+        stage13.open_camera_new_project(device)
+        device.ready.assert_called_once_with(["프로젝트 선택", "사진 촬영"])
+        self.assertEqual(device.open_control.call_args_list, [
+            call("프로젝트 선택", ["내 프로젝트", "프로젝트 관리"]),
+            call("+ 새 프로젝트", ["프로젝트 이름", "목표 기록 수", "프로젝트 만들기"]),
+        ])
 
     def test_stage_d_light_150_still_separates_first_install_and_replayed_guide(self):
         self.assertEqual(stage13.ALL_VARIANTS["light-150"], ("light", "large", 1.5))

@@ -1,5 +1,5 @@
 import { AppText as Text, AppTextInput as TextInput } from "@/components/app-text";
-import { BodyFrameSheetHandle, BodyFrameSheetHeader } from "@/components/body-frame-sheet";
+import { BodyFrameSheetFooter, BodyFrameSheetHandle, BodyFrameSheetHeader } from "@/components/body-frame-sheet";
 import {
   Feather } from "@expo/vector-icons";
 import { useMemo,
@@ -104,6 +104,12 @@ export function BodyFrameProjectSwitcher({
     setCreateOpen(false);
   };
 
+  const dismissCreateSheet = () => {
+    if (!submitting) {
+      setCreateOpen(false);
+    }
+  };
+
   const openCreateSheet = () => {
     setPickerOpen(false);
     setCreateOpen(true);
@@ -162,6 +168,12 @@ export function BodyFrameProjectSwitcher({
       setCustomTarget("100");
       setReferenceMode("latest");
       setCreateError(null);
+    } catch (error) {
+      setCreateError(
+        error instanceof Error && error.message
+          ? error.message
+          : "프로젝트를 만들지 못했습니다. 다시 시도해 주세요."
+      );
     } finally {
       setSubmitting(false);
     }
@@ -237,52 +249,102 @@ export function BodyFrameProjectSwitcher({
             accessibilityViewIsModal
           >
             <BodyFrameSheetHandle />
-            <BodyFrameSheetHeader title="프로젝트 선택" onClose={() => setPickerOpen(false)} />
-            <ScrollView style={styles.projectList} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" nestedScrollEnabled>
-              {visibleProjects.map((project) => {
-                const summary = getBodyProjectProgressSummary(photos, project);
-                const selected = project.id === activeProject?.id;
-                return (
-                  <Pressable
-                    key={project.id}
-                    disabled={disabled}
-                    accessibilityRole="radio"
-                    accessibilityLabel={`${project.name} 프로젝트`}
-                    accessibilityState={{ selected, disabled }}
-                    style={({ pressed }) => [
-                      styles.projectRow,
-                      { backgroundColor: selected ? palette.surfaceStrong : palette.surface },
-                      pressed && styles.projectRowPressed
-                    ]}
-                    onPress={() => {
-                      onSelectProject(project);
-                      setPickerOpen(false);
-                    }}
-                  >
-                    <View style={styles.projectTextWrap}>
-                      <Text style={[styles.projectName, { color: palette.text }]}>{project.name}</Text>
-                      <Text style={[styles.projectMeta, { color: palette.muted }]}>
-                        {summary.photoCount}장 · {formatDuration(summary.durationSeconds)}초
-                      </Text>
-                    </View>
-                    {selected ? <Feather name="check" size={18} color={palette.text} /> : null}
-                  </Pressable>
-                );
-              })}
+            <BodyFrameSheetHeader
+              title="프로젝트 선택"
+              description="촬영할 프로젝트를 선택하세요."
+              onClose={() => setPickerOpen(false)}
+            />
+            <View style={styles.pickerSummaryRow}>
+              <Text style={[styles.pickerSectionTitle, { color: palette.text }]}>
+                내 프로젝트
+              </Text>
+              <Text style={[styles.pickerSectionCount, { color: palette.muted }]}>
+                {visibleProjects.length}개
+              </Text>
+            </View>
+            <ScrollView
+              style={styles.projectList}
+              contentContainerStyle={styles.projectListContent}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              nestedScrollEnabled
+            >
+              {visibleProjects.length === 0 ? (
+                <View style={[styles.emptyProjectState, { backgroundColor: palette.background, borderColor: palette.line }]}>
+                  <Feather name="folder" size={24} color={palette.muted} />
+                  <Text style={[styles.emptyProjectTitle, { color: palette.text }]}>
+                    진행 중인 프로젝트가 없습니다.
+                  </Text>
+                  <Text style={[styles.emptyProjectDescription, { color: palette.muted }]}>
+                    새 프로젝트를 만들고 첫 사진부터 기록하세요.
+                  </Text>
+                </View>
+              ) : (
+                visibleProjects.map((project) => {
+                  const summary = getBodyProjectProgressSummary(photos, project);
+                  const selected = project.id === activeProject?.id;
+                  return (
+                    <Pressable
+                      key={project.id}
+                      disabled={disabled}
+                      accessibilityRole="radio"
+                      accessibilityLabel={`${project.name} 프로젝트`}
+                      accessibilityHint={selected ? "현재 촬영 중인 프로젝트입니다." : "선택하면 이 프로젝트로 촬영합니다."}
+                      accessibilityState={{ selected, disabled }}
+                      style={({ pressed }) => [
+                        styles.projectRow,
+                        {
+                          borderColor: selected ? palette.text : palette.line,
+                          backgroundColor: selected ? palette.surfaceStrong : palette.surface
+                        },
+                        pressed && styles.projectRowPressed
+                      ]}
+                      onPress={() => {
+                        onSelectProject(project);
+                        setPickerOpen(false);
+                      }}
+                    >
+                      <View style={styles.projectTextWrap}>
+                        <Text numberOfLines={2} style={[styles.projectName, { color: palette.text }]}>
+                          {project.name}
+                        </Text>
+                        <Text numberOfLines={2} style={[styles.projectMeta, { color: palette.muted }]}>
+                          {summary.photoCount} / {summary.targetPhotoCount}장 · {formatDuration(summary.durationSeconds)}초
+                        </Text>
+                      </View>
+                      {selected ? (
+                        <View style={styles.selectedProjectMarker}>
+                          <Text style={[styles.selectedProjectText, { color: palette.text }]}>촬영 중</Text>
+                          <Feather name="check" size={18} color={palette.text} />
+                        </View>
+                      ) : null}
+                    </Pressable>
+                  );
+                })
+              )}
             </ScrollView>
 
             <View style={styles.sheetActions}>
-              <Pressable accessibilityRole="button" style={styles.actionRow} onPress={openCreateSheet}>
-                <Text style={[styles.actionText, { color: palette.text }]}>+ 새 프로젝트</Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="+ 새 프로젝트"
+                style={[styles.pickerCreateAction, { backgroundColor: actionColor }]}
+                onPress={openCreateSheet}
+              >
+                <Text numberOfLines={2} style={[styles.actionText, { color: actionTextColor }]}>+ 새 프로젝트</Text>
               </Pressable>
-              <Pressable accessibilityRole="button"
-                style={styles.actionRow}
+              <Pressable
+                accessibilityRole="button"
+                style={[styles.pickerManageAction, { borderColor: palette.line }]}
                 onPress={() => {
                   setPickerOpen(false);
                   onManageProjects?.();
                 }}
               >
-                <Text style={[styles.actionTextSecondary, { color: palette.muted }]}>프로젝트 관리</Text>
+                <Text numberOfLines={2} style={[styles.actionTextSecondary, { color: palette.text }]}>
+                  프로젝트 관리
+                </Text>
+                <Feather name="chevron-right" size={18} color={palette.muted} />
               </Pressable>
             </View>
           </View>
@@ -293,7 +355,7 @@ export function BodyFrameProjectSwitcher({
         transparent
         animationType="slide"
         visible={createOpen}
-        onRequestClose={() => setCreateOpen(false)}
+        onRequestClose={dismissCreateSheet}
       >
         <KeyboardAvoidingView
           style={styles.keyboardAvoidingRoot}
@@ -304,14 +366,18 @@ export function BodyFrameProjectSwitcher({
             accessibilityRole="button"
             accessibilityLabel="새 프로젝트 닫기"
             style={StyleSheet.absoluteFill}
-            onPress={() => setCreateOpen(false)}
+            onPress={dismissCreateSheet}
           />
           <View
             style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16), backgroundColor: palette.surface, borderColor: palette.line }]}
             accessibilityViewIsModal
           >
             <BodyFrameSheetHandle />
-            <BodyFrameSheetHeader title="새 프로젝트" onClose={() => setCreateOpen(false)} />
+            <BodyFrameSheetHeader
+              title="새 프로젝트"
+              description="프로젝트별로 같은 구도의 변화를 기록하세요."
+              onClose={dismissCreateSheet}
+            />
             <ScrollView
               style={styles.createScroll}
               contentContainerStyle={styles.createScrollContent}
@@ -319,23 +385,30 @@ export function BodyFrameProjectSwitcher({
               keyboardDismissMode="on-drag"
               showsVerticalScrollIndicator
             >
-            <Text style={[styles.label, { color: palette.muted }]}>프로젝트 이름</Text>
+            <Text style={[styles.label, { color: palette.text }]}>프로젝트 이름</Text>
             <TextInput
               value={name}
-              onChangeText={setName}
+              onChangeText={(value) => {
+                setName(value);
+                setCreateError(null);
+              }}
               placeholder="새 프로젝트"
               placeholderTextColor={palette.faint}
               style={[styles.input, { backgroundColor: palette.background, color: palette.text, borderColor: palette.line }]}
               maxLength={40}
               accessibilityLabel="프로젝트 이름"
+              editable={!submitting}
+              returnKeyType="done"
             />
 
-            <Text style={[styles.label, { color: palette.muted }]}>목표 기록 수</Text>
-            {maxProgressPhotos !== null ? (
-              <Text style={[styles.planLimitText, { color: palette.muted }]}>
-                현재 플랜 최대 {maxProgressPhotos}장
-              </Text>
-            ) : null}
+            <View style={styles.formSectionHeader}>
+              <Text style={[styles.label, { color: palette.text }]}>목표 기록 수</Text>
+              {maxProgressPhotos !== null ? (
+                <Text style={[styles.planLimitText, { color: palette.muted }]}>
+                  현재 플랜 최대 {maxProgressPhotos}장
+                </Text>
+              ) : null}
+            </View>
             <View style={styles.choiceRow}>
               {(["100", "365", "custom"] as const).map((value) => {
                 const presetTarget =
@@ -356,8 +429,8 @@ export function BodyFrameProjectSwitcher({
                     accessibilityState={{ selected: targetPreset === value, disabled: locked }}
                     style={[
                       styles.choice,
-                      { borderColor: palette.line },
-                      targetPreset === value && { borderColor: palette.text },
+                      { borderColor: palette.line, backgroundColor: palette.surface },
+                      targetPreset === value && { borderColor: palette.text, backgroundColor: palette.surfaceStrong },
                       locked && styles.disabled
                     ]}
                     onPress={() => {
@@ -365,7 +438,7 @@ export function BodyFrameProjectSwitcher({
                       setCreateError(null);
                     }}
                   >
-                    <Text style={[styles.choiceText, { color: palette.text }]}>
+                    <Text numberOfLines={2} style={[styles.choiceText, { color: palette.text }]}>
                       {value === "custom"
                         ? "직접 입력"
                         : locked
@@ -385,14 +458,18 @@ export function BodyFrameProjectSwitcher({
                 }}
                 keyboardType="number-pad"
                 accessibilityLabel="목표 기록 수 직접 입력"
-                style={[styles.input, { backgroundColor: palette.background, color: palette.text, borderColor: palette.line }]}
+                style={[styles.input, styles.customTargetInput, { backgroundColor: palette.background, color: palette.text, borderColor: palette.line }]}
                 placeholder="100"
                 placeholderTextColor={palette.faint}
+                editable={!submitting}
               />
             ) : null}
             {createError ? (
-              <View style={[styles.limitNotice, { backgroundColor: palette.background, borderColor: palette.line }]}>
-                <Text style={[styles.limitNoticeText, { color: palette.muted }]}>{createError}</Text>
+              <View
+                style={[styles.limitNotice, { backgroundColor: palette.background, borderColor: palette.line }]}
+                accessibilityLiveRegion="polite"
+              >
+                <Text style={[styles.limitNoticeText, { color: palette.text }]}>{createError}</Text>
                 {upgradePlanLabel && onUpgrade ? (
                   <Pressable
                     accessibilityRole="button"
@@ -410,10 +487,12 @@ export function BodyFrameProjectSwitcher({
               </View>
             ) : null}
 
-            <Text style={[styles.label, { color: palette.text }]}>촬영 기준 사진 방식</Text>
-            <Text style={[styles.referenceHint, { color: palette.muted }]}>
-              두 번째 촬영부터 겹쳐 볼 사진을 선택합니다.
-            </Text>
+            <View style={styles.referenceSectionHeader}>
+              <Text style={[styles.label, { color: palette.text }]}>촬영 기준 사진 방식</Text>
+              <Text style={[styles.referenceHint, { color: palette.muted }]}>
+                두 번째 촬영부터 겹쳐 볼 사진을 선택합니다.
+              </Text>
+            </View>
             <Pressable
               accessibilityRole="radio"
               accessibilityLabel="최근 사진을 기준으로 촬영"
@@ -462,17 +541,12 @@ export function BodyFrameProjectSwitcher({
 
             </ScrollView>
             <View style={styles.createFooter}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ disabled: submitting }}
-              disabled={submitting}
-              style={[styles.primaryButton, { backgroundColor: actionColor }, submitting && styles.disabled]}
-              onPress={() => void submitProject()}
-            >
-              <Text style={[styles.primaryButtonText, { color: actionTextColor }]}>
-                {submitting ? "생성 중..." : "프로젝트 만들기"}
-              </Text>
-            </Pressable>
+              <BodyFrameSheetFooter
+                onCancel={dismissCreateSheet}
+                onConfirm={() => void submitProject()}
+                confirmLabel={submitting ? "생성 중..." : "프로젝트 만들기"}
+                disabled={submitting}
+              />
             </View>
           </View>
         </View>
@@ -581,26 +655,93 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     marginBottom: 10
   },
-  projectList: { flexShrink: 1, minHeight: 0, maxHeight: 360 },
-  projectRow: {
-    minHeight: 64,
+  pickerSummaryRow: {
     flexDirection: "row",
-    alignItems: "center"
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+    marginTop: 16,
+    marginBottom: 6
+  },
+  pickerSectionTitle: {
+    fontSize: bodyFrameTypography.rowTitle,
+    fontWeight: "600"
+  },
+  pickerSectionCount: { fontSize: bodyFrameTypography.caption },
+  projectList: { flexShrink: 1, minHeight: 0, maxHeight: 360 },
+  projectListContent: { gap: 8, paddingVertical: 8 },
+  projectRow: {
+    minHeight: 72,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderRadius: bodyFrameDesign.cardRadius
   },
   projectRowPressed: { opacity: 0.7 },
-  projectTextWrap: { flex: 1 },
-  projectName: { color: "#F5F5F5", fontSize: 15, fontWeight: "500" },
-  projectMeta: { color: "#A0A0A6", fontSize: 12, marginTop: 4 },
-  sheetActions: { marginTop: 8 },
-  actionRow: { minHeight: bodyFrameDesign.primaryButtonHeight, justifyContent: "center" },
-  actionText: { color: "#F5F5F5", fontSize: 15, fontWeight: "600" },
-  actionTextSecondary: { color: "#A0A0A6", fontSize: 14 },
-  label: { color: "#A0A0A6", fontSize: 12, marginTop: 8, marginBottom: 6 },
-  planLimitText: {
-    marginBottom: 8,
-    color: "#A0A0A6",
-    fontSize: 12
+  projectTextWrap: { flex: 1, minWidth: 0 },
+  projectName: { fontSize: 15, fontWeight: "600", lineHeight: 21 },
+  projectMeta: { fontSize: 12, marginTop: 4, lineHeight: 18 },
+  selectedProjectMarker: { flexDirection: "row", alignItems: "center", gap: 5 },
+  selectedProjectText: { fontSize: bodyFrameTypography.caption, fontWeight: "600" },
+  emptyProjectState: {
+    minHeight: 152,
+    padding: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderRadius: bodyFrameDesign.cardRadius
   },
+  emptyProjectTitle: {
+    fontSize: bodyFrameTypography.rowTitle,
+    fontWeight: "600",
+    textAlign: "center"
+  },
+  emptyProjectDescription: {
+    fontSize: bodyFrameTypography.caption,
+    lineHeight: 18,
+    textAlign: "center"
+  },
+  sheetActions: { flexDirection: "row", gap: 8, marginTop: 8, paddingTop: 8 },
+  pickerCreateAction: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: bodyFrameDesign.primaryButtonHeight,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    borderRadius: bodyFrameDesign.buttonRadius
+  },
+  pickerManageAction: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: bodyFrameDesign.primaryButtonHeight,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderRadius: bodyFrameDesign.buttonRadius
+  },
+  actionText: { fontSize: bodyFrameTypography.button, fontWeight: "600", textAlign: "center" },
+  actionTextSecondary: { fontSize: bodyFrameTypography.button, fontWeight: "600", textAlign: "center" },
+  label: { fontSize: bodyFrameTypography.rowTitle, fontWeight: "600", marginTop: 10, marginBottom: 8 },
+  formSectionHeader: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 6,
+    marginTop: 8,
+    marginBottom: 4
+  },
+  planLimitText: { fontSize: bodyFrameTypography.caption, lineHeight: 18 },
   input: {
     minHeight: bodyFrameDesign.primaryButtonHeight,
     borderWidth: bodyFrameDesign.borderWidth,
@@ -610,38 +751,41 @@ const styles = StyleSheet.create({
     backgroundColor: "#0B0B0C",
     paddingHorizontal: 12
   },
-  choiceRow: { flexDirection: "row", gap: 8 },
+  choiceRow: { flexDirection: "row", gap: 8, marginBottom: 4 },
   choice: {
     flex: 1,
-    minHeight: bodyFrameDesign.minTouchSize,
+    minWidth: 0,
+    minHeight: 52,
+    paddingHorizontal: 5,
+    paddingVertical: 8,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: bodyFrameDesign.borderWidth,
-    borderColor: "#2A2A2E",
-    borderRadius: 8
+    borderRadius: bodyFrameDesign.buttonRadius
   },
-  choiceSelected: { borderColor: "#F5F5F5" },
-  choiceText: { color: "#F5F5F5", fontSize: bodyFrameTypography.caption, textAlign: "center" },
-  referenceHint: {
+  choiceText: {
     fontSize: bodyFrameTypography.caption,
     lineHeight: 18,
-    marginBottom: 6
+    fontWeight: "600",
+    textAlign: "center"
   },
+  customTargetInput: { marginTop: 8 },
+  referenceSectionHeader: { marginTop: 14, marginBottom: 10 },
+  referenceHint: { fontSize: bodyFrameTypography.caption, lineHeight: 18 },
   referenceChoice: {
     minHeight: 56,
     flexDirection: "row",
     alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#2A2A2E",
-    borderRadius: 8,
+    gap: 8,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderRadius: bodyFrameDesign.buttonRadius,
     paddingHorizontal: 12,
-    paddingVertical: 8,
-    marginBottom: 6
+    paddingVertical: 10,
+    marginBottom: 8
   },
-  referenceChoiceSelected: { borderColor: "#F5F5F5" },
-  referenceText: { flex: 1 },
-  referenceTitle: { color: "#F5F5F5", fontSize: bodyFrameTypography.rowTitle, fontWeight: "500" },
-  referenceMeta: { color: "#A0A0A6", fontSize: 12, marginTop: 3 },
+  referenceText: { flex: 1, minWidth: 0 },
+  referenceTitle: { fontSize: bodyFrameTypography.rowTitle, fontWeight: "600" },
+  referenceMeta: { fontSize: bodyFrameTypography.caption, lineHeight: 18, marginTop: 3 },
   limitNotice: {
     marginTop: 10,
     padding: 12,
@@ -670,12 +814,10 @@ const styles = StyleSheet.create({
     fontWeight: "600"
   },
   primaryButton: {
-    minHeight: 48,
+    minHeight: bodyFrameDesign.primaryButtonHeight,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 8,
-    backgroundColor: "#F5F5F5",
-    marginTop: 0
+    borderRadius: bodyFrameDesign.buttonRadius
   },
-  primaryButtonText: { color: "#111111", fontSize: 15, fontWeight: "700" }
+  primaryButtonText: { fontSize: bodyFrameTypography.button, fontWeight: "700" }
 });

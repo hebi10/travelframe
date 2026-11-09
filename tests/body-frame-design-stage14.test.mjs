@@ -53,9 +53,9 @@ assert.ok(settings.includes("saveAppSettings("));
 assert.ok(settings.includes("setActiveSetting(\"fontStyle\")"));
 
 assert.match(switcher, /referenceChoice:\s*\{[^}]*minHeight:\s*56/);
-assert.match(switcher, /label:\s*\{[^}]*marginTop:\s*8/);
+assert.match(switcher, /label:\s*\{[^}]*marginTop:\s*10/);
 assert.ok(switcher.includes("onCreateProject"));
-assert.ok(switcher.includes("bodyFrameDesign.minTouchSize"));
+assert.ok(switcher.includes("bodyFrameDesign.primaryButtonHeight") && switcher.includes("minHeight: 56"));
 
 for(const str of ["feat/body-frame-design-stage14-", "stage13-design-captures", "phone-360dp", "tablet-750dp"]){
   assert.ok(workflow.includes(str), str);
