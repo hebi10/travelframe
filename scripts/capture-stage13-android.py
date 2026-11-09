@@ -44,6 +44,21 @@ def open_camera_save_targets(device):
     open_camera_settings(device)
     device.find_control("핸드폰 앨범", search="below")
 
+def open_camera_guide_settings(device):
+    open_camera_settings(device)
+    device.open_control("라인 가이드 설정 열기", ["가이드 설정", "가이드라인"])
+
+def open_camera_reference_setup(device):
+    device.ready(["프로젝트 선택", "사진 촬영"])
+    labels = [
+        node.get("content-desc", "")
+        for node in qa.ET.fromstring(device.dump()).iter("node")
+        if node.get("content-desc", "").startswith("기준 사진 투명도 ")
+    ]
+    if len(set(labels)) != 1:
+        raise RuntimeError("Exactly one reference photo opacity control must be visible")
+    device.open_control(labels[0], ["사진 가이드", "확인"])
+
 CASES = [
     ("camera", "촬영", "camera", ["프로젝트 선택", "사진 촬영"], None),
     ("camera-project-picker", "촬영 프로젝트 선택", "camera",
@@ -53,6 +68,10 @@ CASES = [
     ("camera-settings", "촬영 설정·도구", "camera", ["촬영 도구", "촬영 옵션"], open_camera_settings),
     ("camera-settings-storage", "촬영 설정·저장 위치", "camera",
      ["앱 보관함", "핸드폰 앨범"], open_camera_save_targets),
+    ("camera-guide-settings", "촬영 가이드 설정", "camera",
+     ["가이드 설정", "가이드라인"], open_camera_guide_settings),
+    ("camera-reference-adjust", "촬영 기준 사진 위치·투명도", "camera",
+     ["사진 가이드", "확인"], open_camera_reference_setup),
     ("records", "기록·프로젝트 목록", "studio", ["QA 데모", "내 프로젝트"], None),
     ("project", "프로젝트 상세·기록", f"project/{P}", ["QA 데모", "프로젝트 설정 열기"], None),
     ("project-metrics", "프로젝트 상세·수치 탭", f"project/{P}", ["QA 데모", "수치 기록", "전체 수치 기록 보기"], (["QA 데모"], "수치")),
@@ -81,12 +100,12 @@ CASES = [
     ("capture-preview", "촬영 후 미리보기", f"capture-preview?id={F}", ["촬영 미리보기", "다시 촬영"], None),
 ]
 CORE = {
-    "camera", "camera-project-picker", "camera-new-project", "camera-settings", "camera-settings-storage", "records", "project", "project-metrics", "project-stats", "compare",
+    "camera", "camera-project-picker", "camera-new-project", "camera-settings", "camera-settings-storage", "camera-guide-settings", "camera-reference-adjust", "records", "project", "project-metrics", "project-stats", "compare",
     "measurements", "video-home", "video-create", "video-library",
     "settings", "account", "project-settings", "video-photos", "video-quality",
 }
 LARGE_TEXT = {
-    "camera", "camera-new-project", "camera-settings", "records", "project", "project-metrics", "project-stats", "compare",
+    "camera", "camera-new-project", "camera-settings", "camera-guide-settings", "records", "project", "project-metrics", "project-stats", "compare",
     "video-home", "video-create", "settings", "account", "project-settings", "video-photos",
 }
 ADDITIONAL = [

@@ -67,6 +67,33 @@ class Stage13CaptureTest(unittest.TestCase):
         for case in ("camera-settings", "camera-settings-storage"):
             self.assertIn(case, names)
 
+    def test_c4_camera_guide_settings_opens_from_native_camera_tools(self):
+        device = Mock()
+        stage13.open_camera_guide_settings(device)
+        self.assertEqual(device.open_control.call_args_list, [
+            call("촬영 설정 열기", ["촬영 도구", "촬영 옵션"]),
+            call("라인 가이드 설정 열기", ["가이드 설정", "가이드라인"]),
+        ])
+        self.assertIn("camera-guide-settings", [item[0] for item in stage13.CASES])
+
+    def test_c4_reference_adjustment_uses_existing_accessible_opacity_control(self):
+        device = Mock()
+        device.dump.return_value = (
+            '<hierarchy><node content-desc="기준 사진 투명도 42퍼센트"/></hierarchy>'
+        )
+        stage13.open_camera_reference_setup(device)
+        device.open_control.assert_called_once_with(
+            "기준 사진 투명도 42퍼센트", ["사진 가이드", "확인"]
+        )
+        self.assertIn("camera-reference-adjust", [item[0] for item in stage13.CASES])
+
+    def test_c4_reference_adjustment_requires_one_unambiguous_source(self):
+        device = Mock()
+        device.dump.return_value = '<hierarchy><node content-desc="다른 동작"/></hierarchy>'
+        with self.assertRaisesRegex(RuntimeError, "Exactly one reference photo"):
+            stage13.open_camera_reference_setup(device)
+        device.open_control.assert_not_called()
+
     def test_stage_d_light_150_still_separates_first_install_and_replayed_guide(self):
         self.assertEqual(stage13.ALL_VARIANTS["light-150"], ("light", "large", 1.5))
         source = SCRIPT.read_text(encoding="utf-8")

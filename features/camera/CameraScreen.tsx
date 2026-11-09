@@ -3244,8 +3244,11 @@ export default function CameraScreen({
               <View style={styles.cameraSettingsHandle} />
               <View style={styles.modalHeader}>
                 <View style={styles.modalTitleGroup}>
-                  <Text selectable={false} style={styles.modalEyebrow}>GUIDE</Text>
+                  <Text selectable={false} style={styles.modalEyebrow}>BODY FRAME</Text>
                   <Text selectable={false} style={styles.modalTitle}>가이드 설정</Text>
+                  <Text selectable={false} style={styles.guideModalDescription}>
+                    같은 구도로 반복 촬영하기 위한 기준선을 조정합니다.
+                  </Text>
                 </View>
                 <Pressable accessibilityRole="button" accessibilityLabel="가이드 설정 닫기" style={styles.modalCloseButton} onPress={() => setGuideSettingsOpen(false)}>
                   <Text selectable={false} style={styles.modalCloseText}>닫기</Text>
@@ -3255,18 +3258,18 @@ export default function CameraScreen({
               <ScrollView
                 style={styles.guideSettingsScroll}
                 contentContainerStyle={styles.guideSettingsContent}
-                showsVerticalScrollIndicator={false}
+                showsVerticalScrollIndicator
                 keyboardShouldPersistTaps="handled"
                 keyboardDismissMode="on-drag"
                 nestedScrollEnabled
               >
                 <View style={styles.modalSection}>
                   <Text selectable={false} style={styles.modalSectionTitle}>가이드라인</Text>
-                  <View style={styles.optionGrid}>
+                  <View style={[styles.optionGrid, styles.guideTypeGrid]}>
                     {GUIDE_TYPES.map((type) => (
                       <Pressable accessibilityRole="button"
                         key={type}
-                        style={[styles.optionButton, guide === type && styles.optionButtonActive]}
+                        style={[styles.optionButton, styles.guideTypeOption, guide === type && styles.optionButtonActive]}
                         onPress={() => {
                           updateGuideType(type);
                         }}
@@ -3281,6 +3284,9 @@ export default function CameraScreen({
                         >
                           {GUIDE_LABELS[type]}
                         </Text>
+                        {guide === type ? (
+                          <Feather name="check" size={14} color={bodyFrameDarkColors.text} />
+                        ) : null}
                       </Pressable>
                     ))}
                   </View>
@@ -3288,7 +3294,7 @@ export default function CameraScreen({
 
                 <View style={styles.modalSection}>
                   <Text selectable={false} style={styles.modalSectionTitle}>크기</Text>
-                  <View style={styles.optionRow}>
+                  <View style={[styles.optionRow, styles.guideSegmentRow]}>
                     {GUIDE_SIZE_OPTIONS.map((option) => (
                       <Pressable accessibilityRole="button"
                         key={option.value}
@@ -3314,6 +3320,7 @@ export default function CameraScreen({
                   <View style={styles.sizeFineControl}>
                     <GuideSizeSlider
                       compact
+                      dark
                       value={guideSize}
                       min={guideSizeBounds.min}
                       max={guideSizeBounds.max}
@@ -3325,6 +3332,7 @@ export default function CameraScreen({
                       keyboardType="number-pad"
                       maxLength={String(guideSizeBounds.max).length}
                       selectTextOnFocus
+                      accessibilityLabel="가이드 크기 직접 입력"
                       style={styles.sizeInput}
                       onChangeText={(value) => setGuideSizeInput(value.replace(/[^0-9]/g, ""))}
                       onBlur={commitGuideSizeInput}
@@ -3351,7 +3359,7 @@ export default function CameraScreen({
 
                 <View style={[styles.modalSection, styles.modalSectionSpaced]}>
                   <Text selectable={false} style={styles.modalSectionTitle}>선 두께</Text>
-                  <View style={styles.optionRow}>
+                  <View style={[styles.optionRow, styles.guideSegmentRow]}>
                     {GUIDE_STROKE_WIDTH_OPTIONS.map((strokeWidth) => {
                       const isActive = guideStrokeWidth === strokeWidth;
                       return (
@@ -3375,6 +3383,9 @@ export default function CameraScreen({
 
                 <View style={[styles.modalSection, styles.modalSectionSpaced]}>
                   <Text selectable={false} style={styles.modalSectionTitle}>색상</Text>
+                  <Text selectable={false} style={styles.guideSectionHint}>
+                    배경과 구분되는 색상을 선택하세요.
+                  </Text>
                   <View style={styles.colorRow}>
                     {GUIDE_COLOR_OPTIONS.map(({ label, value: swatchColor }) => (
                       <Pressable accessibilityRole="button"
@@ -3384,10 +3395,14 @@ export default function CameraScreen({
                           guideColor === swatchColor && styles.colorOptionActive
                         ]}
                         onPress={() => updateGuideColor(swatchColor)}
+                        accessibilityLabel={`가이드 색상 ${label}`}
                         accessibilityState={{ selected: guideColor === swatchColor }}
                       >
                         <View style={[styles.colorSwatch, { backgroundColor: swatchColor }]} />
                         <Text selectable={false} style={styles.colorLabel}>{label}</Text>
+                        {guideColor === swatchColor ? (
+                          <Feather name="check" size={12} color={bodyFrameDarkColors.text} />
+                        ) : null}
                       </Pressable>
                     ))}
                   </View>
@@ -3423,10 +3438,10 @@ export default function CameraScreen({
             <View style={styles.captureRow}>
               <View style={styles.overlaySetupPanel}>
                 <View style={styles.overlaySetupHeader}>
-                  <View>
+                  <View style={styles.overlaySetupHeaderCopy}>
                     <Text selectable={false} style={styles.overlaySetupTitle}>사진 가이드</Text>
                     <Text selectable={false} style={styles.overlaySetupHint}>
-                      드래그와 손가락 확대/축소로 직접 맞출 수 있습니다.
+                      드래그로 이동하고 두 손가락으로 크기를 맞춥니다. 원본 사진은 유지됩니다.
                     </Text>
                   </View>
                   <Text selectable={false} style={styles.overlaySetupValue}>
@@ -3453,7 +3468,7 @@ export default function CameraScreen({
                   <Pressable accessibilityRole="button" style={styles.overlayCompactButton} onPress={resetOverlay}>
                     <Text selectable={false} style={styles.overlayCompactText}>초기화</Text>
                   </Pressable>
-                  <Pressable accessibilityRole="button" style={styles.overlayConfirmButton} onPress={confirmOverlaySetup}>
+                  <Pressable accessibilityRole="button" accessibilityLabel="기준 사진 위치 및 투명도 설정 완료" style={styles.overlayConfirmButton} onPress={confirmOverlaySetup}>
                     <Text selectable={false} style={styles.overlayConfirmText}>확인</Text>
                   </Pressable>
                 </View>
@@ -3464,7 +3479,7 @@ export default function CameraScreen({
                     style={[styles.overlayCompactButton, styles.overlayRemoveButton]}
                     onPress={removeReferenceOverlay}
                   >
-                    <Text selectable={false} style={[styles.overlayCompactText, styles.overlayRemoveText]}>
+                    <Text selectable={false} numberOfLines={2} style={[styles.overlayCompactText, styles.overlayRemoveText]}>
                       이미지 제거
                     </Text>
                   </Pressable>
@@ -3477,7 +3492,7 @@ export default function CameraScreen({
                       style={[styles.overlayCompactButton, (isReferenceModeChanging || bodyFrameCameraSession.projectPhotoCount === 0) && { opacity: 0.45 }]}
                       onPress={() => void toggleProjectReference()}
                     >
-                      <Text selectable={false} style={styles.overlayCompactText}>
+                      <Text selectable={false} numberOfLines={2} style={styles.overlayCompactText}>
                         {isReferenceModeChanging ? "변경중" : projectReferenceMode === "first" ? "프로젝트 마지막 사진" : "프로젝트 첫번째 사진"}
                       </Text>
                     </Pressable>
