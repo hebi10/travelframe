@@ -67,9 +67,9 @@ jobs:
       id-token: write
     env:
       STORE_MANIFEST: ${{ github.workspace }}/docs/release-assets/play-phone-six-20261109.json
-      STORE_INPUT_DIR: ${{ runner.temp }}/store-screenshot-input
-      STORE_OUTPUT_DIR: ${{ runner.temp }}/store-screenshot-output
-      STORE_RECEIPT_PATH: ${{ runner.temp }}/store-play-receipt.json
+      STORE_INPUT_DIR: ${{ github.workspace }}/.store-screenshot-input
+      STORE_OUTPUT_DIR: ${{ github.workspace }}/.store-screenshot-output
+      STORE_RECEIPT_PATH: ${{ github.workspace }}/.store-play-receipt.json
     steps:
       - name: Checkout reviewed store listing pipeline
         uses: actions/checkout@v4
