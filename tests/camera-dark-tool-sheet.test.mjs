@@ -13,7 +13,7 @@ const componentsSource = fs.readFileSync(
 
 for (const token of [
   "cameraSettingsHandle",
-  'style={styles.cameraSettingsTitle}>촬영</Text>',
+  'style={styles.cameraSettingsTitle}>촬영 설정</Text>',
   "cameraToolIntro",
   'accessibilityLabel="사진 설정 열기"',
   '<Text selectable={false} style={styles.cameraToolText}>사진</Text>',
@@ -37,7 +37,7 @@ for (const token of [
   "cameraSettingsSectionDetail",
   "cameraSettingsOptionButtonActive",
   'backgroundColor: "#18181B"',
-  "minHeight: 96"
+  "minHeight: 76"
 ]) {
   assert.ok(stylesSource.includes(token), `dark camera tool styles missing: ${token}`);
 }

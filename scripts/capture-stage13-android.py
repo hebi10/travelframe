@@ -36,12 +36,23 @@ def open_camera_new_project(device):
     open_camera_project_picker(device)
     device.open_control("+ 새 프로젝트", ["프로젝트 이름", "목표 기록 수", "프로젝트 만들기"])
 
+def open_camera_settings(device):
+    device.ready(["프로젝트 선택", "사진 촬영"])
+    device.open_control("촬영 설정 열기", ["촬영 도구", "촬영 옵션"])
+
+def open_camera_save_targets(device):
+    open_camera_settings(device)
+    device.find_control("핸드폰 앨범", search="below")
+
 CASES = [
     ("camera", "촬영", "camera", ["프로젝트 선택", "사진 촬영"], None),
     ("camera-project-picker", "촬영 프로젝트 선택", "camera",
      ["내 프로젝트", "프로젝트 관리"], open_camera_project_picker),
     ("camera-new-project", "촬영 새 프로젝트", "camera",
      ["프로젝트 이름", "목표 기록 수", "프로젝트 만들기"], open_camera_new_project),
+    ("camera-settings", "촬영 설정·도구", "camera", ["촬영 도구", "촬영 옵션"], open_camera_settings),
+    ("camera-settings-storage", "촬영 설정·저장 위치", "camera",
+     ["앱 보관함", "핸드폰 앨범"], open_camera_save_targets),
     ("records", "기록·프로젝트 목록", "studio", ["QA 데모", "내 프로젝트"], None),
     ("project", "프로젝트 상세·기록", f"project/{P}", ["QA 데모", "프로젝트 설정 열기"], None),
     ("project-metrics", "프로젝트 상세·수치 탭", f"project/{P}", ["QA 데모", "수치 기록", "전체 수치 기록 보기"], (["QA 데모"], "수치")),
@@ -70,12 +81,12 @@ CASES = [
     ("capture-preview", "촬영 후 미리보기", f"capture-preview?id={F}", ["촬영 미리보기", "다시 촬영"], None),
 ]
 CORE = {
-    "camera", "camera-project-picker", "camera-new-project", "records", "project", "project-metrics", "project-stats", "compare",
+    "camera", "camera-project-picker", "camera-new-project", "camera-settings", "camera-settings-storage", "records", "project", "project-metrics", "project-stats", "compare",
     "measurements", "video-home", "video-create", "video-library",
     "settings", "account", "project-settings", "video-photos", "video-quality",
 }
 LARGE_TEXT = {
-    "camera", "camera-new-project", "records", "project", "project-metrics", "project-stats", "compare",
+    "camera", "camera-new-project", "camera-settings", "records", "project", "project-metrics", "project-stats", "compare",
     "video-home", "video-create", "settings", "account", "project-settings", "video-photos",
 }
 ADDITIONAL = [

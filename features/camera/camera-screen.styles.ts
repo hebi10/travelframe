@@ -1,6 +1,6 @@
 import { StyleSheet } from "react-native";
 
-import { bodyFrameAccent, bodyFrameDarkColors, bodyFrameDesign, bodyFrameSheetDesign, bodyFrameTypography, colors, controls, typography } from "@/constants/app-theme";
+import { bodyFrameDarkColors, bodyFrameDesign, bodyFrameSheetDesign, bodyFrameTypography, colors, controls, typography } from "@/constants/app-theme";
 import {
   CAMERA_CONTROL_TRAY_HORIZONTAL_PADDING,
   CAMERA_FOCUS_INDICATOR_RADIUS,
@@ -447,20 +447,15 @@ export const styles = StyleSheet.create({
     maxHeight: 560
   },
   cameraSettingsContent: {
-    gap: 22,
+    gap: 14,
     paddingBottom: 28
   },
   cameraToolIntro: {
-    minHeight: 82,
+    minHeight: 58,
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderWidth: bodyFrameDesign.borderWidth,
-    borderColor: "#35353A",
-    borderRadius: bodyFrameDesign.modalRadius,
-    backgroundColor: "#151517"
+    paddingHorizontal: 2,
+    paddingVertical: 4
   },
   cameraToolIntroCopy: {
     flex: 1,
@@ -482,6 +477,62 @@ export const styles = StyleSheet.create({
     height: bodyFrameDesign.borderWidth,
     backgroundColor: bodyFrameDarkColors.line
   },
+  cameraSettingsGroupTitle: {
+    color: bodyFrameDarkColors.text,
+    fontSize: bodyFrameTypography.sectionTitle,
+    fontWeight: "700"
+  },
+  cameraSettingsGroup: {
+    gap: 14
+  },
+  cameraSettingsLabelRow: {
+    minHeight: 24,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between"
+  },
+  cameraSettingsRatioRow: {
+    flexWrap: "wrap",
+    alignItems: "stretch"
+  },
+  cameraSettingsRatioOption: {
+    flex: 0,
+    flexGrow: 1,
+    flexShrink: 0,
+    flexBasis: "30%",
+    minWidth: 0
+  },
+  cameraSettingsSaveList: {
+    gap: 8
+  },
+  cameraSettingsSaveOption: {
+    minHeight: 64,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderColor: "#35353A",
+    borderRadius: bodyFrameDesign.buttonRadius,
+    backgroundColor: "#18181B"
+  },
+  cameraSettingsSaveOptionDisabled: { opacity: 0.52 },
+  cameraSettingsSaveCopy: {
+    flex: 1,
+    minWidth: 0,
+    gap: 3
+  },
+  cameraSettingsSaveDetail: {
+    color: bodyFrameDarkColors.muted,
+    fontSize: bodyFrameTypography.caption,
+    lineHeight: 18
+  },
+  cameraSettingsSaveNotice: {
+    color: bodyFrameDarkColors.muted,
+    fontSize: bodyFrameTypography.caption,
+    lineHeight: 17
+  },
   cameraSettingsOptionRow: {
     flexDirection: "row",
     gap: 8
@@ -500,8 +551,8 @@ export const styles = StyleSheet.create({
     backgroundColor: "#18181B"
   },
   cameraSettingsOptionButtonActive: {
-    borderColor: bodyFrameAccent,
-    backgroundColor: "#050506"
+    borderColor: bodyFrameDarkColors.text,
+    backgroundColor: "#292D31"
   },
   cameraSettingsOptionButtonText: {
     color: bodyFrameDarkColors.text,
@@ -527,22 +578,23 @@ export const styles = StyleSheet.create({
     gap: 8
   },
   cameraToolButton: {
-    width: "31%",
-    minWidth: 88,
-    minHeight: 96,
+    width: "30%",
+    minWidth: 80,
+    minHeight: 76,
     flexGrow: 1,
     alignItems: "center",
     justifyContent: "center",
-    gap: 9,
-    paddingHorizontal: 10,
+    gap: 7,
+    paddingHorizontal: 8,
+    paddingVertical: 9,
     borderWidth: bodyFrameDesign.borderWidth,
     borderColor: "#35353A",
     borderRadius: bodyFrameDesign.buttonRadius,
     backgroundColor: "#18181B"
   },
   cameraToolButtonActive: {
-    borderColor: bodyFrameAccent,
-    backgroundColor: "#0A0A0C"
+    borderColor: bodyFrameDarkColors.text,
+    backgroundColor: "#292D31"
   },
   cameraToolText: {
     color: bodyFrameDarkColors.text,

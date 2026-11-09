@@ -2880,8 +2880,8 @@ export default function CameraScreen({
             <View style={styles.cameraSettingsHandle} />
             <View style={styles.cameraSettingsHeader}>
               <View style={styles.modalTitleGroup}>
-                <Text selectable={false} style={styles.cameraSettingsEyebrow}>CAMERA</Text>
-                <Text selectable={false} style={styles.cameraSettingsTitle}>촬영</Text>
+                <Text selectable={false} style={styles.cameraSettingsEyebrow}>BODY FRAME</Text>
+                <Text selectable={false} style={styles.cameraSettingsTitle}>촬영 설정</Text>
               </View>
               <Pressable accessibilityRole="button" accessibilityLabel="촬영 설정 닫기" style={styles.cameraSettingsCloseButton} onPress={() => setCameraSettingsOpen(false)}>
                 <Text selectable={false} style={styles.cameraSettingsCloseText}>닫기</Text>
@@ -2901,14 +2901,9 @@ export default function CameraScreen({
                     <View style={styles.cameraToolIntroCopy}>
                       <Text selectable={false} style={styles.cameraSettingsSectionTitle}>촬영 도구</Text>
                       <Text selectable={false} style={styles.cameraSettingsSectionDetail}>
-                        자주 쓰지 않는 기능은 촬영 화면을 가리지 않도록 이곳에서 엽니다.
+                        가이드와 사진 보정을 선택하면 촬영 화면에서 직접 조절합니다.
                       </Text>
                     </View>
-                    <Feather
-                      name="chevron-down"
-                      size={24}
-                      color={bodyFrameDarkColors.text}
-                    />
                   </View>
                   <View style={styles.cameraToolGrid}>
                     <Pressable
@@ -2972,26 +2967,18 @@ export default function CameraScreen({
                       <Feather name="zap" size={24} color={bodyFrameDarkColors.text} />
                       <Text selectable={false} style={styles.cameraToolText}>라이트</Text>
                     </Pressable>
-                    <Pressable
-                      style={styles.cameraToolButton}
-                      onPress={toggleCameraFacing}
-                      accessibilityRole="button"
-                      accessibilityLabel={
-                        cameraFacing === "front" ? "후면 카메라로 전환" : "전면 카메라로 전환"
-                      }
-                    >
-                      <Feather name="refresh-cw" size={24} color={bodyFrameDarkColors.text} />
-                      <Text selectable={false} style={styles.cameraToolText}>
-                        {cameraFacing === "front" ? "후면" : "전면"}
-                      </Text>
-                    </Pressable>
                   </View>
                 </View>
 
                 <View style={styles.cameraSettingsDivider} />
 
+                <Text selectable={false} style={styles.cameraSettingsGroupTitle}>촬영 옵션</Text>
+                <View style={styles.cameraSettingsGroup}>
                 <View style={styles.cameraSettingBlock}>
-                  <Text selectable={false} style={styles.cameraSettingsSectionTitle}>카메라 방향</Text>
+                  <View style={styles.cameraSettingsLabelRow}>
+                    <Text selectable={false} style={styles.cameraSettingsSectionTitle}>카메라 방향</Text>
+                    <Feather name="refresh-cw" size={16} color={bodyFrameDarkColors.muted} />
+                  </View>
                   <View style={styles.cameraSettingsOptionRow}>
                     {CAMERA_FACING_OPTIONS.map((option) => (
                       <Pressable accessibilityRole="button"
@@ -3094,7 +3081,11 @@ export default function CameraScreen({
                     onPress={() => setLightEnabled(!torchEnabled)}
                   />
                 </View>
+                </View>
 
+                <View style={styles.cameraSettingsDivider} />
+                <Text selectable={false} style={styles.cameraSettingsGroupTitle}>품질 및 화면</Text>
+                <View style={styles.cameraSettingsGroup}>
                 <View style={styles.cameraSettingBlock}>
                   <Text selectable={false} style={styles.cameraSettingsSectionTitle}>촬영 품질</Text>
                   <View style={styles.cameraSettingsOptionRow}>
@@ -3124,12 +3115,13 @@ export default function CameraScreen({
 
                 <View style={styles.cameraSettingBlock}>
                   <Text selectable={false} style={styles.cameraSettingsSectionTitle}>카메라 비율</Text>
-                  <View style={styles.cameraSettingsOptionRow}>
+                  <View style={[styles.cameraSettingsOptionRow, styles.cameraSettingsRatioRow]}>
                     {CAMERA_RATIO_OPTIONS.map((option) => (
                       <Pressable accessibilityRole="button"
                         key={option.value}
                         style={[
                           styles.cameraSettingsOptionButton,
+                          styles.cameraSettingsRatioOption,
                           cameraRatio === option.value && styles.cameraSettingsOptionButtonActive
                         ]}
                         onPress={() => updateCameraRatio(option.value)}
@@ -3149,9 +3141,15 @@ export default function CameraScreen({
                   </View>
                 </View>
 
+                </View>
+
+                <View style={styles.cameraSettingsDivider} />
                 <View style={styles.cameraSettingBlock}>
-                  <Text selectable={false} style={styles.cameraSettingsSectionTitle}>저장 범위</Text>
-                  <View style={styles.optionGrid}>
+                  <Text selectable={false} style={styles.cameraSettingsGroupTitle}>저장 위치</Text>
+                  <Text selectable={false} style={styles.cameraSettingsSectionDetail}>
+                    선택한 위치에 각각 저장합니다.
+                  </Text>
+                  <View style={styles.cameraSettingsSaveList}>
                     {CAMERA_SAVE_SCOPE_OPTIONS.map((option) => {
                       const isCloudSaveTargetDisabled =
                         option.value === "cloud" && !canSelectCloudSaveTarget;
@@ -3160,37 +3158,48 @@ export default function CameraScreen({
                         !isCloudSaveTargetDisabled;
 
                       return (
-                        <Pressable accessibilityRole="button"
+                        <Pressable
+                          accessibilityRole="checkbox"
                           key={option.value}
                           disabled={isCloudSaveTargetDisabled}
                           style={[
-                            styles.cameraSettingsOptionButton,
+                            styles.cameraSettingsSaveOption,
                             isSelected && styles.cameraSettingsOptionButtonActive,
-                            isCloudSaveTargetDisabled && { opacity: 0.38 }
+                            isCloudSaveTargetDisabled && styles.cameraSettingsSaveOptionDisabled
                           ]}
                           onPress={() => toggleCameraSaveTarget(option.value)}
-                          accessibilityState={{ disabled: isCloudSaveTargetDisabled, selected: isSelected }}
+                          accessibilityState={{ disabled: isCloudSaveTargetDisabled, checked: isSelected, selected: isSelected }}
+                          accessibilityLabel={option.label}
+                          accessibilityHint={option.detail}
                         >
-                          <Text
-                            selectable={false}
-                            style={[
-                              styles.cameraSettingsOptionButtonText,
-                              isSelected && styles.cameraSettingsOptionButtonTextActive
-                            ]}
-                          >
-                            {option.label}
-                          </Text>
+                          <View style={styles.cameraSettingsSaveCopy}>
+                            <Text selectable={false} style={styles.cameraSettingsOptionButtonText}>{option.label}</Text>
+                            <Text selectable={false} style={styles.cameraSettingsSaveDetail}>
+                              {option.detail}
+                            </Text>
+                            {isCloudSaveTargetDisabled ? (
+                              <Text selectable={false} style={styles.cameraSettingsSaveNotice}>
+                                클라우드 백업을 사용할 수 없는 플랜 또는 상태입니다.
+                              </Text>
+                            ) : null}
+                          </View>
+                          <Feather
+                            name={isSelected ? "check-square" : "square"}
+                            size={21}
+                            color={isSelected ? bodyFrameDarkColors.text : bodyFrameDarkColors.muted}
+                          />
                         </Pressable>
                       );
                     })}
                   </View>
                   <Text selectable={false} style={styles.cameraSettingsSectionDetail}>
-                    선택한 위치에 각각 저장합니다. 클라우드는 로그인 및 백업 설정이 가능한 경우에만 사용됩니다.
+                    클라우드는 로그인 및 백업 설정이 가능한 경우에만 사용됩니다.
                   </Text>
                 </View>
 
+                <View style={styles.cameraSettingsDivider} />
                 <View style={styles.cameraSettingBlock}>
-                  <Text selectable={false} style={styles.cameraSettingsSectionTitle}>촬영 보조</Text>
+                  <Text selectable={false} style={styles.cameraSettingsGroupTitle}>촬영 보조</Text>
                   <CameraShutterSoundChoice
                     dark
                     mode={cameraShutterSoundMode}
