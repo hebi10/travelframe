@@ -1,0 +1,133 @@
+{
+  "packageId": "com.haebi.photoguide",
+  "versionName": "1.0.33",
+  "versionCode": 26092625,
+  "sourceSha": "6ebe3874c0e9545a97682f7d694ce9be36f04a39",
+  "apkSha256": "f25f36aa4fab7b595a480e2f44225d461aca1c48e8b86df360f1787f7c79ec68",
+  "runUrl": "https://github.com/hebi10/travelframe/actions/runs/42659941219",
+  "serial": "emulator-5558",
+  "avd": "BodyFrame_Release_QA_20261110_26092625",
+  "devicePixels": "Physical size: 1080x2424",
+  "density": "Physical density: 420",
+  "fontScale": "1.0",
+  "sourceFileHashesMatch": {
+    "features/camera/CameraScreen.tsx": true,
+    "features/camera/camera-screen.components.tsx": true,
+    "features/camera/camera-screen.styles.ts": true,
+    "features/camera/camera-screen.model.ts": true,
+    "features/camera/BodyFrameProjectSwitcher.tsx": true,
+    "components/body-frame-sheet.tsx": true,
+    "lib/app-settings.ts": true,
+    "lib/body-frame-capture-context.ts": true,
+    "lib/camera-zoom-session.ts": true,
+    "lib/camera-exposure-session.ts": true
+  },
+  "routeAndLifecycleChecks": {
+    "account-route": {
+      "status": "PASS",
+      "evidence": "05-account-route.xml"
+    },
+    "project-management-route": {
+      "status": "PASS",
+      "evidence": "10-project-management-route.xml"
+    },
+    "photo-measurement-route": {
+      "status": "PASS",
+      "evidence": "24-photo-measurement-route.xml"
+    },
+    "photo-detail-route": {
+      "status": "PASS",
+      "evidence": "25-photo-detail-route.xml"
+    },
+    "zoom-panel-close-preserves-value": {
+      "status": "PASS",
+      "evidence": "35-zoom-retained-on-close.xml"
+    },
+    "three-photos-saved": {
+      "status": "PASS",
+      "evidence": "37-studio-three-photos.xml"
+    },
+    "project-last-capture-zoom-restore": {
+      "status": "PASS",
+      "evidence": "38-project-captured-zoom-restored.xml"
+    },
+    "background-foreground-resume": {
+      "status": "PASS",
+      "evidence": "41-zoom-after-background-resume.xml"
+    },
+    "final-camera": {
+      "status": "PASS",
+      "evidence": "53-final-release-handoff.xml"
+    }
+  },
+  "guidePagesVerified": 6,
+  "syntheticProjectCount": 1,
+  "syntheticPhotoCount": 3,
+  "realAccountOrHealthValuesEntered": false,
+  "productCodeChanged": false,
+  "originalDevicesModified": false,
+  "runtimeSummary": {
+    "cameraInactiveExceptions": 0,
+    "fatalExceptions": 0,
+    "unhandledPromises": 0,
+    "jsHostFunctionExceptions": 0,
+    "handledBillingInitUnavailableCount": 3,
+    "billingContext": "Isolated emulator with no Play account; sideloaded upload-key APK. Live billing and Play-signed installation were not tested."
+  },
+  "guideComparison": {
+    "comparison": "Prior final debug popup vs same-source signed release popup; native pixels unchanged",
+    "screenPixels": [
+      1080,
+      2424
+    ],
+    "densityDpi": 420,
+    "fontScale": 1.0,
+    "fullPopup": {
+      "bounds": [
+        47,
+        636,
+        1033,
+        1867
+      ],
+      "pixels": [
+        986,
+        1231
+      ],
+      "equalPixelFraction": 0.7610288968384351,
+      "fractionWithinRgbDifference1": 0.9696498336582174,
+      "fractionWithinRgbDifference2": 0.992610602043557,
+      "fractionWithinRgbDifference4": 0.9958245658553626,
+      "meanAbsoluteRgbDifference": 0.25290020207080005,
+      "maximumChannelDifference": 219
+    },
+    "opaqueInterior": {
+      "bounds": [
+        95,
+        684,
+        985,
+        1819
+      ],
+      "pixels": [
+        890,
+        1135
+      ],
+      "equalPixelFraction": 0.7145047765183389,
+      "fractionWithinRgbDifference1": 0.9650626144631985,
+      "fractionWithinRgbDifference2": 0.991691332970351,
+      "fractionWithinRgbDifference4": 0.9954897787457309,
+      "meanAbsoluteRgbDifference": 0.29914336154696497,
+      "maximumChannelDifference": 219
+    },
+    "interiorInsetPx": 48,
+    "excludedFromInterior": "Rounded outer corners and translucent shadow depend on the settings scroll position behind the popup."
+  },
+  "limitations": [
+    "Android emulator only",
+    "Upload-key APK from the exact submitted AAB; Google Play installation and billing are separate",
+    "No full theme/font/device matrix or real optical zoom/torch claim"
+  ],
+  "notes": [
+    "First measurement prompt attempt was interrupted by the expected Android media permission dialog. Permission granted on this new QA device, then the next real capture and prompt navigation passed.",
+    "An unconditional 3x restore expectation was corrected against the existing last-successful-capture policy; no product code change. A real 3x capture then restored 3x after navigation and background resume."
+  ]
+}

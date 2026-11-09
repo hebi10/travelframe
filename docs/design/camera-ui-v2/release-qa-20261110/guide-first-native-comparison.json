@@ -1,0 +1,47 @@
+{
+  "comparison": "Prior final debug popup vs same-source signed release popup; native pixels unchanged",
+  "screenPixels": [
+    1080,
+    2424
+  ],
+  "densityDpi": 420,
+  "fontScale": 1.0,
+  "fullPopup": {
+    "bounds": [
+      47,
+      636,
+      1033,
+      1867
+    ],
+    "pixels": [
+      986,
+      1231
+    ],
+    "equalPixelFraction": 0.7610288968384351,
+    "fractionWithinRgbDifference1": 0.9696498336582174,
+    "fractionWithinRgbDifference2": 0.992610602043557,
+    "fractionWithinRgbDifference4": 0.9958245658553626,
+    "meanAbsoluteRgbDifference": 0.25290020207080005,
+    "maximumChannelDifference": 219
+  },
+  "opaqueInterior": {
+    "bounds": [
+      95,
+      684,
+      985,
+      1819
+    ],
+    "pixels": [
+      890,
+      1135
+    ],
+    "equalPixelFraction": 0.7145047765183389,
+    "fractionWithinRgbDifference1": 0.9650626144631985,
+    "fractionWithinRgbDifference2": 0.991691332970351,
+    "fractionWithinRgbDifference4": 0.9954897787457309,
+    "meanAbsoluteRgbDifference": 0.29914336154696497,
+    "maximumChannelDifference": 219
+  },
+  "interiorInsetPx": 48,
+  "excludedFromInterior": "Rounded outer corners and translucent shadow depend on the settings scroll position behind the popup."
+}

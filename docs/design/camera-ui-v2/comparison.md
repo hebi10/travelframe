@@ -1,5 +1,9 @@
 # 촬영 탭 V2 비교·검증 기록
 
+## 배포판 추가 완료 감사 (2026-11-10)
+
+기존 검증 이후 동일 제출 AAB에서 생성한 서명 APK1.0.33(26092625)를 완전히 새5558에 설치했다. 계정·프로젝트 관리·촬영 후 기록 정보 진입, 실제 사진3장,3x 닫기/마지막 촬영값 복원·Home복귀, 가이드6단계를 추가 검증했다. 제품10파일 해시는 기존 source-manifest와 모두 일치한다. 상세 원본·권한 초기 단계·로그·실제 팝업1:1 차이는 [배포판 검증 기록](release-qa-20261110/summary.md)에 있다. 이 추가 검증은 기존 문서의 당시 '배포APK 미검증' 제한을 해당 대표 시나리오에 한해 보완하며 Google Play 심사·설치 및 실기기 전체 검증을 뜻하지 않는다.
+
 ## 기준과 상태
 - Git 작업 시작: fetch/pull 성공, HEAD=origin/main=4ca8b4a. 기존 미커밋 변경 보존.
 - 생성 시안: design-main.png, design-sheets.png(촬영설정/가이드/프로젝트선택/생성), design-tools.png(사진/색감/확대/조명). built-in image_gen, generation-prompts.json 참조.

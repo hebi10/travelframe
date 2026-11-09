@@ -1,0 +1,8 @@
+{
+  "cameraInactiveExceptions": 0,
+  "fatalExceptions": 0,
+  "unhandledPromises": 0,
+  "jsHostFunctionExceptions": 0,
+  "handledBillingInitUnavailableCount": 3,
+  "billingContext": "Isolated emulator with no Play account; sideloaded upload-key APK. Live billing and Play-signed installation were not tested."
+}
