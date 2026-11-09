@@ -51,6 +51,22 @@ class Stage13CaptureTest(unittest.TestCase):
             call("+ 새 프로젝트", ["프로젝트 이름", "목표 기록 수", "프로젝트 만들기"]),
         ])
 
+    def test_c3_camera_settings_capture_opens_real_native_sheet(self):
+        device = Mock()
+        stage13.open_camera_settings(device)
+        device.ready.assert_called_once_with(["프로젝트 선택", "사진 촬영"])
+        device.open_control.assert_called_once_with(
+            "촬영 설정 열기", ["촬영 도구", "촬영 옵션"]
+        )
+
+    def test_c3_storage_capture_finds_enabled_album_option(self):
+        device = Mock()
+        stage13.open_camera_save_targets(device)
+        device.find_control.assert_called_once_with("핸드폰 앨범", search="below")
+        names = [case[0] for case in stage13.CASES]
+        for case in ("camera-settings", "camera-settings-storage"):
+            self.assertIn(case, names)
+
     def test_stage_d_light_150_still_separates_first_install_and_replayed_guide(self):
         self.assertEqual(stage13.ALL_VARIANTS["light-150"], ("light", "large", 1.5))
         source = SCRIPT.read_text(encoding="utf-8")
