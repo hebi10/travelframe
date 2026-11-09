@@ -215,7 +215,7 @@ jobs:
   c7-integrated-qa:
     needs: stage13-design-captures
     if: ${{ always() && startsWith(github.head_ref, 'feat/r3-frame-journal-camera-c7-') }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
@@ -225,6 +225,15 @@ jobs:
           pattern: body-frame-stage13-*-${{ github.run_id }}
           merge-multiple: true
           path: artifacts/c7-captures
+      - name: Prepare FFmpeg for Android screenshot pixel verification
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! command -v ffmpeg >/dev/null 2>&1; then
+            timeout 120s sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=20 update
+            timeout 240s sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ffmpeg
+          fi
+          ffmpeg -version | head -1
       - name: Inspect C7 PNG integrity, theme pixels and all 24 variant cells
         run: |
           command -v ffmpeg
