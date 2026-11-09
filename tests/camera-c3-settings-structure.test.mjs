@@ -31,7 +31,7 @@ test("C3 groups camera tools, shooting options, quality, storage and support in 
     cursor = next;
   }
   assert.ok(sheet.includes("cameraSettingsGroup"));
-  assert.ok(sheet.includes("FRAME JOURNAL"));
+  assert.ok(sheet.includes("BODY FRAME"));
   assert.ok(sheet.includes('cameraSettingsTitle}>촬영 설정</Text>'));
 });
 
