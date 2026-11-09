@@ -7,7 +7,6 @@ const PACKAGE = "com.haebi.photoguide";
 const LOCALE = "ko-KR";
 const IMAGE_TYPE = "phoneScreenshots";
 const ANDROID_PUBLISHER = "https://androidpublisher.googleapis.com";
-const DRIVE = "https://www.googleapis.com/drive/v3/files/";
 const MAX_FILE_BYTES = 8 * 1024 * 1024;
 const PNG = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
 const checksum = (bytes) => crypto.createHash("sha256").update(bytes).digest("hex");
@@ -41,7 +40,7 @@ export function validateRgbPng(bytes, width, height) {
 }
 
 async function authorizedRequest(url, token, { method="GET", data=null, mime="application/json", fetcher=fetch }={}) {
-  if (!token || !/^https:\/\/(?:www\.googleapis\.com\/drive\/v3\/files\/|androidpublisher\.googleapis\.com\/)/.test(url))
+  if (!token || !url.startsWith("https://androidpublisher.googleapis.com/"))
     throw new Error("Unauthorized screenshot API request");
   const response = await fetcher(url, {
     method,
@@ -55,16 +54,23 @@ async function authorizedRequest(url, token, { method="GET", data=null, mime="ap
   return body ? JSON.parse(body) : {};
 }
 
-export async function downloadDriveStoreImages(manifest, directory, token, fetcher=fetch) {
+export function decodeBundledStoreImages(manifest, directory, embeddedDir) {
   validateStoreManifest(manifest);
   fs.mkdirSync(directory, { recursive: true });
   for (const asset of manifest.assets) {
-    const url = DRIVE + encodeURIComponent(asset.fileId) + "?alt=media";
-    const bytes = await authorizedRequest(url, token, { fetcher });
+    const fileName = String(asset.index).padStart(2, "0") + ".png.b64";
+    const encoded = fs.readFileSync(safeFile(embeddedDir, fileName), "utf8").trim();
+    if (encoded.length > 12 * 1024 * 1024 ||
+        !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(encoded))
+      throw new Error("Invalid bundled screenshot base64 " + asset.index);
+    const bytes = Buffer.from(encoded, "base64");
+    if (bytes.toString("base64") !== encoded)
+      throw new Error("Noncanonical screenshot encoding " + asset.index);
     validateRgbPng(bytes, asset.sourceWidth, asset.sourceHeight);
-    if (checksum(bytes) !== asset.sourceSha256) throw new Error("Drive asset checksum differs from reviewed screenshot " + asset.index);
+    if (checksum(bytes) !== asset.sourceSha256)
+      throw new Error("Bundled screenshot differs from the reviewed source " + asset.index);
     fs.writeFileSync(safeFile(directory, String(asset.index).padStart(2, "0") + ".png"), bytes);
-    console.log("Verified exact Drive screenshot " + asset.index + " / 6");
+    console.log("Verified bundled screenshot " + asset.index + " / 6");
   }
 }
 
@@ -170,8 +176,8 @@ export async function replaceStoreImages(manifest, verified, token, receiptPath,
 async function main() {
   const command = process.argv[2];
   const manifest = validateStoreManifest(JSON.parse(fs.readFileSync(process.env.STORE_MANIFEST, "utf8")));
-  if (command === "download") {
-    await downloadDriveStoreImages(manifest, process.env.STORE_INPUT_DIR, process.env.DRIVE_ACCESS_TOKEN);
+  if (command === "download-bundled") {
+    decodeBundledStoreImages(manifest, process.env.STORE_INPUT_DIR, process.env.STORE_EMBEDDED_DIR);
   } else if (command === "verify") {
     const images = verifyPreparedStoreImages(manifest, process.env.STORE_OUTPUT_DIR);
     console.log("Verified store screenshot bundle: " + images.length + " RGB images at 1080x1920");
@@ -179,7 +185,7 @@ async function main() {
     const images = verifyPreparedStoreImages(manifest, process.env.STORE_OUTPUT_DIR);
     await replaceStoreImages(manifest, images, process.env.PLAY_ACCESS_TOKEN, process.env.STORE_RECEIPT_PATH);
   } else {
-    throw new Error("Expected download, verify, or publish");
+    throw new Error("Expected download-bundled, verify, or publish");
   }
 }
 
