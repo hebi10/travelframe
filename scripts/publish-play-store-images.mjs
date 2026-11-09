@@ -50,7 +50,7 @@ async function authorizedRequest(url, token, { method="GET", data=null, mime="ap
   });
   if (!response.ok) throw new Error("Google screenshot API " + method + " request failed (HTTP " + response.status + ")"); 
   if (method === "DELETE" || response.status === 204) return {};
-  if (mime === "image/png" || url.includes("alt=media")) return Buffer.from(await response.arrayBuffer());
+  if (url.includes("alt=media")) return Buffer.from(await response.arrayBuffer());
   const body = await response.text();
   return body ? JSON.parse(body) : {};
 }
