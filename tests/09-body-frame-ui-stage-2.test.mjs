@@ -68,8 +68,10 @@ assert.ok(
   "top camera controls should respect the 44px shared touch target"
 );
 assert.ok(
-  bodyFrameCameraSource.includes("insets.top + 64"),
-  "project switcher should move up after top-bar simplification"
+  bodyFrameCameraSource.includes("footerStatus={") &&
+    !bodyFrameCameraSource.includes("insets.top + 64") &&
+    cameraSource.includes("styles.cameraCaptureStatus"),
+  "C1 camera guidance should follow the shutter tray instead of covering the top preview"
 );
 
 console.log("Body Frame UI Stage 2 camera contract passed.");

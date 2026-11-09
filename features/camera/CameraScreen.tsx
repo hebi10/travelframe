@@ -190,6 +190,7 @@ type CameraScreenProps = {
   projectReferenceMode?: "first" | "latest";
   onProjectReferenceModeChange?: (projectId: string, mode: "first" | "latest") => Promise<void>;
   headerCenter?: ReactNode;
+  footerStatus?: ReactNode;
   onHeaderBottomChange?: (bottom: number) => void;
 };
 
@@ -200,6 +201,7 @@ export default function CameraScreen({
   projectReferenceMode = "latest",
   onProjectReferenceModeChange,
   headerCenter,
+  footerStatus,
   onHeaderBottomChange
 }: CameraScreenProps = {}) {
   const [isReferenceModeChanging, setIsReferenceModeChanging] = useState(false);
@@ -2630,7 +2632,7 @@ export default function CameraScreen({
 
       {!isGuidePositionAdjusting && !isGridLineControlAdjusting ? (
         <View
-          style={[styles.topBar, { paddingTop: insets.top + 12 }]}
+          style={[styles.topBar, { paddingTop: insets.top + 8 }]}
           onLayout={handleCameraTopBarLayout}
         >
           <Pressable
@@ -3579,6 +3581,9 @@ export default function CameraScreen({
                 style={[styles.cameraControlBottomTray, { paddingBottom: bottomSafePadding }]}
                 onLayout={handleCameraBottomTrayLayout}
               >
+                {footerStatus && activeCameraControlPanel === null ? (
+                  <View style={styles.cameraCaptureStatus}>{footerStatus}</View>
+                ) : null}
                 <View style={styles.captureRow}>
                   <Pressable
                     style={styles.galleryButton}

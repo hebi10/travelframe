@@ -503,9 +503,11 @@ const styles = StyleSheet.create({
     justifyContent: "center"
   },
   headerButtonCompact: {
-    minHeight: bodyFrameDesign.minTouchSize,
-    paddingHorizontal: 10,
-    paddingVertical: 5
+    minHeight: 48,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderColor: "rgba(255,255,255,0.3)",
+    backgroundColor: "rgba(11,11,12,0.8)"
   },
   createOnlyButton: {
     flex: 1,
@@ -530,7 +532,8 @@ const styles = StyleSheet.create({
     gap: 8
   },
   headerMainRowCompact: {
-    gap: 5
+    gap: 6,
+    justifyContent: "center"
   },
   headerTitle: {
     flex: 1,
@@ -539,7 +542,8 @@ const styles = StyleSheet.create({
     fontWeight: "600"
   },
   headerTitleCompact: {
-    fontSize: 13
+    fontSize: 14,
+    textAlign: "center"
   },
   headerStatus: {
     marginTop: 3,
@@ -547,8 +551,9 @@ const styles = StyleSheet.create({
     fontSize: 12
   },
   headerStatusCompact: {
-    marginTop: 1,
-    fontSize: bodyFrameTypography.caption
+    marginTop: 2,
+    fontSize: 11,
+    textAlign: "center"
   },
   disabled: { opacity: 0.5 },
   pressed: { opacity: 0.78 },

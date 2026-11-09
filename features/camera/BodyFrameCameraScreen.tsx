@@ -14,7 +14,6 @@ import { Pressable,
   StyleSheet,
   View
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { bodyFrameDesign, bodyFrameTypography } from "@/constants/app-theme";
 import { BodyFrameProjectSwitcher } from "@/features/camera/BodyFrameProjectSwitcher";
@@ -61,7 +60,6 @@ type CreateProjectInput = {
 };
 
 export default function BodyFrameCameraScreen() {
-  const insets = useSafeAreaInsets();
   const { isLoggedIn, subscription } = useAuth();
   const planEntitlements = useMemo(
     () => getPlanEntitlements({ isLoggedIn, subscription }),
@@ -80,7 +78,6 @@ export default function BodyFrameCameraScreen() {
   const [measurementPromptPhotoId, setMeasurementPromptPhotoId] =
     useState<string | null>(null);
   const [poseAlignmentEnabled, setPoseAlignmentEnabled] = useState(false);
-  const [cameraHeaderBottom, setCameraHeaderBottom] = useState<number | null>(null);
   const lastHandledSaveAtRef = useRef(0);
 
   const reloadProjectState = useCallback(async () => {
@@ -337,7 +334,6 @@ export default function BodyFrameCameraScreen() {
   return (
     <View style={styles.screen}>
       <CameraScreen
-        onHeaderBottomChange={setCameraHeaderBottom}
         projectReferenceMode={activeProject?.referenceMode}
         onProjectReferenceModeChange={activeProject ? handleChangeReferenceMode : undefined}
         headerCenter={
@@ -356,48 +352,47 @@ export default function BodyFrameCameraScreen() {
             onManageProjects={() => router.push("/studio")}
           />
         }
+        footerStatus={
+          saveMessage ? (
+            <View style={styles.captureStatusRow} accessibilityLiveRegion="polite">
+              <Text style={styles.captureSavedText} numberOfLines={2}>
+                {saveMessage}
+              </Text>
+              {measurementPromptPhotoId ? (
+                <Pressable
+                  accessibilityRole="button"
+                  style={styles.captureStatusAction}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/photo/[id]",
+                      params: { id: measurementPromptPhotoId, measurement: "1" }
+                    })
+                  }
+                >
+                  <Text style={styles.captureStatusActionText}>수치 기록</Text>
+                </Pressable>
+              ) : null}
+            </View>
+          ) : (
+            <View style={styles.captureStatusRow}>
+              <Text style={styles.captureStatusText} numberOfLines={2}>
+                {firstPhotoHint}
+              </Text>
+              {captureBlockedReason && upgradePlanLabel ? (
+                <Pressable
+                  accessibilityRole="button"
+                  style={styles.captureStatusAction}
+                  onPress={() => router.push("/account")}
+                >
+                  <Text style={styles.captureStatusActionText}>
+                    플랜 보기 · {upgradePlanLabel}
+                  </Text>
+                </Pressable>
+              ) : null}
+            </View>
+          )
+        }
       />
-
-      <View
-        pointerEvents="box-none"
-        style={[
-          styles.captureHintWrap,
-          { top: cameraHeaderBottom ?? Math.max(insets.top + 64, 76) }
-        ]}
-      >
-        <View pointerEvents="none" style={styles.captureHintPanel}>
-          <Text style={styles.captureHint}>{firstPhotoHint}</Text>
-        </View>
-        {captureBlockedReason && upgradePlanLabel ? (
-          <Pressable
-            accessibilityRole="button"
-            style={styles.planButton}
-            onPress={() => router.push("/account")}
-          >
-            <Text style={styles.planButtonText}>플랜 보기 · {upgradePlanLabel}</Text>
-          </Pressable>
-        ) : null}
-      </View>
-
-      {saveMessage ? (
-        <View style={styles.snackbar} accessibilityLiveRegion="polite">
-          <Text style={styles.snackbarText}>{saveMessage}</Text>
-          {measurementPromptPhotoId ? (
-            <Pressable
-              accessibilityRole="button"
-              style={styles.snackbarAction}
-              onPress={() =>
-                router.push({
-                  pathname: "/photo/[id]",
-                  params: { id: measurementPromptPhotoId, measurement: "1" }
-                })
-              }
-            >
-              <Text style={styles.snackbarActionText}>수치 기록</Text>
-            </Pressable>
-          ) : null}
-        </View>
-      ) : null}
     </View>
   );
 }
@@ -407,75 +402,43 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#0B0B0C"
   },
-  captureHintWrap: {
-    position: "absolute",
-    left: bodyFrameDesign.horizontalPadding,
-    right: bodyFrameDesign.horizontalPadding,
-    zIndex: 40
-  },
-  captureHintPanel: {
-    alignSelf: "center",
-    maxWidth: "100%",
-    marginTop: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    backgroundColor: "rgba(11,11,12,0.78)"
-  },
-  captureHint: {
-    alignSelf: "center",
-    color: "#F5F5F5",
-    fontSize: bodyFrameTypography.caption,
-    lineHeight: 17,
-    textAlign: "center"
-  },
-  planButton: {
-    alignSelf: "center",
-    minHeight: bodyFrameDesign.minTouchSize,
-    marginTop: 8,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 14,
-    borderWidth: bodyFrameDesign.borderWidth,
-    borderColor: "#F5F5F5",
-    borderRadius: bodyFrameDesign.buttonRadius,
-    backgroundColor: "rgba(11,11,12,0.88)"
-  },
-  planButtonText: {
-    color: "#F5F5F5",
-    fontSize: 13,
-    fontWeight: "600"
-  },
-  snackbar: {
-    position: "absolute",
-    left: bodyFrameDesign.horizontalPadding,
-    right: bodyFrameDesign.horizontalPadding,
-    bottom: 118,
-    minHeight: bodyFrameDesign.minTouchSize,
+  captureStatusRow: {
+    width: "100%",
+    minHeight: 24,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-    paddingHorizontal: 14,
-    borderWidth: bodyFrameDesign.borderWidth,
-    borderColor: "#2A2A2E",
-    borderRadius: bodyFrameDesign.cardRadius,
-    backgroundColor: "#1A1A1D",
-    zIndex: 50
-  },
-  snackbarText: {
-    flex: 1,
-    color: "#F5F5F5",
-    fontSize: 13,
-    fontWeight: "500"
-  },
-  snackbarAction: {
-    minHeight: bodyFrameDesign.minTouchSize,
     justifyContent: "center",
-    paddingHorizontal: 8
+    gap: 10,
+    paddingHorizontal: 6
   },
-  snackbarActionText: {
+  captureStatusText: {
+    flexShrink: 1,
+    color: "#D5D9DE",
+    fontSize: bodyFrameTypography.caption,
+    lineHeight: 18,
+    textAlign: "center"
+  },
+  captureSavedText: {
+    flexShrink: 1,
     color: "#F5F5F5",
-    fontSize: bodyFrameTypography.button,
-    fontWeight: "700"
+    fontSize: bodyFrameTypography.caption,
+    lineHeight: 18,
+    fontWeight: "600",
+    textAlign: "center"
+  },
+  captureStatusAction: {
+    minHeight: bodyFrameDesign.minTouchSize,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 12,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderColor: "rgba(255,255,255,0.42)",
+    borderRadius: bodyFrameDesign.buttonRadius,
+    backgroundColor: "#1A1A1D"
+  },
+  captureStatusActionText: {
+    color: "#F5F5F5",
+    fontSize: bodyFrameTypography.caption,
+    fontWeight: "600"
   }
 });

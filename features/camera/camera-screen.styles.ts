@@ -179,8 +179,8 @@ export const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderWidth: bodyFrameDesign.borderWidth,
-    borderColor: "rgba(255, 255, 255, 0.42)",
-    backgroundColor: "rgba(0, 0, 0, 0.34)"
+    borderColor: "rgba(255, 255, 255, 0.3)",
+    backgroundColor: "rgba(11, 11, 12, 0.8)"
   },
   cameraHeaderCenter: {
     flex: 1,
@@ -1215,14 +1215,21 @@ export const styles = StyleSheet.create({
   },
   cameraControlBottomTray: {
     width: "100%",
-    gap: 30,
-    paddingTop: 10,
+    gap: 8,
+    paddingTop: 8,
     paddingHorizontal: CAMERA_CONTROL_HORIZONTAL_PADDING,
-    backgroundColor: "rgba(0, 0, 0, 0.4)"
+    backgroundColor: "rgba(11, 11, 12, 0.92)"
+  },
+  cameraCaptureStatus: {
+    width: "100%",
+    minHeight: 24,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 12
   },
   captureRow: {
     width: "100%",
-    minHeight: 66,
+    minHeight: 68,
     position: "relative",
     alignItems: "center",
     justifyContent: "center"
@@ -1230,8 +1237,8 @@ export const styles = StyleSheet.create({
   galleryButton: {
     position: "absolute",
     left: CAMERA_CONTROL_TRAY_HORIZONTAL_PADDING,
-    width: 54,
-    height: 54,
+    width: 52,
+    height: 52,
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
@@ -1242,8 +1249,8 @@ export const styles = StyleSheet.create({
   overlayQuickButton: {
     position: "absolute",
     right: CAMERA_CONTROL_TRAY_HORIZONTAL_PADDING,
-    width: 76,
-    height: 54,
+    width: 72,
+    height: 52,
     alignItems: "center",
     justifyContent: "center",
     gap: 2,
@@ -1318,8 +1325,8 @@ export const styles = StyleSheet.create({
     fontVariant: ["tabular-nums"]
   },
   shutterOuter: {
-    width: 66,
-    height: 66,
+    width: 68,
+    height: 68,
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 999,
@@ -1330,8 +1337,8 @@ export const styles = StyleSheet.create({
     opacity: 0.45
   },
   shutterInner: {
-    width: 52,
-    height: 52,
+    width: 54,
+    height: 54,
     borderRadius: 999,
     backgroundColor: colors.inverse
   },
