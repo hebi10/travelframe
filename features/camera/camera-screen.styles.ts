@@ -1552,6 +1552,14 @@ export const styles = StyleSheet.create({
     fontSize: bodyFrameTypography.caption,
     fontWeight: "600"
   },
+  cameraUnavailableScreen: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 16,
+    padding: 24,
+    backgroundColor: colors.background
+  },
   permissionScreen: {
     flex: 1,
     backgroundColor: colors.background
