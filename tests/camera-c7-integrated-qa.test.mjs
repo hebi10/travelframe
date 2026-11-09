@@ -67,6 +67,6 @@ test("C7 expands only the create-project confirmation CTA and checks native sing
   assert.ok(projectSwitcher.includes("confirmFlex={1.6}"));
   assert.ok(projectSwitcher.includes('confirmLabel={submitting ? "생성 중..." : "프로젝트 만들기"}'));
   assert.ok(validator.includes("def project_create_button_text_height_dp("));
-  assert.ok(validator.includes('screen == "camera-new-project" and variant.endswith("-150")'));
+  assert.ok(validator.includes('variant.endswith("-150") and screen in ("camera-new-project", "records")'));
   assert.ok(validator.includes("if height_dp > 44:"));
 });
