@@ -53,7 +53,7 @@ test("C7 actions upload a consolidated report only after inspecting native evide
 test("C7 corrects the confirmed 360dp 150% Records create-project word break", () => {
   assert.ok(records.includes("const { width: windowWidth, fontScale } = useWindowDimensions();"));
   assert.ok(records.includes("fontScale >= 1.3 && styles.quickActionsLargeFont"));
-  assert.match(records, /quickActions:\\s*\\{\\s*width:\\s*184/);
-  assert.match(records, /quickActionsLargeFont:\\s*\\{\\s*width:\\s*232/);
+  assert.match(records, /quickActions:\s*\{\s*width:\s*184/);
+  assert.match(records, /quickActionsLargeFont:\s*\{\s*width:\s*232/);
   assert.ok(records.includes("<BodyFrameProjectSwitcher"));
 });
