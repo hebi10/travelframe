@@ -285,7 +285,7 @@ export function BodyHealthConnectImportCard({
             <Pressable
               disabled={loading}
               accessibilityRole="button"
-              style={[styles.primaryButton, { backgroundColor: palette.text }]}
+              style={[styles.primaryButton, { backgroundColor: palette.primary }]}
               onPress={() => void requestAccess()}
             >
               <Text style={[styles.primaryButtonText, { color: palette.inverse }]}>
@@ -345,7 +345,7 @@ export function BodyHealthConnectImportCard({
           <Pressable
             disabled={loading}
             accessibilityRole="button"
-            style={[styles.primaryButton, { backgroundColor: palette.text }]}
+            style={[styles.primaryButton, { backgroundColor: palette.primary }]}
             onPress={confirmImport}
           >
             <Text style={[styles.primaryButtonText, { color: palette.inverse }]}>

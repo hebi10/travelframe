@@ -11,9 +11,9 @@ const appearance = fs.readFileSync("lib/app-appearance.ts", "utf8");
 test("R1 neutral palettes use agreed light and dark color roles", () => {
   for (const token of [
     'background: "#F7F8FA"', 'chrome: "#F7F8FA"', 'surface: "#FFFFFF"',
-    'surfaceStrong: "#ECEEF1"', 'text: "#181A1D"', 'muted: "#5D6269"',
+    'surfaceStrong: "#ECEEF1"', 'text: "#181A1D"', 'primary: "#23262B"', 'muted: "#5D6269"',
     'line: "#DDE1E5"', 'background: "#0B0B0C"', 'surface: "#1A1A1D"',
-    'surfaceStrong: "#292D31"', 'text: "#F5F5F5"', 'line: "#323437"'
+    'surfaceStrong: "#292D31"', 'text: "#F5F5F5"', 'primary: "#F5F5F5"', 'line: "#323437"'
   ]) assert.ok(theme.includes(token), token);
   assert.ok(theme.includes('bodyFrameAccent = "#C6FF4D"'));
 });
@@ -38,5 +38,6 @@ test("R1 prohibits unsafe lime-only light text/selection and preserves dark CTA 
   const contrast = (a, b) => (Math.max(lum(a), lum(b)) + 0.05) / (Math.min(lum(a), lum(b)) + 0.05);
   assert.ok(contrast(matched[1], "#FFFFFF") < 3);
   assert.ok(contrast("#181A1D", "#F7F8FA") >= 4.5);
+  assert.ok(contrast("#23262B", "#FFFFFF") >= 4.5);
   assert.ok(contrast("#F5F5F5", "#0B0B0C") >= 4.5);
 });

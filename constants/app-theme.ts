@@ -4,6 +4,7 @@ export const colors = {
   surface: "#FFFFFF",
   surfaceStrong: "#ECEEF1",
   text: "#181A1D",
+  primary: "#23262B",
   muted: "#5D6269",
   faint: "#5D6269",
   line: "#DDE1E5",
@@ -49,6 +50,7 @@ export const bodyFrameDarkColors = {
   surface: "#1A1A1D",
   surfaceStrong: "#292D31",
   text: "#F5F5F5",
+  primary: "#F5F5F5",
   muted: "#A0A0A6",
   faint: "#88888F",
   line: "#323437",
@@ -59,12 +61,13 @@ export const bodyFrameDarkColors = {
 
 export const getBodyFrameControlColors = (palette: {
   text: string;
+  primary: string;
   inverse: string;
   surface: string;
   line: string;
   faint: string;
 }) => ({
-  primaryBackground: palette.text,
+  primaryBackground: palette.primary,
   primaryText: palette.inverse,
   secondaryBackground: palette.surface,
   secondaryText: palette.text,

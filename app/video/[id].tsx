@@ -131,7 +131,7 @@ export default function VideoDetailScreen() {
           <Text selectable style={[styles.emptyTitle, { color: palette.text }]}>
             영상을 찾을 수 없습니다.
           </Text>
-          <Pressable accessibilityRole="button" style={[styles.darkButton, { backgroundColor: palette.text }]} onPress={() => router.replace("/video-library")}>
+          <Pressable accessibilityRole="button" style={[styles.darkButton, { backgroundColor: palette.primary }]} onPress={() => router.replace("/video-library")}>
             <Text selectable={false} style={[styles.darkButtonText, { color: palette.inverse }]}>
               영상 목록으로 돌아가기
             </Text>

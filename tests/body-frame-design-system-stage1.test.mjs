@@ -21,9 +21,12 @@ const contrast = (a, b) => {
   return (light + 0.05) / (dark + 0.05);
 };
 
-for (const palette of [theme.bodyFrameDarkColors, theme.colors]) {
+for (const [palette, expectedPrimaryBackground] of [
+  [theme.bodyFrameDarkColors, "#F5F5F5"],
+  [theme.colors, "#23262B"]
+]) {
   const ui = theme.getBodyFrameControlColors(palette);
-  assert.equal(ui.primaryBackground, palette.text);
+  assert.equal(ui.primaryBackground, expectedPrimaryBackground);
   assert.equal(ui.primaryText, palette.inverse);
   assert.equal(ui.secondaryBackground, palette.surface);
   assert.equal(ui.secondaryBorder, palette.line);

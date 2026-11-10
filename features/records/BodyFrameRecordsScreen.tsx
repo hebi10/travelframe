@@ -259,7 +259,7 @@ export default function BodyFrameRecordsScreen() {
               accessibilityRole="button"
               accessibilityLabel="바로 촬영"
               accessibilityHint="촬영 화면으로 이동합니다."
-              style={[styles.captureButton, { backgroundColor: palette.text }]}
+              style={[styles.captureButton, { backgroundColor: palette.primary }]}
               onPress={() => router.push("/camera")}
             >
               <Feather name="camera" size={bodyFrameDesign.iconSize} color={palette.inverse} />

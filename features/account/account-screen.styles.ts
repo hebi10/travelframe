@@ -31,8 +31,8 @@ export const createAccountThemedStyles = (palette: AppPalette, fontFamily?: stri
       backgroundColor: isDark ? palette.surfaceStrong : palette.text
     },
     primaryFill: {
-      borderColor: palette.text,
-      backgroundColor: palette.text
+      borderColor: palette.primary,
+      backgroundColor: palette.primary
     },
     primaryContrastText: {
       color: palette.inverse,

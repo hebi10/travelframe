@@ -29,7 +29,16 @@ test("installed Android recorder callbacks survive stop races without hiding act
     const input = path.join(directory, "RecorderStopRace.kt");
     const jar = path.join(directory, "recorder-race.jar");
     fs.writeFileSync(input, fixture);
-    const compile = spawnSync(process.env.KOTLINC || "kotlinc", ["-J-XX:-UsePerfData", `-J-Djava.io.tmpdir=${directory}`, input, "-nowarn", "-include-runtime", "-d", jar], { encoding: "utf8", timeout: 90_000 });
+    const javaArgs = ["-XX:-UsePerfData", `-Djava.io.tmpdir=${directory}`];
+    const compilerArgs = [input, "-nowarn", "-include-runtime", "-d", jar];
+    const kotlinHome = process.platform === "win32" && !process.env.KOTLINC ? process.env.KOTLIN_HOME : undefined;
+    const compiler = kotlinHome
+      ? (process.env.JAVA_HOME ? path.join(process.env.JAVA_HOME, "bin", "java.exe") : "java")
+      : (process.env.KOTLINC || "kotlinc");
+    const args = kotlinHome
+      ? [...javaArgs, "-cp", path.join(kotlinHome, "lib", "*"), "org.jetbrains.kotlin.cli.jvm.K2JVMCompiler", ...compilerArgs]
+      : [...javaArgs.map((arg) => `-J${arg}`), ...compilerArgs];
+    const compile = spawnSync(compiler, args, { encoding: "utf8", timeout: 90_000, shell: false });
     assert.equal(compile.error, undefined, "Kotlin CLI is required to execute the actual installed recorder callback code");
     assert.equal(compile.status, 0, compile.stderr);
     const result = spawnSync("java", ["-XX:-UsePerfData", `-Djava.io.tmpdir=${directory}`, "-jar", jar], { encoding: "utf8", timeout: 20_000 });

@@ -67,7 +67,7 @@ export function BodyFrameProjectSwitcher({
 }: BodyFrameProjectSwitcherProps) {
   const insets = useSafeAreaInsets();
   const { palette } = useAppAppearance();
-  const { primaryBackground: actionColor, primaryText: actionTextColor } =
+  const { primaryBackground: actionColor, primaryText: actionTextColor, selected: selectedColor } =
     getBodyFrameControlColors(palette);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
@@ -504,7 +504,7 @@ export function BodyFrameProjectSwitcher({
               style={[
                 styles.referenceChoice,
                 {
-                  borderColor: referenceMode === "latest" ? actionColor : palette.line,
+                  borderColor: referenceMode === "latest" ? selectedColor : palette.line,
                   backgroundColor: referenceMode === "latest" ? palette.surfaceStrong : palette.surface
                 }
               ]}
@@ -515,7 +515,7 @@ export function BodyFrameProjectSwitcher({
                 <Text style={[styles.referenceMeta, { color: palette.muted }]}>직전 촬영 사진을 반투명하게 표시</Text>
               </View>
               {referenceMode === "latest" ? (
-                <Feather name="check" size={18} color={actionColor} />
+                <Feather name="check" size={18} color={selectedColor} />
               ) : null}
             </Pressable>
             <Pressable
@@ -526,7 +526,7 @@ export function BodyFrameProjectSwitcher({
               style={[
                 styles.referenceChoice,
                 {
-                  borderColor: referenceMode === "first" ? actionColor : palette.line,
+                  borderColor: referenceMode === "first" ? selectedColor : palette.line,
                   backgroundColor: referenceMode === "first" ? palette.surfaceStrong : palette.surface
                 }
               ]}
@@ -537,7 +537,7 @@ export function BodyFrameProjectSwitcher({
                 <Text style={[styles.referenceMeta, { color: palette.muted }]}>첫 촬영 사진을 기준으로 계속 표시</Text>
               </View>
               {referenceMode === "first" ? (
-                <Feather name="check" size={18} color={actionColor} />
+                <Feather name="check" size={18} color={selectedColor} />
               ) : null}
             </Pressable>
 

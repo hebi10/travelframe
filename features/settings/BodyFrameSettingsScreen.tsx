@@ -109,7 +109,7 @@ function BodyFrameSettingRow({
     >
       {iconName ? (
         <View style={styles.settingRowIcon} pointerEvents="none" accessibilityElementsHidden>
-          <Feather name={iconName} size={18} color={palette.muted} />
+          <Feather name={iconName} size={bodyFrameDesign.iconSize} color={palette.muted} />
         </View>
       ) : null}
       <View style={styles.settingRowCopy}>

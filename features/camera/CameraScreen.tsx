@@ -2524,7 +2524,7 @@ export default function CameraScreen({
         ]}>
           <Pressable
             accessibilityRole="button"
-            style={[styles.permissionButton, { backgroundColor: palette.text }]}
+            style={[styles.permissionButton, { backgroundColor: palette.primary }]}
             onPress={canRequestCameraPermission ? requestCameraPermission : openPermissionSettings}
           >
             <Text selectable={false} style={[styles.permissionButtonText, { color: palette.inverse }]}>
