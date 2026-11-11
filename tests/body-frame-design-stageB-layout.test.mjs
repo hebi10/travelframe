@@ -41,7 +41,7 @@ test("Stage B video reduces preview without changing aspect ratio or export path
 });
 
 test("Stage B detail exposes records sooner without cropping or mutating photo order", () => {
-  assert.ok(source.project.includes("height: 156,"));
+  assert.ok(source.project.includes("width: 72,") && source.project.includes("height: 110,"));
   assert.ok(source.project.includes('contentFit="contain"'));
   assert.ok(source.project.includes("marginBottom: 8"));
   for (const token of [

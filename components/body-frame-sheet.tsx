@@ -87,6 +87,7 @@ export function BodyFrameSheetFooter({
     <View style={styles.footer}>
       <Pressable
         accessibilityRole="button"
+        accessibilityLabel={cancelLabel}
         onPress={onCancel}
         style={[styles.footerButton, compactTypography && styles.compactFooterButton, { borderColor: secondaryBorder, backgroundColor: secondaryBackground }]}
       >
@@ -94,6 +95,7 @@ export function BodyFrameSheetFooter({
       </Pressable>
       <Pressable
         accessibilityRole="button"
+        accessibilityLabel={confirmLabel}
         accessibilityState={{ disabled }}
         disabled={disabled}
         onPress={onConfirm}

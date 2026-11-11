@@ -41,7 +41,8 @@ test("C7 checks real APK source identity, PNG hash, UI accessibility and theme p
 test("C7 actions upload a consolidated report only after inspecting native evidence from all widths", () => {
   assert.ok(workflow.includes("  c7-integrated-qa:"));
   assert.ok(workflow.includes("needs: stage13-design-captures"));
-  assert.ok(workflow.includes("always() && startsWith(github.head_ref, 'feat/r3-frame-journal-camera-c7-')"));
+  assert.ok(workflow.includes("always() && (startsWith(github.head_ref, 'feat/r3-frame-journal-camera-c7-')"));
+  assert.ok(workflow.includes("startsWith(github.head_ref, 'ui/ui-r03-')"), "UI-R03 must run the same evidence audit");
   assert.ok(workflow.includes("body-frame-stage13-*-${{ github.run_id }}"));
   assert.ok(workflow.includes("merge-multiple: true"));
   assert.ok(workflow.includes("scripts/verify-frame-journal-c7.py --root artifacts/c7-captures --output artifacts/c7-report"));

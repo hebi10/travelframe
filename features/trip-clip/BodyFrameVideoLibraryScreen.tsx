@@ -148,7 +148,8 @@ export default function BodyFrameVideoLibraryScreen() {
               >
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel={`${video.title} 영상 상세 보기`}
+                  accessibilityLabel={`${video.title} 영상 재생 및 상세 보기`}
+                  accessibilityHint={`생성 ${formatDate(video.createdAt)}, 재생 시간 ${formatDuration(video.duration)}, 화면 비율 ${video.ratio}`}
                   onPress={() =>
                     router.push({
                       pathname: "/video/[id]",
@@ -182,16 +183,16 @@ export default function BodyFrameVideoLibraryScreen() {
                   </View>
                   <View style={styles.videoCopy}>
                     <Text
-                      numberOfLines={1}
+                      numberOfLines={2}
                       style={[styles.videoTitle, { color: palette.text }]}
                     >
                       {video.title}
                     </Text>
                     <Text style={[styles.videoMeta, { color: palette.muted }]}>
-                      {formatDate(video.createdAt)}
+                      생성 {formatDate(video.createdAt)}
                     </Text>
                     <Text style={[styles.videoMeta, { color: palette.muted }]}>
-                      {formatDuration(video.duration)} · {video.ratio}
+                      재생 {formatDuration(video.duration)} · {video.ratio}
                     </Text>
                   </View>
                   <Feather name="chevron-right" size={18} color={palette.muted} />
@@ -200,6 +201,7 @@ export default function BodyFrameVideoLibraryScreen() {
                 <View style={styles.cardActions}>
                   <Pressable
                     accessibilityRole="button"
+                    accessibilityLabel={`${video.title} 영상 재생 및 상세 보기`}
                     onPress={() =>
                       router.push({
                         pathname: "/video/[id]",
@@ -209,7 +211,7 @@ export default function BodyFrameVideoLibraryScreen() {
                     style={[styles.cardButton, { borderColor: palette.line }]}
                   >
                     <Text style={[styles.cardButtonText, { color: palette.text }]}>
-                      상세
+                      재생·상세
                     </Text>
                   </Pressable>
                   <Pressable
@@ -277,7 +279,7 @@ const styles = StyleSheet.create({
     maxWidth: bodyFrameDesign.contentMaxWidth,
     alignSelf: "center",
     paddingHorizontal: bodyFrameDesign.horizontalPadding,
-    gap: 14
+    gap: 12
   },
   topBar: {
     minHeight: bodyFrameDesign.primaryButtonHeight,
@@ -302,7 +304,7 @@ const styles = StyleSheet.create({
     height: bodyFrameDesign.minTouchSize
   },
   pageDetail: {
-    marginBottom: 6,
+    marginBottom: 2,
     fontSize: bodyFrameTypography.body,
     lineHeight: 20
   },
@@ -334,18 +336,18 @@ const styles = StyleSheet.create({
     borderRadius: bodyFrameDesign.cardRadius
   },
   videoMain: {
-    minHeight: 106,
+    minHeight: 124,
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: 10,
     padding: 10
   },
   pressed: {
     opacity: 0.82
   },
   videoCover: {
-    width: 72,
-    height: 90,
+    width: 84,
+    height: 108,
     overflow: "hidden",
     alignItems: "center",
     justifyContent: "center",
@@ -377,7 +379,7 @@ const styles = StyleSheet.create({
   },
   videoMeta: {
     fontSize: bodyFrameTypography.caption,
-    lineHeight: 17
+    lineHeight: 18
   },
   cardActions: {
     flexDirection: "row",

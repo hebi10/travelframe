@@ -304,6 +304,7 @@ export default function BodyFrameRecordsScreen() {
                   key={project.id}
                   accessibilityRole="button"
                   accessibilityLabel={`${project.name} 프로젝트 열기`}
+                  accessibilityHint={`기록 ${summary.photoCount}장, 목표 ${summary.targetPhotoCount}장, 진행률 ${progressPercent}%입니다.`}
                   onPress={() => void openProject(project)}
                   style={({ pressed }) => [
                     styles.projectCard,
@@ -325,7 +326,7 @@ export default function BodyFrameRecordsScreen() {
                       <Image
                         source={{ uri: cover.previewUri ?? cover.uri }}
                         style={styles.coverImage}
-                        contentFit="cover"
+                        contentFit="contain"
                         cachePolicy="memory-disk"
                       />
                     ) : (
@@ -361,9 +362,6 @@ export default function BodyFrameRecordsScreen() {
                         {progressPercent}%
                       </Text>
                     </View>
-                    <Text style={[styles.projectDuration, { color: palette.faint }]}>
-                      변화 영상 {formatDuration(summary.durationSeconds)}
-                    </Text>
                     <View
                       accessible
                       accessibilityRole="progressbar"
@@ -384,6 +382,9 @@ export default function BodyFrameRecordsScreen() {
                         ]}
                       />
                     </View>
+                    <Text style={[styles.projectDuration, { color: palette.muted }]}>
+                      변화 영상 {formatDuration(summary.durationSeconds)}
+                    </Text>
                   </View>
                 </Pressable>
               );
@@ -578,17 +579,18 @@ const styles = StyleSheet.create({
   },
   projectStatsRow: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "baseline",
     justifyContent: "space-between",
     gap: 8
   },
   projectMeta: {
     flexShrink: 1,
-    fontSize: bodyFrameTypography.caption,
-    lineHeight: 17
+    fontSize: bodyFrameTypography.body,
+    fontWeight: "600",
+    lineHeight: 20
   },
   projectPercent: {
-    fontSize: bodyFrameTypography.caption,
+    fontSize: bodyFrameTypography.body,
     fontWeight: "700",
     fontVariant: ["tabular-nums"]
   },
