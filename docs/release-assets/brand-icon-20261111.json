@@ -1,0 +1,59 @@
+{
+  "packageName": "com.haebi.photoguide",
+  "locale": "ko-KR",
+  "design": "2026-11-11-flat-frame-journal",
+  "backgroundColor": "#151719",
+  "googlePlayPublished": false,
+  "assets": [
+    {
+      "path": "assets/icons/body-frame-approved.png",
+      "role": "approved-master",
+      "width": 1024,
+      "height": 1024,
+      "pngColorType": 3,
+      "bytes": 6557,
+      "sha256": "5816b7e8686af8f524a86ab8d5cbc2dc9d74fb78231cfe08c38bd3239df3fe51",
+      "driveId": "1xBtSZ04FRwhpkN_HNQ-Hlev0jTYiJ78W"
+    },
+    {
+      "path": "assets/icons/app-icon.png",
+      "role": "android-launcher",
+      "width": 1024,
+      "height": 1024,
+      "pngColorType": 3,
+      "bytes": 6557,
+      "sha256": "5816b7e8686af8f524a86ab8d5cbc2dc9d74fb78231cfe08c38bd3239df3fe51",
+      "driveId": "1xBtSZ04FRwhpkN_HNQ-Hlev0jTYiJ78W"
+    },
+    {
+      "path": "assets/icons/adaptive-icon.png",
+      "role": "android-adaptive-foreground",
+      "width": 1024,
+      "height": 1024,
+      "pngColorType": 3,
+      "bytes": 5296,
+      "sha256": "2f7b71d87db49336d383db5f2da660336fe345cf176c4bb54c01235c9996a53b",
+      "driveId": "1qaC378H2b-vO2BKfrTlavuE2eHYAMekG"
+    },
+    {
+      "path": "assets/icons/splash-icon.png",
+      "role": "android-splash",
+      "width": 1024,
+      "height": 1024,
+      "pngColorType": 3,
+      "bytes": 4709,
+      "sha256": "612351b2905edfdc1ec2475b39b8ef1c1240577109b1c90be474ba0950d9c715",
+      "driveId": "1Fwm6_MaayNpeHHSFwtUvxS6exdQIrfMz"
+    },
+    {
+      "path": "assets/play-store/ko-KR/app-icon-512.png",
+      "role": "play-listing-icon",
+      "width": 512,
+      "height": 512,
+      "pngColorType": 6,
+      "bytes": 6102,
+      "sha256": "6baf118a5a369863e831fe12c7af9c05287173507268c9a1a335a8667c83ebad",
+      "driveId": "1XkJqB2iIko6XXvAWUOE-pn_jIRWLSbmZ"
+    }
+  ]
+}
