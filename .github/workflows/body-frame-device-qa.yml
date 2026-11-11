@@ -330,7 +330,7 @@ jobs:
           set -euo pipefail
           git cat-file -e "${UI_R00_BASE_SHA}^{commit}"
           git diff --name-only "$UI_R00_BASE_SHA" HEAD > ui-r00-changed.txt
-          if grep -Ev '^(scripts/(capture_ui_r00_baseline|ui_r00_data_fixtures|verify_ui_r00_baseline|test_ui_r00_baseline)\.py|tests/ui-r00-baseline\.test\.mjs|docs/design/ui-r00-baseline-20261111\.md|\.github/workflows/body-frame-device-qa\.yml)$' ui-r00-changed.txt; then
+          if grep -Ev '^(scripts/(capture_ui_r00_baseline|ui_r00_data_fixtures|verify_ui_r00_baseline|test_ui_r00_baseline)\.py|tests/ui-r00-baseline\.test\.mjs|docs/design/ui-r00-baseline-20261111\.md|\.github/workflows/body-frame-device-qa\.yml|\.gitleaksignore)$' ui-r00-changed.txt; then
             echo 'Client app source differs from the locked baseline; stop exact-head capture'
             exit 1
           fi
