@@ -220,6 +220,9 @@ def main():
         qa.prepare_native_hierarchy(dev, args.output)
         dev.shell("svc", "wifi", "disable")
         dev.shell("svc", "data", "disable")
+        dev.shell("input", "keyevent", "KEYCODE_WAKEUP")
+        dev.shell("wm", "dismiss-keyguard")
+        qa.recover_launcher_anr(dev, args.output / "system-diagnostics")
         for profile in PROFILES:
             size, density = stage13.ALL_PROFILES[profile]
             dev.shell("wm", "size", size)
