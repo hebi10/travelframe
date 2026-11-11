@@ -302,6 +302,152 @@ jobs:
           if-no-files-found: warn
           retention-days: 90
 
+  ui-r00-captures:
+    name: UI-R00 Android baseline · ${{ matrix.profile }}
+    needs: build-apk
+    if: ${{ github.event_name == 'pull_request' && startsWith(github.head_ref, 'qa/ui-r00-') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 65
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: [phone-360dp, phone-412dp, tablet-600dp, tablet-750dp]
+    env:
+      UI_R00_BASE_SHA: '9e6d84cad89b59ae34f0fe45b6117b843de731e9'
+      UI_R00_PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      BODY_FRAME_STORE_DEMO_FIXTURES: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          name: body-frame-native-qa-apk
+          path: artifacts/apk
+      - name: Verify exact baseline app and isolated QA-only diffs
+        shell: bash
+        run: |
+          set -euo pipefail
+          git cat-file -e "${UI_R00_BASE_SHA}^{commit}"
+          git diff --name-only "$UI_R00_BASE_SHA" HEAD > ui-r00-changed.txt
+          if grep -Ev '^(scripts/(capture_ui_r00_baseline|ui_r00_data_fixtures|verify_ui_r00_baseline|test_ui_r00_baseline)\.py|tests/ui-r00-baseline\.test\.mjs|docs/design/ui-r00-baseline-20261111\.md|\.github/workflows/body-frame-device-qa\.yml)    needs: build-apk
+    if: github.event_name == 'workflow_dispatch' || (startsWith(github.head_ref, 'feat/body-frame-design-stage6-') || startsWith(github.head_ref, 'fix/body-frame-stage7-'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: body-frame-native-qa-apk
+          path: artifacts/apk
+      - name: Verify native screenshot helpers
+        run: python3 scripts/test_capture_android_qa.py
+      - name: Ensure synthetic fixture encoder
+        run: |
+          if ! command -v ffmpeg >/dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y ffmpeg
+          fi
+          ffmpeg -version | head -1
+      - name: Enable KVM access
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Capture genuine 360/412/600/750dp light/dark and scaled-font Android screens
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_2
+          ram-size: 3072M
+          heap-size: 512M
+          disk-size: 6000M
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back emulated -camera-front none
+          script: python3 scripts/capture-android-qa.py --scenario visual --apk artifacts/apk/app-qaRelease.apk --output artifacts/stage6-visual
+      - name: Audit visual matrix completeness and Android evidence
+        if: always()
+        run: python3 scripts/check-stage6-visual-artifacts.py --output artifacts/stage6-visual
+      - name: Preserve all visual captures and explicit failed scenarios
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: body-frame-stage6-visual-qa-${{ github.run_id }}
+          path: artifacts/stage6-visual/
+          if-no-files-found: warn
+          retention-days: 14
+ ui-r00-changed.txt; then
+            echo 'Client app source differs from the locked baseline; stop exact-head capture'
+            exit 1
+          fi
+          python3 scripts/test_ui_r00_baseline.py
+          python3 -m py_compile scripts/capture_ui_r00_baseline.py scripts/ui_r00_data_fixtures.py scripts/verify_ui_r00_baseline.py
+      - name: Ensure native PNG decoding
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! command -v ffmpeg >/dev/null; then
+            timeout 120s sudo apt-get -o Acquire::Retries=2 update
+            timeout 240s sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ffmpeg
+          fi
+          ffmpeg -version | head -1
+      - name: Enable disposable Android emulator KVM
+        shell: bash
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Capture 10 real screens plus data state cases
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_2
+          ram-size: 3072M
+          heap-size: 512M
+          disk-size: 6000M
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back emulated -camera-front none
+          script: python3 scripts/capture_ui_r00_baseline.py --profile ${{ matrix.profile }} --apk artifacts/apk/app-qaRelease.apk --output artifacts/ui-r00
+      - name: Preserve source-linked PNG, XML, metadata and failure diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: travelframe-ui-r00-${{ matrix.profile }}-${{ github.run_id }}
+          path: artifacts/ui-r00/
+          if-no-files-found: warn
+          retention-days: 90
+
+  ui-r00-verify:
+    name: UI-R00 integrated 100-image verification
+    needs: [build-apk, ui-r00-captures]
+    if: ${{ always() && github.event_name == 'pull_request' && startsWith(github.head_ref, 'qa/ui-r00-') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download genuine Android evidence from all four device profiles
+        uses: actions/download-artifact@v4
+        with:
+          pattern: travelframe-ui-r00-*-${{ github.run_id }}
+          merge-multiple: true
+          path: artifacts/ui-r00
+      - name: Verify all profile screenshots, states, XML and hashes
+        run: |
+          python3 scripts/test_ui_r00_baseline.py
+          python3 scripts/verify_ui_r00_baseline.py --root artifacts/ui-r00 --output artifacts/ui-r00-report
+      - name: Save complete or failing baseline audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: travelframe-ui-r00-final-verification-${{ github.run_id }}
+          path: artifacts/ui-r00-report/
+          if-no-files-found: warn
+          retention-days: 90
+
   stage6-design-matrix:
     needs: build-apk
     if: github.event_name == 'workflow_dispatch' || (startsWith(github.head_ref, 'feat/body-frame-design-stage6-') || startsWith(github.head_ref, 'fix/body-frame-stage7-'))
