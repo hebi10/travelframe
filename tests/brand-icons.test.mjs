@@ -16,7 +16,7 @@ test("TravelFrame flat brand assets are exactly the reviewed PNGs", () => {
     assert.ok(bytes.subarray(0, 8).equals(signature), asset.path);
     assert.equal(bytes.readUInt32BE(16), asset.width, asset.path);
     assert.equal(bytes.readUInt32BE(20), asset.height, asset.path);
-    assert.equal(bytes[24], 8, asset.path);
+    assert.equal(bytes[24], asset.pngBitDepth, asset.path);
     assert.equal(bytes[25], asset.pngColorType, asset.path);
     assert.equal(crypto.createHash("sha256").update(bytes).digest("hex"), asset.sha256, asset.path);
   }
