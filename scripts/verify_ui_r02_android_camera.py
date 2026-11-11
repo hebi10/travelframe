@@ -43,7 +43,7 @@ def visible_label_bounds(xml, label, viewport):
     for node in ET.fromstring(xml).iter("node"):
         if label not in (node.get("text", ""), node.get("content-desc", "")):
             continue
-        match = re.fullmatch(r"\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\]", node.get("bounds", ""))
+        match = re.fullmatch(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]", node.get("bounds", ""))
         if match is None:
             continue
         x1, y1, x2, y2 = (int(value) for value in match.groups())
