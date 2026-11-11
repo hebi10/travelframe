@@ -157,7 +157,7 @@ jobs:
 
   stage13-design-captures:
     needs: build-apk
-    if: github.event_name == 'workflow_dispatch' || startsWith(github.head_ref, 'feat/body-frame-design-stage13-') || startsWith(github.head_ref, 'feat/body-frame-design-stage14-') || startsWith(github.head_ref, 'feat/body-frame-design-stageA-') || startsWith(github.head_ref, 'feat/body-frame-design-stageB-') || startsWith(github.head_ref, 'feat/body-frame-design-stageC-') || startsWith(github.head_ref, 'feat/body-frame-design-stageD-') || startsWith(github.head_ref, 'feat/r3-frame-journal-') || startsWith(github.head_ref, 'fix/body-frame-stage13-')
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.head_ref, 'feat/body-frame-design-stage13-') || startsWith(github.head_ref, 'feat/body-frame-design-stage14-') || startsWith(github.head_ref, 'ui/ui-r07-') || startsWith(github.head_ref, 'feat/body-frame-design-stageA-') || startsWith(github.head_ref, 'feat/body-frame-design-stageB-') || startsWith(github.head_ref, 'feat/body-frame-design-stageC-') || startsWith(github.head_ref, 'feat/body-frame-design-stageD-') || startsWith(github.head_ref, 'feat/r3-frame-journal-') || startsWith(github.head_ref, 'fix/body-frame-stage13-')
     runs-on: ubuntu-latest
     timeout-minutes: 65
     strategy:
@@ -245,6 +245,112 @@ jobs:
         with:
           name: body-frame-c7-integrated-qa-${{ github.run_id }}
           path: artifacts/c7-report/
+          if-no-files-found: warn
+          retention-days: 90
+
+  ui-r07-visual-verify:
+    needs: stage13-design-captures
+    if: ${{ always() && github.event_name == 'pull_request' && startsWith(github.head_ref, 'ui/ui-r07-') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download Android PNG, XML and manifests from all four widths
+        uses: actions/download-artifact@v4
+        with:
+          pattern: body-frame-stage13-*-${{ github.run_id }}
+          merge-multiple: true
+          path: artifacts/c7-captures
+      - name: Prepare FFmpeg for Android screenshot pixel verification
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! command -v ffmpeg >/dev/null 2>&1; then
+            timeout 120s sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=20 update
+            timeout 240s sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ffmpeg
+          fi
+          ffmpeg -version | head -1
+      - name: Inspect UI-R07 original Android onboarding/settings/modals and 24 font/theme cells
+        run: |
+          command -v ffmpeg
+          python3 scripts/test_verify_frame_journal_c7.py
+          python3 scripts/verify-frame-journal-c7.py --root artifacts/c7-captures --output artifacts/c7-report
+      - name: Preserve UI-R07 original Android visual report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: body-frame-ui-r07-visual-${{ github.run_id }}
+          path: artifacts/c7-report/
+          if-no-files-found: warn
+          retention-days: 90
+
+  ui-r07-native-keyboard:
+    name: UI-R07 Android 150-percent keyboard and new-project save
+    needs: build-apk
+    if: ${{ github.event_name == 'pull_request' && startsWith(github.head_ref, 'ui/ui-r07-') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 65
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: body-frame-native-qa-apk
+          path: artifacts/apk
+      - name: Check the native 150-percent keyboard scripts
+        run: |
+          python3 -m py_compile scripts/run_ui_r07_keyboard_qa.py scripts/verify_ui_r07_keyboard_qa.py
+      - name: Enable emulator KVM access
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Capture actual Android IME and project-save screenshots at 150-percent font
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_2
+          ram-size: 3072M
+          heap-size: 512M
+          disk-size: 6000M
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back emulated -camera-front none
+          script: python3 scripts/run_ui_r07_keyboard_qa.py --apk artifacts/apk/app-qaRelease.apk --output artifacts/ui-r07-keyboard
+      - name: Save real keyboard PNG/XML/JSON and failure diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: travelframe-ui-r07-keyboard-${{ github.run_id }}
+          path: artifacts/ui-r07-keyboard/
+          if-no-files-found: warn
+          retention-days: 90
+
+  ui-r07-keyboard-verify:
+    name: UI-R07 independent APK, Android IME and persisted project audit
+    needs: [build-apk, ui-r07-native-keyboard]
+    if: ${{ always() && github.event_name == 'pull_request' && startsWith(github.head_ref, 'ui/ui-r07-') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: body-frame-native-qa-apk
+          path: artifacts/apk
+      - uses: actions/download-artifact@v4
+        with:
+          name: travelframe-ui-r07-keyboard-${{ github.run_id }}
+          path: artifacts/ui-r07-keyboard
+      - name: Recheck 150-percent native keyboard, PNG/XML, actual stored project and APK hash
+        run: |
+          python3 scripts/verify_ui_r07_keyboard_qa.py --root artifacts/ui-r07-keyboard --apk artifacts/apk/app-qaRelease.apk --output artifacts/ui-r07-report
+      - name: Save audited status even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: travelframe-ui-r07-keyboard-report-${{ github.run_id }}
+          path: artifacts/ui-r07-report/
           if-no-files-found: warn
           retention-days: 90
 
