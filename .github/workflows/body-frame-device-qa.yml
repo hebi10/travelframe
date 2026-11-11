@@ -440,7 +440,13 @@ jobs:
           changed = set(subprocess.check_output(
               ['git','diff','--name-only',os.environ['QA_BASE_SHA'],'HEAD'],text=True
           ).splitlines())
-          if changed - allowed:
+          if os.environ.get('GITHUB_HEAD_REF', '').startswith('qa/ui-r08-'):
+              subprocess.check_call([
+                  'python3', 'scripts/verify_ui_r08_preview_sources.py',
+                  '--base', os.environ['QA_BASE_SHA'],
+                  '--manifest', 'docs/qa/ui-r08-source-manifest-20261111.json'
+              ])
+          elif changed - allowed:
               raise SystemExit('Unexpected runtime changes: ' + repr(sorted(changed - allowed)))
           PYQA
           python3 -m py_compile scripts/verify_ui_r01_android_gestures.py scripts/verify_ui_r02_android_camera.py scripts/verify_ui_r01_r02_reports.py
