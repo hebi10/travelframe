@@ -17,7 +17,6 @@ import { AppText as Text } from "@/components/app-text";
 import { Image } from "@/components/private-media-image";
 import { bodyFrameDesign, bodyFrameTypography, getBodyFrameControlColors } from "@/constants/app-theme";
 import { getBodyFrameComparisonCandidates, getBodyFrameComparisonPhotos, selectBodyFrameComparisonPhotos } from "@/lib/body-frame-photo-compare";
-import { shouldStartComparisonPan } from "./comparison-pan-gesture";
 import { getBodyProjectById } from "@/lib/body-project-library";
 import { getPhotos } from "@/lib/photo-library";
 import { useAppAppearance } from "@/lib/app-appearance";
@@ -90,9 +89,8 @@ export default function BodyFrameCompareScreen() {
   const panResponder = useMemo(
     () =>
       PanResponder.create({
-        onStartShouldSetPanResponder: () => false,
-        onMoveShouldSetPanResponder: (_event, gesture) =>
-          shouldStartComparisonPan(gesture.dx, gesture.dy),
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: () => true,
         onPanResponderGrant: () => {
           gestureStartRef.current = dividerRef.current;
         },

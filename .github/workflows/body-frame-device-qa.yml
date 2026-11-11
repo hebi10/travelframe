@@ -302,6 +302,109 @@ jobs:
           if-no-files-found: warn
           retention-days: 90
 
+  ui-r01-r02-android:
+    name: UI-R01/R02 native gestures and camera screen QA
+    needs: build-apk
+    if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'qa/ui-r01-r02-')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 70
+    env:
+      BODY_FRAME_STORE_DEMO_FIXTURES: '1'
+      QA_BASE_SHA: '9e6d84cad89b59ae34f0fe45b6117b843de731e9'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          name: body-frame-native-qa-apk
+          path: artifacts/apk
+      - name: Validate QA-only changes and host tests
+        run: |
+          set -euo pipefail
+          git cat-file -e "$QA_BASE_SHA^{commit}"
+          python3 - <<'PYQA'
+          import os, subprocess
+          allowed = {
+            '.github/workflows/body-frame-device-qa.yml',
+            'scripts/verify_ui_r01_android_gestures.py',
+            'scripts/verify_ui_r02_android_camera.py',
+            'scripts/verify_ui_r01_r02_reports.py',
+            'scripts/test_ui_r01_r02_host.py',
+            'tests/ui-r01-r02-qa-contract.test.mjs',
+            'docs/design/ui-r01-r02-native-qa-20261111.md',
+          }
+          changed = set(subprocess.check_output(
+              ['git','diff','--name-only',os.environ['QA_BASE_SHA'],'HEAD'],text=True
+          ).splitlines())
+          if changed - allowed:
+              raise SystemExit('Unexpected runtime changes: ' + repr(sorted(changed - allowed)))
+          PYQA
+          python3 -m py_compile scripts/verify_ui_r01_android_gestures.py scripts/verify_ui_r02_android_camera.py scripts/verify_ui_r01_r02_reports.py
+          python3 scripts/test_ui_r01_r02_host.py
+      - name: Prepare FFmpeg
+        run: |
+          if ! command -v ffmpeg >/dev/null; then
+            sudo apt-get update && sudo apt-get install -y ffmpeg
+          fi
+      - name: Enable emulator KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Run real Android gestures and camera UI tests using same APK
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_2
+          ram-size: 3072M
+          heap-size: 512M
+          disk-size: 6000M
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back emulated -camera-front none
+          script: |
+            set +e
+            python3 scripts/verify_ui_r01_android_gestures.py --apk artifacts/apk/app-qaRelease.apk --output artifacts/qa/r01
+            r01_status=$?
+            python3 scripts/verify_ui_r02_android_camera.py --apk artifacts/apk/app-qaRelease.apk --output artifacts/qa/r02
+            r02_status=$?
+            if [ "$r01_status" -ne 0 ] || [ "$r02_status" -ne 0 ]; then exit 1; fi
+      - name: Archive both QA runs including failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: travelframe-ui-r01-r02-native-${{ github.run_id }}
+          path: artifacts/qa/
+          if-no-files-found: warn
+          retention-days: 90
+
+  ui-r01-r02-verify:
+    name: UI-R01/R02 independent real PNG/XML and gesture audit
+    needs: [build-apk, ui-r01-r02-android]
+    if: ${{ always() && github.event_name == 'pull_request' && startsWith(github.head_ref, 'qa/ui-r01-r02-') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: travelframe-ui-r01-r02-native-${{ github.run_id }}
+          path: artifacts/qa/
+      - name: Verify 4 actual Android cells and explicit physical hardware pending
+        run: |
+          python3 scripts/test_ui_r01_r02_host.py
+          python3 scripts/verify_ui_r01_r02_reports.py --root artifacts/qa --output artifacts/report
+      - name: Preserve independent verification outcome
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: travelframe-ui-r01-r02-report-${{ github.run_id }}
+          path: artifacts/report/
+          if-no-files-found: warn
+          retention-days: 90
+
   stage6-design-matrix:
     needs: build-apk
     if: github.event_name == 'workflow_dispatch' || (startsWith(github.head_ref, 'feat/body-frame-design-stage6-') || startsWith(github.head_ref, 'fix/body-frame-stage7-'))
