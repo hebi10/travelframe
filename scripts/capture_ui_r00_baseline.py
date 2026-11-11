@@ -10,6 +10,9 @@ import hashlib
 import importlib.util
 import json
 import os
+import struct
+import subprocess
+import time
 from pathlib import Path
 import sys
 import tempfile
@@ -87,8 +90,86 @@ def seed_and_verify(device, state, font, theme):
     return {**actual, "sample": state, "offline": True, "synthetic": True}
 
 
+
+def reference_preview_rgb(path):
+    """Decode the stable central preview region without new Python dependencies."""
+    process = subprocess.run(
+        ["ffmpeg", "-hide_banner", "-loglevel", "error", "-i", str(path),
+         "-vf", "crop=iw*0.64:ih*0.48:iw*0.18:ih*0.24,scale=64:64,format=rgb24",
+         "-frames:v", "1", "-f", "rawvideo", "pipe:1"],
+        check=True, capture_output=True, timeout=25
+    )
+    if len(process.stdout) != 64 * 64 * 3:
+        raise RuntimeError("Unable to decode reference-preview center pixels")
+    return process.stdout
+
+
+def reference_preview_delta(base, target):
+    before = reference_preview_rgb(base)
+    after = reference_preview_rgb(target)
+    return round(sum(abs(a - b) for a, b in zip(before, after)) / len(before), 2)
+
+
+def validate_reference_preview(device, folder, record):
+    """Reject compositor/GPU block corruption even when PNG/XML/SHA look valid.
+
+    The original camera and reference-adjust share the same demo-photo region.
+    From the locked app baseline, healthy preview delta is below 25 RGB units;
+    corrupt emulator captures in the 360/600/750dp profiles exceeded 90.
+    A conservative threshold of 48 allows normal opacity changes.
+    """
+    if record.get("status") != "captured":
+        return record
+    baseline = folder / "camera.png"
+    target = folder / "camera-reference-adjust.png"
+    try:
+        if not baseline.is_file() or not target.is_file():
+            raise RuntimeError("Camera and reference photos are needed for image readback")
+        observed = []
+        for attempt in range(4):
+            delta = reference_preview_delta(baseline, target)
+            observed.append(delta)
+            if delta <= 48.0:
+                record["referencePreviewVisualQuality"] = {
+                    "status": "pass", "centralRgbDelta": delta,
+                    "threshold": 48.0, "attempts": attempt + 1,
+                    "priorDeltas": observed[:-1],
+                }
+                return record
+            if attempt == 3:
+                break
+            time.sleep(3)
+            frame = device.run("exec-out", "screencap", "-p", binary=True)
+            if not frame.startswith(bytes.fromhex("89504e470d0a1a0a")):
+                raise RuntimeError("Retry native screencap is not PNG")
+            if struct.unpack(">II", frame[16:24]) != struct.unpack(
+                ">II", target.read_bytes()[16:24]
+            ):
+                raise RuntimeError("Retry screencap dimensions changed")
+            retry = folder / f"camera-reference-adjust.retry-{attempt + 1}.png"
+            retry.write_bytes(frame)
+            target.write_bytes(frame)
+            record["sha256"] = hashlib.sha256(frame).hexdigest()
+        record["referencePreviewVisualQuality"] = {
+            "status": "fail", "centralRgbDelta": observed[-1],
+            "threshold": 48.0, "attempts": len(observed),
+            "allDeltas": observed,
+        }
+        raise RuntimeError(
+            "Android reference-preview renderer produced abnormal RGB blocks "
+            f"(central delta {observed[-1]} > 48); image remains a FAIL"
+        )
+    except Exception as error:
+        if target.is_file():
+            target.rename(folder / "camera-reference-adjust.failure.png")
+        record.update(status="failed", pixelEvidenceValid=False, error=str(error))
+        return record
+
+
 def collect(device, folder, name, route, expected, action, manifest, sample, snapshot):
     record = stage13.verified_capture(device, folder, name, route, expected, action)
+    if name == "camera-reference-adjust":
+        record = validate_reference_preview(device, folder, record)
     launcher_anr = "Android system Pixel Launcher ANR is covering the app"
     if (record.get("status") == "failed" and launcher_anr in record.get("error", "")
             and manifest.get("launcherRecoveryCount", 0) == 0):
