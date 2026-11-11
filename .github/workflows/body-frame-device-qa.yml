@@ -726,12 +726,47 @@ jobs:
           command -v ffmpeg
           python3 scripts/test_verify_frame_journal_c7.py
           python3 scripts/verify-frame-journal-c7.py --root artifacts/c7-captures --output artifacts/c7-report
+          python3 scripts/verify_ui_r08_visual.py --root artifacts/c7-captures --report artifacts/c7-report/c7-report.json --head ${{ github.event.pull_request.head.sha }} --output artifacts/c7-report/ui-r08-visual.json
       - name: Preserve UI-R08 final visual PASS or FAIL report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: body-frame-ui-r08-visual-${{ github.run_id }}
           path: artifacts/c7-report/
+          if-no-files-found: warn
+          retention-days: 90
+
+  ui-r08-aggregate-gate:
+    name: UI-R08 fail-closed full native evidence integration gate
+    needs:
+      - build-apk
+      - capture-devices
+      - stage13-design-captures
+      - ui-r00-captures
+      - ui-r00-verify
+      - ui-r01-r02-android
+      - ui-r01-r02-verify
+      - ui-r05-native-video
+      - ui-r05-native-verify
+      - ui-r07-native-keyboard
+      - ui-r07-keyboard-verify
+      - ui-r08-visual-verify
+    if: ${{ always() && github.event_name == 'pull_request' && startsWith(github.head_ref, 'qa/ui-r08-') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify all native and functional jobs succeeded for this same head
+        env:
+          UI_R08_NEEDS_JSON: ${{ toJSON(needs) }}
+        run: |
+          python3 scripts/verify_ui_r08_needs.py --output artifacts/ui-r08-gate/report.json
+      - name: Preserve integration PASS or FAIL and all job conclusions
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: body-frame-ui-r08-final-gate-${{ github.run_id }}
+          path: artifacts/ui-r08-gate/
           if-no-files-found: warn
           retention-days: 90
 
