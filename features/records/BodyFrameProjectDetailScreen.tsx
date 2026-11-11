@@ -1121,10 +1121,14 @@ export default function BodyFrameProjectDetailScreen() {
         {detailTab === "records" ? (
           <>
         {projectPhotos.length < 2 ? (
-          <View style={[styles.comparePreviewCard, { borderColor: palette.line, backgroundColor: palette.surface }]}>
+          <View style={[
+            styles.comparePreviewCard,
+            styles.comparePreviewEmptyCard,
+            { borderColor: palette.line, backgroundColor: palette.surface }
+          ]}>
             <Text style={[styles.comparePreviewTitle, { color: palette.text }]}>전후 사진 비교</Text>
-            <Text style={{ color: palette.muted, fontSize: bodyFrameTypography.caption }}>
-              사진을 2장 이상 기록하면 전후 비교와 사진 선택 기능을 사용할 수 있습니다.
+            <Text style={[styles.comparePreviewDetail, { color: palette.muted }]}>
+              사진을 2장 이상 기록하면 비교할 수 있습니다.
             </Text>
           </View>
         ) : null}
@@ -1132,19 +1136,10 @@ export default function BodyFrameProjectDetailScreen() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="프로젝트 첫 사진과 마지막 사진 비교"
+            accessibilityHint="전후 비교 화면에서 사진 두 장을 선택할 수 있습니다."
             onPress={() => router.push(`/project/${project.id}/compare` as Href)}
             style={[styles.comparePreviewCard, { borderColor: palette.line, backgroundColor: palette.surface }]}
           >
-            <View style={styles.comparePreviewHeading}>
-              <Text style={[styles.comparePreviewTitle, { color: palette.text }]}>
-                전후 사진 비교
-              </Text>
-              <Feather name="chevron-right" size={bodyFrameDesign.iconSize} color={palette.text} />
-            </View>
-              <Text style={{ color: palette.muted, fontSize: bodyFrameTypography.caption }}>
-                첫 사진·최근 사진으로 시작하고 원하는 사진 두 장을 직접 고를 수 있습니다.
-              </Text>
-
             <View style={styles.comparePreviewPair}>
               {[{ label: "시작", photo: firstPhoto }, { label: "최근", photo: latestPhoto }].map(({ label, photo }) => (
                 <View key={photo.id} style={[styles.comparePreviewItem, { backgroundColor: palette.surfaceStrong }]}>
@@ -1160,14 +1155,22 @@ export default function BodyFrameProjectDetailScreen() {
                 </View>
               ))}
             </View>
+            <View style={styles.comparePreviewCopy}>
+              <Text style={[styles.comparePreviewTitle, { color: palette.text }]}>
+                전후 사진 비교
+              </Text>
+              <Text style={[styles.comparePreviewDetail, { color: palette.muted }]}>
+                시작·최근 사진 비교
+              </Text>
+            </View>
+            <Feather name="chevron-right" size={bodyFrameDesign.iconSize} color={palette.text} />
           </Pressable>
         ) : null}
-
 
         <View style={styles.projectHeader}>
           <View style={styles.progressHeading}>
             <Text style={[styles.progressCount, { color: palette.text }]}>
-              {summary.photoCount} / {summary.targetPhotoCount}
+              기록 {summary.photoCount} / {summary.targetPhotoCount}장
             </Text>
             <Text style={[styles.progressPercent, { color: palette.muted }]}>
               {progressPercent}% 진행
@@ -2266,17 +2269,34 @@ const styles = StyleSheet.create({
   },
   projectHeader: {
     gap: 8,
-    marginBottom: 10
+    marginBottom: 8
   },
   comparePreviewCard: {
     width: "100%",
     maxWidth: 560,
     alignSelf: "center",
-    gap: 6,
-    padding: 8,
-    marginBottom: 8,
+    minHeight: bodyFrameDesign.minTouchSize,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    padding: 10,
+    marginBottom: 6,
     borderWidth: bodyFrameDesign.borderWidth,
     borderRadius: bodyFrameDesign.cardRadius
+  },
+  comparePreviewEmptyCard: {
+    flexDirection: "column",
+    alignItems: "flex-start",
+    gap: 4
+  },
+  comparePreviewCopy: {
+    flex: 1,
+    minWidth: 0,
+    gap: 4
+  },
+  comparePreviewDetail: {
+    fontSize: bodyFrameTypography.caption,
+    lineHeight: 18
   },
   comparePreviewHeading: {
     minHeight: bodyFrameDesign.minTouchSize,
@@ -2291,12 +2311,11 @@ const styles = StyleSheet.create({
   },
   comparePreviewPair: {
     flexDirection: "row",
-    gap: 8
+    gap: 4
   },
   comparePreviewItem: {
-    flex: 1,
-    minWidth: 0,
-    height: 156,
+    width: 72,
+    height: 110,
     overflow: "hidden"
   },
   comparePreviewImage: {
@@ -2408,7 +2427,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: bodyFrameDesign.buttonRadius,
-    marginBottom: 10
+    marginBottom: 6
   },
   primaryActionText: {
     fontSize: bodyFrameTypography.button,
@@ -2424,7 +2443,7 @@ const styles = StyleSheet.create({
     alignSelf: "center"
   },
   recordsSection: {
-    gap: 12
+    gap: 8
   },
   sectionHeader: {
     flexDirection: "row",
@@ -2466,7 +2485,9 @@ const styles = StyleSheet.create({
     fontWeight: "600"
   },
   sectionCount: {
-    fontSize: bodyFrameTypography.caption
+    fontSize: bodyFrameTypography.body,
+    fontWeight: "600",
+    fontVariant: ["tabular-nums"]
   },
   photoGrid: {
     width: "100%",
