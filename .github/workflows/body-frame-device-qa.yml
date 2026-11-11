@@ -214,7 +214,7 @@ jobs:
 
   c7-integrated-qa:
     needs: stage13-design-captures
-    if: ${{ always() && startsWith(github.head_ref, 'feat/r3-frame-journal-camera-c7-') }}
+    if: ${{ always() && (startsWith(github.head_ref, 'feat/r3-frame-journal-camera-c7-') || startsWith(github.head_ref, 'ui/ui-r03-')) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
