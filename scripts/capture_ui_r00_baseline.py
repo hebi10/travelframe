@@ -77,10 +77,10 @@ def seed_and_verify(device, state, font, theme):
                      "cat > databases/RKStorage", data=db_path.read_bytes())
     saved = device.storage()
     actual = {
-        "projects": len(json.loads(saved[data.KEY_PROJECTS])),
-        "photos": len(json.loads(saved[data.KEY_PHOTOS])),
-        "measurements": len(json.loads(saved[data.KEY_METRICS])),
-        "videos": len(json.loads(saved[data.KEY_VIDEOS])),
+        "projects": len(json.loads(saved[data.PROJECTS_STORAGE_ID])),
+        "photos": len(json.loads(saved[data.PHOTOS_STORAGE_ID])),
+        "measurements": len(json.loads(saved[data.MEASUREMENTS_STORAGE_ID])),
+        "videos": len(json.loads(saved[data.VIDEOS_STORAGE_ID])),
     }
     if any(actual[key] != expected[key] for key in actual):
         raise RuntimeError(f"Seeded UI-R00 state differs from on-device storage: {state} {actual} != {expected}")
