@@ -9,11 +9,11 @@ STATES = (
     "video-empty", "guest", "first-run"
 )
 
-KEY_PROJECTS = "body-frame.projects.v1"
-KEY_PHOTOS = "travel-frame.photos.v1"
-KEY_METRICS = "body-frame.measurements.v1"
-KEY_METRIC_SETTINGS = "body-frame.measurement-settings.v1"
-KEY_VIDEOS = "travel-frame.videos.v1"
+PROJECTS_STORAGE_ID = "body-frame.projects.v1"
+PHOTOS_STORAGE_ID = "travel-frame.photos.v1"
+MEASUREMENTS_STORAGE_ID = "body-frame.measurements.v1"
+MEASUREMENT_SETTINGS_STORAGE_ID = "body-frame.measurement-settings.v1"
+VIDEOS_STORAGE_ID = "travel-frame.videos.v1"
 
 
 def build_state(qa, app_dir, state, font="medium", theme="dark"):
@@ -28,10 +28,10 @@ def build_state(qa, app_dir, state, font="medium", theme="dark"):
         app_dir, populated=(state != "no-project"),
         font_size=font, theme_mode=theme, intro_seen=state != "first-run"
     )
-    projects = json.loads(encoded[KEY_PROJECTS])
-    photos = json.loads(encoded[KEY_PHOTOS])
-    metrics = json.loads(encoded[KEY_METRICS])
-    settings = json.loads(encoded[KEY_METRIC_SETTINGS])
+    projects = json.loads(encoded[PROJECTS_STORAGE_ID])
+    photos = json.loads(encoded[PHOTOS_STORAGE_ID])
+    metrics = json.loads(encoded[MEASUREMENTS_STORAGE_ID])
+    settings = json.loads(encoded[MEASUREMENT_SETTINGS_STORAGE_ID])
     extra_media = []
 
     if state == "project-no-photo":
@@ -100,11 +100,11 @@ def build_state(qa, app_dir, state, font="medium", theme="dark"):
 
     # Both the empty video library and guest state are already represented by
     # the existing offline QA fixture. No fake video or authenticated account.
-    assert not json.loads(encoded[KEY_VIDEOS]), "QA fixture unexpectedly includes user videos"
-    encoded[KEY_PROJECTS] = json.dumps(projects, ensure_ascii=False)
-    encoded[KEY_PHOTOS] = json.dumps(photos, ensure_ascii=False)
-    encoded[KEY_METRICS] = json.dumps(metrics, ensure_ascii=False)
-    encoded[KEY_METRIC_SETTINGS] = json.dumps(settings, ensure_ascii=False)
+    assert not json.loads(encoded[VIDEOS_STORAGE_ID]), "QA fixture unexpectedly includes user videos"
+    encoded[PROJECTS_STORAGE_ID] = json.dumps(projects, ensure_ascii=False)
+    encoded[PHOTOS_STORAGE_ID] = json.dumps(photos, ensure_ascii=False)
+    encoded[MEASUREMENTS_STORAGE_ID] = json.dumps(metrics, ensure_ascii=False)
+    encoded[MEASUREMENT_SETTINGS_STORAGE_ID] = json.dumps(settings, ensure_ascii=False)
     if not projects:
         encoded.pop("body-frame.last-active-project-id.v1", None)
 
@@ -117,7 +117,7 @@ def build_state(qa, app_dir, state, font="medium", theme="dark"):
         "projects": len(projects),
         "photos": len(photos),
         "measurements": len(metrics),
-        "videos": len(json.loads(encoded[KEY_VIDEOS])),
+        "videos": len(json.loads(encoded[VIDEOS_STORAGE_ID])),
         "guest": True,
         "firstRun": state == "first-run",
     }
