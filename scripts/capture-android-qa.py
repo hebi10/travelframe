@@ -81,7 +81,7 @@ def fixture_jpeg(index, preview=False):
         file_name, digest = media[index]
         source = ROOT / 'assets' / 'store-demo' / file_name
         raw = source.read_bytes()
-        if len(raw) > 500_000 or not raw.startswith(b'\\xff\\xd8') or not raw.endswith(b'\\xff\\xd9'):
+        if len(raw) > 500_000 or not raw.startswith(bytes.fromhex('ffd8')) or not raw.endswith(bytes.fromhex('ffd9')):
             raise ValueError('STORE-03-B media must be a small approved JPEG')
         if hashlib.sha256(raw).hexdigest() != digest:
             raise ValueError('STORE-03-B media hash mismatch')
