@@ -4,7 +4,7 @@ import { generateImageAsync, generateImageBackgroundAsync, compositeImagesAsync 
 // Package the approved artwork for Android; do not redraw or alter the mark.
 const projectRoot = process.cwd();
 const src = "assets/icons/body-frame-approved.png";
-for (const [name, padding] of [["app-icon.png", 0], ["adaptive-icon.png", 128], ["splash-icon.png", 128]]) {
+for (const [name, padding] of [["app-icon.png", 0], ["adaptive-icon.png", 144], ["splash-icon.png", 184]]) {
   const { source } = await generateImageAsync({ projectRoot }, {
     src, name, width: 1024 - padding * 2, height: 1024 - padding * 2, resizeMode: "contain",
     backgroundColor: "#151719"
