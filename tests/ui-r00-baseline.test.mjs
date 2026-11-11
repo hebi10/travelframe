@@ -19,6 +19,14 @@ test("UI-R00 captures Android pages rather than generated UI", () => {
   assert.match(source, /svc", "data", "disable/);
 });
 
+test("UI-R00 recovers only a confirmed emulator Pixel Launcher ANR once", () => {
+  assert.match(source, /qa\.recover_launcher_anr/);
+  assert.match(source, /launcherRecoveryCount/);
+  assert.match(source, /Pixel Launcher ANR is covering the app/);
+  assert.match(source, /systemLauncherRecovery/);
+  assert.match(source, /launcherRecoveryError/);
+});
+
 test("UI-R00 includes empty, one, many and three projects without live data", () => {
   for (const sample of ["no-project", "project-no-photo", "project-one-photo", "project-many-photos", "three-projects", "first-run", "video-empty", "guest"]) {
     assert.ok(data.includes('"' + sample + '"'), sample);
