@@ -89,6 +89,20 @@ def seed_and_verify(device, state, font, theme):
 
 def collect(device, folder, name, route, expected, action, manifest, sample, snapshot):
     record = stage13.verified_capture(device, folder, name, route, expected, action)
+    launcher_anr = "Android system Pixel Launcher ANR is covering the app"
+    if (record.get("status") == "failed" and launcher_anr in record.get("error", "")
+            and manifest.get("launcherRecoveryCount", 0) == 0):
+        manifest["launcherRecoveryCount"] = 1
+        try:
+            recovery = qa.recover_launcher_anr(
+                device, folder / "system-diagnostics" / "launcher-recovery"
+            )
+            manifest["launcherRecovery"] = recovery
+            if recovery.get("status") == "recovered":
+                record = stage13.verified_capture(device, folder, name, route, expected, action)
+                record["systemLauncherRecovery"] = recovery
+        except Exception as recovery_error:
+            record["launcherRecoveryError"] = str(recovery_error)
     record.update(
         variant=manifest["currentVariant"], profile=manifest["profile"],
         label=name, sampleState=sample, storageEvidence=snapshot
@@ -128,6 +142,7 @@ def capture_profile(device, apk, output, profile):
         "capturedAt": datetime.now(timezone.utc).isoformat(),
         "captureMatrix": list(VARIANTS),
         "displayEvidence": display,
+        "launcherRecoveryCount": 0,
         "dataOrigin": "AI synthetic demo photo only; locally seeded guest data on a disposable offline emulator",
         "network": "Wi-Fi and mobile data disabled",
         "unverified": [
@@ -138,6 +153,12 @@ def capture_profile(device, apk, output, profile):
         "captures": []
     }
     try:
+        preflight = qa.recover_launcher_anr(
+            device, folder / "system-diagnostics" / "launcher-preflight"
+        )
+        manifest["launcherPreflight"] = preflight
+        if preflight.get("status") == "recovered":
+            manifest["launcherRecoveryCount"] = 1
         for variant in VARIANTS:
             manifest["currentVariant"] = variant
             theme, font, scale = stage13.ALL_VARIANTS[variant]
