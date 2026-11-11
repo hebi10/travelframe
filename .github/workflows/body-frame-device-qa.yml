@@ -366,7 +366,7 @@ jobs:
           heap-size: 512M
           disk-size: 6000M
           disable-animations: true
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back emulated -camera-front none
+          emulator-options: -no-window -gpu swiftshader_indirect -feature -Vulkan -noaudio -no-boot-anim -camera-back emulated -camera-front none
           script: python3 scripts/capture_ui_r00_baseline.py --profile ${{ matrix.profile }} --apk artifacts/apk/app-qaRelease.apk --output artifacts/ui-r00
       - name: Preserve source-linked PNG, XML, metadata and failure diagnostics
         if: always()
