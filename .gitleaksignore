@@ -8,3 +8,7 @@
 # Exact public APK checksum false positive in the historical release QA report.
 # This exception applies only to this committed file, rule, and line.
 7cdddd0ab2cf48b23ab4b56c7f8030faa6529dc9:docs/design/camera-ui-v2/release-qa-20261110/summary.md:generic-api-key:11
+
+# Exact historical UI-R00 synthetic fixture key-name false positive, no credential value.
+# Only the specified commit/file/rule/line is excluded; new findings still fail.
+3cec9eef9b1f77061c8ee58157de479860237ab1:scripts/ui_r00_data_fixtures.py:generic-api-key:14
