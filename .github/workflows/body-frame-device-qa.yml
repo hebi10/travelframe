@@ -157,7 +157,7 @@ jobs:
 
   stage13-design-captures:
     needs: build-apk
-    if: github.event_name == 'workflow_dispatch' || startsWith(github.head_ref, 'feat/body-frame-design-stage13-') || startsWith(github.head_ref, 'feat/body-frame-design-stage14-') || startsWith(github.head_ref, 'feat/body-frame-design-stageA-') || startsWith(github.head_ref, 'feat/body-frame-design-stageB-') || startsWith(github.head_ref, 'feat/body-frame-design-stageC-') || startsWith(github.head_ref, 'feat/body-frame-design-stageD-') || startsWith(github.head_ref, 'feat/r3-frame-journal-') || startsWith(github.head_ref, 'fix/body-frame-stage13-')
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.head_ref, 'feat/body-frame-design-stage13-') || startsWith(github.head_ref, 'feat/body-frame-design-stage14-') || startsWith(github.head_ref, 'ui/ui-r06-') || startsWith(github.head_ref, 'feat/body-frame-design-stageA-') || startsWith(github.head_ref, 'feat/body-frame-design-stageB-') || startsWith(github.head_ref, 'feat/body-frame-design-stageC-') || startsWith(github.head_ref, 'feat/body-frame-design-stageD-') || startsWith(github.head_ref, 'feat/r3-frame-journal-') || startsWith(github.head_ref, 'fix/body-frame-stage13-')
     runs-on: ubuntu-latest
     timeout-minutes: 65
     strategy:
@@ -244,6 +244,42 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: body-frame-c7-integrated-qa-${{ github.run_id }}
+          path: artifacts/c7-report/
+          if-no-files-found: warn
+          retention-days: 90
+
+  ui-r06-visual-verify:
+    needs: stage13-design-captures
+    if: ${{ always() && github.event_name == 'pull_request' && startsWith(github.head_ref, 'ui/ui-r06-') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download Android PNG, XML and manifests from all four widths
+        uses: actions/download-artifact@v4
+        with:
+          pattern: body-frame-stage13-*-${{ github.run_id }}
+          merge-multiple: true
+          path: artifacts/c7-captures
+      - name: Prepare FFmpeg for Android screenshot pixel verification
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! command -v ffmpeg >/dev/null 2>&1; then
+            timeout 120s sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=20 update
+            timeout 240s sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ffmpeg
+          fi
+          ffmpeg -version | head -1
+      - name: Inspect UI-R06 original Android screenshots, tab states and 24 profile variants
+        run: |
+          command -v ffmpeg
+          python3 scripts/test_verify_frame_journal_c7.py
+          python3 scripts/verify-frame-journal-c7.py --root artifacts/c7-captures --output artifacts/c7-report
+      - name: Preserve UI-R06 final visual PASS or FAIL report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: body-frame-ui-r06-visual-${{ github.run_id }}
           path: artifacts/c7-report/
           if-no-files-found: warn
           retention-days: 90
