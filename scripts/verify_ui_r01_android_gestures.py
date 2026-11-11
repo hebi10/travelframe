@@ -126,7 +126,7 @@ def run_variant(device, folder, profile, variant):
         before = first["slider"]
         verify("native-slider-discovered", before is not None and 10 <= before["percent"] <= 90, before)
 
-        if profile == "phone-412dp":
+        if profile in PROFILES:
             gesture = photo_slide(device, before["bounds"], "vertical")
             _, result = save_state(device, folder, "02-vertical-scroll", manifest)
             after = result["slider"]
@@ -143,6 +143,11 @@ def run_variant(device, folder, profile, variant):
                    after_diagonal is not None and after_diagonal["percent"] == pre_diagonal["percent"]
                    and after_diagonal["bounds"][1] < pre_diagonal["bounds"][1]-22,
                    {"gesture": gesture, "before": pre_diagonal, "after": after_diagonal})
+
+        if profile == "tablet-600dp":
+            original_size, density = stage13.ALL_PROFILES[profile]
+            device.shell("wm", "size", original_size)
+            qa.wait_for_visual_profile(device, original_size, density)
 
         compare_route(device)
         before_horizontal = slider(device.dump())
@@ -225,9 +230,11 @@ def main():
         qa.recover_launcher_anr(dev, args.output / "system-diagnostics")
         for profile in PROFILES:
             size, density = stage13.ALL_PROFILES[profile]
-            dev.shell("wm", "size", size)
+            # Preserve 600dp tablet width while constraining height enough to exercise real vertical scrolling.
+            gesture_size = "900x1350" if profile == "tablet-600dp" else size
+            dev.shell("wm", "size", gesture_size)
             dev.shell("wm", "density", density)
-            qa.wait_for_visual_profile(dev, size, density)
+            qa.wait_for_visual_profile(dev, gesture_size, density)
             for variant in VARIANTS:
                 results.append(run_variant(dev, args.output / profile / variant, profile, variant))
     finally:
