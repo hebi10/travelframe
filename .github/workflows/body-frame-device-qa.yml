@@ -333,6 +333,7 @@ jobs:
             'scripts/test_ui_r01_r02_host.py',
             'tests/ui-r01-r02-qa-contract.test.mjs',
             'docs/design/ui-r01-r02-native-qa-20261111.md',
+            '.gitleaksignore',
           }
           changed = set(subprocess.check_output(
               ['git','diff','--name-only',os.environ['QA_BASE_SHA'],'HEAD'],text=True
