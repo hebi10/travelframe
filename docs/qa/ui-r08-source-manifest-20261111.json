@@ -70,5 +70,108 @@
   "limitations": [
     "Not merged main; do not deploy or merge preview branch",
     "Physical ARM64 camera, TalkBack, actual user photos, subscriptions and Google Play excluded"
-  ]
+  ],
+  "allowedChangedPaths": [
+    ".github/workflows/body-frame-device-qa.yml",
+    ".github/workflows/ui-r08-workflow-lint.yml",
+    ".gitleaksignore",
+    "app/(tabs)/_layout.tsx",
+    "app/video/[id].tsx",
+    "components/app-guide-overlay.tsx",
+    "components/body-frame-sheet.tsx",
+    "components/body-frame-status-notice.tsx",
+    "components/body-measurement-summary-card.tsx",
+    "components/screen-shell.tsx",
+    "components/tab-glyph.tsx",
+    "constants/app-theme.ts",
+    "docs/design/ui-r00-baseline-20261111.md",
+    "docs/design/ui-r01-r02-native-qa-20261111.md",
+    "docs/design/ui-r03-records-project-20261111.md",
+    "docs/design/ui-r04-measurements-chart-20261111.md",
+    "docs/design/ui-r05-video-home-create-library-20261111.md",
+    "docs/design/ui-r06-common-design-states-20261111.md",
+    "docs/design/ui-r07-onboarding-settings-modals-20261111.md",
+    "docs/design/ui-r08-full-integration-qa-20261111.md",
+    "docs/qa/ui-r08-source-manifest-20261111.json",
+    "features/account/AccountScreen.tsx",
+    "features/account/account-screen.styles.ts",
+    "features/camera/BodyFrameProjectSwitcher.tsx",
+    "features/records/BodyFrameCompareScreen.tsx",
+    "features/records/BodyFrameProjectDetailScreen.tsx",
+    "features/records/BodyFrameRecordsScreen.tsx",
+    "features/records/BodyMeasurementHistoryScreen.tsx",
+    "features/settings/BodyFrameSettingsScreen.tsx",
+    "features/trip-clip/BodyFrameVideoHomeScreen.tsx",
+    "features/trip-clip/BodyFrameVideoLibraryScreen.tsx",
+    "features/trip-clip/BodyFrameVideoScreen.tsx",
+    "scripts/capture_ui_r00_baseline.py",
+    "scripts/run_ui_r05_native_video.py",
+    "scripts/run_ui_r07_keyboard_qa.py",
+    "scripts/test_ui_r00_baseline.py",
+    "scripts/test_ui_r01_r02_host.py",
+    "scripts/ui_r00_data_fixtures.py",
+    "scripts/verify_ui_r00_baseline.py",
+    "scripts/verify_ui_r01_android_gestures.py",
+    "scripts/verify_ui_r01_r02_reports.py",
+    "scripts/verify_ui_r02_android_camera.py",
+    "scripts/verify_ui_r05_video_qa.py",
+    "scripts/verify_ui_r07_keyboard_qa.py",
+    "scripts/verify_ui_r08_needs.py",
+    "scripts/verify_ui_r08_preview_sources.py",
+    "scripts/verify_ui_r08_visual.py",
+    "tests/15-body-frame-stage-9-1-typography.test.mjs",
+    "tests/body-frame-design-stage11-video-settings.test.mjs",
+    "tests/body-frame-design-stage14.test.mjs",
+    "tests/body-frame-design-stageB-layout.test.mjs",
+    "tests/body-frame-design-system-stage1.test.mjs",
+    "tests/body-frame-photo-comparison.test.mjs",
+    "tests/bottom-tab-spacing.test.mjs",
+    "tests/camera-c7-integrated-qa.test.mjs",
+    "tests/ui-r00-baseline.test.mjs",
+    "tests/ui-r01-r02-qa-contract.test.mjs",
+    "tests/ui-r03-records-project.test.mjs",
+    "tests/ui-r04-measurements-chart.test.mjs",
+    "tests/ui-r05-video-screens.test.mjs",
+    "tests/ui-r06-common-design-states.test.mjs",
+    "tests/ui-r07-onboarding-settings-modals.test.mjs",
+    "tests/ui-r08-integrated-sources.test.mjs"
+  ],
+  "sourceFileCounts": [
+    {
+      "pr": 150,
+      "sha": "4fe80e167894ba87de8a87d858a93b27e25d84e1",
+      "files": 8
+    },
+    {
+      "pr": 151,
+      "sha": "45198509cf18951a2441602f6c7fb34d49b2b2bf",
+      "files": 8
+    },
+    {
+      "pr": 152,
+      "sha": "1940d6f9c85745d95051c4fc9254818b4ea86c2a",
+      "files": 11
+    },
+    {
+      "pr": 153,
+      "sha": "cab64bef067964840815d7b1ad82b35fc6366eb9",
+      "files": 6
+    },
+    {
+      "pr": 154,
+      "sha": "fc6bc532b4539a80c78b20501cae6f0a6014a53c",
+      "files": 9
+    },
+    {
+      "pr": 155,
+      "sha": "2851501fd86a3501c18f0703d38e4e85ec477bf8",
+      "files": 15
+    },
+    {
+      "pr": 156,
+      "sha": "dae8450e651e4fa7334ae2e3abb8f5fb69a8a46e",
+      "files": 11
+    }
+  ],
+  "guard": "Allow only the explicitly enumerated source and QA files; all seven PR heads must be ancestors of the tested merge commit"
 }
