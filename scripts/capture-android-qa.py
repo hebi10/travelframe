@@ -72,6 +72,26 @@ def pattern_rgb(index, width=720, height=960):
 
 @lru_cache(maxsize=6)
 def fixture_jpeg(index, preview=False):
+    if os.environ.get('BODY_FRAME_STORE_DEMO_FIXTURES') == '1':
+        media = {
+            1: ('demo-01.jpg', '49d0f8d95510b9b0eeef517001f8c52e19c2b1600484d035ecc85e5352ff3bcb'),
+            2: ('demo-02.jpg', '5cdf2cc2a8868c3d4794fbc29ddd49248a202aef9a3b05d61e7cc8124e2a923a'),
+            3: ('demo-03.jpg', '933cb741e05caa1fe97f48e6395a8e7a1488a40af387a02e3a5965fac4e3446c'),
+        }
+        file_name, digest = media[index]
+        source = ROOT / 'assets' / 'store-demo' / file_name
+        raw = source.read_bytes()
+        if len(raw) > 500_000 or not raw.startswith(b'\\xff\\xd8') or not raw.endswith(b'\\xff\\xd9'):
+            raise ValueError('STORE-03-B media must be a small approved JPEG')
+        if hashlib.sha256(raw).hexdigest() != digest:
+            raise ValueError('STORE-03-B media hash mismatch')
+        if not preview:
+            return raw
+        return subprocess.run(
+            ['ffmpeg', '-v', 'error', '-i', 'pipe:0', '-vf', 'scale=360:480:flags=lanczos',
+             '-frames:v', '1', '-q:v', '2', '-f', 'mjpeg', 'pipe:1'],
+            input=raw, capture_output=True, check=True, timeout=30
+        ).stdout
     width, height = (360,480) if preview else (720,960)
     ppm = f'P6\n{width} {height}\n255\n'.encode()+pattern_rgb(index,width,height)
     return subprocess.run(['ffmpeg','-v','error','-f','image2pipe','-vcodec','ppm','-i','pipe:0',
