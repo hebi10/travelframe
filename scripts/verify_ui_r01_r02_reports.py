@@ -57,7 +57,20 @@ def verify(root):
                 gest = load_json(r01_dir / "gesture-manifest.json")
                 assert gest.get("status") == "pass", f"Gesture QA not passed: {profile}/{variant}"
                 assert all(item.get("passed") is True for item in gest.get("checks", []))
-                assert len(gest.get("checks", [])) >= (8 if profile == "phone-412dp" else 6)
+                required = {
+                    "native-slider-discovered", "vertical-scroll-within-photo",
+                    "diagonal-vertical-preserves-slider",
+                    "horizontal-photo-drag-adjusts-divider", "horizontal-left-adjusts-divider",
+                    "preset-25", "preset-50", "preset-75", "side-by-side-mode",
+                    "overlay-mode", "photo-picker", "picker-dismissed", "original-records-unchanged",
+                }
+                named = {check["name"]: check for check in gest.get("checks", [])}
+                assert required <= named.keys(), f"Missing required gestures: {sorted(required - named.keys())}"
+                for step in ("vertical-scroll-within-photo", "diagonal-vertical-preserves-slider"):
+                    proof = named[step]["details"]
+                    assert proof["after"]["percent"] == proof["before"]["percent"]
+                    assert proof["after"]["bounds"][1] < proof["before"]["bounds"][1] - 22
+                    assert proof["gesture"]["kind"] in ("vertical", "vertical-diagonal")
                 for screen in gest.get("screens", []):
                     prove_image(r01_dir / (screen["step"]+".png"), screen["sha256"])
                 camera = load_json(r02_dir / "camera-manifest.json")
