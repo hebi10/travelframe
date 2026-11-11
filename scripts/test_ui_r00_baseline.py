@@ -31,8 +31,8 @@ expected = {
 }
 for state, (nprojects, nphotos, newfiles) in expected.items():
     encoded, media, counts = fixtures.build_state(qa, "/data/user/0/com.haebi.photoguide", state)
-    projects = json.loads(encoded[fixtures.KEY_PROJECTS])
-    photos = json.loads(encoded[fixtures.KEY_PHOTOS])
+    projects = json.loads(encoded[fixtures.PROJECTS_STORAGE_ID])
+    photos = json.loads(encoded[fixtures.PHOTOS_STORAGE_ID])
     assert len(projects) == counts["projects"] == nprojects, state
     assert len(photos) == counts["photos"] == nphotos, state
     assert len(media) == newfiles, state
