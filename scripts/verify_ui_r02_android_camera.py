@@ -11,6 +11,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import re
 import sys
 import xml.etree.ElementTree as ET
 
@@ -34,6 +35,21 @@ if len(set(SCREENS)) != len(SCREENS) or not set(SCREENS).issubset(BY_NAME):
 def on_screen(xml, label, viewport):
     # Native accessible controls are evidence of reachable actions, not just text.
     return qa.target_bounds(xml, label, viewport=viewport)
+
+
+def visible_label_bounds(xml, label, viewport):
+    """Verify a labeled control is on screen, even if camera hardware disables it."""
+    left, top, right, bottom = viewport
+    for node in ET.fromstring(xml).iter("node"):
+        if label not in (node.get("text", ""), node.get("content-desc", "")):
+            continue
+        match = re.fullmatch(r"\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\]", node.get("bounds", ""))
+        if match is None:
+            continue
+        x1, y1, x2, y2 = (int(value) for value in match.groups())
+        if left <= x1 < x2 <= right and top <= y1 < y2 <= bottom:
+            return {"bounds": (x1, y1, x2, y2), "enabled": node.get("enabled") == "true"}
+    raise AssertionError(f"Labeled camera control is missing or outside the viewport: {label}")
 
 
 def capture_variant(device, target, profile, variant):
@@ -66,7 +82,12 @@ def capture_variant(device, target, profile, variant):
                     "SEARCHING_FOR_CAMERA" if any("사용할 수 있는 카메라를 찾는 중" in s for s in seen)
                     else "STATE_NOT_CONFIRMED"
                 )
-                on_screen(device.dump(), "사진 촬영", device.viewport())
+                shutter = visible_label_bounds(device.dump(), "사진 촬영", device.viewport())
+                report["emulatorShutter"] = shutter
+                if shutter["enabled"]:
+                    on_screen(device.dump(), "사진 촬영", device.viewport())
+                # A sensor-pending emulator may correctly disable its shutter.
+                # Presence is UI evidence; real-camera readiness is not claimed.
                 on_screen(device.dump(), "프로젝트 선택", device.viewport())
             if name == "camera-reference-adjust":
                 xml = device.dump()
