@@ -37,6 +37,17 @@ class NativeQAContract(unittest.TestCase):
                     self.assertGreater(abs(ex-sx), abs(ey-sy)*2)
         self.assertEqual(fake.shell.call_count, 4)
 
+    def test_disabled_camera_shutter_is_visible_but_not_actionable(self):
+        xml = ('<hierarchy><node class="android.widget.Button" content-desc="사진 촬영" '
+               'enabled="false" clickable="false" bounds="[10,100][90,220]" /></hierarchy>')
+        result = r02.visible_label_bounds(xml, "사진 촬영", (0, 0, 120, 300))
+        self.assertEqual(result["bounds"], (10, 100, 90, 220))
+        self.assertFalse(result["enabled"])
+        with self.assertRaises(RuntimeError):
+            r02.on_screen(xml, "사진 촬영", (0, 0, 120, 300))
+        with self.assertRaises(AssertionError):
+            r02.visible_label_bounds(xml, "사진 촬영", (0, 0, 60, 300))
+
     def test_camera_hardware_remains_unverified(self):
         self.assertEqual(r02.PROFILES, ("phone-412dp","tablet-600dp"))
         self.assertEqual(r02.VARIANTS, ("dark-100","light-100"))
