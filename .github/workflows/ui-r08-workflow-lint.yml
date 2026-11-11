@@ -1,0 +1,24 @@
+name: UI-R08 Android workflow syntax guard
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/body-frame-device-qa.yml'
+      - '.github/workflows/ui-r08-workflow-lint.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-native-workflow:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+      - name: Lint Android native QA workflow without executing production actions
+        run: |
+          go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7 -color .github/workflows/body-frame-device-qa.yml
