@@ -366,12 +366,7 @@ jobs:
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back emulated -camera-front none
           script: |
-            set +e
-            python3 scripts/verify_ui_r01_android_gestures.py --apk artifacts/apk/app-qaRelease.apk --output artifacts/qa/r01
-            r01_status=$?
-            python3 scripts/verify_ui_r02_android_camera.py --apk artifacts/apk/app-qaRelease.apk --output artifacts/qa/r02
-            r02_status=$?
-            if [ "$r01_status" -ne 0 ] || [ "$r02_status" -ne 0 ]; then exit 1; fi
+            python3 -c 'import subprocess,sys; cmds=[["python3","scripts/verify_ui_r01_android_gestures.py","--apk","artifacts/apk/app-qaRelease.apk","--output","artifacts/qa/r01"],["python3","scripts/verify_ui_r02_android_camera.py","--apk","artifacts/apk/app-qaRelease.apk","--output","artifacts/qa/r02"]]; statuses=[subprocess.run(cmd,check=False).returncode for cmd in cmds]; print("UI-R01/R02 exit codes:",statuses,flush=True); sys.exit(1 if any(statuses) else 0)'
       - name: Archive both QA runs including failures
         if: always()
         uses: actions/upload-artifact@v4
