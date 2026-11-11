@@ -10,44 +10,44 @@
       "role": "approved-master",
       "width": 1024,
       "height": 1024,
-      "pngColorType": 3,
-      "bytes": 6557,
-      "sha256": "5816b7e8686af8f524a86ab8d5cbc2dc9d74fb78231cfe08c38bd3239df3fe51",
+      "pngColorType": 6,
+      "bytes": 13725,
+      "sha256": "8088be1abc9cfdb9f2d1c28a53af820dd321f1be9328b3409c073daabdbb7899",
       "driveId": "1xBtSZ04FRwhpkN_HNQ-Hlev0jTYiJ78W",
-      "pngBitDepth": 2
+      "pngBitDepth": 8
     },
     {
       "path": "assets/icons/app-icon.png",
       "role": "android-launcher",
       "width": 1024,
       "height": 1024,
-      "pngColorType": 3,
-      "bytes": 6557,
-      "sha256": "5816b7e8686af8f524a86ab8d5cbc2dc9d74fb78231cfe08c38bd3239df3fe51",
+      "pngColorType": 6,
+      "bytes": 13725,
+      "sha256": "8088be1abc9cfdb9f2d1c28a53af820dd321f1be9328b3409c073daabdbb7899",
       "driveId": "1xBtSZ04FRwhpkN_HNQ-Hlev0jTYiJ78W",
-      "pngBitDepth": 2
+      "pngBitDepth": 8
     },
     {
       "path": "assets/icons/adaptive-icon.png",
       "role": "android-adaptive-foreground",
       "width": 1024,
       "height": 1024,
-      "pngColorType": 3,
-      "bytes": 5296,
-      "sha256": "2f7b71d87db49336d383db5f2da660336fe345cf176c4bb54c01235c9996a53b",
+      "pngColorType": 6,
+      "bytes": 12771,
+      "sha256": "2560aa25185687dcbf24b0bf62d1c681b46a6fdc25b028549175f9de3e9a5064",
       "driveId": "1qaC378H2b-vO2BKfrTlavuE2eHYAMekG",
-      "pngBitDepth": 2
+      "pngBitDepth": 8
     },
     {
       "path": "assets/icons/splash-icon.png",
       "role": "android-splash",
       "width": 1024,
       "height": 1024,
-      "pngColorType": 3,
-      "bytes": 4709,
-      "sha256": "612351b2905edfdc1ec2475b39b8ef1c1240577109b1c90be474ba0950d9c715",
+      "pngColorType": 6,
+      "bytes": 11851,
+      "sha256": "a9c19517bb6fbb1b1e6c62f8ac8e6caf59d9ff59acbdda786c9e5a224d95c9a4",
       "driveId": "1Fwm6_MaayNpeHHSFwtUvxS6exdQIrfMz",
-      "pngBitDepth": 2
+      "pngBitDepth": 8
     },
     {
       "path": "assets/play-store/ko-KR/app-icon-512.png",
