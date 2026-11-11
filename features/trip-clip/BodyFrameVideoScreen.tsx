@@ -651,7 +651,7 @@ export default function BodyFrameVideoScreen() {
         </View>
 
         <Text style={[styles.orderHint, { color: palette.muted }]}>
-영상은 프로젝트의 사진 순서대로 만들어집니다. 순서 변경은 프로젝트 상세에서 가능합니다.
+영상은 프로젝트의 사진 순서(#1 → #2 → #3 …)대로 만들어집니다. 순서 변경은 프로젝트 상세의 순서 조정에서 가능합니다.
         </Text>
 
         {!videoLimitState.allowed ? (
