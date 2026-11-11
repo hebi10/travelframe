@@ -567,11 +567,14 @@ export default function BodyFrameVideoScreen() {
         <View style={styles.previewHeader}>
           <Text style={[styles.sectionTitle, { color: palette.text }]}>미리보기</Text>
           <Text style={[styles.previewMeta, { color: palette.muted }]}>
-            {projectPhotos.length}장 · {formatDuration(totalDuration)}
+            {projectPhotos.length}장 · {formatDuration(totalDuration)} · {videoOptions.ratio}
           </Text>
         </View>
 
         <View
+          accessible
+          accessibilityRole="image"
+          accessibilityLabel={`영상 첫 사진 미리보기, ${projectPhotos.length}장, 영상 길이 ${formatDuration(totalDuration)}, 화면 비율 ${videoOptions.ratio}`}
           style={[
             styles.previewFrame,
             {
@@ -617,9 +620,14 @@ export default function BodyFrameVideoScreen() {
           )}
         </View>
 
-        <Text style={[styles.sectionTitle, styles.settingsTitle, { color: palette.text }]}>
-          영상 설정
-        </Text>
+        <View style={styles.settingsHeading}>
+          <Text style={[styles.sectionTitle, styles.settingsTitle, { color: palette.text }]}>
+            영상 설정
+          </Text>
+          <Text style={[styles.settingsMeta, { color: palette.muted }]}>
+            {videoOptions.quality}p · {videoOptions.ratio}
+          </Text>
+        </View>
         <View
           style={[
             styles.summaryCard,
@@ -643,7 +651,7 @@ export default function BodyFrameVideoScreen() {
         </View>
 
         <Text style={[styles.orderHint, { color: palette.muted }]}>
-          영상은 프로젝트의 사진 순서(#1 → #2 → #3 …)대로 만들어집니다. 순서를 바꾸려면 프로젝트 상세의 순서 조정에서 변경해 주세요.
+영상은 프로젝트의 사진 순서대로 만들어집니다. 순서 변경은 프로젝트 상세에서 가능합니다.
         </Text>
 
         {!videoLimitState.allowed ? (
@@ -922,9 +930,22 @@ const styles = StyleSheet.create({
     fontSize: bodyFrameTypography.caption,
     fontVariant: ["tabular-nums"]
   },
-  settingsTitle: {
+  settingsHeading: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
     marginTop: 6,
     marginBottom: 6
+  },
+  settingsTitle: {
+    marginTop: 0,
+    marginBottom: 0
+  },
+  settingsMeta: {
+    fontSize: bodyFrameTypography.caption,
+    fontVariant: ["tabular-nums"]
   },
   guestLimitText: {
     marginBottom: 6,
@@ -977,15 +998,15 @@ const styles = StyleSheet.create({
   summaryCard: {
     borderWidth: bodyFrameDesign.borderWidth,
     borderRadius: bodyFrameDesign.cardRadius,
-    paddingHorizontal: 14
+    paddingHorizontal: 12
   },
   summaryRow: {
     minHeight: bodyFrameDesign.primaryButtonHeight,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: 12,
-    paddingVertical: 8
+    gap: 10,
+    paddingVertical: 6
   },
   summaryLabel: {
     flexShrink: 0,
@@ -993,6 +1014,7 @@ const styles = StyleSheet.create({
   },
   summaryValueGroup: {
     flex: 1,
+    minWidth: 0,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "flex-end",
