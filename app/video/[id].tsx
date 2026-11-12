@@ -12,7 +12,6 @@ import { Component,
   useCallback,
   useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   Pressable,
   ScrollView,
@@ -22,6 +21,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AdBanner } from "@/components/ad-banner";
+import { BodyFrameStatusNotice } from "@/components/body-frame-status-notice";
 import { bodyFrameDesign, bodyFrameTypography, colors, spacing, typography, getBodyFrameControlColors } from "@/constants/app-theme";
 import { useAuth } from "@/lib/auth-context";
 import { useAppAppearance } from "@/lib/app-appearance";
@@ -117,7 +117,7 @@ export default function VideoDetailScreen() {
       <>
         <Stack.Screen options={{ title: "만든 영상" }} />
         <View style={[styles.centerScreen, { backgroundColor: palette.background }]}>
-          <ActivityIndicator color={palette.text} />
+          <BodyFrameStatusNotice variant="loading" title="영상을 불러오는 중입니다." />
         </View>
       </>
     );
@@ -128,14 +128,13 @@ export default function VideoDetailScreen() {
       <>
         <Stack.Screen options={{ title: "만든 영상" }} />
         <View style={[styles.centerScreen, { backgroundColor: palette.background }]}>
-          <Text selectable style={[styles.emptyTitle, { color: palette.text }]}>
-            영상을 찾을 수 없습니다.
-          </Text>
-          <Pressable accessibilityRole="button" style={[styles.darkButton, { backgroundColor: palette.text }]} onPress={() => router.replace("/video-library")}>
-            <Text selectable={false} style={[styles.darkButtonText, { color: palette.inverse }]}>
-              영상 목록으로 돌아가기
-            </Text>
-          </Pressable>
+          <BodyFrameStatusNotice
+            variant={message ? "error" : "empty"}
+            title={message ? "영상을 불러오지 못했습니다." : "영상을 찾을 수 없습니다."}
+            detail={message ?? "영상이 삭제되었거나 현재 기기에서 찾을 수 없습니다."}
+            actionLabel="영상 목록으로 돌아가기"
+            onAction={() => router.replace("/video-library")}
+          />
         </View>
       </>
     );

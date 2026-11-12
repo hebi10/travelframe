@@ -38,10 +38,21 @@ export const controls = {
 export const bodyFrameAccent = "#C6FF4D" as const;
 
 export const bodyFrameStatusColors = {
-  success: bodyFrameAccent,
-  warning: "#F59E0B",
-  error: "#EF4444"
+  success: "#147344",
+  warning: "#965600",
+  error: "#B42335"
 } as const;
+
+export const bodyFrameDarkStatusColors = {
+  success: "#7AD6A1",
+  warning: "#F4C16C",
+  error: "#FF9199"
+} as const;
+
+export const getBodyFrameStatusColors = (palette: { background: string }) =>
+  palette.background === colors.background
+    ? bodyFrameStatusColors
+    : bodyFrameDarkStatusColors;
 
 export const bodyFrameDarkColors = {
   background: "#0B0B0C",

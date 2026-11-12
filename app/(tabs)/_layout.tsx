@@ -1,17 +1,21 @@
 import { Tabs } from "expo-router";
+import { useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { TabGlyph } from "@/components/tab-glyph";
-import { bodyFrameDesign, getBodyFrameControlColors } from "@/constants/app-theme";
+import { bodyFrameDesign, bodyFrameTypography, getBodyFrameControlColors } from "@/constants/app-theme";
 import { useAppAppearance } from "@/lib/app-appearance";
 
 
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
+  const { fontScale: systemFontScale } = useWindowDimensions();
   const { palette, fontSizeScale, layoutScale, emphasisWeight, fontFamily } = useAppAppearance();
   const { selected: activeTabColor, unselected: inactiveTabColor } = getBodyFrameControlColors(palette);
   const tabBarBottomPadding = Math.max(insets.bottom + 8, 16);
-  const tabBarHeight = 58 + tabBarBottomPadding;
+  const tabLabelLineHeight = 16;
+  const extraFontHeight = Math.max(0, Math.ceil(tabLabelLineHeight * fontSizeScale * systemFontScale) - tabLabelLineHeight);
+  const tabBarHeight = 58 + tabBarBottomPadding + extraFontHeight;
 
   return (
     <Tabs
@@ -36,14 +40,14 @@ export default function TabsLayout() {
           marginBottom: 1
         },
         tabBarItemStyle: {
-          minHeight: bodyFrameDesign.minTouchSize,
+          minHeight: bodyFrameDesign.minTouchSize + extraFontHeight,
           paddingVertical: Math.round(2 * layoutScale)
         },
         tabBarLabelStyle: {
-          fontSize: Math.round(11 * fontSizeScale),
+          fontSize: Math.round(bodyFrameTypography.caption * fontSizeScale),
           fontFamily,
           fontWeight: emphasisWeight,
-          lineHeight: Math.round(14 * fontSizeScale),
+          lineHeight: Math.round(tabLabelLineHeight * fontSizeScale),
           letterSpacing: 0
         }
       }}

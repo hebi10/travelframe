@@ -12,7 +12,7 @@ type TabGlyphProps = {
 const iconNames = {
   camera: "camera",
   studio: "image",
-  video: "youtube",
+  video: "film",
   settings: "settings"
 } as const;
 

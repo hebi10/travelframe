@@ -21,7 +21,7 @@ const videoCreate = read(paths[3]);
 const records = read("features/records/BodyFrameRecordsScreen.tsx");
 const detail = read("features/records/BodyFrameProjectDetailScreen.tsx");
 
-assert.ok(tabs.includes('studio: "image"') && tabs.includes('video: "youtube"'));
+assert.ok(tabs.includes('studio: "image"') && tabs.includes('video: "film"'));
 assert.ok(settings.includes("const settingRowIcons: Record<string, keyof typeof Feather.glyphMap>"));
 assert.ok(settings.includes("styles.settingRowIcon") && settings.includes("size={18} color={palette.muted}"));
 assert.ok(settings.includes("minHeight: 52") && settings.includes("minHeight: 56"));
