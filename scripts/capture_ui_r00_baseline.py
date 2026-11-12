@@ -91,10 +91,10 @@ def seed_and_verify(device, state, font, theme):
 
 
 def reference_preview_rgb(path):
-    """Decode the stable central preview region without new Python dependencies."""
+    """Decode the unobstructed upper preview, not the bottom reference-settings sheet."""
     process = subprocess.run(
         ["ffmpeg", "-hide_banner", "-loglevel", "error", "-i", str(path),
-         "-vf", "crop=iw*0.64:ih*0.48:iw*0.18:ih*0.24,scale=64:64,format=rgb24",
+         "-vf", "crop=iw*0.64:ih*0.16:iw*0.18:ih*0.18,scale=64:64,format=rgb24",
          "-frames:v", "1", "-f", "rawvideo", "pipe:1"],
         check=True, capture_output=True, timeout=25
     )
@@ -112,10 +112,11 @@ def reference_preview_delta(base, target):
 def validate_reference_preview(device, folder, record):
     """Reject compositor/GPU block corruption even when PNG/XML/SHA look valid.
 
-    The original camera and reference-adjust share the same demo-photo region.
-    From the locked app baseline, healthy preview delta is below 25 RGB units;
-    corrupt emulator captures in the 360/600/750dp profiles exceeded 90.
-    A conservative threshold of 48 allows normal opacity changes.
+    The reference setup panel occupies the lower preview on compact 360dp
+    screens, so a center-screen difference measures the legitimate dark panel,
+    not just the camera pixels. Compare the shared upper camera-preview band
+    (x=18..82%, y=18..34%). Keep the original strict 48 RGB-unit limit,
+    native PNG/XML/SHA evidence and bounded full-UI recapture on failure.
     """
     if record.get("status") != "captured":
         return record
@@ -130,8 +131,8 @@ def validate_reference_preview(device, folder, record):
             observed.append(delta)
             if delta <= 48.0:
                 record["referencePreviewVisualQuality"] = {
-                    "status": "pass", "centralRgbDelta": delta,
-                    "threshold": 48.0, "attempts": attempt + 1,
+                    "status": "pass", "previewRgbDelta": delta,
+                    "threshold": 48.0, "sampleRegion": "unobstructed upper preview x18-82 y18-34 percent", "attempts": attempt + 1,
                     "priorDeltas": observed[:-1],
                     "recovery": "fresh app launch and native UI recapture" if attempt else "not needed",
                 }
@@ -166,13 +167,13 @@ def validate_reference_preview(device, folder, record):
                 raise RuntimeError("Recaptured reference PNG digest does not match its metadata")
             record = refreshed
         record["referencePreviewVisualQuality"] = {
-            "status": "fail", "centralRgbDelta": observed[-1],
-            "threshold": 48.0, "attempts": len(observed),
+            "status": "fail", "previewRgbDelta": observed[-1],
+            "threshold": 48.0, "sampleRegion": "unobstructed upper preview x18-82 y18-34 percent", "attempts": len(observed),
             "allDeltas": observed,
         }
         raise RuntimeError(
-            "Android reference-preview renderer produced abnormal RGB blocks "
-            f"(central delta {observed[-1]} > 48); image remains a FAIL"
+            "Android upper reference-preview differs beyond strict pixel tolerance "
+            f"(upper preview delta {observed[-1]} > 48); image remains a FAIL"
         )
     except Exception as error:
         if target.is_file():
