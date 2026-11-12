@@ -149,7 +149,7 @@ export default function BodyFrameVideoScreen() {
   );
   const outputSize = getBodyFrameVideoOutputSize(videoOptions.ratio, videoOptions.quality);
   const frameAspectRatio = outputSize.width / outputSize.height;
-  const previewDisplayWidth = Math.max(160, Math.min(360, windowWidth * 0.82, windowHeight * 0.30 * frameAspectRatio));
+  const previewDisplayWidth = Math.max(160, Math.min(360, windowWidth * 0.82, windowHeight * 0.34 * frameAspectRatio));
   const [isLoading, setIsLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
@@ -908,13 +908,13 @@ const styles = StyleSheet.create({
     fontWeight: "600"
   },
   projectName: {
-    marginTop: 6,
-    marginBottom: 2,
+    marginTop: 4,
+    marginBottom: 0,
     fontSize: bodyFrameTypography.body
   },
   previewHeader: {
-    marginTop: 4,
-    marginBottom: 4,
+    marginTop: 2,
+    marginBottom: 2,
     minHeight: 32,
     flexDirection: "row",
     flexWrap: "wrap",
@@ -936,8 +936,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     gap: 8,
-    marginTop: 6,
-    marginBottom: 6
+    marginTop: 4,
+    marginBottom: 4
   },
   settingsTitle: {
     marginTop: 0,
@@ -1027,7 +1027,7 @@ const styles = StyleSheet.create({
     textAlign: "right"
   },
   orderHint: {
-    marginTop: 10,
+    marginTop: 6,
     fontSize: bodyFrameTypography.caption,
     lineHeight: 17
   },
