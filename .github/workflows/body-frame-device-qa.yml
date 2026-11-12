@@ -43,6 +43,13 @@ jobs:
       EXPO_NO_DOTENV: '1'
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: 6fdd1b89b4241612a576ffd039d634f90ba02372
+      - name: Assert exact merged main commit is built into APK
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "6fdd1b89b4241612a576ffd039d634f90ba02372"
+          echo "UI-R09 final main exact SHA: $(git rev-parse HEAD)"
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -157,7 +164,7 @@ jobs:
 
   stage13-design-captures:
     needs: build-apk
-    if: github.event_name == 'workflow_dispatch' || startsWith(github.head_ref, 'feat/body-frame-design-stage13-') || startsWith(github.head_ref, 'feat/body-frame-design-stage14-') || startsWith(github.head_ref, 'ui/ui-r03-') || startsWith(github.head_ref, 'ui/ui-r04-') || startsWith(github.head_ref, 'ui/ui-r05-') || startsWith(github.head_ref, 'ui/ui-r06-') || startsWith(github.head_ref, 'ui/ui-r07-') || startsWith(github.head_ref, 'feat/body-frame-design-stageA-') || startsWith(github.head_ref, 'feat/body-frame-design-stageB-') || startsWith(github.head_ref, 'feat/body-frame-design-stageC-') || startsWith(github.head_ref, 'feat/body-frame-design-stageD-') || startsWith(github.head_ref, 'feat/r3-frame-journal-') || startsWith(github.head_ref, 'fix/body-frame-stage13-')
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.head_ref, 'feat/body-frame-design-stage13-') || startsWith(github.head_ref, 'feat/body-frame-design-stage14-') || startsWith(github.head_ref, 'ui/ui-r03-') || (startsWith(github.head_ref, 'ui/ui-r04-') || startsWith(github.head_ref, 'qa/ui-r08-')) || (startsWith(github.head_ref, 'ui/ui-r05-') || startsWith(github.head_ref, 'qa/ui-r08-')) || (startsWith(github.head_ref, 'ui/ui-r06-') || startsWith(github.head_ref, 'qa/ui-r08-')) || (startsWith(github.head_ref, 'ui/ui-r07-') || startsWith(github.head_ref, 'qa/ui-r08-')) || startsWith(github.head_ref, 'feat/body-frame-design-stageA-') || startsWith(github.head_ref, 'feat/body-frame-design-stageB-') || startsWith(github.head_ref, 'feat/body-frame-design-stageC-') || startsWith(github.head_ref, 'feat/body-frame-design-stageD-') || startsWith(github.head_ref, 'feat/r3-frame-journal-') || (startsWith(github.head_ref, 'fix/body-frame-stage13-') || startsWith(github.head_ref, 'qa/ui-r08-'))
     runs-on: ubuntu-latest
     timeout-minutes: 65
     strategy:
@@ -214,7 +221,7 @@ jobs:
 
   c7-integrated-qa:
     needs: stage13-design-captures
-    if: ${{ always() && (startsWith(github.head_ref, 'feat/r3-frame-journal-camera-c7-') || startsWith(github.head_ref, 'ui/ui-r03-')) }}
+    if: ${{ always() && ((startsWith(github.head_ref, 'feat/r3-frame-journal-camera-c7-') || startsWith(github.head_ref, 'qa/ui-r08-')) || startsWith(github.head_ref, 'ui/ui-r03-')) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -250,7 +257,7 @@ jobs:
 
   ui-r04-verify:
     needs: stage13-design-captures
-    if: ${{ always() && github.event_name == 'pull_request' && startsWith(github.head_ref, 'ui/ui-r04-') }}
+    if: ${{ always() && github.event_name == 'pull_request' && (startsWith(github.head_ref, 'ui/ui-r04-') || startsWith(github.head_ref, 'qa/ui-r08-')) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -286,7 +293,7 @@ jobs:
 
   ui-r06-visual-verify:
     needs: stage13-design-captures
-    if: ${{ always() && github.event_name == 'pull_request' && startsWith(github.head_ref, 'ui/ui-r06-') }}
+    if: ${{ always() && github.event_name == 'pull_request' && (startsWith(github.head_ref, 'ui/ui-r06-') || startsWith(github.head_ref, 'qa/ui-r08-')) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -322,7 +329,7 @@ jobs:
 
   ui-r05-visual-verify:
     needs: stage13-design-captures
-    if: ${{ always() && github.event_name == 'pull_request' && startsWith(github.head_ref, 'ui/ui-r05-') }}
+    if: ${{ always() && github.event_name == 'pull_request' && (startsWith(github.head_ref, 'ui/ui-r05-') || startsWith(github.head_ref, 'qa/ui-r08-')) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -359,7 +366,7 @@ jobs:
   ui-r05-native-video:
     name: UI-R05 native MP4 export, cancellation and populated library
     needs: build-apk
-    if: ${{ github.event_name == 'pull_request' && startsWith(github.head_ref, 'ui/ui-r05-') }}
+    if: ${{ github.event_name == 'pull_request' && (startsWith(github.head_ref, 'ui/ui-r05-') || startsWith(github.head_ref, 'qa/ui-r08-')) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 85
     steps:
@@ -407,7 +414,7 @@ jobs:
   ui-r05-native-verify:
     name: UI-R05 independent MP4 hash, H.264/frame and native UI audit
     needs: [build-apk, ui-r05-native-video]
-    if: ${{ always() && github.event_name == 'pull_request' && startsWith(github.head_ref, 'ui/ui-r05-') }}
+    if: ${{ always() && github.event_name == 'pull_request' && (startsWith(github.head_ref, 'ui/ui-r05-') || startsWith(github.head_ref, 'qa/ui-r08-')) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -439,7 +446,7 @@ jobs:
 
   ui-r07-visual-verify:
     needs: stage13-design-captures
-    if: ${{ always() && github.event_name == 'pull_request' && startsWith(github.head_ref, 'ui/ui-r07-') }}
+    if: ${{ always() && github.event_name == 'pull_request' && (startsWith(github.head_ref, 'ui/ui-r07-') || startsWith(github.head_ref, 'qa/ui-r08-')) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -476,7 +483,7 @@ jobs:
   ui-r07-native-keyboard:
     name: UI-R07 Android 150-percent keyboard and new-project save
     needs: build-apk
-    if: ${{ github.event_name == 'pull_request' && startsWith(github.head_ref, 'ui/ui-r07-') }}
+    if: ${{ github.event_name == 'pull_request' && (startsWith(github.head_ref, 'ui/ui-r07-') || startsWith(github.head_ref, 'qa/ui-r08-')) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 65
     steps:
@@ -518,7 +525,7 @@ jobs:
   ui-r07-keyboard-verify:
     name: UI-R07 independent APK, Android IME and persisted project audit
     needs: [build-apk, ui-r07-native-keyboard]
-    if: ${{ always() && github.event_name == 'pull_request' && startsWith(github.head_ref, 'ui/ui-r07-') }}
+    if: ${{ always() && github.event_name == 'pull_request' && (startsWith(github.head_ref, 'ui/ui-r07-') || startsWith(github.head_ref, 'qa/ui-r08-')) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -600,7 +607,7 @@ jobs:
   ui-r00-captures:
     name: UI-R00 Android baseline · ${{ matrix.profile }}
     needs: build-apk
-    if: ${{ github.event_name == 'pull_request' && startsWith(github.head_ref, 'qa/ui-r00-') }}
+    if: ${{ github.event_name == 'pull_request' && (startsWith(github.head_ref, 'qa/ui-r00-') || startsWith(github.head_ref, 'qa/ui-r08-')) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 65
     strategy:
@@ -671,7 +678,7 @@ jobs:
   ui-r00-verify:
     name: UI-R00 integrated 100-image verification
     needs: [build-apk, ui-r00-captures]
-    if: ${{ always() && github.event_name == 'pull_request' && startsWith(github.head_ref, 'qa/ui-r00-') }}
+    if: ${{ always() && github.event_name == 'pull_request' && (startsWith(github.head_ref, 'qa/ui-r00-') || startsWith(github.head_ref, 'qa/ui-r08-')) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 12
     steps:
@@ -699,12 +706,12 @@ jobs:
   ui-r01-r02-android:
     name: UI-R01/R02 native gestures and camera screen QA
     needs: build-apk
-    if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'qa/ui-r01-r02-')
+    if: github.event_name == 'pull_request' && (startsWith(github.head_ref, 'qa/ui-r01-r02-') || startsWith(github.head_ref, 'qa/ui-r08-'))
     runs-on: ubuntu-24.04
     timeout-minutes: 70
     env:
       BODY_FRAME_STORE_DEMO_FIXTURES: '1'
-      QA_BASE_SHA: 'd59fbbc76778d7091ab4bed594c95e6391c91b5f'
+      QA_BASE_SHA: '6fdd1b89b4241612a576ffd039d634f90ba02372'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -727,6 +734,8 @@ jobs:
             'scripts/test_ui_r01_r02_host.py',
             'tests/ui-r01-r02-qa-contract.test.mjs',
             'docs/design/ui-r01-r02-native-qa-20261111.md',
+            'scripts/verify_ui_r08_needs.py',
+            'scripts/verify_ui_r08_visual.py',
             '.gitleaksignore',
           }
           changed = set(subprocess.check_output(
@@ -734,6 +743,14 @@ jobs:
           ).splitlines())
           if changed - allowed:
               raise SystemExit('Unexpected runtime changes: ' + repr(sorted(changed - allowed)))
+          if os.environ.get('GITHUB_HEAD_REF', '').startswith('qa/ui-r08-final-main-'):
+              required = {
+                '.github/workflows/body-frame-device-qa.yml',
+                'scripts/verify_ui_r08_needs.py',
+                'scripts/verify_ui_r08_visual.py',
+              }
+              if changed != required:
+                  raise SystemExit('UI-R09 QA branch must contain only 3 test-only files: ' + repr(sorted(changed ^ required)))
           PYQA
           python3 -m py_compile scripts/verify_ui_r01_android_gestures.py scripts/verify_ui_r02_android_camera.py scripts/verify_ui_r01_r02_reports.py
           python3 scripts/test_ui_r01_r02_host.py
@@ -773,7 +790,7 @@ jobs:
   ui-r01-r02-verify:
     name: UI-R01/R02 independent real PNG/XML and gesture audit
     needs: [build-apk, ui-r01-r02-android]
-    if: ${{ always() && github.event_name == 'pull_request' && startsWith(github.head_ref, 'qa/ui-r01-r02-') }}
+    if: ${{ always() && github.event_name == 'pull_request' && (startsWith(github.head_ref, 'qa/ui-r01-r02-') || startsWith(github.head_ref, 'qa/ui-r08-')) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 12
     steps:
@@ -792,6 +809,77 @@ jobs:
         with:
           name: travelframe-ui-r01-r02-report-${{ github.run_id }}
           path: artifacts/report/
+          if-no-files-found: warn
+          retention-days: 90
+
+  ui-r08-visual-verify:
+    needs: stage13-design-captures
+    if: ${{ always() && github.event_name == 'pull_request' && startsWith(github.head_ref, 'qa/ui-r08-') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download Android PNG, XML and manifests from all four widths
+        uses: actions/download-artifact@v4
+        with:
+          pattern: body-frame-stage13-*-${{ github.run_id }}
+          merge-multiple: true
+          path: artifacts/c7-captures
+      - name: Prepare FFmpeg for Android screenshot pixel verification
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! command -v ffmpeg >/dev/null 2>&1; then
+            timeout 120s sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=20 update
+            timeout 240s sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ffmpeg
+          fi
+          ffmpeg -version | head -1
+      - name: Inspect UI-R08 original Android screenshots, tab states and 24 profile variants
+        run: |
+          command -v ffmpeg
+          python3 scripts/test_verify_frame_journal_c7.py
+          python3 scripts/verify-frame-journal-c7.py --root artifacts/c7-captures --output artifacts/c7-report
+          python3 scripts/verify_ui_r08_visual.py --root artifacts/c7-captures --report artifacts/c7-report/c7-report.json --head ${{ github.event.pull_request.head.sha }} --output artifacts/c7-report/ui-r08-visual.json
+      - name: Preserve UI-R08 final visual PASS or FAIL report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: body-frame-ui-r08-visual-${{ github.run_id }}
+          path: artifacts/c7-report/
+          if-no-files-found: warn
+          retention-days: 90
+
+  ui-r08-aggregate-gate:
+    name: UI-R08 fail-closed full native evidence integration gate
+    needs:
+      - build-apk
+      - capture-devices
+      - stage13-design-captures
+      - ui-r00-captures
+      - ui-r00-verify
+      - ui-r01-r02-android
+      - ui-r01-r02-verify
+      - ui-r05-native-video
+      - ui-r05-native-verify
+      - ui-r07-native-keyboard
+      - ui-r07-keyboard-verify
+      - ui-r08-visual-verify
+    if: ${{ always() && github.event_name == 'pull_request' && startsWith(github.head_ref, 'qa/ui-r08-') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify all native and functional jobs succeeded for this same head
+        env:
+          UI_R08_NEEDS_JSON: ${{ toJSON(needs) }}
+        run: |
+          python3 scripts/verify_ui_r08_needs.py --output artifacts/ui-r08-gate/report.json
+      - name: Preserve integration PASS or FAIL and all job conclusions
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: body-frame-ui-r08-final-gate-${{ github.run_id }}
+          path: artifacts/ui-r08-gate/
           if-no-files-found: warn
           retention-days: 90
 
