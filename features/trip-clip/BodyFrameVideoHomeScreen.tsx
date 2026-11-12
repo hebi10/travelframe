@@ -141,7 +141,10 @@ export default function BodyFrameVideoHomeScreen() {
   const savedVideosSection = (
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: palette.text }]}>저장한 영상</Text>
+            <View style={styles.savedHeadingCopy}>
+              <Text style={[styles.sectionTitle, { color: palette.text }]}>저장한 영상</Text>
+              <Text style={[styles.sectionCount, { color: palette.muted }]}>{videos.length}개</Text>
+            </View>
             <Pressable
               accessibilityRole="button"
               onPress={() => router.push("/video-library")}
@@ -159,6 +162,7 @@ export default function BodyFrameVideoHomeScreen() {
                 <Pressable
                   key={video.id}
                   accessibilityRole="button"
+                  accessibilityLabel={`${video.title} 영상 재생 및 상세, ${formatDuration(video.duration)}, ${formatDate(video.createdAt)}`}
                   onPress={() =>
                     router.push({
                       pathname: "/video/[id]",
@@ -196,16 +200,22 @@ export default function BodyFrameVideoHomeScreen() {
                   </View>
                   <View style={styles.rowCopy}>
                     <Text
-                      numberOfLines={1}
+                      numberOfLines={2}
                       style={[styles.rowTitle, { color: palette.text }]}
                     >
                       {video.title}
                     </Text>
                     <Text style={[styles.rowDetail, { color: palette.muted }]}>
-                      {formatDate(video.createdAt)} · {formatDuration(video.duration)}
+                      {formatDate(video.createdAt)}
+                    </Text>
+                    <Text style={[styles.rowDetail, { color: palette.muted }]}>
+                      {formatDuration(video.duration)} · {video.ratio}
                     </Text>
                   </View>
-                  <Feather name="chevron-right" size={18} color={palette.muted} />
+                  <View style={styles.rowAction}>
+                    <Text style={[styles.rowActionText, { color: palette.text }]}>재생</Text>
+                    <Feather name="chevron-right" size={16} color={palette.muted} />
+                  </View>
                 </Pressable>
               ))}
             </View>
@@ -296,6 +306,8 @@ export default function BodyFrameVideoHomeScreen() {
           </Pressable>
         </View>
 
+        {recentVideos.length > 0 ? savedVideosSection : null}
+
         <View
           style={[
             styles.policyRow,
@@ -312,8 +324,6 @@ export default function BodyFrameVideoHomeScreen() {
               : `비로그인 사용자는 주 1회 출력할 수 있습니다. 이번 주 ${guestUsage?.count ?? 0}/1회 사용`}
           </Text>
         </View>
-
-        {recentVideos.length > 0 ? savedVideosSection : null}
 
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
@@ -520,6 +530,12 @@ const styles = StyleSheet.create({
     fontSize: bodyFrameTypography.sectionTitle,
     fontWeight: "600"
   },
+  savedHeadingCopy: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    flexWrap: "wrap",
+    gap: 8
+  },
   sectionCount: {
     fontSize: bodyFrameTypography.caption
   },
@@ -559,6 +575,7 @@ const styles = StyleSheet.create({
   },
   rowCopy: {
     flex: 1,
+    minWidth: 0,
     gap: 4
   },
   rowTitle: {
@@ -567,7 +584,7 @@ const styles = StyleSheet.create({
   },
   rowDetail: {
     fontSize: bodyFrameTypography.caption,
-    lineHeight: 17
+    lineHeight: 18
   },
   rowAction: {
     flexDirection: "row",
@@ -579,7 +596,7 @@ const styles = StyleSheet.create({
     fontWeight: "600"
   },
   videoRow: {
-    minHeight: 94,
+    minHeight: 108,
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
@@ -589,8 +606,8 @@ const styles = StyleSheet.create({
     borderRadius: bodyFrameDesign.cardRadius
   },
   videoCover: {
-    width: 60,
-    height: 78,
+    width: 72,
+    height: 92,
     overflow: "hidden",
     alignItems: "center",
     justifyContent: "center",
