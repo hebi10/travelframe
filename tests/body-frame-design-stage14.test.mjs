@@ -40,7 +40,7 @@ assert.ok(videoHome.includes("styles.heroIllustration"));
 assert.ok(videoHome.includes("router.push(\"/video-library\")"));
 
 assert.ok(videoCreate.includes("windowWidth * 0.82"));
-assert.ok(videoCreate.includes("windowHeight * 0.30 * frameAspectRatio"));
+assert.ok(videoCreate.includes("windowHeight * 0.34 * frameAspectRatio"));
 assert.ok(videoCreate.includes('maxWidth: 360'));
 assert.ok(videoCreate.includes("TripClipRecordingCanvas"));
 assert.ok(videoCreate.includes("saveMadeVideo("));
