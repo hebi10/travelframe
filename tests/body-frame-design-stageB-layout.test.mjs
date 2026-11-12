@@ -23,7 +23,7 @@ test("Stage B four Android screens parse and retain existing media controls", ()
 });
 
 test("Stage B video reduces preview without changing aspect ratio or export path", () => {
-  assert.ok(source.video.includes("windowHeight * 0.30 * frameAspectRatio"));
+  assert.ok(source.video.includes("windowHeight * 0.34 * frameAspectRatio"));
   assert.ok(source.video.includes("windowWidth * 0.82"));
   assert.ok(source.video.includes("aspectRatio: frameAspectRatio"));
   for (const token of [
