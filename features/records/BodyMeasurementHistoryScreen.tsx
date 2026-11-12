@@ -357,28 +357,7 @@ export default function BodyMeasurementHistoryScreen() {
           })}
         </View>
 
-        <BodyMeasurementSummaryCard
-          metric={selectedMetric}
-          series={series}
-          compact
-          onAddMeasurement={openNewEntry}
-        />
-
         <View style={styles.overviewGrid} accessibilityLabel="선택한 지표의 기간별 요약">
-          <OverviewStat
-            label="시작"
-            value={
-              seriesSummary.first
-                ? String(seriesSummary.first.value) + metricMeta.unit
-                : "-"
-            }
-            dateLabel={seriesSummary.first ? formatSummaryDate(seriesSummary.first.recordedAt) : undefined}
-            wide={wideStats}
-            textColor={palette.text}
-            mutedColor={palette.muted}
-            borderColor={palette.line}
-            backgroundColor={palette.surface}
-          />
           <OverviewStat
             label="현재"
             value={
@@ -387,6 +366,7 @@ export default function BodyMeasurementHistoryScreen() {
                 : "-"
             }
             dateLabel={seriesSummary.latest ? formatSummaryDate(seriesSummary.latest.recordedAt) : undefined}
+            prominent
             wide={wideStats}
             textColor={palette.text}
             mutedColor={palette.muted}
@@ -403,6 +383,21 @@ export default function BodyMeasurementHistoryScreen() {
                   metricMeta.unit
             }
             dateLabel="시작 대비"
+            prominent
+            wide={wideStats}
+            textColor={palette.text}
+            mutedColor={palette.muted}
+            borderColor={palette.line}
+            backgroundColor={palette.surface}
+          />
+          <OverviewStat
+            label="시작"
+            value={
+              seriesSummary.first
+                ? String(seriesSummary.first.value) + metricMeta.unit
+                : "-"
+            }
+            dateLabel={seriesSummary.first ? formatSummaryDate(seriesSummary.first.recordedAt) : undefined}
             wide={wideStats}
             textColor={palette.text}
             mutedColor={palette.muted}
@@ -420,7 +415,13 @@ export default function BodyMeasurementHistoryScreen() {
           />
         </View>
 
-
+        <BodyMeasurementSummaryCard
+          metric={selectedMetric}
+          series={series}
+          compact
+          chartOnly
+          onAddMeasurement={openNewEntry}
+        />
 
         <View style={styles.historySection}>
           <View style={styles.sectionHeader}>
@@ -573,6 +574,7 @@ function OverviewStat({
   value,
   dateLabel,
   wide,
+  prominent = false,
   textColor,
   mutedColor,
   borderColor,
@@ -582,6 +584,7 @@ function OverviewStat({
   value: string;
   dateLabel?: string;
   wide: boolean;
+  prominent?: boolean;
   textColor: string;
   mutedColor: string;
   borderColor: string;
@@ -592,11 +595,12 @@ function OverviewStat({
       style={[
         styles.overviewStat,
         wide && styles.overviewStatWide,
+        prominent && styles.overviewStatProminent,
         { borderColor, backgroundColor }
       ]}
     >
       <Text style={[styles.overviewLabel, { color: mutedColor }]}>{label}</Text>
-      <Text style={[styles.overviewValue, { color: textColor }]}>{value}</Text>
+      <Text style={[styles.overviewValue, prominent && styles.overviewValueProminent, { color: textColor }]}>{value}</Text>
       {dateLabel ? (
         <Text style={[styles.overviewDate, { color: mutedColor }]}>{dateLabel}</Text>
       ) : null}
@@ -725,6 +729,9 @@ const styles = StyleSheet.create({
   overviewStatWide: {
     width: "24%"
   },
+  overviewStatProminent: {
+    minHeight: 74
+  },
   overviewLabel: {
     fontSize: bodyFrameTypography.caption
   },
@@ -733,6 +740,11 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     fontVariant: ["tabular-nums"],
     flexShrink: 1
+  },
+  overviewValueProminent: {
+    fontSize: bodyFrameTypography.projectTitle,
+    lineHeight: 30,
+    fontWeight: "700"
   },
   overviewDate: {
     fontSize: bodyFrameTypography.caption,

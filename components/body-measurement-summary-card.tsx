@@ -48,6 +48,13 @@ function Sparkline({
   unit: string;
 }) {
   const [width, setWidth] = useState(0);
+  const axisLabels = useMemo(() => {
+    const values = series.map((point) => point.value);
+    const minimum = Math.min(...values);
+    const maximum = Math.max(...values);
+    const formatter = new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 2 });
+    return [maximum, (maximum + minimum) / 2, minimum].map((value) => formatter.format(value));
+  }, [series]);
   const points = useMemo(
     () =>
       normalizeBodyMeasurementSparklinePoints({
@@ -60,13 +67,20 @@ function Sparkline({
 
   return (
     <View
-      style={styles.chart}
+      style={styles.chartRow}
       accessible
       accessibilityRole="image"
       accessibilityLabel={`${metricLabel} 변화 그래프, 시작 ${series[0]?.value}${unit}, 최근 ${series[series.length - 1]?.value}${unit}, 총 ${series.length}회 기록`}
-      onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
     >
-      <View style={[styles.chartGuide, { backgroundColor: mutedColor }]} />
+      <View style={styles.chartAxis} accessible={false}>
+        {axisLabels.map((label, index) => (
+          <Text key={index} numberOfLines={1} style={[styles.chartAxisText, { color: mutedColor }]}>
+            {label}
+          </Text>
+        ))}
+      </View>
+      <View style={styles.chart} onLayout={(event) => setWidth(event.nativeEvent.layout.width)}>
+        <View style={[styles.chartGuide, { backgroundColor: mutedColor }]} />
 
       {points.slice(0, -1).map((point, index) => {
         const next = points[index + 1];
@@ -105,6 +119,7 @@ function Sparkline({
           ]}
         />
       ))}
+      </View>
     </View>
   );
 }
@@ -114,13 +129,15 @@ export function BodyMeasurementSummaryCard({
   series,
   onAddMeasurement,
   onOpenHistory,
-  compact = false
+  compact = false,
+  chartOnly = false
 }: {
   metric: BodyMeasurementMetric;
   series: BodyMeasurementSeriesPoint[];
   onAddMeasurement?: () => void;
   onOpenHistory?: () => void;
   compact?: boolean;
+  chartOnly?: boolean;
 }) {
   const { palette } = useAppAppearance();
   const meta = bodyMeasurementMetricMeta[metric];
@@ -142,12 +159,14 @@ export function BodyMeasurementSummaryCard({
       style={[
         styles.card,
         compact && styles.compactCard,
+        chartOnly && styles.chartOnlyCard,
         {
           borderColor: palette.line,
           backgroundColor: palette.surface
         }
       ]}
     >
+      {!chartOnly ? (
       <View style={styles.header}>
         <View style={styles.headerCopy}>
           <Text style={[styles.label, { color: palette.muted }]}>
@@ -188,13 +207,14 @@ export function BodyMeasurementSummaryCard({
           ) : null}
         </View>
       </View>
+      ) : null}
 
       {series.length >= 2 ? (
         <>
           {compact && range ? (
             <View style={styles.chartContext}>
               <Text style={[styles.chartContextText, { color: palette.muted }]}>
-                변화 추이
+                변화 추이 · {meta.unit}
               </Text>
               <Text style={[styles.chartContextText, { color: palette.muted }]}>
                 최저 {range.min}{meta.unit} · 최고 {range.max}{meta.unit}
@@ -276,6 +296,10 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     padding: 12
   },
+  chartOnlyCard: {
+    gap: 6,
+    paddingVertical: 10
+  },
   header: {
     minHeight: bodyFrameDesign.minTouchSize,
     flexDirection: "row",
@@ -341,9 +365,26 @@ const styles = StyleSheet.create({
     fontSize: bodyFrameTypography.caption,
     fontWeight: "600"
   },
+  chartRow: {
+    height: CHART_HEIGHT,
+    flexDirection: "row",
+    alignItems: "stretch",
+    gap: 8
+  },
+  chartAxis: {
+    width: 40,
+    minWidth: 40,
+    alignItems: "flex-end",
+    justifyContent: "space-between"
+  },
+  chartAxisText: {
+    fontSize: 11,
+    fontVariant: ["tabular-nums"]
+  },
   chart: {
     position: "relative",
-    width: "100%",
+    flex: 1,
+    minWidth: 0,
     height: CHART_HEIGHT,
     overflow: "hidden"
   },
