@@ -157,7 +157,7 @@ jobs:
 
   stage13-design-captures:
     needs: build-apk
-    if: github.event_name == 'workflow_dispatch' || startsWith(github.head_ref, 'feat/body-frame-design-stage13-') || startsWith(github.head_ref, 'feat/body-frame-design-stage14-') || startsWith(github.head_ref, 'feat/body-frame-design-stageA-') || startsWith(github.head_ref, 'feat/body-frame-design-stageB-') || startsWith(github.head_ref, 'feat/body-frame-design-stageC-') || startsWith(github.head_ref, 'feat/body-frame-design-stageD-') || startsWith(github.head_ref, 'feat/r3-frame-journal-') || startsWith(github.head_ref, 'fix/body-frame-stage13-')
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.head_ref, 'feat/body-frame-design-stage13-') || startsWith(github.head_ref, 'feat/body-frame-design-stage14-') || startsWith(github.head_ref, 'ui/ui-r03-') || startsWith(github.head_ref, 'feat/body-frame-design-stageA-') || startsWith(github.head_ref, 'feat/body-frame-design-stageB-') || startsWith(github.head_ref, 'feat/body-frame-design-stageC-') || startsWith(github.head_ref, 'feat/body-frame-design-stageD-') || startsWith(github.head_ref, 'feat/r3-frame-journal-') || startsWith(github.head_ref, 'fix/body-frame-stage13-')
     runs-on: ubuntu-latest
     timeout-minutes: 65
     strategy:
@@ -214,7 +214,7 @@ jobs:
 
   c7-integrated-qa:
     needs: stage13-design-captures
-    if: ${{ always() && startsWith(github.head_ref, 'feat/r3-frame-journal-camera-c7-') }}
+    if: ${{ always() && (startsWith(github.head_ref, 'feat/r3-frame-journal-camera-c7-') || startsWith(github.head_ref, 'ui/ui-r03-')) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
