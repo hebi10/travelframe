@@ -76,5 +76,5 @@ test("R3 screen supports photo picker, three view modes and original slider acce
   assert.ok(screen.includes("FlatList"));
   assert.ok(screen.includes('accessibilityRole="adjustable"'));
   assert.ok(screen.includes("[0.25, 0.5, 0.75]"));
-  assert.ok(detail.includes("사진을 2장 이상 기록하면 전후 비교"));
+  assert.ok(detail.includes("사진을 2장 이상 기록하면 비교할 수 있습니다."));
 });
