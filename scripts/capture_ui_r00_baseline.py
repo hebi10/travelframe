@@ -10,7 +10,6 @@ import hashlib
 import importlib.util
 import json
 import os
-import struct
 import subprocess
 import time
 from pathlib import Path
@@ -134,22 +133,38 @@ def validate_reference_preview(device, folder, record):
                     "status": "pass", "centralRgbDelta": delta,
                     "threshold": 48.0, "attempts": attempt + 1,
                     "priorDeltas": observed[:-1],
+                    "recovery": "fresh app launch and native UI recapture" if attempt else "not needed",
                 }
                 return record
             if attempt == 3:
                 break
-            time.sleep(3)
-            frame = device.run("exec-out", "screencap", "-p", binary=True)
-            if not frame.startswith(bytes.fromhex("89504e470d0a1a0a")):
-                raise RuntimeError("Retry native screencap is not PNG")
-            if struct.unpack(">II", frame[16:24]) != struct.unpack(
-                ">II", target.read_bytes()[16:24]
-            ):
-                raise RuntimeError("Retry screencap dimensions changed")
-            retry = folder / f"camera-reference-adjust.retry-{attempt + 1}.png"
-            retry.write_bytes(frame)
-            target.write_bytes(frame)
-            record["sha256"] = hashlib.sha256(frame).hexdigest()
+
+            # Keep every rejected image and hierarchy before trying a fresh render.
+            evidence = folder / "diagnostics" / "reference-preview"
+            evidence.mkdir(parents=True, exist_ok=True)
+            for suffix in ("png", "xml", "json"):
+                source = folder / f"camera-reference-adjust.{suffix}"
+                if source.is_file():
+                    (evidence / f"attempt-{attempt + 1}.{suffix}").write_bytes(source.read_bytes())
+
+            # Retaking an unchanged SurfaceView screencap cannot recover a stuck
+            # emulator compositor. Reopen the real app and its reference panel.
+            device.shell("am", "force-stop", qa.PACKAGE)
+            time.sleep(2)
+            refreshed = stage13.verified_capture(
+                device, folder, "camera-reference-adjust", "camera",
+                ["사진 가이드", "확인"], stage13.open_camera_reference_setup
+            )
+            if refreshed.get("status") != "captured" or refreshed.get("pixelEvidenceValid") is not True:
+                raise RuntimeError(
+                    "Fresh Android reference panel did not pass native UI and screenshot checks: "
+                    + str(refreshed.get("error", "unknown failure"))
+                )
+            if not target.is_file() or not (folder / "camera-reference-adjust.xml").is_file():
+                raise RuntimeError("Native reference panel recapture lacks PNG or UI hierarchy")
+            if hashlib.sha256(target.read_bytes()).hexdigest() != refreshed.get("sha256"):
+                raise RuntimeError("Recaptured reference PNG digest does not match its metadata")
+            record = refreshed
         record["referencePreviewVisualQuality"] = {
             "status": "fail", "centralRgbDelta": observed[-1],
             "threshold": 48.0, "attempts": len(observed),
