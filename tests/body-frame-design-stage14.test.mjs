@@ -21,7 +21,7 @@ assert.ok(records.includes("getProjectCover(project, photos)"));
 
 assert.match(project, /projectTabs:\s*\{[^}]*marginBottom:\s*8/);
 assert.match(project, /comparePreviewCard:\s*\{[^}]*maxWidth:\s*560/);
-assert.match(project, /comparePreviewItem:\s*\{[^}]*height:\s*156/);
+assert.match(project, /comparePreviewItem:\s*\{[^}]*height:\s*110/);
 assert.ok(project.includes('useState<"records" | "metrics" | "stats">("records")'));
 assert.ok(project.includes('contentFit="contain"'));
 assert.ok(project.includes("styles.photoGrid"));

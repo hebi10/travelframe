@@ -32,8 +32,14 @@ for (const palette of [theme.bodyFrameDarkColors, theme.colors]) {
   assert.ok(contrast(ui.primaryBackground, ui.primaryText) >= 4.5, "primary label must retain text contrast");
   assert.ok(contrast(ui.selected, palette.chrome) >= 4.5, "selected tab must retain contrast");
 }
-assert.equal(theme.bodyFrameStatusColors.success, theme.bodyFrameAccent);
-assert.notEqual(theme.bodyFrameStatusColors.success, theme.bodyFrameDarkColors.text);
+assert.notEqual(theme.bodyFrameStatusColors.success, theme.bodyFrameAccent);
+for (const palette of [theme.colors, theme.bodyFrameDarkColors]) {
+  const status = theme.getBodyFrameStatusColors(palette);
+  for (const key of ["success", "warning", "error"]) {
+    assert.ok(contrast(status[key], palette.surface) >= 4.5, key + " status must remain readable on " + palette.surface);
+    assert.ok(contrast(status[key], palette.background) >= 4.5, key + " status must remain readable on " + palette.background);
+  }
+}
 assert.equal(theme.bodyFrameDesign.minTouchSize, 44);
 assert.equal(theme.bodyFrameDesign.primaryButtonHeight, 48);
 assert.equal(theme.bodyFrameDesign.iconSize, 20);

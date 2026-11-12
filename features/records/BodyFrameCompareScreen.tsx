@@ -2,7 +2,6 @@ import { Feather } from "@expo/vector-icons";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useMemo, useRef, useState } from "react";
 import {
-  ActivityIndicator,
   FlatList,
   Modal,
   PanResponder,
@@ -14,6 +13,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppText as Text } from "@/components/app-text";
+import { BodyFrameStatusNotice } from "@/components/body-frame-status-notice";
 import { Image } from "@/components/private-media-image";
 import { bodyFrameDesign, bodyFrameTypography, getBodyFrameControlColors } from "@/constants/app-theme";
 import { getBodyFrameComparisonCandidates, getBodyFrameComparisonPhotos, selectBodyFrameComparisonPhotos } from "@/lib/body-frame-photo-compare";
@@ -176,13 +176,18 @@ export default function BodyFrameCompareScreen() {
         ) : null}
 
         {loading ? (
-          <ActivityIndicator color={palette.text} />
+          <BodyFrameStatusNotice
+            variant="loading"
+            title="비교 사진을 불러오는 중입니다."
+          />
         ) : error || !comparison ? (
-          <Text style={[styles.emptyText, { color: palette.muted }]}>
-            {error ?? (chosenBeforeId && chosenAfterId
+          <BodyFrameStatusNotice
+            variant={error ? "error" : "empty"}
+            title={error ? "비교 사진을 불러오지 못했습니다." : "비교할 사진이 없습니다."}
+            detail={error ?? (chosenBeforeId && chosenAfterId
               ? "선택한 사진을 찾을 수 없습니다. 다른 사진을 선택하세요."
               : "비교할 사진이 2장 이상 필요합니다.")}
-          </Text>
+          />
         ) : (
           <>
             <View style={styles.labels}>
