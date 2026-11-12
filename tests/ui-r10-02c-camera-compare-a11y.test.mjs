@@ -52,7 +52,7 @@ test("UI-R10-02C comparison shows dates before modes without changing photo owne
     "selectBodyFrameComparisonPhotos",
     'comparisonMode === "slider"',
     'comparisonMode === "side-by-side"',
-    "comparisonMode === \"overlay\"",
+    "overlayOpacity",
     "onStartShouldSetPanResponder: () => false",
     "shouldStartComparisonPan(gesture.dx, gesture.dy)",
     "contentFit=\"contain\"",
