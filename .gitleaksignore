@@ -9,6 +9,6 @@
 # This exception applies only to this committed file, rule, and line.
 7cdddd0ab2cf48b23ab4b56c7f8030faa6529dc9:docs/design/camera-ui-v2/release-qa-20261110/summary.md:generic-api-key:11
 
-# Exact synthetic fixture key-name false positive in historical UI-R00 QA commit.
-# This exception does not cover other commits, files, lines, or findings.
+# Exact UI-R00 AsyncStorage key-name false positive; not an API key or credential.
+# Only this historical commit, rule, path and line are excluded.
 3cec9eef9b1f77061c8ee58157de479860237ab1:scripts/ui_r00_data_fixtures.py:generic-api-key:14
