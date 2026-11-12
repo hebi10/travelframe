@@ -236,6 +236,11 @@ def main():
             dev.shell("wm", "density", density)
             qa.wait_for_visual_profile(dev, gesture_size, density)
             for variant in VARIANTS:
+                if profile == "tablet-600dp":
+                    # Each theme starts from the same constrained height; run_variant
+                    # restores the full tablet viewport before horizontal checks.
+                    dev.shell("wm", "size", gesture_size)
+                    qa.wait_for_visual_profile(dev, gesture_size, density)
                 results.append(run_variant(dev, args.output / profile / variant, profile, variant))
     finally:
         dev.shell("am", "force-stop", qa.PACKAGE, check=False)
