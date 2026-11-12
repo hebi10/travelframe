@@ -319,11 +319,18 @@ export const styles = StyleSheet.create({
     letterSpacing: 0
   },
   overlaySetupHint: {
-    color: "rgba(255, 255, 255, 0.78)",
+    color: "#E9E9EC",
     fontSize: bodyFrameTypography.caption,
     includeFontPadding: false,
-    lineHeight: 18,
+    lineHeight: 19,
     letterSpacing: 0
+  },
+  overlaySetupModeNote: {
+    color: "#F5F5F5",
+    fontSize: bodyFrameTypography.caption,
+    fontWeight: "600",
+    includeFontPadding: false,
+    lineHeight: 19
   },
   overlaySetupValue: {
     color: colors.inverse,
@@ -1698,7 +1705,7 @@ export const styles = StyleSheet.create({
     backgroundColor: bodyFrameDarkColors.background
   },
   cameraUnavailableText: {
-    color: bodyFrameDarkColors.muted,
+    color: bodyFrameDarkColors.text,
     fontSize: bodyFrameTypography.body,
     includeFontPadding: false,
     lineHeight: 22,
