@@ -11,6 +11,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  useWindowDimensions,
   View
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -88,7 +89,9 @@ function BodyFrameSettingRow({
   mark?: string;
   onPress?: () => void;
 }) {
-  const { palette } = useAppAppearance();
+  const { palette, fontSizeScale } = useAppAppearance();
+  const { width, fontScale: systemFontScale } = useWindowDimensions();
+  const wrapValue = width <= 412 && fontSizeScale * systemFontScale >= 1.3;
   const iconName = settingRowIcons[label];
 
   return (
@@ -100,6 +103,7 @@ function BodyFrameSettingRow({
       onPress={onPress}
       style={({ pressed }) => [
         styles.settingRow,
+        wrapValue && styles.settingRowLargeText,
         {
           borderColor: palette.line,
           backgroundColor: palette.surface,
@@ -118,14 +122,14 @@ function BodyFrameSettingRow({
         </Text>
         {showDetail && detail ? (
           <Text
-            numberOfLines={1}
+            numberOfLines={wrapValue ? 2 : 1}
             style={[styles.settingRowDetail, { color: palette.muted }]}
           >
             {detail}
           </Text>
         ) : null}
       </View>
-      <View style={styles.settingRowValue}>
+      <View style={[styles.settingRowValue, wrapValue && styles.settingRowValueLargeText]}>
         {mark !== "›" ? (
           <Text
             numberOfLines={2}
@@ -619,6 +623,11 @@ const styles = StyleSheet.create({
     borderWidth: bodyFrameDesign.borderWidth,
     borderRadius: bodyFrameDesign.cardRadius
   },
+  settingRowLargeText: {
+    flexWrap: "wrap",
+    alignItems: "flex-start",
+    paddingVertical: 10
+  },
   settingRowIcon: {
     width: 24,
     minHeight: 24,
@@ -636,13 +645,19 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 6
   },
+  settingRowValueLargeText: {
+    width: "100%",
+    maxWidth: "100%",
+    justifyContent: "flex-end",
+    paddingTop: 4
+  },
   settingRowLabel: {
     fontSize: bodyFrameTypography.rowTitle,
     fontWeight: "600"
   },
   settingRowDetail: {
     fontSize: bodyFrameTypography.caption,
-    lineHeight: 16
+    lineHeight: 18
   },
   settingRowMark: {
     flexShrink: 1,
