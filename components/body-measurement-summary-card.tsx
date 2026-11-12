@@ -38,12 +38,14 @@ function Sparkline({
   series,
   lineColor,
   mutedColor,
+  axisLabelColor,
   metricLabel,
   unit
 }: {
   series: BodyMeasurementSeriesPoint[];
   lineColor: string;
   mutedColor: string;
+  axisLabelColor: string;
   metricLabel: string;
   unit: string;
 }) {
@@ -74,7 +76,7 @@ function Sparkline({
     >
       <View style={styles.chartAxis} accessible={false}>
         {axisLabels.map((label, index) => (
-          <Text key={index} numberOfLines={1} style={[styles.chartAxisText, { color: mutedColor }]}>
+          <Text key={index} numberOfLines={1} style={[styles.chartAxisText, { color: axisLabelColor }]}>
             {label}
           </Text>
         ))}
@@ -225,6 +227,7 @@ export function BodyMeasurementSummaryCard({
             series={series}
             lineColor={palette.text}
             mutedColor={palette.line}
+            axisLabelColor={palette.muted}
             metricLabel={meta.label}
             unit={meta.unit}
           />

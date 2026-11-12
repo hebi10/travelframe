@@ -50,6 +50,7 @@ test("UI-R10-02B sparkline has numeric y-axis with unchanged data mapping and da
     "getBodyMeasurementSeriesSummary(series)",
     "styles.chartRow",
     "styles.chartAxis",
+    "axisLabelColor={palette.muted}",
     "axisLabels",
     "new Intl.NumberFormat",
     "styles.chartGuide",
