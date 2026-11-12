@@ -481,7 +481,6 @@ export default function AccountScreen() {
               return (
                 <Pressable accessibilityRole="button"
                   key={item.value}
-                  accessibilityLabel={`${item.label} 선택`}
                   accessibilityState={{ selected: isActive }}
                   style={[
                     styles.segmentButton,
@@ -496,7 +495,6 @@ export default function AccountScreen() {
                 >
                   <Text
                     selectable={false}
-                    numberOfLines={2}
                     style={[
                       styles.segmentText,
                       themed.text,
@@ -518,7 +516,6 @@ export default function AccountScreen() {
               autoCorrect={false}
               keyboardType="email-address"
               placeholder="이메일"
-              accessibilityLabel="로그인 이메일"
               placeholderTextColor={palette.faint}
               style={[styles.input, themed.input]}
               onChangeText={setEmail}
@@ -528,7 +525,6 @@ export default function AccountScreen() {
                 value={password}
                 secureTextEntry
                 placeholder="비밀번호 6자리 이상"
-                accessibilityLabel="계정 비밀번호"
                 placeholderTextColor={palette.faint}
                 style={[styles.input, themed.input]}
                 onChangeText={setPassword}
@@ -541,7 +537,6 @@ export default function AccountScreen() {
             )}
             <Pressable accessibilityRole="button"
               disabled={isSubmitting || isAuthLoading}
-              accessibilityState={{ disabled: isSubmitting || isAuthLoading }}
               style={[
                 styles.primaryButton,
                 themed.primaryFill,
@@ -559,7 +554,6 @@ export default function AccountScreen() {
             </Pressable>
             <Pressable accessibilityRole="button"
               disabled={isSubmitting || isAuthLoading || isGoogleSubmitting}
-              accessibilityState={{ disabled: isSubmitting || isAuthLoading || isGoogleSubmitting }}
               style={[
                 styles.secondaryButton,
                 themed.secondaryButton,
@@ -885,7 +879,7 @@ export default function AccountScreen() {
       ) : null}
 
       {message ? (
-        <View style={[styles.messagePanel, themed.panel]} accessibilityLiveRegion="polite">
+        <View style={[styles.messagePanel, themed.panel]}>
           {isSubmitting ? <ActivityIndicator color={palette.text} /> : null}
           <Text selectable={false} style={[styles.messageText, themed.text]}>
             {message}

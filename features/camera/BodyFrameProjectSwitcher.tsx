@@ -2,11 +2,9 @@ import { AppText as Text, AppTextInput as TextInput } from "@/components/app-tex
 import { BodyFrameSheetFooter, BodyFrameSheetHandle, BodyFrameSheetHeader } from "@/components/body-frame-sheet";
 import {
   Feather } from "@expo/vector-icons";
-import { useEffect,
-  useMemo,
+import { useMemo,
   useState } from "react";
 import {
-  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -79,16 +77,6 @@ export function BodyFrameProjectSwitcher({
   const [referenceMode, setReferenceMode] = useState<ReferencePhotoMode>("latest");
   const [submitting, setSubmitting] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
-  const [keyboardVisible, setKeyboardVisible] = useState(false);
-
-  useEffect(() => {
-    const shown = Keyboard.addListener("keyboardDidShow", () => setKeyboardVisible(true));
-    const hidden = Keyboard.addListener("keyboardDidHide", () => setKeyboardVisible(false));
-    return () => {
-      shown.remove();
-      hidden.remove();
-    };
-  }, []);
 
   const activeSummary = useMemo(
     () =>
@@ -383,7 +371,7 @@ export function BodyFrameProjectSwitcher({
             onPress={dismissCreateSheet}
           />
           <View
-            style={[styles.sheet, { paddingBottom: keyboardVisible ? 8 : Math.max(insets.bottom, 16), backgroundColor: palette.surface, borderColor: palette.line }]}
+            style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16), backgroundColor: palette.surface, borderColor: palette.line }]}
             accessibilityViewIsModal
           >
             <BodyFrameSheetHandle />
@@ -398,7 +386,6 @@ export function BodyFrameProjectSwitcher({
               contentContainerStyle={styles.createScrollContent}
               keyboardShouldPersistTaps="handled"
               keyboardDismissMode="on-drag"
-              nestedScrollEnabled
               showsVerticalScrollIndicator
             >
             <Text style={[styles.label, { color: palette.text }]}>프로젝트 이름</Text>
@@ -556,7 +543,7 @@ export function BodyFrameProjectSwitcher({
 
 
             </ScrollView>
-            <View style={[styles.createFooter, keyboardVisible && styles.createFooterKeyboard]}>
+            <View style={styles.createFooter}>
               <BodyFrameSheetFooter
                 compactTypography={compact}
                 onCancel={dismissCreateSheet}
@@ -581,13 +568,8 @@ const styles = StyleSheet.create({
   createScroll: { flexShrink: 1, minHeight: 0 },
   createScrollContent: { paddingBottom: 16 },
   createFooter: {
-    flexShrink: 0,
     paddingTop: 12,
     paddingBottom: 4
-  },
-  createFooterKeyboard: {
-    paddingTop: 8,
-    paddingBottom: 0
   },
   headerButton: {
     minHeight: 54,
@@ -797,7 +779,7 @@ const styles = StyleSheet.create({
   choice: {
     flex: 1,
     minWidth: 0,
-    minHeight: 64,
+    minHeight: 52,
     paddingHorizontal: 5,
     paddingVertical: 8,
     alignItems: "center",

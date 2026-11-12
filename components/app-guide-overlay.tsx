@@ -6,7 +6,6 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  useWindowDimensions,
   View
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -32,8 +31,7 @@ export function AppGuideOverlay({
   autoShowFirstRun = true
 }: AppGuideOverlayProps) {
   const insets = useSafeAreaInsets();
-  const { height: windowHeight, fontScale: systemFontScale } = useWindowDimensions();
-  const { palette, fontSizeScale } = useAppAppearance();
+  const { palette } = useAppAppearance();
   const { primaryBackground: actionColor, primaryText: actionTextColor } = getBodyFrameControlColors(palette);
   const {
     visible,
@@ -51,7 +49,6 @@ export function AppGuideOverlay({
   }
 
   const isWelcome = tabKey === "camera" && step.id === "body-frame-welcome" && replaySignal === 0;
-  const compactWelcome = windowHeight < 720 || fontSizeScale * systemFontScale >= 1.3;
 
   return (
     <Modal
@@ -127,7 +124,7 @@ export function AppGuideOverlay({
             keyboardShouldPersistTaps="handled"
           >
           {isWelcome ? (
-            <View style={[styles.welcomeContent, compactWelcome && styles.welcomeContentCompact]}>
+            <View style={styles.welcomeContent}>
               <View style={styles.welcomeTopRow}>
                 <Text style={[styles.eyebrow, { color: palette.muted }]}>BODY FRAME</Text>
                 <Text style={[styles.welcomeProgress, { color: palette.muted }]}>
@@ -137,11 +134,11 @@ export function AppGuideOverlay({
               <Image
                 source={getAppGuideArtwork(step.id)}
                 recyclingKey={step.id}
-                style={[styles.welcomeArtwork, compactWelcome && styles.welcomeArtworkCompact]}
+                style={styles.welcomeArtwork}
                 contentFit="contain"
                 accessible={false}
               />
-              <Text accessibilityRole="header" style={[styles.welcomeTitle, { color: palette.text }]}>
+              <Text style={[styles.welcomeTitle, { color: palette.text }]}>
                 {step.title}
               </Text>
               <Text style={[styles.welcomeDescription, { color: palette.muted }]}>
@@ -278,11 +275,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingVertical: 28
   },
-  welcomeContentCompact: {
-    justifyContent: "flex-start",
-    gap: 10,
-    paddingVertical: 16
-  },
   welcomeTopRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -297,9 +289,6 @@ const styles = StyleSheet.create({
     width: "100%",
     height: 192,
     alignSelf: "center"
-  },
-  welcomeArtworkCompact: {
-    height: 116
   },
   welcomeTitle: {
     fontSize: bodyFrameTypography.projectTitle,
@@ -343,7 +332,6 @@ const styles = StyleSheet.create({
   },
   welcomeButton: {
     minHeight: bodyFrameDesign.primaryButtonHeight,
-    paddingVertical: 8,
     alignItems: "center",
     justifyContent: "center",
     marginTop: 4,

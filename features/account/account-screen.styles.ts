@@ -87,9 +87,6 @@ export const styles = StyleSheet.create({
   segmentButton: {
     minHeight: bodyFrameDesign.minTouchSize,
     flex: 1,
-    minWidth: 0,
-    paddingHorizontal: 4,
-    paddingVertical: 8,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: bodyFrameDesign.borderWidth,
@@ -105,8 +102,6 @@ export const styles = StyleSheet.create({
     color: colors.text,
     fontSize: typography.button,
     fontWeight: "800",
-    textAlign: "center",
-    lineHeight: 19,
     letterSpacing: 0
   },
   segmentTextActive: {
@@ -192,7 +187,6 @@ export const styles = StyleSheet.create({
   },
   profileCopy: {
     flex: 1,
-    minWidth: 0,
     gap: 4
   },
   profileName: {
@@ -237,7 +231,6 @@ export const styles = StyleSheet.create({
   },
   inlineActions: {
     flexDirection: "row",
-    flexWrap: "wrap",
     gap: 8
   },
   infoList: {
@@ -260,7 +253,6 @@ export const styles = StyleSheet.create({
   },
   infoValue: {
     flex: 1,
-    minWidth: 0,
     color: colors.text,
     fontSize: typography.small,
     fontWeight: "800",
@@ -302,7 +294,6 @@ export const styles = StyleSheet.create({
   },
   planCopy: {
     flex: 1,
-    minWidth: 0,
     gap: 6
   },
   planTitle: {
@@ -358,11 +349,10 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.background
   },
   paymentModalScroll: { flexShrink: 1, minHeight: 0 },
-  paymentModalBody: { gap: 12, paddingBottom: 18 },
+  paymentModalBody: { gap: 14, paddingBottom: 10 },
   paymentModalAction: { paddingTop: 8 },
   modalHeader: {
     flexDirection: "row",
-    flexWrap: "wrap",
     alignItems: "flex-start",
     justifyContent: "space-between",
     gap: 12
