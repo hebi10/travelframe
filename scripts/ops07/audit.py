@@ -518,12 +518,31 @@ def findings():
             if publisher is None or mandatory not in _guaranteed_atoms(job_condition(publisher)):
                 problems.append("APPROVAL: TravelFrame " + filename + " lacks mandatory OPS-01 release approval")
         store = read(".github/workflows/android-play-store-images.yml") or ""
-        for key, field in (("OPS06_STORE_APPROVED", "ops06_store_approved"),
-                           ("OPS06_CONFIRMATION", "ops06_confirmation"),
-                           ("OPS06_EXPECTED_MAIN_SHA", "ops06_expected_main_sha")):
-            pattern = r"(?m)^[ \t]+" + key + r":[ \t]*\$\{\{[ \t]*inputs\." + field + r"[ \t]*\}\}[ \t]*(?:#.*)?$"
-            if not re.search(pattern, store):
-                problems.append("STORE_BINDING: TravelFrame " + key + " must use approved user input")
+        publisher = jobs(store).get("publish")
+        approval_steps = [step for step in _workflow_steps(publisher or "")
+                          if re.search(r"(?m)^[ \t]*(?:-[ \t]+)?run:[ \t]*python3[ \t]+scripts/ops06/store_gate\.py[ \t]+apply[ \t]*(?:#.*)?$", step)]
+        if len(approval_steps) != 1:
+            problems.append("STORE_BINDING: TravelFrame requires exactly one executable OPS-06 approval step")
+        else:
+            approval_step = approval_steps[0]
+            env_header = re.search(r"(?m)^([ \t]+)env:[ \t]*(?:#.*)?$", approval_step)
+            env_content = []
+            if env_header:
+                env_indent = len(env_header.group(1))
+                for line in approval_step[env_header.end():].splitlines():
+                    if not line.strip() or line.lstrip().startswith("#"):
+                        continue
+                    indentation = len(line) - len(line.lstrip())
+                    if indentation <= env_indent:
+                        break
+                    env_content.append(line)
+            scoped_env = "\n".join(env_content)
+            for key, field in (("OPS06_STORE_APPROVED", "ops06_store_approved"),
+                               ("OPS06_CONFIRMATION", "ops06_confirmation"),
+                               ("OPS06_EXPECTED_MAIN_SHA", "ops06_expected_main_sha")):
+                pattern = r"(?m)^[ \t]+" + key + r":[ \t]*\$\{\{[ \t]*inputs\." + field + r"[ \t]*\}\}[ \t]*(?:#.*)?$"
+                if not re.search(pattern, scoped_env):
+                    problems.append("STORE_BINDING: TravelFrame approval step " + key + " must use approved user input")
     if REPOSITORY == "hebi10/PetWorld":
         closed = read(".github/workflows/play-closed-release.yml") or ""
         if re.search(r"(?i)publisher[.]py\s+deploy[^\n]*--bundle", closed):
