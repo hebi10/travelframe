@@ -101,6 +101,35 @@ class AppContracts(unittest.TestCase):
         with self.assertRaises(mod.Stop):
             mod.make_plan(tracks,[{"versionCode":19,"sha256":"b"*64}],req)
 
+    def test_build_request_approval_cannot_be_bypassed(self):
+        path = ".github/workflows/release-build.yml"
+        original_read = audit.read
+        original = original_read(path)
+        gate = "      - name: Gate release batch, main SHA and required CI\n"
+        dispatch = "      - name: Dispatch existing signed AAB build-only mode\n"
+        self.assertIn(gate, original)
+        self.assertIn(dispatch, original)
+        variants = (
+            ("missing_gate", original.replace(gate, "", 1)),
+            ("skipped_gate", original.replace(gate, gate + "        if: false\n", 1)),
+            ("nonblocking_gate", original.replace(gate, gate + "        continue-on-error: true\n", 1)),
+            ("always_dispatch", original.replace(dispatch, dispatch + "        if: always()\n", 1)),
+            ("forged_approval", original.replace(
+                "FINAL_BATCH_APPROVED: " + "$" + "{{ inputs.final_batch_approved }}",
+                "FINAL_BATCH_APPROVED: 'true'", 1)),
+            ("forged_sha", original.replace(
+                "EXPECTED_MAIN_SHA: " + "$" + "{{ inputs.expected_main_sha }}",
+                "EXPECTED_MAIN_SHA: " + "$" + "{{ github.sha }}", 1)),
+        )
+        for label, altered in variants:
+            with self.subTest(label=label):
+                with patch.object(audit, "read", side_effect=lambda target:
+                                  altered if target == path else original_read(target)):
+                    blockers = audit.findings()
+                self.assertTrue(any(issue.startswith(("OPS03_PREFLIGHT:", "OPS03_BINDING:",
+                                                       "OPS03_DISPATCH_BYPASS:"))
+                                    for issue in blockers), blockers)
+
     def test_missing_existing_aab_cannot_be_published(self):
         mod=module("scripts/ops04/internal.py")
         self.assertIsNotNone(mod, "OPS-04 immutable AAB guard missing")
