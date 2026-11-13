@@ -278,6 +278,30 @@ class TravelFrameApprovalRegressionTests(unittest.TestCase):
             issues = audit.findings()
         self.assertTrue(any("STORE_BINDING" in issue for issue in issues), issues)
 
+    def test_store_approval_binding_is_scoped_to_guard_step(self):
+        read_file = audit.read
+        filename = ".github/workflows/android-play-store-images.yml"
+        source = read_file(filename)
+        valid = "OPS06_CONFIRMATION: ${{ inputs.ops06_confirmation }}"
+        self.assertIn(valid, source)
+        # The validation step may expose the correct input, but the actual gate must too.
+        forged = source.replace(valid, "OPS06_CONFIRMATION: APPLY_VERIFIED_PLAY_STORE_ASSETS", 1)
+        forged = forged.replace(
+            "      - name: Set up Node\n",
+            "      - name: Set up Node\n"
+            "        env:\n"
+            "          OPS06_CONFIRMATION: ${{ inputs.ops06_confirmation }}\n", 1)
+        with patch.object(audit, "read", side_effect=lambda path:
+                          forged if path == filename else read_file(path)):
+            issues = audit.findings()
+        self.assertTrue(any("STORE_BINDING: TravelFrame approval step OPS06_CONFIRMATION"
+                            in issue for issue in issues), issues)
+
+    def test_actual_approval_step_uses_user_inputs(self):
+        issues = audit.findings()
+        self.assertFalse(any("STORE_BINDING: TravelFrame" in issue
+                             for issue in issues), issues)
+
     def test_binary_release_requires_ops01_approval(self):
         read_file = audit.read
         filename = ".github/workflows/android-play-aab.yml"
