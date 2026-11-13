@@ -510,6 +510,20 @@ def findings():
         promote = jobs(read(".github/workflows/play-promote.yml")).get("promote")
         if not promote or "inputs.final_release_confirmed == true" not in _guaranteed_atoms(job_condition(promote)):
             problems.append("APPROVAL: TripCanvas legacy closed promotion lacks mandatory final approval")
+    if REPOSITORY == "hebi10/travelframe":
+        mandatory = "inputs.ops01_release_approved == true"
+        for filename in ("android-play-aab.yml", "android-play-store-images.yml"):
+            workflow = read(".github/workflows/" + filename)
+            publisher = jobs(workflow).get("publish")
+            if publisher is None or mandatory not in _guaranteed_atoms(job_condition(publisher)):
+                problems.append("APPROVAL: TravelFrame " + filename + " lacks mandatory OPS-01 release approval")
+        store = read(".github/workflows/android-play-store-images.yml") or ""
+        for key, field in (("OPS06_STORE_APPROVED", "ops06_store_approved"),
+                           ("OPS06_CONFIRMATION", "ops06_confirmation"),
+                           ("OPS06_EXPECTED_MAIN_SHA", "ops06_expected_main_sha")):
+            pattern = r"(?m)^[ \t]+" + key + r":[ \t]*\$\{\{[ \t]*inputs\." + field + r"[ \t]*\}\}[ \t]*(?:#.*)?$"
+            if not re.search(pattern, store):
+                problems.append("STORE_BINDING: TravelFrame " + key + " must use approved user input")
     if REPOSITORY == "hebi10/PetWorld":
         closed = read(".github/workflows/play-closed-release.yml") or ""
         if re.search(r"(?i)publisher[.]py\s+deploy[^\n]*--bundle", closed):
