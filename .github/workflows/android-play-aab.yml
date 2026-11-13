@@ -2,6 +2,8 @@ name: Android Play test release
 run-name: TravelFrame Play ${{ inputs.mode || 'push-gate' }} · ${{ inputs.track || (contains(github.event.head_commit.message, '[deploy-closed]') && 'closed') || 'internal' }} · ${{ github.ref_name }}
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       ops01_release_approved:
