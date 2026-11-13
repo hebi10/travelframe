@@ -264,5 +264,31 @@ class FailureBoundaryRegressionTests(unittest.TestCase):
         self.assertTrue(any("PROVENANCE_BYPASS" in item for item in issues), issues)
 
 
+
+class TravelFrameApprovalRegressionTests(unittest.TestCase):
+    def test_store_confirmation_cannot_be_hardcoded(self):
+        read_file = audit.read
+        filename = ".github/workflows/android-play-store-images.yml"
+        source = read_file(filename)
+        original = "OPS06_CONFIRMATION: ${{ inputs.ops06_confirmation }}"
+        self.assertIn(original, source)
+        forged = source.replace(original, "OPS06_CONFIRMATION: APPLY_VERIFIED_PLAY_STORE_ASSETS")
+        with patch.object(audit, "read", side_effect=lambda path:
+                          forged if path == filename else read_file(path)):
+            issues = audit.findings()
+        self.assertTrue(any("STORE_BINDING" in issue for issue in issues), issues)
+
+    def test_binary_release_requires_ops01_approval(self):
+        read_file = audit.read
+        filename = ".github/workflows/android-play-aab.yml"
+        source = read_file(filename)
+        self.assertIn("inputs.ops01_release_approved == true", source)
+        forged = source.replace("inputs.ops01_release_approved == true", "true")
+        with patch.object(audit, "read", side_effect=lambda path:
+                          forged if path == filename else read_file(path)):
+            issues = audit.findings()
+        self.assertTrue(any("APPROVAL: TravelFrame" in issue for issue in issues), issues)
+
+
 if __name__ == "__main__":
     unittest.main()
