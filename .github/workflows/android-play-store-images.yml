@@ -13,6 +13,23 @@ on:
       - 'tests/play-store-images.test.mjs'
   workflow_dispatch:
     inputs:
+      ops06_store_approved:
+        description: 'Approve store metadata change separately after final QA'
+        type: boolean
+        required: true
+        default: false
+      ops06_confirmation:
+        description: 'For publish type APPLY_VERIFIED_PLAY_STORE_ASSETS'
+        type: string
+        required: false
+      ops06_expected_main_sha:
+        description: 'Exact approved 40-char current main SHA'
+        type: string
+        required: false
+      ops06_batch_id:
+        description: 'KST release batch YYYY-MM-DD-travelframe'
+        type: string
+        required: false
       ops01_release_approved:
         description: 'Manual Play upload approval after planned work and final QA'
         type: boolean
@@ -94,15 +111,10 @@ jobs:
     name: Verify bundled screenshots and update Play ko-KR phone listing only
     needs: validate
     if: >-
-      github.event_name == 'workflow_dispatch' && inputs.ops01_release_approved == true &&
-      (
-      github.repository == 'hebi10/travelframe' &&
-      github.ref == 'refs/heads/main' &&
-      vars.BODY_FRAME_PLAY_SIGNING_APPROVED_20261107 == 'true' &&
-      ((github.event_name == 'workflow_dispatch' && inputs.mode == 'publish') ||
-       (github.event_name == 'push' &&
-        contains(github.event.head_commit.message, '[publish-store-shots]')))
-      )
+      github.repository == 'hebi10/travelframe' && github.ref == 'refs/heads/main' &&
+      github.event_name == 'workflow_dispatch' && inputs.mode == 'publish' &&
+      inputs.ops01_release_approved == true && inputs.ops06_store_approved == true &&
+      vars.BODY_FRAME_PLAY_SIGNING_APPROVED_20261107 == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     permissions:
@@ -138,6 +150,14 @@ jobs:
             --source-dir "$STORE_INPUT_DIR" \
             --output-dir "$STORE_OUTPUT_DIR"
           node scripts/publish-play-store-images.mjs verify
+      - name: OPS-06 enforce separate listing approval and exact current main
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OPS06_STORE_APPROVED: ${{ inputs.ops06_store_approved }}
+          OPS06_CONFIRMATION: ${{ inputs.ops06_confirmation }}
+          OPS06_EXPECTED_MAIN_SHA: ${{ inputs.ops06_expected_main_sha }}
+          OPS06_BATCH_ID: ${{ inputs.ops06_batch_id }}
+        run: python3 scripts/ops06/store_gate.py apply
       - name: Get Google Play Publisher token for the existing release identity
         id: playauth
         uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
@@ -149,7 +169,7 @@ jobs:
           create_credentials_file: false
           export_environment_variables: false
       - name: Commit only Korean phone screenshots and independently verify Play readback
-        if: github.event_name == 'push' || inputs.mode == 'publish'
+        if: github.event_name == 'workflow_dispatch' && inputs.mode == 'publish'
         env:
           PLAY_ACCESS_TOKEN: ${{ steps.playauth.outputs.access_token }}
         run: node scripts/publish-play-store-images.mjs publish
