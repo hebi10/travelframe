@@ -2,10 +2,13 @@ name: Android Play test release
 run-name: TravelFrame Play ${{ inputs.mode || 'push-gate' }} · ${{ inputs.track || (contains(github.event.head_commit.message, '[deploy-closed]') && 'closed') || 'internal' }} · ${{ github.ref_name }}
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
     inputs:
+      ops01_release_approved:
+        description: 'Manual Play upload approval after planned work and final QA'
+        type: boolean
+        required: true
+        default: false
       mode:
         description: Read-only check, signed AAB/APK build, or publish to the chosen test track
         required: true
@@ -265,7 +268,9 @@ jobs:
   publish:
     name: Publish AAB to the selected test track and verify committed state
     needs: [plan, build]
-    if: needs.plan.outputs.mode == 'deploy'
+    if: >-
+      github.event_name == 'workflow_dispatch' && inputs.ops01_release_approved == true &&
+      (needs.plan.outputs.mode == 'deploy')
     runs-on: ubuntu-latest
     timeout-minutes: 40
     permissions:

@@ -11,18 +11,13 @@ on:
       - 'scripts/publish-play-store-images.mjs'
       - 'scripts/prepare-play-store-images.py'
       - 'tests/play-store-images.test.mjs'
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/android-play-store-images.yml'
-      - 'docs/release-assets/play-phone-six-20261109.json'
-      - 'assets/play-store/2026-11-09/**'
-      - 'scripts/publish-play-store-images.mjs'
-      - 'scripts/prepare-play-store-images.py'
-      - 'tests/play-store-images.test.mjs'
-      - 'docs/release-requests/2026-11-09-store-screenshots.md'
   workflow_dispatch:
     inputs:
+      ops01_release_approved:
+        description: 'Manual Play upload approval after planned work and final QA'
+        type: boolean
+        required: true
+        default: false
       mode:
         description: Inspect-only build or publish the exactly reviewed six Korean phone screenshots
         required: true
@@ -99,12 +94,15 @@ jobs:
     name: Verify bundled screenshots and update Play ko-KR phone listing only
     needs: validate
     if: >-
+      github.event_name == 'workflow_dispatch' && inputs.ops01_release_approved == true &&
+      (
       github.repository == 'hebi10/travelframe' &&
       github.ref == 'refs/heads/main' &&
       vars.BODY_FRAME_PLAY_SIGNING_APPROVED_20261107 == 'true' &&
       ((github.event_name == 'workflow_dispatch' && inputs.mode == 'publish') ||
        (github.event_name == 'push' &&
         contains(github.event.head_commit.message, '[publish-store-shots]')))
+      )
     runs-on: ubuntu-latest
     timeout-minutes: 25
     permissions:
