@@ -297,6 +297,31 @@ class TravelFrameApprovalRegressionTests(unittest.TestCase):
         self.assertTrue(any("STORE_BINDING: TravelFrame approval step OPS06_CONFIRMATION"
                             in issue for issue in issues), issues)
 
+    def test_existing_binary_publisher_requires_independent_aab_verification(self):
+        read_file = audit.read
+        filename = ".github/workflows/android-play-aab.yml"
+        source = read_file(filename)
+        verified = ("      - name: Independently verify downloaded AAB, signer, manifest and run provenance\n"
+                    "        run: node build-tools/scripts/publish-play-release.mjs verify-artifact\n")
+        self.assertIn(verified, source)
+        unsafe = source.replace(verified, "")
+        with patch.object(audit, "read", side_effect=lambda path:
+                          unsafe if path == filename else read_file(path)):
+            issues = audit.findings()
+        self.assertTrue(any("BINARY_PROVENANCE" in issue for issue in issues), issues)
+
+    def test_binary_publisher_cannot_authenticate_after_failed_verification(self):
+        read_file = audit.read
+        filename = ".github/workflows/android-play-aab.yml"
+        source = read_file(filename)
+        original = "      - name: Get fresh short-lived Android Publisher token\n"
+        self.assertIn(original, source)
+        unsafe = source.replace(original, original + "        if: always()\n")
+        with patch.object(audit, "read", side_effect=lambda path:
+                          unsafe if path == filename else read_file(path)):
+            issues = audit.findings()
+        self.assertTrue(any("BINARY_PROVENANCE" in issue for issue in issues), issues)
+
     def test_actual_approval_step_uses_user_inputs(self):
         issues = audit.findings()
         self.assertFalse(any("STORE_BINDING: TravelFrame" in issue
