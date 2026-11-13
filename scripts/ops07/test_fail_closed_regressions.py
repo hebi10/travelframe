@@ -361,5 +361,33 @@ class InterpreterOptionsRegressionTests(unittest.TestCase):
         self.assertTrue(any("STORE_GUARD" in item for item in issues), issues)
 
 
+class QuotedStoreApprovalRegressionTests(unittest.TestCase):
+    def test_quoted_false_condition_skips_approval_and_must_block(self):
+        read_file = audit.read
+        path = ".github/workflows/android-play-store-images.yml"
+        source = read_file(path)
+        anchor = "      - name: OPS-06 enforce separate listing approval and exact current main\n"
+        self.assertIn(anchor, source)
+        forged = source.replace(anchor, anchor + '        "if": false\n', 1)
+        with patch.object(audit, "read", side_effect=lambda name:
+                          forged if name == path else read_file(name)):
+            issues = audit.findings()
+        self.assertTrue(any(issue.startswith(("STORE_OPTIONAL:", "STORE_GUARD:"))
+                            for issue in issues), issues)
+
+    def test_quoted_continue_on_error_cannot_ignore_approval_failure(self):
+        read_file = audit.read
+        path = ".github/workflows/android-play-store-images.yml"
+        source = read_file(path)
+        anchor = "      - name: OPS-06 enforce separate listing approval and exact current main\n"
+        self.assertIn(anchor, source)
+        forged = source.replace(anchor, anchor + '        "continue-on-error": true\n', 1)
+        with patch.object(audit, "read", side_effect=lambda name:
+                          forged if name == path else read_file(name)):
+            issues = audit.findings()
+        self.assertTrue(any(issue.startswith(("STORE_OPTIONAL:", "STORE_GUARD:"))
+                            for issue in issues), issues)
+
+
 if __name__ == "__main__":
     unittest.main()
