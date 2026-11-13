@@ -389,5 +389,28 @@ class QuotedStoreApprovalRegressionTests(unittest.TestCase):
                             for issue in issues), issues)
 
 
+class NodeOptionPublisherRegressionTests(unittest.TestCase):
+    def test_node_source_maps_option_does_not_hide_store_mutation(self):
+        self.assertTrue(audit._store_mutating_command(
+            "run: node --enable-source-maps scripts/publish-play-store-images.mjs publish"))
+
+    def test_node_options_cannot_hide_missing_ops06_store_approval(self):
+        read_file = audit.read
+        path = ".github/workflows/android-play-store-images.yml"
+        original = read_file(path)
+        gate = ("        run: python3 scripts/ops06/store_gate.py apply\n")
+        publisher = ("run: node scripts/publish-play-store-images.mjs publish")
+        self.assertIn(gate, original)
+        self.assertIn(publisher, original)
+        forged = original.replace(gate, "        run: echo approval-bypassed\n", 1)
+        forged = forged.replace(publisher,
+                                "run: node --enable-source-maps scripts/publish-play-store-images.mjs publish")
+        with patch.object(audit, "read", side_effect=lambda name:
+                          forged if name == path else read_file(name)):
+            issues = audit.findings()
+        self.assertTrue(any("STORE_GUARD: android-play-store-images.yml" in issue
+                            for issue in issues), issues)
+
+
 if __name__ == "__main__":
     unittest.main()
