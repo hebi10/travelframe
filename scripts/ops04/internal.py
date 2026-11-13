@@ -68,6 +68,8 @@ def guard():
     require(bool(re.fullmatch("[0-9a-f]{64}", env.get("AAB_SHA256", ""))), "Expected AAB SHA-256 required")
     require(mode in {"check", "publish"}, "Unsupported operation")
     if mode == "publish":
+        require(env.get("BODY_FRAME_PLAY_SIGNING_APPROVED_20261107") == "true",
+                "Existing BodyFrame signing approval remains mandatory")
         require(env.get("FINAL_RELEASE_APPROVED") == "true"
                 and env.get("APPROVAL_PHRASE") == "PUBLISH_VERIFIED_INTERNAL_AAB",
                 "Separate explicit internal-test approval required")
