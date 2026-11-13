@@ -517,6 +517,26 @@ def findings():
             publisher = jobs(workflow).get("publish")
             if publisher is None or mandatory not in _guaranteed_atoms(job_condition(publisher)):
                 problems.append("APPROVAL: TravelFrame " + filename + " lacks mandatory OPS-01 release approval")
+        binary = read(".github/workflows/android-play-aab.yml")
+        binary_job = jobs(binary).get("publish") if binary is not None else None
+        binary_steps = _workflow_steps(binary_job or "")
+        verifier = [(i, step) for i, step in enumerate(binary_steps) if re.search(
+            r"(?m)^[ \t]*(?:-[ \t]+)?run:[ \t]*node[ \t]+build-tools/scripts/publish-play-release\.mjs[ \t]+verify-artifact[ \t]*(?:#.*)?$", step)]
+        publishers = [i for i, step in enumerate(binary_steps) if re.search(
+            r"(?m)^[ \t]*(?:-[ \t]+)?run:[ \t]*node[ \t]+build-tools/scripts/publish-play-release\.mjs[ \t]+publish[ \t]*(?:#.*)?$", step)]
+        authentications = [i for i, step in enumerate(binary_steps)
+                           if "google-github-actions/auth@" in step]
+        if (len(verifier) != 1 or len(publishers) != 1 or len(authentications) != 1
+                or not verifier[0][0] < authentications[0] < publishers[0]):
+            problems.append("BINARY_PROVENANCE: TravelFrame publisher must verify AAB before authentication and upload")
+        else:
+            verify_index, verify_step = verifier[0]
+            if (re.search(r"""(?m)^[ \t]+(?:-[ \t]+)?(?:if|["']if["']|continue-on-error|["']continue-on-error["']):""", verify_step)
+                    or re.search(r"(?m)^[ \t]*(?:run:[ \t]*)?(?:if[ \t]+|set[ \t]+\+e\b)", verify_step)):
+                problems.append("BINARY_PROVENANCE: TravelFrame AAB verification must run and stop on failure")
+            for index in (authentications[0], publishers[0]):
+                if re.search(r"\b(?:always|failure|cancelled)\s*\(", _step_condition(binary_steps[index])):
+                    problems.append("BINARY_PROVENANCE: TravelFrame Play upload cannot bypass a failed AAB check")
         store = read(".github/workflows/android-play-store-images.yml") or ""
         publisher = jobs(store).get("publish")
         approval_steps = [step for step in _workflow_steps(publisher or "")
