@@ -163,6 +163,7 @@ jobs:
         id: ready
         env:
           PLAY_INTERNAL_TRACK: ${{ vars.PLAY_INTERNAL_TRACK }}
+          ANDROID_UPLOAD_CERT_SHA256: ${{ vars.ANDROID_UPLOAD_CERT_SHA256 }}
           PLAY_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
         run: node scripts/ops04/publish_internal.mjs check
       - name: Publish exactly the downloaded AAB into internal only
