@@ -1,6 +1,7 @@
 import java.io.InputStream;
 import java.security.CodeSigner;
 import java.security.MessageDigest;
+import java.security.cert.X509Certificate;
 import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.Locale;
@@ -31,7 +32,9 @@ class VerifyBundleSignatures {
                 if (signers == null || signers.length != 1) {
                     throw new SecurityException("Every payload must have exactly one signer");
                 }
-                byte[] certificate = signers[0].getSignerCertPath().getCertificates().get(0).getEncoded();
+                X509Certificate signingCertificate = (X509Certificate) signers[0].getSignerCertPath().getCertificates().get(0);
+                signingCertificate.checkValidity();
+                byte[] certificate = signingCertificate.getEncoded();
                 String pin = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(certificate));
                 if (!pin.equals(args[1])) throw new SecurityException("Upload certificate pin mismatch");
                 payloads++;
