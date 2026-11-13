@@ -418,6 +418,48 @@ def findings():
         if "github.ref" not in source and "GITHUB_REF" not in source:
             problems.append("SOURCE: " + file + " missing main ref gate")
         if file == "release-build.yml":
+            request = jobs(source).get("request") or ""
+            env_match = re.search(r"(?m)^    env:[ \t]*(?:#.*)?$", request)
+            job_env = ""
+            if env_match:
+                for line in request[env_match.end():].splitlines():
+                    if line.strip() and len(line) - len(line.lstrip()) <= 4:
+                        break
+                    job_env += line + "\n"
+            for key, field in (("FINAL_BATCH_APPROVED", "final_batch_approved"),
+                               ("EXPECTED_MAIN_SHA", "expected_main_sha")):
+                expected_input = "$" + "{{ inputs." + field + " }}"
+                values = re.findall(r"(?m)^[ \t]+" + re.escape(key) + r":[ \t]*([^\n#]+)", request)
+                bound = re.search(r"(?m)^      " + re.escape(key) + r":[ \t]*"
+                                  + re.escape(expected_input) + r"[ \t]*(?:#.*)?$", job_env)
+                if len(values) != 1 or values[0].strip() != expected_input or not bound:
+                    problems.append("OPS03_BINDING: TravelFrame " + key
+                                    + " must come from the approved dispatch input")
+            request_steps = _workflow_steps(request)
+            gate_marker = "Gate release batch, main SHA and required CI"
+            gates = [(i, step) for i, step in enumerate(request_steps)
+                     if re.search(r"(?m)^[ \t]*-[ \t]+name:[ \t]*" + re.escape(gate_marker)
+                                  + r"[ \t]*(?:#.*)?$", step)]
+            dispatches = [(i, step) for i, step in enumerate(request_steps)
+                          if "gh api --method POST" in step and "/dispatches" in step]
+            if len(gates) != 1 or len(dispatches) != 1 or gates[0][0] >= dispatches[0][0]:
+                problems.append("OPS03_PREFLIGHT: TravelFrame approval must run before build dispatch")
+            else:
+                gate = gates[0][1]
+                for required in ("python3 - <<'PY'",
+                                 'if os.environ["FINAL_BATCH_APPROVED"]!="true"',
+                                 'sha!=os.environ["GITHUB_SHA"]',
+                                 'api("repos/"+repo+"/git/ref/heads/main")'):
+                    if required not in gate:
+                        problems.append("OPS03_PREFLIGHT: TravelFrame required approval or SHA preflight missing")
+                        break
+                if (_step_condition(gate)
+                        or re.search(r"(?m)^[ \t]*(?:-[ \t]+)?continue-on-error[ \t]*:", gate)
+                        or re.search(r"(?m)^[ \t]*(?:run:[ \t]*)?set[ \t]+\+e\b", gate)
+                        or not re.search(r"(?m)^[ \t]*(?:-[ \t]+)?run:[ \t]*\|[ \t]*(?:#.*)?$", gate)):
+                    problems.append("OPS03_PREFLIGHT: TravelFrame approval step must fail closed")
+                if re.search(r"\b(?:always|failure|cancelled)\s*\(", _step_condition(dispatches[0][1])):
+                    problems.append("OPS03_DISPATCH_BYPASS: TravelFrame build can run after rejected approval")
             if re.search(r"(?i)inputs\[(?:mode|deploy)\]\s*=\s*(?:deploy|initialize|publish|promote|apply|upload|true)\b", source):
                 problems.append("BUILD: Play publishing mode is forbidden in build-only dispatch")
             for body in jobs(source).values():
