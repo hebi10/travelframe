@@ -20,7 +20,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppGuideOverlay } from "@/components/app-guide-overlay";
-import { bodyFrameAccent, bodyFrameDesign, bodyFrameTypography } from "@/constants/app-theme";
+import { bodyFrameDesign, bodyFrameTypography } from "@/constants/app-theme";
 import { BodyFrameProjectSwitcher } from "@/features/camera/BodyFrameProjectSwitcher";
 import { useAuth } from "@/lib/auth-context";
 import {
@@ -87,9 +87,11 @@ export default function BodyFrameRecordsScreen() {
     0,
     (contentWidth - 12 * (projectColumnCount - 1)) / projectColumnCount
   );
-  const { palette, effectiveThemeMode } = useAppAppearance();
-  const highlightColor = effectiveThemeMode === "dark" ? bodyFrameAccent : palette.text;
-  const coverWidth = Math.min(128, Math.max(108, Math.round(projectCardWidth * 0.36)));
+  const { palette } = useAppAppearance();
+  const highlightColor = palette.text;
+  const coverWidth = fontScale >= 1.3
+    ? Math.min(120, Math.max(100, Math.round(projectCardWidth * 0.32)))
+    : Math.min(144, Math.max(116, Math.round(projectCardWidth * 0.40)));
   const { isLoggedIn, subscription } = useAuth();
   const planEntitlements = useMemo(
     () => getPlanEntitlements({ isLoggedIn, subscription }),
@@ -236,9 +238,14 @@ export default function BodyFrameRecordsScreen() {
         </View>
 
         <View style={styles.projectsHeading}>
-          <View style={styles.projectsHeadingCopy}>
-            <Text style={[styles.projectsTitle, { color: palette.text }]}>내 프로젝트</Text>
-            <Text style={[styles.projectsCount, { color: palette.muted }]}>{cards.length}개</Text>
+          <View style={styles.projectsHeadingIntro}>
+            <View style={styles.projectsHeadingCopy}>
+              <Text style={[styles.projectsTitle, { color: palette.text }]}>내 프로젝트</Text>
+              <Text style={[styles.projectsCount, { color: palette.muted }]}>{cards.length}개</Text>
+            </View>
+            <Text style={[styles.projectsDescription, { color: palette.muted }]}>
+              촬영한 사진으로 변화 과정을 기록하세요.
+            </Text>
           </View>
           <View style={[styles.quickActions, fontScale >= 1.3 && styles.quickActionsLargeFont]}>
             <BodyFrameProjectSwitcher
@@ -304,7 +311,7 @@ export default function BodyFrameRecordsScreen() {
                   key={project.id}
                   accessibilityRole="button"
                   accessibilityLabel={`${project.name} 프로젝트 열기`}
-                  accessibilityHint={`기록 ${summary.photoCount}장, 목표 ${summary.targetPhotoCount}장, 진행률 ${progressPercent}%입니다.`}
+                  accessibilityHint={`기록 ${summary.photoCount}장, 목표 ${summary.targetPhotoCount}장, 진행률 ${progressPercent}%, 예상 영상 ${formatDuration(summary.durationSeconds)}입니다.`}
                   onPress={() => void openProject(project)}
                   style={({ pressed }) => [
                     styles.projectCard,
@@ -383,7 +390,7 @@ export default function BodyFrameRecordsScreen() {
                       />
                     </View>
                     <Text style={[styles.projectDuration, { color: palette.muted }]}>
-                      변화 영상 {formatDuration(summary.durationSeconds)}
+                      예상 영상 {formatDuration(summary.durationSeconds)}
                     </Text>
                   </View>
                 </Pressable>
@@ -503,11 +510,21 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     flexWrap: "wrap",
     gap: 8,
-    marginBottom: 6
+    marginBottom: 12
+  },
+  projectsHeadingIntro: {
+    flex: 1,
+    minWidth: 0,
+    gap: 4
+  },
+  projectsDescription: {
+    fontSize: bodyFrameTypography.caption,
+    lineHeight: 17
   },
   projectsHeadingCopy: {
     flexDirection: "row",
     alignItems: "baseline",
+    flexWrap: "wrap",
     gap: 8
   },
   projectsTitle: {
@@ -526,7 +543,7 @@ const styles = StyleSheet.create({
     gap: 12
   },
   projectCard: {
-    minHeight: 136,
+    minHeight: 154,
     flexDirection: "row",
     overflow: "hidden",
     borderWidth: bodyFrameDesign.borderWidth,
@@ -559,8 +576,8 @@ const styles = StyleSheet.create({
   projectCopy: {
     flex: 1,
     minWidth: 0,
-    gap: 5,
-    padding: 10,
+    gap: 6,
+    padding: 12,
     justifyContent: "space-between"
   },
   projectNameRow: {
@@ -570,7 +587,8 @@ const styles = StyleSheet.create({
   },
   projectName: {
     flex: 1,
-    fontSize: bodyFrameTypography.rowTitle,
+    fontSize: bodyFrameTypography.sectionTitle,
+    lineHeight: 24,
     fontWeight: "600"
   },
   projectDate: {
@@ -581,6 +599,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "baseline",
     justifyContent: "space-between",
+    flexWrap: "wrap",
     gap: 8
   },
   projectMeta: {
