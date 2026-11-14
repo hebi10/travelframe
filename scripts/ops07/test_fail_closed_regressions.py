@@ -1,0 +1,416 @@
+"""Regression fixtures for fail-closed release-authorization parsing."""
+import importlib.util
+from pathlib import Path
+import tempfile
+import unittest
+from unittest.mock import patch
+
+spec = importlib.util.spec_from_file_location("ops07_regression_audit", Path(__file__).with_name("audit.py"))
+audit = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(audit)
+
+
+def publish_on(event, command, job="sync", quoted=False):
+    header = '"jobs":' if quoted else "jobs:"
+    return (event + "\n" + header + "\n  " + job + ":\n"
+            "    runs-on: ubuntu-latest\n    steps:\n      - run: " + command + "\n")
+
+
+def store_workflow(guard=True, guard_run=None, pre_auth="", before_guard="", failure="", guard_if=""):
+    approval = ("      - name: Verify immutable approved batch\n"
+                + ("        if: " + guard_if + "\n" if guard_if else "")
+                + ("        continue-on-error: " + failure + "\n" if failure else "")
+                + "        run: " + (guard_run or "python3 scripts/ops06/store_gate.py apply") + "\n") if guard else ""
+    return ("on:\n  workflow_dispatch:\njobs:\n  upload:\n"
+            "    if: github.event_name == 'workflow_dispatch'\n"
+            "    runs-on: ubuntu-latest\n    steps:\n"
+            + before_guard + approval + pre_auth
+            + "      - uses: google-github-actions/auth@v3\n"
+            + "      - run: python3 scripts/play/listing_images.py --mode upload\n")
+
+
+class FailClosedRegressionTests(unittest.TestCase):
+    def test_inline_comment_and_quoted_jobs_cannot_hide_push(self):
+        text = publish_on('on: [push, workflow_dispatch] # release', 
+                          "python3 scripts/release/publisher.py deploy", quoted=True)
+        self.assertTrue(audit.automatic_mutations("play.yml", text))
+        self.assertEqual(audit.triggers(text), {"push", "workflow_dispatch"})
+        self.assertIn("sync", audit.jobs(text))
+
+    def test_flow_job_mapping_fails_closed(self):
+        text = ('on: push\njobs: {upload: {runs-on: ubuntu-latest,'
+                ' steps: [{run: "python3 scripts/release/publisher.py deploy"}]}}\n')
+        self.assertTrue(audit.automatic_mutations("play.yml", text))
+        self.assertIn("__unparsed_jobs__", audit.jobs(text))
+
+    def test_actual_mobile_and_icon_publishers_without_mode(self):
+        for command in ("python3 scripts/publish-mobile-play.py --aab release.aab",
+                        "python3 scripts/play/store_icon.py --file icon.png"):
+            with self.subTest(command=command):
+                self.assertTrue(audit.automatic_mutations("other.yml", publish_on(
+                    "on:\n  push:", command)))
+
+    def test_dynamic_store_filename_requires_approval(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            folder = root / ".github/workflows"
+            folder.mkdir(parents=True)
+            (folder / "renamed-assets.yml").write_text(store_workflow(guard=False), encoding="utf-8")
+            with patch.object(audit, "ROOT", root):
+                self.assertTrue(any("STORE_GUARD" in issue for issue in audit.store_guard_findings()))
+
+    def test_store_guard_must_execute_and_stop_on_failure(self):
+        for kwargs in (
+            {"guard_if": "false"},
+            {"failure": "true"},
+            {"failure": "$" + "{{ true }}"},
+            {"guard_run": 'echo "python3 scripts/ops06/store_gate.py apply"'},
+            {"guard_run": "python3 scripts/ops06/store_gate.py apply || true"},
+        ):
+            with self.subTest(kwargs=kwargs), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                folder = root / ".github/workflows"
+                folder.mkdir(parents=True)
+                (folder / "play-listing-images.yml").write_text(
+                    store_workflow(**kwargs), encoding="utf-8")
+                with patch.object(audit, "ROOT", root):
+                    issues = audit.store_guard_findings()
+                self.assertTrue(any("STORE_OPTIONAL" in item for item in issues), issues)
+
+    def test_direct_play_edit_before_store_guard_blocks(self):
+        before = ("      - run: curl -X POST "
+                  "https://androidpublisher.googleapis.com/androidpublisher/v3/applications/example/edits\n")
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            folder = root / ".github/workflows"
+            folder.mkdir(parents=True)
+            (folder / "store.yml").write_text(store_workflow(before_guard=before),
+                                               encoding="utf-8")
+            with patch.object(audit, "ROOT", root):
+                issues = audit.store_guard_findings()
+        self.assertTrue(any("STORE_ORDER" in item for item in issues), issues)
+
+    def test_release_approval_atom_must_be_unconditionally_required(self):
+        safe = "github.event_name == 'workflow_dispatch' && inputs.ops01_release_approved == true"
+        unsafe = "github.event_name == 'workflow_dispatch' && (inputs.ops01_release_approved == true || true)"
+        predicate = "inputs.ops01_release_approved == true"
+        self.assertIn(predicate, audit._guaranteed_atoms(safe))
+        self.assertNotIn(predicate, audit._guaranteed_atoms(unsafe))
+
+    def test_chained_publish_scripts_and_image_only_upload(self):
+        for script in (
+            "python3 scripts/play/preflight.py auth && python3 scripts/play/publisher.py deploy",
+            "python3 scripts/play/preflight.py auth; python3 scripts/release/play_closed.py deploy",
+            "python3 scripts/play/images_only.py --track internal",
+        ):
+            with self.subTest(script=script):
+                self.assertTrue(audit.automatic_mutations(
+                    "custom.yml", publish_on("on:\n  push:", script)))
+
+    def test_id_first_upload_before_approval_is_blocked(self):
+        before = ("      - id: early_upload\n"
+                  "        run: python3 scripts/play/listing_images.py --mode upload\n")
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            folder = root / ".github/workflows"
+            folder.mkdir(parents=True)
+            (folder / "renamed-store.yml").write_text(
+                store_workflow(before_guard=before), encoding="utf-8")
+            with patch.object(audit, "ROOT", root):
+                issues = audit.store_guard_findings()
+        self.assertTrue(any("STORE_ORDER" in issue for issue in issues), issues)
+
+    def test_downstream_always_cannot_bypass_approval_failure(self):
+        source = store_workflow().replace(
+            "      - run: python3 scripts/play/listing_images.py --mode upload",
+            "      - name: publish regardless\n"
+            "        if: always()\n"
+            "        run: python3 scripts/play/listing_images.py --mode upload")
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            folder = root / ".github/workflows"
+            folder.mkdir(parents=True)
+            (folder / "renamed-assets.yml").write_text(source, encoding="utf-8")
+            with patch.object(audit, "ROOT", root):
+                issues = audit.store_guard_findings()
+        self.assertTrue(any("STORE_BYPASS" in issue for issue in issues), issues)
+
+    def test_approval_is_not_itself_a_play_mutation(self):
+        source = ("on:\n  workflow_dispatch:\njobs:\n  upload:\n"
+                  "    if: github.event_name == 'workflow_dispatch'\n"
+                  "    runs-on: ubuntu-latest\n    steps:\n"
+                  "      - name: authorize either approved listing mode\n"
+                  "        if: needs.source.outputs.mode == 'listing' || needs.source.outputs.mode == 'reconcile'\n"
+                  "        run: python3 scripts/ops06/store_gate.py apply\n"
+                  "      - name: upload listing\n"
+                  "        if: needs.source.outputs.mode == 'listing'\n"
+                  "        run: python3 scripts/release/listing.py apply --phone-only\n"
+                  "      - name: reconcile listing\n"
+                  "        if: needs.source.outputs.mode == 'reconcile'\n"
+                  "        run: python3 scripts/release/listing.py apply --reconcile-brand\n")
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            folder = root / ".github/workflows"
+            folder.mkdir(parents=True)
+            (folder / "play-listing.yml").write_text(source, encoding="utf-8")
+            with patch.object(audit, "ROOT", root):
+                issues = audit.store_guard_findings()
+        self.assertEqual(issues, [])
+
+    def test_removing_both_internal_provenance_guards_fails(self):
+        workflow = ("on:\n  workflow_dispatch:\njobs:\n"
+                    "  verify:\n    runs-on: ubuntu-latest\n    steps:\n"
+                    "      - run: python3 scripts/ops04/internal.py verify\n"
+                    "  publish:\n    runs-on: ubuntu-latest\n    steps:\n"
+                    "      - run: python3 scripts/ops04/internal.py verify\n")
+        with patch.object(audit, "read", side_effect=lambda path:
+                          workflow if path == ".github/workflows/play-internal-release.yml" else None):
+            findings = audit.findings()
+        self.assertTrue(any("PROVENANCE" in item for item in findings), findings)
+
+
+
+
+
+class SharedHardeningRegressionTests(unittest.TestCase):
+    def test_if_first_and_folded_step_conditions(self):
+        self.assertEqual(audit._step_condition(
+            "      - if: false\n        run: echo skipped\n"), "false")
+        self.assertEqual(audit._step_condition(
+            "      - if: >-\n          always()\n        run: echo unsafe\n"),
+            "always()")
+        self.assertEqual(audit._step_condition(
+            "      - name: release\n        if: >-\n          inputs.mode == 'publish'\n"
+            "        run: echo release\n"), "inputs.mode == 'publish'")
+
+    def test_chained_store_mutation_requires_approval(self):
+        workflow = store_workflow(guard=False).replace(
+            "python3 scripts/play/listing_images.py --mode upload",
+            "python3 scripts/ops07/preflight.py check&&python3 scripts/play/listing_images.py --mode upload")
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            folder = root / ".github/workflows"
+            folder.mkdir(parents=True)
+            (folder / "renamed-store.yml").write_text(workflow, encoding="utf-8")
+            with patch.object(audit, "ROOT", root):
+                issues = audit.store_guard_findings()
+        self.assertTrue(any("STORE_GUARD" in issue for issue in issues), issues)
+
+    def test_run_first_approval_and_masked_pipeline(self):
+        valid = store_workflow().replace(
+            "      - name: Verify immutable approved batch\n"
+            "        run: python3 scripts/ops06/store_gate.py apply\n",
+            "      - run: python3 scripts/ops06/store_gate.py apply\n")
+        bad = store_workflow(guard_run="python3 scripts/ops06/store_gate.py apply | tee approval.log")
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            folder = root / ".github/workflows"
+            folder.mkdir(parents=True)
+            filename = folder / "play-listing-images.yml"
+            with patch.object(audit, "ROOT", root):
+                filename.write_text(valid, encoding="utf-8")
+                self.assertEqual(audit.store_guard_findings(), [])
+                filename.write_text(bad, encoding="utf-8")
+                issues = audit.store_guard_findings()
+        self.assertTrue(any("STORE_OPTIONAL" in issue for issue in issues), issues)
+
+    def test_provenance_guards_must_not_ignore_failed_checks(self):
+        workflow = ("on:\n  workflow_dispatch:\njobs:\n"
+                    "  verify:\n    steps:\n"
+                    "      - run: python3 scripts/ops04/internal.py guard || true\n"
+                    "  publish:\n    steps:\n"
+                    "      - run: python3 scripts/ops04/internal.py guard || true\n")
+        with patch.object(audit, "read", side_effect=lambda path:
+                          workflow if path == ".github/workflows/play-internal-release.yml"
+                          else None):
+            issues = audit.findings()
+        self.assertTrue(any("PROVENANCE" in issue for issue in issues), issues)
+
+    def test_compound_automatic_publisher_is_detected(self):
+        workflow = publish_on("on:\n  push:",
+            "python3 scripts/play/preflight.py auth&&python3 scripts/play/publisher.py deploy")
+        self.assertTrue(audit.automatic_mutations("custom.yml", workflow))
+
+
+
+class FailureBoundaryRegressionTests(unittest.TestCase):
+    def test_step_leading_ignore_errors_rejects_store_approval(self):
+        workflow = store_workflow().replace(
+            "      - name: Verify immutable approved batch\n",
+            "      - continue-on-error: true\n"
+            "        name: Verify immutable approved batch\n")
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            folder = root / ".github/workflows"
+            folder.mkdir(parents=True)
+            (folder / "play-listing-images.yml").write_text(workflow, encoding="utf-8")
+            with patch.object(audit, "ROOT", root):
+                issues = audit.store_guard_findings()
+        self.assertTrue(any("STORE_OPTIONAL" in item for item in issues), issues)
+
+    def test_downstream_auth_cannot_ignore_failed_provenance(self):
+        workflow = ("on:\n  workflow_dispatch:\njobs:\n"
+                    "  verify:\n    steps:\n"
+                    "      - run: python3 scripts/ops04/internal.py guard\n"
+                    "  publish:\n    steps:\n"
+                    "      - run: python3 scripts/ops04/internal.py guard\n"
+                    "      - name: Unsafe Play authentication\n"
+                    "        if: always()\n"
+                    "        uses: google-github-actions/auth@v3\n")
+        with patch.object(audit, "read", side_effect=lambda path:
+                          workflow if path == ".github/workflows/play-internal-release.yml"
+                          else None):
+            issues = audit.findings()
+        self.assertTrue(any("PROVENANCE_BYPASS" in item for item in issues), issues)
+
+
+
+class TravelFrameApprovalRegressionTests(unittest.TestCase):
+    def test_store_confirmation_cannot_be_hardcoded(self):
+        read_file = audit.read
+        filename = ".github/workflows/android-play-store-images.yml"
+        source = read_file(filename)
+        original = "OPS06_CONFIRMATION: ${{ inputs.ops06_confirmation }}"
+        self.assertIn(original, source)
+        forged = source.replace(original, "OPS06_CONFIRMATION: APPLY_VERIFIED_PLAY_STORE_ASSETS")
+        with patch.object(audit, "read", side_effect=lambda path:
+                          forged if path == filename else read_file(path)):
+            issues = audit.findings()
+        self.assertTrue(any("STORE_BINDING" in issue for issue in issues), issues)
+
+    def test_store_approval_binding_is_scoped_to_guard_step(self):
+        read_file = audit.read
+        filename = ".github/workflows/android-play-store-images.yml"
+        source = read_file(filename)
+        valid = "OPS06_CONFIRMATION: ${{ inputs.ops06_confirmation }}"
+        self.assertIn(valid, source)
+        # The validation step may expose the correct input, but the actual gate must too.
+        forged = source.replace(valid, "OPS06_CONFIRMATION: APPLY_VERIFIED_PLAY_STORE_ASSETS", 1)
+        forged = forged.replace(
+            "      - name: Set up Node\n",
+            "      - name: Set up Node\n"
+            "        env:\n"
+            "          OPS06_CONFIRMATION: ${{ inputs.ops06_confirmation }}\n", 1)
+        with patch.object(audit, "read", side_effect=lambda path:
+                          forged if path == filename else read_file(path)):
+            issues = audit.findings()
+        self.assertTrue(any("STORE_BINDING: TravelFrame approval step OPS06_CONFIRMATION"
+                            in issue for issue in issues), issues)
+
+    def test_existing_binary_publisher_requires_independent_aab_verification(self):
+        read_file = audit.read
+        filename = ".github/workflows/android-play-aab.yml"
+        source = read_file(filename)
+        verified = ("      - name: Independently verify downloaded AAB, signer, manifest and run provenance\n"
+                    "        run: node build-tools/scripts/publish-play-release.mjs verify-artifact\n")
+        self.assertIn(verified, source)
+        unsafe = source.replace(verified, "")
+        with patch.object(audit, "read", side_effect=lambda path:
+                          unsafe if path == filename else read_file(path)):
+            issues = audit.findings()
+        self.assertTrue(any("BINARY_PROVENANCE" in issue for issue in issues), issues)
+
+    def test_binary_publisher_cannot_authenticate_after_failed_verification(self):
+        read_file = audit.read
+        filename = ".github/workflows/android-play-aab.yml"
+        source = read_file(filename)
+        original = "      - name: Get fresh short-lived Android Publisher token\n"
+        self.assertIn(original, source)
+        unsafe = source.replace(original, original + "        if: always()\n")
+        with patch.object(audit, "read", side_effect=lambda path:
+                          unsafe if path == filename else read_file(path)):
+            issues = audit.findings()
+        self.assertTrue(any("BINARY_PROVENANCE" in issue for issue in issues), issues)
+
+    def test_actual_approval_step_uses_user_inputs(self):
+        issues = audit.findings()
+        self.assertFalse(any("STORE_BINDING: TravelFrame" in issue
+                             for issue in issues), issues)
+
+    def test_binary_release_requires_ops01_approval(self):
+        read_file = audit.read
+        filename = ".github/workflows/android-play-aab.yml"
+        source = read_file(filename)
+        self.assertIn("inputs.ops01_release_approved == true", source)
+        forged = source.replace("inputs.ops01_release_approved == true", "true")
+        with patch.object(audit, "read", side_effect=lambda path:
+                          forged if path == filename else read_file(path)):
+            issues = audit.findings()
+        self.assertTrue(any("APPROVAL: TravelFrame" in issue for issue in issues), issues)
+
+
+
+class InterpreterOptionsRegressionTests(unittest.TestCase):
+    def test_unbuffered_python_publisher_is_not_exempt(self):
+        workflow = publish_on(
+            "on:\n  push:",
+            "python3 -u scripts/play/publisher.py deploy --bundle release.aab")
+        self.assertTrue(audit.automatic_mutations("custom.yml", workflow))
+
+    def test_unbuffered_store_publisher_requires_approval(self):
+        workflow = store_workflow(guard=False).replace(
+            "python3 scripts/play/listing_images.py --mode upload",
+            "python3 -u scripts/play/listing_images.py --mode upload")
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            folder = root / ".github/workflows"
+            folder.mkdir(parents=True)
+            (folder / "renamed-assets.yml").write_text(workflow, encoding="utf-8")
+            with patch.object(audit, "ROOT", root):
+                issues = audit.store_guard_findings()
+        self.assertTrue(any("STORE_GUARD" in item for item in issues), issues)
+
+
+class QuotedStoreApprovalRegressionTests(unittest.TestCase):
+    def test_quoted_false_condition_skips_approval_and_must_block(self):
+        read_file = audit.read
+        path = ".github/workflows/android-play-store-images.yml"
+        source = read_file(path)
+        anchor = "      - name: OPS-06 enforce separate listing approval and exact current main\n"
+        self.assertIn(anchor, source)
+        forged = source.replace(anchor, anchor + '        "if": false\n', 1)
+        with patch.object(audit, "read", side_effect=lambda name:
+                          forged if name == path else read_file(name)):
+            issues = audit.findings()
+        self.assertTrue(any(issue.startswith(("STORE_OPTIONAL:", "STORE_GUARD:"))
+                            for issue in issues), issues)
+
+    def test_quoted_continue_on_error_cannot_ignore_approval_failure(self):
+        read_file = audit.read
+        path = ".github/workflows/android-play-store-images.yml"
+        source = read_file(path)
+        anchor = "      - name: OPS-06 enforce separate listing approval and exact current main\n"
+        self.assertIn(anchor, source)
+        forged = source.replace(anchor, anchor + '        "continue-on-error": true\n', 1)
+        with patch.object(audit, "read", side_effect=lambda name:
+                          forged if name == path else read_file(name)):
+            issues = audit.findings()
+        self.assertTrue(any(issue.startswith(("STORE_OPTIONAL:", "STORE_GUARD:"))
+                            for issue in issues), issues)
+
+
+class NodeOptionPublisherRegressionTests(unittest.TestCase):
+    def test_node_source_maps_option_does_not_hide_store_mutation(self):
+        self.assertTrue(audit._store_mutating_command(
+            "run: node --enable-source-maps scripts/publish-play-store-images.mjs publish"))
+
+    def test_node_options_cannot_hide_missing_ops06_store_approval(self):
+        read_file = audit.read
+        path = ".github/workflows/android-play-store-images.yml"
+        original = read_file(path)
+        gate = ("        run: python3 scripts/ops06/store_gate.py apply\n")
+        publisher = ("run: node scripts/publish-play-store-images.mjs publish")
+        self.assertIn(gate, original)
+        self.assertIn(publisher, original)
+        forged = original.replace(gate, "        run: echo approval-bypassed\n", 1)
+        forged = forged.replace(publisher,
+                                "run: node --enable-source-maps scripts/publish-play-store-images.mjs publish")
+        with patch.object(audit, "read", side_effect=lambda name:
+                          forged if name == path else read_file(name)):
+            issues = audit.findings()
+        self.assertTrue(any("STORE_GUARD: android-play-store-images.yml" in issue
+                            for issue in issues), issues)
+
+
+if __name__ == "__main__":
+    unittest.main()
