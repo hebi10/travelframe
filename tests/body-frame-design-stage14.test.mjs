@@ -13,8 +13,9 @@ const switcher = read("features/camera/BodyFrameProjectSwitcher.tsx");
 const workflow = read(".github/workflows/body-frame-device-qa.yml");
 
 assert.match(records, /header:\s*\{\s*marginBottom:\s*8/);
-assert.match(records, /projectsHeading:\s*\{[^}]*marginBottom:\s*6/);
-assert.match(records, /projectCopy:\s*\{[^}]*padding:\s*10/);
+assert.match(records, /projectsHeading:\s*\{[^}]*marginBottom:\s*12/);
+assert.match(records, /projectCopy:\s*\{[^}]*padding:\s*12/);
+assert.ok(records.includes("styles.projectsDescription"), "project heading guidance remains accessible");
 assert.ok(records.includes("contentWidth >= 560 ? 2 : 1"));
 assert.ok(records.includes("width: projectCardWidth"));
 assert.ok(records.includes("getProjectCover(project, photos)"));

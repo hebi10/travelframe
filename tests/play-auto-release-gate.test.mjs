@@ -34,6 +34,8 @@ assert.ok(build.includes("needs.plan.outputs.mode == 'build' || needs.plan.outpu
 assert.ok(build.includes("needs: plan"));
 assert.ok(release.includes("needs: [plan, build]"));
 assert.ok(release.includes("needs.plan.outputs.mode == 'deploy'"));
+assert.ok(workflow.includes("ops01_release_approved:"), "final manual release approval input must be present");
+assert.ok(release.includes("github.event_name == 'workflow_dispatch' && inputs.ops01_release_approved == true"), "push-triggered release builds must not publish");
 assert.ok(release.includes("scripts/publish-play-release.mjs publish"));
 assert.ok(!workflow.includes("refs/heads/production"), "Play must never publish to production");
 
