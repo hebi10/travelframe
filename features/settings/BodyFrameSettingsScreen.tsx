@@ -304,6 +304,7 @@ export default function BodyFrameSettingsScreen() {
         <SectionBlock title="저장 및 백업">
           <BodyFrameSettingRow
             label="저장 방식"
+            showDetail
             detail="앱 로컬 저장과 클라우드 백업 방식"
             mark={getStorageModeLabel(settings.storageMode)}
             onPress={() => setActiveSetting("storageMode")}
@@ -372,12 +373,14 @@ export default function BodyFrameSettingsScreen() {
         <SectionBlock title="계정 및 플랜">
           <BodyFrameSettingRow
             label={isLoggedIn ? "내 계정" : "로그인"}
+            showDetail
             detail={isLoggedIn ? user?.email ?? "로그인된 계정" : "Google 또는 이메일로 로그인"}
             mark={isLoggedIn ? planEntitlements.label : "무료"}
             onPress={() => router.push("/account")}
           />
           <BodyFrameSettingRow
             label="플랜 및 Google Play 결제"
+            showDetail
             detail="Pro/Plus/Expert 구독, 기존 구매 복원과 구독 상태"
             mark={planEntitlements.label}
             onPress={() => router.push("/account")}
