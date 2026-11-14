@@ -418,7 +418,10 @@ def findings():
         if "github.ref" not in source and "GITHUB_REF" not in source:
             problems.append("SOURCE: " + file + " missing main ref gate")
         if file == "release-build.yml":
-            request = jobs(source).get("request") or ""
+            request_jobs = jobs(source)
+            if set(request_jobs) != {"request"}:
+                problems.append("OPS03_SCOPE: TravelFrame signed-build workflow needs one gated request job")
+            request = request_jobs.get("request") or ""
             env_match = re.search(r"(?m)^    env:[ \t]*(?:#.*)?$", request)
             job_env = ""
             if env_match:
@@ -435,7 +438,7 @@ def findings():
                 if len(values) != 1 or values[0].strip() != expected_input or not bound:
                     problems.append("OPS03_BINDING: TravelFrame " + key
                                     + " must come from the approved dispatch input")
-            ci_values = re.findall(r"(?m)^      REQUIRED_CI_JSON:[ \t]*([^\n#]+)", request)
+            ci_values = re.findall(r"(?m)^[ \t]+REQUIRED_CI_JSON:[ \t]*([^\n#]+)", request)
             if len(ci_values) != 1 or ci_values[0].strip() != """'["Quality","Secret Scan"]'""":
                 problems.append("OPS03_REQUIRED_CI: TravelFrame Quality and Secret Scan must be mandatory")
             request_steps = _workflow_steps(request)
