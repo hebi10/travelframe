@@ -179,6 +179,22 @@ class AppContracts(unittest.TestCase):
                 self.assertTrue(any(item.startswith(("OPS03_REQUIRED_CI:", "OPS03_SCOPE:"))
                                     for item in issues), issues)
 
+    def test_gh_workflow_run_cannot_start_build_before_approval(self):
+        path = ".github/workflows/release-build.yml"
+        original_read = audit.read
+        source = original_read(path)
+        before = "      - name: Gate release batch, main SHA and required CI\n"
+        self.assertIn(before, source)
+        injected = source.replace(
+            before, "      - name: Unauthorized early build request\n"
+            "        run: gh workflow run android-play-aab.yml --ref main -f mode=build\n"
+            + before, 1)
+        with patch.object(audit, "read", side_effect=lambda name:
+                          injected if name == path else original_read(name)):
+            blockers = audit.findings()
+        self.assertTrue(any("OPS03_UNGUARDED_DISPATCH:" in item for item in blockers),
+                        blockers)
+
     def test_missing_existing_aab_cannot_be_published(self):
         mod=module("scripts/ops04/internal.py")
         self.assertIsNotNone(mod, "OPS-04 immutable AAB guard missing")
