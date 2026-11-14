@@ -156,6 +156,29 @@ class AppContracts(unittest.TestCase):
                 self.assertTrue(any(item.startswith(("OPS03_REQUIRED_CI:", "OPS03_PREFLIGHT:"))
                                     for item in issues), issues)
 
+    def test_signed_build_cannot_override_effective_ci_or_add_ungated_job(self):
+        path = ".github/workflows/release-build.yml"
+        original_read = audit.read
+        original = original_read(path)
+        marker = "          GH_TOKEN: " + "$" + "{{ github.token }}"
+        self.assertIn(marker, original)
+        variants = (
+            ("step_ci_override", original.replace(
+                marker, marker + "\n          REQUIRED_CI_JSON: '[]'", 1)),
+            ("second_build_job", original + "\n  bypass:\n"
+             "    runs-on: ubuntu-latest\n"
+             "    permissions:\n      actions: write\n"
+             "    steps:\n"
+             "      - run: gh api --method POST repos/x/actions/workflows/android-play-aab.yml/dispatches\n"),
+        )
+        for label, changed in variants:
+            with self.subTest(label=label):
+                with patch.object(audit, "read", side_effect=lambda target:
+                                  changed if target == path else original_read(target)):
+                    issues = audit.findings()
+                self.assertTrue(any(item.startswith(("OPS03_REQUIRED_CI:", "OPS03_SCOPE:"))
+                                    for item in issues), issues)
+
     def test_missing_existing_aab_cannot_be_published(self):
         mod=module("scripts/ops04/internal.py")
         self.assertIsNotNone(mod, "OPS-04 immutable AAB guard missing")
