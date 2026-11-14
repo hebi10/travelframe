@@ -466,7 +466,7 @@ def findings():
                         problems.append("OPS03_PREFLIGHT: TravelFrame required approval or SHA preflight missing")
                         break
                 if (_step_condition(gate)
-                        or re.search(r"(?m)^[ \t]*(?:-[ \t]+)?continue-on-error[ \t]*:", gate)
+                        or re.search(r"""(?m)^[ \t]*(?:-[ \t]+)?(?:continue-on-error|["']continue-on-error["'])[ \t]*:""", gate)
                         or re.search(r"(?m)python3[ \t]+-[ \t]+<<'PY'[ \t]*(?:\|\||[;|])", gate)
                         or re.search(r"(?m)^[ \t]*(?:run:[ \t]*)?set[ \t]+\+e\b", gate)
                         or not re.search(r"(?m)^[ \t]*(?:-[ \t]+)?run:[ \t]*\|[ \t]*(?:#.*)?$", gate)):
