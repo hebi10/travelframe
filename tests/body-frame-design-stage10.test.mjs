@@ -20,8 +20,13 @@ for (const [file, source] of [
 
 assert.ok(records.includes("contentWidth >= 560 ? 2 : 1"), "mobile project list is one column, tablets two");
 assert.ok(records.includes("width: projectCardWidth"));
-assert.ok(records.includes("Math.round(projectCardWidth * 0.36)"), "thumbnail is width-bounded");
-assert.ok(records.includes('projectCard: {\n    minHeight: 136,\n    flexDirection: "row"'), "every card is a photo-led row");
+assert.ok(
+  records.includes("const coverWidth = fontScale >= 1.3") &&
+  records.includes("Math.min(120, Math.max(100, Math.round(projectCardWidth * 0.32)))") &&
+  records.includes("Math.min(144, Math.max(116, Math.round(projectCardWidth * 0.40)))"),
+  "thumbnail width must remain bounded for normal and enlarged font scales"
+);
+assert.ok(records.includes('projectCard: {\n    minHeight: 154,\n    flexDirection: "row"'), "every card remains a readable photo-led row");
 assert.ok(records.includes("formatProjectDate(project.createdAt)"));
 assert.ok(!records.includes("singleProjectCard") && !records.includes("singleProjectCopy"));
 assert.ok(records.includes('accessibilityLabel="바로 촬영"'));
