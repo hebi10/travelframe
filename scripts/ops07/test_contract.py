@@ -195,6 +195,19 @@ class AppContracts(unittest.TestCase):
         self.assertTrue(any("OPS03_UNGUARDED_DISPATCH:" in item for item in blockers),
                         blockers)
 
+    def test_quoted_failure_tolerance_cannot_skip_signed_build_approval(self):
+        path = ".github/workflows/release-build.yml"
+        read_file = audit.read
+        original = read_file(path)
+        gate = "      - name: Gate release batch, main SHA and required CI\n"
+        self.assertIn(gate, original)
+        changed = original.replace(
+            gate, gate + '        "continue-on-error": true\n', 1)
+        with patch.object(audit, "read", side_effect=lambda target:
+                          changed if target == path else read_file(target)):
+            blockers = audit.findings()
+        self.assertTrue(any("OPS03_PREFLIGHT:" in item for item in blockers), blockers)
+
     def test_missing_existing_aab_cannot_be_published(self):
         mod=module("scripts/ops04/internal.py")
         self.assertIsNotNone(mod, "OPS-04 immutable AAB guard missing")
