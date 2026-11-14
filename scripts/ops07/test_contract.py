@@ -130,6 +130,32 @@ class AppContracts(unittest.TestCase):
                                                        "OPS03_DISPATCH_BYPASS:"))
                                     for issue in blockers), blockers)
 
+    def test_signed_build_requires_ci_and_propagates_preflight_failure(self):
+        path = ".github/workflows/release-build.yml"
+        original_read = audit.read
+        original = original_read(path)
+        expected = """REQUIRED_CI_JSON: '["Quality","Secret Scan"]'"""
+        preflight = "python3 - <<'PY'"
+        self.assertIn(expected, original)
+        self.assertIn(preflight, original)
+        variants = (
+            ("empty_ci", original.replace(expected, "REQUIRED_CI_JSON: '[]'", 1)),
+            ("no_checks", original.replace(
+                'required=json.loads(os.environ["REQUIRED_CI_JSON"])',
+                'required=[]', 1)),
+            ("no_ci_success", original.replace(
+                'if latest.get("status")!="completed" or latest.get("conclusion")!="success": refuse("Required CI not successful: "+name)',
+                "if False: refuse('unreachable')", 1)),
+            ("mask_preflight", original.replace(preflight, preflight + " || true", 1)),
+        )
+        for label, altered in variants:
+            with self.subTest(label=label):
+                with patch.object(audit, "read", side_effect=lambda filename:
+                                  altered if filename == path else original_read(filename)):
+                    issues = audit.findings()
+                self.assertTrue(any(item.startswith(("OPS03_REQUIRED_CI:", "OPS03_PREFLIGHT:"))
+                                    for item in issues), issues)
+
     def test_missing_existing_aab_cannot_be_published(self):
         mod=module("scripts/ops04/internal.py")
         self.assertIsNotNone(mod, "OPS-04 immutable AAB guard missing")
