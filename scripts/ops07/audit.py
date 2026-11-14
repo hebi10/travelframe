@@ -418,6 +418,9 @@ def findings():
         if "github.ref" not in source and "GITHUB_REF" not in source:
             problems.append("SOURCE: " + file + " missing main ref gate")
         if file == "release-build.yml":
+            normalized_dispatch = re.sub(r"\\\s*\n\s*", " ", source)
+            if re.search(r"(?<![\w-])gh[ \t]+workflow[ \t]+run\b", normalized_dispatch):
+                problems.append("OPS03_UNGUARDED_DISPATCH: gh workflow run bypasses the verified request gate")
             request_jobs = jobs(source)
             if set(request_jobs) != {"request"}:
                 problems.append("OPS03_SCOPE: TravelFrame signed-build workflow needs one gated request job")
