@@ -154,7 +154,7 @@ def validate_reference_preview(device, folder, record):
             time.sleep(2)
             refreshed = stage13.verified_capture(
                 device, folder, "camera-reference-adjust", "camera",
-                ["사진 가이드", "확인"], stage13.open_camera_reference_setup
+                ["기준 사진 조정", "확인"], stage13.open_camera_reference_setup
             )
             if refreshed.get("status") != "captured" or refreshed.get("pixelEvidenceValid") is not True:
                 raise RuntimeError(

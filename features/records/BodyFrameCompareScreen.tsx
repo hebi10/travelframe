@@ -191,11 +191,19 @@ export default function BodyFrameCompareScreen() {
         ) : (
           <>
             <View style={styles.labels}>
-              <Text style={[styles.label, { color: palette.text }]}>
+              <Text numberOfLines={2} style={[styles.label, { color: palette.text }]}>
                 이전 · #{comparison.before.sequence}
               </Text>
-              <Text style={[styles.label, { color: palette.text }]}>
+              <Text numberOfLines={2} style={[styles.label, styles.labelRight, { color: palette.text }]}>
                 현재 · #{comparison.after.sequence}
+              </Text>
+            </View>
+            <View style={styles.dateLabels}>
+              <Text numberOfLines={2} style={[styles.date, { color: palette.muted }]}>
+                {formatDate(comparison.before)}
+              </Text>
+              <Text numberOfLines={2} style={[styles.date, styles.dateRight, { color: palette.muted }]}>
+                {formatDate(comparison.after)}
               </Text>
             </View>
             <View style={styles.modeTabs} accessibilityLabel="사진 비교 방식">
@@ -204,6 +212,13 @@ export default function BodyFrameCompareScreen() {
                   key={option.id}
                   accessibilityRole="tab"
                   accessibilityLabel={option.label}
+                  accessibilityHint={
+                    option.id === "slider"
+                      ? "구분선을 좌우로 이동해 첫 사진과 최근 사진을 비교합니다."
+                      : option.id === "side-by-side"
+                        ? "두 사진을 나란히 표시합니다."
+                        : "이전 사진의 불투명도를 조절해 겹쳐 봅니다."
+                  }
                   accessibilityState={{ selected: comparisonMode === option.id }}
                   onPress={() => setComparisonMode(option.id)}
                   style={[
@@ -224,6 +239,7 @@ export default function BodyFrameCompareScreen() {
               accessible
               accessibilityRole="adjustable"
               accessibilityLabel="첫 사진 표시 비율"
+              accessibilityHint="가로로 밀거나 접근성 늘리기·줄이기 동작으로 10에서 90퍼센트 사이를 조정합니다."
               accessibilityValue={{ min: 10, max: 90, now: Math.round(divider * 100), text: `${Math.round(divider * 100)}%` }}
               accessibilityActions={[
                 { name: "increment", label: "첫 사진 표시 비율 늘리기" },
@@ -317,14 +333,6 @@ export default function BodyFrameCompareScreen() {
                 </View>
               </>
             )}
-            <View style={styles.dateLabels}>
-              <Text style={[styles.date, { color: palette.muted }]}>
-                {formatDate(comparison.before)}
-              </Text>
-              <Text style={[styles.date, { color: palette.muted }]}>
-                {formatDate(comparison.after)}
-              </Text>
-            </View>
             <Text style={[styles.hint, { color: palette.muted }]}>
               {comparisonMode === "slider"
                 ? "구분선을 좌우로 움직여 전후 사진을 비교하세요."
@@ -511,7 +519,13 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: 8
   },
-  label: { fontSize: bodyFrameTypography.caption },
+  label: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: bodyFrameTypography.body,
+    fontWeight: "600"
+  },
+  labelRight: { textAlign: "right" },
   comparison: {
     width: "100%",
     maxWidth: 520,
@@ -525,11 +539,11 @@ const styles = StyleSheet.create({
   divider: { position: "absolute", top: 0, width: 2, height: "100%", backgroundColor: "#FFFFFF" },
   dividerHandle: {
     position: "absolute",
-    left: -21,
+    left: -24,
     top: "50%",
-    width: 44,
-    height: 44,
-    marginTop: -22,
+    width: 48,
+    height: 48,
+    marginTop: -24,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -543,10 +557,22 @@ const styles = StyleSheet.create({
     maxWidth: 520,
     alignSelf: "center",
     flexDirection: "row",
-    justifyContent: "space-between"
+    justifyContent: "space-between",
+    gap: 8
   },
-  date: { fontSize: bodyFrameTypography.caption },
-  hint: { textAlign: "center", fontSize: bodyFrameTypography.caption },
+  date: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: bodyFrameTypography.caption,
+    fontVariant: ["tabular-nums"]
+  },
+  dateRight: { textAlign: "right" },
+  hint: {
+    textAlign: "center",
+    fontSize: bodyFrameTypography.caption,
+    lineHeight: 19,
+    paddingHorizontal: 8
+  },
   footer: {
     width: "100%",
     borderWidth: bodyFrameDesign.borderWidth,

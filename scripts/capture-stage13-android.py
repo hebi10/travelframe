@@ -62,7 +62,7 @@ def open_camera_reference_setup(device):
     ]
     if len(set(labels)) != 1:
         raise RuntimeError("Exactly one reference photo opacity control must be visible")
-    device.open_control(labels[0], ["사진 가이드", "확인"])
+    device.open_control(labels[0], ["기준 사진 조정", "확인"])
 
 def open_camera_color_panel(device):
     open_camera_settings(device)
@@ -121,7 +121,7 @@ CASES = [
     ("camera-guide-settings", "촬영 가이드 설정", "camera",
      ["가이드 설정", "가이드라인"], open_camera_guide_settings),
     ("camera-reference-adjust", "촬영 기준 사진 위치·투명도", "camera",
-     ["사진 가이드", "확인"], open_camera_reference_setup),
+     ["기준 사진 조정", "확인"], open_camera_reference_setup),
     ("camera-color-panel", "촬영 색감·슬롯·고정 저장", "camera",
      ["색감", "저장 슬롯", "설정 저장"], open_camera_color_panel),
     ("camera-zoom-panel", "촬영 확대 배율", "camera",
