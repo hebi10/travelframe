@@ -435,6 +435,9 @@ def findings():
                 if len(values) != 1 or values[0].strip() != expected_input or not bound:
                     problems.append("OPS03_BINDING: TravelFrame " + key
                                     + " must come from the approved dispatch input")
+            ci_values = re.findall(r"(?m)^      REQUIRED_CI_JSON:[ \t]*([^\n#]+)", request)
+            if len(ci_values) != 1 or ci_values[0].strip() != """'["Quality","Secret Scan"]'""":
+                problems.append("OPS03_REQUIRED_CI: TravelFrame Quality and Secret Scan must be mandatory")
             request_steps = _workflow_steps(request)
             gate_marker = "Gate release batch, main SHA and required CI"
             gates = [(i, step) for i, step in enumerate(request_steps)
@@ -449,12 +452,16 @@ def findings():
                 for required in ("python3 - <<'PY'",
                                  'if os.environ["FINAL_BATCH_APPROVED"]!="true"',
                                  'sha!=os.environ["GITHUB_SHA"]',
-                                 'api("repos/"+repo+"/git/ref/heads/main")'):
+                                 'api("repos/"+repo+"/git/ref/heads/main")',
+                                 'required=json.loads(os.environ["REQUIRED_CI_JSON"])',
+                                 'if not matching: refuse("Missing exact-main CI: "+name)',
+                                 'if latest.get("status")!="completed" or latest.get("conclusion")!="success"'):
                     if required not in gate:
                         problems.append("OPS03_PREFLIGHT: TravelFrame required approval or SHA preflight missing")
                         break
                 if (_step_condition(gate)
                         or re.search(r"(?m)^[ \t]*(?:-[ \t]+)?continue-on-error[ \t]*:", gate)
+                        or re.search(r"(?m)python3[ \t]+-[ \t]+<<'PY'[ \t]*(?:\|\||[;|])", gate)
                         or re.search(r"(?m)^[ \t]*(?:run:[ \t]*)?set[ \t]+\+e\b", gate)
                         or not re.search(r"(?m)^[ \t]*(?:-[ \t]+)?run:[ \t]*\|[ \t]*(?:#.*)?$", gate)):
                     problems.append("OPS03_PREFLIGHT: TravelFrame approval step must fail closed")
