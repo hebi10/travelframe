@@ -110,6 +110,15 @@ function download(url, destination) {
           {
             headers: {
               "User-Agent": "travel-frame-gitleaks-runner",
+              ...(new URL(targetUrl).hostname === "api.github.com" &&
+                targetUrl.includes("/releases/assets/")
+                ? {
+                    Accept: "application/octet-stream",
+                    ...(process.env.GITHUB_TOKEN
+                      ? { Authorization: "Bearer " + process.env.GITHUB_TOKEN }
+                      : {}),
+                  }
+                : {}),
             },
           },
           (response) => {
@@ -144,6 +153,65 @@ function download(url, destination) {
       });
     };
     request(url);
+  });
+}
+
+async function downloadWithRetry(url, destination) {
+  const maxAttempts = 5;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      await download(url, destination);
+      return;
+    } catch (error) {
+      fs.rmSync(destination, { force: true });
+      const reason = error instanceof Error ? error.message : String(error);
+      const transient = /HTTP (?:408|429|5\d\d)|ETIMEDOUT|ECONNRESET|EAI_AGAIN|timed out/i.test(reason);
+      if (!transient || attempt === maxAttempts) {
+        throw error;
+      }
+      console.warn(`Gitleaks download attempt ${attempt}/${maxAttempts} failed; retrying after a transient network error.`);
+      await new Promise((resolve) => setTimeout(resolve, Math.min(12000, 1500 * 2 ** (attempt - 1))));
+    }
+  }
+}
+
+function findReleaseAssetApiUrl(assetName) {
+  const url = "https://api.github.com/repos/gitleaks/gitleaks/releases/tags/v" + GITLEAKS_VERSION;
+  return new Promise((resolve, reject) => {
+    https.get(url, {
+      headers: {
+        "User-Agent": "travel-frame-gitleaks-runner",
+        Accept: "application/vnd.github+json",
+        ...(process.env.GITHUB_TOKEN ? { Authorization: "Bearer " + process.env.GITHUB_TOKEN } : {}),
+      },
+    }, (response) => {
+      if (response.statusCode !== 200) {
+        response.resume();
+        reject(new Error("GitHub Releases metadata request failed with HTTP " + response.statusCode));
+        return;
+      }
+      let body = "";
+      response.setEncoding("utf8");
+      response.on("data", (chunk) => {
+        body += chunk;
+        if (body.length > 1024 * 1024) {
+          response.destroy(new Error("GitHub Releases metadata exceeded limit"));
+        }
+      });
+      response.on("error", reject);
+      response.on("end", () => {
+        try {
+          const asset = JSON.parse(body).assets?.find((entry) => entry.name === assetName);
+          if (!asset || typeof asset.url !== "string" ||
+              !asset.url.startsWith("https://api.github.com/repos/gitleaks/gitleaks/releases/assets/")) {
+            throw new Error("Expected Gitleaks asset is absent from official GitHub Releases metadata");
+          }
+          resolve(asset.url);
+        } catch (error) {
+          reject(error);
+        }
+      });
+    }).on("error", reject);
   });
 }
 
@@ -194,7 +262,13 @@ async function installGitleaks() {
   }
 
   console.log(`Installing gitleaks v${GITLEAKS_VERSION} into ${path.relative(PROJECT_ROOT, CACHE_ROOT)}...`);
-  await download(`${RELEASE_BASE_URL}/${asset.name}`, archivePath);
+  try {
+    await downloadWithRetry(`${RELEASE_BASE_URL}/${asset.name}`, archivePath);
+  } catch (error) {
+    console.warn("Gitleaks direct release download unavailable; trying official GitHub Releases API with unchanged SHA-256 verification.");
+    const apiUrl = await findReleaseAssetApiUrl(asset.name);
+    await downloadWithRetry(apiUrl, archivePath);
+  }
 
   const actualSha256 = sha256(archivePath);
   if (actualSha256 !== asset.sha256) {

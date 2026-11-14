@@ -1,0 +1,95 @@
+name: Stage 19 Firebase dedicated staging approval
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "functions/**"
+      - "scripts/stage19-staging-guard.mjs"
+      - "scripts/test-stage19-staging-cloud.mjs"
+      - "tests/stage19-staging-guard.test.mjs"
+      - ".github/workflows/stage19-firebase-staging.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: travelframe-stage19-firebase-staging
+  cancel-in-progress: false
+
+jobs:
+  cloud-staging:
+    name: Deploy only to approved isolated Firebase staging and verify
+    if: >-
+      github.repository == 'hebi10/travelframe' &&
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.head_ref == 'security/stage19-admin14-functions7-compat-20261108' &&
+      vars.TRAVELFRAME_STAGING_APPROVED == 'true'
+    runs-on: ubuntu-24.04
+    environment: travelframe-firebase-staging
+    timeout-minutes: 120
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      STAGE19_STAGING_DEPLOY_APPROVED: ${{ vars.TRAVELFRAME_STAGING_APPROVED }}
+      STAGE19_STAGING_PROJECT_ID: ${{ vars.TRAVELFRAME_STAGING_PROJECT_ID }}
+      STAGE19_APPROVED_PROJECT_ID: ${{ vars.TRAVELFRAME_STAGING_PROJECT_ID }}
+      STAGE19_STAGING_STORAGE_BUCKET: ${{ vars.TRAVELFRAME_STAGING_STORAGE_BUCKET }}
+      STAGE19_STAGING_SERVICE_ACCOUNT: ${{ vars.TRAVELFRAME_STAGING_SERVICE_ACCOUNT }}
+      STAGE19_STAGING_WIF_PROVIDER: ${{ vars.TRAVELFRAME_STAGING_WIF_PROVIDER }}
+      FUNCTIONS_ENABLE_ADMIN_BACKUP_DELETION: "false"
+      FUNCTIONS_ENABLE_ADMIN_FULL_BACKUP_DELETION: "false"
+      FUNCTIONS_ENFORCE_APP_CHECK: "false"
+    steps:
+      - name: Checkout exact PR source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - name: Verify target and deny production before authentication
+        run: node scripts/stage19-staging-guard.mjs
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
+      - name: Run staging target safety regressions
+        run: node --test tests/stage19-staging-guard.test.mjs
+      - name: Authenticate with staging project service account via WIF
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        with:
+          workload_identity_provider: ${{ vars.TRAVELFRAME_STAGING_WIF_PROVIDER }}
+          service_account: ${{ vars.TRAVELFRAME_STAGING_SERVICE_ACCOUNT }}
+          create_credentials_file: true
+          export_environment_variables: true
+      - name: Verify isolated target again after authentication
+        run: node scripts/stage19-staging-guard.mjs
+      - name: Install pinned Admin 14 and Functions 7 dependencies
+        run: npm ci --prefix functions --ignore-scripts --no-fund
+      - name: Verify functions load and all event exports
+        run: npm --prefix functions run quality
+      - name: Install pinned Firebase CLI
+        run: npm install --global firebase-tools@15.18.0
+      - name: Deploy the reviewed Rules only to the isolated staging project
+        timeout-minutes: 15
+        run: |
+          node scripts/stage19-staging-guard.mjs
+          firebase deploy --only firestore:rules,storage --project "$STAGE19_STAGING_PROJECT_ID" --non-interactive
+      - name: Deploy Functions 7 only to isolated staging
+        timeout-minutes: 85
+        run: |
+          node scripts/stage19-staging-guard.mjs
+          firebase deploy --only functions --project "$STAGE19_STAGING_PROJECT_ID" --non-interactive
+      - name: Verify actual staging Auth, Firestore, Storage and callable security
+        timeout-minutes: 15
+        run: node scripts/test-stage19-staging-cloud.mjs
+      - name: Upload redacted staging integration results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: travelframe-stage19-real-staging-integration
+          path: reports/stage19-staging-cloud-integration.json
+          retention-days: 14
+          if-no-files-found: warn

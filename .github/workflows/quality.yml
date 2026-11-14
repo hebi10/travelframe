@@ -44,6 +44,8 @@ jobs:
         run: npm test
 
       - name: Secret Scan
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: npm run security:secrets
 
   functions:

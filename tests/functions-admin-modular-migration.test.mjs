@@ -40,11 +40,11 @@ test("Google Play billing keeps the same database and timestamp injection withou
   assert.ok(billing.includes("createBillingVerificationGate({ db, HttpsError })"));
 });
 
-test("Server dependency versions stay unchanged until independent SDK upgrade and production QA", () => {
-  assert.equal(packageJson.dependencies["firebase-admin"], "^13.10.0");
-  assert.equal(packageJson.dependencies["firebase-functions"], "^6.2.0");
-  assert.equal(lock.packages["node_modules/firebase-admin"]?.version, "13.10.0");
-  assert.equal(lock.packages["node_modules/firebase-functions"]?.version, "6.6.0");
+test("Admin 14 / Functions 7 upgrade remains on Node 22 with pinned lock and public SDK APIs", () => {
+  assert.equal(packageJson.dependencies["firebase-admin"], "^14.5.0");
+  assert.equal(packageJson.dependencies["firebase-functions"], "^7.4.0");
+  assert.equal(lock.packages["node_modules/firebase-admin"]?.version, "14.5.0");
+  assert.equal(lock.packages["node_modules/firebase-functions"]?.version, "7.4.0");
   assert.equal(packageJson.engines.node, "22");
   assert.ok(packageJson.scripts["runtime:deps"].includes("firebase-admin/firestore"));
   assert.ok(packageJson.scripts["runtime:deps"].includes("firebase-admin/storage"));
