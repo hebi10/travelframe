@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const workflow = fs.readFileSync(".github/workflows/android-play-aab.yml", "utf8");
-assert.ok(workflow.includes("push:\n    branches: [main]"), "main CI trigger must remain configured");
+assert.ok(!workflow.includes("push:\n    branches: [main]"), "Play release must not run on main push");
 assert.ok(workflow.includes("workflow_dispatch:"), "Manual CI mode must be available");
 assert.ok(workflow.includes("options: [check, build, deploy]"));
 assert.ok(workflow.includes("options: [internal, closed]"));
@@ -21,14 +21,11 @@ for (const required of [
   "github.ref == 'refs/heads/main'",
   "github.event_name == 'workflow_dispatch'",
   "inputs.mode == 'check'",
-  "vars.BODY_FRAME_PLAY_SIGNING_APPROVED_20261107 == 'true'",
-  "github.event_name == 'push'",
-  "contains(github.event.head_commit.message, '[deploy-internal]')",
-  "contains(github.event.head_commit.message, '[deploy-closed]')",
-  "RELEASE_COMMIT_MESSAGE: ${{ github.event.head_commit.message }}"
+  "vars.BODY_FRAME_PLAY_SIGNING_APPROVED_20261107 == 'true'"
 ]) {
   assert.ok(plan.includes(required), "Missing explicit Play gate: " + required);
 }
+assert.ok(!plan.includes("github.event_name == 'push'"), "Legacy push release gate must not be reachable");
 assert.ok(/name: Verify the upload keystore before contacting Play\n\s+if: steps\.resolve\.outputs\.operation == 'publish'/.test(plan));
 assert.ok(build.includes("needs.plan.outputs.mode == 'build' || needs.plan.outputs.mode == 'deploy'"));
 assert.ok(build.includes("needs: plan"));
