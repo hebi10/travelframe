@@ -89,6 +89,14 @@ def jobs(source):
     indentation = min((depth for depth, match in candidates if match is not None), default=None)
     if indentation is None:
         return {"__unparsed_jobs__": source}
+    # A flow-style job alongside normal jobs must not inherit another job's if gate.
+    for line in children:
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        depth = len(line) - len(line.lstrip())
+        if depth == indentation and not re.fullmatch(
+                r"""(['"]?)[A-Za-z][\w-]*\1\s*:\s*(?:#.*)?""", line.strip()):
+            return {"__unparsed_jobs__": source}
     result, name, buffer = {}, None, []
     for line in children:
         depth = len(line) - len(line.lstrip())
@@ -198,6 +206,7 @@ def _publishing_command(body):
     commands = "\n".join(line for line in body.splitlines()
                          if not line.lstrip().startswith(("- name:", "name:", "#")))
     commands = re.sub(r"\\\s*\n\s*", " ", commands)
+    commands = re.sub(r"\s*(?:&&|\|\||;|\|)\s*", "\n", commands)
     if re.search(r"(?i)\bgh\s+release\s+create\b|softprops/action-gh-release|upload-google-play@", commands):
         return True
     if "androidpublisher.googleapis.com" in commands and re.search(
@@ -214,12 +223,12 @@ def _publishing_command(body):
                     r"|play_internal\.py|play_closed\.py|promote_internal\.py"
                     r"|play_images\.py|store_icon\.py")
     for line in commands.splitlines():
-        match = re.search(r"\b(?:python(?:3(?:\.\d+)?)?|node|bash|sh)\s+([^\s;|]+)([^\n]*)", line)
+        match = re.search(r"\b(?:python(?:3(?:\.\d+)?)?|node|bash|sh)\s+(?:(?:-[uBIESOqv]+|--unbuffered|--enable-source-maps|--trace-warnings|--no-warnings)\s+)*([^\s;|]+)([^\n]*)", line)
         if not match:
             continue
         script, args = match.group(1).lower(), match.group(2).lower()
         # These existing publisher entrypoints mutate by default, even without --publish.
-        if re.search(r"(?:^|/)(?:store_icon|publish-mobile-play|publish_mobile_play)[.]py$", script):
+        if re.search(r"(?:^|/)(?:store_icon|images_only|publish-mobile-play|publish_mobile_play)[.]py$", script):
             return True
         if not re.search(script_names, script):
             continue
@@ -242,6 +251,8 @@ def automatic_mutations(filename, source):
                                      "public-release.yml", "ui-r09-full-release.yml"})
     issues = []
     workflow_jobs = jobs(source)
+    if "__unparsed_jobs__" in workflow_jobs:
+        return [filename + ": cannot safely parse publishing jobs"]
     for name, body in workflow_jobs.items():
         explicit = _publishing_command(body)
         possible = explicit or (relevant_file and MUTATOR.search(name) is not None
@@ -263,6 +274,7 @@ def automatic_mutations(filename, source):
 
 def _store_mutating_command(body):
     normalized = re.sub(r"\\\s*\n\s*", " ", body)
+    normalized = re.sub(r"\s*(?:&&|\|\||;)\s*", "\n", normalized)
     for line in normalized.splitlines():
         if line.lstrip().startswith(("- name:", "name:", "#")):
             continue
@@ -270,11 +282,13 @@ def _store_mutating_command(body):
                 r"(?i)(?:/images|/listings/|:commit)\b", line) and re.search(
                 r"(?i)\b(?:POST|PUT|PATCH|DELETE)\b", line):
             return True
-        match = re.search(r"\b(?:python(?:3(?:\.\d+)?)?|node)\s+([^\s;|]+)([^\n]*)", line)
+        match = re.search(r"\b(?:python(?:3(?:\.\d+)?)?|node)\s+(?:(?:-[uBIESOqv]+|--unbuffered|--enable-source-maps|--trace-warnings|--no-warnings)\s+)*([^\s;|]+)([^\n]*)", line)
         if not match:
             continue
         script, args = match.group(1).lower(), match.group(2).lower()
-        if re.search(r"(?:^|/)store_icon[.]py$", script):
+        if script.endswith("/ops06/store_gate.py"):
+            continue
+        if re.search(r"(?:^|/)(?:store_icon|images_only)[.]py$", script):
             return True
         if "publish_play_store_refresh" in script:
             return True
@@ -288,7 +302,7 @@ def _store_mutating_command(body):
 
 
 def _workflow_steps(body):
-    found = list(re.finditer(r"(?m)^( +)- (?:name|uses|run):", body))
+    found = list(re.finditer(r"(?m)^( +)- [A-Za-z][\w-]*:", body))
     if not found:
         return []
     depth = min(len(item.group(1)) for item in found)
@@ -298,20 +312,32 @@ def _workflow_steps(body):
 
 
 def _step_condition(body):
-    match = re.search(r"(?m)^\s+if:\s*([^\n]+)", body)
+    match = re.search(r"(?m)^([ \t]+)(-[ \t]+)?(?:if|['\"]if['\"]):[ \t]*([^\n]+)", body)
     if not match:
         return ""
-    return match.group(1).strip()
+    condition = match.group(3).strip().split(" #", 1)[0].strip()
+    if condition not in (">", ">-", ">+", "|", "|-", "|+"):
+        return condition
+    indent = len(match.group(1)) + len(match.group(2) or "")
+    parts = []
+    for line in body[match.end():].splitlines():
+        if not line.strip():
+            continue
+        if len(line) - len(line.lstrip()) <= indent:
+            break
+        parts.append(line.strip())
+    return " ".join(parts) if parts else "__unparsed_condition__"
 
 
 def _safe_store_step(guard_step, mutation_steps, body, filename):
-    if re.search(r"(?m)^\s+continue-on-error\s*:\s*(?!false\s*$)[^\n]+", guard_step):
+    if re.search(r"""(?m)^[ \t]+(?:-[ \t]+)?(?:continue-on-error|["']continue-on-error["']):[ \t]*(?!false[ \t]*(?:#.*)?$)[^\n]+""", guard_step):
         return False
-    executable = re.search(r"(?m)^\s*(?:run:\s*)?python(?:3)?\s+scripts/ops06/store_gate\.py\s+apply(?:\s|$)",
-                           guard_step)
-    if not executable:
+    guard_command = r"(?m)^[ \t]*(?:-[ \t]+)?(?:run:[ \t]*)?python(?:3)?\s+scripts/ops06/store_gate\.py\s+apply"
+    if not re.search(guard_command + r"(?:\s|$)", guard_step):
         return False
-    if re.search(r"(?m)^\s*(?:run:\s*)?python(?:3)?\s+scripts/ops06/store_gate\.py\s+apply[^\n]*(?:\|\||;\s*true\b|\|\s*cat)", guard_step):
+    if re.search(guard_command + r"[^\n]*(?:\|\||;[ \t]*true\b|\|(?!\|))", guard_step):
+        return False
+    if re.search(r"(?m)^[ \t]*(?:run:[ \t]*)?set[ \t]+\+e\b", guard_step):
         return False
     guard_cond = _step_condition(guard_step)
     if not guard_cond:
@@ -360,8 +386,16 @@ def store_guard_findings():
             guard = steps[index]
             if not _safe_store_step(guard, [steps[i] for i in mutations], body, filename):
                 problems.append("STORE_OPTIONAL: " + filename + ": approval is optional, ignored or not executable")
+            if index in mutations:
+                problems.append("STORE_ORDER: " + filename + ": approval and publication share one step")
             if any(i < index for i in mutations):
                 problems.append("STORE_ORDER: " + filename + ": publication precedes approval")
+            for downstream in steps[index + 1:]:
+                if not (_store_mutating_command(downstream) or "google-github-actions/auth@" in downstream):
+                    continue
+                if re.search(r"\b(?:always|failure|cancelled)\s*\(", _step_condition(downstream)):
+                    problems.append("STORE_BYPASS: " + filename + ": publication may continue after rejected approval")
+                    break
             if any("google-github-actions/auth@" in step for step in steps[:index]):
                 problems.append("STORE_ORDER: " + filename + ": Play authentication precedes approval")
             if any(_publishing_command(step) and ("androidpublisher.googleapis.com" in step
@@ -384,6 +418,61 @@ def findings():
         if "github.ref" not in source and "GITHUB_REF" not in source:
             problems.append("SOURCE: " + file + " missing main ref gate")
         if file == "release-build.yml":
+            normalized_dispatch = re.sub(r"\\\s*\n\s*", " ", source)
+            if re.search(r"(?<![\w-])gh[ \t]+workflow[ \t]+run\b", normalized_dispatch):
+                problems.append("OPS03_UNGUARDED_DISPATCH: gh workflow run bypasses the verified request gate")
+            request_jobs = jobs(source)
+            if set(request_jobs) != {"request"}:
+                problems.append("OPS03_SCOPE: TravelFrame signed-build workflow needs one gated request job")
+            request = request_jobs.get("request") or ""
+            env_match = re.search(r"(?m)^    env:[ \t]*(?:#.*)?$", request)
+            job_env = ""
+            if env_match:
+                for line in request[env_match.end():].splitlines():
+                    if line.strip() and len(line) - len(line.lstrip()) <= 4:
+                        break
+                    job_env += line + "\n"
+            for key, field in (("FINAL_BATCH_APPROVED", "final_batch_approved"),
+                               ("EXPECTED_MAIN_SHA", "expected_main_sha")):
+                expected_input = "$" + "{{ inputs." + field + " }}"
+                values = re.findall(r"(?m)^[ \t]+" + re.escape(key) + r":[ \t]*([^\n#]+)", request)
+                bound = re.search(r"(?m)^      " + re.escape(key) + r":[ \t]*"
+                                  + re.escape(expected_input) + r"[ \t]*(?:#.*)?$", job_env)
+                if len(values) != 1 or values[0].strip() != expected_input or not bound:
+                    problems.append("OPS03_BINDING: TravelFrame " + key
+                                    + " must come from the approved dispatch input")
+            ci_values = re.findall(r"(?m)^[ \t]+REQUIRED_CI_JSON:[ \t]*([^\n#]+)", request)
+            if len(ci_values) != 1 or ci_values[0].strip() != """'["Quality","Secret Scan"]'""":
+                problems.append("OPS03_REQUIRED_CI: TravelFrame Quality and Secret Scan must be mandatory")
+            request_steps = _workflow_steps(request)
+            gate_marker = "Gate release batch, main SHA and required CI"
+            gates = [(i, step) for i, step in enumerate(request_steps)
+                     if re.search(r"(?m)^[ \t]*-[ \t]+name:[ \t]*" + re.escape(gate_marker)
+                                  + r"[ \t]*(?:#.*)?$", step)]
+            dispatches = [(i, step) for i, step in enumerate(request_steps)
+                          if "gh api --method POST" in step and "/dispatches" in step]
+            if len(gates) != 1 or len(dispatches) != 1 or gates[0][0] >= dispatches[0][0]:
+                problems.append("OPS03_PREFLIGHT: TravelFrame approval must run before build dispatch")
+            else:
+                gate = gates[0][1]
+                for required in ("python3 - <<'PY'",
+                                 'if os.environ["FINAL_BATCH_APPROVED"]!="true"',
+                                 'sha!=os.environ["GITHUB_SHA"]',
+                                 'api("repos/"+repo+"/git/ref/heads/main")',
+                                 'required=json.loads(os.environ["REQUIRED_CI_JSON"])',
+                                 'if not matching: refuse("Missing exact-main CI: "+name)',
+                                 'if latest.get("status")!="completed" or latest.get("conclusion")!="success"'):
+                    if required not in gate:
+                        problems.append("OPS03_PREFLIGHT: TravelFrame required approval or SHA preflight missing")
+                        break
+                if (_step_condition(gate)
+                        or re.search(r"""(?m)^[ \t]*(?:-[ \t]+)?(?:continue-on-error|["']continue-on-error["'])[ \t]*:""", gate)
+                        or re.search(r"(?m)python3[ \t]+-[ \t]+<<'PY'[ \t]*(?:\|\||[;|])", gate)
+                        or re.search(r"(?m)^[ \t]*(?:run:[ \t]*)?set[ \t]+\+e\b", gate)
+                        or not re.search(r"(?m)^[ \t]*(?:-[ \t]+)?run:[ \t]*\|[ \t]*(?:#.*)?$", gate)):
+                    problems.append("OPS03_PREFLIGHT: TravelFrame approval step must fail closed")
+                if re.search(r"\b(?:always|failure|cancelled)\s*\(", _step_condition(dispatches[0][1])):
+                    problems.append("OPS03_DISPATCH_BYPASS: TravelFrame build can run after rejected approval")
             if re.search(r"(?i)inputs\[(?:mode|deploy)\]\s*=\s*(?:deploy|initialize|publish|promote|apply|upload|true)\b", source):
                 problems.append("BUILD: Play publishing mode is forbidden in build-only dispatch")
             for body in jobs(source).values():
@@ -447,10 +536,92 @@ def findings():
         if not release or guard not in release or not re.search(
                 r'if \[\[ "\$FINAL_RELEASE_APPROVAL" != "HOMECREW_FINAL_RELEASE_APPROVED" \]\]; then', release):
             problems.append("APPROVAL: HomeCrew final release authorization gate missing")
+    internal = read(".github/workflows/play-internal-release.yml")
+    if internal is not None:
+        for stage in ("verify", "publish"):
+            body = jobs(internal).get(stage)
+            steps = _workflow_steps(body or "")
+            guard_command = r"(?m)^[ \t]*(?:-[ \t]+)?(?:run:[ \t]*)?python3\s+scripts/ops04/internal\.py\s+guard\b"
+            guards = [(index, step) for index, step in enumerate(steps)
+                      if re.search(guard_command, step)]
+            if len(guards) != 1:
+                problems.append("PROVENANCE: OPS-04 " + stage + " requires an executable signed-source guard")
+                continue
+            index, guard = guards[0]
+            if (_step_condition(guard) or re.search(r"""(?m)^[ \t]+(?:-[ \t]+)?(?:continue-on-error|["']continue-on-error["']):[ \t]*""", guard)
+                    or re.search(guard_command + r"[^\n]*(?:\|\||;[ \t]*true\b|\|(?!\|))", guard)
+                    or re.search(r"(?m)^[ \t]*(?:run:[ \t]*)?set[ \t]+\+e\b", guard)):
+                problems.append("PROVENANCE: OPS-04 " + stage + " guard must run and stop on failure")
+            if any("actions/download-artifact@" in step or "google-github-actions/auth@" in step
+                   for step in steps[:index]):
+                problems.append("PROVENANCE: OPS-04 " + stage + " guard must precede artifact access")
+            for downstream in steps[index + 1:]:
+                if (re.search(r"\b(?:always|failure|cancelled)\s*\(", _step_condition(downstream))
+                        and ("google-github-actions/auth@" in downstream
+                             or _publishing_command(downstream))):
+                    problems.append("PROVENANCE_BYPASS: OPS-04 " + stage + " can publish after a failed guard")
+                    break
     if REPOSITORY == "hebi10/TripCanvas":
-        internal = read(".github/workflows/play-internal-release.yml") or ""
-        if internal.count("scripts/ops04/internal.py guard") < 2:
-            problems.append("PROVENANCE: OPS-04 requires guard in both verify and publish jobs")
+        promote = jobs(read(".github/workflows/play-promote.yml")).get("promote")
+        if not promote or "inputs.final_release_confirmed == true" not in _guaranteed_atoms(job_condition(promote)):
+            problems.append("APPROVAL: TripCanvas legacy closed promotion lacks mandatory final approval")
+    if REPOSITORY == "hebi10/travelframe":
+        mandatory = "inputs.ops01_release_approved == true"
+        for filename in ("android-play-aab.yml", "android-play-store-images.yml"):
+            workflow = read(".github/workflows/" + filename)
+            publisher = jobs(workflow).get("publish")
+            if publisher is None or mandatory not in _guaranteed_atoms(job_condition(publisher)):
+                problems.append("APPROVAL: TravelFrame " + filename + " lacks mandatory OPS-01 release approval")
+        binary = read(".github/workflows/android-play-aab.yml")
+        binary_job = jobs(binary).get("publish") if binary is not None else None
+        binary_steps = _workflow_steps(binary_job or "")
+        verifier = [(i, step) for i, step in enumerate(binary_steps) if re.search(
+            r"(?m)^[ \t]*(?:-[ \t]+)?run:[ \t]*node[ \t]+build-tools/scripts/publish-play-release\.mjs[ \t]+verify-artifact[ \t]*(?:#.*)?$", step)]
+        publishers = [i for i, step in enumerate(binary_steps) if re.search(
+            r"(?m)^[ \t]*(?:-[ \t]+)?run:[ \t]*node[ \t]+build-tools/scripts/publish-play-release\.mjs[ \t]+publish[ \t]*(?:#.*)?$", step)]
+        authentications = [i for i, step in enumerate(binary_steps)
+                           if "google-github-actions/auth@" in step]
+        if (len(verifier) != 1 or len(publishers) != 1 or len(authentications) != 1
+                or not verifier[0][0] < authentications[0] < publishers[0]):
+            problems.append("BINARY_PROVENANCE: TravelFrame publisher must verify AAB before authentication and upload")
+        else:
+            verify_index, verify_step = verifier[0]
+            if (re.search(r"""(?m)^[ \t]+(?:-[ \t]+)?(?:if|["']if["']|continue-on-error|["']continue-on-error["']):""", verify_step)
+                    or re.search(r"(?m)^[ \t]*(?:run:[ \t]*)?(?:if[ \t]+|set[ \t]+\+e\b)", verify_step)):
+                problems.append("BINARY_PROVENANCE: TravelFrame AAB verification must run and stop on failure")
+            for index in (authentications[0], publishers[0]):
+                if re.search(r"\b(?:always|failure|cancelled)\s*\(", _step_condition(binary_steps[index])):
+                    problems.append("BINARY_PROVENANCE: TravelFrame Play upload cannot bypass a failed AAB check")
+        store = read(".github/workflows/android-play-store-images.yml") or ""
+        publisher = jobs(store).get("publish")
+        approval_steps = [step for step in _workflow_steps(publisher or "")
+                          if re.search(r"(?m)^[ \t]*(?:-[ \t]+)?run:[ \t]*python3[ \t]+scripts/ops06/store_gate\.py[ \t]+apply[ \t]*(?:#.*)?$", step)]
+        if len(approval_steps) != 1:
+            problems.append("STORE_BINDING: TravelFrame requires exactly one executable OPS-06 approval step")
+        else:
+            approval_step = approval_steps[0]
+            env_header = re.search(r"(?m)^([ \t]+)env:[ \t]*(?:#.*)?$", approval_step)
+            env_content = []
+            if env_header:
+                env_indent = len(env_header.group(1))
+                for line in approval_step[env_header.end():].splitlines():
+                    if not line.strip() or line.lstrip().startswith("#"):
+                        continue
+                    indentation = len(line) - len(line.lstrip())
+                    if indentation <= env_indent:
+                        break
+                    env_content.append(line)
+            scoped_env = "\n".join(env_content)
+            for key, field in (("OPS06_STORE_APPROVED", "ops06_store_approved"),
+                               ("OPS06_CONFIRMATION", "ops06_confirmation"),
+                               ("OPS06_EXPECTED_MAIN_SHA", "ops06_expected_main_sha")):
+                pattern = r"(?m)^[ \t]+" + key + r":[ \t]*\$\{\{[ \t]*inputs\." + field + r"[ \t]*\}\}[ \t]*(?:#.*)?$"
+                if not re.search(pattern, scoped_env):
+                    problems.append("STORE_BINDING: TravelFrame approval step " + key + " must use approved user input")
+    if REPOSITORY == "hebi10/PetWorld":
+        closed = read(".github/workflows/play-closed-release.yml") or ""
+        if re.search(r"(?i)publisher[.]py\s+deploy[^\n]*--bundle", closed):
+            problems.append("CLOSED: PetWorld promotion must not upload a new binary")
     return problems
 
 

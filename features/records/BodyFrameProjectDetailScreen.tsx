@@ -21,6 +21,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  useWindowDimensions,
   View
 } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
@@ -32,7 +33,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { bodyFrameAccent, bodyFrameDesign, bodyFrameSheetDesign, bodyFrameTypography, getBodyFrameControlColors } from "@/constants/app-theme";
+import { bodyFrameDesign, bodyFrameSheetDesign, bodyFrameTypography, getBodyFrameControlColors } from "@/constants/app-theme";
 import {
   getBodyProjectPhotos,
   getBodyProjectProgressSummary,
@@ -134,7 +135,8 @@ const sortProjectPhotos = (photos: PhotoItem[]) =>
   });
 
 
-const PROJECT_PHOTO_GRID_COLUMNS = 3;
+const PROJECT_PHOTO_PHONE_COLUMNS = 2;
+const PROJECT_PHOTO_TABLET_COLUMNS = 3;
 const PROJECT_PHOTO_GRID_GAP = 8;
 const PROJECT_PHOTO_LONG_PRESS_MS = 320;
 const PROJECT_PHOTO_TAP_DISTANCE = 12;
@@ -152,6 +154,7 @@ function SortableProjectPhotoTile({
   photo,
   index,
   count,
+  gridColumns,
   tileWidth,
   disabled,
   dropTarget,
@@ -168,6 +171,7 @@ function SortableProjectPhotoTile({
   photo: PhotoItem;
   index: number;
   count: number;
+  gridColumns: number;
   tileWidth: number;
   disabled: boolean;
   dropTarget: boolean;
@@ -203,19 +207,19 @@ function SortableProjectPhotoTile({
       translateX.value = translationX;
       translateY.value = translationY;
 
-      const startRow = Math.floor(index / PROJECT_PHOTO_GRID_COLUMNS);
-      const startColumn = index % PROJECT_PHOTO_GRID_COLUMNS;
+      const startRow = Math.floor(index / gridColumns);
+      const startColumn = index % gridColumns;
       const rowDelta = Math.round(translationY / cellHeight);
       const columnDelta = Math.round(translationX / cellWidth);
       const maxRow = Math.max(
         0,
-        Math.ceil(count / PROJECT_PHOTO_GRID_COLUMNS) - 1
+        Math.ceil(count / gridColumns) - 1
       );
       const targetRow = Math.max(0, Math.min(maxRow, startRow + rowDelta));
       const targetColumn = Math.max(
         0,
         Math.min(
-          PROJECT_PHOTO_GRID_COLUMNS - 1,
+          gridColumns - 1,
           startColumn + columnDelta
         )
       );
@@ -223,7 +227,7 @@ function SortableProjectPhotoTile({
         0,
         Math.min(
           count - 1,
-          targetRow * PROJECT_PHOTO_GRID_COLUMNS + targetColumn
+          targetRow * gridColumns + targetColumn
         )
       );
 
@@ -236,6 +240,7 @@ function SortableProjectPhotoTile({
       cellHeight,
       cellWidth,
       count,
+      gridColumns,
       hoverIndex,
       index,
       onDragHover,
@@ -388,10 +393,10 @@ function SortableProjectPhotoTile({
       }
     }
 
-    const sourceRow = Math.floor(index / PROJECT_PHOTO_GRID_COLUMNS);
-    const sourceColumn = index % PROJECT_PHOTO_GRID_COLUMNS;
-    const targetRow = Math.floor(shiftedIndex / PROJECT_PHOTO_GRID_COLUMNS);
-    const targetColumn = shiftedIndex % PROJECT_PHOTO_GRID_COLUMNS;
+    const sourceRow = Math.floor(index / gridColumns);
+    const sourceColumn = index % gridColumns;
+    const targetRow = Math.floor(shiftedIndex / gridColumns);
+    const targetColumn = shiftedIndex % gridColumns;
     const siblingTranslateX =
       (targetColumn - sourceColumn) * cellWidth;
     const siblingTranslateY =
@@ -419,6 +424,7 @@ function SortableProjectPhotoTile({
   }, [
     cellHeight,
     cellWidth,
+    gridColumns,
     dragSourceIndex,
     dragTargetIndex,
     index
@@ -464,7 +470,7 @@ function SortableProjectPhotoTile({
         <Image
           source={{ uri: photo.previewUri ?? photo.uri }}
           style={styles.photoImage}
-          contentFit="cover"
+          contentFit="contain"
           cachePolicy="memory-disk"
         />
         <View style={styles.photoMetaOverlay}>
@@ -494,8 +500,12 @@ export default function BodyFrameProjectDetailScreen() {
   const { id } = useLocalSearchParams<{ id?: string | string[] }>();
   const projectId = Array.isArray(id) ? id[0] : id;
   const insets = useSafeAreaInsets();
-  const { palette, effectiveThemeMode } = useAppAppearance();
-  const accent = effectiveThemeMode === "dark" ? bodyFrameAccent : palette.text;
+  const { width: windowWidth, fontScale } = useWindowDimensions();
+  const projectPhotoGridColumns = windowWidth >= 600
+    ? PROJECT_PHOTO_TABLET_COLUMNS
+    : PROJECT_PHOTO_PHONE_COLUMNS;
+  const { palette } = useAppAppearance();
+  const accent = palette.text;
   const { selected: modalSelectionColor, primaryText: modalSelectionText } =
     getBodyFrameControlColors(palette);
   const { primaryBackground: primaryColor, primaryText: primaryTextColor } =
@@ -609,10 +619,10 @@ export default function BodyFrameProjectDetailScreen() {
     () =>
       photoGridWidth > 0
         ? (photoGridWidth -
-            PROJECT_PHOTO_GRID_GAP * (PROJECT_PHOTO_GRID_COLUMNS - 1)) /
-          PROJECT_PHOTO_GRID_COLUMNS
+            PROJECT_PHOTO_GRID_GAP * (projectPhotoGridColumns - 1)) /
+          projectPhotoGridColumns
         : 0,
-    [photoGridWidth]
+    [photoGridWidth, projectPhotoGridColumns]
   );
 
   const measurementSeries = useMemo(
@@ -1159,8 +1169,11 @@ export default function BodyFrameProjectDetailScreen() {
               <Text style={[styles.comparePreviewTitle, { color: palette.text }]}>
                 전후 사진 비교
               </Text>
-              <Text style={[styles.comparePreviewDetail, { color: palette.muted }]}>
+              <Text numberOfLines={2} style={[styles.comparePreviewDetail, { color: palette.muted }]}>
                 시작·최근 사진 비교
+              </Text>
+              <Text style={[styles.comparePreviewActionLabel, { color: palette.text }]}>
+                비교하기
               </Text>
             </View>
             <Feather name="chevron-right" size={bodyFrameDesign.iconSize} color={palette.text} />
@@ -1196,17 +1209,6 @@ export default function BodyFrameProjectDetailScreen() {
         </View>
 
 
-        <Pressable
-          accessibilityRole="button"
-          style={[styles.primaryAction, { backgroundColor: primaryColor }]}
-          onPress={() => void openCamera()}
-        >
-          <Text style={[styles.primaryActionText, { color: primaryTextColor }]}>
-            오늘 사진 찍기
-          </Text>
-        </Pressable>
-
-
         <View style={styles.recordsSection}>
           <View style={styles.sectionHeader}>
             <View style={styles.recordsHeadingCopy}>
@@ -1216,17 +1218,6 @@ export default function BodyFrameProjectDetailScreen() {
               </Text>
             </View>
             <View style={styles.sectionActions}>
-              <Pressable
-                disabled={isImportingPhotos}
-                accessibilityRole="button"
-                style={[styles.sectionAction, { borderColor: palette.line }]}
-                onPress={() => void importProjectPhotos()}
-              >
-                <Feather name="upload" size={15} color={palette.text} />
-                <Text style={[styles.sectionActionText, { color: palette.text }]}>
-                  {isImportingPhotos ? "추가 중" : "사진 추가"}
-                </Text>
-              </Pressable>
               {projectPhotos.length > 1 ? (
                 <Pressable
                   accessibilityRole="button"
@@ -1280,6 +1271,7 @@ export default function BodyFrameProjectDetailScreen() {
                       photo={photo}
                       index={index}
                       count={projectPhotos.length}
+                      gridColumns={projectPhotoGridColumns}
                       tileWidth={projectPhotoTileWidth}
                       disabled={photoOrderSaving}
                       orderMode={photoOrderMode}
@@ -1334,6 +1326,29 @@ export default function BodyFrameProjectDetailScreen() {
           )}
         </View>
 
+        <View style={[styles.recordsFooterActions, fontScale >= 1.3 && styles.recordsFooterActionsLargeFont]}>
+          <Pressable
+            accessibilityRole="button"
+            style={[styles.primaryAction, { backgroundColor: primaryColor }]}
+            onPress={() => void openCamera()}
+          >
+            <Text style={[styles.primaryActionText, { color: primaryTextColor }]}>
+              오늘 사진 찍기
+            </Text>
+          </Pressable>
+          <Pressable
+            disabled={isImportingPhotos}
+            accessibilityRole="button"
+            accessibilityState={{ disabled: isImportingPhotos, busy: isImportingPhotos }}
+            style={[styles.photoAddAction, { borderColor: palette.line }]}
+            onPress={() => void importProjectPhotos()}
+          >
+            <Feather name="upload" size={bodyFrameDesign.iconSize} color={palette.text} />
+            <Text style={[styles.sectionActionText, { color: palette.text }]}>
+              {isImportingPhotos ? "추가 중" : "사진 추가"}
+            </Text>
+          </Pressable>
+        </View>
 
         <Pressable
           accessibilityRole="button"
@@ -2298,6 +2313,10 @@ const styles = StyleSheet.create({
     fontSize: bodyFrameTypography.caption,
     lineHeight: 18
   },
+  comparePreviewActionLabel: {
+    fontSize: bodyFrameTypography.caption,
+    fontWeight: "700"
+  },
   comparePreviewHeading: {
     minHeight: bodyFrameDesign.minTouchSize,
     flexDirection: "row",
@@ -2423,11 +2442,30 @@ const styles = StyleSheet.create({
     fontWeight: "600"
   },
   primaryAction: {
+    flex: 1,
     minHeight: bodyFrameDesign.primaryButtonHeight,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: bodyFrameDesign.buttonRadius,
-    marginBottom: 6
+    borderRadius: bodyFrameDesign.buttonRadius
+  },
+  recordsFooterActions: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 10
+  },
+  recordsFooterActionsLargeFont: {
+    flexDirection: "column"
+  },
+  photoAddAction: {
+    flex: 1,
+    minHeight: bodyFrameDesign.primaryButtonHeight,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingHorizontal: 10,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderRadius: bodyFrameDesign.buttonRadius
   },
   primaryActionText: {
     fontSize: bodyFrameTypography.button,

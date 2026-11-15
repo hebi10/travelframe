@@ -15,7 +15,7 @@ for (const token of [
   "maxWidth: bodyFrameDesign.contentMaxWidth",
   "aspectRatio: 3 / 4",
   "progressPercent",
-  "변화 영상",
+  "예상 영상 {formatDuration(summary.durationSeconds)}",
   "setLastActiveProjectId",
   "archiveBodyProject(project.id, false)"
 ]) {
