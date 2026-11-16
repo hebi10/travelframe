@@ -17,11 +17,13 @@ GitHub Actions에서 서명 빌드, 내부 테스트 게시, 비공개 테스트
 |---|---|---|
 | `check` | SHA와 배포 입력 확인 | 없음 |
 | `build` | Android QA와 서명 AAB 생성 | `build_approved=true` |
-| `internal` | 서명 AAB 검증, 내부 테스트 게시, Play API 반영 확인 | `build_run_id`, `internal_approved=true` |
+| `internal` | Android QA 확인, 기존 서명 AAB 내부 게시, Play API 반영 확인 | `build_run_id`, `internal_approved=true` |
 | `closed` | 내부 테스트의 완료 버전 검증, 비공개 승격, Play API 반영 확인 | `build_run_id`, `closed_approved=true` |
 | `deploy` | Android QA, 서명 AAB 생성, 내부 게시, 비공개 승격 | `internal_approved=true`, `closed_approved=true` |
 
 단계별 실행에서는 `build` 실행 결과 요약의 **Signed AAB build run ID**를 `internal`과 `closed`에 공통으로 사용한다. 이 ID는 서명 AAB를 생성한 하위 실행을 가리킨다. `closed` 실행 전에 해당 버전의 내부 테스트 게시가 Play API에서 `completed`로 확인되어야 한다.
+
+`internal`은 같은 SHA의 빌드와 함께 실행한 Android QA 결과를 확인한다. 연결된 결과가 없는 기존 서명 빌드를 사용하면 Android QA를 실행한 뒤 검증된 AAB를 게시한다.
 
 이미 내부 게시가 확인된 `deploy` 실행에서 비공개 승격만 남았다면, 해당 실행 요약에 기록된 `build_run_id`로 `closed`를 실행한다. 동일 SHA와 만료 전 빌드 아티팩트가 필요하다.
 

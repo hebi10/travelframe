@@ -21,6 +21,8 @@ PACKAGE = "com.haebi.photoguide"
 OUTPUT = Path("tf-release-output")
 MAIN_CHECKS = ("Quality", "Secret Scan", "OPS-08 final main source and release policy verification")
 BUILD_WORKFLOW = "android-play-aab.yml"
+NATIVE_WORKFLOW = "body-frame-device-qa.yml"
+BUILD_TITLE_PREFIX = "TravelFrame Play build · internal · main · "
 NATIVE_JOBS = (
     "build-apk", "capture-devices",
     "stage13-design-captures (phone-360dp)",
@@ -32,7 +34,7 @@ NATIVE_JOBS = (
     "UI-R05 independent MP4 hash, H.264/frame and native UI audit",
 )
 WORKFLOWS = (
-    "body-frame-device-qa.yml",
+    NATIVE_WORKFLOW,
     BUILD_WORKFLOW,
     "play-internal-release.yml",
     "play-closed-release.yml",
@@ -158,10 +160,11 @@ def wait_main_checks(sha, deadline_seconds=2400, interval=20):
     raise ReleaseGateError("Timed out waiting for exact-main Quality, Secret Scan and OPS-08")
 
 
-def workflow_runs(filename):
+def workflow_runs(filename, sha=None):
     require(filename in WORKFLOWS, "Unknown child workflow")
     response = api("GET", "/repos/" + REPOSITORY + "/actions/workflows/"
-                   + filename + "/runs?event=workflow_dispatch&branch=main&per_page=100")
+                   + filename + "/runs?event=workflow_dispatch&branch=main&per_page=100"
+                   + ("&head_sha=" + sha if sha else ""))
     require(response.get("total_count", 0) >= 0, "Missing workflow run count")
     return response.get("workflow_runs", [])
 
@@ -211,13 +214,31 @@ def require_native_jobs(run_id):
 
 def verify_existing_build_run(run_id, sha):
     run = api("GET", f"/repos/{REPOSITORY}/actions/runs/{run_id}")
+    title = run.get("display_title", "")
     require(run.get("id") == run_id and run.get("head_sha") == sha
             and run.get("head_branch") == "main" and run.get("event") == "workflow_dispatch"
             and run.get("status") == "completed" and run.get("conclusion") == "success"
             and run.get("repository", {}).get("full_name") == REPOSITORY
             and run.get("path", "").split("@")[0] == ".github/workflows/" + BUILD_WORKFLOW
-            and run.get("display_title", "").startswith("TravelFrame Play build · internal · main · "),
+            and title.startswith(BUILD_TITLE_PREFIX),
             "Use a successful signed AAB build-only run from the exact approved main")
+    return title.removeprefix(BUILD_TITLE_PREFIX)
+
+
+def find_paired_native_qa(request_id, sha):
+    if not re.fullmatch(r"tf-[1-9][0-9]*-[1-9][0-9]*", request_id):
+        return None
+    runs = [run for run in workflow_runs(NATIVE_WORKFLOW, sha)
+            if run.get("head_sha") == sha and run.get("head_branch") == "main"
+            and run.get("event") == "workflow_dispatch"
+            and run.get("display_title") == "Body Frame native QA · " + request_id]
+    require(len(runs) <= 1, "Ambiguous paired native release QA")
+    if not runs:
+        return None
+    run = runs[0]
+    require(run.get("status") == "completed" and run.get("conclusion") == "success",
+            "Paired exact-main native release QA did not succeed")
+    return int(run["id"])
 
 
 def require_artifact(run_id, prefix):
@@ -340,6 +361,7 @@ def execute(plan):
     sha = plan["source_sha"]
     batch = plan["batch_id"]
     mode = plan["mode"]
+    request_id = "tf-" + os.environ["GITHUB_RUN_ID"] + "-" + os.environ.get("GITHUB_RUN_ATTEMPT", "1")
     result = dict(schema="tf-release-auto-v1", status="in_progress",
                   source_sha=sha, batch_id=batch, mode=mode, runs={})
     save_result(result)
@@ -354,15 +376,21 @@ def execute(plan):
 
     wait_main_checks(sha)
     build_run = plan["build_run_id"]
+    native = None
     if build_run is not None:
-        verify_existing_build_run(build_run, sha)
+        build_request_id = verify_existing_build_run(build_run, sha)
         result["runs"]["signed_aab"] = build_run
-    else:
-        request_id = "tf-" + os.environ["GITHUB_RUN_ID"] + "-" + os.environ.get("GITHUB_RUN_ATTEMPT", "1")
-        native = stage("android_qa", "body-frame-device-qa.yml",
-                       {"release_qa": "true", "release_request_id": request_id},
-                       request_id, timeout=10800)
+        if mode == "internal":
+            native = find_paired_native_qa(build_request_id, sha)
+    if mode in ("build", "internal", "deploy"):
+        if native is None:
+            native = stage("android_qa", NATIVE_WORKFLOW,
+                           {"release_qa": "true", "release_request_id": request_id},
+                           request_id, timeout=10800)
+        else:
+            result["runs"]["android_qa"] = native
         require_native_jobs(native)
+    if build_run is None:
         build_run = stage("signed_aab", BUILD_WORKFLOW,
                           {"mode": "build", "track": "internal",
                            "ops01_release_approved": "false", "source_sha": sha,
