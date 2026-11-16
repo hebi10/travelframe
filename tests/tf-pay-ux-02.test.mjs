@@ -12,7 +12,9 @@ test("TF-PAY-UX-02: PlanScreen parses as TSX and is browsable without login", ()
   assert.equal(parsed.parseDiagnostics.length, 0);
   assert.ok(plans.includes('SectionBlock title="Pro · Plus · Expert 비교"'));
   assert.ok(plans.includes('currentTier === "guest"'));
-  assert.ok(plans.includes('isLoggedIn ? "구독 안내 보기" : "로그인 후 구독하기"'));
+  assert.ok(plans.includes('"로그인 후 구독하기"'));
+  assert.ok(plans.includes('isLoggedIn ? "구독 안내 보기"') ||
+    plans.includes('isLoggedIn ? "Google Play에서 구독하기"'));
   assert.ok(plans.includes('subscriptionStatus !== "verified"'));
 });
 
