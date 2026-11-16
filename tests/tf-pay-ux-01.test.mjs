@@ -13,7 +13,7 @@ test("TF-PAY-UX-01: five primary tabs expose plans and retain hidden account", (
   assert.match(tabs, /kind="plans"/);
   assert.equal((tabs.match(/tabBarIcon:/g) ?? []).length, 5);
   assert.match(glyph, /plans: "credit-card"/);
-  assert.match(tabs, /name="account"[\\s\\S]*?href: null/);
+  assert.match(tabs, /name="account"[\s\S]*?href: null/);
   assert.equal(read("app/(tabs)/plans.tsx").includes("PlanScreen"), true);
 });
 
