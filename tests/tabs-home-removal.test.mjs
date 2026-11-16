@@ -21,6 +21,7 @@ for (const tabTitle of [
   'title: "촬영"',
   'title: "기록"',
   'title: "영상"',
+  'title: "플랜"',
   'title: "설정"'
 ]) {
   assert.ok(tabsLayoutSource.includes(tabTitle), `bottom tabs should include ${tabTitle}`);
@@ -37,6 +38,7 @@ const getTabScreenBlock = (name) => {
 
 const accountTabBlock = getTabScreenBlock("account");
 const videoTabBlock = getTabScreenBlock("trip-clip");
+const plansTabBlock = getTabScreenBlock("plans");
 
 assert.ok(
   accountTabBlock.includes("href: null"),
@@ -47,6 +49,7 @@ assert.equal(
   false,
   "video should occupy a visible bottom tab"
 );
+assert.equal(plansTabBlock.includes("href: null"), false, "plans must be a visible bottom tab");
 assert.ok(
   !/name="camera"[\s\S]*?tabBarStyle: \{ display: "none" \}/.test(tabsLayoutSource),
   "camera should keep the shared bottom navigation visible"
@@ -68,6 +71,8 @@ assert.ok(
 assert.ok(!tabGlyphSource.includes('"home"'), "tab glyph variants should not include home");
 assert.ok(tabGlyphSource.includes('"video"'), "tab glyph variants should include video");
 assert.ok(!tabGlyphSource.includes('"account"'), "hidden account route should not need a bottom-tab glyph");
+assert.ok(tabGlyphSource.includes('plans: "credit-card"'), "plans tab should use the neutral payment icon");
+assert.ok(fs.existsSync("app/(tabs)/plans.tsx"), "plans route must be present");
 assert.ok(
   tabGlyphSource.includes("activeIndicator"),
   "active bottom tab should use a short underline indicator"
@@ -92,4 +97,4 @@ assert.equal(
   "Body Frame onboarding should not depend on old travel visual slides"
 );
 
-console.log("ok - Body Frame uses four primary bottom tabs");
+console.log("ok - Body Frame uses five primary bottom tabs");

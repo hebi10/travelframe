@@ -58,13 +58,13 @@ test("UI-R06 semantic status colors stay distinct from accent and meet AA contra
   assert.ok(stateNotice.includes('variant === "error" ? statusColors.error : palette.muted'));
 });
 
-test("UI-R06 four tabs keep neutral functional film icon and 44dp touch target at large font scale", () => {
-  for (const token of ['camera: "camera"', 'studio: "image"', 'video: "film"', 'settings: "settings"']) {
+test("UI-R06 five tabs keep neutral functional icons and 44dp touch target at large font scale", () => {
+  for (const token of ['camera: "camera"', 'studio: "image"', 'video: "film"', 'plans: "credit-card"', 'settings: "settings"']) {
     assert.ok(glyph.includes(token), token);
   }
   assert.ok(!glyph.includes('video: "youtube"'));
   assert.ok(glyph.includes("activeIndicator") && glyph.includes("size={bodyFrameDesign.iconSize}"));
-  assert.equal((tabs.match(/tabBarIcon:/g) ?? []).length, 4);
+  assert.equal((tabs.match(/tabBarIcon:/g) ?? []).length, 5);
   assert.ok(tabs.includes('href: null'));
   assert.ok(tabs.includes("useWindowDimensions"));
   assert.ok(tabs.includes("tabBarHeight = 58 + tabBarBottomPadding + extraFontHeight"));

@@ -67,7 +67,7 @@ assert.ok(sheet.includes("minHeight: bodyFrameDesign.minTouchSize") ||
 assert.ok(glyph.includes("size={bodyFrameDesign.iconSize}"));
 assert.ok(tabs.includes("minHeight: bodyFrameDesign.minTouchSize"));
 assert.ok(tabs.includes('href: null'), "account route must stay hidden from tabs");
-assert.equal((tabs.match(/tabBarIcon:/g) ?? []).length, 4, "existing four tabs must remain");
+assert.equal((tabs.match(/tabBarIcon:/g) ?? []).length, 5, "four existing tabs and plans must remain");
 assert.ok(guide.includes("minHeight: bodyFrameDesign.primaryButtonHeight"));
 assert.ok(welcome.includes("minHeight: bodyFrameDesign.primaryButtonHeight"));
 assert.ok(shell.includes('name="chevron-left"'));
