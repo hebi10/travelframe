@@ -130,6 +130,7 @@ export function BodyFrameVideoOptionsSheet({
                     <Pressable
                       accessibilityRole="checkbox"
                       accessibilityLabel={`${item.sequence ?? ""}번째 사진`}
+                      accessibilityHint="영상에 포함할 사진을 선택하거나 해제합니다."
                       accessibilityState={{ checked }}
                       style={[styles.photo, { borderColor: checked ? palette.text : palette.line }]}
                       onPress={() => setDraftIds(current => {
@@ -137,7 +138,7 @@ export function BodyFrameVideoOptionsSheet({
                         return ids.includes(item.id) ? ids.filter(id => id !== item.id) : [...ids, item.id];
                       })}
                     >
-                      <Image source={{ uri: item.previewUri ?? item.uri }} style={styles.photoImage} contentFit="cover" accessible={false} />
+                      <Image source={{ uri: item.previewUri ?? item.uri }} style={styles.photoImage} contentFit="contain" accessible={false} />
                       <Text style={styles.photoLabel}>{checked ? "✓ " : ""}#{item.sequence ?? ""}</Text>
                     </Pressable>
                   );
@@ -279,6 +280,7 @@ export function BodyFrameVideoOptionsSheet({
                   <Pressable
                     key={choice}
                     accessibilityRole="radio"
+                    accessibilityLabel={`${choice}${kind === "interval" ? "초" : kind === "quality" ? "p" : ""}`}
                     accessibilityState={{ selected: active }}
                     style={[styles.choice, { borderColor: active ? selectedColor : palette.line, backgroundColor: active ? selectedColor : palette.background }]}
                     onPress={() => setDraftOptions(current => ({ ...current, [kind]: choice }))}

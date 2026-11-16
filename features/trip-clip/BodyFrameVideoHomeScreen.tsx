@@ -125,6 +125,14 @@ export default function BodyFrameVideoHomeScreen() {
     [activeProject]
   );
 
+  const activeProjectPhotos = activeProject ? getBodyProjectPhotos(photos, activeProject.id) : [];
+  const activeProjectCover = activeProject
+    ? activeProjectPhotos.find(photo => photo.id === activeProject.coverPhotoId) ??
+      [...activeProjectPhotos].sort((a, b) => (b.sequence ?? 0) - (a.sequence ?? 0))[0]
+    : null;
+  const activeProjectSummary = activeProject
+    ? getBodyProjectProgressSummary(photos, activeProject)
+    : null;
   const recentVideos = videos.slice(0, 3);
 
   if (loading) {
@@ -267,27 +275,43 @@ export default function BodyFrameVideoHomeScreen() {
           ]}
         >
           <View style={styles.heroHeader}>
-            <View style={[styles.heroIllustrationFrame, { backgroundColor: palette.surfaceStrong }]}>
-              <Image
-                source={require("../../assets/ui/illustrations/feature-video.png")}
-                style={styles.heroIllustration}
-                contentFit="contain"
-                accessible={false}
-              />
+            <View style={[
+              styles.heroIllustrationFrame,
+              activeProjectCover && styles.heroCoverFrame,
+              { backgroundColor: palette.surfaceStrong }
+            ]}>
+              {activeProjectCover ? (
+                <Image
+                  source={{ uri: activeProjectCover.previewUri ?? activeProjectCover.uri }}
+                  style={styles.heroCoverImage}
+                  contentFit="contain"
+                  accessible={false}
+                />
+              ) : (
+                <Image
+                  source={require("../../assets/ui/illustrations/feature-video.png")}
+                  style={styles.heroIllustration}
+                  contentFit="contain"
+                  accessible={false}
+                />
+              )}
             </View>
             <View style={styles.heroCopy}>
-              <Text style={[styles.heroTitle, { color: palette.text }]}>
-                변화 영상 만들기
+              <Text style={[styles.heroEyebrow, { color: palette.muted }]}>선택 프로젝트</Text>
+              <Text numberOfLines={2} style={[styles.heroTitle, { color: palette.text }]}>
+                {activeProject?.name ?? "변화 영상 만들기"}
               </Text>
               <Text style={[styles.heroDetail, { color: palette.muted }]}>
-                {activeProject
-                  ? `${activeProject.name} 프로젝트의 기록으로 영상을 만듭니다.`
+                {activeProjectSummary
+                  ? `${activeProjectSummary.photoCount}장 · 예상 영상 ${formatDuration(activeProjectSummary.durationSeconds)}`
                   : "먼저 프로젝트를 만들어 주세요."}
               </Text>
             </View>
           </View>
-          <Pressable
+        </View>
+        <Pressable
             accessibilityRole="button"
+            accessibilityLabel="선택한 프로젝트로 변화 영상 만들기"
             disabled={!activeProject}
             accessibilityState={{ disabled: !activeProject }}
             onPress={() => void startVideo()}
@@ -304,7 +328,6 @@ export default function BodyFrameVideoHomeScreen() {
               영상 만들기
             </Text>
           </Pressable>
-        </View>
 
         {recentVideos.length > 0 ? savedVideosSection : null}
 
@@ -476,6 +499,18 @@ const styles = StyleSheet.create({
     width: 74,
     height: 74
   },
+  heroCoverFrame: {
+    width: 98,
+    height: 122
+  },
+  heroCoverImage: {
+    width: "100%",
+    height: "100%"
+  },
+  heroEyebrow: {
+    fontSize: bodyFrameTypography.caption,
+    fontWeight: "600"
+  },
   heroCopy: {
     flex: 1,
     minWidth: 0,
@@ -634,18 +669,23 @@ const styles = StyleSheet.create({
     alignSelf: "center"
   },
   emptyCard: {
-    gap: 6,
+    gap: 8,
+    minHeight: 172,
     padding: 16,
+    alignItems: "center",
+    justifyContent: "center",
     borderWidth: bodyFrameDesign.borderWidth,
     borderRadius: bodyFrameDesign.cardRadius
   },
   emptyTitle: {
     fontSize: bodyFrameTypography.rowTitle,
-    fontWeight: "600"
+    fontWeight: "600",
+    textAlign: "center"
   },
   emptyDetail: {
     fontSize: bodyFrameTypography.caption,
-    lineHeight: 18
+    lineHeight: 19,
+    textAlign: "center"
   },
   message: {
     fontSize: bodyFrameTypography.caption,

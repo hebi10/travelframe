@@ -248,7 +248,7 @@ export default function BodyFrameVideoLibraryScreen() {
               저장한 영상이 없습니다.
             </Text>
             <Text style={[styles.emptyDetail, { color: palette.muted }]}>
-              영상 화면에서 프로젝트를 선택해 첫 변화 영상을 만들어 보세요.
+              프로젝트 사진으로 첫 변화 영상을 만들면 이곳에서 확인할 수 있습니다.
             </Text>
             <Pressable
               accessibilityRole="button"
@@ -312,7 +312,8 @@ const styles = StyleSheet.create({
     minHeight: bodyFrameDesign.minTouchSize,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between"
+    justifyContent: "space-between",
+    gap: 8
   },
   summaryLabel: {
     fontSize: bodyFrameTypography.caption,
@@ -374,7 +375,7 @@ const styles = StyleSheet.create({
     gap: 5
   },
   videoTitle: {
-    fontSize: bodyFrameTypography.rowTitle,
+    fontSize: bodyFrameTypography.sectionTitle,
     fontWeight: "600"
   },
   videoMeta: {
