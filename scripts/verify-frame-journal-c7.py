@@ -19,7 +19,7 @@ PROFILES = ("phone-360dp", "phone-412dp", "tablet-600dp", "tablet-750dp")
 VARIANTS = ("dark-100", "light-100", "dark-130", "light-130", "dark-150", "light-150")
 PRIMARY = (
     "camera", "records", "project", "compare", "measurements",
-    "video-home", "video-create", "settings", "account"
+    "video-home", "video-create", "settings", "account", "plans"
 )
 FULL_EXTRA = (
     "camera-project-picker", "camera-new-project", "camera-settings", "camera-settings-storage",
