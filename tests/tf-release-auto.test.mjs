@@ -53,3 +53,12 @@ test("TF release dispatches existing manual publishers without changing original
   assert.doesNotMatch(workflow, /id-token:\s*write/);
   assert.doesNotMatch(workflow, /androidpublisher\.googleapis\.com/);
 });
+
+test("TF GitHub Actions expressions use valid balanced interpolation", () => {
+  const starts = workflow.match(/\$\{\{/g) ?? [];
+  const ends = workflow.match(/\}\}/g) ?? [];
+  assert.ok(starts.length >= 8, "Expected workflow expressions");
+  assert.equal(starts.length, ends.length, "Unmatched GitHub expression delimiters");
+  assert.doesNotMatch(workflow, /\$\{\{[^\n]*\]\]/, "Invalid leftover placeholder delimiter");
+  assert.doesNotMatch(workflow, /\]\]/, "Generated placeholder must not remain");
+});
