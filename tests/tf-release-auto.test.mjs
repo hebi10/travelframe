@@ -62,3 +62,31 @@ test("TF GitHub Actions expressions use valid balanced interpolation", () => {
   assert.doesNotMatch(workflow, /\$\{\{[^\n]*\]\]/, "Invalid leftover placeholder delimiter");
   assert.doesNotMatch(workflow, /\]\]/, "Generated placeholder must not remain");
 });
+
+test("TF release PR runs full Android 24-environment and native MP4 evidence", () => {
+  const getJob = (name) => {
+    const token = "\n  " + name + ":\n";
+    const start = native.indexOf(token);
+    assert.ok(start !== -1, "Missing Android job: " + name);
+    return native.slice(start + token.length).split(/\n  [a-z0-9-]+:\n/)[0];
+  };
+  const mandatoryJobs = [
+    "stage13-design-captures", "ui-r05-visual-verify", "ui-r05-native-video",
+    "ui-r05-native-verify"
+  ];
+  for (const name of mandatoryJobs) {
+    const job = getJob(name);
+    const condition = job.split("\n").find((line) => line.trim().startsWith("if:"));
+    assert.ok(condition?.includes("ops/tf-release-auto-01-"),
+      "Release PR must execute evidence job " + name);
+  }
+  const stage13 = getJob("stage13-design-captures");
+  for (const profile of ["phone-360dp", "phone-412dp", "tablet-600dp", "tablet-750dp"]) {
+    assert.ok(stage13.includes(profile), "Missing Android profile " + profile);
+  }
+  const verify = getJob("ui-r05-native-verify");
+  assert.match(verify, /inputs\.release_qa == true/,
+    "Exact-main release_qa must independently verify native MP4 evidence");
+  assert.match(verify, /ui-r05-native-video/,
+    "Independent MP4 audit must depend on native video generation");
+});
