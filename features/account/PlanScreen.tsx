@@ -1,4 +1,4 @@
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { Pressable, StyleSheet, View } from "react-native";
 
 import { AppText as Text } from "@/components/app-text";
@@ -26,8 +26,22 @@ const describePlan = (tier: "pro" | "plus" | "expert") => {
   ];
 };
 
+const entryMessages: Record<string, string> = {
+  camera: "현재 사진 기록 한도보다 더 많이 촬영하려면 Pro 이상 플랜을 확인하세요.",
+  records: "프로젝트를 추가하거나 더 많은 사진을 기록하려면 유료 플랜의 혜택을 비교하세요.",
+  project: "프로젝트별 사진을 최대 365장까지 기록할 수 있는 플랜을 확인하세요.",
+  video: "워터마크 없는 영상과 고급 출력 옵션은 Pro 이상에서 지원합니다.",
+  backup: "클라우드 백업은 Pro 1개, Plus 3개, Expert 5개 프로젝트를 지원합니다.",
+  settings: "현재 플랜의 혜택과 Google Play 구독 관리 기능을 확인하세요."
+};
+
 export default function PlanScreen() {
   const { palette } = useAppAppearance();
+  const { source, plan } = useLocalSearchParams<{ source?: string; plan?: string }>();
+  const contextMessage = typeof source === "string" ? entryMessages[source] : undefined;
+  const suggestedPlan = typeof plan === "string" && ["pro", "plus", "expert"].includes(plan)
+    ? plan
+    : null;
   const { isLoggedIn, isAuthLoading, subscription, subscriptionStatus } = useAuth();
   const isUnverified = isAuthLoading || (isLoggedIn && subscriptionStatus !== "verified");
   const currentTier = isUnverified ? null : getPlanTier({ isLoggedIn, subscription });
@@ -39,9 +53,14 @@ export default function PlanScreen() {
     <ScreenShell
       eyebrow="멤버십"
       title="플랜"
-      description="기록을 더 오래 보관하고 변화 영상을 더 자유롭게 만드세요."
+      description={contextMessage ?? "기록을 더 오래 보관하고 변화 영상을 더 자유롭게 만드세요."}
       safeTop
     >
+      {contextMessage ? (
+        <SectionBlock title="필요한 유료 혜택">
+          <Text style={[styles.description, { color: palette.text }]}>{contextMessage}</Text>
+        </SectionBlock>
+      ) : null}
       <SectionBlock title="내 멤버십">
         <View style={[styles.panel, { borderColor: palette.line, backgroundColor: palette.surface }]}>
           <Text style={[styles.status, { color: palette.text }]}>{currentLabel}</Text>
@@ -75,7 +94,9 @@ export default function PlanScreen() {
               style={[styles.panel, { borderColor: palette.line, backgroundColor: palette.surface }]}
             >
               <View style={styles.planHeading}>
-                <Text style={[styles.planTitle, { color: palette.text }]}>{plan.title}</Text>
+                <Text style={[styles.planTitle, { color: palette.text }]}>
+                  {plan.title}{suggestedPlan === tier ? " · 현재 기능 추천" : ""}
+                </Text>
                 <Text style={[styles.price, { color: palette.text }]}>
                   월 {plan.price}
                 </Text>

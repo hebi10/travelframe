@@ -1,3 +1,4 @@
+import { openPlans } from "@/lib/plan-navigation";
 import { AppText as Text, AppTextInput as TextInput } from "@/components/app-text";
 import {
   Feather } from "@expo/vector-icons";
@@ -1856,7 +1857,7 @@ export default function BodyFrameProjectDetailScreen() {
                 <Pressable
                   accessibilityRole="button"
                   style={[styles.upgradeButton, { borderColor: palette.line }]}
-                  onPress={() => router.push("/account")}
+                  onPress={() => openPlans("project", upgradePlanLabel)}
                 >
                   <Text style={[styles.upgradeButtonText, { color: palette.text }]}>
                     플랜 보기 · {upgradePlanLabel}

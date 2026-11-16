@@ -1,3 +1,4 @@
+import { openPlans } from "@/lib/plan-navigation";
 import { AppText as Text } from "@/components/app-text";
 import { Feather } from "@expo/vector-icons";
 import {
@@ -260,7 +261,7 @@ export default function BodyFrameRecordsScreen() {
               upgradePlanLabel={upgradePlanLabel}
               onSelectProject={() => undefined}
               onCreateProject={handleCreateProject}
-              onUpgrade={() => router.push("/account")}
+              onUpgrade={() => openPlans("records", upgradePlanLabel)}
             />
             <Pressable
               accessibilityRole="button"
