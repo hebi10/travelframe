@@ -48,7 +48,7 @@ test("UI-R05 exposes video ratio and options while preserving native recording a
   for (const key of [
     "TripClipRecordingCanvas",
     "getBodyFrameVideoPreviewTransform(previewWidth, frameAspectRatio, RECORDING_VIEW_WIDTH)",
-    "windowHeight * 0.30 * frameAspectRatio",
+    "windowHeight * 0.34 * frameAspectRatio",
     "styles.previewFrame",
     "styles.previewHeader",
     "styles.settingsHeading",
