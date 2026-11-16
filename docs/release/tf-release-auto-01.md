@@ -1,29 +1,29 @@
-# TF-RELEASE-AUTO-01 — TravelFrame 단일 승인형 테스트 배포
+# TF-RELEASE-AUTO-01 — TravelFrame 테스트 배포
 
 ## 목적
 
-GitHub Actions **수동 실행 1회**로 기존 서명키·Google Play API 경로를 재사용하여
-정확한 main Android 검증 → 서명 AAB 빌드 → 내부 테스트 게시/readback → 동일 AAB 비공개 테스트 승격/readback을 순차 처리한다.
-
-**중요:** 일반 main push, PR 병합, 태그, GitHub 이슈/댓글에 반응하지 않는다.
-별도의 internal 및 closed 승인 두 개를 입력한 `workflow_dispatch`에서만 실제 Play를 변경한다.
-이 PR을 병합하는 것 자체는 Google Play 배포 승인이 아니다.
+GitHub Actions에서 서명 빌드, 내부 테스트 게시, 비공개 테스트 승격을 각각 수동으로 요청할 수 있다.
+전체 배포를 승인한 경우 한 번의 실행으로 Android 검증부터 비공개 테스트 승격까지 처리할 수 있다.
+게시 및 승격은 해당 단계의 명시적 승인이 포함된 `workflow_dispatch`에서만 실행한다.
 
 ## GitHub Actions 실행
 
 [TF-RELEASE-AUTO-01](https://github.com/hebi10/travelframe/actions/workflows/tf-release-auto-01.yml)
 → Run workflow, branch **main**.
 
-| 입력 | 값 |
-|---|---|
-| mode | 사전 검증은 `check`, 전체 배포는 `deploy` |
-| expected_main_sha | 검증을 마친 최신 `main` 40자리 SHA |
-| batch_id | `YYYY-MM-DD-travelframe` |
-| internal_approved | 실제 internal 게시 승인 시 `true` |
-| closed_approved | 동일 versionCode 비공개 승격까지 승인 시 `true` |
+모든 모드에 검증할 최신 `main`의 40자리 `expected_main_sha`와 한국시간 기준 `YYYY-MM-DD-travelframe` 형식의 `batch_id`를 입력한다.
 
-`check`는 AAB 빌드·Google Play 변경 없이 SHA, 저장소, 테스트 트랙 및 승인 형식을 검증한다.
-`deploy`는 위 두 승인이 모두 `true`일 때만 실행한다.
+| `mode` | 실행 범위 | 추가 입력 |
+|---|---|---|
+| `check` | SHA와 배포 입력 확인 | 없음 |
+| `build` | Android QA와 서명 AAB 생성 | `build_approved=true` |
+| `internal` | 서명 AAB 검증, 내부 테스트 게시, Play API 반영 확인 | `build_run_id`, `internal_approved=true` |
+| `closed` | 내부 테스트의 완료 버전 검증, 비공개 승격, Play API 반영 확인 | `build_run_id`, `closed_approved=true` |
+| `deploy` | Android QA, 서명 AAB 생성, 내부 게시, 비공개 승격 | `internal_approved=true`, `closed_approved=true` |
+
+단계별 실행에서는 `build` 실행 결과 요약의 **Signed AAB build run ID**를 `internal`과 `closed`에 공통으로 사용한다. 이 ID는 서명 AAB를 생성한 하위 실행을 가리킨다. `closed` 실행 전에 해당 버전의 내부 테스트 게시가 Play API에서 `completed`로 확인되어야 한다.
+
+이미 내부 게시가 확인된 `deploy` 실행에서 비공개 승격만 남았다면, 해당 실행 요약에 기록된 `build_run_id`로 `closed`를 실행한다. 동일 SHA와 만료 전 빌드 아티팩트가 필요하다.
 
 ## 하나의 deploy에서 수행하는 순서
 

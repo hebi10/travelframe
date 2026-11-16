@@ -17,9 +17,12 @@ test("TF release requires manual main-only workflow_dispatch and two approvals",
   assert.match(workflow, /github\.ref == 'refs\/heads\/main'/);
   assert.match(workflow, /internal_approved:/);
   assert.match(workflow, /closed_approved:/);
+  assert.match(workflow, /build_approved:/);
+  assert.match(workflow, /build_run_id:/);
+  assert.match(workflow, /options: \[check, build, internal, closed, deploy\]/);
   assert.match(orchestrator, /internal and closed/);
   assert.match(orchestrator, /GITHUB_SHA.*sha/);
-  assert.match(workflow, /inputs\.mode == 'deploy'/);
+  assert.match(workflow, /inputs\.mode != 'check'/);
 });
 
 test("TF release checks exact main and real native capture and MP4 QA", () => {

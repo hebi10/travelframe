@@ -20,18 +20,20 @@ REPOSITORY = "hebi10/travelframe"
 PACKAGE = "com.haebi.photoguide"
 OUTPUT = Path("tf-release-output")
 MAIN_CHECKS = ("Quality", "Secret Scan", "OPS-08 final main source and release policy verification")
+BUILD_WORKFLOW = "android-play-aab.yml"
 NATIVE_JOBS = (
     "build-apk", "capture-devices",
     "stage13-design-captures (phone-360dp)",
     "stage13-design-captures (phone-412dp)",
     "stage13-design-captures (tablet-600dp)",
     "stage13-design-captures (tablet-750dp)",
+    "ui-r05-visual-verify",
     "UI-R05 native MP4 export, cancellation and populated library",
     "UI-R05 independent MP4 hash, H.264/frame and native UI audit",
 )
 WORKFLOWS = (
     "body-frame-device-qa.yml",
-    "android-play-aab.yml",
+    BUILD_WORKFLOW,
     "play-internal-release.yml",
     "play-closed-release.yml",
 )
@@ -64,7 +66,7 @@ def parse_approval(env):
     require(env.get("GITHUB_EVENT_NAME") == "workflow_dispatch",
             "A manually dispatched, explicitly approved release is required")
     mode = env.get("TF_MODE", "")
-    require(mode in ("check", "deploy"), "Invalid release mode")
+    require(mode in ("check", "build", "internal", "closed", "deploy"), "Invalid release mode")
     sha = env.get("TF_EXPECTED_MAIN_SHA", "")
     require(bool(re.fullmatch("[0-9a-f]{40}", sha)), "Exact main SHA is required")
     require(env.get("GITHUB_SHA") == sha, "Selected workflow ref does not match approved SHA")
@@ -73,8 +75,21 @@ def parse_approval(env):
             "Invalid Asia/Seoul batch ID")
     internal = env.get("TF_INTERNAL_APPROVED", "").lower() == "true"
     closed = env.get("TF_CLOSED_APPROVED", "").lower() == "true"
+    if mode == "build":
+        require(env.get("TF_BUILD_APPROVED", "").lower() == "true",
+                "Final QA and signed AAB build require approval")
+    if mode == "internal":
+        require(internal, "Internal upload requires explicit approval")
+    if mode == "closed":
+        require(closed, "Closed promotion requires explicit approval")
     if mode == "deploy":
         require(internal and closed, "Internal upload and closed promotion each require approval")
+    build_run_id = env.get("TF_BUILD_RUN_ID", "")
+    if mode in ("internal", "closed"):
+        require(bool(re.fullmatch("[1-9][0-9]{0,19}", build_run_id)),
+                "A successful signed AAB build run ID is required")
+    else:
+        require(not build_run_id, "This mode does not accept an existing build run ID")
     internal_track = env.get("TF_PLAY_INTERNAL_TRACK", "")
     closed_track = env.get("TF_PLAY_CLOSED_TRACK", "")
     require(internal_track in ("internal", "qa"), "Exact internal track must be configured")
@@ -82,7 +97,8 @@ def parse_approval(env):
             and closed_track not in ("production", "beta", "internal", "qa")
             and closed_track != internal_track, "Invalid or forbidden closed track")
     return dict(mode=mode, source_sha=sha, batch_id=batch, internal_track=internal_track,
-                closed_track=closed_track, internal_approved=internal, closed_approved=closed)
+                closed_track=closed_track, internal_approved=internal, closed_approved=closed,
+                build_run_id=int(build_run_id) if build_run_id else None)
 
 
 def api(method, path, payload=None):
@@ -193,6 +209,17 @@ def require_native_jobs(run_id):
                 "Required Android capture/MP4 QA was skipped or failed: " + required)
 
 
+def verify_existing_build_run(run_id, sha):
+    run = api("GET", f"/repos/{REPOSITORY}/actions/runs/{run_id}")
+    require(run.get("id") == run_id and run.get("head_sha") == sha
+            and run.get("head_branch") == "main" and run.get("event") == "workflow_dispatch"
+            and run.get("status") == "completed" and run.get("conclusion") == "success"
+            and run.get("repository", {}).get("full_name") == REPOSITORY
+            and run.get("path", "").split("@")[0] == ".github/workflows/" + BUILD_WORKFLOW
+            and run.get("display_title", "").startswith("TravelFrame Play build · internal · main · "),
+            "Use a successful signed AAB build-only run from the exact approved main")
+
+
 def require_artifact(run_id, prefix):
     data = api("GET", "/repos/" + REPOSITORY + "/actions/runs/"
                + str(run_id) + "/artifacts?per_page=100")
@@ -224,6 +251,8 @@ def load_build(run_id, sha):
     meta = json.loads(manifest_file.read_text(encoding="utf-8"))
     require(meta.get("repository") == REPOSITORY
             and meta.get("sourceSha") == sha
+            and meta.get("workflowSha") == sha
+            and meta.get("packageId") == PACKAGE
             and str(meta.get("runId")) == str(run_id),
             "AAB was not built from the exact approved main")
     code, version, digest = meta.get("versionCode"), meta.get("versionName"), meta.get("aabSha256")
@@ -265,11 +294,13 @@ def validate_internal_receipt(receipt, build, source_sha, track):
             "Internal Play commit/readback or AAB identity is unconfirmed")
 
 
-def validate_closed_receipt(receipt, build, sha, batch):
+def validate_closed_receipt(receipt, build, plan):
     require(receipt.get("status") in ("committed_and_read_back", "already_completed_no_change")
             and receipt.get("package") == PACKAGE
-            and receipt.get("source_sha") == sha
-            and receipt.get("batch_id") == batch
+            and receipt.get("source_sha") == plan["source_sha"]
+            and receipt.get("batch_id") == plan["batch_id"]
+            and receipt.get("source_track") == plan["internal_track"]
+            and receipt.get("closed_track") == plan["closed_track"]
             and str(receipt.get("version_code")) == str(build["version_code"])
             and receipt.get("aab_sha256") == build["aab_sha256"]
             and receipt.get("binary_uploaded") is False
@@ -290,21 +321,27 @@ def append_summary(result):
     with open(summary, "a", encoding="utf-8") as output:
         output.write("## TravelFrame verified test release\n\n")
         output.write("Status: **" + result.get("status", "unknown") + "**\n\n")
+        if "mode" in result:
+            output.write("Mode: " + result["mode"] + "\n\n")
         output.write("Source SHA: " + result.get("source_sha", "") + "\n\n")
         for kind, run_id in result.get("runs", {}).items():
             output.write("- " + kind + ": https://github.com/" + REPOSITORY
                          + "/actions/runs/" + str(run_id) + "\n")
         if "build" in result:
-            output.write("\nVersionCode: " + str(result["build"]["version_code"])
+            output.write("\nSigned AAB build run ID: " + str(result["runs"]["signed_aab"])
+                         + "\n\nVersionCode: " + str(result["build"]["version_code"])
                          + "\n\nAAB SHA-256: " + result["build"]["aab_sha256"] + "\n")
+        for key, label in (("internal_readback", "Internal track"), ("closed_readback", "Closed track")):
+            if key in result:
+                output.write("\n" + label + ": " + result[key] + "\n")
 
 
 def execute(plan):
     sha = plan["source_sha"]
     batch = plan["batch_id"]
-    request_id = "tf-" + os.environ["GITHUB_RUN_ID"] + "-" + os.environ.get("GITHUB_RUN_ATTEMPT", "1")
+    mode = plan["mode"]
     result = dict(schema="tf-release-auto-v1", status="in_progress",
-                  source_sha=sha, batch_id=batch, runs={})
+                  source_sha=sha, batch_id=batch, mode=mode, runs={})
     save_result(result)
 
     def stage(name, workflow, payload, marker, timeout=7200):
@@ -316,53 +353,60 @@ def execute(plan):
         return run_id
 
     wait_main_checks(sha)
-    native = stage("android_qa", "body-frame-device-qa.yml",
-                   {"release_qa": "true", "release_request_id": request_id},
-                   request_id, timeout=10800)
-    require_native_jobs(native)
-
-    build_run = stage("signed_aab", "android-play-aab.yml",
-                      {"mode": "build", "track": "internal",
-                       "ops01_release_approved": "false", "source_sha": sha,
-                       "release_request_id": request_id}, request_id)
+    build_run = plan["build_run_id"]
+    if build_run is not None:
+        verify_existing_build_run(build_run, sha)
+        result["runs"]["signed_aab"] = build_run
+    else:
+        request_id = "tf-" + os.environ["GITHUB_RUN_ID"] + "-" + os.environ.get("GITHUB_RUN_ATTEMPT", "1")
+        native = stage("android_qa", "body-frame-device-qa.yml",
+                       {"release_qa": "true", "release_request_id": request_id},
+                       request_id, timeout=10800)
+        require_native_jobs(native)
+        build_run = stage("signed_aab", BUILD_WORKFLOW,
+                          {"mode": "build", "track": "internal",
+                           "ops01_release_approved": "false", "source_sha": sha,
+                           "release_request_id": request_id}, request_id)
     build = load_build(build_run, sha)
     result["build"] = build
     save_result(result)
 
-    common = {"expected_main_sha": sha, "build_run_id": str(build_run),
-              "artifact_name": build["artifact_name"], "aab_sha256": build["aab_sha256"],
-              "version_code": str(build["version_code"]),
-              "version_name": build["version_name"], "batch_id": batch}
-    stage("internal_check", "play-internal-release.yml",
-          {**common, "mode": "check", "final_release_approved": "false"},
-          "check build " + str(build_run) + " batch " + batch, timeout=1800)
-    internal_run = stage("internal_publish", "play-internal-release.yml",
-                         {**common, "mode": "publish", "final_release_approved": "true",
-                          "approval_phrase": "PUBLISH_VERIFIED_INTERNAL_AAB"},
-                         "publish build " + str(build_run) + " batch " + batch, timeout=2400)
-    internal_receipt = load_receipt(internal_run, "ops04-travelframe-publish-",
-                                    "play-release.json", "internal")
-    validate_internal_receipt(internal_receipt, build, sha, plan["internal_track"])
-    result["internal_readback"] = "committed-and-read-back"
-    save_result(result)
+    if mode in ("internal", "deploy"):
+        common = {"expected_main_sha": sha, "build_run_id": str(build_run),
+                  "artifact_name": build["artifact_name"], "aab_sha256": build["aab_sha256"],
+                  "version_code": str(build["version_code"]),
+                  "version_name": build["version_name"], "batch_id": batch}
+        stage("internal_check", "play-internal-release.yml",
+              {**common, "mode": "check", "final_release_approved": "false"},
+              "check build " + str(build_run) + " batch " + batch, timeout=1800)
+        internal_run = stage("internal_publish", "play-internal-release.yml",
+                             {**common, "mode": "publish", "final_release_approved": "true",
+                              "approval_phrase": "PUBLISH_VERIFIED_INTERNAL_AAB"},
+                             "publish build " + str(build_run) + " batch " + batch, timeout=2400)
+        internal_receipt = load_receipt(internal_run, "ops04-travelframe-publish-",
+                                        "play-release.json", "internal")
+        validate_internal_receipt(internal_receipt, build, sha, plan["internal_track"])
+        result["internal_readback"] = "committed-and-read-back"
+        save_result(result)
 
-    promotion = {"expected_main_sha": sha, "batch_id": batch,
-                 "version_code": str(build["version_code"]), "aab_sha256": build["aab_sha256"],
-                 "internal_track": plan["internal_track"], "closed_track": plan["closed_track"]}
-    stage("closed_check", "play-closed-release.yml",
-          {**promotion, "mode": "check", "final_batch_approved": "false"},
-          "check versionCode " + str(build["version_code"]) + " batch " + batch,
-          timeout=1800)
-    closed_run = stage("closed_promote", "play-closed-release.yml",
-                       {**promotion, "mode": "promote", "final_batch_approved": "true",
-                        "approval_phrase": "PROMOTE_VERIFIED_INTERNAL_VERSION"},
-                       "promote versionCode " + str(build["version_code"]) + " batch " + batch,
-                       timeout=2400)
-    closed_receipt = load_receipt(closed_run, "ops05-closed-promotion-",
-                                  "receipt.json", "closed")
-    validate_closed_receipt(closed_receipt, build, sha, batch)
-    result["closed_readback"] = closed_receipt["status"]
-    result["status"] = "committed-and-read-back"
+    if mode in ("closed", "deploy"):
+        promotion = {"expected_main_sha": sha, "batch_id": batch,
+                     "version_code": str(build["version_code"]), "aab_sha256": build["aab_sha256"],
+                     "internal_track": plan["internal_track"], "closed_track": plan["closed_track"]}
+        stage("closed_check", "play-closed-release.yml",
+              {**promotion, "mode": "check", "final_batch_approved": "false"},
+              "check versionCode " + str(build["version_code"]) + " batch " + batch,
+              timeout=1800)
+        closed_run = stage("closed_promote", "play-closed-release.yml",
+                           {**promotion, "mode": "promote", "final_batch_approved": "true",
+                            "approval_phrase": "PROMOTE_VERIFIED_INTERNAL_VERSION"},
+                           "promote versionCode " + str(build["version_code"]) + " batch " + batch,
+                           timeout=2400)
+        closed_receipt = load_receipt(closed_run, "ops05-closed-promotion-",
+                                      "receipt.json", "closed")
+        validate_closed_receipt(closed_receipt, build, plan)
+        result["closed_readback"] = closed_receipt["status"]
+    result["status"] = "signed-aab-verified" if mode == "build" else "committed-and-read-back"
     result.pop("phase", None)
     save_result(result)
     append_summary(result)
@@ -380,9 +424,9 @@ def main():
                          "source_sha": plan["source_sha"], "batch_id": plan["batch_id"]})
             print("Exact main, separate approval inputs and configured tracks validated; Play unchanged")
             return 0
-        require(plan["mode"] == "deploy", "Execution requires deploy mode")
+        require(plan["mode"] != "check", "Select a release stage before execution")
         execute(plan)
-        print("Internal and closed testing both committed and read back for one verified AAB")
+        print("Selected release stages verified: " + plan["mode"])
         return 0
     except (ReleaseGateError, ValueError, OSError, KeyError, json.JSONDecodeError) as exc:
         reason = str(exc)
