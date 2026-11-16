@@ -1,4 +1,5 @@
 name: OPS-04 verified AAB internal testing
+run-name: TF OPS-04 ${{ inputs.mode }} build ${{ inputs.build_run_id }} batch ${{ inputs.batch_id }}
 on:
   workflow_dispatch:
     inputs:

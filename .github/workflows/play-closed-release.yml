@@ -1,5 +1,5 @@
 name: OPS-05 existing internal version to closed test
-run-name: OPS-05 ${{ inputs.mode }} versionCode ${{ inputs.version_code }}
+run-name: TF OPS-05 ${{ inputs.mode }} versionCode ${{ inputs.version_code }} batch ${{ inputs.batch_id }}
 on:
   workflow_dispatch:
     inputs:

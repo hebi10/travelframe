@@ -1,0 +1,78 @@
+name: TF-RELEASE-AUTO-01 verified test release
+run-name: TF verified ${{ inputs.mode ]] · ${{ inputs.batch_id ]] · ${{ github.ref_name ]]
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'check validates approval/source only; deploy runs all verified stages'
+        type: choice
+        options: [check, deploy]
+        default: check
+        required: true
+      expected_main_sha:
+        description: 'Exact 40-character latest main SHA'
+        type: string
+        required: true
+      batch_id:
+        description: 'Approved KST batch ID (YYYY-MM-DD-travelframe)'
+        type: string
+        required: true
+      internal_approved:
+        description: 'Separate explicit approval: publish signed AAB to internal testing'
+        type: boolean
+        default: false
+        required: true
+      closed_approved:
+        description: 'Separate explicit approval: promote the SAME completed internal AAB to existing closed testing'
+        type: boolean
+        default: false
+        required: true
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: tf-release-auto-01-travelframe
+  cancel-in-progress: false
+
+jobs:
+  verified-release:
+    if: github.repository == 'hebi10/travelframe' && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    name: Immutable source QA, AAB, internal, closed
+    runs-on: ubuntu-24.04
+    timeout-minutes: 300
+    env:
+      GH_TOKEN: ${{ github.token ]]
+      TF_MODE: ${{ inputs.mode ]]
+      TF_EXPECTED_MAIN_SHA: ${{ inputs.expected_main_sha ]]
+      TF_BATCH_ID: ${{ inputs.batch_id ]]
+      TF_INTERNAL_APPROVED: ${{ inputs.internal_approved ]]
+      TF_CLOSED_APPROVED: ${{ inputs.closed_approved ]]
+      TF_PLAY_INTERNAL_TRACK: ${{ vars.PLAY_INTERNAL_TRACK ]]
+      TF_PLAY_CLOSED_TRACK: ${{ vars.PLAY_CLOSED_TRACK || 'alpha' ]]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha ]]
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate orchestrator offline fail-closed tests
+        run: python3 -m unittest discover -s scripts/release -p 'test_tf_release_auto*.py' -v
+      - name: Verify main source, selected tracks and separate explicit approvals
+        run: python3 scripts/release/tf_release_orchestrator.py check
+      - name: Execute exact-main native QA, signed AAB, internal, closed and readbacks
+        if: inputs.mode == 'deploy'
+        run: python3 scripts/release/tf_release_orchestrator.py deploy
+      - name: Preserve sanitized verification and Play receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tf-release-auto-result-${{ github.run_id ]]
+          path: tf-release-output/result.json
+          if-no-files-found: ignore
+          retention-days: 30
