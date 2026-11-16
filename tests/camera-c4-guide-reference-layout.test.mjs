@@ -69,7 +69,7 @@ test("C4 guide size, position, grid and visibility callbacks stay connected", ()
 test("C4 reference overlay keeps opacity, scale, reset, confirm and non-destructive hiding", () => {
   for (const token of [
     "styles.overlaySetupPanel", "styles.overlaySetupHeaderCopy",
-    "사진 가이드", "원본 사진은 유지됩니다.",
+    "기준 사진 조정", "원본 사진은 변경되지 않습니다.",
     "OVERLAY_OPACITY_MIN", "OVERLAY_OPACITY_MAX",
     "applyOverlayOpacityPercent", "commitOverlayOpacityPercent",
     "referenceOverlayRef.current?.scaleBy(-0.1)",
