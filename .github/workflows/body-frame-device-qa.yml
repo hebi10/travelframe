@@ -1,4 +1,5 @@
 name: Body Frame native device QA
+run-name: Body Frame native QA · ${{ inputs.release_request_id || github.ref_name }}
 
 on:
   pull_request:
@@ -27,6 +28,17 @@ on:
       - '!scripts/android-qa-apk-selection.json'
       - '.github/workflows/body-frame-device-qa.yml'
   workflow_dispatch:
+    inputs:
+      release_qa:
+        description: 'Full MP4 output/cancellation and SHA verification for the exact-main release'
+        type: boolean
+        default: false
+        required: false
+      release_request_id:
+        description: 'Optional nonsecret correlation marker'
+        type: string
+        default: ''
+        required: false
 
 permissions:
   contents: read
@@ -157,7 +169,7 @@ jobs:
 
   stage13-design-captures:
     needs: build-apk
-    if: github.event_name == 'workflow_dispatch' || startsWith(github.head_ref, 'feat/body-frame-design-stage13-') || startsWith(github.head_ref, 'feat/body-frame-design-stage14-') || startsWith(github.head_ref, 'ui/ui-r03-') || startsWith(github.head_ref, 'ui/ui-r04-') || startsWith(github.head_ref, 'ui/ui-r05-') || startsWith(github.head_ref, 'ui/ui-r06-') || startsWith(github.head_ref, 'ui/ui-r07-') || startsWith(github.head_ref, 'feat/body-frame-design-stageA-') || startsWith(github.head_ref, 'feat/body-frame-design-stageB-') || startsWith(github.head_ref, 'feat/body-frame-design-stageC-') || startsWith(github.head_ref, 'feat/body-frame-design-stageD-') || startsWith(github.head_ref, 'feat/r3-frame-journal-') || startsWith(github.head_ref, 'fix/body-frame-stage13-')
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.head_ref, 'feat/body-frame-design-stage13-') || startsWith(github.head_ref, 'feat/body-frame-design-stage14-') || startsWith(github.head_ref, 'ui/ui-r03-') || startsWith(github.head_ref, 'ui/ui-r04-') || startsWith(github.head_ref, 'ui/ui-r05-') || startsWith(github.head_ref, 'ui/ui-r06-') || startsWith(github.head_ref, 'ui/ui-r07-') || startsWith(github.head_ref, 'feat/body-frame-design-stageA-') || startsWith(github.head_ref, 'feat/body-frame-design-stageB-') || startsWith(github.head_ref, 'feat/body-frame-design-stageC-') || startsWith(github.head_ref, 'feat/body-frame-design-stageD-') || startsWith(github.head_ref, 'feat/r3-frame-journal-') || startsWith(github.head_ref, 'fix/body-frame-stage13-') || startsWith(github.head_ref, 'ops/tf-release-auto-01-')
     runs-on: ubuntu-latest
     timeout-minutes: 65
     strategy:
@@ -322,7 +334,7 @@ jobs:
 
   ui-r05-visual-verify:
     needs: stage13-design-captures
-    if: ${{ always() && github.event_name == 'pull_request' && startsWith(github.head_ref, 'ui/ui-r05-') }}
+    if: ${{ always() && ((github.event_name == 'pull_request' && (startsWith(github.head_ref, 'ui/ui-r05-') || startsWith(github.head_ref, 'ops/tf-release-auto-01-'))) || (github.event_name == 'workflow_dispatch' && inputs.release_qa == true)) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -359,7 +371,7 @@ jobs:
   ui-r05-native-video:
     name: UI-R05 native MP4 export, cancellation and populated library
     needs: build-apk
-    if: ${{ github.event_name == 'pull_request' && startsWith(github.head_ref, 'ui/ui-r05-') }}
+    if: ${{ (github.event_name == 'pull_request' && (startsWith(github.head_ref, 'ui/ui-r05-') || startsWith(github.head_ref, 'ops/tf-release-auto-01-'))) || (github.event_name == 'workflow_dispatch' && inputs.release_qa == true) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 85
     steps:
@@ -407,7 +419,7 @@ jobs:
   ui-r05-native-verify:
     name: UI-R05 independent MP4 hash, H.264/frame and native UI audit
     needs: [build-apk, ui-r05-native-video]
-    if: ${{ always() && github.event_name == 'pull_request' && startsWith(github.head_ref, 'ui/ui-r05-') }}
+    if: ${{ always() && ((github.event_name == 'pull_request' && (startsWith(github.head_ref, 'ui/ui-r05-') || startsWith(github.head_ref, 'ops/tf-release-auto-01-'))) || (github.event_name == 'workflow_dispatch' && inputs.release_qa == true)) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
