@@ -83,7 +83,7 @@ class Stage13CaptureTest(unittest.TestCase):
         )
         stage13.open_camera_reference_setup(device)
         device.open_control.assert_called_once_with(
-            "기준 사진 투명도 42퍼센트", ["사진 가이드", "확인"]
+            "기준 사진 투명도 42퍼센트", ["기준 사진 조정", "확인"]
         )
         self.assertIn("camera-reference-adjust", [item[0] for item in stage13.CASES])
 

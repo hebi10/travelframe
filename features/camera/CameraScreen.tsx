@@ -2596,7 +2596,7 @@ export default function CameraScreen({
         <View style={styles.cameraUnavailableScreen}>
           <ActivityIndicator color={bodyFrameDarkColors.text} />
           <Text selectable style={styles.cameraUnavailableText}>
-            사용할 수 있는 카메라를 찾는 중입니다.
+            카메라를 준비하는 중입니다. 화면이 보이지 않으면 카메라 연결 상태를 확인해 주세요.
           </Text>
         </View>
       )}
@@ -3618,9 +3618,16 @@ export default function CameraScreen({
               >
                 <View style={styles.overlaySetupHeader}>
                   <View style={styles.overlaySetupHeaderCopy}>
-                    <Text selectable={false} style={styles.overlaySetupTitle}>사진 가이드</Text>
+                    <Text selectable={false} style={styles.overlaySetupTitle}>기준 사진 조정</Text>
                     <Text selectable={false} style={styles.overlaySetupHint}>
-                      드래그로 이동하고 두 손가락으로 크기를 맞춥니다. 원본 사진은 유지됩니다.
+                      사진을 끌어 위치를 맞추고 두 손가락으로 크기를 조절하세요. 원본 사진은 변경되지 않습니다.
+                    </Text>
+                    <Text selectable={false} style={styles.overlaySetupModeNote}>
+                      {referenceUri
+                        ? "직접 선택한 기준 사진"
+                        : bodyFrameCameraSession.projectId
+                          ? `현재 기준: ${projectReferenceMode === "first" ? "첫 사진" : "최근 사진"}`
+                          : "선택한 기준 사진을 겹쳐 표시합니다."}
                     </Text>
                   </View>
                   <Text selectable={false} style={styles.overlaySetupValue}>
@@ -3639,13 +3646,13 @@ export default function CameraScreen({
                   />
                 </View>
                 <View style={styles.overlaySetupActions}>
-                  <Pressable accessibilityRole="button" style={styles.overlayCompactButton} onPress={() => referenceOverlayRef.current?.scaleBy(-0.1)}>
+                  <Pressable accessibilityRole="button" accessibilityLabel="기준 사진 크기 줄이기" style={styles.overlayCompactButton} onPress={() => referenceOverlayRef.current?.scaleBy(-0.1)}>
                     <Text selectable={false} style={styles.overlayCompactText}>작게</Text>
                   </Pressable>
-                  <Pressable accessibilityRole="button" style={styles.overlayCompactButton} onPress={() => referenceOverlayRef.current?.scaleBy(0.1)}>
+                  <Pressable accessibilityRole="button" accessibilityLabel="기준 사진 크기 키우기" style={styles.overlayCompactButton} onPress={() => referenceOverlayRef.current?.scaleBy(0.1)}>
                     <Text selectable={false} style={styles.overlayCompactText}>크게</Text>
                   </Pressable>
-                  <Pressable accessibilityRole="button" style={styles.overlayCompactButton} onPress={resetOverlay}>
+                  <Pressable accessibilityRole="button" accessibilityLabel="기준 사진 위치·크기 초기화" style={styles.overlayCompactButton} onPress={resetOverlay}>
                     <Text selectable={false} style={styles.overlayCompactText}>초기화</Text>
                   </Pressable>
                   <Pressable accessibilityRole="button" accessibilityLabel="기준 사진 위치 및 투명도 설정 완료" style={styles.overlayConfirmButton} onPress={confirmOverlaySetup}>
@@ -3666,14 +3673,14 @@ export default function CameraScreen({
                   {onProjectReferenceModeChange && bodyFrameCameraSession.projectId ? (
                     <Pressable
                       accessibilityRole="button"
-                      accessibilityLabel={projectReferenceMode === "first" ? "선택 프로젝트의 마지막 사진을 가이드로 사용" : "선택 프로젝트의 첫 사진을 가이드로 사용"}
+                      accessibilityLabel={projectReferenceMode === "first" ? "프로젝트 최근 사진을 기준으로 변경" : "프로젝트 첫 사진을 기준으로 변경"}
                       accessibilityState={{ disabled: isReferenceModeChanging || bodyFrameCameraSession.projectPhotoCount === 0, busy: isReferenceModeChanging }}
                       disabled={isReferenceModeChanging || bodyFrameCameraSession.projectPhotoCount === 0}
                       style={[styles.overlayCompactButton, (isReferenceModeChanging || bodyFrameCameraSession.projectPhotoCount === 0) && { opacity: 0.45 }]}
                       onPress={() => void toggleProjectReference()}
                     >
                       <Text selectable={false} numberOfLines={2} style={styles.overlayCompactText}>
-                        {isReferenceModeChanging ? "변경중" : projectReferenceMode === "first" ? "프로젝트 마지막 사진" : "프로젝트 첫번째 사진"}
+                        {isReferenceModeChanging ? "변경 중" : projectReferenceMode === "first" ? "최근 사진으로 변경" : "첫 사진으로 변경"}
                       </Text>
                     </Pressable>
                   ) : null}
