@@ -62,8 +62,58 @@ class AuthorizationTests(unittest.TestCase):
                                               TF_CLOSED_APPROVED="false"))
         self.assertEqual(result["mode"], "check")
 
+    def test_each_release_mode_has_its_own_approval(self):
+        cases = (
+            ("build", "TF_BUILD_APPROVED", {}),
+            ("internal", "TF_INTERNAL_APPROVED", {"TF_BUILD_RUN_ID": "42"}),
+            ("closed", "TF_CLOSED_APPROVED", {"TF_BUILD_RUN_ID": "42"}),
+        )
+        for mode, approval, inputs in cases:
+            with self.subTest(mode=mode):
+                env = authorized(TF_MODE=mode, TF_BUILD_APPROVED="false",
+                                 TF_INTERNAL_APPROVED="false", TF_CLOSED_APPROVED="false",
+                                 **inputs)
+                with self.assertRaises(tf.ReleaseGateError):
+                    tf.parse_approval(env)
+                self.assertEqual(tf.parse_approval({**env, approval: "true"})["mode"], mode)
+
+    def test_publish_only_modes_require_an_existing_build_run(self):
+        for mode in ("internal", "closed"):
+            for run in ("", "0", "../42"):
+                with self.subTest(mode=mode, run=run), self.assertRaises(tf.ReleaseGateError):
+                    tf.parse_approval(authorized(TF_MODE=mode, TF_BUILD_RUN_ID=run))
+
 
 class GateTests(unittest.TestCase):
+    def test_existing_build_run_must_be_a_successful_build_only_run_from_exact_main(self):
+        run = {"id": 42, "head_sha": "a" * 40, "head_branch": "main", "event": "workflow_dispatch",
+               "status": "completed", "conclusion": "success", "repository": {"full_name": tf.REPOSITORY},
+               "path": ".github/workflows/android-play-aab.yml",
+               "display_title": "TravelFrame Play build · internal · main · manual"}
+        with patch.object(tf, "api", return_value=run):
+            self.assertEqual(tf.verify_existing_build_run(42, "a" * 40), "manual")
+        for mismatch in ({"head_sha": "b" * 40}, {"path": ".github/workflows/quality.yml"},
+                         {"display_title": "TravelFrame Play deploy · internal · main · manual"},
+                         {"conclusion": "failure"}):
+            with self.subTest(mismatch=mismatch), patch.object(tf, "api", return_value={**run, **mismatch}):
+                with self.assertRaises(tf.ReleaseGateError):
+                    tf.verify_existing_build_run(42, "a" * 40)
+
+    def test_native_evidence_must_match_request_and_main_and_have_succeeded(self):
+        sha = "a" * 40
+        run = {"id": 33, "head_sha": sha, "head_branch": "main", "event": "workflow_dispatch",
+               "status": "completed", "conclusion": "success",
+               "display_title": "Body Frame native QA · tf-25-1"}
+        with patch.object(tf, "workflow_runs", return_value=[run]) as runs:
+            self.assertEqual(tf.find_paired_native_qa("tf-25-1", sha), 33)
+            self.assertIsNone(tf.find_paired_native_qa("tf-25-10", sha))
+            self.assertIsNone(tf.find_paired_native_qa("manual", sha))
+            self.assertEqual(runs.call_count, 2)
+        with patch.object(tf, "workflow_runs", return_value=[{**run, "head_sha": "b" * 40}]):
+            self.assertIsNone(tf.find_paired_native_qa("tf-25-1", sha))
+        with patch.object(tf, "workflow_runs", return_value=[{**run, "conclusion": "failure"}]), \
+                self.assertRaises(tf.ReleaseGateError):
+            tf.find_paired_native_qa("tf-25-1", sha)
     def test_native_all_required_jobs_must_succeed(self):
         jobs = [{"name": name, "conclusion": "success"} for name in tf.NATIVE_JOBS]
         with patch.object(tf, "api", return_value={"total_count": len(jobs), "jobs": jobs}):
@@ -80,11 +130,13 @@ class GateTests(unittest.TestCase):
             "batch_id": "2026-11-16-travelframe",
             "version_code": 26092623, "aab_sha256": "f" * 64,
             "binary_uploaded": False, "aab_rebuilt": False,
+            "source_track": "internal", "closed_track": "alpha",
         }
-        tf.validate_closed_receipt(receipt, build, "a" * 40, "2026-11-16-travelframe")
-        receipt["version_code"] += 1
-        with self.assertRaises(tf.ReleaseGateError):
-            tf.validate_closed_receipt(receipt, build, "a" * 40, "2026-11-16-travelframe")
+        plan = tf.parse_approval(authorized())
+        tf.validate_closed_receipt(receipt, build, plan)
+        for mismatch in ({"version_code": 26092624}, {"closed_track": "beta"}):
+            with self.subTest(mismatch=mismatch), self.assertRaises(tf.ReleaseGateError):
+                tf.validate_closed_receipt({**receipt, **mismatch}, build, plan)
 
     def test_internal_readback_requires_exact_aab(self):
         build = {"version_code": 26092623, "aab_sha256": "f" * 64}
@@ -98,6 +150,57 @@ class GateTests(unittest.TestCase):
         receipt["status"] = "committed-readback-unverified"
         with self.assertRaises(tf.ReleaseGateError):
             tf.validate_internal_receipt(receipt, build, "a" * 40, "internal")
+
+
+class StageSelectionTests(unittest.TestCase):
+    def test_only_requested_stages_are_dispatched(self):
+        build = {"artifact_name": "body-frame-play-43-42-1", "version_code": 43,
+                 "version_name": "1.0.0", "aab_sha256": "f" * 64}
+        build_workflows = ["body-frame-device-qa.yml", "android-play-aab.yml"]
+        internal_workflows = ["play-internal-release.yml"] * 2
+        closed_workflows = ["play-closed-release.yml"] * 2
+        cases = {
+            "build": (build_workflows, "signed-aab-verified"),
+            "internal": (internal_workflows, "committed-and-read-back"),
+            "closed": (closed_workflows, "committed-and-read-back"),
+            "deploy": (build_workflows + internal_workflows + closed_workflows, "committed-and-read-back"),
+        }
+        for mode, (workflows, status) in cases.items():
+            with (self.subTest(mode=mode), patch.dict(os.environ, {"GITHUB_RUN_ID": "25"}),
+                  patch.object(tf, "wait_main_checks"),
+                  patch.object(tf, "verify_existing_build_run", return_value="tf-25-1") as reuse,
+                  patch.object(tf, "find_paired_native_qa", return_value=33),
+                  patch.object(tf, "require_native_jobs") as native_jobs,
+                  patch.object(tf, "load_build", return_value=build),
+                  patch.object(tf, "dispatch_and_wait", side_effect=range(100, 106)) as dispatch,
+                  patch.object(tf, "load_receipt", return_value={"status": "committed_and_read_back"}),
+                  patch.object(tf, "validate_internal_receipt"), patch.object(tf, "validate_closed_receipt"),
+                  patch.object(tf, "save_result"), patch.object(tf, "append_summary") as summary):
+                run = "42" if mode in ("internal", "closed") else ""
+                plan = tf.parse_approval(authorized(TF_MODE=mode, TF_BUILD_APPROVED="true",
+                                                    TF_BUILD_RUN_ID=run))
+                tf.execute(plan)
+                self.assertEqual([c.args[0] for c in dispatch.call_args_list], workflows)
+                self.assertEqual(summary.call_args.args[0]["status"], status)
+                if run:
+                    reuse.assert_called_once_with(42, plan["source_sha"])
+                else:
+                    reuse.assert_not_called()
+                if mode == "internal":
+                    native_jobs.assert_called_once_with(33)
+                    self.assertEqual(summary.call_args.args[0]["runs"]["android_qa"], 33)
+
+    def test_internal_fallback_native_qa_failure_prevents_publish(self):
+        plan = tf.parse_approval(authorized(TF_MODE="internal", TF_BUILD_RUN_ID="42"))
+        with (patch.dict(os.environ, {"GITHUB_RUN_ID": "25"}),
+              patch.object(tf, "wait_main_checks"), patch.object(tf, "save_result"),
+              patch.object(tf, "verify_existing_build_run", return_value="manual"),
+              patch.object(tf, "find_paired_native_qa", return_value=None),
+              patch.object(tf, "dispatch_and_wait", return_value=33) as dispatch,
+              patch.object(tf, "require_native_jobs", side_effect=tf.ReleaseGateError("native QA failed")),
+              self.assertRaisesRegex(tf.ReleaseGateError, "native QA failed")):
+            tf.execute(plan)
+        self.assertEqual([call.args[0] for call in dispatch.call_args_list], ["body-frame-device-qa.yml"])
 
 
 if __name__ == "__main__":
