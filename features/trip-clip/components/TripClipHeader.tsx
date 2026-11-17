@@ -59,6 +59,7 @@ export function TripClipHeader({
               (isLoading || isExporting) && styles.disabledButton
             ]}
             onPress={handleHeaderSavePress}
+            accessibilityLabel={isEditingMadeVideo ? "편집한 영상 저장" : "영상 작업 임시 저장"}
           >
             <Text selectable={false} style={styles.draftSaveButtonText}>
               {isEditingMadeVideo ? "저장" : "임시 저장"}
@@ -66,13 +67,15 @@ export function TripClipHeader({
           </Pressable>
         </View>
         <Text selectable style={styles.eyebrow}>
-          영상 만들기
+          {isEditingMadeVideo ? "영상 재편집" : "영상 만들기"}
         </Text>
         <Text selectable style={styles.title}>
-          동영상
+          {isEditingMadeVideo ? "저장한 영상 편집" : "동영상"}
         </Text>
         <Text selectable style={styles.description}>
-          사진을 고르고 순서를 정한 뒤 템플릿과 음악을 적용해 앱 안에서 영상처럼 재생합니다.
+          {isEditingMadeVideo
+            ? "저장한 영상의 사진과 편집 설정을 확인하고 수정할 수 있습니다."
+            : "사진을 고르고 순서를 정한 뒤 템플릿과 음악을 적용해 앱 안에서 영상처럼 재생합니다."}
         </Text>
         {availableDraft && showDraftPrompt ? (
           <View style={styles.draftPanel}>
@@ -108,6 +111,7 @@ export function TripClipHeader({
             placeholderTextColor={colors.faint}
             style={styles.workTitleInput}
             onChangeText={setWorkTitle}
+            accessibilityLabel="영상 작업 이름"
           />
         </View>
       </View>
