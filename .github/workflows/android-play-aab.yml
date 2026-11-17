@@ -81,6 +81,17 @@ jobs:
       INPUT_VERSION_CODE: ${{ inputs.version_code }}
       INPUT_VERSION_NAME: ${{ inputs.version_name }}
     steps:
+      - name: RU-02 reject legacy Play publishing before Play authentication
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$INPUT_MODE" in
+            check|build) ;;
+            deploy)
+              echo "::error::Use OPS-04 internal or OPS-05 closed instead of legacy deploy."
+              exit 1 ;;
+            *) exit 1 ;;
+          esac
       - name: Checkout trusted workflow tools
         uses: actions/checkout@v4
         with:
