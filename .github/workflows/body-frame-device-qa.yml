@@ -146,6 +146,8 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
       - name: Capture genuine Android UI at mobile and tablet sizes
+        id: first-capture
+        continue-on-error: true
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
@@ -158,6 +160,47 @@ jobs:
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back emulated -camera-front none
           script: python3 scripts/capture-android-qa.py --apk artifacts/apk/app-qaRelease.apk --output artifacts/native-qa
+      - name: Confirm emulator transport failure before retrying
+        id: capture-retry
+        if: steps.first-capture.outcome == 'failure'
+        run: |
+          mkdir -p artifacts/native-qa
+          {
+            timeout 5 adb devices -l || true
+            free -h
+            df -h .
+          } > artifacts/native-qa/runner-state.txt 2>&1
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path('artifacts/native-qa/capture-manifest.json')
+          if not path.is_file():
+              raise SystemExit('Emulator action failed before capture recorded a transport error')
+          manifest = json.loads(path.read_text(encoding='utf-8'))
+          if manifest.get('fatalKind') != 'adb-transport' or manifest.get('failed') != 0:
+              raise SystemExit('Native QA failed; inspect the original capture manifest')
+          print('ADB disconnected before QA completed; retrying once on a fresh emulator')
+          PY
+          mv artifacts/native-qa artifacts/native-qa-first-attempt
+          echo 'retry=true' >> "$GITHUB_OUTPUT"
+      - name: Retry complete native capture on a fresh emulator
+        if: steps.capture-retry.outputs.retry == 'true'
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_2
+          ram-size: 3072M
+          heap-size: 512M
+          disk-size: 6000M
+          avd-name: body-frame-qa-retry
+          emulator-port: 5556
+          force-avd-creation: true
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -camera-back emulated -camera-front none
+          script: python3 scripts/capture-android-qa.py --apk artifacts/apk/app-qaRelease.apk --output artifacts/native-qa
       - name: Upload screenshots and capture diagnostics
         if: always()
         uses: actions/upload-artifact@v4
@@ -165,6 +208,14 @@ jobs:
           name: body-frame-native-device-qa-${{ github.run_id }}
           path: artifacts/native-qa/
           if-no-files-found: warn
+          retention-days: 14
+      - name: Upload first attempt diagnostics
+        if: always() && steps.capture-retry.outputs.retry == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: body-frame-native-device-qa-first-attempt-${{ github.run_id }}
+          path: artifacts/native-qa-first-attempt/
+          if-no-files-found: error
           retention-days: 14
 
   stage13-design-captures:

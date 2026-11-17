@@ -329,6 +329,14 @@ def prepare_native_hierarchy(device,output):
     return metadata
 
 
+class AdbTransportError(RuntimeError):
+    """The selected emulator is offline or no longer registered with ADB."""
+
+
+def adb_disconnected(output):
+    return bool(re.search(r"\bdevice offline\b|\bdevice (?:'[^']+' )?not found\b|no devices/emulators found", output, re.I))
+
+
 class Device:
     def __init__(self, serial=None):
         self.prefix = ['adb'] + (['-s', serial] if serial else [])
@@ -336,12 +344,27 @@ class Device:
         self.command_stderr=''
         self.hierarchy_sequence=0
 
+    def transport_disconnected(self):
+        try:
+            state = subprocess.run([*self.prefix, 'get-state'], capture_output=True, timeout=4)
+        except (OSError, subprocess.TimeoutExpired):
+            return False
+        return state.stdout.strip() == b'offline' or adb_disconnected(state.stderr.decode(errors='replace'))
+
     def run(self, *args, binary=False, check=True, data=None, timeout=120):
-        result = subprocess.run([*self.prefix, *map(str, args)], input=data,
-                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=timeout)
+        try:
+            result = subprocess.run([*self.prefix, *map(str, args)], input=data,
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=timeout)
+        except subprocess.TimeoutExpired as error:
+            if check and self.transport_disconnected():
+                raise AdbTransportError(f'adb {args}: emulator disconnected during command timeout') from error
+            raise
         self.command_stderr=result.stderr.decode(errors='replace')
         if check and result.returncode:
-            raise RuntimeError(f'adb {args}: {result.stderr.decode(errors="replace")}')
+            if adb_disconnected(self.command_stderr) or (not self.command_stderr.strip() and self.transport_disconnected()):
+                raise AdbTransportError(f'adb {args}: {self.command_stderr.strip() or "emulator disconnected"}')
+            detail = self.command_stderr.strip() or result.stdout.decode(errors='replace').strip()
+            raise RuntimeError(f'adb {args} exited {result.returncode}: {detail or "no output"}')
         return result.stdout if binary else result.stdout.decode(errors='replace')
 
     def shell(self, *args, **kwargs):
@@ -382,6 +405,7 @@ class Device:
         backend='native-no-idle' if self.native_hierarchy_jar else 'legacy-uiautomator'
         evidence=dict(sequence=self.hierarchy_sequence,backend=backend,remotePath=target,startedAt=datetime.now(timezone.utc).isoformat(),requestedClickLabel=click_label,acknowledged=False)
         unacknowledged_xml=None
+        transport_lost = False
         try:
             self.shell('rm','-f',target)
             if self.native_hierarchy_jar:
@@ -411,8 +435,9 @@ class Device:
             self.last_hierarchy_evidence=evidence
             return xml
         except Exception as error:
+            transport_lost = isinstance(error, AdbTransportError)
             evidence.update(error=str(error),stderr=self.command_stderr,acknowledged=False)
-            if click_label is not None:
+            if click_label is not None and not transport_lost:
                 try:
                     raw=self.run('exec-out','cat',target,check=False,timeout=5)
                     if raw.strip():
@@ -431,7 +456,7 @@ class Device:
             folder=Path(directory)/'diagnostics/hierarchy-dumps' if directory else None
             if folder:folder.mkdir(parents=True,exist_ok=True)
             archive_error=None
-            if click_label is not None:
+            if click_label is not None and not transport_lost:
                 evidence['acquisitionSnapshots']=[]
                 try:
                     listing=self.shell('find','/data/local/tmp','-maxdepth','1','-type','f','-name',Path(target).name+'.attempt-*.xml',timeout=5)
@@ -452,7 +477,13 @@ class Device:
                 except Exception as error:
                     evidence['acquisitionArchiveError']=str(error)
                     if 'error' not in evidence:archive_error=RuntimeError('Native acquisition snapshots could not be retained: '+str(error))
-            try:self.shell('rm','-f',target,*([target+'.preclick.png'] if click_label is not None else []),check=False,timeout=5)
+            try:
+                if not transport_lost:
+                    self.shell('rm','-f',target,*([target+'.preclick.png'] if click_label is not None else []),timeout=5)
+            except (RuntimeError, subprocess.TimeoutExpired) as error:
+                evidence['cleanupError'] = str(error)
+                if 'error' not in evidence and isinstance(error, (AdbTransportError, subprocess.TimeoutExpired)):
+                    raise
             finally:
                 if folder:
                     if click_label is not None and evidence.get('acknowledged'):
@@ -468,7 +499,7 @@ class Device:
         if restart:
             self.shell('am', 'force-stop', PACKAGE)
         self.shell('am', 'start', '-W', '-a', 'android.intent.action.VIEW',
-                   '-d', 'bodyframe://' + route, '-p', PACKAGE)
+                   '-d', 'bodyframe://' + route, '-p', PACKAGE, timeout=45)
         time.sleep(2)
 
     def ready(self, expected, seconds=45):
@@ -600,6 +631,8 @@ class Device:
             if all(any(marker in text for text in strings) for marker in expected):return current
             self.tap(label,match=match)
             try:return self.ready(expected,seconds=10)
+            except AdbTransportError:
+                raise
             except RuntimeError:
                 # Recheck before retrying; an animation may have completed meanwhile.
                 current=self.dump();strings=ui_strings(current)
@@ -694,8 +727,12 @@ def capture(device, directory, name, route, expected, action=None, open_route=Tr
                       sha256=hashlib.sha256(image).hexdigest(), visibleText=ui_strings(xml), foreground=resumed)
     except Exception as error:
         record.update(status='failed', error=str(error))
+        if isinstance(error, AdbTransportError):
+            record['failureKind'] = 'adb-transport'
+            (directory / f'{name}.json').write_text(json.dumps(record, indent=2, ensure_ascii=False))
+            raise
         try:
-            (directory / f'{name}.failure.png').write_bytes(device.run('exec-out', 'screencap', '-p', binary=True))
+            (directory / f'{name}.failure.png').write_bytes(device.run('exec-out', 'screencap', '-p', binary=True, timeout=8))
             (directory / f'{name}.failure.xml').write_text(device.dump())
         except Exception as diagnostics_error:
             record['diagnosticsError'] = str(diagnostics_error)
@@ -1195,6 +1232,27 @@ def capture_design_matrix(device, output, records, manifest):
     device.shell('settings', 'put', 'system', 'font_scale', '1.0')
 
 
+def finish_emulator_capture(device, output):
+    errors = {}
+    try:
+        logcat = device.run('logcat', '-d', timeout=8)
+        (output / 'logcat.txt').write_text(logcat, encoding='utf-8')
+    except (RuntimeError, subprocess.TimeoutExpired, OSError) as error:
+        errors['logcat'] = str(error)
+        if isinstance(error, AdbTransportError):
+            return errors
+
+    for command in [('am', 'force-stop', PACKAGE), ('wm', 'size', 'reset'),
+                    ('wm', 'density', 'reset'), ('settings', 'put', 'system', 'font_scale', '1.0')]:
+        try:
+            device.shell(*command, timeout=5)
+        except (RuntimeError, subprocess.TimeoutExpired, OSError) as error:
+            errors[shlex.join(command)] = str(error)
+            if isinstance(error, AdbTransportError):
+                break
+    return errors
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--apk', required=True, type=Path)
@@ -1219,9 +1277,11 @@ def main():
                             'Photo editor requires login: guest capture shows the real login-required alert'], captures=records)
     if args.trust_manifest:
         manifest['apkTrust']=json.loads(args.trust_manifest.read_text())
+    verified_emulator = False
     try:
-        if device.shell('getprop', 'ro.kernel.qemu').strip() != '1':
+        if device.shell('getprop', 'ro.kernel.qemu', timeout=10).strip() != '1':
             raise RuntimeError('Refusing to seed a physical Android device')
+        verified_emulator = True
         device.run('install', '-r', '-g', args.apk.resolve())
         manifest['hierarchyBackend']=prepare_native_hierarchy(device,args.output)
         device.shell('svc', 'wifi', 'disable')
@@ -1300,18 +1360,21 @@ def main():
                 records.extend(video_failure_and_background_smoke(device,directory))
                 records.extend(video_smoke(device, directory,restart=False))
                 (directory / 'device.txt').write_text(device.shell('wm', 'size') + device.shell('wm', 'density') + device.shell('getprop', 'ro.build.version.sdk'))
+    except AdbTransportError as error:
+        manifest['fatalError'] = str(error)
+        manifest['fatalKind'] = 'adb-transport'
+        raise
     except Exception as error:
         manifest['fatalError'] = str(error)
         raise
     finally:
         manifest['captured'] = sum(item.get('status') == 'captured' for item in records)
         manifest['failed'] = sum(item.get('status') != 'captured' for item in records)
-        (args.output / 'capture-manifest.json').write_text(json.dumps(manifest, indent=2, ensure_ascii=False))
-        (args.output / 'logcat.txt').write_text(device.run('logcat', '-d', check=False))
-        device.shell('am', 'force-stop', PACKAGE, check=False)
-        device.shell('wm', 'size', 'reset', check=False)
-        device.shell('wm', 'density', 'reset', check=False)
-        device.shell('settings', 'put', 'system', 'font_scale', '1.0', check=False)
+        if verified_emulator and manifest.get('fatalKind') != 'adb-transport':
+            errors = finish_emulator_capture(device, args.output)
+            if errors:
+                manifest['diagnosticErrors'] = errors
+        (args.output / 'capture-manifest.json').write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding='utf-8')
     if manifest['failed']:
         raise SystemExit(f"{manifest['failed']} requested native captures failed; inspect capture-manifest.json and failure screenshots")
 

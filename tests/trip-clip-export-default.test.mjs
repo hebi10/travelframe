@@ -31,6 +31,6 @@ assert.ok(
 
 assert.match(
   source,
-  /<Text selectable style=\{styles\.eyebrow\}>\s*영상 만들기\s*<\/Text>/,
-  "trip clip screen eyebrow should say 영상 만들기"
+  /<Text selectable style=\{styles\.eyebrow\}>\s*\{isEditingMadeVideo\s*\?\s*"영상 재편집"\s*:\s*"영상 만들기"\}\s*<\/Text>/,
+  "trip clip screen eyebrow should distinguish saved-video editing from creating a video"
 );
