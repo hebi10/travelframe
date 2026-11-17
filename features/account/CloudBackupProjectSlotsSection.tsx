@@ -1,3 +1,4 @@
+import { openPlans } from "@/lib/plan-navigation";
 import { AppText as Text } from "@/components/app-text";
 import {
   useFocusEffect } from "expo-router";
@@ -190,6 +191,29 @@ export function CloudBackupProjectSlotsSection({
     ? slots.find((slot) => slot.id === replacementSlotId) ?? null
     : null;
   const canAddSlot = slots.filter((slot) => slot.slotNumber <= maxSlots).length < maxSlots;
+
+  if (maxSlots <= 0) {
+    return (
+      <SectionBlock title="클라우드 프로젝트 백업">
+        <View style={[styles.notice, { borderColor: palette.line, backgroundColor: palette.surface }]}>
+          <Text style={[styles.noticeTitle, { color: palette.text }]}>
+            Pro 이상 구독 후 프로젝트를 클라우드에 백업할 수 있습니다.
+          </Text>
+          <Text style={[styles.detail, { color: palette.muted }]}>
+            Pro는 1개, Plus는 3개, Expert는 5개 프로젝트를 선택할 수 있습니다.
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="클라우드 백업 플랜 비교하기"
+            onPress={() => openPlans("backup", "Pro")}
+            style={[styles.smallButton, { borderColor: palette.line }]}
+          >
+            <Text style={[styles.buttonText, { color: palette.text }]}>백업 플랜 비교</Text>
+          </Pressable>
+        </View>
+      </SectionBlock>
+    );
+  }
 
   return (
     <SectionBlock title="클라우드 프로젝트 백업">

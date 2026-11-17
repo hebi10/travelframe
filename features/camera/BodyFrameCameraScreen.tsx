@@ -1,3 +1,4 @@
+import { openPlans } from "@/lib/plan-navigation";
 import { AppText as Text } from "@/components/app-text";
 import {
   router,
@@ -348,7 +349,7 @@ export default function BodyFrameCameraScreen() {
             upgradePlanLabel={upgradePlanLabel}
             onSelectProject={handleSelectProject}
             onCreateProject={handleCreateProject}
-            onUpgrade={() => router.push("/account")}
+            onUpgrade={() => openPlans("camera", upgradePlanLabel)}
             onManageProjects={() => router.push("/studio")}
           />
         }
@@ -382,7 +383,7 @@ export default function BodyFrameCameraScreen() {
                 <Pressable
                   accessibilityRole="button"
                   style={styles.captureStatusAction}
-                  onPress={() => router.push("/account")}
+                  onPress={() => openPlans("camera", upgradePlanLabel)}
                 >
                   <Text style={styles.captureStatusActionText}>
                     플랜 보기 · {upgradePlanLabel}

@@ -1,3 +1,4 @@
+import { openPlans } from "@/lib/plan-navigation";
 import { AppText as Text } from "@/components/app-text";
 import { Feather } from "@expo/vector-icons";
 import Constants from "expo-constants";
@@ -238,7 +239,7 @@ export default function BodyFrameSettingsScreen() {
   const enableCloudBackup = () => {
     if (!planEntitlements.canBackupToCloud) {
       setActiveSetting(null);
-      router.push("/account");
+      openPlans("backup", "Pro");
       return;
     }
 
@@ -383,7 +384,7 @@ export default function BodyFrameSettingsScreen() {
             showDetail
             detail="Pro/Plus/Expert 구독, 기존 구매 복원과 구독 상태"
             mark={planEntitlements.label}
-            onPress={() => router.push("/account")}
+            onPress={() => openPlans("settings")}
           />
         </SectionBlock>
 
@@ -536,7 +537,7 @@ export default function BodyFrameSettingsScreen() {
                       style={[styles.planButton, { borderColor: palette.text }]}
                       onPress={() => {
                         setActiveSetting(null);
-                        router.push("/account");
+                        openPlans("backup", "Pro");
                       }}
                     >
                       <Text style={[styles.planButtonText, { color: palette.text }]}>

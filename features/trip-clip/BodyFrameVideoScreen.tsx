@@ -1,3 +1,4 @@
+import { openPlans } from "@/lib/plan-navigation";
 import { AppText as Text } from "@/components/app-text";
 import { Feather } from "@expo/vector-icons";
 import * as FileSystem from "expo-file-system/legacy";
@@ -673,7 +674,7 @@ export default function BodyFrameVideoScreen() {
               <Pressable
                 accessibilityRole="button"
                 style={[styles.limitPlanButton, { borderColor: palette.text }]}
-                onPress={() => router.push("/account")}
+                onPress={() => openPlans("video", upgradePlanLabel)}
               >
                 <Text style={[styles.limitPlanButtonText, { color: palette.text }]}>
                   플랜 보기 · {upgradePlanLabel}

@@ -1,3 +1,4 @@
+import { openPlans } from "@/lib/plan-navigation";
 import { AppText as Text } from "@/components/app-text";
 import {
   Feather } from "@expo/vector-icons";
@@ -330,6 +331,23 @@ export default function BodyFrameVideoHomeScreen() {
           </Pressable>
 
         {recentVideos.length > 0 ? savedVideosSection : null}
+
+        {planEntitlements.showWatermark ? (
+          <View style={[styles.policyRow, { borderColor: palette.line, backgroundColor: palette.surface }]}>
+            <Feather name="film" size={16} color={palette.muted} />
+            <Text style={[styles.policyText, { color: palette.muted }]}>
+              Pro 이상에서는 광고와 영상 워터마크를 제거하고 고급 출력 옵션을 사용할 수 있습니다.
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="영상 Pro 플랜 혜택 비교"
+              onPress={() => openPlans("video", "Pro")}
+              style={styles.textButton}
+            >
+              <Text style={[styles.textButtonText, { color: palette.text }]}>플랜 보기</Text>
+            </Pressable>
+          </View>
+        ) : null}
 
         <View
           style={[
