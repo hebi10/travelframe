@@ -114,7 +114,16 @@ export default function PlanScreen() {
                 accessibilityLabel={active ? plan.title + " 현재 이용 중" : plan.title + " 구독 안내"}
                 accessibilityState={{ disabled: active }}
                 disabled={active}
-                onPress={() => router.push("/account")}
+                onPress={() =>
+                  router.push({
+                    pathname: "/account",
+                    params: {
+                      purchasePlan: plan.id,
+                      checkoutId: String(Date.now()),
+                      returnSource: contextMessage && typeof source === "string" ? source : "plans"
+                    }
+                  })
+                }
                 style={[
                   styles.action,
                   { backgroundColor: active ? palette.surfaceStrong : palette.text }
@@ -123,7 +132,7 @@ export default function PlanScreen() {
                 <Text
                   style={[styles.actionText, { color: active ? palette.muted : palette.inverse }]}
                 >
-                  {active ? "현재 이용 중" : isLoggedIn ? "구독 안내 보기" : "로그인 후 구독하기"}
+                  {active ? "현재 이용 중" : isLoggedIn ? "Google Play에서 구독하기" : "로그인 후 구독하기"}
                 </Text>
               </Pressable>
             </View>

@@ -1,6 +1,6 @@
 import { AppText as Text, AppTextInput as TextInput } from "@/components/app-text";
-import { useCallback, useMemo, useState } from "react";
-import { useFocusEffect } from "expo-router";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import {
   ActivityIndicator,
   Alert,
@@ -31,6 +31,7 @@ import {
 } from "@/lib/subscription";
 import { getSubscriptionProductsFromSubscription } from "@/lib/subscription-products";
 import { getPlanEntitlements } from "@/lib/plan-entitlements";
+import { getPlanReturnPath } from "@/lib/plan-navigation";
 import {
   getEffectiveStorageMode,
   getStorageModeLabel
@@ -69,6 +70,12 @@ import { getLastActiveProjectId } from "@/lib/body-project-preferences";
 import { getPhotos } from "@/lib/photo-library";
 
 export default function AccountScreen() {
+  const { purchasePlan, checkoutId, returnSource } = useLocalSearchParams<{
+    purchasePlan?: string;
+    checkoutId?: string;
+    returnSource?: string;
+  }>();
+  const handledCheckoutRef = useRef<string | null>(null);
   const insets = useSafeAreaInsets();
   const { palette, fontFamily } = useAppAppearance();
   const themed = useMemo(
@@ -107,6 +114,17 @@ export default function AccountScreen() {
   const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false);
   const [isBackupRestoreSubmitting, setIsBackupRestoreSubmitting] = useState(false);
   const [selectedPaymentPlan, setSelectedPaymentPlan] = useState<PaymentPlan | null>(null);
+
+  useEffect(() => {
+    if (!isLoggedIn || isAuthLoading || typeof checkoutId !== "string" ||
+        typeof purchasePlan !== "string" || handledCheckoutRef.current === checkoutId) {
+      return;
+    }
+    const requestedPlan = paymentPlans.find((candidate) => candidate.id === purchasePlan);
+    if (!requestedPlan) return;
+    handledCheckoutRef.current = checkoutId;
+    setSelectedPaymentPlan(requestedPlan);
+  }, [checkoutId, isAuthLoading, isLoggedIn, purchasePlan]);
   const [showDeleteRequestInfo, setShowDeleteRequestInfo] = useState(false);
   const {
     connected: billingConnected,
@@ -360,9 +378,11 @@ export default function AccountScreen() {
   const getPaymentActionLabel = (plan: PaymentPlan) =>
     getPaymentPlanStatus(plan).active
       ? "사용 중"
-      : !billingConnected
+      : !billingConnected || isLoadingProducts
         ? "Google Play 연결 중..."
-        : "구독하기";
+        : !getStorePrice(getPaymentProductId(plan))
+          ? "상품 가격 확인 필요"
+          : "구독하기";
 
   const runPaymentPurchase = async (plan: PaymentPlan) => {
     if (isSubmitting) return;
@@ -375,6 +395,9 @@ export default function AccountScreen() {
         `${plan.title} 구독이 활성화되었습니다. 아래 클라우드 프로젝트 백업에서 백업할 프로젝트를 선택할 수 있습니다.`
       );
       setSelectedPaymentPlan(null);
+      if (typeof checkoutId === "string" && purchasePlan === plan.id) {
+        router.replace(getPlanReturnPath(returnSource));
+      }
     } catch (error) {
       setMessage(getUserFacingErrorMessage(error, "결제를 완료하지 못했습니다."));
     } finally {
@@ -383,7 +406,9 @@ export default function AccountScreen() {
   };
 
   const handlePaymentPurchase = () => {
-    if (isSubmitting || !selectedPaymentPlan) {
+    if (isSubmitting || !selectedPaymentPlan || !billingConnected || isLoadingProducts ||
+        productLoadError || isSubscriptionCheckFailed ||
+        !getStorePrice(getPaymentProductId(selectedPaymentPlan))) {
       return;
     }
 
@@ -439,6 +464,17 @@ export default function AccountScreen() {
     };
   };
 
+  const canSubmitSelectedPlan = Boolean(
+    selectedPaymentPlan &&
+    billingConnected &&
+    !isLoadingProducts &&
+    !productLoadError &&
+    !isSubscriptionCheckFailed &&
+    subscriptionStatus === "verified" &&
+    getStorePrice(getPaymentProductId(selectedPaymentPlan)) &&
+    !getPaymentPlanStatus(selectedPaymentPlan).active
+  );
+
   return (
     <>
       <KeyboardAvoidingView
@@ -455,6 +491,18 @@ export default function AccountScreen() {
         }
         safeTop
       >
+      {typeof checkoutId === "string" ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="플랜 비교로 돌아가기"
+          onPress={() => router.replace("/plans")}
+          style={[styles.secondaryButton, themed.secondaryButton]}
+        >
+          <Text selectable={false} style={[styles.secondaryButtonText, themed.text]}>
+            플랜 비교로 돌아가기
+          </Text>
+        </Pressable>
+      ) : null}
       {!isFirebaseReady ? (
         <SectionBlock title="연결 필요">
           <View style={[styles.noticePanel, themed.panel]}>
@@ -829,7 +877,7 @@ export default function AccountScreen() {
                         {plan.title}
                       </Text>
                       <Text selectable={false} style={[styles.planPrice, themed.text]}>
-                        {getStorePrice(getPaymentProductId(plan)) ?? plan.price}
+                        {getStorePrice(getPaymentProductId(plan)) ?? "Google Play 가격 확인 중"}
                       </Text>
                       <Text selectable={false} style={[styles.helpText, themed.mutedText]}>
                         월 구독 · 취소 전까지 자동 갱신
@@ -966,8 +1014,7 @@ export default function AccountScreen() {
                 </Text>
                 <Text selectable={false} style={[styles.planPrice, themed.text]}>
                   {selectedPaymentPlan
-                    ? getStorePrice(getPaymentProductId(selectedPaymentPlan)) ??
-                      selectedPaymentPlan.price
+                    ? getStorePrice(getPaymentProductId(selectedPaymentPlan)) ?? "Google Play 가격 확인 중"
                     : ""}
                 </Text>
                 <Text selectable={false} style={[styles.benefitText, themed.mutedText]}>
@@ -1046,19 +1093,12 @@ export default function AccountScreen() {
             </ScrollView>
             <View style={styles.paymentModalAction}>
             <Pressable accessibilityRole="button"
-              disabled={
-                isSubmitting ||
-                !billingConnected ||
-                !selectedPaymentPlan ||
-                (selectedPaymentPlan ? getPaymentPlanStatus(selectedPaymentPlan).active : false)
-              }
+              disabled={isSubmitting || !canSubmitSelectedPlan}
+              accessibilityState={{ disabled: isSubmitting || !canSubmitSelectedPlan }}
               style={[
                 styles.primaryButton,
                 themed.primaryFill,
-                (isSubmitting ||
-                  !billingConnected ||
-                  (selectedPaymentPlan ? getPaymentPlanStatus(selectedPaymentPlan).active : false)) &&
-                  styles.disabledButton
+                (isSubmitting || !canSubmitSelectedPlan) && styles.disabledButton
               ]}
               onPress={handlePaymentPurchase}
             >
