@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Host-only checks for fixture integrity and UI selector interpretation."""
 import importlib.util
+import json
 from pathlib import Path
 import sqlite3
+import subprocess
 import tempfile
 import unittest
 from unittest.mock import Mock, call, patch
@@ -291,6 +293,80 @@ class CaptureHelpersTest(unittest.TestCase):
 
 
 class CaptureScenarioTest(unittest.TestCase):
+    def test_ambiguous_adb_failure_checks_selected_emulator_state(self):
+        device = qa.Device('emulator-5554')
+        failed_command = subprocess.CompletedProcess([], 1, b'', b'')
+        for state, error_type in [(b'offline\n', qa.AdbTransportError), (b'device\n', RuntimeError)]:
+            with self.subTest(state=state), patch.object(qa.subprocess, 'run', side_effect=[
+                failed_command, subprocess.CompletedProcess([], 0, state, b'')
+            ]) as run:
+                with self.assertRaises(error_type) as error:
+                    device.open('photo/qa-demo-photo-1', restart=False)
+                self.assertIs(type(error.exception), error_type)
+                run.assert_called_with(['adb', '-s', 'emulator-5554', 'get-state'], capture_output=True, timeout=4)
+
+    def test_adb_timeout_is_retryable_only_if_transport_loss_is_confirmed(self):
+        command_timeout = subprocess.TimeoutExpired('adb', 45)
+        for state, error_type in [(b'offline\n', qa.AdbTransportError), (b'device\n', subprocess.TimeoutExpired)]:
+            with self.subTest(state=state), patch.object(qa.subprocess, 'run', side_effect=[
+                command_timeout, subprocess.CompletedProcess([], 0, state, b'')
+            ]):
+                with self.assertRaises(error_type):
+                    qa.Device().open('photo/qa-demo-photo-1', restart=False)
+
+    def test_disconnected_capture_preserves_screen_error_and_stops(self):
+        device = Mock()
+        device.open.side_effect = qa.AdbTransportError('device offline')
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary)
+            with self.assertRaisesRegex(qa.AdbTransportError, 'device offline'):
+                qa.capture(device, output, 'photo', 'photo/qa-demo-photo-1', ['기록 상세'])
+            record = json.loads((output / 'photo.json').read_text())
+        self.assertEqual(record['failureKind'], 'adb-transport')
+        self.assertEqual(record['error'], 'device offline')
+        device.run.assert_not_called()
+        device.dump.assert_not_called()
+
+    def test_capture_keeps_primary_failure_when_logcat_times_out(self):
+        device = Mock()
+        device.shell.return_value = '1'
+        device.run.side_effect = [None, subprocess.TimeoutExpired('adb logcat', 8)]
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary)
+            apk = output / 'app.apk'
+            apk.write_bytes(b'APK')
+            argv = ['capture-android-qa.py', '--apk', str(apk), '--output', str(output), '--scenario', 'keyboard']
+            with patch('sys.argv', argv), patch.object(qa, 'Device', return_value=device), patch.object(
+                qa, 'prepare_native_hierarchy', side_effect=RuntimeError('primary capture failure')
+            ):
+                with self.assertRaisesRegex(RuntimeError, 'primary capture failure'):
+                    qa.main()
+            manifest = json.loads((output / 'capture-manifest.json').read_text())
+        self.assertEqual(manifest['fatalError'], 'primary capture failure')
+        self.assertIn('logcat', manifest['diagnosticErrors'])
+        self.assertNotIn('fatalKind', manifest)
+        device.shell.assert_any_call('wm', 'size', 'reset', timeout=5)
+
+    def test_capture_main_stops_after_disconnect_and_marks_retryable_failure(self):
+        device = Mock()
+        device.shell.return_value = '1'
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary)
+            apk = output / 'app.apk'
+            apk.write_bytes(b'APK')
+            argv = ['capture-android-qa.py', '--apk', str(apk), '--output', str(output), '--scenario', 'keyboard']
+            with patch('sys.argv', argv), patch.object(qa, 'Device', return_value=device), patch.object(
+                qa, 'prepare_native_hierarchy', side_effect=qa.AdbTransportError('device offline')
+            ):
+                with self.assertRaisesRegex(qa.AdbTransportError, 'device offline'):
+                    qa.main()
+            manifest = json.loads((output / 'capture-manifest.json').read_text())
+        self.assertEqual(manifest['fatalKind'], 'adb-transport')
+        self.assertEqual(manifest['fatalError'], 'device offline')
+        self.assertEqual(manifest['failed'], 0)
+        device.shell.assert_called_once_with('getprop', 'ro.kernel.qemu', timeout=10)
+        device.run.assert_called_once_with('install', '-r', '-g', apk)
+
     def run_scenario(self, scenario=None):
         import json
         device=Mock()
