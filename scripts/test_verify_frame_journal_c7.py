@@ -20,6 +20,7 @@ class FrameJournalC7Test(unittest.TestCase):
         })
         self.assertTrue({"camera", "records", "video-home", "settings"}.issubset(c7.PRIMARY))
         self.assertIn("measurements", c7.PRIMARY)
+        self.assertIn("plans", c7.PRIMARY)
         self.assertIn("camera-color-panel", c7.FULL_EXTRA)
         self.assertIn("camera-permission-denied", c7.ACTION_REQUIREMENTS)
 

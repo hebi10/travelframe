@@ -148,6 +148,7 @@ CASES = [
     ("video-ratio", "영상 비율 옵션", "video-create", ["화면 비율", "적용"], (["변화 영상 만들기"], "화면 비율", "summary")),
     ("video-overlay", "영상 오버레이 옵션", "video-create", ["텍스트 오버레이", "적용"], (["변화 영상 만들기"], "텍스트", "summary")),
     ("video-library", "영상 보관함", "video-library", ["영상 관리", "저장한 영상"], None),
+    ("plans", "플랜 비교", "plans", ["플랜", "내 멤버십"], None),
     ("settings", "설정", "settings", ["설정", "기준 사진 표시"], None),
     ("settings-reference", "기준 사진 설정 시트", "settings", ["기준 사진 표시", "닫기"], (["기준 사진 표시"], "기준 사진 표시", "summary")),
     ("legacy-studio", "레거시 스튜디오", "legacy-studio", ["사진과 영상을 관리하세요."], None),
@@ -158,16 +159,16 @@ CASES = [
 CORE = {
     "camera", "camera-project-picker", "camera-new-project", "camera-settings", "camera-settings-storage", "camera-guide-settings", "camera-reference-adjust", "camera-color-panel", "camera-zoom-panel", "camera-light-panel", "records", "project", "project-metrics", "project-stats", "compare",
     "measurements", "video-home", "video-create", "video-library",
-    "settings", "account", "project-settings", "video-photos", "video-quality",
+    "settings", "account", "plans", "project-settings", "video-photos", "video-quality",
 }
 LARGE_TEXT = {
     "camera", "camera-new-project", "camera-settings", "camera-guide-settings", "camera-color-panel", "records", "project", "project-metrics", "project-stats", "compare",
-    "video-home", "video-create", "settings", "account", "project-settings", "video-photos",
+    "video-home", "video-create", "settings", "account", "plans", "project-settings", "video-photos",
 }
 # Cover the same primary navigation pages in all 24 theme/font/device combinations.
 C7_PRIMARY = {
     "camera", "records", "project", "compare", "measurements",
-    "video-home", "video-create", "settings", "account"
+    "video-home", "video-create", "settings", "account", "plans"
 }
 if not C7_PRIMARY.issubset(CORE):
     raise RuntimeError("C7 primary routes must be present in the core screenshot list")

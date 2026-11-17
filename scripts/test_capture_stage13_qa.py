@@ -30,7 +30,7 @@ class Stage13CaptureTest(unittest.TestCase):
         self.assertGreaterEqual(len(names), 27)
         for needed in ("camera", "records", "project", "project-metrics", "project-stats",
                        "compare", "photo", "measurements", "video-home", "video-create",
-                       "video-library", "settings", "account", "video-overlay"):
+                       "video-library", "settings", "account", "plans", "video-overlay"):
             self.assertIn(needed, names)
         self.assertTrue(stage13.CORE.issubset(set(names)))
         self.assertTrue(stage13.LARGE_TEXT.issubset(set(names)))
@@ -40,6 +40,9 @@ class Stage13CaptureTest(unittest.TestCase):
         self.assertIn("camera-new-project", names)
         self.assertIn("camera-new-project", stage13.CORE)
         self.assertIn("camera-new-project", stage13.LARGE_TEXT)
+        self.assertIn("plans", stage13.CORE)
+        self.assertIn("plans", stage13.LARGE_TEXT)
+        self.assertIn("plans", stage13.C7_PRIMARY)
 
 
     def test_c2_camera_project_sheet_actions_follow_native_controls(self):
