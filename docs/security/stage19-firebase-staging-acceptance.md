@@ -25,6 +25,7 @@
 | `TRAVELFRAME_STAGING_SERVICE_ACCOUNT` | 해당 스테이징 프로젝트에 속한 전용 서비스 계정 이메일 |
 | `TRAVELFRAME_STAGING_WIF_PROVIDER` | 검증된 WIF provider 전체 리소스 경로 |
 | `TRAVELFRAME_STAGING_APPROVED` | 최종 확인 및 명시 승인 이후에만 `true` |
+| `TRAVELFRAME_STAGING_APPROVED_SHA` | 매 변경마다 새로 승인한 PR HEAD SHA(40자리). 구 SHA의 승인으로 최신 코드가 자동 배포되지 않음 |
 
 서비스 계정 개인키·장기 토큰은 GitHub Secret이나 코드에 저장하지 않는다. Workflow는 OIDC를 사용한다.
 
@@ -48,3 +49,10 @@
 **출시/운영 안전 기준:** 위 항목이 완료되기 전 PR #128 Draft / `main` 미병합. 실제 신규 스테이징 프로젝트를 연결할 권한이 없다면 작업을 차단 상태로 기록하고 고객 데이터에 대한 시험으로 대체하지 않는다.
 
 근거: [#125](https://github.com/hebi10/travelframe/issues/125), [#106](https://github.com/hebi10/travelframe/issues/106), [#63](https://github.com/hebi10/travelframe/issues/63), [PR #128](https://github.com/hebi10/travelframe/pull/128).
+
+## 2026-11-17 보안 보강 · 승인 SHA 고정 및 실패 시 정리
+
+- 클라우드 배포 job은 승인 변수와 **정확한 현재 PR HEAD SHA**가 동시에 일치할 때만 실행한다. PR에 새로운 코드가 추가되면 이전 승인 SHA는 즉시 불일치하여 배포가 SKIPPED된다.
+- 배포 직전 검증 스크립트도 PR 소스 SHA와 승인 SHA의 동일성 및 형태를 확인한다. 승인 값은 워크플로 실행 시 설정해야 하며 운영 프로젝트는 계속 차단한다.
+- 실제 스테이징의 Firestore·Storage·Auth 시험은 네트워크 응답이 실패해도 서버에서 임시 생성이 완료되었을 수 있으므로, 모든 임시 리소스에 대해 삭제를 재시도하고 정리 실패를 FAIL로 기록한다. 미존재 Firebase 테스트 계정 삭제는 성공적인 정리로 처리한다.
+- 자동 QA 성공만으로 독립 실클라우드 검증을 PASS 처리하지 않으며, PR #128은 스테이징·실구매 게이트 전까지 Draft를 유지한다.

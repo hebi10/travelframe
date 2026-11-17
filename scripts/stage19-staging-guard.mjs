@@ -11,7 +11,9 @@ export const verifyStagingTarget = ({
   storageBucket,
   approvalFlag,
   serviceAccount,
-  identityProvider
+  identityProvider,
+  sourceHeadSha,
+  approvedHeadSha
 }) => {
   const projectId = String(stageProjectId ?? "").trim();
   if (!ID_PATTERN.test(projectId) || projectId.startsWith("demo-")) {
@@ -32,6 +34,13 @@ export const verifyStagingTarget = ({
   if (!/^projects\/[0-9]+\/locations\/global\/workloadIdentityPools\/[a-zA-Z0-9_-]+\/providers\/[a-zA-Z0-9_-]+$/.test(identityProvider ?? "")) {
     throw new Error("A Workload Identity Federation provider is required");
   }
+  if (
+    typeof sourceHeadSha !== "string" ||
+    !/^[a-f0-9]{40}$/.test(sourceHeadSha) ||
+    sourceHeadSha !== approvedHeadSha
+  ) {
+    throw new Error("Staging deployment requires approval for this exact PR head SHA");
+  }
   return { projectId, storageBucket };
 };
 
@@ -45,7 +54,9 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
       storageBucket: process.env.STAGE19_STAGING_STORAGE_BUCKET,
       approvalFlag: process.env.STAGE19_STAGING_DEPLOY_APPROVED,
       serviceAccount: process.env.STAGE19_STAGING_SERVICE_ACCOUNT,
-      identityProvider: process.env.STAGE19_STAGING_WIF_PROVIDER
+      identityProvider: process.env.STAGE19_STAGING_WIF_PROVIDER,
+      sourceHeadSha: process.env.STAGE19_SOURCE_HEAD_SHA,
+      approvedHeadSha: process.env.STAGE19_APPROVED_HEAD_SHA
     });
     console.log("Verified disposable staging-only deployment target: " + config.projectId);
   } catch (error) {

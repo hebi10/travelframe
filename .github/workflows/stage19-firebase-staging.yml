@@ -7,6 +7,8 @@ on:
       - "functions/**"
       - "scripts/stage19-staging-guard.mjs"
       - "scripts/test-stage19-staging-cloud.mjs"
+      - "scripts/stage19-staging-cleanup.mjs"
+      - "tests/stage19-staging-cleanup.test.mjs"
       - "tests/stage19-staging-guard.test.mjs"
       - ".github/workflows/stage19-firebase-staging.yml"
 
@@ -25,7 +27,8 @@ jobs:
       github.event_name == 'pull_request' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.head_ref == 'security/stage19-admin14-functions7-compat-20261108' &&
-      vars.TRAVELFRAME_STAGING_APPROVED == 'true'
+      vars.TRAVELFRAME_STAGING_APPROVED == 'true' &&
+      vars.TRAVELFRAME_STAGING_APPROVED_SHA == github.event.pull_request.head.sha
     runs-on: ubuntu-24.04
     environment: travelframe-firebase-staging
     timeout-minutes: 120
@@ -39,6 +42,8 @@ jobs:
       STAGE19_STAGING_STORAGE_BUCKET: ${{ vars.TRAVELFRAME_STAGING_STORAGE_BUCKET }}
       STAGE19_STAGING_SERVICE_ACCOUNT: ${{ vars.TRAVELFRAME_STAGING_SERVICE_ACCOUNT }}
       STAGE19_STAGING_WIF_PROVIDER: ${{ vars.TRAVELFRAME_STAGING_WIF_PROVIDER }}
+      STAGE19_SOURCE_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      STAGE19_APPROVED_HEAD_SHA: ${{ vars.TRAVELFRAME_STAGING_APPROVED_SHA }}
       FUNCTIONS_ENABLE_ADMIN_BACKUP_DELETION: "false"
       FUNCTIONS_ENABLE_ADMIN_FULL_BACKUP_DELETION: "false"
       FUNCTIONS_ENFORCE_APP_CHECK: "false"
@@ -55,8 +60,8 @@ jobs:
           node-version: "22"
           cache: npm
           cache-dependency-path: functions/package-lock.json
-      - name: Run staging target safety regressions
-        run: node --test tests/stage19-staging-guard.test.mjs
+      - name: Run staging target and cleanup safety regressions
+        run: node --test tests/stage19-staging-guard.test.mjs tests/stage19-staging-cleanup.test.mjs
       - name: Authenticate with staging project service account via WIF
         uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
         with:

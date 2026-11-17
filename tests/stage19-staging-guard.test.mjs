@@ -11,7 +11,9 @@ const valid = {
   storageBucket: "travelframe-staging-verify.firebasestorage.app",
   approvalFlag: "true",
   serviceAccount: "staging-runner@travelframe-staging-verify.iam.gserviceaccount.com",
-  identityProvider: "projects/123456789/locations/global/workloadIdentityPools/github/providers/travelframe"
+  identityProvider: "projects/123456789/locations/global/workloadIdentityPools/github/providers/travelframe",
+  sourceHeadSha: "a".repeat(40),
+  approvedHeadSha: "a".repeat(40)
 };
 
 test("staging preflight validates an exact separate project and bucket", () => {
@@ -28,7 +30,10 @@ for (const [name,change] of [
   ["reject demo emulator project", { stageProjectId: "demo-travelframe", approvedProjectId: "demo-travelframe" }],
   ["reject bucket for wrong project", { storageBucket: "travelframe-4e1fb.appspot.com" }],
   ["reject service account in production project", { serviceAccount: "staging-runner@" + production + ".iam.gserviceaccount.com" }],
-  ["reject missing WIF identity provider", { identityProvider: "" }]
+  ["reject missing WIF identity provider", { identityProvider: "" }],
+  ["reject stale staging approval SHA", { approvedHeadSha: "b".repeat(40) }],
+  ["reject missing staging approval SHA", { approvedHeadSha: undefined }],
+  ["reject invalid source SHA", { sourceHeadSha: "main" }]
 ]) {
   test(name, () => assert.throws(() => verifyStagingTarget({ ...valid, ...change })));
 }

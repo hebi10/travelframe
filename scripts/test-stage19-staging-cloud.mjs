@@ -4,6 +4,7 @@ import fs from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { verifyStagingTarget } from "./stage19-staging-guard.mjs";
+import { cleanupDisposableStagingResources } from "./stage19-staging-cleanup.mjs";
 
 const root = path.resolve(".");
 const rc = JSON.parse(fs.readFileSync(path.join(root, ".firebaserc"), "utf8"));
@@ -14,7 +15,9 @@ const { projectId, storageBucket } = verifyStagingTarget({
   storageBucket: process.env.STAGE19_STAGING_STORAGE_BUCKET,
   approvalFlag: process.env.STAGE19_STAGING_DEPLOY_APPROVED,
   serviceAccount: process.env.STAGE19_STAGING_SERVICE_ACCOUNT,
-  identityProvider: process.env.STAGE19_STAGING_WIF_PROVIDER
+  identityProvider: process.env.STAGE19_STAGING_WIF_PROVIDER,
+  sourceHeadSha: process.env.STAGE19_SOURCE_HEAD_SHA,
+  approvedHeadSha: process.env.STAGE19_APPROVED_HEAD_SHA
 });
 
 for (const key of ["FIRESTORE_EMULATOR_HOST", "FIREBASE_STORAGE_EMULATOR_HOST", "FIREBASE_AUTH_EMULATOR_HOST"]) {
@@ -43,9 +46,6 @@ const report = {
   passed: false
 };
 const casePassed = (label) => report.cases.push({ name: label, status: "PASS" });
-let docCreated = false;
-let fileCreated = false;
-let userCreated = false;
 let failure = null;
 const scrub = (message) => String(message).replace(/Bearer\s+\S+/gi, "[REDACTED]").slice(0, 300);
 
@@ -65,7 +65,6 @@ async function denyUnauthenticatedCallable(name) {
 
 try {
   await doc.set({ stage19: true, createdAt: FieldValue.serverTimestamp() });
-  docCreated = true;
   await db.runTransaction(async (transaction) => {
     const found = await transaction.get(doc);
     assert.equal(found.data()?.stage19, true);
@@ -78,13 +77,11 @@ try {
     resumable: false,
     contentType: "text/plain"
   });
-  fileCreated = true;
   const [contents] = await file.download();
   assert.equal(contents.toString("utf8"), "stage19-isolated-staging-" + id);
   casePassed("Cloud Storage Admin 14 save/read");
 
   await auth.createUser({ uid: testUid, email: testUid + "@example.test" });
-  userCreated = true;
   const user = await auth.getUser(testUid);
   assert.equal(user.uid, testUid);
   casePassed("Firebase Auth Admin 14 create/read");
@@ -104,17 +101,18 @@ try {
   failure = error;
   report.failure = scrub(error instanceof Error ? error.message : error);
 } finally {
-  const cleanup = await Promise.allSettled([
-    ...(docCreated ? [doc.delete()] : []),
-    ...(fileCreated ? [file.delete({ ignoreNotFound: true })] : []),
-    ...(userCreated ? [auth.deleteUser(testUid)] : [])
-  ]);
-  const deletedApp = await Promise.allSettled([deleteApp(app)]);
-  const unsuccessful = [...cleanup, ...deletedApp].filter((item) => item.status === "rejected");
-  report.cleanup = unsuccessful.length ? "FAILED" : "PASS";
-  if (unsuccessful.length) {
+  const cleanup = await cleanupDisposableStagingResources({
+    doc,
+    file,
+    auth,
+    uid: testUid,
+    app,
+    deleteApp
+  });
+  report.cleanup = cleanup.passed ? "PASS" : "FAILED";
+  if (!cleanup.passed) {
     report.passed = false;
-    report.cleanupFailureCount = unsuccessful.length;
+    report.cleanupFailureCount = cleanup.failureCount;
   }
   fs.mkdirSync("reports", { recursive: true });
   fs.writeFileSync("reports/stage19-staging-cloud-integration.json", JSON.stringify(report, null, 2) + "\n");
