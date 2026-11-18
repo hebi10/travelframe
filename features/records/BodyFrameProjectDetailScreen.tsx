@@ -80,6 +80,8 @@ import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 import { useAppAppearance } from "@/lib/app-appearance";
 import { useAuth } from "@/lib/auth-context";
 import { getPlanEntitlements } from "@/lib/plan-entitlements";
+import { getSelectedCloudBackupProjectIds } from "@/lib/cloud-backup-project-slots";
+import { PROJECT_SAVE_MODE_OPTIONS, isProjectCloudSaveMode } from "@/lib/project-save-policy";
 import {
   DEFAULT_PROJECT_REMINDER_MESSAGE,
   PROJECT_REMINDER_WEEKDAY_OPTIONS,
@@ -95,7 +97,7 @@ import {
   type ProjectReminderSettings,
   type ProjectReminderWeekday
 } from "@/lib/project-reminder";
-import type { BodyProject, ReferencePhotoMode } from "@/types/body-project";
+import type { BodyProject, ProjectSaveMode, ReferencePhotoMode } from "@/types/body-project";
 import {
   bodyMeasurementMetricMeta,
   defaultBodyMeasurementSettings,
@@ -521,6 +523,7 @@ export default function BodyFrameProjectDetailScreen() {
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
   const [nameDraft, setNameDraft] = useState("");
   const [targetDraft, setTargetDraft] = useState("");
+  const [saveModeDraft, setSaveModeDraft] = useState<ProjectSaveMode | null>(null);
   const [saving, setSaving] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [detailTab, setDetailTab] = useState<"records" | "metrics" | "stats">("records");
@@ -593,6 +596,7 @@ export default function BodyFrameProjectDetailScreen() {
     if (storedProject) {
       setNameDraft(storedProject.name);
       setTargetDraft(String(storedProject.targetPhotoCount));
+      setSaveModeDraft(storedProject.saveMode ?? null);
       await setLastActiveProjectId(storedProject.id);
     }
   }, [projectId]);
@@ -680,10 +684,39 @@ export default function BodyFrameProjectDetailScreen() {
 
     setSaving(true);
     try {
+      if (saveModeDraft && saveModeDraft !== project.saveMode && isProjectCloudSaveMode(saveModeDraft)) {
+        if (!user || !planEntitlements.canBackupToCloud) {
+          Alert.alert("클라우드 구독 필요", "Pro 이상 구독으로 클라우드 프로젝트 백업을 사용할 수 있습니다.");
+          return;
+        }
+        const eligibleProjects = await getSelectedCloudBackupProjectIds(
+          user,
+          planEntitlements.maxCloudBackupProjects
+        );
+        if (!eligibleProjects.has(project.id)) {
+          Alert.alert(
+            "백업 프로젝트 선택 필요",
+            "먼저 계정 화면에서 이 프로젝트를 클라우드 백업 대상으로 선택해 주세요.",
+            [
+              { text: "취소", style: "cancel" },
+              {
+                text: "계정으로 이동",
+                onPress: () => {
+                  setSettingsOpen(false);
+                  router.push("/account");
+                }
+              }
+            ]
+          );
+          return;
+        }
+      }
+
       await Promise.all([
         updateBodyProject(project.id, {
           name: nextProjectName,
-          targetPhotoCount: target
+          targetPhotoCount: target,
+          ...(saveModeDraft ? { saveMode: saveModeDraft } : {})
         }),
         updateBodyMeasurementSettings(project.id, measurementDraft),
         updateBodyCaptureContextEnabled(
@@ -707,6 +740,8 @@ export default function BodyFrameProjectDetailScreen() {
 
       await reload();
       setSettingsOpen(false);
+    } catch (error) {
+      Alert.alert("프로젝트 설정 저장 실패", getUserFacingErrorMessage(error, "프로젝트 설정을 저장하지 못했습니다."));
     } finally {
       setSaving(false);
     }
@@ -714,6 +749,10 @@ export default function BodyFrameProjectDetailScreen() {
     nameDraft,
     planEntitlements.label,
     planEntitlements.maxProgressPhotos,
+    planEntitlements.maxCloudBackupProjects,
+    planEntitlements.canBackupToCloud,
+    saveModeDraft,
+    user,
     measurementDraft,
     rememberCaptureContextDraft,
     poseAlignmentDraft,
@@ -1906,6 +1945,50 @@ export default function BodyFrameProjectDetailScreen() {
                 })}
               </View>
 
+              <View style={styles.settingDivider} />
+
+              <Text style={[styles.settingTitle, { color: palette.text }]}>
+                저장 및 백업
+              </Text>
+              <Text style={[styles.settingDetail, { color: palette.muted }]}>
+                앱 보관함 · 필수 저장 (해제할 수 없음). 프로젝트에 추가할 저장 위치를 선택합니다.
+              </Text>
+              <View style={styles.metricChoiceGrid}>
+                {PROJECT_SAVE_MODE_OPTIONS.map((option) => {
+                  const active = saveModeDraft === option.value;
+                  return (
+                    <Pressable
+                      key={option.value}
+                      disabled={saving}
+                      accessibilityRole="radio"
+                      accessibilityLabel={option.label}
+                      accessibilityHint={option.detail}
+                      accessibilityState={{ selected: active, disabled: saving }}
+                      style={[
+                        styles.choiceButton,
+                        {
+                          borderColor: active ? modalSelectionColor : palette.line,
+                          backgroundColor: active ? modalSelectionColor : palette.background
+                        }
+                      ]}
+                      onPress={() => setSaveModeDraft(option.value)}
+                    >
+                      <Text style={[styles.choiceText, { color: active ? modalSelectionText : palette.text }]}>
+                        {option.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              <Text style={[styles.settingHint, { color: palette.muted }]}>
+                {saveModeDraft
+                  ? PROJECT_SAVE_MODE_OPTIONS.find((item) => item.value === saveModeDraft)?.detail
+                  : "기존 프로젝트는 이전 공통 저장 설정을 유지합니다. 선택하면 이 프로젝트부터 새 방식이 적용됩니다."}
+              </Text>
+              <Text style={[styles.settingHint, { color: palette.muted }]}>
+                클라우드를 포함한 방식은 Pro 이상 구독과 계정의 백업 프로젝트 선택이 필요합니다.
+                저장 방식을 변경해도 이전 사진이나 기존 클라우드 백업이 자동 삭제되지 않습니다.
+              </Text>
               <View style={styles.settingDivider} />
 
               <Text style={[styles.settingTitle, { color: palette.text }]}>
