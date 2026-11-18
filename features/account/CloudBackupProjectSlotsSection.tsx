@@ -21,7 +21,7 @@ import {
   selectCloudBackupProject,
   type CloudBackupProjectSlot
 } from "@/lib/cloud-backup-project-slots";
-import { getBodyProjects } from "@/lib/body-project-library";
+import { getBodyProjects, updateBodyProject } from "@/lib/body-project-library";
 import { getPhotos } from "@/lib/photo-library";
 import type { BodyProject } from "@/types/body-project";
 import type { PhotoItem } from "@/types/photo";
@@ -128,7 +128,10 @@ export function CloudBackupProjectSlotsSection({
     setBusyProjectId(projectId);
     setMessage(null);
     try {
-      await replaceCloudBackupProject({ user, slotId: slot.id, projectId });
+      await replaceCloudBackupProject({
+        user, slotId: slot.id, projectId,
+        confirmDeletePreviousProjectId: slot.projectId
+      });
       setReplacementSlotId(null);
       await reload();
       setMessage(
@@ -146,6 +149,38 @@ export function CloudBackupProjectSlotsSection({
     }
   };
 
+  const stopProjectCloudBackup = async (project: BodyProject) => {
+    if (busyProjectId) return;
+    setBusyProjectId(project.id);
+    try {
+      await updateBodyProject(project.id, { saveMode: "local_only" });
+      await reload();
+      setMessage(
+        `"${project.name}" 프로젝트의 새 클라우드 백업을 중지했습니다. 이 기기의 앱 보관함·앨범 저장은 유지되며 기존 원격 파일은 삭제되지 않습니다. 슬롯은 계속 사용합니다.`
+      );
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "백업 중지 설정을 저장하지 못했습니다.");
+    } finally {
+      setBusyProjectId(null);
+    }
+  };
+
+  const resumeProjectCloudBackup = async (project: BodyProject) => {
+    if (busyProjectId) return;
+    setBusyProjectId(project.id);
+    try {
+      await updateBodyProject(project.id, { saveMode: "local_cloud" });
+      await reload();
+      setMessage(
+        `"${project.name}" 프로젝트의 앱·앨범·클라우드 저장을 다시 사용합니다. 원격 데이터는 계속 보존됩니다.`
+      );
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "백업 재개 설정을 저장하지 못했습니다.");
+    } finally {
+      setBusyProjectId(null);
+    }
+  };
+
   const confirmReplaceProject = (
     slot: CloudBackupProjectSlot,
     project: BodyProject
@@ -154,7 +189,7 @@ export function CloudBackupProjectSlotsSection({
       projectById.get(slot.projectId)?.name ?? "현재 백업 프로젝트";
     Alert.alert(
       "백업 프로젝트를 변경할까요?",
-      `"${currentName}"의 클라우드 백업 사진과 연결된 프로젝트 영상이 모두 삭제됩니다. 기기에 저장된 원본은 삭제되지 않습니다. "${project.name}" 프로젝트는 처음부터 다시 업로드해야 합니다.`,
+      `"${currentName}"의 기존 클라우드 사진·영상·측정 기록과 촬영 설정이 영구 삭제됩니다. 이 기기에 원본이 없으면 복구할 수 없습니다. "${project.name}" 프로젝트는 다시 업로드해야 합니다.`,
       [
         { text: "취소", style: "cancel" },
         {
@@ -175,7 +210,7 @@ export function CloudBackupProjectSlotsSection({
     const name = projectById.get(pending)?.name ?? "새 프로젝트";
     Alert.alert(
       "중단된 백업 프로젝트 변경",
-      `이전 교체 작업이 완료되지 않았습니다. 기존 클라우드 데이터 삭제를 이어서 진행하고 "${name}" 프로젝트로 변경할까요? 이미 삭제된 데이터는 복구되지 않습니다.`,
+      `이전 교체 작업이 완료되지 않았습니다. 기존 클라우드 사진·영상·수치 기록 삭제를 이어서 진행하고 "${name}" 프로젝트로 변경할까요? 이미 삭제된 데이터는 복구되지 않습니다.`,
       [
         { text: "취소", style: "cancel" },
         {
@@ -234,9 +269,9 @@ export function CloudBackupProjectSlotsSection({
           {maxPhotosPerProject}장을 저장할 수 있습니다.
         </Text>
         <Text style={[styles.warning, { color: palette.text }]}>
-          백업 프로젝트는 선택 후 바로 수정할 수 없습니다. 변경하려면 기존
-          클라우드 백업을 모두 삭제한 뒤 새 프로젝트를 처음부터 다시
-          업로드해야 합니다. 로컬 원본은 삭제되지 않습니다.
+          새 백업 중지는 원격 데이터를 삭제하지 않습니다. 슬롯 교체는 명시적으로
+          기존 클라우드 파일을 영구 삭제하는 별도 작업입니다. 원본이 현재 기기에
+          없을 수 있으므로 교체 전에 복원 상태를 확인해 주세요.
         </Text>
       </View>
 
@@ -264,6 +299,34 @@ export function CloudBackupProjectSlotsSection({
                       : "백업 프로젝트 고정됨"}
                 </Text>
               </View>
+              {!lockedByPlan && !replacing && project ? (
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={Boolean(busyProjectId)}
+                  style={[styles.smallButton, { borderColor: palette.line }]}
+                  onPress={() => {
+                    if (project.saveMode === "local_only") {
+                      void resumeProjectCloudBackup(project);
+                    } else {
+                      Alert.alert(
+                        "새 백업만 중지",
+                        "이 프로젝트의 새 클라우드 업로드만 중지합니다. 기존 원격 사진·영상·측정 기록은 그대로 보존되고 슬롯은 사용 중 상태로 남습니다.",
+                        [
+                          { text: "취소", style: "cancel" },
+                          {
+                            text: "백업 중지",
+                            onPress: () => { void stopProjectCloudBackup(project); }
+                          }
+                        ]
+                      );
+                    }
+                  }}
+                >
+                  <Text style={[styles.buttonText, { color: palette.text }]}>
+                    {project.saveMode === "local_only" ? "클라우드 재개" : "새 백업 중지"}
+                  </Text>
+                </Pressable>
+              ) : null}
               {!lockedByPlan ? (
                 <Pressable
                   accessibilityRole="button"

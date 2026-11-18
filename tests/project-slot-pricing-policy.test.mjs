@@ -41,9 +41,9 @@ for (const token of [
 }
 
 for (const token of [
-  "백업 프로젝트는 선택 후 바로 수정할 수 없습니다",
-  "클라우드 백업을 모두 삭제",
-  "로컬 원본은 삭제되지 않습니다",
+  "새 백업 중지는 원격 데이터를 삭제하지 않습니다",
+  "기존 클라우드 파일을 영구 삭제",
+  "원본이 현재 기기에",
   "삭제 후 변경"
 ]) {
   assert.ok(slotUi.includes(token), `backup project warning missing: ${token}`);

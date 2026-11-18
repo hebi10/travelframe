@@ -596,6 +596,13 @@ exports.replaceCloudBackupProject = secureOnCall(async (request) => {
     if (!previousProjectId) {
       throw new HttpsError("failed-precondition", "기존 백업 프로젝트를 확인할 수 없습니다.");
     }
+    if (previousProjectId !== projectId &&
+        normalizeBackupProjectId(request.data?.confirmDeletePreviousProjectId) !== previousProjectId) {
+      throw new HttpsError(
+        "failed-precondition",
+        "기존 프로젝트 클라우드 파일의 영구 삭제를 명시적으로 확인해야 합니다."
+      );
+    }
     const initial = decideSlotReplacement({
       slot: current.data(), previousProjectId, projectId
     });
@@ -3273,7 +3280,14 @@ const deleteCloudBackupDataForUser = async (uid) => {
 
 exports.deleteCloudBackupData = secureOnCall(async (request) => {
   try {
-    return await deleteCloudBackupDataForUser(requireUid(request));
+    const uid = requireUid(request);
+    if (request.data?.confirmation !== "DELETE_ALL_CLOUD_BACKUPS") {
+      throw new HttpsError(
+        "failed-precondition",
+        "클라우드의 모든 사진·영상·수치 기록을 영구 삭제하려면 별도 확인이 필요합니다."
+      );
+    }
+    return await deleteCloudBackupDataForUser(uid);
   } catch (error) {
     throw toHttpsError(error);
   }

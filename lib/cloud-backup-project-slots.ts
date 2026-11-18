@@ -87,20 +87,22 @@ export const selectCloudBackupProject = async ({
 export const replaceCloudBackupProject = async ({
   user,
   slotId,
-  projectId
+  projectId,
+  confirmDeletePreviousProjectId
 }: {
   user: User;
   slotId: string;
   projectId: string;
+  confirmDeletePreviousProjectId: string;
 }) => {
   if (!user.uid) {
     throw new Error("로그인 후 백업 프로젝트를 변경할 수 있습니다.");
   }
 
   const response = await callSlotFunction<
-    { slotId: string; projectId: string },
+    { slotId: string; projectId: string; confirmDeletePreviousProjectId: string },
     SlotResponse & { deletedPhotoCount: number; deletedVideoCount: number }
-  >("replaceCloudBackupProject", { slotId, projectId });
+  >("replaceCloudBackupProject", { slotId, projectId, confirmDeletePreviousProjectId });
   await enqueueProjectCloudSync({ projectId, kind: "initial" }).catch(() => undefined);
   return response;
 };

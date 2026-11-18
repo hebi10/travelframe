@@ -833,13 +833,21 @@ export default function SettingsScreen() {
 
     Alert.alert(
       "백업 데이터를 삭제할까요?",
-      "계정에 백업된 사진, 여러 사진 작업, 영상 백업을 삭제합니다. 기기 안에 저장된 원본 작업물은 삭제하지 않습니다.",
+      "클라우드에 저장된 사진·영상·프로젝트·몸무게·체지방률 등 측정 기록과 촬영 설정을 모두 영구 삭제합니다. 다른 기기에서 원본을 복원하지 않았다면 다시 찾을 수 없습니다. 현재 기기 파일은 삭제하지 않습니다.",
       [
         { text: "취소", style: "cancel" },
         {
-          text: "삭제",
+          text: "삭제 확인",
           style: "destructive",
-          onPress: async () => {
+          onPress: () => Alert.alert(
+            "모든 클라우드 백업 영구 삭제",
+            "프로젝트 수치 기록을 포함한 클라우드 데이터를 영구 삭제합니다. 이 작업은 취소할 수 없습니다.",
+            [
+              { text: "취소", style: "cancel" },
+              {
+                text: "영구 삭제 실행",
+                style: "destructive",
+                onPress: async () => {
             try {
               setIsBackupSubmitting(true);
               const summary = await deleteCloudBackupData({ user });
@@ -857,7 +865,10 @@ export default function SettingsScreen() {
             } finally {
               setIsBackupSubmitting(false);
             }
-          }
+                }
+              }
+            ]
+          )
         }
       ]
     );
