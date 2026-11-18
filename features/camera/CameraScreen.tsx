@@ -134,6 +134,9 @@ import {
 import { styles } from "@/features/camera/camera-screen.styles";
 import { useAppAppearance } from "@/lib/app-appearance";
 import { useAuth } from "@/lib/auth-context";
+import { getBodyProjectById } from "@/lib/body-project-library";
+import { getProjectSaveTargets, PROJECT_SAVE_MODE_OPTIONS, isProjectCloudSaveMode } from "@/lib/project-save-policy";
+import type { ProjectSaveMode } from "@/types/body-project";
 import { recordBackupFailure } from "@/lib/backup-failure-queue";
 import { requestPhotoSavePermission } from "@/lib/trip-clip-export";
 import { calculateGuidePositionDragOffset, clampGuidePositionOffset } from "@/lib/camera-guide-position";
@@ -193,6 +196,8 @@ import type { PhotoItem, PhotoRatioLabel, SaveCapturedPhotoInput } from "@/types
 type CameraScreenProps = {
   projectReferenceMode?: "first" | "latest";
   onProjectReferenceModeChange?: (projectId: string, mode: "first" | "latest") => Promise<void>;
+  projectSaveMode?: ProjectSaveMode | null;
+  onProjectSaveModeChange?: (projectId: string, mode: ProjectSaveMode) => Promise<void>;
   headerCenter?: ReactNode;
   footerStatus?: ReactNode;
   onHeaderBottomChange?: (bottom: number) => void;
@@ -204,6 +209,8 @@ const CAMERA_PERMISSION_RECOVERY_POLL_MS = 50;
 export default function CameraScreen({
   projectReferenceMode = "latest",
   onProjectReferenceModeChange,
+  projectSaveMode = null,
+  onProjectSaveModeChange,
   headerCenter,
   footerStatus,
   onHeaderBottomChange
@@ -1537,6 +1544,7 @@ export default function CameraScreen({
   };
 
   const toggleCameraSaveTarget = (target: CameraSaveTarget) => {
+    if (target === "app") return;
     if (target === "cloud" && !canSelectCloudSaveTarget) {
       return;
     }
@@ -2175,6 +2183,10 @@ export default function CameraScreen({
           {
             text: "앱에만 저장",
             onPress: () => {
+              if (getBodyFrameCameraSessionSnapshot().projectId) {
+                setErrorMessage("사진은 앱 보관함에 저장했습니다. 프로젝트 설정에서 저장 위치를 변경할 수 있습니다.");
+                return;
+              }
               const fallback = createAppOnlySaveFallback();
               setCameraSaveScope(fallback.cameraSaveScope);
               queueAppSettingsUpdate(fallback);
@@ -2220,6 +2232,7 @@ export default function CameraScreen({
           if (targets.device) {
             setPhotoSaveStage("device");
             try {
+              await requestPhotoSavePermission();
               await saveCapturedPhotoToDevice(captureInput, savedPhoto?.uri);
               if (__DEV__) console.info("[camera:save] album-complete", Date.now() - saveStartedAt);
             } catch (deviceError) {
@@ -2316,17 +2329,19 @@ export default function CameraScreen({
       cameraNativeCaptureInProgressRef.current = true;
       setIsCapturing(true);
       setErrorMessage(null);
-      const captureSaveScope = canSelectCloudSaveTarget
-        ? cameraSaveScope
-        : createCameraSaveScope({
-            ...getCameraSaveScopeTargets(cameraSaveScope),
-            cloud: false
-          });
-      // Resolve the system dialog before a photo or a pending save exists.
-      if (getCameraSaveScopeTargets(captureSaveScope).device) {
-        await requestPhotoSavePermission();
-        await waitForCameraSessionReadyForCapture();
+      const captureProjectId = getBodyFrameCameraSessionSnapshot().projectId;
+      const captureProject = captureProjectId
+        ? await getBodyProjectById(captureProjectId)
+        : null;
+      if (captureProjectId &&
+          (!captureProject || getBodyFrameCameraSessionSnapshot().projectId !== captureProjectId)) {
+        throw new Error("촬영 프로젝트가 변경되었습니다. 다시 촬영해 주세요.");
       }
+      const captureSaveScope = createCameraSaveScope(getProjectSaveTargets({
+        projectMode: captureProject?.saveMode,
+        legacyScope: cameraSaveScope,
+        cloudAllowed: canSelectCloudSaveTarget
+      }));
       const captureStartedAt = Date.now();
       const logCaptureStage = (stage: string) => {
         if (__DEV__) console.info("[camera:capture]", stage, Date.now() - captureStartedAt);
@@ -3280,10 +3295,56 @@ export default function CameraScreen({
                 <View style={styles.cameraSettingBlock}>
                   <Text selectable={false} style={styles.cameraSettingsGroupTitle}>저장 위치</Text>
                   <Text selectable={false} style={styles.cameraSettingsSectionDetail}>
-                    선택한 위치에 각각 저장합니다.
+                    {bodyFrameCameraSession.projectId
+                      ? "앱 보관함은 필수이며 추가 저장 위치는 프로젝트마다 지정합니다."
+                      : "기존 공통 저장 설정입니다. 앱 보관함은 항상 사용됩니다."}
                   </Text>
                   <View style={styles.cameraSettingsSaveList}>
-                    {CAMERA_SAVE_SCOPE_OPTIONS.map((option) => {
+                    {bodyFrameCameraSession.projectId ? (
+                      <>
+                        <View style={styles.cameraSettingsSaveOption}>
+                          <View style={styles.cameraSettingsSaveCopy}>
+                            <Text style={styles.cameraSettingsOptionButtonText}>앱 보관함 · 필수</Text>
+                            <Text style={styles.cameraSettingsSaveDetail}>모든 촬영 기록을 앱 안에 먼저 저장합니다.</Text>
+                          </View>
+                          <Feather name="check-square" size={21} color={bodyFrameDarkColors.text} />
+                        </View>
+                        {PROJECT_SAVE_MODE_OPTIONS.map((option) => {
+                          const selected = projectSaveMode === option.value;
+                          const cloudUnavailable = isProjectCloudSaveMode(option.value) && !canSelectCloudSaveTarget;
+                          return (
+                            <Pressable
+                              key={option.value}
+                              accessibilityRole="radio"
+                              accessibilityState={{ selected, disabled: !onProjectSaveModeChange }}
+                              accessibilityLabel={option.label}
+                              accessibilityHint={cloudUnavailable ? "Pro 이상 구독과 백업 프로젝트 선택이 필요합니다." : option.detail}
+                              disabled={!onProjectSaveModeChange}
+                              style={[styles.cameraSettingsSaveOption, selected && styles.cameraSettingsOptionButtonActive]}
+                              onPress={() => {
+                                const selectedId = bodyFrameCameraSession.projectId;
+                                if (!selectedId || !onProjectSaveModeChange) return;
+                                void onProjectSaveModeChange(selectedId, option.value)
+                                  .catch((error) => setErrorMessage(
+                                    getUserFacingErrorMessage(error, "프로젝트 저장 방식을 변경하지 못했습니다.")
+                                  ));
+                              }}
+                            >
+                              <View style={styles.cameraSettingsSaveCopy}>
+                                <Text style={styles.cameraSettingsOptionButtonText}>{option.label}</Text>
+                                <Text style={styles.cameraSettingsSaveDetail}>{option.detail}</Text>
+                              </View>
+                              <Feather name={selected ? "check-circle" : "circle"} size={21} color={bodyFrameDarkColors.text} />
+                            </Pressable>
+                          );
+                        })}
+                        {!projectSaveMode ? (
+                          <Text style={styles.cameraSettingsSectionDetail}>
+                            기존 프로젝트는 이전 저장 설정을 유지합니다. 새로운 방식을 선택하면 이 프로젝트에만 적용됩니다.
+                          </Text>
+                        ) : null}
+                      </>
+                    ) : CAMERA_SAVE_SCOPE_OPTIONS.map((option) => {
                       const isCloudSaveTargetDisabled =
                         option.value === "cloud" && !canSelectCloudSaveTarget;
                       const isSelected =
@@ -3294,16 +3355,16 @@ export default function CameraScreen({
                         <Pressable
                           accessibilityRole="checkbox"
                           key={option.value}
-                          disabled={isCloudSaveTargetDisabled}
+                          disabled={option.value === "app" || isCloudSaveTargetDisabled}
                           style={[
                             styles.cameraSettingsSaveOption,
                             isSelected && styles.cameraSettingsOptionButtonActive,
                             isCloudSaveTargetDisabled && styles.cameraSettingsSaveOptionDisabled
                           ]}
                           onPress={() => toggleCameraSaveTarget(option.value)}
-                          accessibilityState={{ disabled: isCloudSaveTargetDisabled, checked: isSelected, selected: isSelected }}
+                          accessibilityState={{ disabled: option.value === "app" || isCloudSaveTargetDisabled, checked: isSelected, selected: isSelected }}
                           accessibilityLabel={option.label}
-                          accessibilityHint={option.detail}
+                          accessibilityHint={option.value === "app" ? "앱 내부 저장은 필수입니다." : option.detail}
                         >
                           <View style={styles.cameraSettingsSaveCopy}>
                             <Text selectable={false} style={styles.cameraSettingsOptionButtonText}>{option.label}</Text>
@@ -3326,7 +3387,7 @@ export default function CameraScreen({
                     })}
                   </View>
                   <Text selectable={false} style={styles.cameraSettingsSectionDetail}>
-                    클라우드는 로그인 및 백업 설정이 가능한 경우에만 사용됩니다.
+                    클라우드는 로그인, 유료 구독 및 백업 프로젝트 선택이 완료된 경우에 사용됩니다.
                   </Text>
                 </View>
 
