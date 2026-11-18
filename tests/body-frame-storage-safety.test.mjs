@@ -98,6 +98,27 @@ function cloudFixture(f, hooks = {}) {
     "@/lib/work-library": load("lib/work-library.ts", f.dependencies),
     "@/lib/video-library": load("lib/video-library.ts", f.dependencies),
     "@/lib/body-project-backup": load("lib/body-project-backup.ts", {}),
+    "@/lib/body-measurement-library": {
+      getBodyMeasurements: async () => [],
+      getBodyMeasurementSettings: async () => ({
+        enabled: false, promptAfterCapture: false, primaryMetric: "weight",
+        fields: { weight: true, bodyFat: false, skeletalMuscle: false, waist: false }
+      }),
+      mergeBodyMeasurementsFromBackup: async () => [],
+      mergeBodyMeasurementSettingsFromBackup: async () => false
+    },
+    "@/lib/body-measurement-normalization": {
+      normalizeBodyMeasurementEntry: data => data,
+      normalizeBodyMeasurementSettings: data => data
+    },
+    "@/lib/body-pose-alignment": {
+      getBodyPoseAlignmentSettings: async () => ({ enabled: false }),
+      mergeBodyPoseAlignmentSettingsFromBackup: async () => false
+    },
+    "@/lib/body-frame-capture-context": {
+      getBodyCaptureContextState: async () => ({ enabled: true, context: null }),
+      mergeBodyCaptureContextStatesFromBackup: async () => false
+    },
     "@/lib/photo-library": f.api,
     "firebase/firestore": { doc: (_, ...parts) => parts.slice(-2).join("/"), collection: (_, ...parts) => parts.at(-1), getDocs: async prefix => ({ docs: [...documents].filter(([key]) => key.startsWith(`${prefix}/`)).map(([key, data]) => ({ id: key.split("/").at(-1), data: () => data })) }), getDoc: async key => ({ exists: () => documents.has(key), data: () => documents.get(key) }), setDoc: async (key, value, options) => { documents.set(key, options?.merge ? { ...documents.get(key), ...value } : value); }, serverTimestamp: () => "server-time" },
     "@/lib/private-storage": { privateStorageUrl: path => `https://private/${path}` },
