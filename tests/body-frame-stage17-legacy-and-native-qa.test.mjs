@@ -25,8 +25,8 @@ test("Native emulator QA prepares FFmpeg within bounded host limits and never pu
   assert.ok(native, "native capture job must exist");
   assert.ok(native.includes("runs-on: ubuntu-24.04"));
   assert.ok(native.includes("timeout-minutes: 45"));
-  const ffmpegTimeout = Number(native.match(/name: Ensure native video inspection tools\n        timeout-minutes: (\d+)/)?.[1]);
-  assert.ok(ffmpegTimeout >= 6 && ffmpegTimeout <= 15, "FFmpeg setup must remain bounded");
+  const toolTimeout = Number(native.match(/name: Ensure native video inspection tools\n        timeout-minutes: (\d+)/)?.[1]);
+  assert.ok(toolTimeout >= 6 && toolTimeout <= 15, "FFmpeg setup must remain bounded");
   assert.ok(native.includes("timeout 150s sudo apt-get"));
   assert.ok(native.includes("timeout 600s sudo env DEBIAN_FRONTEND=noninteractive apt-get"));
   assert.ok(native.includes("archive.ubuntu.com/ubuntu"), "avoid the stalled EC2 region-specific apt mirror");
