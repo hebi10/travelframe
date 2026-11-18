@@ -63,15 +63,18 @@ test("C3 photo quality and aspect ratio remain functional with wrapped six-ratio
   }
 });
 
-test("C3 storage exposes purpose and checkbox state without changing save target logic", () => {
+test("C3 storage protects mandatory app saves and offers project-specific storage modes", () => {
   assert.ok(sheet.includes("CAMERA_SAVE_SCOPE_OPTIONS.map"));
   assert.ok(sheet.includes("getCameraSaveScopeTargets(cameraSaveScope)[option.value]"));
   assert.ok(sheet.includes("toggleCameraSaveTarget(option.value)"));
   assert.ok(sheet.includes('accessibilityRole="checkbox"'));
   assert.ok(sheet.includes("checked: isSelected"));
-  assert.ok(sheet.includes("disabled={isCloudSaveTargetDisabled}"));
+  assert.ok(sheet.includes('disabled={option.value === "app" || isCloudSaveTargetDisabled}'));
   assert.ok(sheet.includes("option.detail"));
-  assert.ok(sheet.includes("클라우드는 로그인 및 백업 설정이 가능한 경우에만 사용됩니다."));
+  assert.ok(sheet.includes("PROJECT_SAVE_MODE_OPTIONS.map"));
+  assert.ok(sheet.includes("onProjectSaveModeChange(selectedId, option.value)"));
+  assert.ok(sheet.includes("앱 보관함 · 필수"));
+  assert.ok(sheet.includes("클라우드는 로그인, 유료 구독 및 백업 프로젝트 선택이 완료된 경우에 사용됩니다."));
   for (const label of ["앱 보관함", "핸드폰 앨범", "클라우드"]) {
     assert.ok(model.includes(label));
   }
