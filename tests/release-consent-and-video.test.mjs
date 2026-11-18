@@ -98,11 +98,11 @@ assert.ok(callback);
 const runnable = ts.transpileModule(`globalThis.run = ${callback};`, {
   compilerOptions: { target: ts.ScriptTarget.ES2022 }
 }).outputText;
-const exportFixture = async ({ saveFails = false, adThrows = false } = {}) => {
+const exportFixture = async ({ saveFails = false, rewardDenied = false } = {}) => {
   const events = [];
   const messages = [];
   const context = {
-    exportController: { current: null }, AbortController,
+    exportController: { current: null }, rewardGatePending: { current: false }, AbortController,
     assertBodyFrameExportActive: signal => { if (signal.aborted) throw new Error("취소"); },
     FileSystem: { deleteAsync: async () => {} }, setAlbumRetryUri: () => {},
     activeProject: { id: "test-project", name: "test" }, projectPhotos: [{ id: "photo", uri: "file:///photo.jpg" }],
@@ -117,24 +117,22 @@ const exportFixture = async ({ saveFails = false, adThrows = false } = {}) => {
     saveVideoToLibrary: async () => events.push("album"),
     saveMadeVideo: async () => { if (saveFails) throw new Error("save failed"); events.push("local"); return { uri: "file:///persisted.mp4" }; },
     recordGuestWeeklyVideoExport: async () => ({}), getUserFacingErrorMessage: error => error.message,
-    cancelPostSaveAd: () => {},
-    requestPostSaveAd: () => { events.push("ad"); if (adThrows) throw new Error("ad failed"); }
+    requestRewardedFeatureAd: async () => { events.push("reward"); return !rewardDenied; }
   };
   vm.runInNewContext(runnable, context);
   await context.run();
   return { events, messages };
 };
-await check("current Body Frame export requests an ad only after durable save and completion", async () => {
+await check("Body Frame export requires one rewarded choice before rendering and saving", async () => {
   const { events } = await exportFixture();
-  assert.deepEqual(events, ["local", "album", "finished", "ad"]);
+  assert.deepEqual(events, ["reward", "local", "album", "finished"]);
 });
-await check("failed local video save never requests an ad", async () => {
+await check("denying the reward prevents all video writes", async () => {
+  const { events } = await exportFixture({ rewardDenied: true });
+  assert.deepEqual(events, ["reward"]);
+});
+await check("failed local video save does not attempt an additional ad or external save", async () => {
   const { events } = await exportFixture({ saveFails: true });
-  assert.equal(events.includes("ad"), false);
-});
-await check("unexpected ad failure cannot overwrite successful save feedback", async () => {
-  const { messages, events } = await exportFixture({ adThrows: true });
-  assert.equal(events.includes("ad"), true);
-  assert.match(messages.at(-1), /저장했습니다/);
+  assert.deepEqual(events, ["reward", "finished"]);
 });
 if (failures) throw new Error(`${failures} consent/video regressions`);
