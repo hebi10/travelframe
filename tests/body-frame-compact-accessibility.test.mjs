@@ -148,6 +148,7 @@ const createCallback = findExpression(records,
     getBodyFrameProjectCreationLimitState,
     getBodyProjects: async () => Array.from({ length: activeCount }, (_, id) => ({ id: String(id), archived: false })),
     createBodyProject: async () => { markCreationStarted(); await creationGate; activeCount++; return { id: "created" }; },
+    initializeNewBodyProjectMeasurements: async () => {},
     archiveBodyProject: async () => { await creationGate; activeCount++; },
     setLastActiveProjectId: async () => {}, reload: async () => {}, Alert: { alert: () => {} }
   };
