@@ -39,7 +39,6 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppGuideOverlay } from "@/components/app-guide-overlay";
-import { InterstitialAdModal } from "@/components/interstitial-ad-modal";
 import { TripClipRecordingCanvas } from "@/components/trip-clip-recording-canvas";
 import { TripClipPreviewPlayer } from "@/components/trip-clip-preview-player";
 import { spacing } from "@/constants/app-theme";
@@ -150,6 +149,7 @@ import {
   getRemainingBackupSlots
 } from "@/lib/cloud-backup-limits";
 import { getPlanEntitlements } from "@/lib/plan-entitlements";
+import { useRewardedFeatureAd } from "@/lib/use-rewarded-feature-ad";
 import { isMediaLibraryAccessGranted } from "@/lib/media-library-permissions";
 import { requestMediaLibraryAccess } from "@/lib/request-media-library-access";
 import {
@@ -333,6 +333,7 @@ export default function TripClipScreen() {
   const isEditingMadeVideo = Boolean(videoId);
   const recorder = useOptionalViewRecorder();
   const { user, isLoggedIn, isAuthLoading, subscription } = useAuth();
+  const { requestRewardedFeatureAd } = useRewardedFeatureAd();
   const insets = useSafeAreaInsets();
   const bottomSafePadding = Math.max(insets.bottom + 12, 28);
   const modalSafeStyle = useMemo(
@@ -411,7 +412,6 @@ export default function TripClipScreen() {
     useState<WeeklyVideoExportUsage | null>(null);
   const [exportProgress, setExportProgress] =
     useState<ExportProgress>(initialExportProgress);
-  const [isPostSaveAdVisible, setIsPostSaveAdVisible] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const [progressSeconds, setProgressSeconds] = useState(0);
   const [recordingFrameIndex, setRecordingFrameIndex] = useState(0);
@@ -1822,17 +1822,19 @@ export default function TripClipScreen() {
       return;
     }
 
-    if (exportFormat !== "mp4") {
-      await executeSelectedExport({ returnToVideoWorks });
+    if (selectedPhotos.length === 0 || isExporting) {
+      setExportMessage("저장하기 전에 사진을 선택해 주세요.");
       return;
     }
-
-    if (videoDurationTooLong) {
+    if (exportFormat === "mp4" && videoDurationTooLong) {
       showVideoDurationBlocked();
       return;
     }
+    if (!(await requestRewardedFeatureAd(exportFormat === "mp4" ? "영상 저장" : "이미지 저장"))) {
+      return;
+    }
 
-    if (isLoggedIn) {
+    if (exportFormat !== "mp4" || isLoggedIn) {
       await executeSelectedExport({ returnToVideoWorks });
       return;
     }
@@ -2139,9 +2141,6 @@ export default function TripClipScreen() {
         router.replace("/studio?tab=works" as Href);
         return;
       }
-      if (planEntitlements.showAds) {
-        setIsPostSaveAdVisible(true);
-      }
     } catch (error) {
       const message = getUserFacingErrorMessage(error, "저장하지 못했습니다.");
       setExportMessage(message);
@@ -2170,6 +2169,9 @@ export default function TripClipScreen() {
 
     if (selectedPhotos.length === 0 || isExporting) {
       setExportMessage("공유하기 전에 사진을 선택해 주세요.");
+      return;
+    }
+    if (!(await requestRewardedFeatureAd(exportFormat === "mp4" ? "영상 공유" : "이미지 공유"))) {
       return;
     }
 
@@ -2676,11 +2678,6 @@ export default function TripClipScreen() {
           </View>
         </View>
       </Modal>
-      <InterstitialAdModal
-        visible={isPostSaveAdVisible}
-        placement="post_video_save"
-        onClose={() => setIsPostSaveAdVisible(false)}
-      />
       <AppGuideOverlay tabKey="tripClip" />
     </View>
     </KeyboardAvoidingView>
