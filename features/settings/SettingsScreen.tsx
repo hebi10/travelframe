@@ -645,6 +645,7 @@ export default function SettingsScreen() {
       }
       setRestorableProjects(projects);
       setSelectedRestoreProjectId(projects[0].id);
+      setActiveSetting(null);
       setShowProjectRestorePicker(true);
     } catch (error) {
       setAuthMessage(getUserFacingErrorMessage(error, "클라우드 프로젝트를 확인하지 못했습니다."));
