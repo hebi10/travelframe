@@ -165,10 +165,12 @@ const cameraSaveScopeTargets: Record<CameraSaveScope, CameraSaveTargets> = {
 };
 
 export const getCameraSaveScopeTargets = (scope: CameraSaveScope): CameraSaveTargets => ({
-  ...cameraSaveScopeTargets[scope]
+  ...cameraSaveScopeTargets[scope],
+  app: true
 });
 
 export const createCameraSaveScope = (targets: CameraSaveTargets): CameraSaveScope => {
+  targets = { ...targets, app: true };
   if (targets.app && targets.device && targets.cloud) {
     return "all";
   }
