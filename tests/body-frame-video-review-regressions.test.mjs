@@ -36,6 +36,7 @@ await check('missing primary with valid original fallback persists real cover be
     '@/lib/private-storage':{downloadPrivateFile},
     '@/lib/local-storage':{localStorageAdapter:{getItem:async key=>storage.get(key)??null,setItem:async(key,value)=>storage.set(key,value)}},
     '@/lib/local-library-limit':limits,
+    '@/lib/project-cloud-sync-queue':{enqueueProjectCloudSync:async()=>{}},
     '@/lib/trip-clip-title':{TRIP_CLIP_TITLE_PREFIX:'영상',getNextTripClipTitle:()=> '영상 1'}
   });
   let encoded=0; const overlays=[];

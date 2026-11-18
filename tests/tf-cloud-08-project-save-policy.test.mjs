@@ -96,6 +96,7 @@ vm.runInNewContext(transpile("lib/body-project-library.ts"), {
       setItem: async (k,v) => { memory.set(k,v); }
     } };
     if (id === "@/lib/project-save-policy") return policy;
+    if (id === "@/lib/project-cloud-sync-queue") return { enqueueProjectCloudSync: async () => {} };
     throw new Error("unexpected dependency: " + id);
   }
 });

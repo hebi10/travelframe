@@ -40,6 +40,8 @@ function fixture(fault) {
     "@/lib/private-storage": { downloadPrivateFile: async (source, uri) => { files.set(uri, "download"); return { uri }; } },
     "expo-image-manipulator": { SaveFormat: { JPEG: "jpeg" }, manipulateAsync: async () => { files.set("file:///rendered.jpg", "rendered"); return { uri: "file:///rendered.jpg", width: 100, height: 100 }; } },
     "@/lib/local-storage": { localStorageAdapter: adapter },
+    "@/lib/project-cloud-sync-queue": { enqueueProjectCloudSync: async () => {} },
+    "@/lib/photo-library": { getPhotos: async () => [] },
     "@/lib/local-library-limit": { assertLocalLibraryCapacity: () => {} },
     "@/lib/image-backup-utils": { optimizeImageForStorage: async x => x, resolveImageDimensions: async () => ({ width: 100, height: 100 }) },
     "@/lib/android-image-adjustment": { hasCameraColorAdjustment: () => false },

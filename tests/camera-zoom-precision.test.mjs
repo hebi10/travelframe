@@ -98,7 +98,11 @@ test("project context JSON save and reload preserve fractional zoom and independ
   assert.equal(restored.context.cameraExposureBias, -0.75);
   assert.equal((await capture.getBodyCaptureContextState("other-project")).context.cameraZoomPercent, 42);
   assert.equal((await capture.getBodyCaptureContextState("other-project")).enabled, true);
-  assert.deepEqual([...stored.keys()], ["body.frame.capture.context.v1"]);
+  assert.deepEqual(
+    [...stored.keys()],
+    ["body.frame.capture.context.v1", "body-frame.project-cloud-sync-queue.v1"],
+    "project capture settings and the ID-only pending cloud sync queue must remain separate"
+  );
 });
 
 test("normalization keeps legacy integer zoom and existing finite, clamp and fallback behavior", async () => {

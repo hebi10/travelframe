@@ -14,6 +14,7 @@ vm.runInNewContext(code, { exports, require: (id) => {
   if (id === "expo-file-system/legacy") return fileSystem;
   if (id.endsWith("local-storage")) return { localStorageAdapter: { getItem: async (k) => storage.get(k), setItem: async (k,v) => storage.set(k,v) } };
   if (id.endsWith("local-library-limit")) return { assertLocalLibraryCapacity: () => {} };
+  if (id.endsWith("project-cloud-sync-queue")) return { enqueueProjectCloudSync: async () => {} };
   if (id.endsWith("trip-clip-title")) return { getNextTripClipTitle: () => "video", TRIP_CLIP_TITLE_PREFIX: "video" };
   throw new Error(id);
 } });
