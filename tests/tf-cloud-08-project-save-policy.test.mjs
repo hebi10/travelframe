@@ -101,7 +101,7 @@ assert.ok(saveJob.indexOf("saveCapturedPhoto(captureInput, captureReservation)")
 assert.ok(wrap.includes("getSelectedCloudBackupProjectIds("));
 assert.ok(wrap.includes('updateBodyProject(projectId, { saveMode: mode })'));
 assert.ok(detail.includes("PROJECT_SAVE_MODE_OPTIONS.map"));
-assert.ok(detail.includes('...{ saveMode: saveModeDraft }'));
+assert.ok(detail.includes("...(saveModeDraft ? { saveMode: saveModeDraft } : {})"));
 assert.ok(detail.includes("getSelectedCloudBackupProjectIds("));
 const backup = fs.readFileSync("lib/cloud-backup.ts", "utf8");
 assert.ok(backup.includes("projectWantsCloudBackup"));
