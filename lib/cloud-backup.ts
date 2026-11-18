@@ -34,6 +34,23 @@ import {
 } from "@/lib/cloud-backup-project-slots";
 import { firebaseAuth, firebaseFunctions, firestore, firebaseStorage } from "@/lib/firebase";
 import { getBodyProjectById, getBodyProjects, mergeBodyProjectsFromBackup } from "@/lib/body-project-library";
+import {
+  getBodyMeasurements,
+  getBodyMeasurementSettings,
+  mergeBodyMeasurementsFromBackup,
+  mergeBodyMeasurementSettingsFromBackup
+} from "@/lib/body-measurement-library";
+import {
+  getBodyPoseAlignmentSettings,
+  mergeBodyPoseAlignmentSettingsFromBackup
+} from "@/lib/body-pose-alignment";
+import {
+  getBodyCaptureContextState,
+  mergeBodyCaptureContextStatesFromBackup
+} from "@/lib/body-frame-capture-context";
+import { normalizeBodyMeasurementEntry, normalizeBodyMeasurementSettings } from "@/lib/body-measurement-normalization";
+import type { BodyMeasurementEntry, BodyMeasurementSettings } from "@/types/body-measurement";
+import type { BodyCaptureContextState } from "@/types/body-capture-context";
 import { canUploadLinkedProjectWork, isProjectCloudSaveMode, projectWantsCloudBackup } from "@/lib/project-save-policy";
 import { isPhotoBackupCurrent, recoverMissingBodyProjects } from "@/lib/body-project-backup";
 import type { BodyProject } from "@/types/body-project";
@@ -383,6 +400,43 @@ const backupBodyProjects = async (userId: string, projectId?: string) => {
   for (const project of projects) {
     if (projectId && project.id !== projectId) continue;
     await setDoc(doc(firestore, "users", userId, "bodyProjects", project.id), project);
+  }
+};
+
+const backupBodyProjectSupplement = async (userId: string, projectId: string) => {
+  if (!firestore) throw new Error("Firebase 연결 정보가 아직 설정되지 않았습니다.");
+  const [measurements, measurementSettings, poseSettings, captureContextState] =
+    await Promise.all([
+      getBodyMeasurements(projectId),
+      getBodyMeasurementSettings(projectId),
+      getBodyPoseAlignmentSettings(projectId),
+      getBodyCaptureContextState(projectId)
+    ]);
+  const backedUpAt = new Date().toISOString();
+  await setDoc(
+    doc(firestore, "users", userId, "bodyProjectSettings", projectId),
+    {
+      id: projectId,
+      userId,
+      projectId,
+      schemaVersion: 1,
+      measurementSettings,
+      poseAlignmentEnabled: poseSettings.enabled,
+      captureContextState,
+      backedUpAt
+    }
+  );
+  for (const entry of measurements) {
+    await setDoc(
+      doc(firestore, "users", userId, "bodyMeasurements", entry.id),
+      {
+        ...entry,
+        id: entry.id,
+        userId,
+        schemaVersion: 1,
+        backedUpAt
+      }
+    );
   }
 };
 
@@ -889,6 +943,7 @@ export const backupCurrentWorkspace = async ({
       isCloudBackupTargetEnabled(settings, "photos")
     )) {
       await backupBodyProjects(user.uid, projectId);
+      await backupBodyProjectSupplement(user.uid, projectId);
     }
   }
   const existingPhotoSnapshot = await getDocs(collection(firestore, "users", user.uid, "photoBackups"));
@@ -2020,11 +2075,16 @@ export const restoreCloudBackupToLocal = async ({ user }: { user: User | null })
     throw new Error("Firebase 연결 정보가 아직 설정되지 않았습니다.");
   }
 
-  const [photoSnapshot, imageWorkSnapshot, videoSnapshot, projectSnapshot] = await Promise.all([
+  const [
+    photoSnapshot, imageWorkSnapshot, videoSnapshot, projectSnapshot,
+    measurementSnapshot, projectSettingsSnapshot
+  ] = await Promise.all([
     getDocs(collection(firestore, "users", user.uid, "photoBackups")),
     getDocs(collection(firestore, "users", user.uid, "imageWorks")),
     getDocs(collection(firestore, "users", user.uid, "videos")),
-    getDocs(collection(firestore, "users", user.uid, "bodyProjects"))
+    getDocs(collection(firestore, "users", user.uid, "bodyProjects")),
+    getDocs(collection(firestore, "users", user.uid, "bodyMeasurements")),
+    getDocs(collection(firestore, "users", user.uid, "bodyProjectSettings"))
   ]);
   const photos = photoSnapshot.docs.map((item) =>
     normalizePhotoBackup(item.data(), item.id)
@@ -2046,6 +2106,37 @@ export const restoreCloudBackupToLocal = async ({ user }: { user: User | null })
     mergePhotosFromBackup(photos),
     mergeImageBundleWorksFromBackup(imageWorks),
     mergeMadeVideosFromBackup(videos)
+  ]);
+
+  const restoredProjectIds = new Set((await getBodyProjects()).map((project) => project.id));
+  const remoteMeasurements = measurementSnapshot.docs
+    .map((item) => normalizeBodyMeasurementEntry({ ...item.data(), id: item.id }))
+    .filter((item): item is BodyMeasurementEntry =>
+      Boolean(item && restoredProjectIds.has(item.projectId))
+    );
+  const remoteProjectSettings = projectSettingsSnapshot.docs
+    .map((item) => ({ ...item.data(), projectId: item.id }))
+    .filter((item) => restoredProjectIds.has(item.projectId));
+  await mergeBodyMeasurementsFromBackup(remoteMeasurements);
+  await Promise.all([
+    mergeBodyMeasurementSettingsFromBackup(
+      remoteProjectSettings.map((item) => ({
+        projectId: item.projectId,
+        settings: normalizeBodyMeasurementSettings(item.measurementSettings) as BodyMeasurementSettings
+      }))
+    ),
+    mergeBodyPoseAlignmentSettingsFromBackup(
+      remoteProjectSettings.map((item) => ({
+        projectId: item.projectId,
+        enabled: item.poseAlignmentEnabled === true
+      }))
+    ),
+    mergeBodyCaptureContextStatesFromBackup(
+      remoteProjectSettings.map((item) => ({
+        projectId: item.projectId,
+        state: item.captureContextState as BodyCaptureContextState
+      }))
+    )
   ]);
 
   return {
