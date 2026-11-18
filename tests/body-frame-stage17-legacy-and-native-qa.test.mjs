@@ -25,10 +25,13 @@ test("Native emulator QA prepares FFmpeg within bounded host limits and never pu
   assert.ok(native, "native capture job must exist");
   assert.ok(native.includes("runs-on: ubuntu-24.04"));
   assert.ok(native.includes("timeout-minutes: 45"));
-  assert.ok(native.includes("name: Ensure native video inspection tools\n        timeout-minutes: 6"));
-  assert.ok(native.includes("timeout 120s sudo apt-get"));
+  const ffmpegTimeout = Number(native.match(/name: Ensure native video inspection tools\n        timeout-minutes: (\d+)/)?.[1]);
+  assert.ok(ffmpegTimeout >= 6 && ffmpegTimeout <= 15, "FFmpeg setup must remain bounded");
+  assert.ok(native.includes("timeout 150s sudo apt-get"));
+  assert.ok(native.includes("timeout 600s sudo env DEBIAN_FRONTEND=noninteractive apt-get"));
+  assert.ok(native.includes("archive.ubuntu.com/ubuntu"), "avoid the stalled EC2 region-specific apt mirror");
   const toolName = ["ff", "mpeg"].join("");
-  assert.ok(native.includes("timeout 240s sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends " + toolName));
+  assert.ok(native.includes("install -y --no-install-recommends " + toolName));
   assert.ok(native.includes("ffprobe -version"));
   assert.ok(native.includes("body-frame-native-device-qa-"));
   assert.ok(native.includes("scripts/capture-android-qa.py"));
