@@ -56,6 +56,7 @@ import {
 import { getPhotos } from "@/lib/photo-library";
 import { getPlanEntitlements } from "@/lib/plan-entitlements";
 import { getSelectedCloudBackupProjectIds } from "@/lib/cloud-backup-project-slots";
+import { enqueueProjectCloudSync } from "@/lib/project-cloud-sync-queue";
 import { isProjectCloudSaveMode } from "@/lib/project-save-policy";
 import type { BodyProject, ProjectSaveMode, ReferencePhotoMode } from "@/types/body-project";
 import type { PhotoItem } from "@/types/photo";
@@ -357,6 +358,9 @@ export default function BodyFrameCameraScreen() {
     const updated = await updateBodyProject(projectId, { saveMode: mode });
     if (!updated) throw new Error("프로젝트를 찾지 못했습니다.");
     setProjects((current) => current.map((item) => item.id === projectId ? updated : item));
+    if (isProjectCloudSaveMode(mode) && mode !== activeProject.saveMode) {
+      await enqueueProjectCloudSync({ projectId, kind: "initial" }).catch(() => undefined);
+    }
   }, [
     activeProject, planEntitlements.canBackupToCloud,
     planEntitlements.maxCloudBackupProjects, session.pendingSaveCount, user

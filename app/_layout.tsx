@@ -5,6 +5,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { AuthProvider, useAuth } from "@/lib/auth-context";
+import { ProjectCloudSyncBridge } from "@/components/project-cloud-sync-bridge";
 import { useAppAppearance } from "@/lib/app-appearance";
 import { initializeAdMob } from "@/lib/admob-config";
 import { shouldShowAds } from "@/lib/ad-entitlement";
@@ -26,6 +27,7 @@ function AppStack() {
 
   return (
     <>
+      <ProjectCloudSyncBridge />
       <Stack
         screenOptions={{
           headerLargeTitle: false,
