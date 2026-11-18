@@ -258,6 +258,9 @@ await expectAllowed("owner creates Body Frame project", firestoreRequest("PATCH"
 await expectDenied("other users cannot read Body Frame projects", firestoreRequest("GET", `users/${ownerUid}/bodyProjects/project-1`, { uid: otherUid }));
 await expectDenied("health data stays outside project backups", firestoreRequest("PATCH", `users/${ownerUid}/bodyProjects/project-1`, { uid: ownerUid, data: { ...projectBackup, weight: 65 } }));
 await expectAllowed("owner updates project metadata", firestoreRequest("PATCH", `users/${ownerUid}/bodyProjects/project-1`, { uid: ownerUid, data: { ...projectBackup, archived: true } }));
+await expectAllowed("owner sets project cloud save mode", firestoreRequest("PATCH", `users/${ownerUid}/bodyProjects/project-1`, { uid: ownerUid, data: { ...projectBackup, saveMode: "cloud" } }));
+await expectAllowed("owner selects local only without deleting legacy data", firestoreRequest("PATCH", `users/${ownerUid}/bodyProjects/project-1`, { uid: ownerUid, data: { ...projectBackup, saveMode: "local_only" } }));
+await expectDenied("project save mode rejects unknown values", firestoreRequest("PATCH", `users/${ownerUid}/bodyProjects/project-1`, { uid: ownerUid, data: { ...projectBackup, saveMode: "public" } }));
 await expectDenied("other users cannot delete project metadata", firestoreRequest("DELETE", `users/${ownerUid}/bodyProjects/project-1`, { uid: otherUid }));
 await seedBackupUploadSession({ sessionId: "body-photo", storagePath: `users/${ownerUid}/backups/photos/body.jpg`, fileSize: 1024, status: "completed" });
 const bodyPhoto = { ...validPhotoBackup(ownerUid, "body-photo"), storagePath: `users/${ownerUid}/backups/photos/body.jpg`, backupSessionId: "body-photo", projectId: "project-1", sequence: 1, sourceUpdatedAt: "2026-09-19T00:00:00Z" };
