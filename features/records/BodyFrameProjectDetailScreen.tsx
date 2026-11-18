@@ -81,6 +81,7 @@ import { useAppAppearance } from "@/lib/app-appearance";
 import { useAuth } from "@/lib/auth-context";
 import { getPlanEntitlements } from "@/lib/plan-entitlements";
 import { getSelectedCloudBackupProjectIds } from "@/lib/cloud-backup-project-slots";
+import { enqueueProjectCloudSync } from "@/lib/project-cloud-sync-queue";
 import { PROJECT_SAVE_MODE_OPTIONS, isProjectCloudSaveMode } from "@/lib/project-save-policy";
 import {
   DEFAULT_PROJECT_REMINDER_MESSAGE,
@@ -725,6 +726,11 @@ export default function BodyFrameProjectDetailScreen() {
         ),
         updateBodyPoseAlignmentSettings(project.id, poseAlignmentDraft)
       ]);
+      if (saveModeDraft && saveModeDraft !== project.saveMode &&
+          isProjectCloudSaveMode(saveModeDraft)) {
+        await enqueueProjectCloudSync({ projectId: project.id, kind: "initial" })
+          .catch(() => undefined);
+      }
 
       if (reminderSettings.enabled && nextProjectName !== project.name) {
         try {

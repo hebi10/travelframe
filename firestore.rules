@@ -269,6 +269,7 @@ service cloud.firestore {
     function videoBackupKeys() {
       return [
         "projectId",
+        "sourceUpdatedAt",
         "id",
         "userId",
         "localId",
@@ -303,6 +304,7 @@ service cloud.firestore {
 
     function videoBackupMutableKeys() {
       return [
+        "sourceUpdatedAt",
         "localUri",
         "coverUri",
         "updatedAt",
@@ -486,6 +488,8 @@ service cloud.firestore {
       return hasValidBackupOwner(userId)
         && requestedProjectWriteUnlocked(userId)
         && backupUploadProjectMatches(userId)
+        && (!request.resource.data.keys().hasAny(["sourceUpdatedAt"]) ||
+            request.resource.data.sourceUpdatedAt is string)
         && (!request.resource.data.keys().hasAny(["projectId"]) || (request.resource.data.projectId is string && request.resource.data.projectId.size() > 0))
         && request.resource.data.keys().hasOnly(videoBackupKeys())
         && request.resource.data.localId == videoId
@@ -564,6 +568,8 @@ service cloud.firestore {
     function isValidVideoBackupUpdate(userId, videoId) {
       return hasValidBackupOwner(userId)
         && requestedProjectWriteUnlocked(userId)
+        && (!request.resource.data.keys().hasAny(["sourceUpdatedAt"]) ||
+            request.resource.data.sourceUpdatedAt is string)
         && (!request.resource.data.keys().hasAny(["projectId"]) || (request.resource.data.projectId is string && request.resource.data.projectId.size() > 0))
         && request.resource.data.keys().hasOnly(videoBackupKeys())
         && request.resource.data.localId == videoId

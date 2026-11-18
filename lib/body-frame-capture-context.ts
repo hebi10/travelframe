@@ -4,6 +4,7 @@ import {
   type AppSettings
 } from "@/lib/app-settings";
 import { localStorageAdapter } from "@/lib/local-storage";
+import { enqueueProjectCloudSync } from "@/lib/project-cloud-sync-queue";
 import {
   defaultBodyCaptureContextState,
   type BodyCaptureContext,
@@ -195,6 +196,7 @@ export const updateBodyCaptureContextEnabled = async (
       updatedAt: new Date().toISOString()
     };
     await writeStateMap({ ...map, [projectId]: next });
+    await enqueueProjectCloudSync({ projectId, kind: "settings" }).catch(() => undefined);
     return next;
   });
 
@@ -211,5 +213,6 @@ export const saveBodyCaptureContext = async (
       updatedAt: new Date().toISOString()
     };
     await writeStateMap({ ...map, [projectId]: next });
+    await enqueueProjectCloudSync({ projectId, kind: "settings" }).catch(() => undefined);
     return next;
   });

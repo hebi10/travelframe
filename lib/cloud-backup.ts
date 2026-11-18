@@ -403,41 +403,94 @@ const backupBodyProjects = async (userId: string, projectId?: string) => {
   }
 };
 
-const backupBodyProjectSupplement = async (userId: string, projectId: string) => {
+const backupBodyProjectSupplement = async (
+  userId: string,
+  projectId: string,
+  {
+    mode = "all",
+    measurementId
+  }: {
+    mode?: "all" | "settings" | "measurement";
+    measurementId?: string;
+  } = {}
+) => {
   if (!firestore) throw new Error("Firebase 연결 정보가 아직 설정되지 않았습니다.");
-  const [measurements, measurementSettings, poseSettings, captureContextState] =
-    await Promise.all([
-      getBodyMeasurements(projectId),
-      getBodyMeasurementSettings(projectId),
-      getBodyPoseAlignmentSettings(projectId),
-      getBodyCaptureContextState(projectId)
-    ]);
   const backedUpAt = new Date().toISOString();
-  await setDoc(
-    doc(firestore, "users", userId, "bodyProjectSettings", projectId),
-    {
-      id: projectId,
-      userId,
-      projectId,
-      schemaVersion: 1,
-      measurementSettings,
-      poseAlignmentEnabled: poseSettings.enabled,
-      captureContextState,
-      backedUpAt
-    }
-  );
-  for (const entry of measurements) {
+  if (mode !== "measurement") {
+    const [measurementSettings, poseSettings, captureContextState] =
+      await Promise.all([
+        getBodyMeasurementSettings(projectId),
+        getBodyPoseAlignmentSettings(projectId),
+        getBodyCaptureContextState(projectId)
+      ]);
     await setDoc(
-      doc(firestore, "users", userId, "bodyMeasurements", entry.id),
+      doc(firestore, "users", userId, "bodyProjectSettings", projectId),
       {
-        ...entry,
-        id: entry.id,
+        id: projectId,
         userId,
+        projectId,
         schemaVersion: 1,
+        measurementSettings,
+        poseAlignmentEnabled: poseSettings.enabled,
+        captureContextState,
         backedUpAt
       }
     );
   }
+  if (mode !== "settings") {
+    const measurements = await getBodyMeasurements(projectId);
+    for (const entry of measurements) {
+      if (measurementId && entry.id !== measurementId) continue;
+      await setDoc(
+        doc(firestore, "users", userId, "bodyMeasurements", entry.id),
+        {
+          ...entry,
+          id: entry.id,
+          userId,
+          schemaVersion: 1,
+          backedUpAt
+        }
+      );
+    }
+  }
+};
+
+export const backupProjectSupplementIfEnabled = async ({
+  user,
+  subscription,
+  projectId,
+  mode = "all",
+  measurementId
+}: {
+  user: User | null;
+  subscription: UserSubscription;
+  projectId: string;
+  mode?: "all" | "settings" | "measurement";
+  measurementId?: string;
+}) => {
+  if (!user || !isCreatorSubscriptionActive(subscription)) return false;
+  if (firebaseAuth?.currentUser?.uid !== user.uid) {
+    throw new Error("백업 계정이 변경되었습니다.");
+  }
+  await assertLocalLibraryOwner(user.uid);
+  const [project, settings, selected] = await Promise.all([
+    getBodyProjectById(projectId),
+    getAppSettings(),
+    getSelectedCloudBackupProjectIds(
+      user, getPlanEntitlements({ isLoggedIn: true, subscription }).maxCloudBackupProjects
+    )
+  ]);
+  if (!project || !selected.has(projectId) ||
+      !projectWantsCloudBackup(project, isCloudBackupTargetEnabled(settings, "photos"))) {
+    return false;
+  }
+  if (firebaseAuth?.currentUser?.uid !== user.uid) {
+    throw new Error("백업 계정이 변경되었습니다.");
+  }
+  if (mode === "measurement" && !measurementId) return false;
+  await backupBodyProjects(user.uid, projectId);
+  await backupBodyProjectSupplement(user.uid, projectId, { mode, measurementId });
+  return true;
 };
 
 const uploadLocalFile = async ({
@@ -1699,6 +1752,19 @@ export const backupImageBundleWork = async ({
     return null;
   }
 
+  const existingWorkSnapshot = await getDoc(
+    doc(firestore, "users", user.uid, "imageWorks", work.id)
+  );
+  const existingWork = existingWorkSnapshot.data();
+  if (existingWorkSnapshot.exists() &&
+      existingWork?.backupStatus === "backed_up" &&
+      existingWork?.localId === work.id &&
+      existingWork?.sourceUpdatedAt === (work.updatedAt ?? work.createdAt) &&
+      Array.isArray(existingWork?.storagePaths) &&
+      existingWork.storagePaths.length > 0) {
+    return existingWork;
+  }
+
   const sourceDeviceId = await getSourceDeviceId();
   const backedUpAt = new Date().toISOString();
   const optimizedImagesForCleanup: OptimizedBackupImageCleanup[] = [];
@@ -1783,6 +1849,7 @@ export const backupImageBundleWork = async ({
     imageQuality: settings.imageBackupQuality,
     userId: user.uid,
     localId: work.id,
+    sourceUpdatedAt: work.updatedAt ?? work.createdAt,
     backupStatus: "backed_up",
     backupEnabledAt: backedUpAt,
     lastBackedUpAt: backedUpAt,
@@ -1855,6 +1922,17 @@ export const backupMadeVideo = async ({
   if (!projectWantsCloudBackup(project, isCloudBackupTargetEnabled(settings, "videos"))) {
     return null;
   }
+  if (video.projectId) {
+    if (!project) return null;
+    const selectedProjectIds = await getSelectedCloudBackupProjectIds(
+      user,
+      getPlanEntitlements({
+        isLoggedIn: true,
+        subscription: subscription ?? null
+      }).maxCloudBackupProjects
+    );
+    if (!selectedProjectIds.has(video.projectId)) return null;
+  }
   if (!video.projectId && video.photoIds?.length) {
     const [photos, projects, selectedProjectIds] = await Promise.all([
       getPhotos(),
@@ -1887,13 +1965,16 @@ export const backupMadeVideo = async ({
         backupStatus?: string;
         localId?: string;
         storagePath?: string;
+        backupSessionId?: string;
+        sourceUpdatedAt?: string;
       }
     | undefined;
   if (
     existingSnapshot.exists() &&
     existingVideo?.backupStatus === "backed_up" &&
     existingVideo.localId === video.id &&
-    existingVideo.storagePath
+    existingVideo.storagePath &&
+    existingVideo.sourceUpdatedAt === (video.updatedAt ?? video.createdAt)
   ) {
     return existingVideo;
   }
@@ -1943,6 +2024,7 @@ export const backupMadeVideo = async ({
       backupStatus: "backed_up",
       backupEnabledAt: settings.cloudBackupEnabled ? backedUpAt : null,
       lastBackedUpAt: backedUpAt,
+      sourceUpdatedAt: video.updatedAt ?? video.createdAt,
       sourceDeviceId,
       fileType: "video/mp4",
       backedUpAt,
@@ -1964,6 +2046,10 @@ export const backupMadeVideo = async ({
     return null;
   }
 
+  if (existingVideo?.backupSessionId &&
+      existingVideo.backupSessionId !== upload.backupSessionId) {
+    await releaseBackupUploads([existingVideo.backupSessionId]).catch(() => undefined);
+  }
   await refreshBackupOverview(user.uid, backedUpAt);
   await applyStorageSaverPolicy({
     settings,

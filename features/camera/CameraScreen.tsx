@@ -137,7 +137,8 @@ import { useAuth } from "@/lib/auth-context";
 import { getBodyProjectById } from "@/lib/body-project-library";
 import { getProjectSaveTargets, PROJECT_SAVE_MODE_OPTIONS, isProjectCloudSaveMode } from "@/lib/project-save-policy";
 import type { ProjectSaveMode } from "@/types/body-project";
-import { recordBackupFailure } from "@/lib/backup-failure-queue";
+import { clearBackupFailure, recordBackupFailure } from "@/lib/backup-failure-queue";
+import { enqueueProjectCloudSync } from "@/lib/project-cloud-sync-queue";
 import { requestPhotoSavePermission } from "@/lib/trip-clip-export";
 import { calculateGuidePositionDragOffset, clampGuidePositionOffset } from "@/lib/camera-guide-position";
 import { getNormalizedCameraFocusPoint, getTapExposureControlPosition } from "@/lib/camera-focus-controls";
@@ -2262,11 +2263,20 @@ export default function CameraScreen({
             if (targets.cloud) {
               setPhotoSaveStage("cloud");
               try {
-                await backupPhotoIfEnabled({
+                const result = await backupPhotoIfEnabled({
                   user: backupUser,
                   subscription: backupSubscription,
                   photo: savedPhoto
                 });
+                if (result) {
+                  await clearBackupFailure(savedPhoto.id).catch(() => undefined);
+                } else if (savedPhoto.projectId) {
+                  await enqueueProjectCloudSync({
+                    projectId: savedPhoto.projectId,
+                    kind: "photo",
+                    itemId: savedPhoto.id
+                  }).catch(() => undefined);
+                }
               } catch (backupError) {
                 await recordBackupFailure({
                   id: savedPhoto.id,
@@ -2276,7 +2286,14 @@ export default function CameraScreen({
                     backupError,
                     "클라우드 백업을 완료하지 못했습니다."
                   )
-                });
+                }).catch(() => undefined);
+                if (savedPhoto.projectId) {
+                  await enqueueProjectCloudSync({
+                    projectId: savedPhoto.projectId,
+                    kind: "photo",
+                    itemId: savedPhoto.id
+                  }).catch(() => undefined);
+                }
               }
             }
           }

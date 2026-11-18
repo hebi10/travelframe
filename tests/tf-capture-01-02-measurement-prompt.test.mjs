@@ -74,6 +74,7 @@ const lib = load("lib/body-measurement-library.ts", {
     getItem: async key => values.get(key) ?? null,
     setItem: async (key, value) => values.set(key, value)
   } },
+  "@/lib/project-cloud-sync-queue": { enqueueProjectCloudSync: async () => {} },
   "@/lib/body-measurement-normalization": {
     normalizeBodyMeasurementSettings: value => value,
     normalizeBodyMeasurementEntry: value => value

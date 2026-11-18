@@ -3,6 +3,7 @@ import { collection, getDocs } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 
 import { firebaseFunctions, firestore } from "@/lib/firebase";
+import { enqueueProjectCloudSync } from "@/lib/project-cloud-sync-queue";
 
 export type CloudBackupProjectSlot = {
   id: string;
@@ -75,10 +76,12 @@ export const selectCloudBackupProject = async ({
     throw new Error("로그인 후 백업 프로젝트를 선택할 수 있습니다.");
   }
 
-  return callSlotFunction<{ projectId: string }, SlotResponse>(
+  const response = await callSlotFunction<{ projectId: string }, SlotResponse>(
     "selectCloudBackupProject",
     { projectId }
   );
+  await enqueueProjectCloudSync({ projectId, kind: "initial" }).catch(() => undefined);
+  return response;
 };
 
 export const replaceCloudBackupProject = async ({
@@ -94,10 +97,12 @@ export const replaceCloudBackupProject = async ({
     throw new Error("로그인 후 백업 프로젝트를 변경할 수 있습니다.");
   }
 
-  return callSlotFunction<
+  const response = await callSlotFunction<
     { slotId: string; projectId: string },
     SlotResponse & { deletedPhotoCount: number; deletedVideoCount: number }
   >("replaceCloudBackupProject", { slotId, projectId });
+  await enqueueProjectCloudSync({ projectId, kind: "initial" }).catch(() => undefined);
+  return response;
 };
 
 export const getSelectedCloudBackupProjectIds = async (

@@ -31,6 +31,7 @@ const normalizer = execute("lib/body-measurement-normalization.ts", {
 const library = execute("lib/body-measurement-library.ts", {
   "@/lib/local-storage": { localStorageAdapter: adapter },
   "@/lib/body-measurement-normalization": normalizer,
+  "@/lib/project-cloud-sync-queue": { enqueueProjectCloudSync: async () => {} },
   "@/types/body-measurement": types
 });
 
@@ -103,6 +104,7 @@ assert.equal((await library.getBodyMeasurementSettings("project-b")).primaryMetr
 
 const pose = execute("lib/body-pose-alignment.ts", {
   "@/lib/local-storage": { localStorageAdapter: adapter },
+  "@/lib/project-cloud-sync-queue": { enqueueProjectCloudSync: async () => {} },
   "@/types/body-pose-alignment": execute("types/body-pose-alignment.ts")
 });
 await pose.updateBodyPoseAlignmentSettings("project-a", false);
@@ -121,6 +123,7 @@ const defaultAppSettings = {
   cameraContrast: 0, cameraSaturation: 0
 };
 const context = execute("lib/body-frame-capture-context.ts", {
+  "@/lib/project-cloud-sync-queue": { enqueueProjectCloudSync: async () => {} },
   "@/lib/app-settings": {
     defaultAppSettings,
     normalizeCameraZoomPercent: n => n

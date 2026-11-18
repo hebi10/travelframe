@@ -1,5 +1,6 @@
 import { normalizeReferencePhotoMode } from "@/lib/body-frame-normalization";
 import { localStorageAdapter } from "@/lib/local-storage";
+import { enqueueProjectCloudSync } from "@/lib/project-cloud-sync-queue";
 import { sanitizeProjectPathSegment } from "@/lib/body-frame-stage2-utils";
 import type { BodyProject, ProjectSaveMode, ReferencePhotoMode } from "@/types/body-project";
 import { isProjectSaveMode } from "@/lib/project-save-policy";
@@ -192,6 +193,11 @@ export const updateBodyProject = async (
     }
 
     await writeProjects(nextProjects);
+    if (patch.name !== undefined || patch.targetPhotoCount !== undefined ||
+        patch.referenceMode !== undefined || patch.saveMode !== undefined) {
+      await enqueueProjectCloudSync({ projectId: normalizedId, kind: "settings" })
+        .catch(() => undefined);
+    }
     return updatedProject;
   });
 
