@@ -938,8 +938,10 @@ export const backupCurrentWorkspace = async ({
           })
   );
   for (const projectId of cloudProjectIds) {
+    const localProject = projectById.get(projectId);
+    if (!localProject) continue;
     if (projectWantsCloudBackup(
-      projectById.get(projectId),
+      localProject,
       isCloudBackupTargetEnabled(settings, "photos")
     )) {
       await backupBodyProjects(user.uid, projectId);
