@@ -33,7 +33,10 @@ function harness({
   permission = async () => {},
   canCapture = () => true,
   waitForReady = null,
-  timeout = false
+  timeout = false,
+  projectId = null,
+  loadProject = async id => ({ id, saveMode: "local_only" }),
+  posePending = false
 } = {}) {
   const events = [];
   const lock = { current: false };
@@ -47,7 +50,10 @@ function harness({
     canCaptureWithCurrentSession: canCapture,
     isCapturing: false,
     cameraNativeCaptureInProgressRef: lock,
-    poseSnapshotPromiseRef: { current: null },
+    poseSnapshotPromiseRef: { current: posePending ? Promise.resolve() : null },
+    getBodyFrameCameraSessionSnapshot: () => ({ projectId }),
+    getBodyProjectById: loadProject,
+    getProjectSaveTargets: ({ legacyScope }) => ({ app: true, device: legacyScope === "app_device", cloud: false }),
     setIsCapturing: (value) => { capturing = value; },
     setErrorMessage: (value) => { if (value) events.push("error"); },
     canSelectCloudSaveTarget: true,
@@ -89,61 +95,60 @@ function harness({
   return { capture, events, lock, isCapturing: () => capturing };
 }
 
-let resolvePermission;
-const first = harness({ permission: () => new Promise((resolve) => { resolvePermission = resolve; }) });
-const pending = first.capture();
-await Promise.resolve();
-assert.deepEqual(first.events, ["permission"], "permission must precede reservation, capture and the saving queue");
+// Permission now belongs to the background save job; capture itself must not be blocked.
+const first = harness({ device: true });
 await first.capture();
-assert.deepEqual(first.events, ["permission"], "double tapping must not open another permission request");
-resolvePermission();
-await pending;
-assert.deepEqual(first.events, ["permission", "reserve", "capture", "queue"]);
+assert.deepEqual(first.events, ["reserve", "capture", "queue"]);
 assert.equal(first.lock.current, false);
 assert.equal(first.isCapturing(), false);
+assert.ok(!first.events.includes("permission"));
 
-const denied = harness({ permission: async () => { throw new Error("핸드폰 앨범 저장 권한이 필요합니다."); } });
-await denied.capture();
-assert.deepEqual(denied.events, ["permission", "permission-help"]);
-assert.equal(denied.lock.current, false);
-assert.equal(denied.isCapturing(), false);
+let releaseProjectLoad;
+const projectLoad = new Promise(resolve => { releaseProjectLoad = resolve; });
+const pendingProject = harness({
+  projectId: "project-a",
+  loadProject: async id => { await projectLoad; return { id, saveMode: "local_only" }; }
+});
+const blocked = pendingProject.capture();
+await Promise.resolve();
+await pendingProject.capture();
+assert.deepEqual(pendingProject.events, [], "double shutter taps must not start a second capture while storage mode loads");
+releaseProjectLoad();
+await blocked;
+assert.deepEqual(pendingProject.events, ["reserve", "capture", "queue"]);
 
-let cameraActive = true;
+let cameraReady = false;
 const recoveredSession = harness({
-  permission: async () => { cameraActive = false; },
-  canCapture: () => cameraActive,
-  waitForReady: async () => { cameraActive = true; }
+  posePending: true,
+  waitForReady: async () => { cameraReady = true; }
 });
 await recoveredSession.capture();
-assert.deepEqual(
-  recoveredSession.events,
-  ["permission", "wait-ready", "reserve", "capture", "queue"],
-  "a permission-triggered camera restart should resume capture after the session is ready"
-);
-assert.equal(recoveredSession.isCapturing(), false);
-assert.equal(recoveredSession.lock.current, false);
+assert.ok(cameraReady);
+assert.deepEqual(recoveredSession.events, ["wait-ready", "reserve", "capture", "queue"],
+  "pose-triggered camera recovery must still precede native capture");
 
-cameraActive = true;
 const unrecoveredSession = harness({
-  permission: async () => { cameraActive = false; },
-  canCapture: () => cameraActive,
-  waitForReady: async () => {
-    throw new Error("앨범 권한 확인 후 카메라가 다시 준비되지 않았습니다.");
-  }
+  posePending: true,
+  waitForReady: async () => { throw new Error("카메라를 다시 준비하지 못했습니다."); }
 });
 await unrecoveredSession.capture();
-assert.deepEqual(
-  unrecoveredSession.events,
-  ["permission", "wait-ready", "error"],
-  "camera recovery failure should be visible instead of silently returning"
-);
-assert.equal(unrecoveredSession.isCapturing(), false);
-assert.equal(unrecoveredSession.lock.current, false);
+assert.deepEqual(unrecoveredSession.events, ["wait-ready", "error"],
+  "camera recovery failures must not enter saving queue");
 
 const localOnly = harness({ device: false });
 await localOnly.capture();
 assert.deepEqual(localOnly.events, ["reserve", "capture", "queue"]);
-console.log("ok - photo permission is resolved before capture and denied requests never enter the saving queue");
+
+const queueSource = source.slice(
+  source.indexOf("const runSaveJob = async () =>"),
+  source.indexOf("const capturePhoto = async () =>")
+);
+assert.ok(queueSource.indexOf("saveCapturedPhoto(captureInput, captureReservation)") <
+          queueSource.indexOf("await requestPhotoSavePermission()"),
+  "app photo save must precede the permission prompt for optional album copies");
+assert.ok(queueSource.includes("if (!savedPhoto) throw deviceError;"),
+  "an album denial after a durable app save must not delete the photo");
+console.log("ok - app recording precedes optional album permission, double taps and camera recovery stay safe");
 const stalled = harness({ device: false, timeout: true });
 await stalled.capture();
 assert.ok(stalled.events.includes("recover"), "native capture timeout must restart the camera");
