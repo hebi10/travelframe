@@ -84,6 +84,24 @@ const readSettingsMap = async () => {
   }
 };
 
+export const initializeNewBodyProjectMeasurements = async (projectId: string) =>
+  runMutation(async () => {
+    const map = await readSettingsMap();
+    if (Object.prototype.hasOwnProperty.call(map, projectId)) {
+      return map[projectId];
+    }
+    const settings = normalizeBodyMeasurementSettings({
+      ...defaultBodyMeasurementSettings,
+      enabled: true,
+      promptAfterCapture: true
+    });
+    await localStorageAdapter.setItem(
+      BODY_MEASUREMENT_SETTINGS_STORAGE_KEY,
+      JSON.stringify({ ...map, [projectId]: settings })
+    );
+    return settings;
+  });
+
 export const getBodyMeasurementSettings = async (projectId: string) => {
   const settings = await readSettingsMap();
   return settings[projectId] ?? defaultBodyMeasurementSettings;
@@ -142,7 +160,14 @@ export const saveBodyMeasurement = async ({
 }: Omit<BodyMeasurementEntry, "id"> & { id?: string; source?: BodyMeasurementEntry["source"] }) =>
   runMutation(async () => {
     const entries = await readEntries();
-    const nowId = id ?? createMeasurementId();
+    const matchingManual = !id && photoId && source === "manual"
+      ? entries.find((entry) =>
+          entry.projectId === projectId &&
+          entry.photoId === photoId &&
+          entry.source === "manual"
+        )
+      : null;
+    const nowId = id ?? matchingManual?.id ?? createMeasurementId();
     const normalized = normalizeBodyMeasurementEntry({
       id: nowId,
       projectId,
