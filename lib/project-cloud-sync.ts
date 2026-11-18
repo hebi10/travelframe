@@ -17,6 +17,7 @@ import { getPlanEntitlements } from "@/lib/plan-entitlements";
 import { projectWantsCloudBackup } from "@/lib/project-save-policy";
 import {
   enqueueProjectCloudSync,
+  getProjectCloudSyncTasks,
   processProjectCloudSyncQueue,
   type ProjectCloudSyncTask
 } from "@/lib/project-cloud-sync-queue";
@@ -69,6 +70,8 @@ export const prepareProjectCloudSync = async ({
     getPhotos(),
     getAppSettings()
   ]);
+  const pendingTasks = await getProjectCloudSyncTasks();
+  const pendingIds = new Set(pendingTasks.map((task) => task.id));
   const selected = projects.filter(
     (project) => selectedIds.has(project.id) &&
       projectWantsCloudBackup(
@@ -76,7 +79,8 @@ export const prepareProjectCloudSync = async ({
       )
   );
   for (const project of selected) {
-    if (!completedIds.includes(project.id)) {
+    if (!completedIds.includes(project.id) &&
+        !pendingIds.has(["initial", project.id, ""].join(":"))) {
       await enqueueProjectCloudSync({ projectId: project.id, kind: "initial" });
     }
   }
@@ -85,7 +89,8 @@ export const prepareProjectCloudSync = async ({
   for (const failure of failures) {
     if (failure.kind !== "photo") continue;
     const photo = photoById.get(failure.id);
-    if (photo?.projectId && selectedProjectIds.has(photo.projectId)) {
+    if (photo?.projectId && selectedProjectIds.has(photo.projectId) &&
+        !pendingIds.has(["photo", photo.projectId, photo.id].join(":"))) {
       await enqueueProjectCloudSync({
         projectId: photo.projectId,
         kind: "photo",
@@ -164,6 +169,13 @@ const syncTask = async ({
   const videos = (await getMadeVideos()).filter((item) => item.projectId === project.id);
   for (const video of videos) {
     await backupMadeVideo({ user, subscription, video, enabled: true });
+  }
+  const photoIds = new Set(photos.map((photo) => photo.id));
+  const works = (await getImageBundleWorks()).filter((work) =>
+    work.photoIds.length > 0 && work.photoIds.every((id) => photoIds.has(id))
+  );
+  for (const work of works) {
+    await backupImageBundleWork({ user, subscription, work, enabled: true });
   }
   await markInitialSynced(project.id);
 };
