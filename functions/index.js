@@ -189,6 +189,7 @@ const IMAGE_WORK_BACKUP_KEYS = new Set([
   "title",
   "createdAt",
   "updatedAt",
+  "sourceUpdatedAt",
   "coverUri",
   "ratio",
   "photoIds",
@@ -1689,6 +1690,11 @@ const sanitizeImageWorkBackupData = ({ uid, workId, imageWork }) => {
 
   if (!VALID_BACKUP_STATUSES.has(imageWork.backupStatus)) {
     throw new HttpsError("invalid-argument", "Invalid image work backup status.");
+  }
+  if (imageWork.sourceUpdatedAt !== undefined &&
+      (typeof imageWork.sourceUpdatedAt !== "string" ||
+        Number.isNaN(Date.parse(imageWork.sourceUpdatedAt)))) {
+    throw new HttpsError("invalid-argument", "Invalid image work source revision.");
   }
 
   return Object.fromEntries(keys.map((key) => [key, imageWork[key]]));
