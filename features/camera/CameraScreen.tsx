@@ -198,6 +198,7 @@ type CameraScreenProps = {
   onProjectReferenceModeChange?: (projectId: string, mode: "first" | "latest") => Promise<void>;
   projectSaveMode?: ProjectSaveMode | null;
   onProjectSaveModeChange?: (projectId: string, mode: ProjectSaveMode) => Promise<void>;
+  onPhotoSaved?: (photo: PhotoItem) => void;
   headerCenter?: ReactNode;
   footerStatus?: ReactNode;
   onHeaderBottomChange?: (bottom: number) => void;
@@ -211,6 +212,7 @@ export default function CameraScreen({
   onProjectReferenceModeChange,
   projectSaveMode = null,
   onProjectSaveModeChange,
+  onPhotoSaved,
   headerCenter,
   footerStatus,
   onHeaderBottomChange
@@ -2228,6 +2230,11 @@ export default function CameraScreen({
             savedPhoto = await saveCapturedPhoto(captureInput, captureReservation);
             if (__DEV__) console.info("[camera:save] app-complete", Date.now() - saveStartedAt);
             setRecentPhoto(savedPhoto);
+            try {
+              onPhotoSaved?.(savedPhoto);
+            } catch {
+              // The already-saved photo must survive measurement prompt failures.
+            }
           }
           if (targets.device) {
             setPhotoSaveStage("device");
@@ -2309,7 +2316,7 @@ export default function CameraScreen({
         }
       });
     },
-    [isDeviceAlbumPermissionError, showDeviceAlbumPermissionPrompt]
+    [isDeviceAlbumPermissionError, onPhotoSaved, showDeviceAlbumPermissionPrompt]
   );
 
   const capturePhoto = async () => {
