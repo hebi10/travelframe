@@ -85,6 +85,7 @@ export default function BodyFrameCameraScreen() {
   const [measurementPromptPhotoId, setMeasurementPromptPhotoId] =
     useState<string | null>(null);
   const [poseAlignmentEnabled, setPoseAlignmentEnabled] = useState(false);
+  const [isScreenFocused, setIsScreenFocused] = useState(false);
   const [capturePrompts, setCapturePrompts] = useState<CaptureMeasurementPrompt[]>([]);
   const capturePromptQueueRef = useRef<ReturnType<typeof createCaptureMeasurementPromptQueue> | null>(null);
   if (!capturePromptQueueRef.current) {
@@ -98,6 +99,7 @@ export default function BodyFrameCameraScreen() {
           getBodyProjectById(projectId)
         ]);
         if (!(measurementSettings.enabled && measurementSettings.promptAfterCapture)) return null;
+        setMeasurementPromptPhotoId(photo.id);
         return {
           photo,
           settings: measurementSettings,
@@ -131,8 +133,10 @@ export default function BodyFrameCameraScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      setIsScreenFocused(true);
       void reloadProjectState();
       return () => {
+        setIsScreenFocused(false);
         clearBodyFrameCameraSession();
       };
     }, [reloadProjectState])
@@ -239,7 +243,7 @@ export default function BodyFrameCameraScreen() {
 
   const handleCapturedPhotoSaved = useCallback((photo: PhotoItem) => {
     setSaveMessage(`${photo.sequence ?? 1}번째 사진을 저장했습니다.`);
-    setMeasurementPromptPhotoId(photo.id);
+    setMeasurementPromptPhotoId(null);
     void capturePromptQueueRef.current?.enqueue(photo).catch(() => {
       setSaveMessage("사진은 저장했습니다. 수치 정보는 사진 상세에서 입력할 수 있습니다.");
     });
@@ -434,7 +438,7 @@ export default function BodyFrameCameraScreen() {
       {activeCapturePrompt ? (
         <BodyMeasurementEditorSheet
           key={activeCapturePrompt.photo.id}
-          visible
+          visible={isScreenFocused}
           projectId={activeCapturePrompt.photo.projectId ?? ""}
           photoId={activeCapturePrompt.photo.id}
           sequence={activeCapturePrompt.photo.sequence}
