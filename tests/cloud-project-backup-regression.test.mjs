@@ -14,6 +14,19 @@ function harness() {
   let localPhotos = [photo];
   let localProjects = [project];
   let localWorks = [];
+  const sampleMeasurement = {
+    id: "measurement-a", projectId: project.id, photoId: photo.id,
+    sequence: 1, recordedAt: photo.createdAt,
+    weightKg: 71.2, bodyFatPercent: 17.6, source: "manual"
+  };
+  let localMeasurements = [sampleMeasurement];
+  const sampleMeasurementSettings = {
+    enabled: true, promptAfterCapture: true, primaryMetric: "weight",
+    fields: { weight: true, bodyFat: true, skeletalMuscle: false, waist: false }
+  };
+  let localMeasurementSettings = { [project.id]: sampleMeasurementSettings };
+  let localPose = { [project.id]: { enabled: true } };
+  let localCapture = { [project.id]: { enabled: true, context: null } };
   let uploads = 0;
   let failUploadNumber = 0;
   let releaseFailures = 0;
@@ -65,6 +78,40 @@ function harness() {
     },
     "@/lib/photo-library": { getPhotos: async () => localPhotos, getDeletedPhotoIds: async () => new Set(), wasPhotoDeletedLocally: async () => false, mergePhotosFromBackup: async values => { const added = values.filter(value => !localPhotos.some(item => item.id === value.id)); localPhotos = [...localPhotos, ...added]; return added; } },
     "@/lib/body-project-library": { getBodyProjects: async () => localProjects, getBodyProjectById: async id => localProjects.find(p=>p.id===id), mergeBodyProjectsFromBackup: async values => { localProjects = [...localProjects, ...values.filter(p=>!localProjects.some(x=>x.id===p.id))]; }, replaceBodyProjects: async values => { localProjects = values; } },
+    "@/lib/body-measurement-library": {
+      getBodyMeasurements: async id => localMeasurements.filter(item => !id || item.projectId === id),
+      getBodyMeasurementSettings: async id => localMeasurementSettings[id] ?? sampleMeasurementSettings,
+      mergeBodyMeasurementsFromBackup: async values => {
+        const added = values.filter(item => !localMeasurements.some(existing => existing.id === item.id));
+        localMeasurements = [...localMeasurements, ...added];
+        return added;
+      },
+      mergeBodyMeasurementSettingsFromBackup: async values => {
+        for (const item of values) {
+          if (!(item.projectId in localMeasurementSettings)) localMeasurementSettings[item.projectId] = item.settings;
+        }
+      }
+    },
+    "@/lib/body-measurement-normalization": {
+      normalizeBodyMeasurementEntry: value => value,
+      normalizeBodyMeasurementSettings: value => value
+    },
+    "@/lib/body-pose-alignment": {
+      getBodyPoseAlignmentSettings: async id => localPose[id] ?? { enabled: false },
+      mergeBodyPoseAlignmentSettingsFromBackup: async values => {
+        for (const item of values) {
+          if (!(item.projectId in localPose)) localPose[item.projectId] = { enabled: item.enabled };
+        }
+      }
+    },
+    "@/lib/body-frame-capture-context": {
+      getBodyCaptureContextState: async id => localCapture[id] ?? { enabled: true, context: null },
+      mergeBodyCaptureContextStatesFromBackup: async values => {
+        for (const item of values) {
+          if (!(item.projectId in localCapture)) localCapture[item.projectId] = item.state;
+        }
+      }
+    },
     "@/lib/subscription": { isCreatorSubscriptionActive: () => true },
     "@/lib/storage-mode": { isStorageSaverMode: () => false, shouldUseCloudBackupForStorageMode: () => true },
     "@/lib/video-library": { getMadeVideos: async () => [], getDeletedVideoIds: async () => new Set(), wasVideoDeletedLocally: async () => false, mergeMadeVideosFromBackup: async values => values },
@@ -80,11 +127,27 @@ function harness() {
     }, fetch: async () => ({ blob: async () => ({ size: 100 }) }), console, setTimeout });
     return exports;
   }
-  return { api: load("lib/cloud-backup.ts"), remote, released, uploads: () => uploads, projects: () => localProjects,
-    changeUser: next => { auth.currentUser = next; }, setOwner: next => { owner = next; },
-    setWorks: values => { localWorks=values; }, failUpload: n => { failUploadNumber=n; },
+  return {
+    api: load("lib/cloud-backup.ts"),
+    remote, released, uploads: () => uploads,
+    projects: () => localProjects,
+    measurements: () => localMeasurements,
+    measurementSettings: () => localMeasurementSettings,
+    captureContext: () => localCapture,
+    poseSettings: () => localPose,
+    changeUser: next => { auth.currentUser = next; },
+    setOwner: next => { owner = next; },
+    setWorks: values => { localWorks=values; },
+    setMeasurements: values => { localMeasurements=values; },
+    setProjectSaveMode: mode => { localProjects = localProjects.map(value => ({ ...value, saveMode: mode })); },
+    failUpload: n => { failUploadNumber=n; },
     failFirstRelease: () => { releaseFailures=1; },
-    emptyLocal: () => { localPhotos=[]; localProjects=[]; }, rejectWrites: () => { rejectPhotoWrite=true; } };
+    emptyLocal: () => {
+      localPhotos=[]; localProjects=[]; localMeasurements=[];
+      localMeasurementSettings={}; localPose={}; localCapture={};
+    },
+    rejectWrites: () => { rejectPhotoWrite=true; }
+  };
 }
 
 // Stale callers and unclaimed/foreign libraries must fail before cloud writes.
@@ -108,16 +171,37 @@ function harness() {
   assert.equal(h.remote.get("users/owner/photoBackups/photo-a").sourceUpdatedAt, "2026-09-19T00:00:00.000Z");
   assert.ok(h.released.includes("old-session"), "replacement should retire the old upload");
 }
-// Regression: repeat full backup should reuse the unchanged upload and include its project.
+// Regression: repeated backup preserves a project's photo, measurement and selected UI settings.
 {
   const h=harness();
   await h.api.backupCurrentWorkspace({user, subscription: {}});
   await h.api.backupCurrentWorkspace({user, subscription: {}});
   assert.equal(h.uploads(),1,"unchanged photos must not consume another upload reservation");
   assert.equal(h.remote.get("users/owner/bodyProjects/project-a").name,"Training");
+  assert.equal(h.remote.get("users/owner/bodyMeasurements/measurement-a").weightKg,71.2);
+  assert.equal(h.remote.get("users/owner/bodyProjectSettings/project-a").measurementSettings.promptAfterCapture,true);
+  assert.equal(h.remote.get("users/owner/bodyProjectSettings/project-a").poseAlignmentEnabled,true);
   h.emptyLocal();
   await h.api.restoreCloudBackupToLocal({user});
   assert.equal(h.projects()[0].name,"Training","a fresh device must restore project metadata");
+  assert.equal(h.measurements()[0].photoId,"photo-a","measurement must retain original photoId");
+  assert.equal(h.measurements()[0].weightKg,71.2,"new device restores body measurements");
+  assert.equal(h.measurementSettings()[project.id].promptAfterCapture,true);
+  assert.equal(h.poseSettings()[project.id].enabled,true);
+  assert.equal(h.captureContext()[project.id].enabled,true);
+  await h.api.restoreCloudBackupToLocal({user});
+  assert.equal(h.measurements().length,1,"repeat restore must not duplicate measurements");
+  h.setMeasurements([{ ...h.measurements()[0], weightKg: 72.9 }]);
+  await h.api.restoreCloudBackupToLocal({user});
+  assert.equal(h.measurements()[0].weightKg,72.9,"local measurement edits must take precedence");
+}
+// Regression: switching a project to local-only must not send sensitive measurements.
+{
+  const h=harness();
+  h.setProjectSaveMode("local_only");
+  await h.api.backupCurrentWorkspace({user,subscription:{}});
+  assert.equal(h.remote.has("users/owner/bodyMeasurements/measurement-a"),false);
+  assert.equal(h.remote.has("users/owner/bodyProjectSettings/project-a"),false);
 }
 // Regression: old backups with project IDs but no project documents must remain reachable.
 {
