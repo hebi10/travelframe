@@ -131,7 +131,7 @@ assert.ok(wrapper.includes("visible={isScreenFocused}"), "navigation must hide t
 for (const source of [wrapper, projectList]) {
   assert.ok(source.includes("initializeNewBodyProjectMeasurements(project.id)"), "new projects enable a configurable prompt");
 }
-assert.ok(editor.includes("capturePhoto ? \"촬영 기록 입력\""));
+assert.match(editor, /title=\{capturePhoto\s*\?\s*"촬영 기록 입력"/);
 assert.ok(editor.includes('cancelLabel={capturePhoto ? "나중에 입력" : "취소"}'));
 assert.ok(editor.includes("if (!entry && activeMetrics.every"));
 assert.ok(editor.includes("savingRef.current = true"));
@@ -153,7 +153,7 @@ const runSubmit = async ({ drafts = { weight: "", bodyFat: "" }, note = "", entr
   const saves = [], errors = [], close = [], alerts = [];
   const savingRef = { current: false };
   const context = {
-    savingRef, setSaveError: x => errors.push(x), setSaving: () => {},
+    savingRef, Error, setSaveError: x => errors.push(x), setSaving: () => {},
     activeMetrics: ["weight", "bodyFat"], drafts, note, entry,
     parseDraft: (metric, value) => value.trim() === "" ? undefined : (Number.isFinite(Number(value)) && Number(value) >= 0 ? Number(value) : null),
     bodyMeasurementMetricMeta: { weight: { label: "몸무게" }, bodyFat: { label: "체지방률" } },
