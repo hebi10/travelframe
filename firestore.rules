@@ -599,7 +599,7 @@ service cloud.firestore {
         allow read: if isOwner(userId) || isAdmin();
         allow delete: if isOwner(userId);
         allow create, update: if isOwner(userId)
-          && request.resource.data.keys().hasOnly(["id", "userId", "name", "createdAt", "updatedAt", "targetPhotoCount", "referenceMode", "coverPhotoId", "archived"])
+          && request.resource.data.keys().hasOnly(["id", "userId", "name", "createdAt", "updatedAt", "targetPhotoCount", "referenceMode", "coverPhotoId", "archived", "saveMode"])
           && request.resource.data.id == projectId
           && (!request.resource.data.keys().hasAny(["userId"]) || request.resource.data.userId == userId)
           && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 200
@@ -607,7 +607,9 @@ service cloud.firestore {
           && request.resource.data.targetPhotoCount is int && request.resource.data.targetPhotoCount > 0
           && request.resource.data.referenceMode in ["first", "latest"]
           && request.resource.data.archived is bool
-          && (!request.resource.data.keys().hasAny(["coverPhotoId"]) || request.resource.data.coverPhotoId is string);
+          && (!request.resource.data.keys().hasAny(["coverPhotoId"]) || request.resource.data.coverPhotoId is string)
+          && (!request.resource.data.keys().hasAny(["saveMode"]) ||
+              request.resource.data.saveMode in ["cloud", "local_cloud", "local_only"]);
       }
 
       match /videos/{videoId} {

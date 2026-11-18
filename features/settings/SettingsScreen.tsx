@@ -346,6 +346,7 @@ export default function SettingsScreen() {
   };
 
   const toggleCameraSaveTarget = async (target: CameraSaveTarget) => {
+    if (target === "app") return;
     if (target === "cloud" && !canSelectCloudSaveTarget) {
       return;
     }
@@ -1634,14 +1635,15 @@ export default function SettingsScreen() {
               {activeSetting === "cameraSaveScope"
                 ? cameraSaveScopeOptions.map((scope) => {
                     const isCloudSaveTargetDisabled = scope.value === "cloud" && !canSelectCloudSaveTarget;
+                    const isDisabled = scope.value === "app" || isCloudSaveTargetDisabled;
 
                     return (
                       <OptionButton
                         key={scope.value}
                         label={scope.label}
-                        detail={scope.detail}
+                        detail={scope.value === "app" ? "필수 저장 · 해제할 수 없습니다." : scope.detail}
                         active={getCameraSaveScopeTargets(settings.cameraSaveScope)[scope.value] && !isCloudSaveTargetDisabled}
-                        disabled={isCloudSaveTargetDisabled}
+                        disabled={isDisabled}
                         onPress={() => toggleCameraSaveTarget(scope.value)}
                       />
                     );

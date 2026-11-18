@@ -5,7 +5,8 @@ import { fileURLToPath } from "node:url";
 
 const root = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const testsDirectory = path.join(root, "tests");
-const filters = process.argv.slice(2).map((value) => value.toLowerCase());
+const continueOnFailure = process.argv.includes("--continue-on-failure");
+const filters = process.argv.slice(2).filter(value => value !== "--continue-on-failure").map(value => value.toLowerCase());
 const defaultExcludedTests = new Set(["firebase-rules-emulator.test.mjs"]);
 const TEST_TIMEOUT_MS = 300_000;
 const splitSourceCompatPreload = "./tests/source-split-compat-preload.mjs";
@@ -61,6 +62,7 @@ if (missingAndroidInputs.length > 0) {
   process.exit(1);
 }
 
+const failures = [];
 for (const fileName of testFiles) {
   const filePath = path.join("tests", fileName);
   const result = spawnSync(
@@ -73,15 +75,23 @@ for (const fileName of testFiles) {
     }
   );
 
-  if (
+  const timedOut =
     result.signal === "SIGTERM" ||
-    (result.error && "code" in result.error && result.error.code === "ETIMEDOUT")
-  ) {
+    (result.error && "code" in result.error && result.error.code === "ETIMEDOUT");
+  if (timedOut) {
     console.error(`${filePath} timed out after ${TEST_TIMEOUT_MS / 1000} seconds.`);
-    process.exit(1);
+    failures.push({ filePath, status: "timeout" });
+  } else if (result.status !== 0) {
+    failures.push({ filePath, status: String(result.status ?? result.signal ?? 1) });
   }
 
-  if (result.status !== 0) {
-    process.exit(result.status ?? 1);
+  if (failures.length && !continueOnFailure) process.exit(1);
+}
+
+if (failures.length > 0) {
+  console.error(`\n${failures.length} of ${testFiles.length} Node tests failed:`);
+  for (const failure of failures) {
+    console.error(`- ${failure.filePath} (status: ${failure.status})`);
   }
+  process.exitCode = 1;
 }

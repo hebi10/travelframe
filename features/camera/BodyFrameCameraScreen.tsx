@@ -11,7 +11,8 @@ import {
   useState,
   useSyncExternalStore
 } from "react";
-import { Pressable,
+import { Alert,
+  Pressable,
   StyleSheet,
   View
 } from "react-native";
@@ -51,7 +52,9 @@ import {
 } from "@/lib/body-project-library";
 import { getPhotos } from "@/lib/photo-library";
 import { getPlanEntitlements } from "@/lib/plan-entitlements";
-import type { BodyProject, ReferencePhotoMode } from "@/types/body-project";
+import { getSelectedCloudBackupProjectIds } from "@/lib/cloud-backup-project-slots";
+import { isProjectCloudSaveMode } from "@/lib/project-save-policy";
+import type { BodyProject, ProjectSaveMode, ReferencePhotoMode } from "@/types/body-project";
 import type { PhotoItem } from "@/types/photo";
 
 type CreateProjectInput = {
@@ -61,7 +64,7 @@ type CreateProjectInput = {
 };
 
 export default function BodyFrameCameraScreen() {
-  const { isLoggedIn, subscription } = useAuth();
+  const { isLoggedIn, subscription, user } = useAuth();
   const planEntitlements = useMemo(
     () => getPlanEntitlements({ isLoggedIn, subscription }),
     [isLoggedIn, subscription]
@@ -324,6 +327,43 @@ export default function BodyFrameCameraScreen() {
     setProjects((current) => current.map((project) => project.id === projectId ? updatedProject : project));
   }, [activeProject?.id]);
 
+  const handleChangeProjectSaveMode = useCallback(async (projectId: string, mode: ProjectSaveMode) => {
+    if (!activeProject || activeProject.id !== projectId ||
+        session.pendingSaveCount > 0 ||
+        getBodyFrameCameraSessionSnapshot().projectId !== projectId) {
+      throw new Error("프로젝트가 변경되거나 사진 저장 중입니다. 다시 시도해 주세요.");
+    }
+    if (isProjectCloudSaveMode(mode)) {
+      if (!user || !planEntitlements.canBackupToCloud) {
+        openPlans("backup", "Pro");
+        return;
+      }
+      const eligibleIds = await getSelectedCloudBackupProjectIds(
+        user, planEntitlements.maxCloudBackupProjects
+      );
+      if (!eligibleIds.has(projectId)) {
+        Alert.alert(
+          "백업 프로젝트 선택 필요",
+          "먼저 계정 화면에서 이 프로젝트를 클라우드 백업 프로젝트로 선택해 주세요.",
+          [
+            { text: "취소", style: "cancel" },
+            { text: "계정으로 이동", onPress: () => router.push("/account") }
+          ]
+        );
+        return;
+      }
+    }
+    if (getBodyFrameCameraSessionSnapshot().projectId !== projectId) {
+      throw new Error("촬영 프로젝트가 변경되었습니다.");
+    }
+    const updated = await updateBodyProject(projectId, { saveMode: mode });
+    if (!updated) throw new Error("프로젝트를 찾지 못했습니다.");
+    setProjects((current) => current.map((item) => item.id === projectId ? updated : item));
+  }, [
+    activeProject, planEntitlements.canBackupToCloud,
+    planEntitlements.maxCloudBackupProjects, session.pendingSaveCount, user
+  ]);
+
   const firstPhotoHint = captureBlockedReason
     ? captureBlockedReason
     : activeProject && activeSummary?.photoCount === 0
@@ -337,6 +377,8 @@ export default function BodyFrameCameraScreen() {
       <CameraScreen
         projectReferenceMode={activeProject?.referenceMode}
         onProjectReferenceModeChange={activeProject ? handleChangeReferenceMode : undefined}
+        projectSaveMode={activeProject?.saveMode ?? null}
+        onProjectSaveModeChange={activeProject ? handleChangeProjectSaveMode : undefined}
         headerCenter={
           <BodyFrameProjectSwitcher
             compact
