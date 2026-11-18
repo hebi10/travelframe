@@ -612,6 +612,102 @@ service cloud.firestore {
               request.resource.data.saveMode in ["cloud", "local_cloud", "local_only"]);
       }
 
+      match /bodyMeasurements/{measurementId} {
+        allow read: if isOwner(userId);
+        allow delete: if false;
+        allow create, update: if isOwner(userId)
+          && request.resource.data.keys().hasOnly([
+            "id", "userId", "projectId", "schemaVersion", "recordedAt",
+            "photoId", "sequence", "weightKg", "bodyFatPercent",
+            "skeletalMuscleKg", "waistCm", "note", "source",
+            "sourceRecordId", "sourceAppPackage", "backedUpAt"
+          ])
+          && request.resource.data.keys().hasAll([
+            "id", "userId", "projectId", "schemaVersion",
+            "recordedAt", "source", "backedUpAt"
+          ])
+          && request.resource.data.id == measurementId
+          && request.resource.data.userId == userId
+          && request.resource.data.schemaVersion == 1
+          && request.resource.data.projectId is string
+          && request.resource.data.projectId.size() > 0
+          && request.resource.data.projectId.size() <= 160
+          && request.resource.data.recordedAt is string
+          && request.resource.data.backedUpAt is string
+          && request.resource.data.source in ["manual", "health_connect"]
+          && (!request.resource.data.keys().hasAny(["photoId"]) ||
+              (request.resource.data.photoId is string && request.resource.data.photoId.size() > 0))
+          && (!request.resource.data.keys().hasAny(["sequence"]) ||
+              (request.resource.data.sequence is int && request.resource.data.sequence > 0))
+          && (!request.resource.data.keys().hasAny(["weightKg"]) ||
+              (request.resource.data.weightKg is number &&
+                request.resource.data.weightKg >= 20 && request.resource.data.weightKg <= 500))
+          && (!request.resource.data.keys().hasAny(["bodyFatPercent"]) ||
+              (request.resource.data.bodyFatPercent is number &&
+                request.resource.data.bodyFatPercent >= 1 && request.resource.data.bodyFatPercent <= 70))
+          && (!request.resource.data.keys().hasAny(["skeletalMuscleKg"]) ||
+              (request.resource.data.skeletalMuscleKg is number &&
+                request.resource.data.skeletalMuscleKg >= 5 && request.resource.data.skeletalMuscleKg <= 150))
+          && (!request.resource.data.keys().hasAny(["waistCm"]) ||
+              (request.resource.data.waistCm is number &&
+                request.resource.data.waistCm >= 30 && request.resource.data.waistCm <= 300))
+          && (!request.resource.data.keys().hasAny(["note"]) ||
+              (request.resource.data.note is string && request.resource.data.note.size() <= 500))
+          && (!request.resource.data.keys().hasAny(["sourceRecordId"]) ||
+              (request.resource.data.sourceRecordId is string &&
+                request.resource.data.sourceRecordId.size() <= 512))
+          && (!request.resource.data.keys().hasAny(["sourceAppPackage"]) ||
+              (request.resource.data.sourceAppPackage is string &&
+                request.resource.data.sourceAppPackage.size() <= 256));
+      }
+
+      match /bodyProjectSettings/{projectId} {
+        allow read: if isOwner(userId);
+        allow delete: if false;
+        allow create, update: if isOwner(userId)
+          && request.resource.data.keys().hasOnly([
+            "id", "userId", "projectId", "schemaVersion",
+            "measurementSettings", "poseAlignmentEnabled",
+            "captureContextState", "backedUpAt"
+          ])
+          && request.resource.data.keys().hasAll([
+            "id", "userId", "projectId", "schemaVersion",
+            "measurementSettings", "poseAlignmentEnabled",
+            "captureContextState", "backedUpAt"
+          ])
+          && request.resource.data.id == projectId
+          && request.resource.data.projectId == projectId
+          && request.resource.data.userId == userId
+          && request.resource.data.schemaVersion == 1
+          && request.resource.data.backedUpAt is string
+          && request.resource.data.poseAlignmentEnabled is bool
+          && request.resource.data.measurementSettings is map
+          && request.resource.data.measurementSettings.keys().hasOnly([
+            "enabled", "fields", "primaryMetric", "promptAfterCapture"
+          ])
+          && request.resource.data.measurementSettings.enabled is bool
+          && request.resource.data.measurementSettings.promptAfterCapture is bool
+          && request.resource.data.measurementSettings.primaryMetric in [
+            "weight", "bodyFat", "skeletalMuscle", "waist"
+          ]
+          && request.resource.data.measurementSettings.fields is map
+          && request.resource.data.measurementSettings.fields.keys().hasOnly([
+            "weight", "bodyFat", "skeletalMuscle", "waist"
+          ])
+          && request.resource.data.measurementSettings.fields.weight is bool
+          && request.resource.data.measurementSettings.fields.bodyFat is bool
+          && request.resource.data.measurementSettings.fields.skeletalMuscle is bool
+          && request.resource.data.measurementSettings.fields.waist is bool
+          && request.resource.data.captureContextState is map
+          && request.resource.data.captureContextState.keys().hasOnly([
+            "enabled", "context", "updatedAt"
+          ])
+          && request.resource.data.captureContextState.enabled is bool
+          && (!request.resource.data.captureContextState.keys().hasAny(["context"]) ||
+              request.resource.data.captureContextState.context == null ||
+              request.resource.data.captureContextState.context is map);
+      }
+
       match /videos/{videoId} {
         allow read: if isOwner(userId) || isAdmin();
         allow create: if isOwner(userId) && isValidVideoBackupMetadata(userId, videoId);

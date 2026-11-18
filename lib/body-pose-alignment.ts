@@ -48,6 +48,23 @@ export const getBodyPoseAlignmentSettings = async (projectId: string) => {
   return map[projectId] ?? defaultBodyPoseAlignmentSettings;
 };
 
+export const mergeBodyPoseAlignmentSettingsFromBackup = async (
+  incoming: ReadonlyArray<{ projectId: string; enabled: boolean }>
+) => {
+  const map = await readSettingsMap();
+  const next = { ...map };
+  let changed = false;
+  for (const item of incoming) {
+    if (!item.projectId || Object.prototype.hasOwnProperty.call(next, item.projectId)) continue;
+    next[item.projectId] = { enabled: item.enabled === true };
+    changed = true;
+  }
+  if (changed) {
+    await localStorageAdapter.setItem(BODY_POSE_ALIGNMENT_STORAGE_KEY, JSON.stringify(next));
+  }
+  return changed;
+};
+
 export const updateBodyPoseAlignmentSettings = async (
   projectId: string,
   enabled: boolean
