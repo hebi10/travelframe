@@ -20,6 +20,7 @@ import { BodyFrameSheetHandle } from "@/components/body-frame-sheet";
 import { ActionRow } from "@/components/action-row";
 import { CameraGuideOverlay } from "@/components/camera-guide-overlay";
 import { ScreenShell } from "@/components/screen-shell";
+import { ProjectCloudStatusCards } from "@/features/settings/ProjectCloudStatusCards";
 import { SectionBlock } from "@/components/section-block";
 import { GUIDE_LABELS, GUIDE_TYPES } from "@/constants/camera-guides";
 import {
@@ -60,6 +61,9 @@ import {
 import { APP_FONT_OPTIONS } from "@/lib/app-fonts";
 import { useAuth } from "@/lib/auth-context";
 import { getPlanEntitlements } from "@/lib/plan-entitlements";
+import { getProjectCloudBackupStatuses, type ProjectCloudBackupStatus } from "@/lib/project-cloud-backup-status";
+import { enqueueProjectCloudSync } from "@/lib/project-cloud-sync-queue";
+import { flushProjectCloudSync } from "@/lib/project-cloud-sync";
 import {
   getEffectiveStorageMode,
   getStorageModeLabel,
@@ -169,6 +173,9 @@ export default function SettingsScreen() {
   const [backupFailures, setBackupFailures] = useState<BackupFailureRecord[]>([]);
   const [backupOverview, setBackupOverview] =
     useState<CloudBackupOverview>(emptyBackupOverview);
+  const [projectStatuses, setProjectStatuses] = useState<ProjectCloudBackupStatus[]>([]);
+  const [projectStatusBusy, setProjectStatusBusy] = useState(false);
+  const [projectStatusError, setProjectStatusError] = useState<string | null>(null);
   const [usageStats, setUsageStats] = useState<UsageStats>(emptyUsageStats);
   const [musicTracks, setMusicTracks] = useState<UserMusicTrack[]>([]);
   const [weeklyVideoExportUsage, setWeeklyVideoExportUsage] =
@@ -191,6 +198,30 @@ export default function SettingsScreen() {
   const refreshBackupFailures = useCallback(async () => {
     setBackupFailures(await getBackupFailures());
   }, []);
+
+  const refreshProjectStatuses = useCallback(async () => {
+    if (!user) {
+      setProjectStatuses([]);
+      setProjectStatusError(null);
+      return;
+    }
+    setProjectStatusBusy(true);
+    setProjectStatusError(null);
+    try {
+      setProjectStatuses(await getProjectCloudBackupStatuses({ user }));
+    } catch (error) {
+      setProjectStatusError(getUserFacingErrorMessage(error, "프로젝트 백업 상태를 확인하지 못했습니다."));
+    } finally {
+      setProjectStatusBusy(false);
+    }
+  }, [user]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void refreshProjectStatuses();
+      return () => undefined;
+    }, [refreshProjectStatuses])
+  );
 
   useEffect(() => {
     return subscribeCloudBackupOverview({
@@ -632,7 +663,7 @@ export default function SettingsScreen() {
     confirmCloudRestore(localSummary);
   };
 
-  const handleProjectRestorePress = async () => {
+  const handleProjectRestorePress = async (preferredProjectId?: string) => {
     if (!user || isBackupSubmitting) return;
     try {
       setIsBackupSubmitting(true);
@@ -644,7 +675,11 @@ export default function SettingsScreen() {
         return;
       }
       setRestorableProjects(projects);
-      setSelectedRestoreProjectId(projects[0].id);
+      setSelectedRestoreProjectId(
+        preferredProjectId && projects.some((item) => item.id === preferredProjectId)
+          ? preferredProjectId
+          : projects[0].id
+      );
       setActiveSetting(null);
       setShowProjectRestorePicker(true);
     } catch (error) {
@@ -674,6 +709,18 @@ export default function SettingsScreen() {
       setAuthMessage(getUserFacingErrorMessage(error, "선택한 프로젝트를 복원하지 못했습니다."));
     } finally {
       setIsBackupSubmitting(false);
+    }
+  };
+
+  const retryProjectCloudBackup = async (projectId: string) => {
+    if (!user || isBackupSubmitting) return;
+    try {
+      await enqueueProjectCloudSync({ projectId, kind: "initial" });
+      setAuthMessage("프로젝트 동기화를 대기열에 등록했습니다. 앱 사용 중 자동으로 재시도합니다.");
+      void flushProjectCloudSync({ user, subscription }).catch(() => undefined);
+      await refreshProjectStatuses();
+    } catch (error) {
+      setAuthMessage(getUserFacingErrorMessage(error, "프로젝트 동기화를 요청하지 못했습니다."));
     }
   };
 
@@ -1083,6 +1130,23 @@ export default function SettingsScreen() {
                       프로젝트 선택 복원
                     </Text>
                   </Pressable>
+
+                  <ProjectCloudStatusCards
+                    statuses={projectStatuses}
+                    loading={projectStatusBusy}
+                    error={projectStatusError}
+                    disabled={isBackupSubmitting}
+                    colors={{
+                      text: palette.text,
+                      muted: palette.muted,
+                      line: palette.line,
+                      surface: palette.surface
+                    }}
+                    formatBytes={formatImageBackupUsage}
+                    onRefresh={() => void refreshProjectStatuses()}
+                    onRetry={(projectId) => void retryProjectCloudBackup(projectId)}
+                    onRestore={(projectId) => void handleProjectRestorePress(projectId)}
+                  />
                   <Pressable
                     disabled={isBackupSubmitting}
                     style={[
@@ -1900,6 +1964,23 @@ export default function SettingsScreen() {
                       </Text>
                     </Pressable>
                   </View>
+
+                  <ProjectCloudStatusCards
+                    statuses={projectStatuses}
+                    loading={projectStatusBusy}
+                    error={projectStatusError}
+                    disabled={isBackupSubmitting}
+                    colors={{
+                      text: palette.text,
+                      muted: palette.muted,
+                      line: palette.line,
+                      surface: palette.surface
+                    }}
+                    formatBytes={formatImageBackupUsage}
+                    onRefresh={() => void refreshProjectStatuses()}
+                    onRetry={(projectId) => void retryProjectCloudBackup(projectId)}
+                    onRestore={(projectId) => void handleProjectRestorePress(projectId)}
+                  />
                   {STORAGE_MODE_OPTIONS.map((option) => {
                     const isCloudBackupOptionDisabled =
                       option.requiresBackupPlan && !canSelectCloudSaveTarget;
