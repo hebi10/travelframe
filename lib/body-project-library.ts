@@ -66,6 +66,9 @@ const normalizeBodyProject = (value: unknown): BodyProject | null => {
     referenceMode: normalizeReferencePhotoMode(record.referenceMode),
     ...(coverPhotoId ? { coverPhotoId } : {}),
     ...(isProjectSaveMode(record.saveMode) ? { saveMode: record.saveMode } : {}),
+    ...(record.cloudResumeMode === "cloud" || record.cloudResumeMode === "local_cloud"
+      ? { cloudResumeMode: record.cloudResumeMode }
+      : {}),
     archived: record.archived === true
   };
 };
@@ -155,7 +158,9 @@ export const createBodyProject = async ({
 
 export const updateBodyProject = async (
   id: string,
-  patch: Partial<Pick<BodyProject, "name" | "targetPhotoCount" | "referenceMode" | "coverPhotoId" | "saveMode">>
+  patch: Partial<Pick<BodyProject, "name" | "targetPhotoCount" | "referenceMode" | "coverPhotoId" | "saveMode">> & {
+    cloudResumeMode?: BodyProject["cloudResumeMode"] | null;
+  }
 ) =>
   runProjectMutation(async () => {
     const projects = await getBodyProjects();
@@ -183,6 +188,12 @@ export const updateBodyProject = async (
           ? { coverPhotoId: patch.coverPhotoId.trim() || undefined }
           : {}),
         ...(isProjectSaveMode(patch.saveMode) ? { saveMode: patch.saveMode } : {}),
+        ...(patch.cloudResumeMode === null ||
+        (isProjectSaveMode(patch.saveMode) && patch.saveMode !== "local_only")
+          ? { cloudResumeMode: undefined }
+          : patch.cloudResumeMode === "cloud" || patch.cloudResumeMode === "local_cloud"
+            ? { cloudResumeMode: patch.cloudResumeMode }
+            : {}),
         updatedAt: new Date().toISOString()
       };
       return updatedProject;

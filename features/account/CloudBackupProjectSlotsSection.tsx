@@ -23,6 +23,7 @@ import {
 } from "@/lib/cloud-backup-project-slots";
 import { getBodyProjects, updateBodyProject } from "@/lib/body-project-library";
 import { getPhotos } from "@/lib/photo-library";
+import { enqueueProjectCloudSync } from "@/lib/project-cloud-sync-queue";
 import type { BodyProject } from "@/types/body-project";
 import type { PhotoItem } from "@/types/photo";
 
@@ -155,7 +156,10 @@ export function CloudBackupProjectSlotsSection({
     if (busyProjectId) return;
     setBusyProjectId(project.id);
     try {
-      await updateBodyProject(project.id, { saveMode: "local_only" });
+      await updateBodyProject(project.id, {
+        saveMode: "local_only",
+        cloudResumeMode: project.saveMode === "cloud" ? "cloud" : "local_cloud"
+      });
       await reload();
       setMessage(
         `"${project.name}" 프로젝트의 새 클라우드 백업을 중지했습니다. 이 기기의 앱 보관함·앨범 저장은 유지되며 기존 원격 파일은 삭제되지 않습니다. 슬롯은 계속 사용합니다.`
@@ -171,10 +175,12 @@ export function CloudBackupProjectSlotsSection({
     if (busyProjectId) return;
     setBusyProjectId(project.id);
     try {
-      await updateBodyProject(project.id, { saveMode: "local_cloud" });
+      const resumeMode = project.cloudResumeMode === "cloud" ? "cloud" : "local_cloud";
+      await updateBodyProject(project.id, { saveMode: resumeMode, cloudResumeMode: null });
+      await enqueueProjectCloudSync({ projectId: project.id, kind: "initial" });
       await reload();
       setMessage(
-        `"${project.name}" 프로젝트의 앱·앨범·클라우드 저장을 다시 사용합니다. 원격 데이터는 계속 보존됩니다.`
+        `"${project.name}" 프로젝트의 기존 저장 방식으로 클라우드 백업을 재개했습니다. 중지 중 변경된 항목은 동기화 대기열에 등록했습니다.`
       );
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "백업 재개 설정을 저장하지 못했습니다.");

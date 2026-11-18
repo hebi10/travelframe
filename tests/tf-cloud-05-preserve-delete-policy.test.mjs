@@ -7,6 +7,9 @@ const ui = read("features/account/CloudBackupProjectSlotsSection.tsx");
 const settings = read("features/settings/SettingsScreen.tsx");
 const slots = read("lib/cloud-backup-project-slots.ts");
 const cloud = read("lib/cloud-backup.ts");
+const projectLibrary = read("lib/body-project-library.ts");
+const projectTypes = read("types/body-project.ts");
+const nativeQaWorkflow = read(".github/workflows/body-frame-device-qa.yml");
 
 const replace = backend.slice(
   backend.indexOf("exports.replaceCloudBackupProject = secureOnCall("),
@@ -23,7 +26,16 @@ assert.ok(slots.includes("confirmDeletePreviousProjectId: string"));
 assert.ok(slots.includes("{ slotId, projectId, confirmDeletePreviousProjectId }"));
 assert.ok(ui.includes("confirmDeletePreviousProjectId: slot.projectId"));
 assert.ok(ui.includes('saveMode: "local_only"'), "non-destructive stop must change only future sync");
-assert.ok(ui.includes('saveMode: "local_cloud"'), "stop should offer a way to resume");
+assert.ok(ui.includes('cloudResumeMode: project.saveMode === "cloud" ? "cloud" : "local_cloud"'), "stop must preserve the prior cloud-only save mode");
+assert.ok(ui.includes('project.cloudResumeMode === "cloud" ? "cloud" : "local_cloud"'), "resume must restore the previous device save behavior");
+assert.ok(ui.includes('cloudResumeMode: null'), "resume clears the temporary pause marker");
+assert.ok(ui.includes('kind: "initial"'), "resume must resync changes made while the project was paused");
+assert.ok(projectLibrary.includes('record.cloudResumeMode === "cloud"'), "restart must restore the pause marker from persistent storage");
+assert.ok(projectLibrary.includes('{ cloudResumeMode: undefined }'), "resume must clear persisted pause state");
+assert.ok(projectTypes.includes('cloudResumeMode?: "cloud" | "local_cloud"'));
+assert.ok(nativeQaWorkflow.includes("  push:\n    branches:\n      - main"), "native QA must target final main");
+assert.ok(nativeQaWorkflow.includes("contains(github.event.head_commit.message, '[android-qa]')"), "native QA must require an explicit final merge marker");
+assert.ok(!nativeQaWorkflow.includes("  pull_request:\n"), "native QA must not re-run on intermediate PR updates");
 assert.ok(ui.includes("기존 원격 파일은 삭제되지 않습니다"));
 assert.ok(ui.includes("측정 기록과 촬영 설정이 영구 삭제됩니다"));
 assert.ok(ui.includes("원본이 없으면 복구할 수 없습니다"));

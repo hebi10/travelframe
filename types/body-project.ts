@@ -10,5 +10,6 @@ export type BodyProject = {
   referenceMode: ReferencePhotoMode;
   coverPhotoId?: string;
   saveMode?: ProjectSaveMode;
+  cloudResumeMode?: "cloud" | "local_cloud";
   archived: boolean;
 };
