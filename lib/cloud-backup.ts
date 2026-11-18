@@ -1732,6 +1732,19 @@ export const backupImageBundleWork = async ({
     return null;
   }
 
+  const existingWorkSnapshot = await getDoc(
+    doc(firestore, "users", user.uid, "imageWorks", work.id)
+  );
+  const existingWork = existingWorkSnapshot.data();
+  if (existingWorkSnapshot.exists() &&
+      existingWork?.backupStatus === "backed_up" &&
+      existingWork?.localId === work.id &&
+      existingWork?.sourceUpdatedAt === (work.updatedAt ?? work.createdAt) &&
+      Array.isArray(existingWork?.storagePaths) &&
+      existingWork.storagePaths.length > 0) {
+    return existingWork;
+  }
+
   const sourceDeviceId = await getSourceDeviceId();
   const backedUpAt = new Date().toISOString();
   const optimizedImagesForCleanup: OptimizedBackupImageCleanup[] = [];
@@ -1816,6 +1829,7 @@ export const backupImageBundleWork = async ({
     imageQuality: settings.imageBackupQuality,
     userId: user.uid,
     localId: work.id,
+    sourceUpdatedAt: work.updatedAt ?? work.createdAt,
     backupStatus: "backed_up",
     backupEnabledAt: backedUpAt,
     lastBackedUpAt: backedUpAt,
@@ -1931,13 +1945,16 @@ export const backupMadeVideo = async ({
         backupStatus?: string;
         localId?: string;
         storagePath?: string;
+        backupSessionId?: string;
+        sourceUpdatedAt?: string;
       }
     | undefined;
   if (
     existingSnapshot.exists() &&
     existingVideo?.backupStatus === "backed_up" &&
     existingVideo.localId === video.id &&
-    existingVideo.storagePath
+    existingVideo.storagePath &&
+    existingVideo.sourceUpdatedAt === (video.updatedAt ?? video.createdAt)
   ) {
     return existingVideo;
   }
@@ -1987,6 +2004,7 @@ export const backupMadeVideo = async ({
       backupStatus: "backed_up",
       backupEnabledAt: settings.cloudBackupEnabled ? backedUpAt : null,
       lastBackedUpAt: backedUpAt,
+      sourceUpdatedAt: video.updatedAt ?? video.createdAt,
       sourceDeviceId,
       fileType: "video/mp4",
       backedUpAt,
@@ -2008,6 +2026,10 @@ export const backupMadeVideo = async ({
     return null;
   }
 
+  if (existingVideo?.backupSessionId &&
+      existingVideo.backupSessionId !== upload.backupSessionId) {
+    await releaseBackupUploads([existingVideo.backupSessionId]).catch(() => undefined);
+  }
   await refreshBackupOverview(user.uid, backedUpAt);
   await applyStorageSaverPolicy({
     settings,

@@ -303,7 +303,8 @@ export const updateMadeVideo = async (
     id: video.id,
     uri: persistedUri,
     localUri: isRemoteUri(persistedUri) ? updates.localUri ?? video.localUri : persistedUri,
-    createdAt: video.createdAt
+    createdAt: video.createdAt,
+    updatedAt: new Date().toISOString()
   };
 
   await writeVideos(videos.map((item) => (item.id === id ? updatedVideo : item)));

@@ -217,7 +217,8 @@ export const updateImageBundleWork = async (
       ...updates,
       id: item.id,
       kind: "image-bundle",
-      createdAt: item.createdAt
+      createdAt: item.createdAt,
+      updatedAt: new Date().toISOString()
     };
 
     return updatedItem;
