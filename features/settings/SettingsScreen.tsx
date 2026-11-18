@@ -60,7 +60,7 @@ import {
 } from "@/lib/google-auth";
 import { APP_FONT_OPTIONS } from "@/lib/app-fonts";
 import { useAuth } from "@/lib/auth-context";
-import { getPlanEntitlements } from "@/lib/plan-entitlements";
+import { GIB, getPlanEntitlements } from "@/lib/plan-entitlements";
 import { getProjectCloudBackupStatuses, type ProjectCloudBackupStatus } from "@/lib/project-cloud-backup-status";
 import { enqueueProjectCloudSync } from "@/lib/project-cloud-sync-queue";
 import { flushProjectCloudSync } from "@/lib/project-cloud-sync";

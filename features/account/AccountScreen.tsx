@@ -824,6 +824,7 @@ export default function AccountScreen() {
             user={user}
             maxSlots={planEntitlements.maxCloudBackupProjects}
             maxPhotosPerProject={planEntitlements.maxCloudPhotosPerProject}
+            backupStorageBytes={planEntitlements.backupStorageBytes}
           />
 
           <SectionBlock title="플랜 및 결제">

@@ -29,11 +29,13 @@ import type { PhotoItem } from "@/types/photo";
 export function CloudBackupProjectSlotsSection({
   user,
   maxSlots,
-  maxPhotosPerProject
+  maxPhotosPerProject,
+  backupStorageBytes
 }: {
   user: User | null;
   maxSlots: number;
   maxPhotosPerProject: number;
+  backupStorageBytes: number;
 }) {
   const { palette } = useAppAppearance();
   const [projects, setProjects] = useState<BodyProject[]>([]);
@@ -235,7 +237,7 @@ export function CloudBackupProjectSlotsSection({
             Pro 이상 구독 후 프로젝트를 클라우드에 백업할 수 있습니다.
           </Text>
           <Text style={[styles.detail, { color: palette.muted }]}>
-            Pro는 1개, Plus는 3개, Expert는 5개 프로젝트를 선택할 수 있습니다.
+            Pro는 1개·2GB, Plus는 3개·6GB, Expert는 5개·10GB의 계정 공유 저장 공간을 제공합니다.
           </Text>
           <Pressable
             accessibilityRole="button"
@@ -265,8 +267,10 @@ export function CloudBackupProjectSlotsSection({
           {Math.min(slots.length, maxSlots)} / {maxSlots}개 프로젝트 선택
         </Text>
         <Text style={[styles.detail, { color: palette.muted }]}>
-          선택한 프로젝트만 클라우드에 백업되며 프로젝트당 사진 최대{" "}
-          {maxPhotosPerProject}장을 저장할 수 있습니다.
+          선택한 프로젝트만 클라우드에 백업됩니다. 계정 전체 저장 용량{" "}
+          {Math.round(backupStorageBytes / (1024 * 1024 * 1024))}GB ·
+          프로젝트당 사진 최대 {maxPhotosPerProject}장입니다.
+          촬영 수치와 설정도 선택한 프로젝트와 함께 백업됩니다.
         </Text>
         <Text style={[styles.warning, { color: palette.text }]}>
           새 백업 중지는 원격 데이터를 삭제하지 않습니다. 슬롯 교체는 명시적으로
