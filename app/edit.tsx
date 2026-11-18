@@ -55,6 +55,8 @@ import { getPlanEntitlements } from "@/lib/plan-entitlements";
 import { isMediaLibraryAccessGranted } from "@/lib/media-library-permissions";
 import { requestMediaLibraryAccess } from "@/lib/request-media-library-access";
 import { recordBackupFailure } from "@/lib/backup-failure-queue";
+import { clearBackupFailure } from "@/lib/backup-failure-queue";
+import { enqueueProjectCloudSync } from "@/lib/project-cloud-sync-queue";
 import { backupPhotoIfEnabled } from "@/lib/cloud-backup";
 import { deleteLocalFile, getPhotoById, saveEditedPhoto } from "@/lib/photo-library";
 import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
@@ -500,11 +502,12 @@ export default function EditScreen() {
         localImageLimit: planEntitlements.localImageLimit
       });
       try {
-        await backupPhotoIfEnabled({
+        const backedUp = await backupPhotoIfEnabled({
           user,
           subscription,
           photo: savedPhoto
         });
+        if (backedUp) await clearBackupFailure(savedPhoto.id).catch(() => undefined);
       } catch (backupError) {
         console.error("편집 사진 자동 백업에 실패했습니다.", backupError);
         await recordBackupFailure({
@@ -515,7 +518,14 @@ export default function EditScreen() {
             backupError,
             "클라우드 백업은 완료하지 못했습니다."
           )
-        });
+        }).catch(() => undefined);
+        if (savedPhoto.projectId) {
+          await enqueueProjectCloudSync({
+            projectId: savedPhoto.projectId,
+            kind: "photo",
+            itemId: savedPhoto.id
+          }).catch(() => undefined);
+        }
         Alert.alert(
           "백업 실패",
           "편집 결과는 현재 기기에 저장되었습니다. 클라우드 백업은 설정에서 다시 시도할 수 있습니다."

@@ -2,9 +2,23 @@ import * as FileSystem from "expo-file-system/legacy";
 import { downloadPrivateFile } from "@/lib/private-storage";
 
 import { localStorageAdapter } from "@/lib/local-storage";
+import { getPhotos } from "@/lib/photo-library";
+import { enqueueProjectCloudSync } from "@/lib/project-cloud-sync-queue";
 import { assertLocalLibraryCapacity } from "@/lib/local-library-limit";
 import { getNextTripClipTitle, TRIP_CLIP_TITLE_PREFIX } from "@/lib/trip-clip-title";
 import type { ImageBundleWorkItem } from "@/types/work";
+
+const enqueueImageWorkIfProjectLinked = async (work: ImageBundleWorkItem) => {
+  if (!work.photoIds.length) return;
+  const photos = await getPhotos();
+  const projectByPhotoId = new Map(photos.map((photo) => [photo.id, photo.projectId]));
+  const linkedProjectIds = new Set(work.photoIds.map((photoId) => projectByPhotoId.get(photoId)));
+  if (linkedProjectIds.size !== 1) return;
+  const projectId = [...linkedProjectIds][0];
+  if (projectId) {
+    await enqueueProjectCloudSync({ projectId, kind: "image-work", itemId: work.id });
+  }
+};
 
 const IMAGE_BUNDLE_STORAGE_KEY = "travel-frame.image-bundles.v1";
 const IMAGE_BUNDLE_DELETION_MARKER_KEY = "travel-frame.image-bundle-deletion-markers.v1";
@@ -196,6 +210,7 @@ export const saveImageBundleWork = async (
   };
 
   await writeImageBundles([savedItem, ...items]);
+  await enqueueImageWorkIfProjectLinked(savedItem).catch(() => undefined);
   return savedItem;
 });
 
@@ -229,6 +244,7 @@ export const updateImageBundleWork = async (
   }
 
   await writeImageBundles(nextItems);
+  await enqueueImageWorkIfProjectLinked(updatedItem).catch(() => undefined);
   return updatedItem;
 });
 

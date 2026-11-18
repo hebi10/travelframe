@@ -1,7 +1,7 @@
 import type { User } from "firebase/auth";
 
 import { getAppSettings, isCloudBackupTargetEnabled } from "@/lib/app-settings";
-import { getBackupFailures } from "@/lib/backup-failure-queue";
+import { clearBackupFailure, getBackupFailures } from "@/lib/backup-failure-queue";
 import { getBodyProjects, getBodyProjectById } from "@/lib/body-project-library";
 import { getSelectedCloudBackupProjectIds } from "@/lib/cloud-backup-project-slots";
 import {
@@ -151,7 +151,12 @@ const syncTask = async ({
     const photo = (await getPhotos()).find((item) =>
       item.id === task.itemId && item.projectId === project.id
     );
-    if (photo) await backupPhotoIfEnabled({ user, subscription, photo });
+    if (photo) {
+      const backup = await backupPhotoIfEnabled({ user, subscription, photo });
+      if (backup) await clearBackupFailure(photo.id).catch(() => undefined);
+    } else {
+      await clearBackupFailure(task.itemId).catch(() => undefined);
+    }
     return;
   }
   if (task.kind === "video" && task.itemId) {
@@ -179,7 +184,8 @@ const syncTask = async ({
   await backupProjectSupplementIfEnabled({ user, subscription, projectId: project.id });
   const photos = (await getPhotos()).filter((item) => item.projectId === project.id);
   for (const photo of photos) {
-    await backupPhotoIfEnabled({ user, subscription, photo });
+    const backedUp = await backupPhotoIfEnabled({ user, subscription, photo });
+    if (backedUp) await clearBackupFailure(photo.id).catch(() => undefined);
   }
   const videos = (await getMadeVideos()).filter((item) => item.projectId === project.id);
   for (const video of videos) {
