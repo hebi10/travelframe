@@ -39,7 +39,7 @@ export const getProjectCloudBackupStatuses = async ({
 }: { user: User | null }): Promise<ProjectCloudBackupStatus[]> => {
   if (!user || !firestore || firebaseAuth?.currentUser?.uid !== user.uid) return [];
   await assertLocalLibraryOwner(user.uid);
-  const [projects, slots, photos, tasks, remoteProjects, remotePhotos, remoteVideos, remoteMeasurements] =
+  const [projects, slots, photos, tasks, remoteProjects, remotePhotos, remoteVideos, remoteMeasurements, remoteSettings] =
     await Promise.all([
       getBodyProjects(),
       getCloudBackupProjectSlots(user),
@@ -48,7 +48,8 @@ export const getProjectCloudBackupStatuses = async ({
       getDocs(collection(firestore, "users", user.uid, "bodyProjects")),
       getDocs(collection(firestore, "users", user.uid, "photoBackups")),
       getDocs(collection(firestore, "users", user.uid, "videos")),
-      getDocs(collection(firestore, "users", user.uid, "bodyMeasurements"))
+      getDocs(collection(firestore, "users", user.uid, "bodyMeasurements")),
+      getDocs(collection(firestore, "users", user.uid, "bodyProjectSettings"))
     ]);
   if (firebaseAuth?.currentUser?.uid !== user.uid) {
     throw new Error("계정이 변경되어 프로젝트 백업 현황을 확인하지 못했습니다.");
@@ -71,9 +72,10 @@ export const getProjectCloudBackupStatuses = async ({
     const dates = [...projectPhotos, ...projectVideos, ...projectMeasurements]
       .map((item) => dateValue(item.data().lastBackedUpAt ?? item.data().backedUpAt))
       .filter((value): value is string => Boolean(value));
-    const remoteProject = remoteProjects.docs.find((item) => item.id === projectId);
-    const remoteDate = dateValue(remoteProject?.data().updatedAt ?? remoteProject?.data().createdAt);
-    if (remoteDate) dates.push(remoteDate);
+    const settingsDate = dateValue(
+      remoteSettings.docs.find((item) => item.id === projectId)?.data().backedUpAt
+    );
+    if (settingsDate) dates.push(settingsDate);
     const cloudBytes =
       projectPhotos.reduce((sum, item) => sum + finiteSize(item.data().imageBackupSize ?? item.data().fileSize), 0) +
       projectVideos.reduce((sum, item) => sum + finiteSize(item.data().fileSize), 0);
