@@ -506,12 +506,13 @@ exports.selectCloudBackupProject = secureOnCall(async (request) => {
 
 const deleteBackupProjectCloudData = async ({ uid, projectId }) => {
   const userRef = db.doc(`users/${uid}`);
-  const [photoSnapshot, videoSnapshot, sessionSnapshot, adminSessionSnapshot] =
+  const [photoSnapshot, videoSnapshot, sessionSnapshot, adminSessionSnapshot, measurementSnapshot] =
     await Promise.all([
       userRef.collection("photoBackups").where("projectId", "==", projectId).get(),
       userRef.collection("videos").where("projectId", "==", projectId).get(),
       userRef.collection("backupUploadSessions").where("projectId", "==", projectId).get(),
-      userRef.collection("adminBackupUploadSessions").where("projectId", "==", projectId).get()
+      userRef.collection("adminBackupUploadSessions").where("projectId", "==", projectId).get(),
+      userRef.collection("bodyMeasurements").where("projectId", "==", projectId).get()
     ]);
 
   const backupDocs = [...photoSnapshot.docs, ...videoSnapshot.docs];
@@ -540,6 +541,8 @@ const deleteBackupProjectCloudData = async ({ uid, projectId }) => {
     ...backupDocs.map((item) => item.ref),
     ...sessionSnapshot.docs.map((item) => item.ref),
     ...adminSessionSnapshot.docs.map((item) => item.ref),
+    ...measurementSnapshot.docs.map((item) => item.ref),
+    userRef.collection("bodyProjectSettings").doc(projectId),
     userRef.collection("bodyProjects").doc(projectId)
   ];
   await commitDeleteBatch(refs);
@@ -3143,6 +3146,8 @@ const deleteCloudBackupDataForUser = async (uid) => {
     videoSnapshot,
     musicSnapshot,
     projectSnapshot,
+    measurementSnapshot,
+    projectSettingsSnapshot,
     sessionSnapshot,
     adminSessionSnapshot,
     musicSessionSnapshot,
@@ -3154,6 +3159,8 @@ const deleteCloudBackupDataForUser = async (uid) => {
     userRef.collection("videos").get(),
     userRef.collection("musicTracks").get(),
     userRef.collection("bodyProjects").get(),
+    userRef.collection("bodyMeasurements").get(),
+    userRef.collection("bodyProjectSettings").get(),
     userRef.collection("backupUploadSessions").get(),
     userRef.collection("adminBackupUploadSessions").get(),
     userRef.collection("musicUploadSessions").get(),
@@ -3164,6 +3171,8 @@ const deleteCloudBackupDataForUser = async (uid) => {
   let imageBackupBytes = 0;
   const documentDeletes = [
     ...projectSnapshot.docs,
+    ...measurementSnapshot.docs,
+    ...projectSettingsSnapshot.docs,
     ...sessionSnapshot.docs,
     ...adminSessionSnapshot.docs,
     ...musicSessionSnapshot.docs,
