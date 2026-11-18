@@ -52,8 +52,8 @@ assert.ok(
   "successful logged-out video creation should record the weekly quota"
 );
 assert.ok(
-  tripClipSource.includes("if (isLoggedIn)"),
-  "logged-in users should bypass the guest weekly quota"
+  tripClipSource.includes('exportFormat !== "mp4" || isLoggedIn'),
+  "logged-in and image exports should bypass the guest video quota after the reward choice"
 );
 
 console.log("ok - photo editing stays auth-gated while guest video output uses a weekly quota");
