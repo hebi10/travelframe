@@ -129,13 +129,16 @@ jobs:
       - name: Verify capture helper
         run: python3 scripts/test_capture_android_qa.py
       - name: Ensure native video inspection tools
-        timeout-minutes: 6
+        timeout-minutes: 15
         shell: bash
         run: |
           set -euo pipefail
           if ! command -v ffprobe >/dev/null || ! command -v ffmpeg >/dev/null; then
-            timeout 120s sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=20 update
-            timeout 240s sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ffmpeg
+            if [ -f /etc/apt/apt-mirrors.txt ]; then
+              printf '%s\n' 'https://archive.ubuntu.com/ubuntu' | sudo tee /etc/apt/apt-mirrors.txt >/dev/null
+            fi
+            timeout 150s sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 update
+            timeout 600s sudo env DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 install -y --no-install-recommends ffmpeg
           fi
           command -v ffprobe
           command -v ffmpeg
