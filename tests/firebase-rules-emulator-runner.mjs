@@ -351,6 +351,28 @@ await seedBackupUploadSession({ sessionId: "body-released", storagePath: `users/
 await expectDenied("released upload cannot replace a photo", firestoreRequest("PATCH", `users/${ownerUid}/photoBackups/body-photo`, { uid: ownerUid, data: { ...bodyPhoto, storagePath: `users/${ownerUid}/backups/photos/body-released.jpg`, backupSessionId: "body-released" } }));
 await seedBackupUploadSession({ sessionId: "body-video", storagePath: `users/${ownerUid}/backups/videos/body.mp4`, fileSize: 2048, contentType: "video/mp4", mediaKind: "video", status: "completed" });
 await expectAllowed("Body Frame video keeps its project", firestoreRequest("PATCH", `users/${ownerUid}/videos/body-video`, { uid: ownerUid, data: { ...validVideoBackup(ownerUid, "body-video"), storagePath: `users/${ownerUid}/backups/videos/body.mp4`, backupSessionId: "body-video", projectId: "project-1" } }));
+await expectAllowed("video edit revision permits ISO source timestamp", firestoreRequest("PATCH",
+  `users/${ownerUid}/videos/body-video`, {
+    uid: ownerUid,
+    data: {
+      ...validVideoBackup(ownerUid, "body-video"),
+      storagePath: `users/${ownerUid}/backups/videos/body.mp4`,
+      backupSessionId: "body-video",
+      projectId: "project-1",
+      sourceUpdatedAt: "2026-11-18T08:00:00.000Z"
+    }
+  }));
+await expectDenied("invalid video edit revision is rejected", firestoreRequest("PATCH",
+  `users/${ownerUid}/videos/body-video`, {
+    uid: ownerUid,
+    data: {
+      ...validVideoBackup(ownerUid, "body-video"),
+      storagePath: `users/${ownerUid}/backups/videos/body.mp4`,
+      backupSessionId: "body-video",
+      projectId: "project-1",
+      sourceUpdatedAt: 100
+    }
+  }));
 
 await expectDenied(
   "unauthenticated users cannot read backup overview",
