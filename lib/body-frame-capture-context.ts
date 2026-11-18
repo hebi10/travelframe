@@ -166,6 +166,22 @@ export const getBodyCaptureContextState = async (projectId: string) => {
   return map[projectId] ?? defaultBodyCaptureContextState;
 };
 
+export const mergeBodyCaptureContextStatesFromBackup = async (
+  incoming: ReadonlyArray<{ projectId: string; state: BodyCaptureContextState }>
+) =>
+  runMutation(async () => {
+    const map = await readStateMap();
+    const next = { ...map };
+    let changed = false;
+    for (const item of incoming) {
+      if (!item.projectId || Object.prototype.hasOwnProperty.call(next, item.projectId)) continue;
+      next[item.projectId] = normalizeState(item.state);
+      changed = true;
+    }
+    if (changed) await writeStateMap(next);
+    return changed;
+  });
+
 export const updateBodyCaptureContextEnabled = async (
   projectId: string,
   enabled: boolean
