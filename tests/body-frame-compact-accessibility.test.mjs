@@ -61,7 +61,8 @@ await (async () => {
       setCameraSaveScope: (scope) => { selectedScope = scope; },
       queueAppSettingsUpdate: (settings) => { updates.push(settings); persistedSettings = { ...persistedSettings, ...settings }; },
       Alert: { alert: (_title, _message, buttons) => { actions = buttons; } },
-      Linking: { openSettings: () => {} }
+      Linking: { openSettings: () => {} },
+      getBodyFrameCameraSessionSnapshot: () => ({ projectId: null })
     })("권한 거절");
     actions.find((button) => button.text === "앱에만 저장").onPress();
     check("actual permission prompt callback applies the local fallback", () => {
