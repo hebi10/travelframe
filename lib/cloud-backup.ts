@@ -440,6 +440,39 @@ const backupBodyProjectSupplement = async (userId: string, projectId: string) =>
   }
 };
 
+export const backupProjectSupplementIfEnabled = async ({
+  user,
+  subscription,
+  projectId
+}: {
+  user: User | null;
+  subscription: UserSubscription;
+  projectId: string;
+}) => {
+  if (!user || !isCreatorSubscriptionActive(subscription)) return false;
+  if (firebaseAuth?.currentUser?.uid !== user.uid) {
+    throw new Error("백업 계정이 변경되었습니다.");
+  }
+  await assertLocalLibraryOwner(user.uid);
+  const [project, settings, selected] = await Promise.all([
+    getBodyProjectById(projectId),
+    getAppSettings(),
+    getSelectedCloudBackupProjectIds(
+      user, getPlanEntitlements({ isLoggedIn: true, subscription }).maxCloudBackupProjects
+    )
+  ]);
+  if (!project || !selected.has(projectId) ||
+      !projectWantsCloudBackup(project, isCloudBackupTargetEnabled(settings, "photos"))) {
+    return false;
+  }
+  if (firebaseAuth?.currentUser?.uid !== user.uid) {
+    throw new Error("백업 계정이 변경되었습니다.");
+  }
+  await backupBodyProjects(user.uid, projectId);
+  await backupBodyProjectSupplement(user.uid, projectId);
+  return true;
+};
+
 const uploadLocalFile = async ({
   uri,
   storagePath,
@@ -1854,6 +1887,17 @@ export const backupMadeVideo = async ({
   ]);
   if (!projectWantsCloudBackup(project, isCloudBackupTargetEnabled(settings, "videos"))) {
     return null;
+  }
+  if (video.projectId) {
+    if (!project) return null;
+    const selectedProjectIds = await getSelectedCloudBackupProjectIds(
+      user,
+      getPlanEntitlements({
+        isLoggedIn: true,
+        subscription: subscription ?? null
+      }).maxCloudBackupProjects
+    );
+    if (!selectedProjectIds.has(video.projectId)) return null;
   }
   if (!video.projectId && video.photoIds?.length) {
     const [photos, projects, selectedProjectIds] = await Promise.all([
