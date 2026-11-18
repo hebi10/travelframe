@@ -1124,7 +1124,7 @@ export default function SettingsScreen() {
                       themed.secondaryButton,
                       (isBackupSubmitting || !planEntitlements.canBackupToCloud) && styles.disabledButton
                     ]}
-                    onPress={planEntitlements.canBackupToCloud ? handleProjectRestorePress : undefined}
+                    onPress={planEntitlements.canBackupToCloud ? () => void handleProjectRestorePress() : undefined}
                   >
                     <Text selectable={false} style={[styles.authSecondaryButtonText, themed.text]}>
                       프로젝트 선택 복원
@@ -1957,7 +1957,7 @@ export default function SettingsScreen() {
                         themed.secondaryButton,
                         (isBackupSubmitting || !planEntitlements.canBackupToCloud) && styles.disabledButton
                       ]}
-                      onPress={planEntitlements.canBackupToCloud ? handleProjectRestorePress : undefined}
+                      onPress={planEntitlements.canBackupToCloud ? () => void handleProjectRestorePress() : undefined}
                     >
                       <Text selectable={false} style={[styles.authSecondaryButtonText, themed.text]}>
                         프로젝트 선택 복원
