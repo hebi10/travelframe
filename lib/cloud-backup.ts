@@ -345,9 +345,9 @@ const releaseBackupUpload = async (data: { backupSessionId: string }) => {
 };
 
 const deleteCloudBackupDataCallable = () =>
-  callBackupFunction<Record<string, never>, BackupSummary>(
+  callBackupFunction<{ confirmation: "DELETE_ALL_CLOUD_BACKUPS" }, BackupSummary>(
     "deleteCloudBackupData",
-    {}
+    { confirmation: "DELETE_ALL_CLOUD_BACKUPS" }
   );
 
 const deleteUserBackupItem = (data: {
