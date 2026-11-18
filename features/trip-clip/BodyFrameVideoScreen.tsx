@@ -61,7 +61,7 @@ import {
 } from "@/lib/app-settings";
 import { useAppAppearance } from "@/lib/app-appearance";
 import { useAuth } from "@/lib/auth-context";
-import { usePostSaveAd } from "@/lib/use-post-save-ad";
+import { useRewardedFeatureAd } from "@/lib/use-rewarded-feature-ad";
 import { ensurePhotoPreviews, getPhotos } from "@/lib/photo-library";
 import { getPlanEntitlements } from "@/lib/plan-entitlements";
 import {
@@ -120,7 +120,7 @@ export default function BodyFrameVideoScreen() {
   const recorder = useOptionalViewRecorder();
   const recordingViewAvailable = isRecordingViewAvailable();
   const { isLoggedIn, subscription } = useAuth();
-  const { requestPostSaveAd, cancelPostSaveAd } = usePostSaveAd();
+  const { requestRewardedFeatureAd } = useRewardedFeatureAd();
   const planEntitlements = useMemo(
     () => getPlanEntitlements({ isLoggedIn, subscription }),
     [isLoggedIn, subscription]
@@ -142,6 +142,7 @@ export default function BodyFrameVideoScreen() {
   const [previewWidth, setPreviewWidth] = useState(0);
   const [recordingRunId, setRecordingRunId] = useState("");
   const exportController = useRef<AbortController | null>(null);
+  const rewardGatePending = useRef(false);
   const imageReadiness = useRef(createBodyFrameImageReadiness());
   const [albumRetryUri, setAlbumRetryUri] = useState<string | null>(null);
   const getMeasurementForPhoto = useCallback(
@@ -398,7 +399,23 @@ export default function BodyFrameVideoScreen() {
       return;
     }
 
-    let saved = false;
+    if (rewardGatePending.current) return;
+    rewardGatePending.current = true;
+    try {
+      const existingVideos = await getMadeVideos();
+      assertLocalLibraryCapacity({
+        currentCount: existingVideos.length,
+        limit: planEntitlements.localVideoLimit,
+        label: "영상"
+      });
+      if (!(await requestRewardedFeatureAd("변화 영상 만들기"))) return;
+    } catch (error) {
+      setMessage(getUserFacingErrorMessage(error, "저장 공간이나 광고 상태를 확인하지 못했습니다."));
+      return;
+    } finally {
+      rewardGatePending.current = false;
+    }
+
     let appSaved = false;
     let recordingResult: Awaited<ReturnType<typeof recordProjectVideo>> | null = null;
     const controller = new AbortController();
@@ -407,7 +424,6 @@ export default function BodyFrameVideoScreen() {
       setIsExporting(true);
       setExportProgress(5);
       setMessage(null);
-      cancelPostSaveAd();
 
       const storedVideos = await getMadeVideos();
       assertLocalLibraryCapacity({
@@ -460,7 +476,6 @@ export default function BodyFrameVideoScreen() {
       setMessage(
         `${projectPhotos.length}장 · ${formatDuration(totalDuration)} 변화 영상을 Body Frame 앨범에 저장했습니다.`
       );
-      saved = true;
     } catch (error) {
       controller.abort();
       const detail = getUserFacingErrorMessage(error, "변화 영상을 만들지 못했습니다.");
@@ -471,16 +486,8 @@ export default function BodyFrameVideoScreen() {
       setIsExporting(false);
     }
 
-    if (saved) {
-      try {
-        requestPostSaveAd();
-      } catch {
-        // Advertising must never change a successfully saved video's result.
-      }
-    }
   }, [
     activeProject,
-    cancelPostSaveAd,
     durations,
     guestUsage,
     isExporting,
@@ -491,7 +498,7 @@ export default function BodyFrameVideoScreen() {
     planEntitlements.weeklyVideoExportLimit,
     projectPhotos,
     recordProjectVideo,
-    requestPostSaveAd,
+    requestRewardedFeatureAd,
     totalDuration,
     videoOptions.ratio,
     videoLimitState.allowed,
