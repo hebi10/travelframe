@@ -1,7 +1,8 @@
 import { normalizeReferencePhotoMode } from "@/lib/body-frame-normalization";
 import { localStorageAdapter } from "@/lib/local-storage";
 import { sanitizeProjectPathSegment } from "@/lib/body-frame-stage2-utils";
-import type { BodyProject, ReferencePhotoMode } from "@/types/body-project";
+import type { BodyProject, ProjectSaveMode, ReferencePhotoMode } from "@/types/body-project";
+import { isProjectSaveMode } from "@/lib/project-save-policy";
 
 export const BODY_PROJECT_STORAGE_KEY = "body-frame.projects.v1";
 
@@ -63,6 +64,7 @@ const normalizeBodyProject = (value: unknown): BodyProject | null => {
     targetPhotoCount,
     referenceMode: normalizeReferencePhotoMode(record.referenceMode),
     ...(coverPhotoId ? { coverPhotoId } : {}),
+    ...(isProjectSaveMode(record.saveMode) ? { saveMode: record.saveMode } : {}),
     archived: record.archived === true
   };
 };
@@ -123,11 +125,13 @@ export const getBodyProjectById = async (id: string) => {
 export const createBodyProject = async ({
   name,
   targetPhotoCount = 100,
-  referenceMode = "latest"
+  referenceMode = "latest",
+  saveMode = "local_only"
 }: {
   name: string;
   targetPhotoCount?: number;
   referenceMode?: ReferencePhotoMode;
+  saveMode?: ProjectSaveMode;
 }) =>
   runProjectMutation(async () => {
     const projects = await getBodyProjects();
@@ -140,6 +144,7 @@ export const createBodyProject = async ({
       targetPhotoCount:
         Number.isInteger(targetPhotoCount) && targetPhotoCount > 0 ? targetPhotoCount : 100,
       referenceMode,
+      saveMode,
       archived: false
     };
 
@@ -149,7 +154,7 @@ export const createBodyProject = async ({
 
 export const updateBodyProject = async (
   id: string,
-  patch: Partial<Pick<BodyProject, "name" | "targetPhotoCount" | "referenceMode" | "coverPhotoId">>
+  patch: Partial<Pick<BodyProject, "name" | "targetPhotoCount" | "referenceMode" | "coverPhotoId" | "saveMode">>
 ) =>
   runProjectMutation(async () => {
     const projects = await getBodyProjects();
@@ -176,6 +181,7 @@ export const updateBodyProject = async (
         ...(typeof patch.coverPhotoId === "string"
           ? { coverPhotoId: patch.coverPhotoId.trim() || undefined }
           : {}),
+        ...(isProjectSaveMode(patch.saveMode) ? { saveMode: patch.saveMode } : {}),
         updatedAt: new Date().toISOString()
       };
       return updatedProject;

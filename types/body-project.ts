@@ -1,4 +1,5 @@
 export type ReferencePhotoMode = "first" | "latest";
+export type ProjectSaveMode = "cloud" | "local_cloud" | "local_only";
 
 export type BodyProject = {
   id: string;
@@ -8,5 +9,6 @@ export type BodyProject = {
   targetPhotoCount: number;
   referenceMode: ReferencePhotoMode;
   coverPhotoId?: string;
+  saveMode?: ProjectSaveMode;
   archived: boolean;
 };
