@@ -2,12 +2,13 @@ import Constants from "expo-constants";
 import { Platform } from "react-native";
 
 import { adConsent } from "@/lib/ad-consent";
-import { resolveInterstitialAdUnitId } from "@/lib/admob-units";
+import { resolveInterstitialAdUnitId, resolveRewardedAdUnitId } from "@/lib/admob-units";
 
 type AdMobExtra = {
   androidAppId?: string;
   androidBannerAdUnitId?: string;
   androidInterstitialAdUnitId?: string;
+  androidRewardedAdUnitId?: string;
 };
 
 const extra = Constants.expoConfig?.extra as
@@ -22,8 +23,16 @@ export const admobConfig = {
   androidBannerAdUnitId:
     extra?.admob?.androidBannerAdUnitId ?? "ca-app-pub-3239289311207399/3281997392",
   androidInterstitialAdUnitId:
-    extra?.admob?.androidInterstitialAdUnitId ?? null
+    extra?.admob?.androidInterstitialAdUnitId ?? null,
+  androidRewardedAdUnitId: extra?.admob?.androidRewardedAdUnitId ?? null
 } as const;
+
+export const getRewardedAdUnitId = () =>
+  resolveRewardedAdUnitId({
+    isAndroid: Platform.OS === "android",
+    isDev: __DEV__,
+    androidRewardedAdUnitId: admobConfig.androidRewardedAdUnitId
+  });
 
 export const getBannerAdUnitId = () =>
   Platform.OS === "android" ? admobConfig.androidBannerAdUnitId : null;
