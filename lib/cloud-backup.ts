@@ -34,7 +34,7 @@ import {
 } from "@/lib/cloud-backup-project-slots";
 import { firebaseAuth, firebaseFunctions, firestore, firebaseStorage } from "@/lib/firebase";
 import { getBodyProjectById, getBodyProjects, mergeBodyProjectsFromBackup } from "@/lib/body-project-library";
-import { isProjectCloudSaveMode, projectWantsCloudBackup } from "@/lib/project-save-policy";
+import { canUploadLinkedProjectWork, isProjectCloudSaveMode, projectWantsCloudBackup } from "@/lib/project-save-policy";
 import { isPhotoBackupCurrent, recoverMissingBodyProjects } from "@/lib/body-project-backup";
 import type { BodyProject } from "@/types/body-project";
 import {
@@ -858,9 +858,15 @@ export const backupCurrentWorkspace = async ({
         isCloudBackupTargetEnabled(settings, "photos")
       )
   );
-  const selectedImageBundleBackups = isCloudBackupTargetEnabled(settings, "imageBundles")
-    ? imageBundles
-    : [];
+  const selectedImageBundleBackups = imageBundles.filter(
+    (work) => canUploadLinkedProjectWork({
+      photoIds: work.photoIds,
+      photos,
+      projects,
+      selectedProjectIds: cloudProjectIds,
+      legacyEnabled: isCloudBackupTargetEnabled(settings, "imageBundles")
+    })
+  );
   const selectedVideoBackups = videos.filter(
     (video) =>
       video.projectId
@@ -869,7 +875,13 @@ export const backupCurrentWorkspace = async ({
             projectById.get(video.projectId),
             isCloudBackupTargetEnabled(settings, "videos")
           )
-        : isCloudBackupTargetEnabled(settings, "videos")
+        : canUploadLinkedProjectWork({
+            photoIds: video.photoIds ?? [],
+            photos,
+            projects,
+            selectedProjectIds: cloudProjectIds,
+            legacyEnabled: isCloudBackupTargetEnabled(settings, "videos")
+          })
   );
   for (const projectId of cloudProjectIds) {
     if (projectWantsCloudBackup(
@@ -1598,8 +1610,22 @@ export const backupImageBundleWork = async ({
     throw new Error("Firebase 연결 정보가 아직 설정되지 않았습니다.");
   }
 
-  const settings = await getAppSettings();
-  if (!isCloudBackupTargetEnabled(settings, "imageBundles")) {
+  const [settings, photos, projects, selectedProjectIds] = await Promise.all([
+    getAppSettings(),
+    getPhotos(),
+    getBodyProjects(),
+    getSelectedCloudBackupProjectIds(
+      user,
+      getPlanEntitlements({ isLoggedIn: true, subscription: subscription ?? null }).maxCloudBackupProjects
+    )
+  ]);
+  if (!canUploadLinkedProjectWork({
+    photoIds: work.photoIds,
+    photos,
+    projects,
+    selectedProjectIds,
+    legacyEnabled: isCloudBackupTargetEnabled(settings, "imageBundles")
+  })) {
     return null;
   }
 
@@ -1771,6 +1797,23 @@ export const backupMadeVideo = async ({
   ]);
   if (!projectWantsCloudBackup(project, isCloudBackupTargetEnabled(settings, "videos"))) {
     return null;
+  }
+  if (!video.projectId && video.photoIds?.length) {
+    const [photos, projects, selectedProjectIds] = await Promise.all([
+      getPhotos(),
+      getBodyProjects(),
+      getSelectedCloudBackupProjectIds(
+        user,
+        getPlanEntitlements({ isLoggedIn: true, subscription: subscription ?? null }).maxCloudBackupProjects
+      )
+    ]);
+    if (!canUploadLinkedProjectWork({
+      photoIds: video.photoIds,
+      photos,
+      projects,
+      selectedProjectIds,
+      legacyEnabled: isCloudBackupTargetEnabled(settings, "videos")
+    })) return null;
   }
 
   if (!(await isVideoStillBackupEligible(video.id))) {
