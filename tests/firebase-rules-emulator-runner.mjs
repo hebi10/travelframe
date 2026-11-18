@@ -285,6 +285,9 @@ await expectAllowed("owner reads private measurement", firestoreRequest("GET",
   `users/${ownerUid}/bodyMeasurements/measurement-1`, { uid: ownerUid }));
 await expectDenied("other account cannot read private measurements", firestoreRequest("GET",
   `users/${ownerUid}/bodyMeasurements/measurement-1`, { uid: otherUid }));
+await seedDoc(`admins/${adminUid}`, { role: "admin" });
+await expectDenied("administrator client cannot view private measurements", firestoreRequest("GET",
+  `users/${ownerUid}/bodyMeasurements/measurement-1`, { uid: adminUid }));
 await expectDenied("other account cannot write private measurements", firestoreRequest("PATCH",
   `users/${ownerUid}/bodyMeasurements/measurement-1`, { uid: otherUid, data: projectMeasurement }));
 await expectDenied("out of range weight is rejected", firestoreRequest("PATCH",
@@ -318,6 +321,8 @@ await expectAllowed("owner backs up private project settings", firestoreRequest(
   }));
 await expectDenied("other account cannot read project settings", firestoreRequest("GET",
   `users/${ownerUid}/bodyProjectSettings/project-1`, { uid: otherUid }));
+await expectDenied("administrator client cannot view private project settings", firestoreRequest("GET",
+  `users/${ownerUid}/bodyProjectSettings/project-1`, { uid: adminUid }));
 await expectDenied("other account cannot overwrite project settings", firestoreRequest("PATCH",
   `users/${ownerUid}/bodyProjectSettings/project-1`, {
     uid: otherUid, data: projectMeasurementSettings

@@ -613,7 +613,7 @@ service cloud.firestore {
       }
 
       match /bodyMeasurements/{measurementId} {
-        allow read: if isOwner(userId) || isAdmin();
+        allow read: if isOwner(userId);
         allow delete: if false;
         allow create, update: if isOwner(userId)
           && request.resource.data.keys().hasOnly([
@@ -662,7 +662,7 @@ service cloud.firestore {
       }
 
       match /bodyProjectSettings/{projectId} {
-        allow read: if isOwner(userId) || isAdmin();
+        allow read: if isOwner(userId);
         allow delete: if false;
         allow create, update: if isOwner(userId)
           && request.resource.data.keys().hasOnly([
