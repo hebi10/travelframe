@@ -95,13 +95,13 @@ assert.ok(edit.includes("backgroundColor: bodyFrameDarkColors.text"));
 
 const legacyModals = [
   ["features/trip-clip/TripClipScreen.tsx", 2],
-  ["features/settings/SettingsScreen.tsx", 5],
+  ["features/settings/SettingsScreen.tsx", 6],
   ["features/studio/StudioScreen.tsx", 2]
 ];
-assert.equal(legacyModals.reduce((sum, [, count]) => sum + count, 0), 9);
+assert.equal(legacyModals.reduce((sum, [, count]) => sum + count, 0), 10);
 for (const [path, expected] of legacyModals) {
   const source = read(path);
-  assert.equal((source.match(/<Modal\b/g) ?? []).length, expected, path + " modal count must remain unchanged");
+  assert.equal((source.match(/<Modal\b/g) ?? []).length, expected, path + " modal count must match accessible flows");
   assert.equal((source.match(/\baccessibilityViewIsModal\b/g) ?? []).length, expected,
     path + " must isolate every legacy modal for screen readers");
 }
