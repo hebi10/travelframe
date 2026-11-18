@@ -42,6 +42,31 @@ for (const [legacyScope, device, cloud] of [
   );
 }
 
+const linkedPhoto = [
+  { id: "photo-a", projectId: "project-a" },
+  { id: "photo-b", projectId: "project-b" }
+];
+const projects = [
+  { id: "project-a", saveMode: "local_only" },
+  { id: "project-b", saveMode: "cloud" }
+];
+for (const [photoIds, selectedIds, enabled, expected] of [
+  [["photo-a"], ["project-a"], true, false],
+  [["photo-b"], ["project-b"], true, true],
+  [["photo-b"], [], true, false],
+  [["photo-a", "photo-b"], ["project-a", "project-b"], true, false],
+  [[], [], true, true],
+  [[], [], false, false]
+]) {
+  assert.equal(policy.canUploadLinkedProjectWork({
+    photoIds,
+    photos: linkedPhoto,
+    projects,
+    selectedProjectIds: new Set(selectedIds),
+    legacyEnabled: enabled
+  }), expected, "photo-linked work must not bypass project privacy or selected slot constraints");
+}
+
 const memory = new Map();
 const old = [
   { id: "project-a", name: "기존 A", createdAt: "2026-01-01", updatedAt: "2026-01-01", targetPhotoCount: 100, referenceMode: "first", archived: false },
@@ -109,5 +134,6 @@ assert.ok(backup.includes("currentProject?.saveMode === \"local_only\""));
 assert.ok(backup.includes("const cloudProjectIds = new Set("));
 assert.ok(backup.includes("getBodyProjectById(video.projectId)"));
 assert.ok(backup.includes('itemType: "video"'));
+assert.ok(backup.includes("canUploadLinkedProjectWork("));
 
 console.log("ok - TF-CLOUD-08 project save modes enforce mandatory app storage, legacy migration, and cloud opt-out");
