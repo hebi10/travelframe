@@ -76,7 +76,7 @@ export const updateBodyPoseAlignmentSettings = async (
     BODY_POSE_ALIGNMENT_STORAGE_KEY,
     JSON.stringify({ ...map, [projectId]: next })
   );
-  await enqueueProjectCloudSync({ projectId, kind: "supplement" }).catch(() => undefined);
+  await enqueueProjectCloudSync({ projectId, kind: "settings" }).catch(() => undefined);
   return next;
 };
 

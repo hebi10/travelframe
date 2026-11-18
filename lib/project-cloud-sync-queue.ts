@@ -1,6 +1,6 @@
 import { localStorageAdapter } from "@/lib/local-storage";
 
-export type ProjectCloudSyncKind = "initial" | "supplement" | "photo" | "video" | "image-work";
+export type ProjectCloudSyncKind = "initial" | "supplement" | "settings" | "measurement" | "photo" | "video" | "image-work";
 
 export type ProjectCloudSyncTask = {
   id: string;
@@ -15,7 +15,7 @@ export type ProjectCloudSyncTask = {
 
 const KEY = "body-frame.project-cloud-sync-queue.v1";
 const VALID_KINDS: readonly ProjectCloudSyncKind[] =
-  ["initial", "supplement", "photo", "video", "image-work"];
+  ["initial", "supplement", "settings", "measurement", "photo", "video", "image-work"];
 const listeners = new Set<() => void>();
 let serial = Promise.resolve();
 let activeDrain: Promise<number> | null = null;
@@ -70,7 +70,7 @@ export const enqueueProjectCloudSync = ({
   itemId?: string;
 }): Promise<ProjectCloudSyncTask> => serialize(async () => {
   if (!projectId || !VALID_KINDS.includes(kind) ||
-      (kind !== "supplement" && kind !== "initial" && !itemId)) {
+      (!["supplement", "settings", "initial"].includes(kind) && !itemId)) {
     throw new Error("백업 대기열 대상이 올바르지 않습니다.");
   }
   const id = [kind, projectId, itemId ?? ""].join(":");

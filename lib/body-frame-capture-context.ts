@@ -196,7 +196,7 @@ export const updateBodyCaptureContextEnabled = async (
       updatedAt: new Date().toISOString()
     };
     await writeStateMap({ ...map, [projectId]: next });
-    await enqueueProjectCloudSync({ projectId, kind: "supplement" }).catch(() => undefined);
+    await enqueueProjectCloudSync({ projectId, kind: "settings" }).catch(() => undefined);
     return next;
   });
 
@@ -213,6 +213,6 @@ export const saveBodyCaptureContext = async (
       updatedAt: new Date().toISOString()
     };
     await writeStateMap({ ...map, [projectId]: next });
-    await enqueueProjectCloudSync({ projectId, kind: "supplement" }).catch(() => undefined);
+    await enqueueProjectCloudSync({ projectId, kind: "settings" }).catch(() => undefined);
     return next;
   });

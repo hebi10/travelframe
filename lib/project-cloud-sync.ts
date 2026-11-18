@@ -128,8 +128,23 @@ const syncTask = async ({
         project, isCloudBackupTargetEnabled(settings, "photos")
       )) return;
 
-  if (task.kind === "supplement") {
-    await backupProjectSupplementIfEnabled({ user, subscription, projectId: project.id });
+  if (task.kind === "supplement" || task.kind === "settings") {
+    await backupProjectSupplementIfEnabled({
+      user,
+      subscription,
+      projectId: project.id,
+      mode: task.kind === "settings" ? "settings" : "all"
+    });
+    return;
+  }
+  if (task.kind === "measurement" && task.itemId) {
+    await backupProjectSupplementIfEnabled({
+      user,
+      subscription,
+      projectId: project.id,
+      mode: "measurement",
+      measurementId: task.itemId
+    });
     return;
   }
   if (task.kind === "photo" && task.itemId) {

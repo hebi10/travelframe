@@ -195,7 +195,7 @@ export const updateBodyProject = async (
     await writeProjects(nextProjects);
     if (patch.name !== undefined || patch.targetPhotoCount !== undefined ||
         patch.referenceMode !== undefined || patch.saveMode !== undefined) {
-      await enqueueProjectCloudSync({ projectId: normalizedId, kind: "supplement" })
+      await enqueueProjectCloudSync({ projectId: normalizedId, kind: "settings" })
         .catch(() => undefined);
     }
     return updatedProject;

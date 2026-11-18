@@ -403,51 +403,70 @@ const backupBodyProjects = async (userId: string, projectId?: string) => {
   }
 };
 
-const backupBodyProjectSupplement = async (userId: string, projectId: string) => {
+const backupBodyProjectSupplement = async (
+  userId: string,
+  projectId: string,
+  {
+    mode = "all",
+    measurementId
+  }: {
+    mode?: "all" | "settings" | "measurement";
+    measurementId?: string;
+  } = {}
+) => {
   if (!firestore) throw new Error("Firebase 연결 정보가 아직 설정되지 않았습니다.");
-  const [measurements, measurementSettings, poseSettings, captureContextState] =
-    await Promise.all([
-      getBodyMeasurements(projectId),
-      getBodyMeasurementSettings(projectId),
-      getBodyPoseAlignmentSettings(projectId),
-      getBodyCaptureContextState(projectId)
-    ]);
   const backedUpAt = new Date().toISOString();
-  await setDoc(
-    doc(firestore, "users", userId, "bodyProjectSettings", projectId),
-    {
-      id: projectId,
-      userId,
-      projectId,
-      schemaVersion: 1,
-      measurementSettings,
-      poseAlignmentEnabled: poseSettings.enabled,
-      captureContextState,
-      backedUpAt
-    }
-  );
-  for (const entry of measurements) {
+  if (mode !== "measurement") {
+    const [measurementSettings, poseSettings, captureContextState] =
+      await Promise.all([
+        getBodyMeasurementSettings(projectId),
+        getBodyPoseAlignmentSettings(projectId),
+        getBodyCaptureContextState(projectId)
+      ]);
     await setDoc(
-      doc(firestore, "users", userId, "bodyMeasurements", entry.id),
+      doc(firestore, "users", userId, "bodyProjectSettings", projectId),
       {
-        ...entry,
-        id: entry.id,
+        id: projectId,
         userId,
+        projectId,
         schemaVersion: 1,
+        measurementSettings,
+        poseAlignmentEnabled: poseSettings.enabled,
+        captureContextState,
         backedUpAt
       }
     );
+  }
+  if (mode !== "settings") {
+    const measurements = await getBodyMeasurements(projectId);
+    for (const entry of measurements) {
+      if (measurementId && entry.id !== measurementId) continue;
+      await setDoc(
+        doc(firestore, "users", userId, "bodyMeasurements", entry.id),
+        {
+          ...entry,
+          id: entry.id,
+          userId,
+          schemaVersion: 1,
+          backedUpAt
+        }
+      );
+    }
   }
 };
 
 export const backupProjectSupplementIfEnabled = async ({
   user,
   subscription,
-  projectId
+  projectId,
+  mode = "all",
+  measurementId
 }: {
   user: User | null;
   subscription: UserSubscription;
   projectId: string;
+  mode?: "all" | "settings" | "measurement";
+  measurementId?: string;
 }) => {
   if (!user || !isCreatorSubscriptionActive(subscription)) return false;
   if (firebaseAuth?.currentUser?.uid !== user.uid) {
@@ -468,8 +487,9 @@ export const backupProjectSupplementIfEnabled = async ({
   if (firebaseAuth?.currentUser?.uid !== user.uid) {
     throw new Error("백업 계정이 변경되었습니다.");
   }
+  if (mode === "measurement" && !measurementId) return false;
   await backupBodyProjects(user.uid, projectId);
-  await backupBodyProjectSupplement(user.uid, projectId);
+  await backupBodyProjectSupplement(user.uid, projectId, { mode, measurementId });
   return true;
 };
 
