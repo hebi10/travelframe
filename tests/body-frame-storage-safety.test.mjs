@@ -100,6 +100,7 @@ function cloudFixture(f, hooks = {}) {
     "@/lib/work-library": load("lib/work-library.ts", f.dependencies),
     "@/lib/video-library": load("lib/video-library.ts", f.dependencies),
     "@/lib/body-project-backup": load("lib/body-project-backup.ts", {}),
+    "@/lib/project-restore-selection": load("lib/project-restore-selection.ts", {}),
     "@/lib/body-measurement-library": {
       getBodyMeasurements: async () => [],
       getBodyMeasurementSettings: async () => ({

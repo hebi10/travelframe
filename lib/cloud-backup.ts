@@ -53,6 +53,7 @@ import type { BodyMeasurementEntry, BodyMeasurementSettings } from "@/types/body
 import type { BodyCaptureContextState } from "@/types/body-capture-context";
 import { canUploadLinkedProjectWork, isProjectCloudSaveMode, projectWantsCloudBackup } from "@/lib/project-save-policy";
 import { isPhotoBackupCurrent, recoverMissingBodyProjects } from "@/lib/body-project-backup";
+import { selectCloudProjectRestoreItems } from "@/lib/project-restore-selection";
 import type { BodyProject } from "@/types/body-project";
 import {
   calculateCombinedImageBackupSize,
@@ -2151,7 +2152,66 @@ const normalizeVideoBackup = (
   backupStatus: "backed_up"
 });
 
-export const restoreCloudBackupToLocal = async ({ user }: { user: User | null }) => {
+export type RestorableCloudProject = {
+  id: string;
+  name: string;
+  updatedAt: string;
+  photoCount: number;
+  videoCount: number;
+  measurementCount: number;
+};
+
+export const getRestorableCloudProjects = async ({
+  user
+}: { user: User | null }): Promise<RestorableCloudProject[]> => {
+  if (!user || firebaseAuth?.currentUser?.uid !== user.uid) {
+    throw new Error("로그인한 계정의 백업만 확인할 수 있습니다.");
+  }
+  await assertLocalLibraryOwner(user.uid);
+  if (!firestore) {
+    throw new Error("Firebase 연결 정보가 아직 설정되지 않았습니다.");
+  }
+  const [projectSnapshot, photoSnapshot, videoSnapshot, measurementSnapshot] = await Promise.all([
+    getDocs(collection(firestore, "users", user.uid, "bodyProjects")),
+    getDocs(collection(firestore, "users", user.uid, "photoBackups")),
+    getDocs(collection(firestore, "users", user.uid, "videos")),
+    getDocs(collection(firestore, "users", user.uid, "bodyMeasurements"))
+  ]);
+  if (firebaseAuth?.currentUser?.uid !== user.uid) {
+    throw new Error("계정이 변경되어 백업 조회를 중단했습니다.");
+  }
+  const photos = photoSnapshot.docs.map((item) => normalizePhotoBackup(item.data(), item.id));
+  const projects = recoverMissingBodyProjects(
+    projectSnapshot.docs.map((item) => ({ ...item.data(), id: item.id }) as BodyProject),
+    photos
+  );
+  const videos = videoSnapshot.docs.map((item) => normalizeVideoBackup(item.data(), item.id));
+  const counts = projects.map((project) => {
+    const projectPhotos = photos.filter((photo) => photo.projectId === project.id);
+    const photoIds = new Set(projectPhotos.map((photo) => photo.id));
+    const videoCount = videos.filter((video) =>
+      video.projectId === project.id ||
+      (!video.projectId && video.photoIds.length > 0 &&
+        video.photoIds.every((id) => photoIds.has(id)))
+    ).length;
+    return {
+      id: project.id,
+      name: project.name,
+      updatedAt: project.updatedAt,
+      photoCount: projectPhotos.length,
+      videoCount,
+      measurementCount: measurementSnapshot.docs.filter((item) =>
+        item.data().projectId === project.id
+      ).length
+    };
+  });
+  return counts.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+};
+
+export const restoreCloudBackupToLocal = async ({
+  user,
+  projectIds
+}: { user: User | null; projectIds?: string[] }) => {
   if (!user) {
     throw new Error("로그인이 필요합니다.");
   }
@@ -2174,36 +2234,32 @@ export const restoreCloudBackupToLocal = async ({ user }: { user: User | null })
     getDocs(collection(firestore, "users", user.uid, "bodyMeasurements")),
     getDocs(collection(firestore, "users", user.uid, "bodyProjectSettings"))
   ]);
-  const photos = photoSnapshot.docs.map((item) =>
+  const allPhotos = photoSnapshot.docs.map((item) =>
     normalizePhotoBackup(item.data(), item.id)
   );
-  const imageWorks = imageWorkSnapshot.docs.map((item) =>
+  const allImageWorks = imageWorkSnapshot.docs.map((item) =>
     normalizeImageWorkBackup(item.data(), item.id)
   );
-  const videos = videoSnapshot.docs.map((item) =>
+  const allVideos = videoSnapshot.docs.map((item) =>
     normalizeVideoBackup(item.data(), item.id)
   );
   if (firebaseAuth?.currentUser?.uid !== user.uid) throw new Error("계정이 변경되어 복원을 중단했습니다.");
   await assertLocalLibraryOwner(user.uid);
 
-  const projects = projectSnapshot.docs.map(item => ({ ...item.data(), id: item.id }) as BodyProject);
-  // Each library reads and merges current state under its own mutation queue.
-  // No snapshot taken before project restoration can overwrite a later capture.
-  await mergeBodyProjectsFromBackup(recoverMissingBodyProjects(projects, [...await getPhotos(), ...photos]));
-  const [missingPhotos, missingImageWorks, missingVideos] = await Promise.all([
-    mergePhotosFromBackup(photos),
-    mergeImageBundleWorksFromBackup(imageWorks),
-    mergeMadeVideosFromBackup(videos)
-  ]);
-
-  const restoredProjectIds = new Set((await getBodyProjects()).map((project) => project.id));
-  const remoteMeasurements = measurementSnapshot.docs
-    .map((item) => normalizeBodyMeasurementEntry({ ...item.data(), id: item.id }))
-    .filter((item): item is BodyMeasurementEntry =>
-      Boolean(item && restoredProjectIds.has(item.projectId))
-    );
-  const remoteProjectSettings = projectSettingsSnapshot.docs
-    .map((item) => {
+  const remoteProjects = recoverMissingBodyProjects(
+    projectSnapshot.docs.map((item) => ({ ...item.data(), id: item.id }) as BodyProject),
+    allPhotos
+  );
+  const selected = selectCloudProjectRestoreItems({
+    requestedProjectIds: projectIds,
+    projects: remoteProjects,
+    photos: allPhotos,
+    imageWorks: allImageWorks,
+    videos: allVideos,
+    measurements: measurementSnapshot.docs
+      .map((item) => normalizeBodyMeasurementEntry({ ...item.data(), id: item.id }))
+      .filter((item): item is BodyMeasurementEntry => Boolean(item)),
+    settings: projectSettingsSnapshot.docs.map((item) => {
       const data = item.data() as Record<string, unknown>;
       return {
         projectId: item.id,
@@ -2212,7 +2268,24 @@ export const restoreCloudBackupToLocal = async ({ user }: { user: User | null })
         captureContextState: data.captureContextState
       };
     })
-    .filter((item) => restoredProjectIds.has(item.projectId));
+  });
+
+  // Each library merges the latest local state; project selection never overwrites
+  // another project's photos, measurements, videos or preferences.
+  await mergeBodyProjectsFromBackup(selected.projects);
+  const [missingPhotos, missingImageWorks, missingVideos] = await Promise.all([
+    mergePhotosFromBackup(selected.photos),
+    mergeImageBundleWorksFromBackup(selected.imageWorks),
+    mergeMadeVideosFromBackup(selected.videos)
+  ]);
+
+  const restoredProjectIds = new Set((await getBodyProjects()).map((project) => project.id));
+  const remoteMeasurements = selected.measurements.filter((entry) =>
+    restoredProjectIds.has(entry.projectId)
+  );
+  const remoteProjectSettings = selected.settings.filter((entry) =>
+    restoredProjectIds.has(entry.projectId)
+  );
   await mergeBodyMeasurementsFromBackup(remoteMeasurements);
   await Promise.all([
     mergeBodyMeasurementSettingsFromBackup(

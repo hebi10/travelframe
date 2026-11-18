@@ -149,7 +149,8 @@ for (const fragment of [
   'getDocs(collection(firestore, "users", user.uid, "bodyMeasurements"))',
   'getDocs(collection(firestore, "users", user.uid, "bodyProjectSettings"))',
   "mergeBodyMeasurementsFromBackup(remoteMeasurements)",
-  "restoredProjectIds.has(item.projectId)",
+  "selectCloudProjectRestoreItems({",
+  "restoredProjectIds.has(entry.projectId)",
   "mergeBodyCaptureContextStatesFromBackup"
 ]) assert.ok(backup.includes(fragment), "cloud backup missing: " + fragment);
 assert.ok(server.includes('userRef.collection("bodyMeasurements").where("projectId", "==", projectId).get()'));
