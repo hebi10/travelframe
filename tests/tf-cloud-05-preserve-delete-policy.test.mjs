@@ -25,7 +25,7 @@ assert.ok(ui.includes("confirmDeletePreviousProjectId: slot.projectId"));
 assert.ok(ui.includes('saveMode: "local_only"'), "non-destructive stop must change only future sync");
 assert.ok(ui.includes('saveMode: "local_cloud"'), "stop should offer a way to resume");
 assert.ok(ui.includes("기존 원격 파일은 삭제되지 않습니다"));
-assert.ok(ui.includes("수치 기록과 촬영 설정이 영구 삭제됩니다"));
+assert.ok(ui.includes("측정 기록과 촬영 설정이 영구 삭제됩니다"));
 assert.ok(ui.includes("원본이 없으면 복구할 수 없습니다"));
 const lastDeletion = backend.slice(
   backend.indexOf("exports.deleteCloudBackupData = secureOnCall("),
