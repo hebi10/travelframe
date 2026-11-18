@@ -31,6 +31,7 @@ const runExport = async (storedCount, overrides = {}) => {
   const albumRetries = [];
   const context = {
     exportController: { current: null },
+    rewardGatePending: { current: false },
     AbortController,
     assertBodyFrameExportActive: signal => { if (signal.aborted) throw new Error("취소되었습니다"); },
     FileSystem: { deleteAsync: async () => {} },
@@ -45,8 +46,7 @@ const runExport = async (storedCount, overrides = {}) => {
     setIsExporting: (value) => exporting.push(value),
     setExportProgress: () => {},
     setMessage: (value) => messages.push(value),
-    cancelPostSaveAd: () => {},
-    requestPostSaveAd: () => { events.push("ad"); },
+    requestRewardedFeatureAd: async () => { events.push("reward"); return true; },
     getMadeVideos: async () => Array.from({ length: storedCount }),
     assertLocalLibraryCapacity: limitExports.assertLocalLibraryCapacity,
     recordProjectVideo: async () => { events.push("record"); return { uri: "file:///video.mp4", coverUri: "file:///cover.jpg", cleanup: async () => {} }; },
@@ -72,9 +72,11 @@ const runExport = async (storedCount, overrides = {}) => {
 const full = await runExport(30);
 assert.deepEqual(full.events, [], "full storage must prevent native recording, every save and new ads");
 assert.match(full.messages.at(-1), /영상 보관함 한도 30개/);
-assert.deepEqual(full.exporting, [true, false], "failure must release the busy state");
+assert.deepEqual(full.exporting, [], "capacity preflight must run before export progress");
+const denied = await runExport(0, { requestRewardedFeatureAd: async () => false });
+assert.deepEqual(denied.events, [], "declining the rewarded ad must prevent recording and saving");
 const available = await runExport(29);
-assert.deepEqual(available.events, ["record", "app-save", "external-save", "ad"]);
+assert.deepEqual(available.events, ["reward", "record", "app-save", "external-save"]);
 assert.match(available.messages.at(-1), /저장했습니다/);
 assert.deepEqual((await runExport(0, { projectPhotos: [] })).events, [], "empty photo selection must not record or save");
 const overDuration = await runExport(0, { videoLimitState: { allowed: false, limit: 10 }, totalDuration: 20 });
@@ -94,16 +96,16 @@ assert.deepEqual(customized.savedVideos[0].durations, { one: 0.5, three: 0.5 });
 const albumFailure = await runExport(0, {
   saveVideoToLibrary: async () => { throw new Error("앨범 권한이 필요합니다"); }
 });
-assert.deepEqual(albumFailure.events, ["record", "app-save"], "album failure keeps the already encoded app video");
+assert.deepEqual(albumFailure.events, ["reward", "record", "app-save"], "album failure keeps the already encoded app video");
 assert.match(albumFailure.messages.at(-1), /영상은 앱에 저장했습니다/);
 assert.equal(albumFailure.albumRetries.at(-1), "file:///persisted.mp4", "retry uses the saved file without recording again");
 const appFailure = await runExport(0, { saveMadeVideo: async () => { throw new Error("목록 저장 실패"); } });
-assert.deepEqual(appFailure.events, ["record"], "do not export externally before durable app metadata succeeds");
+assert.deepEqual(appFailure.events, ["reward", "record"], "do not export externally before durable app metadata succeeds");
 const cancelledRecording = await runExport(0, { recordProjectVideo: async signal => {
   assert.equal(signal.aborted, false);
   throw new Error("취소되었습니다");
 } });
-assert.deepEqual(cancelledRecording.events, [], "cancelled recording never reaches either save destination");
+assert.deepEqual(cancelledRecording.events, ["reward"], "cancelled recording never reaches either save destination");
 assert.match(cancelledRecording.messages.at(-1), /취소/);
 
 const videoHelpers = {};
