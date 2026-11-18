@@ -39,6 +39,7 @@ function harness({ localFailure = false, deviceOnly = false, albumFailure = fals
       if (albumFailure) throw new Error("album failure");
     },
     setRecentPhoto: (photo) => { recent = photo; },
+    onPhotoSaved: () => {},
     getBodyCaptureContextState: async () => ({ enabled: false }),
     saveBodyCaptureContext: async () => {},
     backupPhotoIfEnabled: async () => { await backup.promise; },

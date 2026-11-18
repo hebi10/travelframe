@@ -46,12 +46,12 @@ assert.deepEqual(changed, [], "later shots must not overtake a pending earlier s
 releaseFirst();
 assert.equal(await one, true);
 assert.equal(await two, true);
-assert.deepEqual(changed, [["photo-1"], ["photo-1", "photo-2"]], "concurrent shots must remain FIFO");
+assert.deepEqual(JSON.parse(JSON.stringify(changed)), [["photo-1"], ["photo-1", "photo-2"]], "concurrent shots must remain FIFO");
 prompts.dismiss("photo-1");
-assert.deepEqual(prompts.getItems().map(x => x.photo.id), ["photo-2"]);
+assert.deepEqual(Array.from(prompts.getItems(), x => x.photo.id), ["photo-2"]);
 prompts.dismiss("photo-2");
 assert.equal(prompts.getItems().length, 0);
-assert.deepEqual(changed.at(-1), [], "skip or successful save dismisses only its photo");
+assert.deepEqual(Array.from(changed.at(-1)), [], "skip or successful save dismisses only its photo");
 let rejectLoad = true;
 const recovered = queueModule.createCaptureMeasurementPromptQueue({
   load: async photo => { if (rejectLoad) { rejectLoad = false; throw Error("storage read failed"); } return { photo, settings, projectName:"test", entry:null }; },
