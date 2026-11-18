@@ -81,7 +81,9 @@ import {
   getLocalWorkspaceSummary,
   markBackupExpired,
   restoreCloudBackupToLocal,
+  getRestorableCloudProjects,
   subscribeCloudBackupOverview,
+  type RestorableCloudProject,
   type BackupProgressUpdate,
   type CloudBackupOverview,
   type LocalWorkspaceSummary
@@ -148,6 +150,9 @@ export default function SettingsScreen() {
   const [isAuthSubmitting, setIsAuthSubmitting] = useState(false);
   const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false);
   const [showBackupConfirm, setShowBackupConfirm] = useState(false);
+  const [showProjectRestorePicker, setShowProjectRestorePicker] = useState(false);
+  const [restorableProjects, setRestorableProjects] = useState<RestorableCloudProject[]>([]);
+  const [selectedRestoreProjectId, setSelectedRestoreProjectId] = useState<string | null>(null);
   const [backupTargetStorageMode, setBackupTargetStorageMode] =
     useState<StorageMode>("local_backup");
   const [showDeleteRequestInfo, setShowDeleteRequestInfo] = useState(false);
@@ -627,6 +632,50 @@ export default function SettingsScreen() {
     confirmCloudRestore(localSummary);
   };
 
+  const handleProjectRestorePress = async () => {
+    if (!user || isBackupSubmitting) return;
+    try {
+      setIsBackupSubmitting(true);
+      setBackupCheckMessage("복원할 프로젝트를 확인하고 있습니다.");
+      setAuthMessage(null);
+      const projects = await getRestorableCloudProjects({ user });
+      if (projects.length === 0) {
+        setAuthMessage("클라우드에 복원할 프로젝트가 없습니다.");
+        return;
+      }
+      setRestorableProjects(projects);
+      setSelectedRestoreProjectId(projects[0].id);
+      setShowProjectRestorePicker(true);
+    } catch (error) {
+      setAuthMessage(getUserFacingErrorMessage(error, "클라우드 프로젝트를 확인하지 못했습니다."));
+    } finally {
+      setIsBackupSubmitting(false);
+      setBackupCheckMessage(null);
+    }
+  };
+
+  const restoreSelectedProject = async () => {
+    if (!user || !selectedRestoreProjectId || isBackupSubmitting) return;
+    try {
+      setIsBackupSubmitting(true);
+      setAuthMessage(null);
+      const project = restorableProjects.find((item) => item.id === selectedRestoreProjectId);
+      if (!project) throw new Error("복원할 프로젝트를 다시 선택해 주세요.");
+      const summary = await restoreCloudBackupToLocal({
+        user,
+        projectIds: [project.id]
+      });
+      setShowProjectRestorePicker(false);
+      setAuthMessage(
+        `"${project.name}" 프로젝트를 복원했습니다. 새로 추가한 사진 ${summary.photoCount}장, 여러 사진 작업 ${summary.imageBundleCount}개, 영상 ${summary.videoCount}개입니다. 기존 기기 데이터는 유지됩니다.`
+      );
+    } catch (error) {
+      setAuthMessage(getUserFacingErrorMessage(error, "선택한 프로젝트를 복원하지 못했습니다."));
+    } finally {
+      setIsBackupSubmitting(false);
+    }
+  };
+
   const retryBackupFailures = async () => {
     if (isBackupSubmitting) {
       return;
@@ -1017,6 +1066,20 @@ export default function SettingsScreen() {
                   >
                     <Text selectable={false} style={[styles.authSecondaryButtonText, themed.text]}>
                       백업 데이터 불러오기
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    accessibilityRole="button"
+                    disabled={isBackupSubmitting || !planEntitlements.canBackupToCloud}
+                    style={[
+                      styles.authSecondaryButton,
+                      themed.secondaryButton,
+                      (isBackupSubmitting || !planEntitlements.canBackupToCloud) && styles.disabledButton
+                    ]}
+                    onPress={planEntitlements.canBackupToCloud ? handleProjectRestorePress : undefined}
+                  >
+                    <Text selectable={false} style={[styles.authSecondaryButtonText, themed.text]}>
+                      프로젝트 선택 복원
                     </Text>
                   </Pressable>
                   <Pressable
@@ -1821,6 +1884,20 @@ export default function SettingsScreen() {
                         백업 데이터 불러오기
                       </Text>
                     </Pressable>
+                    <Pressable
+                      accessibilityRole="button"
+                      disabled={isBackupSubmitting || !planEntitlements.canBackupToCloud}
+                      style={[
+                        styles.authSecondaryButton,
+                        themed.secondaryButton,
+                        (isBackupSubmitting || !planEntitlements.canBackupToCloud) && styles.disabledButton
+                      ]}
+                      onPress={planEntitlements.canBackupToCloud ? handleProjectRestorePress : undefined}
+                    >
+                      <Text selectable={false} style={[styles.authSecondaryButtonText, themed.text]}>
+                        프로젝트 선택 복원
+                      </Text>
+                    </Pressable>
                   </View>
                   {STORAGE_MODE_OPTIONS.map((option) => {
                     const isCloudBackupOptionDisabled =
@@ -1896,6 +1973,91 @@ export default function SettingsScreen() {
                 </Text>
               </View>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        animationType="fade"
+        transparent
+        visible={showProjectRestorePicker}
+        onRequestClose={() => {
+          if (!isBackupSubmitting) setShowProjectRestorePicker(false);
+        }}
+      >
+        <View style={[styles.modalBackdrop, modalSafeStyle]}>
+          <View style={[styles.modalPanel, themed.modalPanel]} accessibilityViewIsModal>
+            <BodyFrameSheetHandle />
+            <View style={styles.modalHeader}>
+              <Text selectable={false} style={[styles.modalTitle, themed.text]}>
+                프로젝트 선택 복원
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="복원 프로젝트 선택 닫기"
+                disabled={isBackupSubmitting}
+                style={[styles.closeButton, themed.secondaryButton]}
+                onPress={() => setShowProjectRestorePicker(false)}
+              >
+                <Text selectable={false} style={[styles.closeButtonText, themed.text]}>
+                  닫기
+                </Text>
+              </Pressable>
+            </View>
+            <ScrollView
+              style={styles.modalScroll}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={styles.optionList}
+              showsVerticalScrollIndicator={false}
+            >
+              <Text selectable style={[styles.optionDetail, themed.mutedText]}>
+                선택한 프로젝트의 사진·영상·수치 기록과 촬영 설정만 불러옵니다. 다른 프로젝트와 현재 기기에 있는 기록은 변경하지 않습니다.
+              </Text>
+              {restorableProjects.map((project) => {
+                const selected = selectedRestoreProjectId === project.id;
+                return (
+                  <Pressable
+                    key={project.id}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected, disabled: isBackupSubmitting }}
+                    accessibilityLabel={project.name}
+                    disabled={isBackupSubmitting}
+                    style={[
+                      styles.authSecondaryButton,
+                      themed.secondaryButton,
+                      selected && themed.activeBorder
+                    ]}
+                    onPress={() => setSelectedRestoreProjectId(project.id)}
+                  >
+                    <Text selectable={false} style={[styles.authSecondaryButtonText, themed.text]}>
+                      {selected ? "선택됨 · " : ""}{project.name}
+                    </Text>
+                    <Text selectable style={[styles.optionDetail, themed.mutedText]}>
+                      사진 {project.photoCount}장 · 영상 {project.videoCount}개 · 수치 기록 {project.measurementCount}개
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ disabled: isBackupSubmitting || !selectedRestoreProjectId }}
+              disabled={isBackupSubmitting || !selectedRestoreProjectId}
+              style={[
+                styles.authPrimaryButton,
+                themed.activeFill,
+                (isBackupSubmitting || !selectedRestoreProjectId) && styles.disabledButton
+              ]}
+              onPress={() => void restoreSelectedProject()}
+            >
+              {isBackupSubmitting ? (
+                <ActivityIndicator color={palette.inverse} />
+              ) : (
+                <Text selectable={false} style={[styles.authPrimaryButtonText, themed.inverseText]}>
+                  선택한 프로젝트 복원
+                </Text>
+              )}
+            </Pressable>
           </View>
         </View>
       </Modal>
