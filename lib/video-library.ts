@@ -2,6 +2,7 @@ import * as FileSystem from "expo-file-system/legacy";
 import { downloadPrivateFile } from "@/lib/private-storage";
 
 import { localStorageAdapter } from "@/lib/local-storage";
+import { enqueueProjectCloudSync } from "@/lib/project-cloud-sync-queue";
 import { assertLocalLibraryCapacity } from "@/lib/local-library-limit";
 import { getNextTripClipTitle, TRIP_CLIP_TITLE_PREFIX } from "@/lib/trip-clip-title";
 import type { MadeVideoItem } from "@/types/video";
@@ -276,6 +277,10 @@ export const saveMadeVideo = async (
   };
 
   await writeVideos([savedVideo, ...videos]);
+  if (savedVideo.projectId) {
+    await enqueueProjectCloudSync({ projectId: savedVideo.projectId, kind: "video", itemId: savedVideo.id })
+      .catch(() => undefined);
+  }
   return savedVideo;
 });
 
@@ -308,6 +313,10 @@ export const updateMadeVideo = async (
   };
 
   await writeVideos(videos.map((item) => (item.id === id ? updatedVideo : item)));
+  if (updatedVideo.projectId) {
+    await enqueueProjectCloudSync({ projectId: updatedVideo.projectId, kind: "video", itemId: id })
+      .catch(() => undefined);
+  }
 
   if (video.uri && video.uri !== persistedUri && !isRemoteUri(video.uri)) {
     await FileSystem.deleteAsync(video.uri, { idempotent: true });

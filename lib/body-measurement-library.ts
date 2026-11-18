@@ -1,4 +1,5 @@
 import { localStorageAdapter } from "@/lib/local-storage";
+import { enqueueProjectCloudSync } from "@/lib/project-cloud-sync-queue";
 import {
   normalizeBodyMeasurementEntry,
   normalizeBodyMeasurementSettings
@@ -169,6 +170,7 @@ export const updateBodyMeasurementSettings = async (
       BODY_MEASUREMENT_SETTINGS_STORAGE_KEY,
       JSON.stringify(nextMap)
     );
+    await enqueueProjectCloudSync({ projectId, kind: "supplement" }).catch(() => undefined);
     return next;
   });
 
@@ -239,6 +241,7 @@ export const saveBodyMeasurement = async ({
     await writeEntries(nextEntries);
     const tombstones = await readDeletedMeasurementIds();
     if (tombstones.delete(normalized.id)) await writeDeletedMeasurementIds(tombstones);
+    await enqueueProjectCloudSync({ projectId, kind: "supplement" }).catch(() => undefined);
     return normalized;
   });
 

@@ -1,4 +1,5 @@
 import { localStorageAdapter } from "@/lib/local-storage";
+import { enqueueProjectCloudSync } from "@/lib/project-cloud-sync-queue";
 import {
   defaultBodyPoseAlignmentSettings,
   type BodyPoseAlignmentSettings,
@@ -75,6 +76,7 @@ export const updateBodyPoseAlignmentSettings = async (
     BODY_POSE_ALIGNMENT_STORAGE_KEY,
     JSON.stringify({ ...map, [projectId]: next })
   );
+  await enqueueProjectCloudSync({ projectId, kind: "supplement" }).catch(() => undefined);
   return next;
 };
 
