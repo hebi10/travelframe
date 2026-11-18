@@ -33,7 +33,8 @@ import {
   getSelectedCloudBackupProjectIds
 } from "@/lib/cloud-backup-project-slots";
 import { firebaseAuth, firebaseFunctions, firestore, firebaseStorage } from "@/lib/firebase";
-import { getBodyProjects, mergeBodyProjectsFromBackup } from "@/lib/body-project-library";
+import { getBodyProjectById, getBodyProjects, mergeBodyProjectsFromBackup } from "@/lib/body-project-library";
+import { isProjectCloudSaveMode, projectWantsCloudBackup } from "@/lib/project-save-policy";
 import { isPhotoBackupCurrent, recoverMissingBodyProjects } from "@/lib/body-project-backup";
 import type { BodyProject } from "@/types/body-project";
 import {
@@ -816,7 +817,7 @@ export const backupCurrentWorkspace = async ({
   const backupLimitTier = getBackupLimitTier(subscription);
   emitBackupProgress(onProgress, 3, "백업할 데이터를 준비하고 있습니다.");
 
-  const [settings, photos, imageBundles, videos, selectedProjectIds] =
+  const [settings, photos, imageBundles, videos, selectedProjectIds, projects] =
     await Promise.all([
       getAppSettings(),
       getPhotos(),
@@ -828,8 +829,16 @@ export const backupCurrentWorkspace = async ({
           isLoggedIn: Boolean(user),
           subscription
         }).maxCloudBackupProjects
-      )
+      ),
+      getBodyProjects()
     ]);
+  const projectById = new Map(projects.map((project) => [project.id, project]));
+  const cloudProjectIds = new Set(
+    [...selectedProjectIds].filter((id) => {
+      const mode = projectById.get(id)?.saveMode;
+      return !mode || isProjectCloudSaveMode(mode);
+    })
+  );
   if (
     isCloudBackupTargetEnabled(settings, "photos") &&
     selectedProjectIds.size === 0 &&
@@ -840,24 +849,33 @@ export const backupCurrentWorkspace = async ({
     );
   }
 
-  const selectedPhotoBackups = isCloudBackupTargetEnabled(settings, "photos")
-    ? photos.filter(
-        (photo) =>
-          Boolean(photo.projectId) &&
-          selectedProjectIds.has(photo.projectId as string)
+  const selectedPhotoBackups = photos.filter(
+    (photo) =>
+      Boolean(photo.projectId) &&
+      cloudProjectIds.has(photo.projectId as string) &&
+      projectWantsCloudBackup(
+        projectById.get(photo.projectId as string),
+        isCloudBackupTargetEnabled(settings, "photos")
       )
-    : [];
+  );
   const selectedImageBundleBackups = isCloudBackupTargetEnabled(settings, "imageBundles")
     ? imageBundles
     : [];
-  const selectedVideoBackups = isCloudBackupTargetEnabled(settings, "videos")
-    ? videos.filter(
-        (video) =>
-          !video.projectId || selectedProjectIds.has(video.projectId)
-      )
-    : [];
-  if (isCloudBackupTargetEnabled(settings, "photos")) {
-    for (const projectId of selectedProjectIds) {
+  const selectedVideoBackups = videos.filter(
+    (video) =>
+      video.projectId
+        ? cloudProjectIds.has(video.projectId) &&
+          projectWantsCloudBackup(
+            projectById.get(video.projectId),
+            isCloudBackupTargetEnabled(settings, "videos")
+          )
+        : isCloudBackupTargetEnabled(settings, "videos")
+  );
+  for (const projectId of cloudProjectIds) {
+    if (projectWantsCloudBackup(
+      projectById.get(projectId),
+      isCloudBackupTargetEnabled(settings, "photos")
+    )) {
       await backupBodyProjects(user.uid, projectId);
     }
   }
@@ -1359,6 +1377,10 @@ export const backupPhoto = async ({
   if (!photo.projectId) {
     return null;
   }
+  const currentProject = await getBodyProjectById(photo.projectId);
+  if (currentProject?.saveMode === "local_only") {
+    return null;
+  }
   const selectedProjectIds = await getSelectedCloudBackupProjectIds(
     user,
     getPlanEntitlements({
@@ -1520,18 +1542,20 @@ export const backupPhotoIfEnabled = async ({
   subscription: UserSubscription;
   photo: PhotoItem;
 }) => {
-  const settings = await getAppSettings();
-  if (
-    !shouldUseCloudBackupForStorageMode(
-      settings.storageMode,
-      isCreatorSubscriptionActive(subscription)
-    ) ||
-    !isCloudBackupTargetEnabled(settings, "photos") ||
-    !user ||
-    !photo.projectId
-  ) {
+  if (!user || !photo.projectId) {
     return null;
   }
+  const [settings, project] = await Promise.all([
+    getAppSettings(),
+    getBodyProjectById(photo.projectId)
+  ]);
+  const isSubscribed = isCreatorSubscriptionActive(subscription);
+  const cloudEnabled = isSubscribed && projectWantsCloudBackup(
+    project,
+    shouldUseCloudBackupForStorageMode(settings.storageMode, isSubscribed) &&
+      isCloudBackupTargetEnabled(settings, "photos")
+  );
+  if (!cloudEnabled) return null;
 
   const selectedProjectIds = await getSelectedCloudBackupProjectIds(
     user,
@@ -1548,10 +1572,7 @@ export const backupPhotoIfEnabled = async ({
     user,
     photo,
     subscription,
-    enabled: shouldUseCloudBackupForStorageMode(
-      settings.storageMode,
-      isCreatorSubscriptionActive(subscription)
-    )
+    enabled: cloudEnabled
   });
 };
 
@@ -1743,11 +1764,12 @@ export const backupMadeVideo = async ({
     throw new Error("Firebase 연결 정보가 아직 설정되지 않았습니다.");
   }
 
-  const [sourceDeviceId, settings] = await Promise.all([
+  const [sourceDeviceId, settings, project] = await Promise.all([
     getSourceDeviceId(),
-    getAppSettings()
+    getAppSettings(),
+    video.projectId ? getBodyProjectById(video.projectId) : Promise.resolve(null)
   ]);
-  if (!isCloudBackupTargetEnabled(settings, "videos")) {
+  if (!projectWantsCloudBackup(project, isCloudBackupTargetEnabled(settings, "videos"))) {
     return null;
   }
 
@@ -1794,7 +1816,10 @@ export const backupMadeVideo = async ({
   const upload = await uploadLocalFile({
     uri: video.uri,
     storagePath,
-    mediaKind: "video"
+    mediaKind: "video",
+    itemType: "video",
+    projectId: video.projectId,
+    itemId: video.id
   });
   const downloadUrl = upload.downloadURL;
 
