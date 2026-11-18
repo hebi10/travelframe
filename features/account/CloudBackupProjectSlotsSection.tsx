@@ -23,17 +23,20 @@ import {
 } from "@/lib/cloud-backup-project-slots";
 import { getBodyProjects, updateBodyProject } from "@/lib/body-project-library";
 import { getPhotos } from "@/lib/photo-library";
+import { enqueueProjectCloudSync } from "@/lib/project-cloud-sync-queue";
 import type { BodyProject } from "@/types/body-project";
 import type { PhotoItem } from "@/types/photo";
 
 export function CloudBackupProjectSlotsSection({
   user,
   maxSlots,
-  maxPhotosPerProject
+  maxPhotosPerProject,
+  backupStorageBytes
 }: {
   user: User | null;
   maxSlots: number;
   maxPhotosPerProject: number;
+  backupStorageBytes: number;
 }) {
   const { palette } = useAppAppearance();
   const [projects, setProjects] = useState<BodyProject[]>([]);
@@ -153,7 +156,10 @@ export function CloudBackupProjectSlotsSection({
     if (busyProjectId) return;
     setBusyProjectId(project.id);
     try {
-      await updateBodyProject(project.id, { saveMode: "local_only" });
+      await updateBodyProject(project.id, {
+        saveMode: "local_only",
+        cloudResumeMode: project.saveMode === "cloud" ? "cloud" : "local_cloud"
+      });
       await reload();
       setMessage(
         `"${project.name}" 프로젝트의 새 클라우드 백업을 중지했습니다. 이 기기의 앱 보관함·앨범 저장은 유지되며 기존 원격 파일은 삭제되지 않습니다. 슬롯은 계속 사용합니다.`
@@ -169,10 +175,12 @@ export function CloudBackupProjectSlotsSection({
     if (busyProjectId) return;
     setBusyProjectId(project.id);
     try {
-      await updateBodyProject(project.id, { saveMode: "local_cloud" });
+      const resumeMode = project.cloudResumeMode === "cloud" ? "cloud" : "local_cloud";
+      await updateBodyProject(project.id, { saveMode: resumeMode, cloudResumeMode: null });
+      await enqueueProjectCloudSync({ projectId: project.id, kind: "initial" });
       await reload();
       setMessage(
-        `"${project.name}" 프로젝트의 앱·앨범·클라우드 저장을 다시 사용합니다. 원격 데이터는 계속 보존됩니다.`
+        `"${project.name}" 프로젝트의 기존 저장 방식으로 클라우드 백업을 재개했습니다. 중지 중 변경된 항목은 동기화 대기열에 등록했습니다.`
       );
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "백업 재개 설정을 저장하지 못했습니다.");
@@ -235,7 +243,7 @@ export function CloudBackupProjectSlotsSection({
             Pro 이상 구독 후 프로젝트를 클라우드에 백업할 수 있습니다.
           </Text>
           <Text style={[styles.detail, { color: palette.muted }]}>
-            Pro는 1개, Plus는 3개, Expert는 5개 프로젝트를 선택할 수 있습니다.
+            Pro는 1개·2GB, Plus는 3개·6GB, Expert는 5개·10GB의 계정 공유 저장 공간을 제공합니다.
           </Text>
           <Pressable
             accessibilityRole="button"
@@ -265,8 +273,10 @@ export function CloudBackupProjectSlotsSection({
           {Math.min(slots.length, maxSlots)} / {maxSlots}개 프로젝트 선택
         </Text>
         <Text style={[styles.detail, { color: palette.muted }]}>
-          선택한 프로젝트만 클라우드에 백업되며 프로젝트당 사진 최대{" "}
-          {maxPhotosPerProject}장을 저장할 수 있습니다.
+          선택한 프로젝트만 클라우드에 백업됩니다. 계정 전체 저장 용량{" "}
+          {Math.round(backupStorageBytes / (1024 * 1024 * 1024))}GB ·
+          프로젝트당 사진 최대 {maxPhotosPerProject}장입니다.
+          촬영 수치와 설정도 선택한 프로젝트와 함께 백업됩니다.
         </Text>
         <Text style={[styles.warning, { color: palette.text }]}>
           새 백업 중지는 원격 데이터를 삭제하지 않습니다. 슬롯 교체는 명시적으로

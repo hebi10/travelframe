@@ -60,7 +60,7 @@ import {
 } from "@/lib/google-auth";
 import { APP_FONT_OPTIONS } from "@/lib/app-fonts";
 import { useAuth } from "@/lib/auth-context";
-import { getPlanEntitlements } from "@/lib/plan-entitlements";
+import { GIB, getPlanEntitlements } from "@/lib/plan-entitlements";
 import { getProjectCloudBackupStatuses, type ProjectCloudBackupStatus } from "@/lib/project-cloud-backup-status";
 import { enqueueProjectCloudSync } from "@/lib/project-cloud-sync-queue";
 import { flushProjectCloudSync } from "@/lib/project-cloud-sync";
@@ -1225,7 +1225,7 @@ export default function SettingsScreen() {
             <Text selectable style={[styles.backupStatusDetail, themed.mutedText]}>
               클라우드 백업:{" "}
               {planEntitlements.canBackupToCloud
-                ? `프로젝트 최대 ${planEntitlements.maxCloudBackupProjects}개 · 프로젝트당 사진 ${planEntitlements.maxCloudPhotosPerProject}장`
+                ? `백업 프로젝트 ${planEntitlements.maxCloudBackupProjects}개 · 계정 전체 ${Math.round(planEntitlements.backupStorageBytes / GIB)}GB · 프로젝트당 사진 ${planEntitlements.maxCloudPhotosPerProject}장`
                 : "사용 불가"}
             </Text>
           </View>

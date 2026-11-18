@@ -20,8 +20,9 @@ const describePlan = (tier: "pro" | "plus" | "expert") => {
   const entitlement = PLAN_ENTITLEMENTS[tier];
   return [
     "프로젝트 무제한 · 프로젝트당 사진 365장",
-    "클라우드 프로젝트 " + entitlement.maxCloudBackupProjects + "개 · " +
+    "클라우드 백업 대상 " + entitlement.maxCloudBackupProjects + "개 · 계정 전체 공유 " +
       entitlement.backupStorageBytes / GIB + "GB",
+    "선택한 프로젝트의 사진·영상·몸무게·체지방률 및 촬영 설정 백업과 복원",
     "광고 및 워터마크 제거 · 고급 영상 옵션"
   ];
 };
@@ -31,7 +32,7 @@ const entryMessages: Record<string, string> = {
   records: "프로젝트를 추가하거나 더 많은 사진을 기록하려면 유료 플랜의 혜택을 비교하세요.",
   project: "프로젝트별 사진을 최대 365장까지 기록할 수 있는 플랜을 확인하세요.",
   video: "워터마크 없는 영상과 고급 출력 옵션은 Pro 이상에서 지원합니다.",
-  backup: "클라우드 백업은 Pro 1개, Plus 3개, Expert 5개 프로젝트를 지원합니다.",
+  backup: "클라우드 백업은 Pro 1개·2GB, Plus 3개·6GB, Expert 5개·10GB의 계정 공유 저장 공간을 제공합니다.",
   settings: "현재 플랜의 혜택과 Google Play 구독 관리 기능을 확인하세요."
 };
 
@@ -145,6 +146,8 @@ export default function PlanScreen() {
           유료 상품은 Google Play 월 구독이며 취소 전까지 자동 갱신됩니다.
           플랜 변경·구매 복원은 계정에서 관리할 수 있습니다.
           구독이 끝나더라도 기기에 저장된 기존 기록은 자동 삭제되지 않습니다.
+          클라우드 백업은 선택한 프로젝트에만 적용되며, 프로젝트당 사진 최대 365장과 계정 전체 저장 용량 한도가 함께 적용됩니다.
+          새 백업 중지는 기존 원격 데이터를 삭제하지 않지만, 백업 슬롯 교체와 전체 클라우드 영구 삭제는 별도 확인이 필요한 작업입니다.
         </Text>
         <Pressable
           accessibilityRole="button"

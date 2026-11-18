@@ -2,31 +2,9 @@ name: Body Frame native device QA
 run-name: Body Frame native QA · ${{ inputs.release_request_id || github.ref_name }}
 
 on:
-  pull_request:
-    paths:
-      - 'app/**'
-      - 'components/**'
-      - 'features/**'
-      - 'lib/**'
-      - 'plugins/**'
-      - 'assets/**'
-      - 'constants/**'
-      - 'types/**'
-      - 'hooks/**'
-      - 'android/**'
-      - 'package.json'
-      - 'package-lock.json'
-      - 'app.json'
-      - 'app.config.*'
-      - 'babel.config.*'
-      - 'metro.config.*'
-      - 'tsconfig.json'
-      - '.npmrc'
-      - 'scripts/**'
-      - '!scripts/verify-android-qa-apk.py'
-      - '!scripts/test_verify_android_qa_apk.py'
-      - '!scripts/android-qa-apk-selection.json'
-      - '.github/workflows/body-frame-device-qa.yml'
+  push:
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       release_qa:
@@ -49,6 +27,7 @@ concurrency:
 
 jobs:
   build-apk:
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[android-qa]')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 75
     env:
