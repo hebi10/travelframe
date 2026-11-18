@@ -19,6 +19,8 @@ import { Alert,
 
 import { bodyFrameDesign, bodyFrameTypography } from "@/constants/app-theme";
 import { BodyFrameProjectSwitcher } from "@/features/camera/BodyFrameProjectSwitcher";
+import { BodyMeasurementEditorSheet } from "@/features/records/BodyMeasurementEditorSheet";
+import { createCaptureMeasurementPromptQueue, type CaptureMeasurementPrompt } from "@/lib/capture-measurement-prompt";
 import CameraScreen from "@/features/camera/CameraScreen";
 import { useAuth } from "@/lib/auth-context";
 import {
@@ -43,10 +45,11 @@ import {
   getLastActiveProjectId,
   setLastActiveProjectId
 } from "@/lib/body-project-preferences";
-import { getBodyMeasurementSettings } from "@/lib/body-measurement-library";
+import { getBodyMeasurementSettings, getBodyMeasurementByPhotoId, initializeNewBodyProjectMeasurements } from "@/lib/body-measurement-library";
 import { getBodyPoseAlignmentSettings } from "@/lib/body-pose-alignment";
 import {
   createBodyProject,
+  getBodyProjectById,
   getBodyProjects,
   updateBodyProject
 } from "@/lib/body-project-library";
@@ -82,7 +85,29 @@ export default function BodyFrameCameraScreen() {
   const [measurementPromptPhotoId, setMeasurementPromptPhotoId] =
     useState<string | null>(null);
   const [poseAlignmentEnabled, setPoseAlignmentEnabled] = useState(false);
-  const lastHandledSaveAtRef = useRef(0);
+  const [capturePrompts, setCapturePrompts] = useState<CaptureMeasurementPrompt[]>([]);
+  const capturePromptQueueRef = useRef<ReturnType<typeof createCaptureMeasurementPromptQueue> | null>(null);
+  if (!capturePromptQueueRef.current) {
+    capturePromptQueueRef.current = createCaptureMeasurementPromptQueue({
+      load: async (photo) => {
+        const projectId = photo.projectId;
+        if (!projectId) return null;
+        const [measurementSettings, entry, project] = await Promise.all([
+          getBodyMeasurementSettings(projectId),
+          getBodyMeasurementByPhotoId(projectId, photo.id),
+          getBodyProjectById(projectId)
+        ]);
+        if (!(measurementSettings.enabled && measurementSettings.promptAfterCapture)) return null;
+        return {
+          photo,
+          settings: measurementSettings,
+          projectName: project?.name ?? "프로젝트 기록",
+          entry: entry?.source === "manual" ? entry : null
+        };
+      },
+      onChange: setCapturePrompts
+    });
+  }
 
   const reloadProjectState = useCallback(async () => {
     const [storedProjects, storedPhotos, lastActiveProjectId] = await Promise.all([
@@ -212,54 +237,20 @@ export default function BodyFrameCameraScreen() {
     planEntitlements.maxProgressPhotos
   ]);
 
-  useEffect(() => {
-    if (
-      session.lastSavedAt <= 0 ||
-      session.lastSavedAt === lastHandledSaveAtRef.current ||
-      !session.lastSavedSequence
-    ) {
-      return;
-    }
+  const handleCapturedPhotoSaved = useCallback((photo: PhotoItem) => {
+    setSaveMessage(`${photo.sequence ?? 1}번째 사진을 저장했습니다.`);
+    setMeasurementPromptPhotoId(photo.id);
+    void capturePromptQueueRef.current?.enqueue(photo).catch(() => {
+      setSaveMessage("사진은 저장했습니다. 수치 정보는 사진 상세에서 입력할 수 있습니다.");
+    });
+    void reloadProjectState().catch(() => undefined);
+  }, [reloadProjectState]);
 
-    lastHandledSaveAtRef.current = session.lastSavedAt;
-    setSaveMessage(`${session.lastSavedSequence}번째 사진을 저장했습니다.`);
-    setMeasurementPromptPhotoId(null);
+  const dismissCapturePrompt = useCallback((photoId: string) => {
+    capturePromptQueueRef.current?.dismiss(photoId);
+  }, []);
 
-    void (async () => {
-      const projectId = session.projectId;
-      if (!projectId) {
-        await reloadProjectState();
-        return;
-      }
-
-      const [storedPhotos, measurementSettings] = await Promise.all([
-        getPhotos(),
-        getBodyMeasurementSettings(projectId)
-      ]);
-      const savedPhoto =
-        storedPhotos.find(
-          (photo) =>
-            photo.projectId === projectId &&
-            photo.sequence === session.lastSavedSequence
-        ) ?? null;
-
-      if (
-        measurementSettings.enabled &&
-        measurementSettings.promptAfterCapture &&
-        savedPhoto
-      ) {
-        setMeasurementPromptPhotoId(savedPhoto.id);
-      }
-
-      await reloadProjectState();
-    })();
-
-  }, [
-    reloadProjectState,
-    session.lastSavedAt,
-    session.lastSavedSequence,
-    session.projectId
-  ]);
+  const activeCapturePrompt = capturePrompts[0] ?? null;
 
   useEffect(() => {
     if (!saveMessage) {
@@ -309,6 +300,9 @@ export default function BodyFrameCameraScreen() {
         name,
         targetPhotoCount,
         referenceMode
+      });
+      await initializeNewBodyProjectMeasurements(project.id).catch(() => {
+        Alert.alert("수치 입력 설정", "프로젝트는 생성됐지만 촬영 후 수치 입력 설정을 저장하지 못했습니다. 프로젝트 설정에서 다시 활성화해 주세요.");
       });
       const storedPhotos = await getPhotos();
       const storedProjects = await getBodyProjects();
@@ -379,6 +373,7 @@ export default function BodyFrameCameraScreen() {
         onProjectReferenceModeChange={activeProject ? handleChangeReferenceMode : undefined}
         projectSaveMode={activeProject?.saveMode ?? null}
         onProjectSaveModeChange={activeProject ? handleChangeProjectSaveMode : undefined}
+        onPhotoSaved={handleCapturedPhotoSaved}
         headerCenter={
           <BodyFrameProjectSwitcher
             compact
@@ -436,6 +431,27 @@ export default function BodyFrameCameraScreen() {
           )
         }
       />
+      {activeCapturePrompt ? (
+        <BodyMeasurementEditorSheet
+          key={activeCapturePrompt.photo.id}
+          visible
+          projectId={activeCapturePrompt.photo.projectId ?? ""}
+          photoId={activeCapturePrompt.photo.id}
+          sequence={activeCapturePrompt.photo.sequence}
+          recordedAt={activeCapturePrompt.photo.createdAt}
+          settings={activeCapturePrompt.settings}
+          entry={activeCapturePrompt.entry}
+          capturePhoto={{
+            uri: activeCapturePrompt.photo.previewUri ?? activeCapturePrompt.photo.uri,
+            projectName: activeCapturePrompt.projectName,
+            sequence: activeCapturePrompt.photo.sequence
+          }}
+          onClose={() => dismissCapturePrompt(activeCapturePrompt.photo.id)}
+          onSaved={() => {
+            setSaveMessage("사진과 수치 기록을 저장했습니다.");
+          }}
+        />
+      ) : null}
     </View>
   );
 }
