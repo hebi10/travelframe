@@ -63,3 +63,29 @@ export const projectWantsCloudBackup = (
   project: Pick<BodyProject, "saveMode"> | null | undefined,
   legacyEnabled: boolean
 ) => project?.saveMode ? isProjectCloudSaveMode(project.saveMode) : legacyEnabled;
+
+export const canUploadLinkedProjectWork = ({
+  photoIds,
+  photos,
+  projects,
+  selectedProjectIds,
+  legacyEnabled
+}: {
+  photoIds: readonly string[];
+  photos: readonly { id: string; projectId?: string }[];
+  projects: readonly Pick<BodyProject, "id" | "saveMode">[];
+  selectedProjectIds: ReadonlySet<string>;
+  legacyEnabled: boolean;
+}) => {
+  const projectById = new Map(projects.map((project) => [project.id, project]));
+  const photoProjectId = new Map(photos.map((photo) => [photo.id, photo.projectId]));
+  const linkedProjects = new Set(
+    photoIds.map((photoId) => photoProjectId.get(photoId)).filter((id): id is string => Boolean(id))
+  );
+  if (linkedProjects.size === 0) return legacyEnabled;
+  return [...linkedProjects].every(
+    (projectId) =>
+      selectedProjectIds.has(projectId) &&
+      projectWantsCloudBackup(projectById.get(projectId), legacyEnabled)
+  );
+};
