@@ -124,6 +124,10 @@ assert.ok(wrapper.includes("capturePromptQueueRef.current?.enqueue(photo)"));
 assert.ok(wrapper.includes("activeCapturePrompt.photo.id"));
 assert.ok(wrapper.includes("<BodyMeasurementEditorSheet"));
 assert.ok(wrapper.includes("onPhotoSaved={handleCapturedPhotoSaved}"));
+assert.ok(wrapper.includes("setMeasurementPromptPhotoId(null)"), "each shot clears a previous suggestion");
+assert.ok(wrapper.includes("measurementSettings.enabled && measurementSettings.promptAfterCapture"),
+  "disabled projects must not display the after-shot prompt");
+assert.ok(wrapper.includes("visible={isScreenFocused}"), "navigation must hide the camera prompt without losing the photo");
 for (const source of [wrapper, projectList]) {
   assert.ok(source.includes("initializeNewBodyProjectMeasurements(project.id)"), "new projects enable a configurable prompt");
 }
