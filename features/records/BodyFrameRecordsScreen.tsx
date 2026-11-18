@@ -39,6 +39,7 @@ import {
 } from "@/lib/body-project-library";
 import { setLastActiveProjectId } from "@/lib/body-project-preferences";
 import { getPhotos } from "@/lib/photo-library";
+import { initializeNewBodyProjectMeasurements } from "@/lib/body-measurement-library";
 import { getPlanEntitlements } from "@/lib/plan-entitlements";
 import { useAppAppearance } from "@/lib/app-appearance";
 import type { BodyProject, ReferencePhotoMode } from "@/types/body-project";
@@ -201,6 +202,9 @@ export default function BodyFrameRecordsScreen() {
           name,
           targetPhotoCount,
           referenceMode
+        });
+        await initializeNewBodyProjectMeasurements(project.id).catch(() => {
+          Alert.alert("수치 입력 설정", "프로젝트는 생성됐지만 촬영 후 수치 입력 설정을 저장하지 못했습니다. 프로젝트 설정에서 다시 활성화해 주세요.");
         });
         await setLastActiveProjectId(project.id);
         await reload();
