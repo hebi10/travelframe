@@ -71,7 +71,7 @@ export const canUploadLinkedProjectWork = ({
   selectedProjectIds,
   legacyEnabled
 }: {
-  photoIds: readonly string[];
+  photoIds?: readonly string[] | null;
   photos: readonly { id: string; projectId?: string }[];
   projects: readonly Pick<BodyProject, "id" | "saveMode">[];
   selectedProjectIds: ReadonlySet<string>;
@@ -80,7 +80,9 @@ export const canUploadLinkedProjectWork = ({
   const projectById = new Map(projects.map((project) => [project.id, project]));
   const photoProjectId = new Map(photos.map((photo) => [photo.id, photo.projectId]));
   const linkedProjects = new Set(
-    photoIds.map((photoId) => photoProjectId.get(photoId)).filter((id): id is string => Boolean(id))
+    (Array.isArray(photoIds) ? photoIds : [])
+      .map((photoId) => photoProjectId.get(photoId))
+      .filter((id): id is string => Boolean(id))
   );
   if (linkedProjects.size === 0) return legacyEnabled;
   return [...linkedProjects].every(

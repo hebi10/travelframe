@@ -67,6 +67,18 @@ for (const [photoIds, selectedIds, enabled, expected] of [
   }), expected, "photo-linked work must not bypass project privacy or selected slot constraints");
 }
 
+assert.equal(
+  policy.canUploadLinkedProjectWork({
+    photoIds: undefined,
+    photos: linkedPhoto,
+    projects,
+    selectedProjectIds: new Set(["project-b"]),
+    legacyEnabled: true
+  }),
+  true,
+  "older image works without photoIds must preserve legacy backup behavior rather than crash"
+);
+
 const memory = new Map();
 const old = [
   { id: "project-a", name: "기존 A", createdAt: "2026-01-01", updatedAt: "2026-01-01", targetPhotoCount: 100, referenceMode: "first", archived: false },
