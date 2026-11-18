@@ -2117,7 +2117,10 @@ export const restoreCloudBackupToLocal = async ({ user }: { user: User | null })
       Boolean(item && restoredProjectIds.has(item.projectId))
     );
   const remoteProjectSettings = projectSettingsSnapshot.docs
-    .map((item) => ({ ...item.data(), projectId: item.id }))
+    .map((item) => ({
+      ...(item.data() as Record<string, unknown>),
+      projectId: item.id
+    }))
     .filter((item) => restoredProjectIds.has(item.projectId));
   await mergeBodyMeasurementsFromBackup(remoteMeasurements);
   await Promise.all([

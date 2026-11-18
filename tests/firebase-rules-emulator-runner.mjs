@@ -61,8 +61,10 @@ const firestoreValue = (value) => {
     return { stringValue: value };
   }
 
-  if (typeof value === "number" && Number.isInteger(value)) {
-    return { integerValue: String(value) };
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return Number.isInteger(value)
+      ? { integerValue: String(value) }
+      : { doubleValue: value };
   }
 
   if (typeof value === "boolean") {
