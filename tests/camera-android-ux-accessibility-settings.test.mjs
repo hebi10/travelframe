@@ -70,7 +70,7 @@ for (const snippet of [
   "accessibilityState={{ selected: flashMode === option.value }}",
   "accessibilityState={{ selected: photoQuality === option.value }}",
   "accessibilityState={{ selected: cameraRatio === option.value }}",
-  "accessibilityState={{ disabled: option.value === "app" || isCloudSaveTargetDisabled, checked: isSelected, selected: isSelected }}",
+  'accessibilityState={{ disabled: option.value === "app" || isCloudSaveTargetDisabled, checked: isSelected, selected: isSelected }}',
   'accessibilityRole="checkbox"',
   "accessibilityState={{ selected: guide === type }}",
   "accessibilityState={{ selected: guideSize === option.value }}",
