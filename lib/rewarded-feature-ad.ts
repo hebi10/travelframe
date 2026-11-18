@@ -84,7 +84,14 @@ export const createGoogleMobileRewardedAdPresenter = (
           showing = true;
           if (timeout !== undefined) clearTimeout(timeout);
           timeout = undefined;
-          void Promise.resolve().then(() => rewarded.show()).catch(() => complete("unavailable"));
+          void Promise.resolve().then(() => {
+            if (finished) return;
+            if (!canShow()) {
+              complete("cancelled");
+              return;
+            }
+            return rewarded.show();
+          }).catch(() => complete("unavailable"));
         }),
         rewarded.addAdEventListener(ads.RewardedAdEventType.EARNED_REWARD, () => {
           if (!finished) earned = true;
