@@ -156,6 +156,36 @@ class AppContracts(unittest.TestCase):
                 self.assertTrue(any(item.startswith(("OPS03_REQUIRED_CI:", "OPS03_PREFLIGHT:"))
                                     for item in issues), issues)
 
+    def test_signed_build_must_fail_closed_without_exact_main_manual_native_qa(self):
+        path = ".github/workflows/release-build.yml"
+        original_read = audit.read
+        original = original_read(path)
+        required = """REQUIRED_MANUAL_QA_JSON: '["Body Frame native device QA"]'"""
+        self.assertIn(required, original)
+        variants = (
+            ("missing_manual_qa", original.replace(required, "REQUIRED_MANUAL_QA_JSON: '[]'", 1)),
+            ("forged_push", original.replace(
+                'r.get("event")=="workflow_dispatch"',
+                'r.get("event") in ("push","workflow_dispatch")', 1)),
+            ("no_manual_run_required", original.replace(
+                'if not matched: refuse("Missing exact-main manually dispatched final Android QA: "+name)',
+                "if not matched: pass", 1)),
+            ("ignore_failure", original.replace(
+                'if latest.get("status")!="completed" or latest.get("conclusion")!="success": refuse("Manual final Android QA failed: "+name)',
+                "if False: pass", 1)),
+            ("ignore_missing_video", original.replace(
+                'len(found)!=1 or found[0].get("status")!="completed" or found[0].get("conclusion")!="success"',
+                "False", 1)),
+        )
+        for name, modified in variants:
+            with self.subTest(name=name):
+                self.assertNotEqual(original, modified)
+                with patch.object(audit, "read", side_effect=lambda target:
+                                  modified if target == path else original_read(target)):
+                    blockers = audit.findings()
+                self.assertTrue(any("OPS03_REQUIRED_CI:" in item or
+                                    "OPS03_PREFLIGHT:" in item for item in blockers), blockers)
+
     def test_signed_build_cannot_override_effective_ci_or_add_ungated_job(self):
         path = ".github/workflows/release-build.yml"
         original_read = audit.read
