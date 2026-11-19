@@ -33,9 +33,9 @@ assert.ok(ui.includes('kind: "initial"'), "resume must resync changes made while
 assert.ok(projectLibrary.includes('record.cloudResumeMode === "cloud"'), "restart must restore the pause marker from persistent storage");
 assert.ok(projectLibrary.includes('{ cloudResumeMode: undefined }'), "resume must clear persisted pause state");
 assert.ok(projectTypes.includes('cloudResumeMode?: "cloud" | "local_cloud"'));
-assert.ok(nativeQaWorkflow.includes("  workflow_dispatch:\\n"), "native QA must be explicitly triggered after batch completion");
+assert.ok(nativeQaWorkflow.includes("  workflow_dispatch:\n"), "native QA must be explicitly triggered after batch completion");
 assert.ok(nativeQaWorkflow.includes("expected_main_sha:"), "native QA requires the exact frozen main SHA");
-assert.ok(!nativeQaWorkflow.includes("  push:\\n"), "native QA must not automatically repeat on main pushes");
+assert.ok(!nativeQaWorkflow.includes("  push:\n"), "native QA must not automatically repeat on main pushes");
 assert.ok(nativeQaWorkflow.includes("FULL_RELEASE_QA"), "native QA must require full MP4 release evidence");
 assert.ok(!nativeQaWorkflow.includes("  pull_request:\n"), "native QA must not re-run on intermediate PR updates");
 assert.ok(ui.includes("기존 원격 파일은 삭제되지 않습니다"));
