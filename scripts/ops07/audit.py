@@ -444,6 +444,9 @@ def findings():
             ci_values = re.findall(r"(?m)^[ \t]+REQUIRED_CI_JSON:[ \t]*([^\n#]+)", request)
             if len(ci_values) != 1 or ci_values[0].strip() != """'["Quality","Secret Scan"]'""":
                 problems.append("OPS03_REQUIRED_CI: TravelFrame Quality and Secret Scan must be mandatory")
+            native_values = re.findall(r"(?m)^[ \t]+REQUIRED_MANUAL_QA_JSON:[ \t]*([^\n#]+)", request)
+            if len(native_values) != 1 or native_values[0].strip() != """'["Body Frame native device QA"]'""":
+                problems.append("OPS03_REQUIRED_CI: TravelFrame requires exact-main manual full native device QA")
             request_steps = _workflow_steps(request)
             gate_marker = "Gate release batch, main SHA and required CI"
             gates = [(i, step) for i, step in enumerate(request_steps)
@@ -461,7 +464,12 @@ def findings():
                                  'api("repos/"+repo+"/git/ref/heads/main")',
                                  'required=json.loads(os.environ["REQUIRED_CI_JSON"])',
                                  'if not matching: refuse("Missing exact-main CI: "+name)',
-                                 'if latest.get("status")!="completed" or latest.get("conclusion")!="success"'):
+                                 'if latest.get("status")!="completed" or latest.get("conclusion")!="success": refuse("Required CI not successful: "+name)',
+                                 'for name in json.loads(os.environ["REQUIRED_MANUAL_QA_JSON"])',
+                                 'r.get("event")=="workflow_dispatch"',
+                                 'if not matched: refuse("Missing exact-main manually dispatched final Android QA: "+name)',
+                                 'if latest.get("status")!="completed" or latest.get("conclusion")!="success": refuse("Manual final Android QA failed: "+name)',
+                                 'len(found)!=1 or found[0].get("status")!="completed" or found[0].get("conclusion")!="success"'):
                     if required not in gate:
                         problems.append("OPS03_PREFLIGHT: TravelFrame required approval or SHA preflight missing")
                         break
