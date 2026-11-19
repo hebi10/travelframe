@@ -385,7 +385,8 @@ def execute(plan):
     if mode in ("build", "internal", "deploy"):
         if native is None:
             native = stage("android_qa", NATIVE_WORKFLOW,
-                           {"release_qa": "true", "release_request_id": request_id},
+                           {"release_qa": "true", "release_request_id": request_id,
+                            "expected_main_sha": sha},
                            request_id, timeout=10800)
         else:
             result["runs"]["android_qa"] = native

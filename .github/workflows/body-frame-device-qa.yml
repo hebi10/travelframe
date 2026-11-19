@@ -2,16 +2,17 @@ name: Body Frame native device QA
 run-name: Body Frame native QA · ${{ inputs.release_request_id || github.ref_name }}
 
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
     inputs:
+      expected_main_sha:
+        description: 'Exact final main commit SHA after completing the development batch'
+        type: string
+        required: true
       release_qa:
         description: 'Full MP4 output/cancellation and SHA verification for the exact-main release'
         type: boolean
-        default: false
-        required: false
+        default: true
+        required: true
       release_request_id:
         description: 'Optional nonsecret correlation marker'
         type: string
@@ -23,16 +24,28 @@ permissions:
 
 concurrency:
   group: body-frame-device-qa-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build-apk:
-    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[android-qa]')) }}
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 75
     env:
       EXPO_NO_DOTENV: '1'
     steps:
+      - name: Require frozen main, full release QA and exact source
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_MAIN_SHA: ${{ inputs.expected_main_sha }}
+          FULL_RELEASE_QA: ${{ inputs.release_qa }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REF" == "refs/heads/main" ]] || { echo "::error::Native full QA must run on main"; exit 1; }
+          [[ "$FULL_RELEASE_QA" == "true" ]] || { echo "::error::Full MP4 and screenshot QA required"; exit 1; }
+          [[ "$EXPECTED_MAIN_SHA" =~ ^[0-9a-f]{40}$ && "$EXPECTED_MAIN_SHA" == "$GITHUB_SHA" ]] || { echo "::error::Exact final main SHA mismatch"; exit 1; }
+          [[ "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha)" == "$GITHUB_SHA" ]] || { echo "::error::main changed before QA start"; exit 1; }
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:

@@ -42,3 +42,10 @@
 
 ### 앱별 보존 지침
 - 기존 Android 전용 범위, photoId 식별자, 기록·백업 마이그레이션 및 데이터 보존 조건을 유지한다. android-play-aab.yml·android-play-store-images.yml을 따르며 Firebase Functions 배포는 Play 승인과 분리한다.
+
+## CI-DEDUP-20261119-P3 — 최종 main 전체 기기 QA 단일 실행
+- 일반 PR·main에서는 `quality.yml`의 TypeScript/ESLint/단위 테스트·Android Kotlin 컴파일·Firebase 규칙과 `secret-scan.yml` 검사를 유지한다.
+- `body-frame-device-qa.yml`은 `[android-qa]` 커밋 마커를 통한 push 자동 실행을 중단하고 정확한 최신 `main` SHA의 `workflow_dispatch` 수동 실행으로 전환한다. `release_qa=true`와 `expected_main_sha` 일치가 필수다.
+- 360·412dp 폰, 600·750dp 태블릿, 실제 Android 캡처, 사진·영상·MP4 렌더링·취소·독립 SHA 검증·데이터 보존 QA는 축소하지 않는다. 저장·삭제·백업·복원·결제·인증 등 고위험 변경의 선별 검증은 병합 전에 별도 유지한다.
+- `scripts/release/tf_release_orchestrator.py`가 동일 SHA를 네이티브 QA에 전달하며, `release-build.yml`은 동일 SHA의 Quality·Secret Scan과 수동 전체 기기 QA 성공, 필수 9개 Android 기기/영상 증빙 job 성공을 검증하지 못하면 서명 AAB 생성 요청을 차단한다.
+- `main` 변경 후 기존 SHA의 QA 성공을 재사용하지 않는다. 계측 중복을 줄이되 개발 완료·Play 업로드나 Firebase 배포 승인으로 오해하지 않는다.
