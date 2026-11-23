@@ -1,6 +1,6 @@
 import { localStorageAdapter } from "@/lib/local-storage";
 
-export type ProjectCloudSyncKind = "initial" | "supplement" | "settings" | "measurement" | "photo" | "video" | "image-work";
+export type ProjectCloudSyncKind = "initial" | "project-state" | "delete-project" | "delete-photo" | "delete-video" | "delete-measurement" | "supplement" | "settings" | "measurement" | "photo" | "photo-order" | "photo-metadata" | "video" | "image-work";
 
 export type ProjectCloudSyncTask = {
   id: string;
@@ -15,7 +15,7 @@ export type ProjectCloudSyncTask = {
 
 const KEY = "body-frame.project-cloud-sync-queue.v1";
 const VALID_KINDS: readonly ProjectCloudSyncKind[] =
-  ["initial", "supplement", "settings", "measurement", "photo", "video", "image-work"];
+  ["initial", "project-state", "delete-project", "delete-photo", "delete-video", "delete-measurement", "supplement", "settings", "measurement", "photo", "photo-order", "photo-metadata", "video", "image-work"];
 const listeners = new Set<() => void>();
 let serial = Promise.resolve();
 let activeDrain: Promise<number> | null = null;
@@ -70,7 +70,7 @@ export const enqueueProjectCloudSync = ({
   itemId?: string;
 }): Promise<ProjectCloudSyncTask> => serialize(async () => {
   if (!projectId || !VALID_KINDS.includes(kind) ||
-      (!["supplement", "settings", "initial"].includes(kind) && !itemId)) {
+      (!["supplement", "settings", "initial", "project-state", "delete-project", "photo-order"].includes(kind) && !itemId)) {
     throw new Error("백업 대기열 대상이 올바르지 않습니다.");
   }
   const id = [kind, projectId, itemId ?? ""].join(":");
@@ -92,16 +92,18 @@ export const enqueueProjectCloudSync = ({
 export const processProjectCloudSyncQueue = ({
   execute,
   now = Date.now(),
-  maxItems = 6
+  maxItems = 6,
+  canExecute = () => true
 }: {
   execute: (task: ProjectCloudSyncTask) => Promise<void>;
   now?: number;
   maxItems?: number;
+  canExecute?: (task: ProjectCloudSyncTask) => boolean;
 }): Promise<number> => {
   if (activeDrain) return activeDrain;
   const run = async () => {
     const tasks = (await readTasks())
-      .filter((task) => task.nextAttemptAt <= now)
+      .filter((task) => task.nextAttemptAt <= now && canExecute(task))
       .slice(0, maxItems);
     let processed = 0;
     for (const task of tasks) {

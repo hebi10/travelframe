@@ -289,7 +289,7 @@ export default function BodyMeasurementHistoryScreen() {
             {project.name}
           </Text>
           <Text style={[styles.projectDetail, { color: palette.muted }]}>
-            직접 입력한 수치는 현재 기기에만 저장됩니다.
+            직접 입력한 수치는 프로젝트 백업 설정에 따라 클라우드에도 저장됩니다. Health Connect에서 가져온 수치는 이 기기에 저장됩니다.
           </Text>
         </View>
 

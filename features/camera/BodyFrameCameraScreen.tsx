@@ -87,6 +87,7 @@ export default function BodyFrameCameraScreen() {
     useState<string | null>(null);
   const [poseAlignmentEnabled, setPoseAlignmentEnabled] = useState(false);
   const [isScreenFocused, setIsScreenFocused] = useState(false);
+  const [projectSheetOpen, setProjectSheetOpen] = useState(false);
   const [capturePrompts, setCapturePrompts] = useState<CaptureMeasurementPrompt[]>([]);
   const capturePromptQueueRef = useRef<ReturnType<typeof createCaptureMeasurementPromptQueue> | null>(null);
   if (!capturePromptQueueRef.current) {
@@ -99,8 +100,9 @@ export default function BodyFrameCameraScreen() {
           getBodyMeasurementByPhotoId(projectId, photo.id),
           getBodyProjectById(projectId)
         ]);
-        if (!(measurementSettings.enabled && measurementSettings.promptAfterCapture)) return null;
+        if (!measurementSettings.enabled) return null;
         setMeasurementPromptPhotoId(photo.id);
+        if (!measurementSettings.promptAfterCapture) return null;
         return {
           photo,
           settings: measurementSettings,
@@ -382,9 +384,11 @@ export default function BodyFrameCameraScreen() {
         projectSaveMode={activeProject?.saveMode ?? null}
         onProjectSaveModeChange={activeProject ? handleChangeProjectSaveMode : undefined}
         onPhotoSaved={handleCapturedPhotoSaved}
+        externalModalOpen={projectSheetOpen || Boolean(isScreenFocused && activeCapturePrompt)}
         headerCenter={
           <BodyFrameProjectSwitcher
             compact
+            onSheetVisibilityChange={setProjectSheetOpen}
             projects={projects}
             photos={photos}
             activeProject={activeProject}
@@ -408,12 +412,13 @@ export default function BodyFrameCameraScreen() {
                 <Pressable
                   accessibilityRole="button"
                   style={styles.captureStatusAction}
-                  onPress={() =>
+                  onPress={() => {
+                    dismissCapturePrompt(measurementPromptPhotoId);
                     router.push({
                       pathname: "/photo/[id]",
                       params: { id: measurementPromptPhotoId, measurement: "1" }
-                    })
-                  }
+                    });
+                  }}
                 >
                   <Text style={styles.captureStatusActionText}>수치 기록</Text>
                 </Pressable>

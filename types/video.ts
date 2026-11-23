@@ -1,4 +1,5 @@
 import type { MusicTrack, TripClipRatio, TripClipTemplate, TripClipTransition } from "@/constants/trip-clip";
+import type { BodyFrameVideoOptions } from "@/lib/body-frame-video";
 import type { BackupMetadata } from "@/types/photo";
 
 export type MadeVideoItem = BackupMetadata & {
@@ -17,4 +18,6 @@ export type MadeVideoItem = BackupMetadata & {
   durations: Record<string, number>;
   musicId: MusicTrack["id"] | "custom";
   musicLabel: string;
+  bodyFrameOptions?: BodyFrameVideoOptions;
+  containsLocalHealthData?: boolean;
 };

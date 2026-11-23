@@ -37,6 +37,8 @@ import {
   createBodyProject,
   getBodyProjects
 } from "@/lib/body-project-library";
+import { permanentlyDeleteArchivedProject } from "@/lib/body-project-deletion";
+import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 import { setLastActiveProjectId } from "@/lib/body-project-preferences";
 import { getPhotos } from "@/lib/photo-library";
 import { initializeNewBodyProjectMeasurements } from "@/lib/body-measurement-library";
@@ -139,7 +141,7 @@ export default function BodyFrameRecordsScreen() {
   );
 
   const openProject = useCallback(async (project: BodyProject) => {
-    await setLastActiveProjectId(project.id);
+    if (!project.archived) await setLastActiveProjectId(project.id);
     router.push({
       pathname: "/project/[id]",
       params: { id: project.id }
@@ -177,6 +179,36 @@ export default function BodyFrameRecordsScreen() {
     },
     [planEntitlements.maxProjectCount, reload]
   );
+
+  const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
+  const confirmDeleteProject = (project: BodyProject) => {
+    Alert.alert(
+      "보관된 프로젝트를 영구 삭제할까요?",
+      `"${project.name}"의 프로젝트 기록, 사진, 수치와 연결 영상이 삭제됩니다.${isLoggedIn ? " 계정에 백업된 프로젝트도 삭제를 요청합니다." : ""} 기기 앨범으로 내보낸 파일은 유지됩니다.`,
+      [
+        { text: "취소", style: "cancel" },
+        {
+          text: "영구 삭제",
+          style: "destructive",
+          onPress: () => void (async () => {
+            if (projectActivationInFlight.current) return;
+            projectActivationInFlight.current = true;
+            setDeletingProjectId(project.id);
+            try {
+              await permanentlyDeleteArchivedProject(project.id, isLoggedIn);
+              await reload();
+              if (isLoggedIn) Alert.alert("기기에서 프로젝트를 삭제했습니다", "계정 백업 삭제를 대기열에 등록했습니다.");
+            } catch (error) {
+              Alert.alert("프로젝트 삭제 실패", getUserFacingErrorMessage(error, "잠시 후 다시 시도해 주세요."));
+            } finally {
+              projectActivationInFlight.current = false;
+              setDeletingProjectId(null);
+            }
+          })()
+        }
+      ]
+    );
+  };
 
   const handleCreateProject = useCallback(
     async ({ name, targetPhotoCount, referenceMode }: CreateProjectInput) => {
@@ -424,7 +456,13 @@ export default function BodyFrameRecordsScreen() {
                     }
                   ]}
                 >
-                  <View style={styles.archivedCopy}>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`${project.name} 보관 기록 열기`}
+                    disabled={deletingProjectId !== null}
+                    onPress={() => void openProject(project)}
+                    style={styles.archivedCopy}
+                  >
                     <Text
                       numberOfLines={1}
                       style={[styles.archivedName, { color: palette.text }]}
@@ -435,11 +473,22 @@ export default function BodyFrameRecordsScreen() {
                       목표 {project.targetPhotoCount}장 · 기준{" "}
                       {project.referenceMode === "first" ? "첫 사진" : "최근 사진"}
                     </Text>
-                  </View>
+                  </Pressable>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`${project.name} 영구 삭제`}
+                    style={[styles.restoreButton, { borderColor: palette.line }]}
+                    disabled={deletingProjectId !== null || restoringProjectId !== null}
+                    onPress={() => confirmDeleteProject(project)}
+                  >
+                    <Text style={[styles.restoreButtonText, { color: palette.text }]}>
+                      {deletingProjectId === project.id ? "삭제 중" : "삭제"}
+                    </Text>
+                  </Pressable>
                   <Pressable
                     accessibilityRole="button"
                     style={[styles.restoreButton, { borderColor: palette.line }]}
-                    disabled={restoringProjectId !== null}
+                    disabled={restoringProjectId !== null || deletingProjectId !== null}
                     accessibilityState={{ disabled: restoringProjectId !== null, busy: restoringProjectId === project.id }}
                     onPress={() => void restoreProject(project)}
                   >

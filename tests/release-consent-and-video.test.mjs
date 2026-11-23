@@ -105,6 +105,8 @@ const exportFixture = async ({ saveFails = false, adThrows = false } = {}) => {
     exportController: { current: null }, AbortController,
     assertBodyFrameExportActive: signal => { if (signal.aborted) throw new Error("취소"); },
     FileSystem: { deleteAsync: async () => {} }, setAlbumRetryUri: () => {},
+    editingVideo: null, selectedTrack: null, normalizeBodyFrameVideoOptions: value => value,
+    getMeasurementForPhoto: () => null,
     activeProject: { id: "test-project", name: "test" }, projectPhotos: [{ id: "photo", uri: "file:///photo.jpg" }],
     isExporting: false, isLoggedIn: true, guestUsage: null,
     planEntitlements: { canExportVideo: true, localVideoLimit: 30, label: "무료", weeklyVideoExportLimit: 0 },

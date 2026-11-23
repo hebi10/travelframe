@@ -38,6 +38,7 @@ export type BodyFrameVideoOptions = {
   quality: (typeof BODY_FRAME_VIDEO_QUALITIES)[number];
   ratio: (typeof BODY_FRAME_VIDEO_RATIOS)[number];
   overlay: BodyFrameVideoOverlayOptions;
+  musicTrackId?: string;
 };
 
 export const DEFAULT_BODY_FRAME_VIDEO_OVERLAY: BodyFrameVideoOverlayOptions = {
@@ -54,6 +55,29 @@ export const DEFAULT_BODY_FRAME_VIDEO_OPTIONS: BodyFrameVideoOptions = {
   ratio: BODY_FRAME_VIDEO_RATIO,
   overlay: DEFAULT_BODY_FRAME_VIDEO_OVERLAY
 };
+export const normalizeBodyFrameVideoOptions = (value: unknown): BodyFrameVideoOptions | undefined => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const candidate = value as Partial<BodyFrameVideoOptions>;
+  const overlay = candidate.overlay;
+  return {
+    interval: candidate.interval && BODY_FRAME_VIDEO_INTERVALS.includes(candidate.interval)
+      ? candidate.interval : DEFAULT_BODY_FRAME_VIDEO_OPTIONS.interval,
+    quality: candidate.quality === 720 ? 720 : 1080,
+    ratio: candidate.ratio && BODY_FRAME_VIDEO_RATIOS.includes(candidate.ratio)
+      ? candidate.ratio : DEFAULT_BODY_FRAME_VIDEO_OPTIONS.ratio,
+    overlay: {
+      showDate: overlay?.showDate === true,
+      showWeight: overlay?.showWeight === true,
+      showBodyFat: overlay?.showBodyFat === true,
+      customText: typeof overlay?.customText === "string" ? overlay.customText.slice(0, 40) : "",
+      position: overlay?.position && BODY_FRAME_VIDEO_OVERLAY_POSITIONS.includes(overlay.position)
+        ? overlay.position : DEFAULT_BODY_FRAME_VIDEO_OVERLAY.position
+    },
+    ...(typeof candidate.musicTrackId === "string" && candidate.musicTrackId.length <= 160
+      ? { musicTrackId: candidate.musicTrackId } : {})
+  };
+};
+
 export const getBodyFrameVideoOutputSize = (
   ratio: BodyFrameVideoOptions["ratio"],
   quality: BodyFrameVideoOptions["quality"]
@@ -184,7 +208,7 @@ export const getBodyFrameVideoOverlayText = ({
 
   if (overlay.showDate) {
     const date = formatBodyFrameVideoOverlayDate(
-      measurement?.recordedAt ?? photo?.createdAt
+      photo?.createdAt ?? measurement?.recordedAt
     );
     if (date) {
       parts.push(date);

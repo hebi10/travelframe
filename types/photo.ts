@@ -63,6 +63,7 @@ export type PhotoItem = BackupMetadata & {
 
 export type SaveCapturedPhotoInput = {
   uri: string;
+  createdAt?: string;
   width?: number;
   height?: number;
   ratioLabel?: PhotoRatioLabel;

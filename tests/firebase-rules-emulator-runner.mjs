@@ -262,6 +262,8 @@ await expectDenied("health data stays outside project backups", firestoreRequest
 await expectAllowed("owner updates project metadata", firestoreRequest("PATCH", `users/${ownerUid}/bodyProjects/project-1`, { uid: ownerUid, data: { ...projectBackup, archived: true } }));
 await expectAllowed("owner sets project cloud save mode", firestoreRequest("PATCH", `users/${ownerUid}/bodyProjects/project-1`, { uid: ownerUid, data: { ...projectBackup, saveMode: "cloud" } }));
 await expectAllowed("owner selects local only without deleting legacy data", firestoreRequest("PATCH", `users/${ownerUid}/bodyProjects/project-1`, { uid: ownerUid, data: { ...projectBackup, saveMode: "local_only" } }));
+await expectAllowed("owner can preserve a project's previous cloud mode", firestoreRequest("PATCH", `users/${ownerUid}/bodyProjects/project-1`, { uid: ownerUid, data: { ...projectBackup, saveMode: "local_only", cloudResumeMode: "cloud" } }));
+await expectDenied("resume mode is only valid for paused projects", firestoreRequest("PATCH", `users/${ownerUid}/bodyProjects/project-1`, { uid: ownerUid, data: { ...projectBackup, saveMode: "cloud", cloudResumeMode: "cloud" } }));
 await expectDenied("project save mode rejects unknown values", firestoreRequest("PATCH", `users/${ownerUid}/bodyProjects/project-1`, { uid: ownerUid, data: { ...projectBackup, saveMode: "public" } }));
 await expectDenied("other users cannot delete project metadata", firestoreRequest("DELETE", `users/${ownerUid}/bodyProjects/project-1`, { uid: otherUid }));
 
@@ -281,6 +283,11 @@ const projectMeasurement = {
 };
 await expectAllowed("owner backs up private body measurement", firestoreRequest("PATCH",
   `users/${ownerUid}/bodyMeasurements/measurement-1`, { uid: ownerUid, data: projectMeasurement }));
+await expectDenied("Health Connect values remain local even for old clients", firestoreRequest("PATCH",
+  `users/${ownerUid}/bodyMeasurements/measurement-1`, { uid: ownerUid, data: { ...projectMeasurement, source: "health_connect" } }));
+await seedDoc(`users/${ownerUid}/backupProjectLocks/project-deleted`, { status: "deleted", operation: "delete-project" });
+await expectDenied("deleted projects cannot be recreated by a stale client", firestoreRequest("PATCH",
+  `users/${ownerUid}/bodyProjects/project-deleted`, { uid: ownerUid, data: { ...projectBackup, id: "project-deleted" } }));
 await expectAllowed("owner reads private measurement", firestoreRequest("GET",
   `users/${ownerUid}/bodyMeasurements/measurement-1`, { uid: ownerUid }));
 await expectDenied("other account cannot read private measurements", firestoreRequest("GET",

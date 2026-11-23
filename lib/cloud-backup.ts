@@ -33,7 +33,7 @@ import {
   getSelectedCloudBackupProjectIds
 } from "@/lib/cloud-backup-project-slots";
 import { firebaseAuth, firebaseFunctions, firestore, firebaseStorage } from "@/lib/firebase";
-import { getBodyProjectById, getBodyProjects, mergeBodyProjectsFromBackup } from "@/lib/body-project-library";
+import { getBodyProjectById, getBodyProjects, getDeletedBodyProjectIds, mergeBodyProjectsFromBackup } from "@/lib/body-project-library";
 import {
   getBodyMeasurements,
   getBodyMeasurementSettings,
@@ -52,6 +52,7 @@ import { normalizeBodyMeasurementEntry, normalizeBodyMeasurementSettings } from 
 import type { BodyMeasurementEntry, BodyMeasurementSettings } from "@/types/body-measurement";
 import type { BodyCaptureContextState } from "@/types/body-capture-context";
 import { canUploadLinkedProjectWork, isProjectCloudSaveMode, projectWantsCloudBackup } from "@/lib/project-save-policy";
+import { normalizeBodyFrameVideoOptions } from "@/lib/body-frame-video";
 import { isPhotoBackupCurrent, recoverMissingBodyProjects } from "@/lib/body-project-backup";
 import { selectCloudProjectRestoreItems } from "@/lib/project-restore-selection";
 import type { BodyProject } from "@/types/body-project";
@@ -351,13 +352,43 @@ const deleteCloudBackupDataCallable = () =>
   );
 
 const deleteUserBackupItem = (data: {
-  itemType: "photo" | "imageWork" | "video" | "music";
+  itemType: "photo" | "imageWork" | "video" | "music" | "measurement";
   itemId: string;
+  projectId?: string;
 }) =>
   callBackupFunction<typeof data, { deleted: boolean; summary: BackupSummary }>(
     "deleteUserBackupItem",
     data
   );
+
+export const deleteCloudProjectBackup = async (user: User, projectId: string) => {
+  await assertLocalLibraryOwner(user.uid);
+  if (firebaseAuth?.currentUser?.uid !== user.uid) throw new Error("백업 계정이 변경되었습니다.");
+  await callBackupFunction("deleteCloudBackupProject", { projectId, confirmDeleteProjectId: projectId });
+};
+
+export const deleteProjectBackupItem = async ({
+  user,
+  projectId,
+  itemType,
+  itemId
+}: {
+  user: User;
+  projectId: string;
+  itemType: "photo" | "video" | "measurement";
+  itemId: string;
+}) => {
+  await assertLocalLibraryOwner(user.uid);
+  if (firebaseAuth?.currentUser?.uid !== user.uid) throw new Error("백업 계정이 변경되었습니다.");
+  await deleteUserBackupItem({ projectId, itemType, itemId }).catch((error: unknown) => {
+    if ((error as { code?: string } | null)?.code !== "functions/not-found") throw error;
+  });
+};
+
+const serializeVideoForBackup = (video: MadeVideoItem) =>
+  Object.fromEntries(Object.entries(video).filter(([key, value]) =>
+    key !== "containsLocalHealthData" && value !== undefined
+  ));
 
 const normalizeDateValue = (value: unknown) => {
   if (!value) {
@@ -400,8 +431,19 @@ const backupBodyProjects = async (userId: string, projectId?: string) => {
   const projects = await getBodyProjects();
   for (const project of projects) {
     if (projectId && project.id !== projectId) continue;
-    await setDoc(doc(firestore, "users", userId, "bodyProjects", project.id), project);
+    const { cloudResumeMode, ...data } = project;
+    await setDoc(doc(firestore, "users", userId, "bodyProjects", project.id), {
+      ...data,
+      ...(cloudResumeMode ? { cloudResumeMode } : {})
+    });
   }
+};
+
+export const backupPausedProjectMetadata = async (user: User, projectId: string) => {
+  const project = await getBodyProjectById(projectId);
+  if (project?.saveMode !== "local_only" || !project.cloudResumeMode) return;
+  if (firebaseAuth?.currentUser?.uid !== user.uid) throw new Error("백업 계정이 변경되었습니다.");
+  await backupBodyProjects(user.uid, projectId);
 };
 
 const backupBodyProjectSupplement = async (
@@ -441,7 +483,7 @@ const backupBodyProjectSupplement = async (
   if (mode !== "settings") {
     const measurements = await getBodyMeasurements(projectId);
     for (const entry of measurements) {
-      if (measurementId && entry.id !== measurementId) continue;
+      if (entry.source === "health_connect" || (measurementId && entry.id !== measurementId)) continue;
       await setDoc(
         doc(firestore, "users", userId, "bodyMeasurements", entry.id),
         {
@@ -975,7 +1017,7 @@ export const backupCurrentWorkspace = async ({
       legacyEnabled: isCloudBackupTargetEnabled(settings, "imageBundles")
     })
   );
-  const selectedVideoBackups = videos.filter(
+  const selectedVideoBackups = videos.filter((video) => !video.containsLocalHealthData).filter(
     (video) =>
       video.projectId
         ? cloudProjectIds.has(video.projectId) &&
@@ -1376,7 +1418,7 @@ export const backupCurrentWorkspace = async ({
     await setDoc(
       doc(firestore, "users", user.uid, "videos", video.id),
       {
-        ...video,
+        ...serializeVideoForBackup(video),
         userId: user.uid,
         localId: video.id,
         localUri: video.uri,
@@ -1466,11 +1508,23 @@ const updateCloudOnlyPhotoMetadata = async (
   if (!(await isPhotoStillBackupEligible(photo.id))) return null;
   const metadata = {
     ...(typeof photo.sequence === "number" ? { sequence: photo.sequence } : {}),
-    sourceUpdatedAt: photo.updatedAt ?? photo.createdAt,
+    createdAt: photo.createdAt,
+    ...(photo.backupStatus === "pending" ? {} : { sourceUpdatedAt: photo.updatedAt ?? photo.createdAt }),
     updatedAt: serverTimestamp()
   };
   await setDoc(doc(firestore, "users", userId, "photoBackups", photo.id), metadata, { merge: true });
   return { ...existingData, ...metadata };
+};
+
+export const backupProjectPhotoMetadata = async (user: User, photo: PhotoItem) => {
+  if (!firestore || firebaseAuth?.currentUser?.uid !== user.uid) {
+    throw new Error("백업 계정이 변경되었습니다.");
+  }
+  const snapshot = await getDoc(doc(firestore, "users", user.uid, "photoBackups", photo.id));
+  const existing = snapshot.data();
+  if (existing && !isPhotoBackupCurrent(photo, existing)) {
+    await updateCloudOnlyPhotoMetadata(user.uid, photo, existing);
+  }
 };
 
 export const backupPhoto = async ({
@@ -1904,7 +1958,7 @@ export const backupMadeVideo = async ({
   enabled: boolean;
   subscription?: UserSubscription | null;
 }) => {
-  if (!enabled || !user) {
+  if (!enabled || !user || video.containsLocalHealthData) {
     return null;
   }
 
@@ -1987,7 +2041,7 @@ export const backupMadeVideo = async ({
   const currentVideoCount = await getCollectionSize(user.uid, "videos");
   const backupLimitTier = getBackupLimitTier(subscription);
   const videoLimit = getCloudBackupVideoLimit(backupLimitTier);
-  if (!canBackupMoreVideos(currentVideoCount, backupLimitTier)) {
+  if (!existingSnapshot.exists() && !canBackupMoreVideos(currentVideoCount, backupLimitTier)) {
     throw new Error(
       `영상 백업 한도 ${videoLimit}개를 모두 사용했습니다. 설정에서 기존 영상 백업을 정리한 뒤 다시 시도해 주세요.`
     );
@@ -2014,7 +2068,7 @@ export const backupMadeVideo = async ({
   await setDoc(
     doc(firestore, "users", user.uid, "videos", video.id),
     {
-      ...video,
+      ...serializeVideoForBackup(video),
       userId: user.uid,
       localId: video.id,
       localUri: video.uri,
@@ -2144,6 +2198,7 @@ const normalizeVideoBackup = (
       : {},
   musicId: data.musicId === "custom" || typeof data.musicId === "string" ? (data.musicId as MadeVideoItem["musicId"]) : "none",
   musicLabel: typeof data.musicLabel === "string" ? data.musicLabel : "무음",
+  bodyFrameOptions: normalizeBodyFrameVideoOptions(data.bodyFrameOptions),
   downloadURL:
     (typeof data.downloadURL === "string" && data.downloadURL) ||
     (typeof data.uri === "string" && /^https?:\/\//i.test(data.uri) && data.uri) ||
@@ -2273,10 +2328,17 @@ export const restoreCloudBackupToLocal = async ({
   // Each library merges the latest local state; project selection never overwrites
   // another project's photos, measurements, videos or preferences.
   await mergeBodyProjectsFromBackup(selected.projects);
+  const deletedProjectIds = await getDeletedBodyProjectIds();
+  const deletedProjectPhotoIds = new Set(selected.photos
+    .filter((photo) => photo.projectId && deletedProjectIds.has(photo.projectId))
+    .map((photo) => photo.id));
   const [missingPhotos, missingImageWorks, missingVideos] = await Promise.all([
-    mergePhotosFromBackup(selected.photos),
-    mergeImageBundleWorksFromBackup(selected.imageWorks),
-    mergeMadeVideosFromBackup(selected.videos)
+    mergePhotosFromBackup(selected.photos.filter((photo) => !deletedProjectPhotoIds.has(photo.id))),
+    mergeImageBundleWorksFromBackup(selected.imageWorks.filter((work) =>
+      !work.photoIds.some((id) => deletedProjectPhotoIds.has(id)))),
+    mergeMadeVideosFromBackup(selected.videos.filter((video) =>
+      (!video.projectId || !deletedProjectIds.has(video.projectId)) &&
+      !video.photoIds.some((id) => deletedProjectPhotoIds.has(id))))
   ]);
 
   const restoredProjectIds = new Set((await getBodyProjects()).map((project) => project.id));

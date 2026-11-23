@@ -148,7 +148,8 @@ for (const token of [
   '"BodyFat"',
   "days = 30",
   "requestBodyHealthConnectReadPermissions",
-  "readLatestBodyHealthConnectMeasurements"
+  "readBodyHealthConnectMeasurements",
+  "pageToken"
 ]) {
   if (!healthConnectSource.includes(token)) {
     fail(`Health Connect source invariant missing: ${token}`);

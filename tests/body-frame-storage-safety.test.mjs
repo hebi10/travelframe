@@ -41,6 +41,8 @@ function fixture(fault) {
     "expo-image-manipulator": { SaveFormat: { JPEG: "jpeg" }, manipulateAsync: async () => { files.set("file:///rendered.jpg", "rendered"); return { uri: "file:///rendered.jpg", width: 100, height: 100 }; } },
     "@/lib/local-storage": { localStorageAdapter: adapter },
     "@/lib/project-cloud-sync-queue": { enqueueProjectCloudSync: async () => {} },
+    "@/lib/body-frame-video": load("lib/body-frame-video.ts"),
+    "@/lib/body-frame-camera-project": load("lib/body-frame-camera-project.ts"),
     "@/lib/photo-library": { getPhotos: async () => [] },
     "@/lib/local-library-limit": { assertLocalLibraryCapacity: () => {} },
     "@/lib/image-backup-utils": { optimizeImageForStorage: async x => x, resolveImageDimensions: async () => ({ width: 100, height: 100 }) },
@@ -95,7 +97,7 @@ function cloudFixture(f, hooks = {}) {
     "@/lib/local-library-owner": { assertLocalLibraryOwner: async () => {} },
     "@/lib/cloud-backup-project-slots": { getSelectedCloudBackupProjectIds: async () => new Set(["pr"]) },
     "@/lib/plan-entitlements": { getPlanEntitlements: () => ({ maxCloudBackupProjects: 1 }), getPlanTier: () => "pro" },
-    "@/lib/body-project-library": { getBodyProjects: async () => [], getBodyProjectById: async () => null, mergeBodyProjectsFromBackup: hooks.mergeProjects ?? (async () => {}) },
+    "@/lib/body-project-library": { getBodyProjects: async () => [], getBodyProjectById: async () => null, getDeletedBodyProjectIds: async () => new Set(), mergeBodyProjectsFromBackup: hooks.mergeProjects ?? (async () => {}) },
     "@/lib/project-save-policy": load("lib/project-save-policy.ts", {}),
     "@/lib/work-library": load("lib/work-library.ts", f.dependencies),
     "@/lib/video-library": load("lib/video-library.ts", f.dependencies),
@@ -170,7 +172,9 @@ test("cloud restore paused at project merge preserves a completed project captur
   c.documents.set("photoBackups/deleted", { ...c.remote, localId: "deleted" });
   const photo = load("lib/photo-library.ts", {
     "@/lib/legacy-photo-library": f.api,
-    "@/lib/body-frame-camera-session": { finishBodyFrameCameraCapture: () => {} },
+    "@/lib/body-frame-camera-project": f.dependencies["@/lib/body-frame-camera-project"],
+    "@/lib/project-cloud-sync-queue": f.dependencies["@/lib/project-cloud-sync-queue"],
+    "@/lib/body-frame-camera-session": { finishBodyFrameCameraCapture: () => {}, resetBodyFrameCameraSequence: () => {} },
     "@/lib/body-project-library": { updateBodyProject: async () => {} },
     "@/lib/body-measurement-library": {},
     "@/lib/body-frame-photo-storage": { storeBodyFramePhotoFile: async ({ photoId }) => {
@@ -199,7 +203,9 @@ for (const finishWithError of [false, true]) test(`project finalization ${finish
   const f = fixture(); const reached = barrier(), resume = barrier(); let draftId, stagedUri, stagedPreview;
   const api = load("lib/photo-library.ts", {
     "@/lib/legacy-photo-library": f.api,
-    "@/lib/body-frame-camera-session": { finishBodyFrameCameraCapture: () => {} },
+    "@/lib/body-frame-camera-project": f.dependencies["@/lib/body-frame-camera-project"],
+    "@/lib/project-cloud-sync-queue": f.dependencies["@/lib/project-cloud-sync-queue"],
+    "@/lib/body-frame-camera-session": { finishBodyFrameCameraCapture: () => {}, resetBodyFrameCameraSequence: () => {} },
     "@/lib/body-project-library": { updateBodyProject: async () => {} },
     "@/lib/body-measurement-library": {},
     "@/lib/body-frame-photo-storage": { storeBodyFramePhotoFile: async ({ photoId }) => {
@@ -252,7 +258,9 @@ test("project rollback does not adopt and discard an edit queued before reservat
   };
   const api = load("lib/photo-library.ts", {
     "@/lib/legacy-photo-library": f.api,
-    "@/lib/body-frame-camera-session": { finishBodyFrameCameraCapture: () => {} },
+    "@/lib/body-frame-camera-project": f.dependencies["@/lib/body-frame-camera-project"],
+    "@/lib/project-cloud-sync-queue": f.dependencies["@/lib/project-cloud-sync-queue"],
+    "@/lib/body-frame-camera-session": { finishBodyFrameCameraCapture: () => {}, resetBodyFrameCameraSequence: () => {} },
     "@/lib/body-project-library": { updateBodyProject: async () => {} },
     "@/lib/body-measurement-library": {},
     "@/lib/body-frame-photo-storage": { storeBodyFramePhotoFile: async () => { throw Error("project store failed"); } }

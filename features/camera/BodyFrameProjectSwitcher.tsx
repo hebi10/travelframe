@@ -47,6 +47,7 @@ type BodyFrameProjectSwitcherProps = {
   onManageProjects?: () => void;
   compact?: boolean;
   createOnly?: boolean;
+  onSheetVisibilityChange?: (visible: boolean) => void;
 };
 
 const formatDuration = (seconds: number) =>
@@ -65,7 +66,8 @@ export function BodyFrameProjectSwitcher({
   onUpgrade,
   onManageProjects,
   compact = false,
-  createOnly = false
+  createOnly = false,
+  onSheetVisibilityChange
 }: BodyFrameProjectSwitcherProps) {
   const insets = useSafeAreaInsets();
   const { palette } = useAppAppearance();
@@ -80,6 +82,10 @@ export function BodyFrameProjectSwitcher({
   const [submitting, setSubmitting] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
+
+  useEffect(() => {
+    onSheetVisibilityChange?.(pickerOpen || createOpen);
+  }, [createOpen, onSheetVisibilityChange, pickerOpen]);
 
   useEffect(() => {
     const shown = Keyboard.addListener("keyboardDidShow", () => setKeyboardVisible(true));

@@ -168,15 +168,19 @@ const getPreviewResize = (width?: number, height?: number) => {
 const createPhotoPreview = async ({
   sourceUri,
   id,
+  projectId,
   width,
   height
 }: {
   sourceUri: string;
   id: string;
+  projectId?: string;
   width?: number;
   height?: number;
 }) => {
-  const directory = await ensurePhotoPreviewDirectory();
+  const root = await ensurePhotoPreviewDirectory();
+  const directory = projectId ? `${root}${encodeURIComponent(projectId)}/` : root;
+  if (projectId) await FileSystem.makeDirectoryAsync(directory, { intermediates: true });
   const previewUri = `${directory}${id}-preview.jpg`;
   const resize = getPreviewResize(width, height);
   const rendered = await manipulateAsync(
@@ -355,7 +359,7 @@ export const reorderProjectPhotos = async ({
       }
 
       const sequence = sequenceById.get(photo.id);
-      if (!sequence) {
+      if (!sequence || photo.sequence === sequence) {
         return photo;
       }
 
@@ -618,6 +622,7 @@ export const saveCapturedPhoto = async ({
   uri,
   width,
   height,
+  createdAt,
   ratioLabel = "Original",
   colorAdjustment,
   localImageLimit
@@ -664,7 +669,7 @@ export const saveCapturedPhoto = async ({
       id,
       uri: destinationUri,
       previewUri,
-      createdAt: new Date().toISOString(),
+      createdAt: createdAt ?? new Date().toISOString(),
       width: prepared.width ?? 0,
       height: prepared.height ?? 0,
       ratioLabel: shouldApplyRatio
@@ -715,7 +720,11 @@ export const saveEditedPhoto = async ({
     });
   }
   const id = targetPhotoId ?? createPhotoId();
-  const directory = await ensurePhotoDirectory();
+  const rootDirectory = await ensurePhotoDirectory();
+  const directory = existingPhoto?.projectId
+    ? `${rootDirectory}${encodeURIComponent(existingPhoto.projectId)}/`
+    : rootDirectory;
+  await FileSystem.makeDirectoryAsync(directory, { intermediates: true });
   // Keep photoId immutable; each content version gets independent file paths.
   const versionId = `${id}-${createPhotoId()}`;
   const destinationUri = `${directory}${versionId}-edited.jpg`;
@@ -748,6 +757,7 @@ export const saveEditedPhoto = async ({
     previewUri = await createPhotoPreview({
       sourceUri: destinationUri,
       id: versionId,
+      projectId: existingPhoto?.projectId,
       width: prepared.width,
       height: prepared.height
     });
@@ -875,12 +885,13 @@ export const deletePhoto = async (id: string) => runPhotoLibraryMutation(async (
 
   await writePhotos(photos.filter((item) => item.id !== id));
   if (photo) {
-    await deleteLocalFile(photo.uri);
-    if (photo.previewUri) {
-      await deleteLocalFile(photo.previewUri);
-    }
+    await Promise.all(
+      [...new Set([photo.uri, photo.previewUri, photo.localUri, photo.localPreviewUri])]
+        .filter((uri): uri is string => Boolean(uri))
+        .map((uri) => deleteLocalFile(uri).catch(() => undefined))
+    );
   }
-
+  return photo ?? null;
 });
 
 export const togglePhotoForVideo = async (id: string) => runPhotoLibraryMutation(async () => {

@@ -241,8 +241,10 @@ export const saveBodyMeasurement = async ({
     await writeEntries(nextEntries);
     const tombstones = await readDeletedMeasurementIds();
     if (tombstones.delete(normalized.id)) await writeDeletedMeasurementIds(tombstones);
-    await enqueueProjectCloudSync({ projectId, kind: "measurement", itemId: normalized.id })
-      .catch(() => undefined);
+    if (normalized.source === "manual") {
+      await enqueueProjectCloudSync({ projectId, kind: "measurement", itemId: normalized.id })
+        .catch(() => undefined);
+    }
     return normalized;
   });
 
@@ -296,13 +298,17 @@ export const getBodyMeasurementBySourceRecordId = async (
   );
 };
 
-export const deleteBodyMeasurement = async (id: string) =>
+export const deleteBodyMeasurement = async (id: string, { projectDeletion = false } = {}) =>
   runMutation(async () => {
     const entries = await readEntries();
     const deletedIds = await readDeletedMeasurementIds();
     deletedIds.add(id);
     await writeDeletedMeasurementIds(deletedIds);
     await writeEntries(entries.filter((entry) => entry.id !== id));
+    const removed = entries.find((entry) => entry.id === id);
+    if (removed && !projectDeletion) {
+      await enqueueProjectCloudSync({ projectId: removed.projectId, kind: "delete-measurement", itemId: id });
+    }
   });
 
 export const detachBodyMeasurementsFromPhoto = async (photoId: string) =>
@@ -318,6 +324,9 @@ export const detachBodyMeasurementsFromPhoto = async (photoId: string) =>
 
     if (changed) {
       await writeEntries(next);
+      for (const entry of entries.filter((item) => item.photoId === photoId && item.source === "manual")) {
+        await enqueueProjectCloudSync({ projectId: entry.projectId, kind: "measurement", itemId: entry.id });
+      }
     }
   });
 

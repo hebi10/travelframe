@@ -53,13 +53,13 @@ assert.ok(
 
 for (const token of [
   "getBodyMeasurementSettings", "updateBodyMeasurementSettings", "measurementDraft",
-  "수치 기록", "현재 기기에만 저장됩니다.", "기록 항목", "대표 수치",
+  "수치 기록", "프로젝트 백업 설정에 따라", "기록 항목", "대표 수치",
   "촬영 후 기록 제안", "bodyMeasurementMetricMeta"
 ]) assert.ok(projectDetail.includes(token), `project measurement settings should contain ${token}`);
 
 for (const token of [
   "BodyMeasurementEditorSheet", "getBodyMeasurementByPhotoId", "measurementEntry",
-  "기록 정보", "변화 영상 텍스트", 'requiredMetrics={["weight", "bodyFat"]}',
+  "기록 정보", "변화 영상 텍스트", 'onSavePhotoDate={savePhotoDate}', 'measurementSettings.fields[metric]',
   "allowRecordedAtEdit", "formatRecordDate", "measurement?: string"
 ]) assert.ok(photoDetail.includes(token), `photo measurement UI should contain ${token}`);
 
@@ -70,7 +70,7 @@ for (const token of [
 
 for (const token of [
   "activeMetrics", 'keyboardType="decimal-pad"', "parseMeasurementInput",
-  "saveBodyMeasurement", "deleteBodyMeasurement", "입력한 값은 현재 기기에만 저장됩니다.",
+  "saveBodyMeasurement", "deleteBodyMeasurement", "프로젝트 백업 설정에 따라 클라우드에도 저장됩니다.",
   "requiredMetrics", "allowRecordedAtEdit", "recordedDateDraft", "parseRecordedDate",
   "YYYY-MM-DD"
 ]) assert.ok(editor.includes(token), `measurement editor should contain ${token}`);

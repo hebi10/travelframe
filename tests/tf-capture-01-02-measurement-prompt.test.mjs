@@ -126,15 +126,15 @@ assert.ok(wrapper.includes("activeCapturePrompt.photo.id"));
 assert.ok(wrapper.includes("<BodyMeasurementEditorSheet"));
 assert.ok(wrapper.includes("onPhotoSaved={handleCapturedPhotoSaved}"));
 assert.ok(wrapper.includes("setMeasurementPromptPhotoId(null)"), "each shot clears a previous suggestion");
-assert.ok(wrapper.includes("measurementSettings.enabled && measurementSettings.promptAfterCapture"),
-  "disabled projects must not display the after-shot prompt");
+assert.match(wrapper, /if \(!measurementSettings.enabled\) return null;\s*setMeasurementPromptPhotoId\(photo.id\);\s*if \(!measurementSettings.promptAfterCapture\)/,
+  "disabling auto-open must preserve the manual action when measurements are enabled");
 assert.ok(wrapper.includes("visible={isScreenFocused}"), "navigation must hide the camera prompt without losing the photo");
 for (const source of [wrapper, projectList]) {
   assert.ok(source.includes("initializeNewBodyProjectMeasurements(project.id)"), "new projects enable a configurable prompt");
 }
 assert.match(editor, /title=\{capturePhoto\s*\?\s*"촬영 기록 입력"/);
 assert.ok(editor.includes('cancelLabel={capturePhoto ? "나중에 입력" : "취소"}'));
-assert.ok(editor.includes("if (!entry && activeMetrics.every"));
+assert.ok(editor.includes("if (!hasMeasurement && !(onSavePhotoDate && dateChanged))"));
 assert.ok(editor.includes("savingRef.current = true"));
 assert.ok(editor.includes("setSaveError(error instanceof Error"), "save errors must not discard user input");
 assert.ok(editor.includes('accessibilityLabel="방금 저장한 사진"'));
@@ -160,7 +160,7 @@ const runSubmit = async ({ drafts = { weight: "", bodyFat: "" }, note = "", entr
     bodyMeasurementMetricMeta: { weight: { label: "몸무게" }, bodyFat: { label: "체지방률" } },
     Alert: { alert: (...args) => alerts.push(args) }, requestClose: () => close.push("skip"),
     projectId: "new", photoId: "photo-1", sequence: 3, recordedAt: "2026-11-18T02:00:00Z",
-    allowRecordedAtEdit: false,
+    allowRecordedAtEdit: false, onSavePhotoDate: undefined,
     saveBodyMeasurement: async payload => { if (fail) throw Error("device full"); saves.push(payload); return { id:"measurement-1", ...payload }; },
     onSaved: () => close.push("onSaved"), onClose: () => close.push("onClose")
   };

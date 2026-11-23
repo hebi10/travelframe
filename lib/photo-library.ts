@@ -2,8 +2,10 @@ import { storeBodyFramePhotoFile } from "@/lib/body-frame-photo-storage";
 import {
   finishBodyFrameCameraCapture,
   reserveBodyFrameCameraCapture,
+  resetBodyFrameCameraSequence,
   type ReservedBodyFrameCapture
 } from "@/lib/body-frame-camera-session";
+import { getNextBodyProjectSequence } from "@/lib/body-frame-camera-project";
 import { updateBodyProject } from "@/lib/body-project-library";
 import {
   detachBodyMeasurementsFromPhoto,
@@ -13,17 +15,34 @@ import {
   deleteLocalFile,
   deletePhoto as deleteLegacyPhoto,
   discardPhotoDraft,
+  getPhotos,
   updatePhotoMetadata,
   reorderProjectPhotos as reorderLegacyProjectPhotos,
   saveCapturedPhoto as saveLegacyCapturedPhoto
 } from "@/lib/legacy-photo-library";
+import { enqueueProjectCloudSync } from "@/lib/project-cloud-sync-queue";
 import type { PhotoItem, SaveCapturedPhotoInput } from "@/types/photo";
 
 export * from "@/lib/legacy-photo-library";
 
-export const deletePhoto = async (id: string) => {
-  await detachBodyMeasurementsFromPhoto(id);
-  return deleteLegacyPhoto(id);
+export const deletePhoto = async (id: string, { projectDeletion = false } = {}) => {
+  // Remove the measurement link before a concurrent manual measurement edit can reuse it.
+  if (!projectDeletion) await detachBodyMeasurementsFromPhoto(id);
+  const photo = await deleteLegacyPhoto(id);
+  if (photo?.projectId && !projectDeletion) {
+    const remaining = await getPhotos();
+    resetBodyFrameCameraSequence(photo.projectId, getNextBodyProjectSequence(remaining, photo.projectId));
+    await enqueueProjectCloudSync({ projectId: photo.projectId, kind: "delete-photo", itemId: id });
+  }
+  return photo;
+};
+
+export const updateBodyProjectPhotoDate = async (id: string, createdAt: string) => {
+  const photo = await updatePhotoMetadata(id, { createdAt, updatedAt: new Date().toISOString() });
+  if (photo.projectId) {
+    await enqueueProjectCloudSync({ projectId: photo.projectId, kind: "photo-metadata", itemId: id });
+  }
+  return photo;
 };
 
 export const reorderBodyProjectPhotos = async ({
@@ -41,11 +60,13 @@ export const reorderBodyProjectPhotos = async ({
     orderedPhotoIds.map((id, index) => [id, index + 1])
   );
 
+  resetBodyFrameCameraSequence(projectId, getNextBodyProjectSequence(reordered, projectId));
   await syncBodyMeasurementPhotoSequences(projectId, sequenceByPhotoId);
   await updateBodyProject(projectId, {
     coverPhotoId: orderedPhotoIds[orderedPhotoIds.length - 1]
   }).catch(() => null);
 
+  await enqueueProjectCloudSync({ projectId, kind: "photo-order" });
   return reordered;
 };
 

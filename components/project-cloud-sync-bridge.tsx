@@ -4,14 +4,12 @@ import { AppState } from "react-native";
 import { useAuth } from "@/lib/auth-context";
 import { flushProjectCloudSync, prepareProjectCloudSync } from "@/lib/project-cloud-sync";
 import { subscribeProjectCloudSync } from "@/lib/project-cloud-sync-queue";
-import { isCreatorSubscriptionActive } from "@/lib/subscription";
 
 export function ProjectCloudSyncBridge() {
   const { user, subscription, subscriptionStatus, isAuthLoading } = useAuth();
 
   useEffect(() => {
-    if (!user || isAuthLoading || subscriptionStatus !== "verified" ||
-        !isCreatorSubscriptionActive(subscription)) {
+    if (!user || isAuthLoading || subscriptionStatus !== "verified") {
       return;
     }
 
@@ -28,8 +26,8 @@ export function ProjectCloudSyncBridge() {
     const interval = setInterval(flush, 60_000);
 
     void prepareProjectCloudSync({ user, subscription })
-      .then(flush)
-      .catch(() => undefined);
+      .catch(() => undefined)
+      .then(flush);
 
     return () => {
       mounted = false;

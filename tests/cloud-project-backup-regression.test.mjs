@@ -77,7 +77,7 @@ function harness() {
       getSelectedCloudBackupProjectIds: async () => new Set([project.id])
     },
     "@/lib/photo-library": { getPhotos: async () => localPhotos, getDeletedPhotoIds: async () => new Set(), wasPhotoDeletedLocally: async () => false, mergePhotosFromBackup: async values => { const added = values.filter(value => !localPhotos.some(item => item.id === value.id)); localPhotos = [...localPhotos, ...added]; return added; } },
-    "@/lib/body-project-library": { getBodyProjects: async () => localProjects, getBodyProjectById: async id => localProjects.find(p=>p.id===id), mergeBodyProjectsFromBackup: async values => { localProjects = [...localProjects, ...values.filter(p=>!localProjects.some(x=>x.id===p.id))]; }, replaceBodyProjects: async values => { localProjects = values; } },
+    "@/lib/body-project-library": { getBodyProjects: async () => localProjects, getBodyProjectById: async id => localProjects.find(p=>p.id===id), getDeletedBodyProjectIds: async () => new Set(), mergeBodyProjectsFromBackup: async values => { localProjects = [...localProjects, ...values.filter(p=>!localProjects.some(x=>x.id===p.id))]; }, replaceBodyProjects: async values => { localProjects = values; } },
     "@/lib/body-measurement-library": {
       getBodyMeasurements: async id => localMeasurements.filter(item => !id || item.projectId === id),
       getBodyMeasurementSettings: async id => localMeasurementSettings[id] ?? sampleMeasurementSettings,

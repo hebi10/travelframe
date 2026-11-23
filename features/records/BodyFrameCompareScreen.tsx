@@ -1,3 +1,4 @@
+import * as FileSystem from "expo-file-system/legacy";
 import { Feather } from "@expo/vector-icons";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useMemo, useRef, useState } from "react";
@@ -18,10 +19,28 @@ import { Image } from "@/components/private-media-image";
 import { bodyFrameDesign, bodyFrameTypography, getBodyFrameControlColors } from "@/constants/app-theme";
 import { getBodyFrameComparisonCandidates, getBodyFrameComparisonPhotos, selectBodyFrameComparisonPhotos } from "@/lib/body-frame-photo-compare";
 import { shouldStartComparisonPan } from "./comparison-pan-gesture";
+import { createBodyFrameImageReadiness } from "@/lib/body-frame-video-export";
+import { getBodyFrameVideoMeasurement } from "@/lib/body-frame-video";
+import { getBodyMeasurements } from "@/lib/body-measurement-library";
+import { resolvePrivateMediaUri } from "@/lib/private-storage";
+import { saveImageToLibrary, shareImage } from "@/lib/trip-clip-export";
+import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
+import { isRecordingViewAvailable, OptionalRecordingView, useOptionalViewRecorder } from "@/lib/view-recorder";
+import type { BodyMeasurementEntry } from "@/types/body-measurement";
 import { getBodyProjectById } from "@/lib/body-project-library";
 import { getPhotos } from "@/lib/photo-library";
 import { useAppAppearance } from "@/lib/app-appearance";
 import type { PhotoItem } from "@/types/photo";
+
+const COMPARISON_EXPORT_WIDTH = 360;
+const COMPARISON_EXPORT_HEIGHT = 310;
+const formatMetric = (value: number | undefined, unit: string) =>
+  value === undefined ? "—" : `${value.toFixed(1)}${unit}`;
+const formatChange = (before: number | undefined, after: number | undefined, unit: string) => {
+  if (before === undefined || after === undefined) return "—";
+  const delta = (after - before).toFixed(1);
+  return `${after - before >= 0.05 ? "+" : ""}${delta === "-0.0" ? "0.0" : delta}${unit}`;
+};
 
 const clamp = (value: number) => Math.min(0.9, Math.max(0.1, value));
 type ComparisonMode = "slider" | "side-by-side" | "overlay";
@@ -40,6 +59,14 @@ export default function BodyFrameCompareScreen() {
     getBodyFrameControlColors(palette);
   const [projectName, setProjectName] = useState<string | null>(null);
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
+  const [measurements, setMeasurements] = useState<BodyMeasurementEntry[]>([]);
+  const [exportMessage, setExportMessage] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const [exportImages, setExportImages] = useState<string[] | null>(null);
+  const exportInProgress = useRef(false);
+  const readiness = useRef(createBodyFrameImageReadiness());
+  const recorder = useOptionalViewRecorder();
+  const recorderAvailable = isRecordingViewAvailable();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [width, setWidth] = useState(0);
@@ -69,6 +96,14 @@ export default function BodyFrameCompareScreen() {
       : defaultComparison,
     [photos, projectId, chosenBeforeId, chosenAfterId, defaultComparison]
   );
+  const beforeMeasurement = getBodyFrameVideoMeasurement(comparison?.before, measurements);
+  const afterMeasurement = getBodyFrameVideoMeasurement(comparison?.after, measurements);
+  const comparisonMetrics = [
+    { label: "몸무게", before: beforeMeasurement?.weightKg, after: afterMeasurement?.weightKg, unit: "kg", deltaUnit: "kg" },
+    { label: "체지방률", before: beforeMeasurement?.bodyFatPercent, after: afterMeasurement?.bodyFatPercent, unit: "%", deltaUnit: "%p" }
+  ].filter((metric) => metric.before !== undefined || metric.after !== undefined);
+  const validDraft = Boolean(selectBodyFrameComparisonPhotos(photos, projectId, draftBeforeId ?? "", draftAfterId ?? ""));
+
   const openPicker = useCallback(() => {
     setDraftBeforeId(comparison?.before.id ?? null);
     setDraftAfterId(comparison?.after.id ?? null);
@@ -115,11 +150,13 @@ export default function BodyFrameCompareScreen() {
       setChosenAfterId(null);
       setPickerOpen(false);
 
-      void Promise.all([getBodyProjectById(projectId), getPhotos()])
-        .then(([project, storedPhotos]) => {
+      setExportMessage(null);
+      void Promise.all([getBodyProjectById(projectId), getPhotos(), getBodyMeasurements(projectId)])
+        .then(([project, storedPhotos, storedMeasurements]) => {
           if (!active) return;
           setProjectName(project?.name ?? null);
           setPhotos(storedPhotos);
+          setMeasurements(storedMeasurements);
         })
         .catch(() => {
           if (active) setError("비교할 사진을 불러오지 못했습니다.");
@@ -136,7 +173,55 @@ export default function BodyFrameCompareScreen() {
 
   const formatDate = (photo: PhotoItem) => {
     const date = new Date(photo.createdAt);
-    return Number.isNaN(date.getTime()) ? "" : date.toLocaleDateString("ko-KR");
+    return Number.isNaN(date.getTime()) ? "" : date.toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" });
+  };
+
+  const exportComparison = async (action: "save" | "share") => {
+    if (!comparison || exportInProgress.current) return;
+    const cacheDirectory = FileSystem.cacheDirectory;
+    if (!cacheDirectory || !recorderAvailable) {
+      setExportMessage("이 기기에서는 비교 이미지 내보내기를 사용할 수 없습니다.");
+      return;
+    }
+
+    exportInProgress.current = true;
+    setExporting(true);
+    setExportMessage(null);
+    const uri = `${cacheDirectory}body-frame-comparison-${Date.now()}.jpg`;
+    let shared = false;
+    try {
+      const images = await Promise.all([
+        resolvePrivateMediaUri(comparison.before.uri),
+        resolvePrivateMediaUri(comparison.after.uri)
+      ]);
+      readiness.current = createBodyFrameImageReadiness();
+      setExportImages(images);
+      await Promise.all([readiness.current.wait("0"), readiness.current.wait("1")]);
+      await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+      await recorder.snapshot({
+        output: uri.replace(/^file:\/\//, ""),
+        width: COMPARISON_EXPORT_WIDTH * 3,
+        height: COMPARISON_EXPORT_HEIGHT * 3,
+        format: "jpg",
+        quality: 0.95
+      });
+      const info = await FileSystem.getInfoAsync(uri);
+      if (!info.exists || info.isDirectory || info.size <= 0) throw new Error("비교 이미지가 생성되지 않았습니다.");
+      if (action === "save") {
+        await saveImageToLibrary(uri);
+        setExportMessage("비교 이미지를 기기 앨범에 저장했습니다.");
+      } else {
+        await shareImage(uri);
+        shared = true;
+      }
+    } catch (error) {
+      setExportMessage(getUserFacingErrorMessage(error, "비교 이미지를 내보내지 못했습니다."));
+    } finally {
+      if (!shared) await FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => undefined);
+      exportInProgress.current = false;
+      setExportImages(null);
+      setExporting(false);
+    }
   };
 
   return (
@@ -206,6 +291,16 @@ export default function BodyFrameCompareScreen() {
                 {formatDate(comparison.after)}
               </Text>
             </View>
+            {comparisonMetrics.map((metric) => (
+              <View key={metric.label} style={styles.labels}>
+                <Text style={[styles.date, { color: palette.text }]}>
+                  {metric.label} · {formatMetric(metric.before, metric.unit)} → {formatMetric(metric.after, metric.unit)}
+                </Text>
+                <Text style={[styles.date, styles.dateRight, { color: palette.text }]}>
+                  변화 {formatChange(metric.before, metric.after, metric.deltaUnit)}
+                </Text>
+              </View>
+            ))}
             <View style={styles.modeTabs} accessibilityLabel="사진 비교 방식">
               {comparisonModes.map(option => (
                 <Pressable
@@ -340,10 +435,52 @@ export default function BodyFrameCompareScreen() {
                   ? "두 사진을 나란히 확인하세요."
                   : "이전 사진의 불투명도를 바꾸어 비교하세요."}
             </Text>
-
+            <View style={styles.modeTabs}>
+              {(["save", "share"] as const).map((action) => (
+                <Pressable
+                  key={action}
+                  accessibilityRole="button"
+                  disabled={exporting}
+                  style={[styles.modeTab, { borderColor: palette.line, backgroundColor: palette.surface }]}
+                  onPress={() => void exportComparison(action)}
+                >
+                  <Text style={{ color: palette.text }}>{action === "save" ? "비교 이미지 저장" : "비교 이미지 공유"}</Text>
+                </Pressable>
+              ))}
+            </View>
+            {exportMessage || exporting ? (
+              <Text accessibilityLiveRegion="polite" style={[styles.hint, { color: palette.text }]}>
+                {exporting ? "비교 이미지를 만드는 중입니다." : exportMessage}
+              </Text>
+            ) : null}
           </>
         )}
       </ScrollView>
+      {exportImages && comparison ? (
+        <View pointerEvents="none" importantForAccessibility="no-hide-descendants" style={styles.exportHost}>
+          <OptionalRecordingView available={recorderAvailable} sessionId={recorder.sessionId} style={styles.exportCanvas}>
+            <View style={styles.exportPhotos}>
+              {[comparison.before, comparison.after].map((photo, index) => (
+                <View key={photo.id} style={styles.exportPhoto}>
+                  <Text style={styles.exportCaption}>{index === 0 ? "이전" : "현재"} · {formatDate(photo)}</Text>
+                  <Image
+                    source={{ uri: exportImages[index] }}
+                    style={styles.exportImage}
+                    contentFit="contain"
+                    onDisplay={() => readiness.current.displayed(String(index))}
+                    onError={() => readiness.current.failed(String(index))}
+                  />
+                </View>
+              ))}
+            </View>
+            {comparisonMetrics.map((metric) => (
+              <Text key={metric.label} style={styles.exportCaption}>
+                {metric.label}  {formatMetric(metric.before, metric.unit)} → {formatMetric(metric.after, metric.unit)}  ·  {formatChange(metric.before, metric.after, metric.deltaUnit)}
+              </Text>
+            ))}
+          </OptionalRecordingView>
+        </View>
+      ) : null}
       {!loading && !error && comparison && comparisonMode === "slider" ? (
         <View
           style={[
@@ -459,15 +596,19 @@ export default function BodyFrameCompareScreen() {
                 );
               }}
             />
+            {!validDraft ? (
+              <Text accessibilityLiveRegion="polite" style={{ color: palette.text }}>
+                현재 사진의 순번을 이전 사진보다 뒤로 선택해 주세요.
+              </Text>
+            ) : null}
             <View style={styles.pickerActions}>
               <Pressable accessibilityRole="button" onPress={() => setPickerOpen(false)}
                 style={[styles.pickerAction, { borderColor: palette.line }]}>
                 <Text style={{ color: palette.text }}>취소</Text>
               </Pressable>
               <Pressable accessibilityRole="button" accessibilityLabel="선택한 사진으로 비교"
-                accessibilityState={{ disabled: !selectBodyFrameComparisonPhotos(
-                  photos, projectId, draftBeforeId ?? "", draftAfterId ?? "") }}
-                disabled={!selectBodyFrameComparisonPhotos(photos, projectId, draftBeforeId ?? "", draftAfterId ?? "")}
+                accessibilityState={{ disabled: !validDraft }}
+                disabled={!validDraft}
                 onPress={applySelection}
                 style={[styles.pickerAction, {
                   backgroundColor: controlColor,
@@ -484,6 +625,12 @@ export default function BodyFrameCompareScreen() {
 }
 
 const styles = StyleSheet.create({
+  exportHost: { position: "absolute", top: 0, left: -10000, width: COMPARISON_EXPORT_WIDTH },
+  exportCanvas: { width: COMPARISON_EXPORT_WIDTH, height: COMPARISON_EXPORT_HEIGHT, backgroundColor: "#111111", padding: 8, gap: 4 },
+  exportPhotos: { flexDirection: "row", gap: 8 },
+  exportPhoto: { flex: 1, gap: 4 },
+  exportImage: { width: "100%", height: 228, backgroundColor: "#171717" },
+  exportCaption: { fontSize: 12, color: "#FFFFFF" },
   screen: { flex: 1 },
   content: {
     width: "100%",

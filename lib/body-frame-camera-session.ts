@@ -28,7 +28,7 @@ let snapshot: BodyFrameCameraSessionSnapshot = {
 
 const listeners = new Set<() => void>();
 const reservations = new Map<string, ReservedBodyFrameCapture>();
-const nextProjectSequences = new Map<string, number>();
+const savedProjectSequences = new Map<string, number>();
 let nextReservationId = 0;
 
 const emit = () => {
@@ -84,12 +84,13 @@ export const setBodyFrameCameraSession = ({
   captureBlockedReason?: string | null;
 }) => {
   const projectChanged = snapshot.projectId !== projectId;
+  const stored = Number.isInteger(sequence) && sequence > 0 ? sequence : 1;
+  savedProjectSequences.set(projectId, Math.max(savedProjectSequences.get(projectId) ?? 1, stored));
   setSnapshot({
     ...snapshot,
     projectId,
     sequence: Math.max(
-      Number.isInteger(sequence) && sequence > 0 ? sequence : 1,
-      nextProjectSequences.get(projectId) ?? 1,
+      savedProjectSequences.get(projectId) ?? 1,
       ...[...reservations.values()]
         .filter((reservation) => reservation.projectId === projectId)
         .map((reservation) => reservation.sequence + 1)
@@ -106,6 +107,17 @@ export const setBodyFrameCameraSession = ({
       typeof captureBlockedReason === "string" && captureBlockedReason.length > 0
         ? captureBlockedReason
         : null
+  });
+};
+
+export const resetBodyFrameCameraSequence = (projectId: string, nextSequence: number) => {
+  savedProjectSequences.set(projectId, nextSequence);
+  if (snapshot.projectId !== projectId) return;
+  setSnapshot({
+    ...snapshot,
+    sequence: Math.max(nextSequence, ...[...reservations.values()]
+      .filter((reservation) => reservation.projectId === projectId)
+      .map((reservation) => reservation.sequence + 1))
   });
 };
 
@@ -148,7 +160,10 @@ export const reserveBodyFrameCameraCapture = ({
       : snapshot.sequence;
   const resolvedSequence = Math.max(
     requestedSequence,
-    resolvedProjectId ? nextProjectSequences.get(resolvedProjectId) ?? 1 : 1
+    resolvedProjectId ? savedProjectSequences.get(resolvedProjectId) ?? 1 : 1,
+    ...[...reservations.values()]
+      .filter((reservation) => reservation.projectId === resolvedProjectId)
+      .map((reservation) => reservation.sequence + 1)
   );
 
   if (!resolvedProjectId || !Number.isInteger(resolvedSequence) || resolvedSequence <= 0) {
@@ -169,7 +184,6 @@ export const reserveBodyFrameCameraCapture = ({
     sequence: resolvedSequence
   };
   reservations.set(reservation.reservationId, reservation);
-  nextProjectSequences.set(resolvedProjectId, resolvedSequence + 1);
   setSnapshot({
     ...snapshot,
     pendingSaveCount: snapshot.pendingSaveCount + 1,
@@ -201,6 +215,15 @@ export const finishBodyFrameCameraCapture = ({
   if (!reservation) return;
   reservations.delete(reservation.reservationId);
   projectId = reservation.projectId;
+  if (success) {
+    savedProjectSequences.set(projectId, Math.max(savedProjectSequences.get(projectId) ?? 1, reservation.sequence + 1));
+  }
+  const nextSequence = Math.max(
+    savedProjectSequences.get(projectId) ?? 1,
+    ...[...reservations.values()]
+      .filter((item) => item.projectId === projectId)
+      .map((item) => item.sequence + 1)
+  );
   const savedIntoActiveProject =
     success && (!projectId || projectId === snapshot.projectId);
   const nextProjectPhotoCount = savedIntoActiveProject
@@ -213,6 +236,7 @@ export const finishBodyFrameCameraCapture = ({
   setSnapshot({
     ...snapshot,
     pendingSaveCount: reservations.size,
+    sequence: projectId === snapshot.projectId ? nextSequence : snapshot.sequence,
     projectPhotoCount: nextProjectPhotoCount,
     captureBlockedReason: limitReached
       ? snapshot.captureBlockedReason ??

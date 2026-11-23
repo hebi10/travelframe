@@ -6,13 +6,18 @@ import vm from "node:vm";
 const deleted = [];
 const copied = [];
 const storage = new Map();
+let failWrite = false;
 const fileSystem = { documentDirectory: "file:///documents/", getInfoAsync: async () => ({ exists: true }), makeDirectoryAsync: async () => {}, copyAsync: async (args) => copied.push(args), deleteAsync: async (uri) => deleted.push(uri) };
 const exports = {};
 const code = ts.transpileModule(fs.readFileSync("lib/video-library.ts", "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
 vm.runInNewContext(code, { exports, require: (id) => {
   if (id === "@/lib/private-storage") return { downloadPrivateFile: async () => { throw new Error("unexpected remote download"); } };
   if (id === "expo-file-system/legacy") return fileSystem;
-  if (id.endsWith("local-storage")) return { localStorageAdapter: { getItem: async (k) => storage.get(k), setItem: async (k,v) => storage.set(k,v) } };
+  if (id.endsWith("local-storage")) return { localStorageAdapter: {
+    getItem: async (k) => storage.get(k),
+    setItem: async (k,v) => { if (failWrite) throw new Error("write failed"); storage.set(k,v); }
+  } };
+  if (id.endsWith("body-frame-video")) return { normalizeBodyFrameVideoOptions: value => value };
   if (id.endsWith("local-library-limit")) return { assertLocalLibraryCapacity: () => {} };
   if (id.endsWith("project-cloud-sync-queue")) return { enqueueProjectCloudSync: async () => {} };
   if (id.endsWith("trip-clip-title")) return { getNextTripClipTitle: () => "video", TRIP_CLIP_TITLE_PREFIX: "video" };
@@ -22,6 +27,13 @@ const original = "file:///documents/projects/a/photos/0001.jpg";
 const saved = await exports.saveMadeVideo({ uri: "file:///cache/output.mp4", coverUri: original, title: "video", ratio: "9:16", template: "minimal", transition: "none", duration: 1, photoIds: [] });
 assert.notEqual(saved.coverUri, original, "video must own a cover copy");
 assert.ok(copied.some((copy) => copy.from === original && copy.to === saved.coverUri));
+failWrite = true;
+await assert.rejects(exports.updateMadeVideo(saved.id, {
+  uri: "file:///cache/re-edited.mp4", coverUri: "file:///cache/cover.jpg"
+}), /write failed/);
+assert.equal((await exports.getMadeVideos())[0].uri, saved.uri);
+assert.ok(!deleted.includes(saved.uri) && !deleted.includes(saved.coverUri));
+failWrite = false;
 await exports.deleteMadeVideo(saved.id);
 assert.ok(!deleted.includes(original));
 await exports.replaceMadeVideosFromBackup([{ ...saved, id: "old", coverUri: original }]);

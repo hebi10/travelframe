@@ -8,6 +8,8 @@ import {
   requestPermission,
   SdkAvailabilityStatus,
   type Permission,
+  type RecordType,
+  type ReadRecordsOptions,
   type RecordResult
 } from "react-native-health-connect";
 
@@ -73,7 +75,7 @@ const toWeightCandidate = (
   record: RecordResult<"Weight">
 ): BodyHealthConnectCandidate | null => {
   const value = record.weight?.inKilograms;
-  if (!Number.isFinite(value) || value <= 0) return null;
+  if (!Number.isFinite(value) || value < 20 || value > 500) return null;
 
   const sourceAppPackage = record.metadata?.dataOrigin;
   const base = {
@@ -95,7 +97,7 @@ const toBodyFatCandidate = (
   record: RecordResult<"BodyFat">
 ): BodyHealthConnectCandidate | null => {
   const value = record.percentage;
-  if (!Number.isFinite(value) || value <= 0) return null;
+  if (!Number.isFinite(value) || value < 1 || value > 70) return null;
 
   const sourceAppPackage = record.metadata?.dataOrigin;
   const base = {
@@ -113,16 +115,19 @@ const toBodyFatCandidate = (
   };
 };
 
-const getLatest = <T extends BodyHealthConnectCandidate>(
-  candidates: (T | null)[]
-) =>
-  candidates
-    .filter((candidate): candidate is T => Boolean(candidate))
-    .sort(
-      (a, b) =>
-        new Date(b.recordedAt).getTime() -
-        new Date(a.recordedAt).getTime()
-    )[0] ?? null;
+const readAll = async <T extends RecordType>(recordType: T, options: ReadRecordsOptions) => {
+  const records: RecordResult<T>[] = [];
+  const seenTokens = new Set<string>();
+  let pageToken: string | undefined;
+  do {
+    const page = await readRecords(recordType, { ...options, pageToken });
+    records.push(...page.records);
+    pageToken = page.pageToken;
+    if (pageToken && seenTokens.has(pageToken)) throw new Error("Health Connect 기록을 이어서 읽지 못했습니다.");
+    if (pageToken) seenTokens.add(pageToken);
+  } while (pageToken);
+  return records;
+};
 
 export const getBodyHealthConnectAvailability = async () => {
   if (Platform.OS !== "android") {
@@ -169,7 +174,7 @@ export const requestBodyHealthConnectReadPermissions = async (
   );
 };
 
-export const readLatestBodyHealthConnectMeasurements = async ({
+export const readBodyHealthConnectMeasurements = async ({
   metrics,
   days = 30
 }: {
@@ -196,28 +201,14 @@ export const readLatestBodyHealthConnectMeasurements = async ({
     endTime: endTime.toISOString()
   };
 
-  const candidates: BodyHealthConnectCandidate[] = [];
-
-  if (metrics.includes("weight")) {
-    const response = await readRecords("Weight", {
-      timeRangeFilter,
-      ascendingOrder: false,
-      pageSize: 100
-    });
-    const latest = getLatest(response.records.map(toWeightCandidate));
-    if (latest) candidates.push(latest);
-  }
-
-  if (metrics.includes("bodyFat")) {
-    const response = await readRecords("BodyFat", {
-      timeRangeFilter,
-      ascendingOrder: false,
-      pageSize: 100
-    });
-    const latest = getLatest(response.records.map(toBodyFatCandidate));
-    if (latest) candidates.push(latest);
-  }
-
+  const options = { timeRangeFilter, ascendingOrder: false, pageSize: 100 };
+  const [weights, bodyFat] = await Promise.all([
+    metrics.includes("weight") ? readAll("Weight", options) : [],
+    metrics.includes("bodyFat") ? readAll("BodyFat", options) : []
+  ]);
+  const candidates = [...weights.map(toWeightCandidate), ...bodyFat.map(toBodyFatCandidate)]
+    .filter((candidate): candidate is BodyHealthConnectCandidate =>
+      Boolean(candidate && Number.isFinite(Date.parse(candidate.recordedAt))));
   return candidates.sort(
     (a, b) =>
       new Date(b.recordedAt).getTime() -

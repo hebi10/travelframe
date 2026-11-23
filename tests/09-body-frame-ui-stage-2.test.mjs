@@ -44,7 +44,7 @@ for (const tool of [
 
 assert.ok(
   cameraSource.includes(
-    "referenceUri || bodyFrameCameraSession.automaticReferenceUri"
+    "referenceUri ?? bodyFrameCameraSession.automaticReferenceUri"
   ),
   "automatic Body Frame reference photos should participate in overlay controls"
 );

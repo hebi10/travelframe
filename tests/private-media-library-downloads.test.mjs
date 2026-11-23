@@ -26,6 +26,7 @@ for (const [file, method, storageKey, item] of [
     if (name === "@/lib/local-storage") return { localStorageAdapter: {
       getItem: async (key) => stored.get(key), setItem: async (key, value) => { stored.set(key, value); }
     } };
+    if (name === "@/lib/body-frame-video") return { normalizeBodyFrameVideoOptions: value => value };
     if (name === "@/lib/trip-clip-title") return { TRIP_CLIP_TITLE_PREFIX: "video" };
     return {};
   } };

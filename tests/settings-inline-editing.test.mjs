@@ -17,7 +17,6 @@ for (const token of [
   "setActiveSetting(\"overlayOpacity\")",
   "setActiveSetting(\"cameraRatio\")",
   "setActiveSetting(\"storageMode\")",
-  "setActiveSetting(\"cloudBackup\")",
   "setActiveSetting(\"themeMode\")",
   "setActiveSetting(\"fontStyle\")",
   "setActiveSetting(\"fontSize\")",

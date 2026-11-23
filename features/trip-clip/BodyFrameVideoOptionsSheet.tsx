@@ -25,6 +25,7 @@ import {
   type BodyFrameVideoOptions,
   type BodyFrameVideoOverlayPosition
 } from "@/lib/body-frame-video";
+import type { UserMusicTrack } from "@/lib/user-music";
 import type { PhotoItem } from "@/types/photo";
 
 export type VideoOptionKind =
@@ -32,14 +33,16 @@ export type VideoOptionKind =
   | "interval"
   | "quality"
   | "ratio"
-  | "overlay";
+  | "overlay"
+  | "music";
 
 const titles = {
   photos: "사진 선택",
   interval: "사진 간격",
   quality: "영상 화질",
   ratio: "화면 비율",
-  overlay: "텍스트 오버레이"
+  overlay: "텍스트 오버레이",
+  music: "배경음악"
 };
 
 const overlayPositions: Array<{
@@ -53,12 +56,14 @@ const overlayPositions: Array<{
 ];
 
 export function BodyFrameVideoOptionsSheet({
-  kind, options, photos, selectedIds, onCancel, onApply
+  kind, options, photos, selectedIds, canUseAdvancedOutput, musicTracks, onCancel, onApply
 }: {
   kind: VideoOptionKind;
   options: BodyFrameVideoOptions;
   photos: PhotoItem[];
   selectedIds: string[] | null;
+  canUseAdvancedOutput: boolean;
+  musicTracks: readonly UserMusicTrack[];
   onCancel: () => void;
   onApply: (options: BodyFrameVideoOptions, selectedIds: string[] | null) => void;
 }) {
@@ -74,7 +79,7 @@ export function BodyFrameVideoOptionsSheet({
     kind === "interval"
       ? BODY_FRAME_VIDEO_INTERVALS
       : kind === "quality"
-        ? BODY_FRAME_VIDEO_QUALITIES
+        ? BODY_FRAME_VIDEO_QUALITIES.filter((quality) => quality === 720 || canUseAdvancedOutput)
         : kind === "ratio"
           ? BODY_FRAME_VIDEO_RATIOS
           : [];
@@ -271,6 +276,26 @@ export function BodyFrameVideoOptionsSheet({
               <Text style={[styles.example, { color: palette.faint }]}>
                 예시: 26.09.22 · 72.4kg · 18.2%
               </Text>
+            </View>
+          ) : kind === "music" ? (
+            <View style={styles.choices}>
+              {[{ id: "", name: "무음" }, ...musicTracks].map((track) => {
+                const selected = (draftOptions.musicTrackId ?? "") === track.id;
+                return (
+                  <Pressable
+                    key={track.id}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected }}
+                    style={[styles.choice, { borderColor: selected ? selectedColor : palette.line, backgroundColor: selected ? selectedColor : palette.background }]}
+                    onPress={() => setDraftOptions((current) => ({ ...current, musicTrackId: track.id || undefined }))}
+                  >
+                    <Text style={{ color: selected ? selectedTextColor : palette.text }}>{track.name}</Text>
+                  </Pressable>
+                );
+              })}
+              {musicTracks.length === 0 ? (
+                <Text style={{ color: palette.muted }}>세부 설정의 배경음악에서 곡을 추가할 수 있습니다.</Text>
+              ) : null}
             </View>
           ) : (
             <View style={styles.choices}>

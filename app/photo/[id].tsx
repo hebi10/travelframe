@@ -27,7 +27,7 @@ import {
   getBodyMeasurementByPhotoId,
   getBodyMeasurementSettings
 } from "@/lib/body-measurement-library";
-import { deletePhoto, getPhotoById } from "@/lib/photo-library";
+import { deletePhoto, getPhotoById, updateBodyProjectPhotoDate } from "@/lib/photo-library";
 import { saveImageToLibrary } from "@/lib/trip-clip-export";
 import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 import type { BodyProject } from "@/types/body-project";
@@ -135,6 +135,10 @@ export default function PhotoDetailScreen() {
     }, [loadPhoto])
   );
 
+  const savePhotoDate = useCallback(async (date: string) => {
+    if (id) setPhoto(await updateBodyProjectPhotoDate(id, date));
+  }, [id]);
+
   const returnToRecord = useCallback(() => {
     if (photo?.projectId) {
       router.replace({
@@ -191,7 +195,7 @@ export default function PhotoDetailScreen() {
   const confirmDelete = () => {
     Alert.alert(
       "기록 사진을 삭제할까요?",
-      "앱에 저장된 사진이 삭제됩니다. 프로젝트 기록 수에도 반영됩니다.",
+      "앱에 저장된 사진과 연결된 클라우드 백업이 삭제됩니다. 기기 앨범 사본은 유지됩니다.",
       [
         { text: "취소", style: "cancel" },
         { text: "삭제", style: "destructive", onPress: () => void removePhoto() }
@@ -269,7 +273,7 @@ export default function PhotoDetailScreen() {
               {sequenceLabel}
             </Text>
             <Text style={[styles.recordDate, { color: palette.muted }]}>
-              {formatDate(measurementEntry?.recordedAt ?? photo.createdAt)}
+              {formatDate(photo.createdAt)}
             </Text>
           </View>
         </View>
@@ -334,29 +338,8 @@ export default function PhotoDetailScreen() {
                   {formatRecordDate(measurementEntry?.recordedAt ?? photo.createdAt)}
                 </Text>
               </View>
-              <View style={styles.measurementValueRow}>
-                <Text style={[styles.measurementLabel, { color: palette.muted }]}>
-                  몸무게
-                </Text>
-                <Text style={[styles.measurementValue, { color: palette.text }]}>
-                  {formatMeasurementValue(measurementEntry, "weight")}
-                </Text>
-              </View>
-              <View style={styles.measurementValueRow}>
-                <Text style={[styles.measurementLabel, { color: palette.muted }]}>
-                  체지방률
-                </Text>
-                <Text style={[styles.measurementValue, { color: palette.text }]}>
-                  {formatMeasurementValue(measurementEntry, "bodyFat")}
-                </Text>
-              </View>
-              {(["skeletalMuscle", "waist"] as BodyMeasurementMetric[])
-                .filter(
-                  (metric) =>
-                    measurementEntry &&
-                    measurementSettings.fields[metric] &&
-                    getMeasurementValue(measurementEntry, metric) !== undefined
-                )
+              {(Object.keys(bodyMeasurementMetricMeta) as BodyMeasurementMetric[])
+                .filter((metric) => measurementSettings.fields[metric])
                 .map((metric) => (
                   <View key={metric} style={styles.measurementValueRow}>
                     <Text style={[styles.measurementLabel, { color: palette.muted }]}>
@@ -498,7 +481,7 @@ export default function PhotoDetailScreen() {
           recordedAt={photo.createdAt}
           settings={measurementSettings}
           entry={measurementEntry}
-          requiredMetrics={["weight", "bodyFat"]}
+          onSavePhotoDate={savePhotoDate}
           allowRecordedAtEdit
           onClose={() => setMeasurementEditorOpen(false)}
           onSaved={setMeasurementEntry}

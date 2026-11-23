@@ -7,6 +7,10 @@ import { getSelectedCloudBackupProjectIds } from "@/lib/cloud-backup-project-slo
 import {
   backupImageBundleWork,
   backupMadeVideo,
+  backupPausedProjectMetadata,
+  backupProjectPhotoMetadata,
+  deleteProjectBackupItem,
+  deleteCloudProjectBackup,
   backupPhotoIfEnabled,
   backupProjectSupplementIfEnabled
 } from "@/lib/cloud-backup";
@@ -113,6 +117,15 @@ const syncTask = async ({
     throw new Error("백업 계정이 변경되었습니다.");
   }
   await assertLocalLibraryOwner(user.uid);
+  if (task.kind === "delete-project") {
+    await deleteCloudProjectBackup(user, task.projectId);
+    return;
+  }
+  if (task.itemId && (task.kind === "delete-photo" || task.kind === "delete-video" || task.kind === "delete-measurement")) {
+    const itemType = task.kind === "delete-photo" ? "photo" : task.kind === "delete-video" ? "video" : "measurement";
+    await deleteProjectBackupItem({ user, projectId: task.projectId, itemType, itemId: task.itemId });
+    return;
+  }
   if (!isCreatorSubscriptionActive(subscription)) {
     throw new Error("클라우드 구독이 활성화되지 않았습니다.");
   }
@@ -123,8 +136,12 @@ const syncTask = async ({
     ),
     getAppSettings()
   ]);
-  if (!project || !selectedIds.has(project.id) ||
-      !projectWantsCloudBackup(
+  if (!project || !selectedIds.has(project.id)) return;
+  if (task.kind === "project-state") {
+    await backupPausedProjectMetadata(user, project.id);
+    return;
+  }
+  if (!projectWantsCloudBackup(
         project, isCloudBackupTargetEnabled(settings, "photos")
       )) return;
 
@@ -147,11 +164,21 @@ const syncTask = async ({
     });
     return;
   }
-  if (task.kind === "photo" && task.itemId) {
+  if (task.kind === "photo-order") {
+    const photos = (await getPhotos()).filter((photo) => photo.projectId === project.id);
+    for (const photo of photos) await backupProjectPhotoMetadata(user, photo);
+    await backupProjectSupplementIfEnabled({ user, subscription, projectId: project.id });
+    return;
+  }
+  if ((task.kind === "photo" || task.kind === "photo-metadata") && task.itemId) {
     const photo = (await getPhotos()).find((item) =>
       item.id === task.itemId && item.projectId === project.id
     );
     if (photo) {
+      if (task.kind === "photo-metadata") {
+        await backupProjectPhotoMetadata(user, photo);
+        return;
+      }
       const backup = await backupPhotoIfEnabled({ user, subscription, photo });
       if (backup) await clearBackupFailure(photo.id).catch(() => undefined);
     } else {
@@ -211,9 +238,9 @@ export const flushProjectCloudSync = ({
   now?: number;
 }) => {
   if (!user || firebaseAuth?.currentUser?.uid !== user.uid) return Promise.resolve(0);
-  if (!isCreatorSubscriptionActive(subscription)) return Promise.resolve(0);
   return processProjectCloudSyncQueue({
     execute: (task) => syncTask({ user, subscription, task }),
+    canExecute: (task) => task.kind.startsWith("delete-") || isCreatorSubscriptionActive(subscription),
     ...(now === undefined ? {} : { now })
   });
 };
