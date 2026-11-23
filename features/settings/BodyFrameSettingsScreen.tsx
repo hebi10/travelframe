@@ -47,7 +47,6 @@ type InlineSettingKey =
   | "overlayOpacity"
   | "cameraRatio"
   | "storageMode"
-  | "cloudBackup"
   | "themeMode"
   | "fontStyle"
   | "fontSize";
@@ -214,7 +213,6 @@ export default function BodyFrameSettingsScreen() {
     if (activeSetting === "overlayOpacity") return "기준 사진 투명도";
     if (activeSetting === "cameraRatio") return "촬영 비율";
     if (activeSetting === "storageMode") return "저장 방식";
-    if (activeSetting === "cloudBackup") return "클라우드 백업";
     if (activeSetting === "themeMode") return "화면 모드";
     if (activeSetting === "fontStyle") return "폰트 스타일";
     if (activeSetting === "fontSize") return "글자 크기";
@@ -234,26 +232,6 @@ export default function BodyFrameSettingsScreen() {
     } finally {
       setSaving(false);
     }
-  };
-
-  const enableCloudBackup = () => {
-    if (!planEntitlements.canBackupToCloud) {
-      setActiveSetting(null);
-      openPlans("backup", "Pro");
-      return;
-    }
-
-    void updateSetting({
-      storageMode: "local_backup",
-      cloudBackupEnabled: true
-    });
-  };
-
-  const disableCloudBackup = () => {
-    void updateSetting({
-      storageMode: "local_only",
-      cloudBackupEnabled: false
-    });
   };
 
   return (
@@ -306,21 +284,23 @@ export default function BodyFrameSettingsScreen() {
           <BodyFrameSettingRow
             label="저장 방식"
             showDetail
-            detail="앱 로컬 저장과 클라우드 백업 방식"
+            detail="프로젝트 저장 방식이 설정되지 않은 이전 기록에 적용됩니다."
             mark={getStorageModeLabel(settings.storageMode)}
             onPress={() => setActiveSetting("storageMode")}
           />
           <BodyFrameSettingRow
-            label="클라우드 백업"
+            label="프로젝트 클라우드 백업"
             showDetail={!planEntitlements.canBackupToCloud}
-            detail={
-              planEntitlements.canBackupToCloud
-                ? "현재 플랜에서 백업을 사용할 수 있습니다."
-                : "Pro 이상에서 클라우드 백업을 사용할 수 있습니다."
-            }
-            mark={settings.cloudBackupEnabled ? "켜짐" : "꺼짐"}
-            onPress={() => setActiveSetting("cloudBackup")}
+            detail="프로젝트별 백업 중지·재개, 저장 현황, 선택 복원"
+            mark="열기"
+            onPress={() => router.push("/account")}
           />
+          {!planEntitlements.canBackupToCloud ? (
+            <Pressable accessibilityRole="button" style={[styles.planButton, { borderColor: palette.line }]}
+              onPress={() => openPlans("backup", "Pro")}>
+              <Text style={[styles.planButtonText, { color: palette.text }]}>백업 플랜 보기</Text>
+            </Pressable>
+          ) : null}
           <BodyFrameSettingRow
             label="저장·백업 세부 설정"
             detail="사진 화질, 저장 범위, 백업 대상과 복원"
@@ -511,42 +491,6 @@ export default function BodyFrameSettingsScreen() {
                     );
                   })
                 : null}
-
-              {activeSetting === "cloudBackup" ? (
-                <>
-                  <SettingOptionRow
-                    label="켜짐"
-                    detail={
-                      planEntitlements.canBackupToCloud
-                        ? "앱 보관함과 선택한 프로젝트를 클라우드에 백업합니다."
-                        : "Pro 이상 구독에서 사용할 수 있습니다."
-                    }
-                    active={settings.cloudBackupEnabled}
-                    disabled={!planEntitlements.canBackupToCloud}
-                    onPress={enableCloudBackup}
-                  />
-                  <SettingOptionRow
-                    label="꺼짐"
-                    detail="클라우드 신규 백업을 사용하지 않습니다."
-                    active={!settings.cloudBackupEnabled}
-                    onPress={disableCloudBackup}
-                  />
-                  {!planEntitlements.canBackupToCloud ? (
-                    <Pressable
-                      accessibilityRole="button"
-                      style={[styles.planButton, { borderColor: palette.text }]}
-                      onPress={() => {
-                        setActiveSetting(null);
-                        openPlans("backup", "Pro");
-                      }}
-                    >
-                      <Text style={[styles.planButtonText, { color: palette.text }]}>
-                        플랜 보기
-                      </Text>
-                    </Pressable>
-                  ) : null}
-                </>
-              ) : null}
 
               {activeSetting === "themeMode"
                 ? themeOptions.map((theme) => (

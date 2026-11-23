@@ -81,7 +81,7 @@ test("C4 reference overlay keeps opacity, scale, reset, confirm and non-destruct
   ]) assert.ok(overlay.includes(token), token);
   assert.ok(styles.includes("overlaySetupActions: {\n    flexDirection: \"row\",\n    flexWrap: \"wrap\""));
   assert.ok(styles.includes("overlaySetupHeaderCopy:"));
-  assert.ok(camera.includes("queueAppSettingsUpdate({ referencePhotoVisible: false })"));
+  assert.ok(camera.includes("queueAppSettingsUpdate({ referencePhotoVisible: showAutomatic })"));
   assert.ok(camera.includes("queueAppSettingsUpdate({ referencePhotoVisible: true })"));
   assert.ok(!/deleteCapturedPhoto\(|deleteLocalFile\(/.test(overlay), "reference removal must never delete the original photo");
 });

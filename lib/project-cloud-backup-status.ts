@@ -12,7 +12,7 @@ export type ProjectCloudBackupStatus = {
   projectId: string;
   name: string;
   slotNumber: number | null;
-  slotStatus: "active" | "over_limit" | "replacing" | "unselected";
+  slotStatus: "active" | "paused" | "over_limit" | "replacing" | "unselected";
   localPhotos: number;
   cloudPhotos: number;
   cloudVideos: number;
@@ -56,6 +56,7 @@ export const getProjectCloudBackupStatuses = async ({
   }
 
   const names = new Map(projects.map((project) => [project.id, project.name]));
+  const localById = new Map(projects.map((project) => [project.id, project]));
   for (const item of remoteProjects.docs) {
     if (!names.has(item.id)) {
       const name = item.data().name;
@@ -66,6 +67,9 @@ export const getProjectCloudBackupStatuses = async ({
 
   return [...names.entries()].map(([projectId, name]) => {
     const slot = slotMap.get(projectId);
+    const local = localById.get(projectId);
+    const paused = local?.saveMode === "local_only" || (!local &&
+      remoteProjects.docs.find((item) => item.id === projectId)?.data().saveMode === "local_only");
     const projectPhotos = remotePhotos.docs.filter((item) => item.data().projectId === projectId);
     const projectVideos = remoteVideos.docs.filter((item) => item.data().projectId === projectId);
     const projectMeasurements = remoteMeasurements.docs.filter((item) => item.data().projectId === projectId);
@@ -83,7 +87,7 @@ export const getProjectCloudBackupStatuses = async ({
     return {
       projectId, name,
       slotNumber: slot?.slotNumber ?? null,
-      slotStatus: slot?.status ?? "unselected",
+      slotStatus: paused && slot?.status === "active" ? "paused" : slot?.status ?? "unselected",
       localPhotos: photos.filter((photo) => photo.projectId === projectId).length,
       cloudPhotos: projectPhotos.length,
       cloudVideos: projectVideos.length,

@@ -36,12 +36,14 @@ await check('missing primary with valid original fallback persists real cover be
     '@/lib/private-storage':{downloadPrivateFile},
     '@/lib/local-storage':{localStorageAdapter:{getItem:async key=>storage.get(key)??null,setItem:async(key,value)=>storage.set(key,value)}},
     '@/lib/local-library-limit':limits,
+    '@/lib/body-frame-video':videoModel,
     '@/lib/project-cloud-sync-queue':{enqueueProjectCloudSync:async()=>{}},
     '@/lib/trip-clip-title':{TRIP_CLIP_TITLE_PREFIX:'영상',getNextTripClipTitle:()=> '영상 1'}
   });
   let encoded=0; const overlays=[];
   const context={...helpers,...videoModel,FileSystem,downloadPrivateFile,
     activeProject:{id:'project',name:'기록'},projectPhotos:[{id:'A',uri:'file:///missing.jpg',downloadURL:'https://original/A',width:3,height:4}],previewPhoto:{uri:'file:///missing.jpg'},
+    editingVideo:null,selectedTrack:null, getMeasurementForPhoto:()=>null,
     isExporting:false,exportController:{current:null},AbortController,isLoggedIn:true,guestUsage:null,
     planEntitlements:{canExportVideo:true,localVideoLimit:30},videoLimitState:{allowed:true},videoOptions:{ratio:'3:4',interval:0.1},durations:{A:0.1},totalDuration:0.1,
     recordingViewAvailable:true,totalFrames:3,outputSize:{width:1080,height:1440},BODY_FRAME_VIDEO_BITRATE:5_000_000,

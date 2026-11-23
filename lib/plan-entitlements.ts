@@ -31,6 +31,7 @@ export type PlanEntitlements = {
 export const GIB = 1024 * 1024 * 1024;
 
 const FREE_PROGRESS_PHOTO_LIMIT = 100;
+const AD_REMOVE_PROJECT_LIMIT = 2;
 export const CLOUD_BACKUP_PHOTOS_PER_PROJECT = 365;
 
 const paidPlan = ({
@@ -111,13 +112,13 @@ export const PLAN_ENTITLEMENTS: Record<PlanTier, PlanEntitlements> = {
     showWatermark: true,
     canUseAdvancedOutput: false,
     canBackupToCloud: false,
-    localImageLimit: 100,
+    localImageLimit: AD_REMOVE_PROJECT_LIMIT * FREE_PROGRESS_PHOTO_LIMIT,
     localVideoLimit: 30,
     musicTrackLimit: 0,
     backupStorageBytes: 0,
     maxProgressPhotos: FREE_PROGRESS_PHOTO_LIMIT,
     maxProgressVideoSeconds: null,
-    maxProjectCount: 2,
+    maxProjectCount: AD_REMOVE_PROJECT_LIMIT,
     maxCloudBackupProjects: 0,
     maxCloudPhotosPerProject: 0
   },
@@ -173,6 +174,27 @@ const isActivePremiumProduct = (
   return new Date(subscription.expiresAt).getTime() > Date.now();
 };
 
+export const getAdRemoveSubscription = (subscription: UserSubscription | null): UserSubscription | null => {
+  if (!subscription) return null;
+  if (isActivePremiumProduct(subscription, "ad_remove")) return subscription;
+  const entitlement = subscription.adRemoveEntitlement;
+  if (entitlement?.status !== "active" ||
+      (entitlement.expiresAt && !(new Date(entitlement.expiresAt).getTime() > Date.now()))) {
+    return null;
+  }
+  return {
+    ...subscription,
+    plan: "premium",
+    status: "active",
+    productId: "ad_remove",
+    productName: "광고 제거",
+    expiresAt: entitlement.expiresAt,
+    startedAt: null,
+    lastPaymentAt: null,
+    priceLabel: ""
+  };
+};
+
 export const getPlanTier = ({
   isLoggedIn,
   subscription
@@ -196,7 +218,7 @@ export const getPlanTier = ({
     return "pro";
   }
 
-  if (isActivePremiumProduct(subscription, "ad_remove")) {
+  if (getAdRemoveSubscription(subscription)) {
     return "ad_remove";
   }
 

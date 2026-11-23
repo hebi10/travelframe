@@ -65,6 +65,7 @@ import {
   getBodyFrameUpgradeLabel,
   isBodyFrameProjectTargetAllowed
 } from "@/lib/body-frame-plan-limits";
+import { getExifPhotoCapturedAt } from "@/lib/photo-capture-date";
 import { backupPhotoIfEnabled } from "@/lib/cloud-backup";
 import { recordBackupFailure } from "@/lib/backup-failure-queue";
 import {
@@ -598,7 +599,7 @@ export default function BodyFrameProjectDetailScreen() {
       setNameDraft(storedProject.name);
       setTargetDraft(String(storedProject.targetPhotoCount));
       setSaveModeDraft(storedProject.saveMode ?? null);
-      await setLastActiveProjectId(storedProject.id);
+      if (!storedProject.archived) await setLastActiveProjectId(storedProject.id);
     }
   }, [projectId]);
 
@@ -882,13 +883,13 @@ export default function BodyFrameProjectDetailScreen() {
   }, [project]);
 
   const openCamera = useCallback(async () => {
-    if (!project) return;
+    if (!project || project.archived) return;
     await setLastActiveProjectId(project.id);
     router.push("/camera");
   }, [project]);
 
   const importProjectPhotos = useCallback(async () => {
-    if (!project || isImportingPhotos) return;
+    if (!project || project.archived || isImportingPhotos) return;
 
     const remaining =
       planEntitlements.maxProgressPhotos === null
@@ -919,6 +920,7 @@ export default function BodyFrameProjectDetailScreen() {
         mediaTypes: ["images"],
         allowsMultipleSelection: true,
         selectionLimit: Math.min(20, remaining),
+        exif: true,
         allowsEditing: false,
         quality: 1
       });
@@ -945,6 +947,7 @@ export default function BodyFrameProjectDetailScreen() {
             uri: asset.uri,
             width: asset.width,
             height: asset.height,
+            createdAt: getExifPhotoCapturedAt(asset.exif),
             localImageLimit: planEntitlements.localImageLimit,
             projectId: project.id,
             sequence: nextSequence
@@ -960,6 +963,7 @@ export default function BodyFrameProjectDetailScreen() {
             });
           } catch (backupError) {
             backupFailureCount += 1;
+            await enqueueProjectCloudSync({ projectId: project.id, kind: "photo", itemId: savedPhoto.id });
             await recordBackupFailure({
               id: savedPhoto.id,
               kind: "photo",
@@ -1069,7 +1073,7 @@ export default function BodyFrameProjectDetailScreen() {
   );
 
   const openVideo = useCallback(async () => {
-    if (!project) return;
+    if (!project || project.archived) return;
     await setLastActiveProjectId(project.id);
     router.push("/video-create");
   }, [project]);
@@ -1375,7 +1379,8 @@ export default function BodyFrameProjectDetailScreen() {
         <View style={[styles.recordsFooterActions, fontScale >= 1.3 && styles.recordsFooterActionsLargeFont]}>
           <Pressable
             accessibilityRole="button"
-            style={[styles.primaryAction, { backgroundColor: primaryColor }]}
+            disabled={project.archived}
+            style={[styles.primaryAction, { backgroundColor: primaryColor, opacity: project.archived ? 0.5 : 1 }]}
             onPress={() => void openCamera()}
           >
             <Text style={[styles.primaryActionText, { color: primaryTextColor }]}>
@@ -1383,9 +1388,9 @@ export default function BodyFrameProjectDetailScreen() {
             </Text>
           </Pressable>
           <Pressable
-            disabled={isImportingPhotos}
+            disabled={project.archived || isImportingPhotos}
             accessibilityRole="button"
-            accessibilityState={{ disabled: isImportingPhotos, busy: isImportingPhotos }}
+            accessibilityState={{ disabled: project.archived || isImportingPhotos, busy: isImportingPhotos }}
             style={[styles.photoAddAction, { borderColor: palette.line }]}
             onPress={() => void importProjectPhotos()}
           >
@@ -1398,7 +1403,8 @@ export default function BodyFrameProjectDetailScreen() {
 
         <Pressable
           accessibilityRole="button"
-          style={[styles.videoAction, { borderColor: palette.text }]}
+          disabled={project.archived}
+          style={[styles.videoAction, { borderColor: palette.text, opacity: project.archived ? 0.5 : 1 }]}
           onPress={() => void openVideo()}
         >
           <Text style={[styles.videoActionText, { color: palette.text }]}>
@@ -2089,7 +2095,7 @@ export default function BodyFrameProjectDetailScreen() {
                 수치 기록
               </Text>
               <Text style={[styles.settingDetail, { color: palette.muted }]}>
-                원하는 경우에만 몸무게 같은 수치를 사진 기록과 함께 저장합니다. 현재 기기에만 저장됩니다.
+                원하는 경우 몸무게 같은 수치를 사진과 함께 기록할 수 있습니다. 직접 입력한 값은 프로젝트 백업 설정에 따라 클라우드에도 저장됩니다.
               </Text>
               <View style={styles.choiceRow}>
                 {([

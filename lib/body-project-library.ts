@@ -235,8 +235,35 @@ export const archiveBodyProject = async (id: string, archived = true) =>
     }
 
     await writeProjects(nextProjects);
+    await enqueueProjectCloudSync({ projectId: normalizedId, kind: "settings" }).catch(() => undefined);
     return updatedProject;
   });
+
+const DELETED_PROJECT_IDS_KEY = "body-frame.projects.deleted.v1";
+
+export const getDeletedBodyProjectIds = async (): Promise<Set<string>> => {
+  const raw = await localStorageAdapter.getItem(DELETED_PROJECT_IDS_KEY);
+  if (!raw) return new Set();
+  const data: unknown = JSON.parse(raw);
+  if (!Array.isArray(data) || data.some((id) => typeof id !== "string")) {
+    throw new Error("삭제된 프로젝트 정보를 읽지 못했습니다.");
+  }
+  return new Set(data);
+};
+
+export const deleteArchivedBodyProject = (
+  id: string,
+  removeProjectData: () => Promise<void>
+) => runProjectMutation(async () => {
+  const projects = await getBodyProjects();
+  const project = projects.find((item) => item.id === id);
+  if (!project?.archived) throw new Error("보관 중인 프로젝트만 삭제할 수 있습니다.");
+  await removeProjectData();
+  const deletedIds = await getDeletedBodyProjectIds();
+  deletedIds.add(id);
+  await localStorageAdapter.setItem(DELETED_PROJECT_IDS_KEY, JSON.stringify([...deletedIds]));
+  await writeProjects(projects.filter((item) => item.id !== id));
+});
 
 export const replaceBodyProjects = async (projects: BodyProject[]) => {
   await writeProjects(projects);
@@ -246,7 +273,7 @@ export const replaceBodyProjects = async (projects: BodyProject[]) => {
 export const mergeBodyProjectsFromBackup = async (projects: BodyProject[]) =>
   runProjectMutation(async () => {
     const current = await getBodyProjects();
-    const existingIds = new Set(current.map(project => project.id));
+    const existingIds = new Set([...current.map(project => project.id), ...await getDeletedBodyProjectIds()]);
     const incoming = projects
       .map(normalizeBodyProject)
       .filter((project): project is BodyProject => Boolean(project))

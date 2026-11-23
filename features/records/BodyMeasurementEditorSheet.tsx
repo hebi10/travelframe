@@ -132,6 +132,7 @@ export function BodyMeasurementEditorSheet({
   allowRecordedAtEdit = false,
   capturePhoto,
   onClose,
+  onSavePhotoDate,
   onSaved,
   onDeleted
 }: {
@@ -146,6 +147,7 @@ export function BodyMeasurementEditorSheet({
   allowRecordedAtEdit?: boolean;
   capturePhoto?: { uri: string; projectName: string; sequence?: number };
   onClose: () => void;
+  onSavePhotoDate?: (recordedAt: string) => Promise<void>;
   onSaved: (entry: BodyMeasurementEntry) => void;
   onDeleted?: () => void;
 }) {
@@ -177,10 +179,10 @@ export function BodyMeasurementEditorSheet({
   useEffect(() => {
     if (!visible) return;
     setDrafts(getEntryDrafts(entry));
-    setRecordedDateDraft(formatRecordedDate(entry?.recordedAt ?? recordedAt));
+    setRecordedDateDraft(formatRecordedDate(onSavePhotoDate ? recordedAt : entry?.recordedAt ?? recordedAt));
     setNote(entry?.note ?? "");
     setSaveError(null);
-  }, [entry, photoId, projectId, recordedAt, sequence, visible]);
+  }, [entry, onSavePhotoDate, photoId, projectId, recordedAt, sequence, visible]);
 
   const updateDraft = (metric: BodyMeasurementMetric, value: string) => {
     setDrafts((current) => ({ ...current, [metric]: value }));
@@ -204,7 +206,7 @@ export function BodyMeasurementEditorSheet({
     }
 
     const nextRecordedAt = allowRecordedAtEdit
-      ? parseRecordedDate(recordedDateDraft, entry?.recordedAt ?? recordedAt)
+      ? parseRecordedDate(recordedDateDraft, onSavePhotoDate ? recordedAt : entry?.recordedAt ?? recordedAt)
       : recordedAt;
     if (!nextRecordedAt) {
       Alert.alert(
@@ -214,7 +216,9 @@ export function BodyMeasurementEditorSheet({
       return;
     }
 
-    if (!entry && activeMetrics.every((metric) => parsed[metric] === undefined) && !note.trim()) {
+    const dateChanged = nextRecordedAt !== recordedAt;
+    const hasMeasurement = entry || activeMetrics.some((metric) => parsed[metric] !== undefined) || note.trim();
+    if (!hasMeasurement && !(onSavePhotoDate && dateChanged)) {
       requestClose();
       return;
     }
@@ -222,22 +226,25 @@ export function BodyMeasurementEditorSheet({
     savingRef.current = true;
     setSaving(true);
     try {
-      const saved = await saveBodyMeasurement({
-        id: entry?.id,
-        projectId,
-        photoId,
-        sequence,
-        recordedAt: nextRecordedAt,
-        weightKg: parsed.weight ?? undefined,
-        bodyFatPercent: parsed.bodyFat ?? undefined,
-        skeletalMuscleKg: parsed.skeletalMuscle ?? undefined,
-        waistCm: parsed.waist ?? undefined,
-        note,
-        source: entry?.source ?? "manual",
-        sourceRecordId: entry?.sourceRecordId,
-        sourceAppPackage: entry?.sourceAppPackage
-      });
-      onSaved(saved);
+      if (hasMeasurement) {
+        const saved = await saveBodyMeasurement({
+          id: entry?.id,
+          projectId,
+          photoId,
+          sequence,
+          recordedAt: entry?.source === "health_connect" && onSavePhotoDate ? entry.recordedAt : nextRecordedAt,
+          weightKg: activeMetrics.includes("weight") ? parsed.weight ?? undefined : entry?.weightKg,
+          bodyFatPercent: activeMetrics.includes("bodyFat") ? parsed.bodyFat ?? undefined : entry?.bodyFatPercent,
+          skeletalMuscleKg: activeMetrics.includes("skeletalMuscle") ? parsed.skeletalMuscle ?? undefined : entry?.skeletalMuscleKg,
+          waistCm: activeMetrics.includes("waist") ? parsed.waist ?? undefined : entry?.waistCm,
+          note,
+          source: entry?.source ?? "manual",
+          sourceRecordId: entry?.sourceRecordId,
+          sourceAppPackage: entry?.sourceAppPackage
+        });
+        onSaved(saved);
+      }
+      if (onSavePhotoDate && dateChanged) await onSavePhotoDate(nextRecordedAt);
       onClose();
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : "수치 기록을 저장하지 못했습니다. 다시 시도해 주세요.");
@@ -250,7 +257,7 @@ export function BodyMeasurementEditorSheet({
   const confirmDelete = () => {
     if (!entry || saving) return;
 
-    Alert.alert("수치 기록을 삭제할까요?", "사진은 삭제되지 않습니다.", [
+    Alert.alert("수치 기록을 삭제할까요?", "이 수치 기록과 연결된 클라우드 백업이 삭제됩니다. 사진은 유지됩니다.", [
       { text: "취소", style: "cancel" },
       {
         text: "삭제",
@@ -304,7 +311,7 @@ export function BodyMeasurementEditorSheet({
                 : entry ? "수치 기록 수정" : "수치 기록"}
             description={capturePhoto
               ? "사진은 이미 저장되었습니다. 원하는 항목만 입력하거나 나중에 입력할 수 있습니다."
-              : "입력한 값은 현재 기기에만 저장됩니다."}
+              : "직접 입력한 수치는 프로젝트 백업 설정에 따라 클라우드에도 저장됩니다."}
             closeLabel={capturePhoto ? "나중에 입력" : "닫기"}
             onClose={requestClose}
           />

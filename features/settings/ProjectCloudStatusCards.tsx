@@ -16,6 +16,7 @@ type Props = {
 
 const slotLabel: Record<ProjectCloudBackupStatus["slotStatus"], string> = {
   active: "백업 대상",
+  paused: "새 백업 중지",
   over_limit: "플랜 슬롯 초과",
   replacing: "백업 대상 변경 중",
   unselected: "백업 슬롯 미선택"

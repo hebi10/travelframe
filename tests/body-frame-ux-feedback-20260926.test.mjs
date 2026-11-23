@@ -20,7 +20,7 @@ assert.ok(
 );
 assert.ok(
   camera.includes("settings.referencePhotoVisible") &&
-    camera.includes("referencePhotoVisible: false") &&
+    camera.includes("referencePhotoVisible: showAutomatic") &&
     camera.includes("referencePhotoVisible: true") &&
     camera.includes("commitOverlayOpacityPercent") &&
     camera.includes("queueAppSettingsUpdate({ overlayOpacity: nextOpacity })"),

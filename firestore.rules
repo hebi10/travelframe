@@ -189,7 +189,7 @@ service cloud.firestore {
 
     function photoBackupMutableKeys() {
       return [
-        "projectId", "sequence", "sourceUpdatedAt", "width", "height", "ratioLabel", "kind", "edited", "addedToVideo", "sourcePhotoId", "edit",
+        "projectId", "sequence", "sourceUpdatedAt", "createdAt", "width", "height", "ratioLabel", "kind", "edited", "addedToVideo", "sourcePhotoId", "edit",
         "localUri",
         "localPreviewUri",
         "localFileStatus",
@@ -288,6 +288,7 @@ service cloud.firestore {
         "durations",
         "musicId",
         "musicLabel",
+        "bodyFrameOptions",
         "storagePath",
         "downloadURL",
         "fileSize",
@@ -318,6 +319,7 @@ service cloud.firestore {
         "durations",
         "musicId",
         "musicLabel",
+        "bodyFrameOptions",
         "backupStatus",
         "backupEnabledAt",
         "lastBackedUpAt",
@@ -484,6 +486,26 @@ service cloud.firestore {
         && isValidBackupStatus(request.resource.data.backupStatus);
     }
 
+    function validBodyFrameVideoOptions() {
+      let data = request.resource.data;
+      return !data.keys().hasAny(["bodyFrameOptions"]) ||
+        (data.bodyFrameOptions is map
+          && data.bodyFrameOptions.keys().hasOnly(["interval", "quality", "ratio", "overlay", "musicTrackId"])
+          && data.bodyFrameOptions.interval in [0.1, 0.2, 0.5, 1]
+          && data.bodyFrameOptions.quality in [720, 1080]
+          && data.bodyFrameOptions.ratio in ["3:4", "9:16", "1:1", "16:9"]
+          && (!data.bodyFrameOptions.keys().hasAny(["musicTrackId"]) ||
+            (data.bodyFrameOptions.musicTrackId is string && data.bodyFrameOptions.musicTrackId.size() <= 160))
+          && data.bodyFrameOptions.overlay is map
+          && data.bodyFrameOptions.overlay.keys().hasOnly(["showDate", "showWeight", "showBodyFat", "customText", "position"])
+          && data.bodyFrameOptions.overlay.showDate is bool
+          && data.bodyFrameOptions.overlay.showWeight is bool
+          && data.bodyFrameOptions.overlay.showBodyFat is bool
+          && data.bodyFrameOptions.overlay.customText is string
+          && data.bodyFrameOptions.overlay.customText.size() <= 40
+          && data.bodyFrameOptions.overlay.position in ["top-left", "top-right", "bottom-left", "bottom-right"]);
+    }
+
     function isValidVideoBackup(userId, videoId) {
       return hasValidBackupOwner(userId)
         && requestedProjectWriteUnlocked(userId)
@@ -492,6 +514,7 @@ service cloud.firestore {
             request.resource.data.sourceUpdatedAt is string)
         && (!request.resource.data.keys().hasAny(["projectId"]) || (request.resource.data.projectId is string && request.resource.data.projectId.size() > 0))
         && request.resource.data.keys().hasOnly(videoBackupKeys())
+        && validBodyFrameVideoOptions()
         && request.resource.data.localId == videoId
         && isValidBackupStoragePath(userId, request.resource.data.storagePath)
         && isValidBackupFileSize(request.resource.data.fileSize)
@@ -524,6 +547,8 @@ service cloud.firestore {
         && request.resource.data.fileSize == resource.data.fileSize
         && request.resource.data.fileType == resource.data.fileType
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(photoBackupMutableKeys())
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(["createdAt"]) ||
+          request.resource.data.createdAt is string)
         && hasValidBackupOwner(userId)
         && requestedProjectWriteUnlocked(userId)
         && validPhotoProjectFields()
@@ -572,6 +597,7 @@ service cloud.firestore {
             request.resource.data.sourceUpdatedAt is string)
         && (!request.resource.data.keys().hasAny(["projectId"]) || (request.resource.data.projectId is string && request.resource.data.projectId.size() > 0))
         && request.resource.data.keys().hasOnly(videoBackupKeys())
+        && validBodyFrameVideoOptions()
         && request.resource.data.localId == videoId
         && isValidBackupStoragePath(userId, request.resource.data.storagePath)
         && isValidBackupFileSize(request.resource.data.fileSize)
@@ -605,7 +631,8 @@ service cloud.firestore {
         allow read: if isOwner(userId) || isAdmin();
         allow delete: if isOwner(userId);
         allow create, update: if isOwner(userId)
-          && request.resource.data.keys().hasOnly(["id", "userId", "name", "createdAt", "updatedAt", "targetPhotoCount", "referenceMode", "coverPhotoId", "archived", "saveMode"])
+          && projectBackupUnlocked(userId, projectId)
+          && request.resource.data.keys().hasOnly(["id", "userId", "name", "createdAt", "updatedAt", "targetPhotoCount", "referenceMode", "coverPhotoId", "archived", "saveMode", "cloudResumeMode"])
           && request.resource.data.id == projectId
           && (!request.resource.data.keys().hasAny(["userId"]) || request.resource.data.userId == userId)
           && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 200
@@ -615,13 +642,17 @@ service cloud.firestore {
           && request.resource.data.archived is bool
           && (!request.resource.data.keys().hasAny(["coverPhotoId"]) || request.resource.data.coverPhotoId is string)
           && (!request.resource.data.keys().hasAny(["saveMode"]) ||
-              request.resource.data.saveMode in ["cloud", "local_cloud", "local_only"]);
+              request.resource.data.saveMode in ["cloud", "local_cloud", "local_only"])
+          && (!request.resource.data.keys().hasAny(["cloudResumeMode"]) ||
+              (request.resource.data.saveMode == "local_only" &&
+                request.resource.data.cloudResumeMode in ["cloud", "local_cloud"]));
       }
 
       match /bodyMeasurements/{measurementId} {
         allow read: if isOwner(userId);
         allow delete: if false;
         allow create, update: if isOwner(userId)
+          && requestedProjectWriteUnlocked(userId)
           && request.resource.data.keys().hasOnly([
             "id", "userId", "projectId", "schemaVersion", "recordedAt",
             "photoId", "sequence", "weightKg", "bodyFatPercent",
@@ -640,7 +671,7 @@ service cloud.firestore {
           && request.resource.data.projectId.size() <= 160
           && request.resource.data.recordedAt is string
           && request.resource.data.backedUpAt is string
-          && request.resource.data.source in ["manual", "health_connect"]
+          && request.resource.data.source == "manual"
           && (!request.resource.data.keys().hasAny(["photoId"]) ||
               (request.resource.data.photoId is string && request.resource.data.photoId.size() > 0))
           && (!request.resource.data.keys().hasAny(["sequence"]) ||
@@ -671,6 +702,7 @@ service cloud.firestore {
         allow read: if isOwner(userId);
         allow delete: if false;
         allow create, update: if isOwner(userId)
+          && projectBackupUnlocked(userId, projectId)
           && request.resource.data.keys().hasOnly([
             "id", "userId", "projectId", "schemaVersion",
             "measurementSettings", "poseAlignmentEnabled",

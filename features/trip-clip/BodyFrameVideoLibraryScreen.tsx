@@ -18,7 +18,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { bodyFrameDesign, bodyFrameTypography, getBodyFrameControlColors } from "@/constants/app-theme";
 import { useAppAppearance } from "@/lib/app-appearance";
-import { deleteMadeVideo, getMadeVideos } from "@/lib/video-library";
+import { saveVideoToLibrary, shareVideo } from "@/lib/trip-clip-export";
+import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
+import { deleteMadeVideo, getMadeVideos, requireLocalMadeVideo } from "@/lib/video-library";
 import type { MadeVideoItem } from "@/types/video";
 
 const formatDuration = (seconds: number) =>
@@ -64,10 +66,30 @@ export default function BodyFrameVideoLibraryScreen() {
     }, [load])
   );
 
+  const [exportingId, setExportingId] = useState<string | null>(null);
+  const exportVideo = async (id: string, action: "save" | "share") => {
+    if (exportingId || deletingId) return;
+    setExportingId(id);
+    setMessage(null);
+    try {
+      const { uri } = await requireLocalMadeVideo(id);
+      if (action === "save") {
+        await saveVideoToLibrary(uri);
+        setMessage("영상을 기기 앨범에 저장했습니다.");
+      } else {
+        await shareVideo(uri);
+      }
+    } catch (error) {
+      setMessage(getUserFacingErrorMessage(error, "영상을 저장하거나 공유하지 못했습니다."));
+    } finally {
+      setExportingId(null);
+    }
+  };
+
   const confirmDelete = (video: MadeVideoItem) => {
     Alert.alert(
       "영상을 삭제할까요?",
-      "앱에 저장된 영상 기록이 삭제됩니다.",
+      "이 영상과 연결된 클라우드 백업이 삭제됩니다. 기기 앨범으로 내보낸 영상은 유지됩니다.",
       [
         { text: "취소", style: "cancel" },
         {
@@ -214,9 +236,21 @@ export default function BodyFrameVideoLibraryScreen() {
                       재생·상세
                     </Text>
                   </Pressable>
+                  {(["save", "share"] as const).map((action) => (
+                    <Pressable
+                      key={action}
+                      accessibilityRole="button"
+                      disabled={Boolean(exportingId || deletingId)}
+                      onPress={() => void exportVideo(video.id, action)}
+                      style={[styles.mediaButton, { borderColor: palette.line }]}
+                      accessibilityLabel={`${video.title} ${action === "save" ? "앨범 저장" : "공유"}`}
+                    >
+                      <Text style={{ color: palette.text }}>{action === "save" ? "앨범 저장" : "공유"}</Text>
+                    </Pressable>
+                  ))}
                   <Pressable
                     accessibilityRole="button"
-                    disabled={deletingId === video.id}
+                    disabled={Boolean(exportingId) || deletingId === video.id}
                     accessibilityLabel={`${video.title} 영상 삭제`}
                     accessibilityState={{ disabled: deletingId === video.id }}
                     onPress={() => confirmDelete(video)}
@@ -271,6 +305,13 @@ export default function BodyFrameVideoLibraryScreen() {
 }
 
 const styles = StyleSheet.create({
+  mediaButton: {
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    minHeight: 44,
+    paddingHorizontal: 10
+  },
   screen: {
     flex: 1
   },

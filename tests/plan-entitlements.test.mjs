@@ -59,6 +59,18 @@ assert.equal(
   "expert"
 );
 
+const expiredWithPurchase = {
+  ...activeSubscription("creator_monthly"),
+  expiresAt: "2000-01-01T00:00:00Z",
+  adRemoveEntitlement: { status: "active", expiresAt: null }
+};
+assert.equal(getPlanTier({ isLoggedIn: true, subscription: expiredWithPurchase }), "ad_remove");
+assert.equal(getPlanTier({ isLoggedIn: true, subscription: {
+  ...expiredWithPurchase, adRemoveEntitlement: { status: "expired", expiresAt: null }
+} }), "free");
+assert.equal(PLAN_ENTITLEMENTS.ad_remove.localImageLimit,
+  PLAN_ENTITLEMENTS.ad_remove.maxProgressPhotos * PLAN_ENTITLEMENTS.ad_remove.maxProjectCount);
+
 assert.equal(PLAN_ENTITLEMENTS.guest.canExportVideo, true);
 assert.equal(PLAN_ENTITLEMENTS.guest.weeklyVideoExportLimit, 1);
 assert.equal(PLAN_ENTITLEMENTS.guest.localImageLimit, 100);

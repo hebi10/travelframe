@@ -200,6 +200,7 @@ type CameraScreenProps = {
   projectSaveMode?: ProjectSaveMode | null;
   onProjectSaveModeChange?: (projectId: string, mode: ProjectSaveMode) => Promise<void>;
   onPhotoSaved?: (photo: PhotoItem) => void;
+  externalModalOpen?: boolean;
   headerCenter?: ReactNode;
   footerStatus?: ReactNode;
   onHeaderBottomChange?: (bottom: number) => void;
@@ -214,6 +215,7 @@ export default function CameraScreen({
   projectSaveMode = null,
   onProjectSaveModeChange,
   onPhotoSaved,
+  externalModalOpen = false,
   headerCenter,
   footerStatus,
   onHeaderBottomChange
@@ -381,16 +383,15 @@ export default function CameraScreen({
     }),
     [insets.bottom, insets.top]
   );
-  const isCameraModalOpen = guideSettingsOpen || cameraSettingsOpen;
+  const isCameraModalOpen = guideSettingsOpen || cameraSettingsOpen || externalModalOpen;
   const controlsStyle = overlaySetupActive
     ? [styles.controls, { paddingBottom: bottomSafePadding }]
     : styles.controls;
   const isLineGuideActive = guideVisible;
   const referenceProjectKey = bodyFrameCameraSession.projectId ?? "legacy";
   const referenceOverlayVisible = referencePhotoVisible;
-  const hasReferenceSource = Boolean(
-    referenceUri || bodyFrameCameraSession.automaticReferenceUri
-  );
+  const activeReferenceUri = referenceUri ?? bodyFrameCameraSession.automaticReferenceUri;
+  const hasReferenceSource = Boolean(activeReferenceUri);
   const hasReferenceOverlay = referenceOverlayVisible && hasReferenceSource;
   const isPhotoGuideActive = hasReferenceOverlay;
   const isPhotoSavePending = pendingPhotoSaveCount > 0;
@@ -679,9 +680,9 @@ export default function CameraScreen({
     poseAlignmentWasAlignedRef.current = false;
 
     const enabled = bodyFrameCameraSession.poseAlignmentEnabled;
-    const referenceUri = bodyFrameCameraSession.automaticReferenceUri;
+    const referenceUri = activeReferenceUri;
 
-    if (!enabled) {
+    if (!enabled || isCameraModalOpen || overlaySetupActive) {
       setPoseGuidance(null);
       return () => {
         cancelled = true;
@@ -735,6 +736,7 @@ export default function CameraScreen({
           referenceResolved = true;
           referencePose = await analyzeAndroidPose(referenceUri);
         }
+        if (cancelled) return;
 
         if (!referencePose?.detected) {
           setPoseGuidance({
@@ -815,14 +817,14 @@ export default function CameraScreen({
 
     return () => {
       cancelled = true;
-      poseAnalysisBusyRef.current = false;
       if (timer) {
         clearTimeout(timer);
       }
     };
   }, [
-    bodyFrameCameraSession.automaticReferenceUri,
+    activeReferenceUri,
     bodyFrameCameraSession.poseAlignmentEnabled,
+    overlaySetupActive,
     cameraFacing,
     isCameraModalOpen,
     isCameraReady,
@@ -1654,8 +1656,10 @@ export default function CameraScreen({
   };
 
   const removeReferenceOverlay = () => {
-    setReferencePhotoVisible(false);
-    queueAppSettingsUpdate({ referencePhotoVisible: false });
+    const showAutomatic = Boolean(referenceUri && bodyFrameCameraSession.automaticReferenceUri);
+    setReferenceUri(null);
+    setReferencePhotoVisible(showAutomatic);
+    queueAppSettingsUpdate({ referencePhotoVisible: showAutomatic });
     setOverlayLocked(false);
     setOverlaySetupActive(false);
     setOverlayOpacity(defaultOverlayOpacity.current);
@@ -2016,7 +2020,6 @@ export default function CameraScreen({
     () =>
       Gesture.Pinch()
         .enabled(
-            !referenceUri &&
             !isCameraModalOpen &&
             !overlaySetupActive &&
             !isGuidePositionAdjusting &&
@@ -2041,7 +2044,6 @@ export default function CameraScreen({
       isGridLineControlAdjusting,
       isGuidePositionAdjusting,
       overlaySetupActive,
-      referenceUri,
       zoomPercent
     ]
   );

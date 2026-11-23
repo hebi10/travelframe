@@ -26,7 +26,8 @@ import { bodyFrameDesign, bodyFrameTypography, colors, spacing, typography, getB
 import { useAuth } from "@/lib/auth-context";
 import { useAppAppearance } from "@/lib/app-appearance";
 import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
-import { getMadeVideoById } from "@/lib/video-library";
+import { saveVideoToLibrary, shareVideo } from "@/lib/trip-clip-export";
+import { getMadeVideoById, requireLocalMadeVideo } from "@/lib/video-library";
 import { getVideoAspectRatio } from "@/lib/video-utils";
 import type { MadeVideoItem } from "@/types/video";
 
@@ -73,6 +74,26 @@ export default function VideoDetailScreen() {
   const [playbackRequested, setPlaybackRequested] = useState(false);
   const videoSource = video?.uri || null;
   const hasPlayableVideoSource = Boolean(videoSource);
+
+  const [exporting, setExporting] = useState(false);
+  const exportVideo = async (action: "save" | "share") => {
+    if (!video || exporting) return;
+    setExporting(true);
+    setMessage(null);
+    try {
+      const { uri } = await requireLocalMadeVideo(video.id);
+      if (action === "save") {
+        await saveVideoToLibrary(uri);
+        setMessage("영상을 기기 앨범에 저장했습니다.");
+      } else {
+        await shareVideo(uri);
+      }
+    } catch (error) {
+      setMessage(getUserFacingErrorMessage(error, "영상을 저장하거나 공유하지 못했습니다."));
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const loadVideo = useCallback(async () => {
     if (!id) {
@@ -231,6 +252,15 @@ export default function VideoDetailScreen() {
         ) : null}
 
         <View style={styles.actions}>
+          {(["save", "share"] as const).map((action) => (
+            <Pressable key={action} accessibilityRole="button" disabled={exporting}
+              style={[styles.lightButton, { backgroundColor: palette.background, borderColor: palette.text }]}
+              onPress={() => void exportVideo(action)}>
+              <Text style={[styles.lightButtonText, { color: palette.text }]}>
+                {action === "save" ? "앨범 저장" : "공유"}
+              </Text>
+            </Pressable>
+          ))}
           <Pressable
             accessibilityRole="button"
             style={[styles.darkButton, { backgroundColor: actionColor }]}
@@ -240,6 +270,10 @@ export default function VideoDetailScreen() {
                 return;
               }
 
+              if (video.projectId && (video.bodyFrameOptions || video.transition === "none")) {
+                router.push({ pathname: "/video-create", params: { videoId: video.id } });
+                return;
+              }
               router.push({
                 pathname: "/legacy-video-edit",
                 params: { videoId: video.id, returnTo: `/video/${video.id}` }

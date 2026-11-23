@@ -33,8 +33,7 @@ import { getSubscriptionProductsFromSubscription } from "@/lib/subscription-prod
 import { getPlanEntitlements } from "@/lib/plan-entitlements";
 import { getPlanReturnPath } from "@/lib/plan-navigation";
 import {
-  getEffectiveStorageMode,
-  getStorageModeLabel
+  getEffectiveStorageMode
 } from "@/lib/storage-mode";
 import { useAppAppearance } from "@/lib/app-appearance";
 import {
@@ -43,6 +42,10 @@ import {
   isGoogleSignInConfigured,
   signInWithGoogleAuthSession
 } from "@/lib/google-auth";
+import { ProjectCloudStatusCards } from "@/features/settings/ProjectCloudStatusCards";
+import { getProjectCloudBackupStatuses, type ProjectCloudBackupStatus } from "@/lib/project-cloud-backup-status";
+import { enqueueProjectCloudSync } from "@/lib/project-cloud-sync-queue";
+import { flushProjectCloudSync } from "@/lib/project-cloud-sync";
 import { restoreCloudBackupToLocal } from "@/lib/cloud-backup";
 import { formatImageBackupSize } from "@/lib/image-backup-utils";
 import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
@@ -326,7 +329,46 @@ export default function AccountScreen() {
     });
   };
 
-  const restoreBackupData = async () => {
+  const [projectStatuses, setProjectStatuses] = useState<ProjectCloudBackupStatus[]>([]);
+  const [projectStatusError, setProjectStatusError] = useState<string | null>(null);
+  const [projectStatusBusy, setProjectStatusBusy] = useState(false);
+  const projectRefresh = useRef(0);
+  const refreshProjectStatuses = useCallback(async () => {
+    const request = ++projectRefresh.current;
+    if (!user) return;
+    setProjectStatusBusy(true);
+    setProjectStatusError(null);
+    try {
+      const statuses = await getProjectCloudBackupStatuses({ user });
+      if (projectRefresh.current === request) setProjectStatuses(statuses);
+    } catch (error) {
+      if (projectRefresh.current === request) {
+        setProjectStatusError(getUserFacingErrorMessage(error, "프로젝트 백업 현황을 확인하지 못했습니다."));
+      }
+    } finally {
+      if (projectRefresh.current === request) setProjectStatusBusy(false);
+    }
+  }, [user]);
+  useFocusEffect(useCallback(() => {
+    void refreshProjectStatuses();
+    return () => {
+      projectRefresh.current++;
+      setProjectStatuses([]);
+    };
+  }, [refreshProjectStatuses]));
+
+  const retryProjectBackup = async (projectId: string) => {
+    if (!user || !planEntitlements.canBackupToCloud) return;
+    try {
+      await enqueueProjectCloudSync({ projectId, kind: "initial" });
+      await flushProjectCloudSync({ user, subscription });
+      await refreshProjectStatuses();
+    } catch (error) {
+      setMessage(getUserFacingErrorMessage(error, "프로젝트 동기화를 요청하지 못했습니다."));
+    }
+  };
+
+  const restoreBackupData = async (projectId?: string) => {
     if (isBackupRestoreSubmitting) {
       return;
     }
@@ -339,7 +381,8 @@ export default function AccountScreen() {
     try {
       setIsBackupRestoreSubmitting(true);
       setMessage(null);
-      const summary = await restoreCloudBackupToLocal({ user });
+      const summary = await restoreCloudBackupToLocal({ user, ...(projectId ? { projectIds: [projectId] } : {}) });
+      void refreshProjectStatuses();
       setMessage(
         `클라우드 백업에서 현재 앱에 없는 항목만 불러왔습니다. 사진 ${summary.photoCount}장, 영상 ${summary.videoCount}개를 추가했습니다.`
       );
@@ -765,14 +808,6 @@ export default function AccountScreen() {
             <View style={[styles.backupSummaryPanel, themed.panel]}>
               <View style={styles.infoList}>
                 <InfoRow
-                  label="백업 설정"
-                  value={effectiveStorageMode === "local_only" ? "꺼짐" : "켜짐"}
-                />
-                <InfoRow
-                  label="저장 방식"
-                  value={getStorageModeLabel(effectiveStorageMode)}
-                />
-                <InfoRow
                 label="백업 권한"
                 value={
                   isSubscriptionCheckFailed
@@ -802,7 +837,7 @@ export default function AccountScreen() {
                 />
               </View>
               <Text selectable={false} style={[styles.helpText, themed.mutedText]}>
-                설정의 클라우드 백업에서 켜거나 끌 수 있습니다. 구독 기간이 끝나면 새 백업은 중단됩니다. 기존 백업 데이터 삭제는 설정에서 직접 요청할 수 있습니다.
+                아래 백업 슬롯에서 프로젝트별로 백업을 시작하거나 중지할 수 있습니다. 구독 기간이 끝나면 새 백업은 중단됩니다. 기존 백업 데이터 삭제는 설정에서 직접 요청할 수 있습니다.
               </Text>
               <Pressable accessibilityRole="button"
                 disabled={isBackupRestoreSubmitting || !isLoggedIn}
@@ -825,7 +860,28 @@ export default function AccountScreen() {
             maxSlots={planEntitlements.maxCloudBackupProjects}
             maxPhotosPerProject={planEntitlements.maxCloudPhotosPerProject}
             backupStorageBytes={planEntitlements.backupStorageBytes}
+            onBackupChanged={refreshProjectStatuses}
           />
+          {user ? (
+            <ProjectCloudStatusCards
+              statuses={projectStatuses}
+              loading={projectStatusBusy}
+              error={projectStatusError}
+              disabled={isBackupRestoreSubmitting}
+              colors={palette}
+              formatBytes={formatImageBackupSize}
+              onRefresh={() => void refreshProjectStatuses()}
+              onRetry={(projectId) => void retryProjectBackup(projectId)}
+              onRestore={(projectId) => Alert.alert(
+                "프로젝트를 복원할까요?",
+                "이 프로젝트에서 현재 기기에 없는 백업 항목을 불러옵니다.",
+                [
+                  { text: "취소", style: "cancel" },
+                  { text: "복원", onPress: () => void restoreBackupData(projectId) }
+                ]
+              )}
+            />
+          ) : null}
 
           <SectionBlock title="플랜 및 결제">
             <View style={[styles.planCard, themed.panelStrong]}>

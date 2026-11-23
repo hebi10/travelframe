@@ -31,12 +31,14 @@ export function CloudBackupProjectSlotsSection({
   user,
   maxSlots,
   maxPhotosPerProject,
-  backupStorageBytes
+  backupStorageBytes,
+  onBackupChanged
 }: {
   user: User | null;
   maxSlots: number;
   maxPhotosPerProject: number;
   backupStorageBytes: number;
+  onBackupChanged?: () => void;
 }) {
   const { palette } = useAppAppearance();
   const [projects, setProjects] = useState<BodyProject[]>([]);
@@ -108,10 +110,12 @@ export function CloudBackupProjectSlotsSection({
     try {
       await selectCloudBackupProject({ user, projectId: project.id });
       await reload();
+      onBackupChanged?.();
       setMessage(
         `"${project.name}" 프로젝트를 클라우드 백업 프로젝트로 선택했습니다.`
       );
     } catch (error) {
+      await reload().catch(() => undefined);
       setMessage(
         error instanceof Error
           ? error.message
@@ -137,6 +141,7 @@ export function CloudBackupProjectSlotsSection({
       });
       setReplacementSlotId(null);
       await reload();
+      onBackupChanged?.();
       setMessage(
         `"${projectName}" 프로젝트로 백업 슬롯을 변경했습니다. 새 프로젝트는 처음부터 다시 백업됩니다.`
       );
@@ -160,7 +165,9 @@ export function CloudBackupProjectSlotsSection({
         saveMode: "local_only",
         cloudResumeMode: project.saveMode === "cloud" ? "cloud" : "local_cloud"
       });
+      await enqueueProjectCloudSync({ projectId: project.id, kind: "project-state" });
       await reload();
+      onBackupChanged?.();
       setMessage(
         `"${project.name}" 프로젝트의 새 클라우드 백업을 중지했습니다. 이 기기의 앱 보관함·앨범 저장은 유지되며 기존 원격 파일은 삭제되지 않습니다. 슬롯은 계속 사용합니다.`
       );
@@ -179,6 +186,7 @@ export function CloudBackupProjectSlotsSection({
       await updateBodyProject(project.id, { saveMode: resumeMode, cloudResumeMode: null });
       await enqueueProjectCloudSync({ projectId: project.id, kind: "initial" });
       await reload();
+      onBackupChanged?.();
       setMessage(
         `"${project.name}" 프로젝트의 기존 저장 방식으로 클라우드 백업을 재개했습니다. 중지 중 변경된 항목은 동기화 대기열에 등록했습니다.`
       );
