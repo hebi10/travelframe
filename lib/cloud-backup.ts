@@ -484,7 +484,7 @@ const backupBodyProjectSupplement = async (
     const measurements = await getBodyMeasurements(projectId);
     for (const entry of measurements) {
       if (measurementId && entry.id !== measurementId) continue;
-      const backupEntry = getCloudBodyMeasurement(entry);
+      const backupEntry = getCloudBodyMeasurement(entry, backedUpAt);
       if (!backupEntry) {
         if (entry.manualRecordedAt) {
           await deleteUserBackupItem({ itemType: "measurement", itemId: entry.id, projectId });

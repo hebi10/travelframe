@@ -31,10 +31,8 @@ for (const snippet of [
   "releaseBackupUploads(backupSessionIds)",
   "await removeBackupIfImageWorkWasDeleted({",
   "await removeBackupIfVideoWasDeleted({",
-  "mergeImageBundleWorksFromBackup(",
-  "selected.imageWorks.filter(",
-  "mergeMadeVideosFromBackup(",
-  "selected.videos.filter("
+  "mergeImageBundleWorksFromBackup(selected.imageWorks.filter(",
+  "mergeMadeVideosFromBackup(selected.videos.filter("
 ]) {
   assert.ok(backupSource.includes(snippet), `backup/restore should defend work/video deletion races: ${snippet}`);
 }

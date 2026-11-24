@@ -13,7 +13,27 @@ const MATCH_WINDOW_MS = 60_000;
 const getGroupId = (timestamp: number, source?: string) =>
   `health-connect:${new Date(timestamp).toISOString()}:${source ?? ""}`;
 
-export const groupBodyHealthConnectMeasurements = (candidates: readonly BodyHealthConnectCandidate[]) => {
+export const indexHealthConnectMeasurements = (entries: readonly BodyMeasurementEntry[]) => {
+  const indexed = new Map<string, BodyMeasurementEntry>();
+  for (const entry of entries) {
+    if (entry.source !== "health_connect") continue;
+    for (const id of [entry.sourceRecordId, ...(entry.sourceMemberIds ?? [])]) {
+      if (id && (!indexed.has(id) || (!indexed.get(id)?.photoId && entry.photoId))) indexed.set(id, entry);
+    }
+  }
+  return indexed;
+};
+
+export const groupBodyHealthConnectMeasurements = (
+  candidates: readonly BodyHealthConnectCandidate[],
+  savedEntries: readonly BodyMeasurementEntry[] = []
+) => {
+  const pairedIds = new Map<string, string>();
+  for (const entry of savedEntries) {
+    if (entry.source !== "health_connect" || !entry.sourceMemberIds || entry.sourceMemberIds.length < 2) continue;
+    for (const id of entry.sourceMemberIds) pairedIds.set(id, entry.id);
+  }
+
   const records = candidates.map((candidate) => ({ candidate, time: Date.parse(candidate.recordedAt) }))
     .filter(({ time }) => Number.isFinite(time))
     .sort((a, b) => a.time - b.time);
@@ -26,7 +46,8 @@ export const groupBodyHealthConnectMeasurements = (candidates: readonly BodyHeal
       const right = records[next];
       const difference = right.time - left.time;
       if (difference > MATCH_WINDOW_MS) break;
-      if (right.candidate.sourceAppPackage === source && right.candidate.metric !== left.candidate.metric) {
+      if (right.candidate.sourceAppPackage === source && right.candidate.metric !== left.candidate.metric &&
+          pairedIds.get(left.candidate.sourceRecordId) === pairedIds.get(right.candidate.sourceRecordId)) {
         pairs.push({ left, right, difference });
       }
     }

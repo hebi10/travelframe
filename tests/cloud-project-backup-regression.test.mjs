@@ -117,7 +117,7 @@ function harness() {
       }
     },
     "@/lib/body-measurement-normalization": {
-      getCloudBodyMeasurement: (entry) => load("lib/body-measurement-normalization.ts").getCloudBodyMeasurement(entry),
+      getCloudBodyMeasurement: (entry, backedUpAt) => load("lib/body-measurement-normalization.ts").getCloudBodyMeasurement(entry, backedUpAt),
       normalizeBodyMeasurementEntry: value => value,
       normalizeBodyMeasurementSettings: value => value
     },
@@ -303,7 +303,7 @@ console.log("ok - project backups restore relationships and replace edited photo
   h.setMeasurements([{
     id: "edited-health", projectId: project.id, photoId: photo.id,
     source: "health_connect", recordedAt: "2026-10-01T01:00:00Z", sourceAppPackage: "health.app",
-    sourceRecordId: "device-record", weightKg: 70, bodyFatPercent: 17, waistCm: 83,
+    sourceRecordId: "device-record", sourceMemberIds: ["weight-record", "fat-record"], weightKg: 70, bodyFatPercent: 17, waistCm: 83,
     manualFields: ["waistCm"], manualRecordedAt: "2026-10-02T03:00:00Z"
   }]);
   await h.api.backupCurrentWorkspace({ user, subscription: {} });
@@ -311,7 +311,27 @@ console.log("ok - project backups restore relationships and replace edited photo
   assert.equal(backedUp.source, "manual");
   assert.equal(backedUp.waistCm, 83);
   assert.equal(backedUp.recordedAt, "2026-10-02T03:00:00Z");
-  for (const key of ["weightKg", "bodyFatPercent", "sourceAppPackage", "sourceRecordId", "manualFields"]) {
+  for (const key of ["weightKg", "bodyFatPercent", "sourceAppPackage", "sourceRecordId", "sourceMemberIds", "manualFields"]) {
+    assert.equal(Object.hasOwn(backedUp, key), false, key);
+  }
+}
+
+{
+  const h = harness();
+  const importedAt = "2026-10-04T02:00:00.000Z";
+  const id = `measurement-${Date.parse(importedAt)}-legacy`;
+  h.setMeasurements([{
+    id, projectId: project.id, source: "health_connect",
+    recordedAt: "2026-09-01T01:00:00Z", sourceAppPackage: "health.app", sourceRecordId: "device-record",
+    weightKg: 70, bodyFatPercent: 17, skeletalMuscleKg: 29, waistCm: 83, note: "직접 입력"
+  }]);
+  await h.api.backupCurrentWorkspace({ user, subscription: {} });
+  const backedUp = h.remote.get(`users/owner/bodyMeasurements/${id}`);
+  assert.equal(backedUp.recordedAt, importedAt);
+  assert.equal(backedUp.skeletalMuscleKg, 29);
+  assert.equal(backedUp.waistCm, 83);
+  assert.equal(backedUp.note, "직접 입력");
+  for (const key of ["weightKg", "bodyFatPercent", "sourceAppPackage", "sourceRecordId", "sourceMemberIds"]) {
     assert.equal(Object.hasOwn(backedUp, key), false, key);
   }
 }
