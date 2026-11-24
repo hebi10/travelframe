@@ -45,6 +45,13 @@ class Stage13CaptureTest(unittest.TestCase):
         self.assertIn("plans", stage13.C7_PRIMARY)
 
 
+    def test_compare_capture_requires_current_sequence_labels_not_hidden_slider_nodes(self):
+        case = next(case for case in stage13.CASES if case[0] == "compare")
+        self.assertEqual(case[3], ["전후 사진 비교", "이전 · #1", "현재 · #3"])
+        self.assertIn("compare", stage13.C7_PRIMARY)
+        self.assertIn("compare", stage13.CORE)
+        self.assertIn("compare", stage13.LARGE_TEXT)
+
     def test_c2_camera_project_sheet_actions_follow_native_controls(self):
         device = Mock()
         stage13.open_camera_new_project(device)
