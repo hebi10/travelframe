@@ -28,10 +28,11 @@ const types = execute("types/body-measurement.ts");
 const normalizer = execute("lib/body-measurement-normalization.ts", {
   "@/types/body-measurement": types
 });
+const queuedMeasurements = [];
 const library = execute("lib/body-measurement-library.ts", {
   "@/lib/local-storage": { localStorageAdapter: adapter },
   "@/lib/body-measurement-normalization": normalizer,
-  "@/lib/project-cloud-sync-queue": { enqueueProjectCloudSync: async () => {} },
+  "@/lib/project-cloud-sync-queue": { enqueueProjectCloudSync: async task => { queuedMeasurements.push(task); } },
   "@/types/body-measurement": types
 });
 
@@ -63,6 +64,28 @@ const healthTwin = { ...health, id: "health-remote-id" };
 assert.equal((await library.mergeBodyMeasurementsFromBackup([health])).length, 1);
 assert.equal((await library.mergeBodyMeasurementsFromBackup([healthTwin])).length, 0,
   "Health Connect source records must not duplicate on repeated restores");
+
+const detachedManual = {
+  ...sample, id: "manual-detach", photoId: "photo-detach", projectId: "project-detach"
+};
+const detachedEdited = {
+  id: "edited-health-detach", projectId: "project-detach", photoId: "photo-detach", sequence: 2,
+  recordedAt: sample.recordedAt, source: "health_connect", sourceRecordId: "edited-health-source",
+  weightKg: 70, waistCm: 82, manualFields: ["waistCm"], manualRecordedAt: sample.recordedAt
+};
+const detachedImported = {
+  id: "raw-health-detach", projectId: "project-detach", photoId: "photo-detach",
+  recordedAt: sample.recordedAt, source: "health_connect", sourceRecordId: "raw-health-source", weightKg: 71
+};
+for (const entry of [detachedManual, detachedEdited, detachedImported]) await library.saveBodyMeasurement(entry);
+queuedMeasurements.length = 0;
+await library.detachBodyMeasurementsFromPhoto("photo-detach");
+const detached = await library.getBodyMeasurements("project-detach");
+assert.equal(detached.length, 3, "photo removal preserves measurement values");
+assert.ok(detached.every(entry => !entry.photoId));
+assert.deepEqual(queuedMeasurements.map(task => task.itemId).sort(), ["edited-health-detach", "manual-detach"]);
+assert.equal(normalizer.getCloudBodyMeasurement(detached.find(entry => entry.id === "edited-health-detach"), sample.recordedAt).photoId, undefined);
+assert.equal(normalizer.getCloudBodyMeasurement(detached.find(entry => entry.id === "raw-health-detach"), sample.recordedAt), null);
 
 const deleted = {
   ...sample, id: "to-delete", photoId: "photo-deleted", weightKg: 65

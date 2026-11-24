@@ -29,7 +29,7 @@ import {
   saveBodyMeasurement
 } from "@/lib/body-measurement-library";
 import { getPhotos } from "@/lib/photo-library";
-import { findHealthConnectPhoto, groupBodyHealthConnectMeasurements, indexHealthConnectMeasurements } from "@/lib/body-health-connect-import";
+import { findHealthConnectPhoto, groupBodyHealthConnectMeasurements, resolveHealthConnectMeasurementMatch } from "@/lib/body-health-connect-import";
 import { useAppAppearance } from "@/lib/app-appearance";
 import {
   bodyMeasurementMetricMeta,
@@ -195,19 +195,12 @@ export function BodyHealthConnectImportCard({
       let skipped = 0;
 
       const [savedEntries, allPhotos] = await Promise.all([getBodyMeasurements(projectId), getPhotos()]);
-      const savedBySourceId = indexHealthConnectMeasurements(savedEntries);
       const occupiedPhotoIds = new Set(savedEntries.flatMap((entry) => entry.photoId ? [entry.photoId] : []));
       const projectPhotos = allPhotos.filter((photo) => photo.projectId === projectId);
       const matchedEntryIds = new Set<string>();
 
       for (const group of groupBodyHealthConnectMeasurements(candidates, savedEntries)) {
-        const legacy = [...group.originalRecordIds, ...group.legacyGroupIds]
-          .map((id) => savedBySourceId.get(id))
-          .filter((entry) => entry !== undefined)
-          .filter((entry) => !matchedEntryIds.has(entry.id));
-        const current = savedBySourceId.get(group.sourceRecordId);
-        const existing = current && !matchedEntryIds.has(current.id) ? current
-          : legacy.find((entry) => entry.photoId) ?? legacy[0];
+        const { existing, legacy } = resolveHealthConnectMeasurementMatch(group, savedEntries, matchedEntryIds);
         if (existing) matchedEntryIds.add(existing.id);
         const photo = existing?.photoId ? undefined :
           findHealthConnectPhoto(group.recordedAt, projectPhotos, occupiedPhotoIds);

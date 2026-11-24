@@ -350,3 +350,28 @@ console.log("ok - project backups restore relationships and replace edited photo
   assert.equal(await h.api.backupImageBundleWork({ user, work: unlinked, enabled: true }), null);
   assert.equal(h.uploads(), 0);
 }
+
+{
+  const h = harness();
+  const edited = {
+    id: "edited-detach", projectId: project.id, photoId: photo.id, sequence: 1,
+    recordedAt: photo.createdAt, source: "health_connect", sourceRecordId: "private-source",
+    weightKg: 70, waistCm: 83, manualFields: ["waistCm"], manualRecordedAt: photo.createdAt
+  };
+  h.setMeasurements([edited]);
+  await h.api.backupCurrentWorkspace({ user, subscription: {} });
+  const key = "users/owner/bodyMeasurements/edited-detach";
+  assert.equal(h.remote.get(key).photoId, photo.id);
+  const { photoId: removedPhotoId, ...detached } = edited;
+  h.setMeasurements([detached]);
+  await h.api.backupProjectSupplementIfEnabled({ user, subscription: {}, projectId: project.id, mode: "measurement", measurementId: edited.id });
+  assert.equal(Object.hasOwn(h.remote.get(key), "photoId"), false);
+  assert.equal(h.remote.get(key).waistCm, 83);
+  assert.equal(Object.hasOwn(h.remote.get(key), "weightKg"), false);
+  h.remote.delete("users/owner/photoBackups/" + removedPhotoId);
+  h.emptyLocal();
+  await h.api.restoreCloudBackupToLocal({ user, projectIds: [project.id] });
+  const restored = h.measurements().find(entry => entry.id === edited.id);
+  assert.equal(restored?.photoId, undefined);
+  assert.equal(restored?.waistCm, 83);
+}
