@@ -6,7 +6,7 @@ const source = fs.readFileSync("lib/body-health-connect-import.ts", "utf8");
 const { outputText } = ts.transpileModule(source, {
   compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 }
 });
-const { groupBodyHealthConnectMeasurements, resolveHealthConnectMeasurementMatch } = await import(`data:text/javascript,${encodeURIComponent(outputText)}`);
+const { groupBodyHealthConnectMeasurements, resolveHealthConnectMeasurementMatch, getHealthConnectSourceMemberIds } = await import(`data:text/javascript,${encodeURIComponent(outputText)}`);
 const timestamp = "2026-11-20T21:00:00.000Z";
 const first = { metric: "weight", value: 70, recordedAt: timestamp, sourceRecordId: "member-A", sourceAppPackage: "scale" };
 const second = { ...first, value: 73, sourceRecordId: "member-B" };
@@ -38,3 +38,37 @@ for (const group of reimported) {
 }
 assert.equal(groupBodyHealthConnectMeasurements([first, fat]).length, 1, "new complementary metrics still pair");
 console.log("ok - persisted Health Connect member identities take precedence over colliding generated IDs and preserve independently saved records");
+
+const sameTimeFat = { ...fat, recordedAt: timestamp };
+const legacyPair = {
+  id: "legacy-pair", projectId: "project", source: "health_connect",
+  sourceRecordId: groupBodyHealthConnectMeasurements([first, sameTimeFat])[0].sourceRecordId,
+  sourceAppPackage: "scale", recordedAt: timestamp, weightKg: 70, bodyFatPercent: 19, photoId: "old-photo"
+};
+for (const candidate of [first, sameTimeFat]) {
+  const [group] = groupBodyHealthConnectMeasurements([candidate], [legacyPair]);
+  const { existing } = resolveHealthConnectMeasurementMatch(group, [legacyPair], new Set());
+  assert.equal(existing.id, legacyPair.id);
+  assert.deepEqual(getHealthConnectSourceMemberIds(existing, group), [], "single-metric import must retain the legacy alias");
+}
+const [legacyCombined] = groupBodyHealthConnectMeasurements([first, sameTimeFat], [legacyPair]);
+assert.equal(legacyCombined.originalRecordIds.length, 2);
+assert.equal(resolveHealthConnectMeasurementMatch(legacyCombined, [legacyPair], new Set()).existing.id, legacyPair.id);
+const migrated = { ...legacyPair, sourceMemberIds: getHealthConnectSourceMemberIds(legacyPair, legacyCombined) };
+assert.deepEqual(migrated.sourceMemberIds, ["member-A", "member-fat"]);
+for (const candidate of [first, sameTimeFat]) {
+  const [group] = groupBodyHealthConnectMeasurements([candidate], [migrated]);
+  assert.equal(resolveHealthConnectMeasurementMatch(group, [migrated], new Set()).existing.id, legacyPair.id);
+}
+const partialLegacy = { ...legacyPair, sourceMemberIds: ["member-A"] };
+const [repaired] = groupBodyHealthConnectMeasurements([first, sameTimeFat], [partialLegacy]);
+assert.equal(repaired.originalRecordIds.length, 2);
+assert.deepEqual(getHealthConnectSourceMemberIds(partialLegacy, repaired), ["member-A", "member-fat"]);
+const separateLegacy = [
+  { ...legacyPair, id: "legacy-weight", bodyFatPercent: undefined, photoId: undefined },
+  { ...legacyPair, id: "legacy-fat", sourceRecordId: groupBodyHealthConnectMeasurements([fat])[0].sourceRecordId,
+    weightKg: undefined, recordedAt: fat.recordedAt, photoId: undefined }
+];
+assert.equal(groupBodyHealthConnectMeasurements([first, fat], separateLegacy).length, 2,
+  "pre-upgrade independently saved entries must not merge");
+console.log("ok - legacy metric toggles preserve group identity until member migration is complete");
