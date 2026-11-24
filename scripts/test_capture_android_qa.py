@@ -124,9 +124,9 @@ class CaptureHelpersTest(unittest.TestCase):
                 qa.private_video_path(uri, app)
 
     def test_native_probe_requires_expected_codec_dimensions_frames_and_duration(self):
-        probe = {'streams': [{'codec_type': 'video', 'codec_name': 'h264', 'width': 1080, 'height': 1440, 'nb_read_frames': '9'}], 'format': {'duration': '0.300'}}
+        probe = {'streams': [{'codec_type': 'video', 'codec_name': 'h264', 'width': 720, 'height': 960, 'nb_read_frames': '9'}], 'format': {'duration': '0.300'}}
         self.assertEqual(qa.validate_video_probe(probe)['duration'], 0.3)
-        for key, value in [('codec_name', 'mpeg4'), ('width', 720), ('nb_read_frames', '1')]:
+        for key, value in [('codec_name', 'mpeg4'), ('width', 1080), ('nb_read_frames', '1')]:
             broken = {'streams': [dict(probe['streams'][0], **{key: value})], 'format': probe['format']}
             with self.assertRaises(ValueError):
                 qa.validate_video_probe(broken)
@@ -143,7 +143,7 @@ class CaptureHelpersTest(unittest.TestCase):
                 qa.validate_marker_pixels(pixels,120,160,index)
 
     def test_native_probe_requires_exact_frame_count_and_one_frame_duration_tolerance(self):
-        stream = {'codec_type':'video','codec_name':'h264','width':1080,'height':1440}
+        stream = {'codec_type':'video','codec_name':'h264','width':720,'height':960}
         for frames, duration in [(None, '0.3'), ('N/A','0.3'), ('9','0.9'), ('9','0.2')]:
             with self.assertRaises(ValueError):
                 qa.validate_video_probe({'streams':[dict(stream,nb_read_frames=frames)],'format':{'duration':duration}})
@@ -173,7 +173,7 @@ class CaptureHelpersTest(unittest.TestCase):
 
     def test_declared_frame_count_cannot_replace_counted_decoded_frames(self):
         with self.assertRaises(ValueError):
-            qa.validate_video_probe({'streams':[{'codec_type':'video','codec_name':'h264','width':1080,'height':1440,'nb_frames':'9'}],'format':{'duration':'0.3'}})
+            qa.validate_video_probe({'streams':[{'codec_type':'video','codec_name':'h264','width':720,'height':960,'nb_frames':'9'}],'format':{'duration':'0.3'}})
 
     def test_export_action_never_falls_back_to_nonclickable_containing_header(self):
         header='<hierarchy><node clickable="false" enabled="true" bounds="[0,0][720,1600]"><node text="변화 영상 만들기" clickable="false" enabled="true" bounds="[140,84][580,188]"/></node></hierarchy>'
