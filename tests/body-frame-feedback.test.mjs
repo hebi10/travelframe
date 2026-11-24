@@ -44,6 +44,23 @@ test("Health Connect combines matching instants and picks the closest unused pho
   assert.equal(findHealthConnectPhoto(groups[0].recordedAt, photos, new Set(["near", "later"])), undefined);
 });
 
+test("Health Connect matches the closest complementary measurement within one minute from the same source", () => {
+  const candidate = (metric, seconds, id, sourceAppPackage = "source") => ({
+    metric, value: metric === "weight" ? 72 : 18,
+    recordedAt: new Date(Date.UTC(2026, 10, 20, 21, 0, seconds)).toISOString(),
+    sourceRecordId: id, sourceAppPackage
+  });
+  const groups = groupBodyHealthConnectMeasurements([
+    candidate("weight", 0, "earlier"),
+    candidate("weight", 37, "nearest"),
+    candidate("bodyFat", 38, "paired"),
+    candidate("bodyFat", 37, "other-source", "other"),
+    candidate("bodyFat", 120, "too-late")
+  ]);
+  assert.deepEqual(groups.find((group) => group.originalRecordIds.includes("paired")).originalRecordIds, ["nearest", "paired"]);
+  assert.equal(groups.length, 4);
+});
+
 test("saved Body Frame settings round-trip with music and all overlay properties", () => {
   const options = {
     interval: 0.2, quality: 1080, ratio: "9:16", musicTrackId: "track-a",

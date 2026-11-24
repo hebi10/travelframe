@@ -5,27 +5,62 @@ import type { PhotoItem } from "@/types/photo";
 type ImportedMeasurement = Pick<BodyMeasurementEntry, "recordedAt" | "weightKg" | "bodyFatPercent" | "sourceAppPackage"> & {
   sourceRecordId: string;
   originalRecordIds: string[];
+  legacyGroupIds: string[];
 };
 
+const MATCH_WINDOW_MS = 60_000;
+
+const getGroupId = (timestamp: number, source?: string) =>
+  `health-connect:${new Date(timestamp).toISOString()}:${source ?? ""}`;
+
 export const groupBodyHealthConnectMeasurements = (candidates: readonly BodyHealthConnectCandidate[]) => {
-  const groups = new Map<string, ImportedMeasurement>();
-  for (const candidate of candidates) {
-    const timestamp = Date.parse(candidate.recordedAt);
-    if (!Number.isFinite(timestamp)) continue;
-    const recordedAt = new Date(timestamp).toISOString();
-    const sourceRecordId = `health-connect:${recordedAt}:${candidate.sourceAppPackage ?? ""}`;
-    const group = groups.get(sourceRecordId) ?? {
-      sourceRecordId,
-      originalRecordIds: [],
-      recordedAt,
-      sourceAppPackage: candidate.sourceAppPackage
-    };
-    group.originalRecordIds.push(candidate.sourceRecordId);
-    if (candidate.metric === "weight") group.weightKg ??= candidate.value;
-    else group.bodyFatPercent ??= candidate.value;
-    groups.set(sourceRecordId, group);
+  const records = candidates.map((candidate) => ({ candidate, time: Date.parse(candidate.recordedAt) }))
+    .filter(({ time }) => Number.isFinite(time))
+    .sort((a, b) => a.time - b.time);
+  type Record = typeof records[number];
+  const pairs: { left: Record; right: Record; difference: number }[] = [];
+  for (const [index, left] of records.entries()) {
+    const source = left.candidate.sourceAppPackage;
+    if (!source) continue;
+    for (let next = index + 1; next < records.length; next++) {
+      const right = records[next];
+      const difference = right.time - left.time;
+      if (difference > MATCH_WINDOW_MS) break;
+      if (right.candidate.sourceAppPackage === source && right.candidate.metric !== left.candidate.metric) {
+        pairs.push({ left, right, difference });
+      }
+    }
   }
-  return [...groups.values()];
+  const matches = new Map<Record, Record>();
+  const paired = new Set<Record>();
+  for (const { left, right } of pairs.sort((a, b) => a.difference - b.difference)) {
+    if (paired.has(left) || paired.has(right)) continue;
+    matches.set(left, right);
+    paired.add(left);
+    paired.add(right);
+  }
+
+  const groups: ImportedMeasurement[] = [];
+  const ids = new Set<string>();
+  for (const record of records) {
+    const other = matches.get(record);
+    if (!other && paired.has(record)) continue;
+    const members = other ? [record, other] : [record];
+    const source = record.candidate.sourceAppPackage;
+    const groupId = getGroupId(record.time, source);
+    const id = ids.has(groupId) ? `${groupId}:${record.candidate.sourceRecordId}` : groupId;
+    ids.add(id);
+    groups.push({
+      sourceRecordId: id,
+      originalRecordIds: members.map(({ candidate }) => candidate.sourceRecordId),
+      legacyGroupIds: members.map(({ time }) => getGroupId(time, source)),
+      recordedAt: new Date(record.time).toISOString(),
+      sourceAppPackage: source,
+      weightKg: members.find(({ candidate }) => candidate.metric === "weight")?.candidate.value,
+      bodyFatPercent: members.find(({ candidate }) => candidate.metric === "bodyFat")?.candidate.value
+    });
+  }
+  return groups.sort((a, b) => Date.parse(b.recordedAt) - Date.parse(a.recordedAt));
 };
 
 const dayFormat = new Intl.DateTimeFormat("en-CA", {

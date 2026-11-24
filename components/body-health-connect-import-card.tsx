@@ -24,6 +24,7 @@ import {
   type BodyHealthConnectMetric
 } from "@/lib/body-health-connect";
 import {
+  deleteBodyMeasurement,
   getBodyMeasurements,
   saveBodyMeasurement
 } from "@/lib/body-measurement-library";
@@ -199,16 +200,27 @@ export function BodyHealthConnectImportCard({
         .map((entry) => [entry.sourceRecordId!, entry]));
       const occupiedPhotoIds = new Set(savedEntries.flatMap((entry) => entry.photoId ? [entry.photoId] : []));
       const projectPhotos = allPhotos.filter((photo) => photo.projectId === projectId);
+      const matchedEntryIds = new Set<string>();
 
       for (const group of groups) {
-        const legacy = group.originalRecordIds.map((id) => savedBySourceId.get(id));
-        const existing = savedBySourceId.get(group.sourceRecordId) ??
-          legacy.find((entry) => entry?.photoId) ?? legacy.find(Boolean);
+        const legacy = [...group.originalRecordIds, ...group.legacyGroupIds]
+          .map((id) => savedBySourceId.get(id))
+          .filter((entry) => entry !== undefined && !matchedEntryIds.has(entry.id));
+        const current = savedBySourceId.get(group.sourceRecordId);
+        const existing = current && !matchedEntryIds.has(current.id) ? current
+          : legacy.find((entry) => entry.photoId) ?? legacy[0];
+        if (existing) matchedEntryIds.add(existing.id);
         const photo = existing?.photoId ? undefined :
           findHealthConnectPhoto(group.recordedAt, projectPhotos, occupiedPhotoIds);
-        if (existing && !photo &&
-            (group.weightKg === undefined || existing.weightKg !== undefined) &&
-            (group.bodyFatPercent === undefined || existing.bodyFatPercent !== undefined)) {
+        const manualFields = existing?.manualFields ?? [];
+        const legacyDuplicates = [...new Set(legacy)].filter((entry) =>
+          entry.id !== existing?.id && !entry.photoId && !entry.manualRecordedAt && !entry.note &&
+          entry.skeletalMuscleKg === undefined && entry.waistCm === undefined &&
+          (entry.weightKg === undefined || entry.weightKg === group.weightKg) &&
+          (entry.bodyFatPercent === undefined || entry.bodyFatPercent === group.bodyFatPercent));
+        if (existing && !photo && !legacyDuplicates.length &&
+            (group.weightKg === undefined || existing.weightKg !== undefined || manualFields.includes("weightKg")) &&
+            (group.bodyFatPercent === undefined || existing.bodyFatPercent !== undefined || manualFields.includes("bodyFatPercent"))) {
           skipped += 1;
           continue;
         }
@@ -219,15 +231,21 @@ export function BodyHealthConnectImportCard({
           photoId: existing?.photoId ?? photo?.id,
           sequence: existing?.sequence ?? photo?.sequence,
           recordedAt: group.recordedAt,
-          weightKg: existing?.weightKg ?? group.weightKg,
-          bodyFatPercent: existing?.bodyFatPercent ?? group.bodyFatPercent,
+          weightKg: manualFields.includes("weightKg") ? existing?.weightKg : existing?.weightKg ?? group.weightKg,
+          bodyFatPercent: manualFields.includes("bodyFatPercent") ? existing?.bodyFatPercent : existing?.bodyFatPercent ?? group.bodyFatPercent,
           skeletalMuscleKg: existing?.skeletalMuscleKg,
           waistCm: existing?.waistCm,
           note: existing?.note,
           source: "health_connect",
           sourceRecordId: group.sourceRecordId,
-          sourceAppPackage: group.sourceAppPackage
+          sourceAppPackage: group.sourceAppPackage,
+          manualFields: existing?.manualFields,
+          manualRecordedAt: existing?.manualRecordedAt
         });
+        for (const duplicate of legacyDuplicates) {
+          await deleteBodyMeasurement(duplicate.id, { projectDeletion: true });
+          matchedEntryIds.add(duplicate.id);
+        }
         if (photo) occupiedPhotoIds.add(photo.id);
         imported += 1;
       }

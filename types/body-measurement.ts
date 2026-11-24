@@ -18,6 +18,12 @@ export type BodyMeasurementSettings = {
   promptAfterCapture: boolean;
 };
 
+export const bodyMeasurementValueFields = [
+  "weightKg", "bodyFatPercent", "skeletalMuscleKg", "waistCm", "note"
+] as const;
+
+export type BodyMeasurementValueField = typeof bodyMeasurementValueFields[number];
+
 export type BodyMeasurementEntry = {
   id: string;
   projectId: string;
@@ -32,6 +38,8 @@ export type BodyMeasurementEntry = {
   source: "manual" | "health_connect";
   sourceRecordId?: string;
   sourceAppPackage?: string;
+  manualFields?: BodyMeasurementValueField[];
+  manualRecordedAt?: string;
 };
 
 export const defaultBodyMeasurementSettings: BodyMeasurementSettings = {

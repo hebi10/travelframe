@@ -1,5 +1,6 @@
 import {
   defaultBodyMeasurementSettings,
+  bodyMeasurementValueFields,
   type BodyMeasurementEntry,
   type BodyMeasurementFields,
   type BodyMeasurementMetric,
@@ -116,6 +117,11 @@ export const normalizeBodyMeasurementEntry = (
       ? record.sourceAppPackage.trim()
       : undefined;
 
+  const manualFields = record.source === "health_connect" && Array.isArray(record.manualFields)
+    ? bodyMeasurementValueFields.filter((field) => (record.manualFields as unknown[]).includes(field))
+    : [];
+  const manualRecordedAt = manualFields.length ? normalizeIsoDate(record.manualRecordedAt) : null;
+
   return {
     id,
     projectId,
@@ -147,7 +153,28 @@ export const normalizeBodyMeasurementEntry = (
     ...(note ? { note } : {}),
     source: record.source === "health_connect" ? "health_connect" : "manual",
     ...(sourceRecordId ? { sourceRecordId } : {}),
-    ...(sourceAppPackage ? { sourceAppPackage } : {})
+    ...(sourceAppPackage ? { sourceAppPackage } : {}),
+    ...(manualRecordedAt ? { manualFields, manualRecordedAt } : {})
+  };
+};
+
+export const getCloudBodyMeasurement = (entry: BodyMeasurementEntry) => {
+  const { sourceAppPackage, sourceRecordId, manualFields, manualRecordedAt, ...local } = entry;
+  if (local.source === "manual") return local;
+  if (!manualFields?.length || !manualRecordedAt) return null;
+  const values = Object.fromEntries(manualFields
+    .filter((field) => entry[field] !== undefined)
+    .map((field) => [field, entry[field]]));
+  if (!Object.keys(values).length) return null;
+
+  return {
+    id: entry.id,
+    projectId: entry.projectId,
+    ...(entry.photoId ? { photoId: entry.photoId } : {}),
+    ...(entry.sequence ? { sequence: entry.sequence } : {}),
+    recordedAt: manualRecordedAt,
+    source: "manual" as const,
+    ...values
   };
 };
 

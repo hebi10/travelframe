@@ -30,6 +30,7 @@ import {
 import { useAppAppearance } from "@/lib/app-appearance";
 import {
   bodyMeasurementMetricMeta,
+  bodyMeasurementValueFields,
   type BodyMeasurementEntry,
   type BodyMeasurementMetric,
   type BodyMeasurementSettings
@@ -205,9 +206,10 @@ export function BodyMeasurementEditorSheet({
       return;
     }
 
+    const currentRecordedAt = onSavePhotoDate ? recordedAt : entry?.recordedAt ?? recordedAt;
     const nextRecordedAt = allowRecordedAtEdit
-      ? parseRecordedDate(recordedDateDraft, onSavePhotoDate ? recordedAt : entry?.recordedAt ?? recordedAt)
-      : recordedAt;
+      ? parseRecordedDate(recordedDateDraft, currentRecordedAt)
+      : currentRecordedAt;
     if (!nextRecordedAt) {
       Alert.alert(
         "날짜를 확인해 주세요.",
@@ -216,9 +218,19 @@ export function BodyMeasurementEditorSheet({
       return;
     }
 
-    const dateChanged = nextRecordedAt !== recordedAt;
-    const hasMeasurement = entry || activeMetrics.some((metric) => parsed[metric] !== undefined) || note.trim();
-    if (!hasMeasurement && !(onSavePhotoDate && dateChanged)) {
+    const dateChanged = nextRecordedAt !== currentRecordedAt;
+    const values = {
+      weightKg: activeMetrics.includes("weight") ? parsed.weight ?? undefined : entry?.weightKg,
+      bodyFatPercent: activeMetrics.includes("bodyFat") ? parsed.bodyFat ?? undefined : entry?.bodyFatPercent,
+      skeletalMuscleKg: activeMetrics.includes("skeletalMuscle") ? parsed.skeletalMuscle ?? undefined : entry?.skeletalMuscleKg,
+      waistCm: activeMetrics.includes("waist") ? parsed.waist ?? undefined : entry?.waistCm,
+      note: note.trim() || undefined
+    };
+    const changedFields = bodyMeasurementValueFields.filter((field) => values[field] !== entry?.[field]);
+    const isImported = entry?.source === "health_connect";
+    const saveMeasurement = changedFields.length > 0 ||
+      Boolean(entry && dateChanged && (!onSavePhotoDate || !isImported));
+    if (!saveMeasurement && !(onSavePhotoDate && dateChanged)) {
       requestClose();
       return;
     }
@@ -226,21 +238,24 @@ export function BodyMeasurementEditorSheet({
     savingRef.current = true;
     setSaving(true);
     try {
-      if (hasMeasurement) {
+      if (saveMeasurement) {
+        const manualFields = isImported
+          ? [...new Set([...(entry.manualFields ?? []), ...changedFields])]
+          : undefined;
         const saved = await saveBodyMeasurement({
           id: entry?.id,
           projectId,
           photoId,
           sequence,
-          recordedAt: entry?.source === "health_connect" && onSavePhotoDate ? entry.recordedAt : nextRecordedAt,
-          weightKg: activeMetrics.includes("weight") ? parsed.weight ?? undefined : entry?.weightKg,
-          bodyFatPercent: activeMetrics.includes("bodyFat") ? parsed.bodyFat ?? undefined : entry?.bodyFatPercent,
-          skeletalMuscleKg: activeMetrics.includes("skeletalMuscle") ? parsed.skeletalMuscle ?? undefined : entry?.skeletalMuscleKg,
-          waistCm: activeMetrics.includes("waist") ? parsed.waist ?? undefined : entry?.waistCm,
-          note,
+          recordedAt: isImported && onSavePhotoDate ? entry.recordedAt : nextRecordedAt,
+          ...values,
           source: entry?.source ?? "manual",
           sourceRecordId: entry?.sourceRecordId,
-          sourceAppPackage: entry?.sourceAppPackage
+          sourceAppPackage: entry?.sourceAppPackage,
+          manualFields,
+          manualRecordedAt: manualFields?.length
+            ? (onSavePhotoDate || dateChanged ? nextRecordedAt : entry?.manualRecordedAt ?? new Date().toISOString())
+            : undefined
         });
         onSaved(saved);
       }

@@ -172,7 +172,7 @@ assert.ok(
 );
 
 assert.ok(
-  cloudBackupSource.includes('entry.source === "health_connect"') &&
+  cloudBackupSource.includes('getCloudBodyMeasurement(entry)') &&
     cloudBackupSource.includes("video.containsLocalHealthData"),
   "Health Connect values and derived overlay videos must stay out of automatic cloud backup"
 );

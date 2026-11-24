@@ -117,6 +117,7 @@ function harness() {
       }
     },
     "@/lib/body-measurement-normalization": {
+      getCloudBodyMeasurement: (entry) => load("lib/body-measurement-normalization.ts").getCloudBodyMeasurement(entry),
       normalizeBodyMeasurementEntry: value => value,
       normalizeBodyMeasurementSettings: value => value
     },
@@ -289,4 +290,22 @@ console.log("ok - project backups restore relationships and replace edited photo
   await h.api.backupProjectPhotoMetadata(user, changed);
   await h.api.backupPhoto({ user, photo: changed, enabled: true });
   assert.equal(h.uploads(), 1, "a metadata update must not upload edited image pixels again");
+}
+
+{
+  const h = harness();
+  h.setMeasurements([{
+    id: "edited-health", projectId: project.id, photoId: photo.id,
+    source: "health_connect", recordedAt: "2026-10-01T01:00:00Z", sourceAppPackage: "health.app",
+    sourceRecordId: "device-record", weightKg: 70, bodyFatPercent: 17, waistCm: 83,
+    manualFields: ["waistCm"], manualRecordedAt: "2026-10-02T03:00:00Z"
+  }]);
+  await h.api.backupCurrentWorkspace({ user, subscription: {} });
+  const backedUp = h.remote.get("users/owner/bodyMeasurements/edited-health");
+  assert.equal(backedUp.source, "manual");
+  assert.equal(backedUp.waistCm, 83);
+  assert.equal(backedUp.recordedAt, "2026-10-02T03:00:00Z");
+  for (const key of ["weightKg", "bodyFatPercent", "sourceAppPackage", "sourceRecordId", "manualFields"]) {
+    assert.equal(Object.hasOwn(backedUp, key), false, key);
+  }
 }

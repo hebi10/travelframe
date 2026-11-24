@@ -202,7 +202,9 @@ export const saveBodyMeasurement = async ({
   note,
   source = "manual",
   sourceRecordId,
-  sourceAppPackage
+  sourceAppPackage,
+  manualFields,
+  manualRecordedAt
 }: Omit<BodyMeasurementEntry, "id"> & { id?: string; source?: BodyMeasurementEntry["source"] }) =>
   runMutation(async () => {
     const entries = await readEntries();
@@ -227,7 +229,9 @@ export const saveBodyMeasurement = async ({
       note,
       source,
       sourceRecordId,
-      sourceAppPackage
+      sourceAppPackage,
+      manualFields,
+      manualRecordedAt
     });
 
     if (!normalized) {
@@ -241,7 +245,7 @@ export const saveBodyMeasurement = async ({
     await writeEntries(nextEntries);
     const tombstones = await readDeletedMeasurementIds();
     if (tombstones.delete(normalized.id)) await writeDeletedMeasurementIds(tombstones);
-    if (normalized.source === "manual") {
+    if (normalized.source === "manual" || normalized.manualRecordedAt) {
       await enqueueProjectCloudSync({ projectId, kind: "measurement", itemId: normalized.id })
         .catch(() => undefined);
     }
