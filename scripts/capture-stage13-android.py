@@ -137,7 +137,7 @@ CASES = [
     ("photo", "사진 상세", f"photo/{F}", ["기록 상세"], None),
     ("photo-measurement", "사진별 수치 입력", f"photo/{F}?measurement=1", ["몸무게", "체지방률", "저장"], None),
     ("edit-login-required", "편집 로그인 안내", f"edit?photoId={F}", ["로그인이 필요합니다", "사진 편집은 무료 로그인부터"], None),
-    ("compare", "전후 사진 비교", f"project/{P}/compare", ["전후 사진 비교", "첫 사진", "마지막 사진"], None),
+    ("compare", "전후 사진 비교", f"project/{P}/compare", ["전후 사진 비교", "이전 · #1", "현재 · #3"], None),
     ("measurements", "전체 수치 기록", f"project/{P}/measurements", ["수치 기록", "QA 데모"], None),
     ("measurement-create", "수치 추가 시트", f"project/{P}/measurements?add=1", ["몸무게", "저장"], None),
     ("video-home", "영상 홈", "trip-clip", ["변화 영상 만들기"], None),

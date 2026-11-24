@@ -112,3 +112,18 @@ test("UI-R05 isolates actual native MP4, cancellation and verified Android scree
   assert.ok(audit.includes("NOT_TESTED") && audit.includes("ffprobe"));
   assert.doesNotMatch(workflow, /\[deploy-closed\]|\[publish-store-shots\]/);
 });
+
+
+test("TF-FINAL-08 comparison capture and required MP4 tool setup preserve actual native QA gates", () => {
+  const stage13 = fs.readFileSync("scripts/capture-stage13-android.py", "utf8");
+  const compare = stage13.split("\n").find(line => line.includes('("compare", "전후 사진 비교"'));
+  assert.ok(compare?.includes('["전후 사진 비교", "이전 · #1", "현재 · #3"]'));
+  assert.ok(!compare.includes('"마지막 사진"'));
+  const independent = workflow.slice(workflow.indexOf("  ui-r05-native-verify:"), workflow.indexOf("  ui-r07-visual-verify:"));
+  assert.ok(independent.includes("timeout 600s"));
+  assert.ok(independent.includes("Acquire::Retries=2"));
+  assert.ok(independent.includes("command -v ffprobe"));
+  assert.ok(independent.includes("scripts/verify_ui_r05_video_qa.py"));
+  assert.ok(independent.includes("inputs.release_qa == true"));
+  assert.ok(workflow.includes('if: github.event_name == \'workflow_dispatch\''));
+});
