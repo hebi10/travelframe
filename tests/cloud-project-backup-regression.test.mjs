@@ -290,6 +290,12 @@ console.log("ok - project backups restore relationships and replace edited photo
   await h.api.backupProjectPhotoMetadata(user, changed);
   await h.api.backupPhoto({ user, photo: changed, enabled: true });
   assert.equal(h.uploads(), 1, "a metadata update must not upload edited image pixels again");
+
+  const workspaceEdit = { ...changed, backupStatus: "pending", updatedAt: "2026-11-23T12:00:00Z" };
+  h.setPhotos([workspaceEdit]);
+  await h.api.backupCurrentWorkspace({ user, subscription: {} });
+  assert.equal(h.photos()[0].backupStatus, "backed_up");
+  assert.equal(h.uploads(), 2, "the workspace backup uploads the new version exactly once");
 }
 
 {
