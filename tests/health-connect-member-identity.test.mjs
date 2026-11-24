@@ -6,7 +6,7 @@ const source = fs.readFileSync("lib/body-health-connect-import.ts", "utf8");
 const { outputText } = ts.transpileModule(source, {
   compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 }
 });
-const { groupBodyHealthConnectMeasurements, resolveHealthConnectMeasurementMatch, getHealthConnectSourceMemberIds } = await import(`data:text/javascript,${encodeURIComponent(outputText)}`);
+const { groupBodyHealthConnectMeasurements, resolveHealthConnectMeasurementMatch, getHealthConnectSourceMemberIds, getHealthConnectReservedEntryIds } = await import(`data:text/javascript,${encodeURIComponent(outputText)}`);
 const timestamp = "2026-11-20T21:00:00.000Z";
 const first = { metric: "weight", value: 70, recordedAt: timestamp, sourceRecordId: "member-A", sourceAppPackage: "scale" };
 const second = { ...first, value: 73, sourceRecordId: "member-B" };
@@ -72,3 +72,24 @@ const separateLegacy = [
 assert.equal(groupBodyHealthConnectMeasurements([first, fat], separateLegacy).length, 2,
   "pre-upgrade independently saved entries must not merge");
 console.log("ok - legacy metric toggles preserve group identity until member migration is complete");
+
+for (const order of [[second, first, sameTimeFat], [first, sameTimeFat, second], [sameTimeFat, second, first]]) {
+  const imported = groupBodyHealthConnectMeasurements(order, [legacyPair]);
+  assert.equal(imported.length, 2);
+  const reserved = getHealthConnectReservedEntryIds(imported);
+  assert.ok(reserved.has(legacyPair.id));
+  const matched = new Set();
+  for (const group of imported) {
+    const { existing, legacy } = resolveHealthConnectMeasurementMatch(group, [legacyPair], matched, reserved);
+    if (group.originalRecordIds.includes("member-B")) {
+      assert.equal(existing, undefined, "new same-time weight must not consume a reserved legacy pair");
+      assert.equal(legacy.length, 0, "reserved legacy record must also be protected from duplicate cleanup");
+    } else {
+      assert.equal(existing?.id, legacyPair.id);
+      assert.deepEqual(getHealthConnectSourceMemberIds(existing, group).sort(), ["member-A", "member-fat"]);
+    }
+    if (existing) matched.add(existing.id);
+  }
+  assert.equal(matched.size, 1);
+}
+console.log("ok - inferred legacy owners are reserved across all groups before timestamp fallback");

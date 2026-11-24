@@ -28,7 +28,8 @@ export const indexHealthConnectMeasurements = (entries: readonly BodyMeasurement
 export const resolveHealthConnectMeasurementMatch = (
   group: Pick<ImportedMeasurement, "sourceRecordId" | "originalRecordIds" | "legacyGroupIds" | "savedEntryId">,
   savedEntries: readonly BodyMeasurementEntry[],
-  matchedEntryIds: ReadonlySet<string>
+  matchedEntryIds: ReadonlySet<string>,
+  reservedEntryIds: ReadonlySet<string> = new Set()
 ) => {
   const memberIds = new Set(group.originalRecordIds);
   const eligible = savedEntries.filter((entry) =>
@@ -39,7 +40,8 @@ export const resolveHealthConnectMeasurementMatch = (
   );
   const fallbackIds = new Set([group.sourceRecordId, ...group.legacyGroupIds, ...group.originalRecordIds]);
   const legacy = eligible.filter((entry) =>
-    !entry.sourceMemberIds?.length && entry.sourceRecordId && fallbackIds.has(entry.sourceRecordId)
+    !entry.sourceMemberIds?.length && entry.sourceRecordId && fallbackIds.has(entry.sourceRecordId) &&
+    (!reservedEntryIds.has(entry.id) || entry.id === group.savedEntryId)
   );
   const existing = members.find((entry) => entry.photoId) ?? members[0] ??
     eligible.find((entry) => entry.id === group.savedEntryId) ??
@@ -56,6 +58,10 @@ const representedMetrics = (entry: Pick<BodyMeasurementEntry, "weightKg" | "body
 
 // A legacy exact-time group has no per-metric identity until all of its
 // represented metrics are available. Keep its legacy alias in that case.
+export const getHealthConnectReservedEntryIds = (
+  groups: readonly Pick<ImportedMeasurement, "savedEntryId">[]
+) => new Set(groups.flatMap((group) => group.savedEntryId ? [group.savedEntryId] : []));
+
 export const getHealthConnectSourceMemberIds = (
   existing: BodyMeasurementEntry | undefined,
   group: Pick<ImportedMeasurement, "originalRecordIds" | "weightKg" | "bodyFatPercent">

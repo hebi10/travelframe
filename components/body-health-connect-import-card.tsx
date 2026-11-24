@@ -29,7 +29,7 @@ import {
   saveBodyMeasurement
 } from "@/lib/body-measurement-library";
 import { getPhotos } from "@/lib/photo-library";
-import { findHealthConnectPhoto, getHealthConnectSourceMemberIds, groupBodyHealthConnectMeasurements, resolveHealthConnectMeasurementMatch } from "@/lib/body-health-connect-import";
+import { findHealthConnectPhoto, getHealthConnectReservedEntryIds, getHealthConnectSourceMemberIds, groupBodyHealthConnectMeasurements, resolveHealthConnectMeasurementMatch } from "@/lib/body-health-connect-import";
 import { useAppAppearance } from "@/lib/app-appearance";
 import {
   bodyMeasurementMetricMeta,
@@ -199,8 +199,10 @@ export function BodyHealthConnectImportCard({
       const projectPhotos = allPhotos.filter((photo) => photo.projectId === projectId);
       const matchedEntryIds = new Set<string>();
 
-      for (const group of groupBodyHealthConnectMeasurements(candidates, savedEntries)) {
-        const { existing, legacy } = resolveHealthConnectMeasurementMatch(group, savedEntries, matchedEntryIds);
+      const importGroups = groupBodyHealthConnectMeasurements(candidates, savedEntries);
+      const reservedEntryIds = getHealthConnectReservedEntryIds(importGroups);
+      for (const group of importGroups) {
+        const { existing, legacy } = resolveHealthConnectMeasurementMatch(group, savedEntries, matchedEntryIds, reservedEntryIds);
         if (existing) matchedEntryIds.add(existing.id);
         const photo = existing?.photoId ? undefined :
           findHealthConnectPhoto(group.recordedAt, projectPhotos, occupiedPhotoIds);
