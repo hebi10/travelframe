@@ -202,7 +202,10 @@ export const saveBodyMeasurement = async ({
   note,
   source = "manual",
   sourceRecordId,
-  sourceAppPackage
+  sourceMemberIds,
+  sourceAppPackage,
+  manualFields,
+  manualRecordedAt
 }: Omit<BodyMeasurementEntry, "id"> & { id?: string; source?: BodyMeasurementEntry["source"] }) =>
   runMutation(async () => {
     const entries = await readEntries();
@@ -227,7 +230,10 @@ export const saveBodyMeasurement = async ({
       note,
       source,
       sourceRecordId,
-      sourceAppPackage
+      sourceMemberIds: sourceMemberIds ?? entries.find((entry) => entry.id === nowId)?.sourceMemberIds,
+      sourceAppPackage,
+      manualFields,
+      manualRecordedAt
     });
 
     if (!normalized) {
@@ -241,7 +247,7 @@ export const saveBodyMeasurement = async ({
     await writeEntries(nextEntries);
     const tombstones = await readDeletedMeasurementIds();
     if (tombstones.delete(normalized.id)) await writeDeletedMeasurementIds(tombstones);
-    if (normalized.source === "manual") {
+    if (normalized.source === "manual" || normalized.manualFields?.length) {
       await enqueueProjectCloudSync({ projectId, kind: "measurement", itemId: normalized.id })
         .catch(() => undefined);
     }
@@ -300,7 +306,7 @@ export const getBodyMeasurementBySourceRecordId = async (
     entries.find(
       (entry) =>
         entry.source === "health_connect" &&
-        entry.sourceRecordId === sourceRecordId
+        (entry.sourceRecordId === sourceRecordId || entry.sourceMemberIds?.includes(sourceRecordId))
     ) ?? null
   );
 };
@@ -331,7 +337,8 @@ export const detachBodyMeasurementsFromPhoto = async (photoId: string) =>
 
     if (changed) {
       await writeEntries(next);
-      for (const entry of entries.filter((item) => item.photoId === photoId && item.source === "manual")) {
+      for (const entry of entries.filter((item) => item.photoId === photoId &&
+        (item.source === "manual" || item.manualFields?.length))) {
         await enqueueProjectCloudSync({ projectId: entry.projectId, kind: "measurement", itemId: entry.id });
       }
     }

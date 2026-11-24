@@ -48,7 +48,7 @@ import {
   getBodyCaptureContextState,
   mergeBodyCaptureContextStatesFromBackup
 } from "@/lib/body-frame-capture-context";
-import { normalizeBodyMeasurementEntry, normalizeBodyMeasurementSettings } from "@/lib/body-measurement-normalization";
+import { getCloudBodyMeasurement, normalizeBodyMeasurementEntry, normalizeBodyMeasurementSettings } from "@/lib/body-measurement-normalization";
 import type { BodyMeasurementEntry, BodyMeasurementSettings } from "@/types/body-measurement";
 import type { BodyCaptureContextState } from "@/types/body-capture-context";
 import { canUploadLinkedProjectWork, isProjectCloudSaveMode, projectWantsCloudBackup } from "@/lib/project-save-policy";
@@ -483,12 +483,18 @@ const backupBodyProjectSupplement = async (
   if (mode !== "settings") {
     const measurements = await getBodyMeasurements(projectId);
     for (const entry of measurements) {
-      if (entry.source === "health_connect" || (measurementId && entry.id !== measurementId)) continue;
+      if (measurementId && entry.id !== measurementId) continue;
+      const backupEntry = getCloudBodyMeasurement(entry, backedUpAt);
+      if (!backupEntry) {
+        if (entry.manualRecordedAt) {
+          await deleteUserBackupItem({ itemType: "measurement", itemId: entry.id, projectId });
+        }
+        continue;
+      }
       await setDoc(
         doc(firestore, "users", userId, "bodyMeasurements", entry.id),
         {
-          ...entry,
-          id: entry.id,
+          ...backupEntry,
           userId,
           schemaVersion: 1,
           backedUpAt

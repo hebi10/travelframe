@@ -335,7 +335,7 @@ export default function PhotoDetailScreen() {
                   날짜
                 </Text>
                 <Text style={[styles.measurementValue, { color: palette.text }]}>
-                  {formatRecordDate(measurementEntry?.recordedAt ?? photo.createdAt)}
+                  {formatRecordDate(photo.createdAt)}
                 </Text>
               </View>
               {(Object.keys(bodyMeasurementMetricMeta) as BodyMeasurementMetric[])

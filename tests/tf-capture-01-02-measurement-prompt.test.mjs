@@ -134,7 +134,7 @@ for (const source of [wrapper, projectList]) {
 }
 assert.match(editor, /title=\{capturePhoto\s*\?\s*"촬영 기록 입력"/);
 assert.ok(editor.includes('cancelLabel={capturePhoto ? "나중에 입력" : "취소"}'));
-assert.ok(editor.includes("if (!hasMeasurement && !(onSavePhotoDate && dateChanged))"));
+assert.ok(editor.includes("if (!saveMeasurement && !(onSavePhotoDate && dateChanged))"));
 assert.ok(editor.includes("savingRef.current = true"));
 assert.ok(editor.includes("setSaveError(error instanceof Error"), "save errors must not discard user input");
 assert.ok(editor.includes('accessibilityLabel="방금 저장한 사진"'));
@@ -157,6 +157,7 @@ const runSubmit = async ({ drafts = { weight: "", bodyFat: "" }, note = "", entr
     savingRef, Error, setSaveError: x => errors.push(x), setSaving: () => {},
     activeMetrics: ["weight", "bodyFat"], drafts, note, entry,
     parseDraft: (metric, value) => value.trim() === "" ? undefined : (Number.isFinite(Number(value)) && Number(value) >= 0 ? Number(value) : null),
+    bodyMeasurementValueFields: ["weightKg", "bodyFatPercent", "skeletalMuscleKg", "waistCm", "note"],
     bodyMeasurementMetricMeta: { weight: { label: "몸무게" }, bodyFat: { label: "체지방률" } },
     Alert: { alert: (...args) => alerts.push(args) }, requestClose: () => close.push("skip"),
     projectId: "new", photoId: "photo-1", sequence: 3, recordedAt: "2026-11-18T02:00:00Z",

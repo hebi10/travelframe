@@ -117,6 +117,7 @@ function harness() {
       }
     },
     "@/lib/body-measurement-normalization": {
+      getCloudBodyMeasurement: (entry, backedUpAt) => load("lib/body-measurement-normalization.ts").getCloudBodyMeasurement(entry, backedUpAt),
       normalizeBodyMeasurementEntry: value => value,
       normalizeBodyMeasurementSettings: value => value
     },
@@ -295,4 +296,67 @@ console.log("ok - project backups restore relationships and replace edited photo
   await h.api.backupCurrentWorkspace({ user, subscription: {} });
   assert.equal(h.photos()[0].backupStatus, "backed_up");
   assert.equal(h.uploads(), 2, "the workspace backup uploads the new version exactly once");
+}
+
+{
+  const h = harness();
+  h.setMeasurements([{
+    id: "edited-health", projectId: project.id, photoId: photo.id,
+    source: "health_connect", recordedAt: "2026-10-01T01:00:00Z", sourceAppPackage: "health.app",
+    sourceRecordId: "device-record", sourceMemberIds: ["weight-record", "fat-record"], weightKg: 70, bodyFatPercent: 17, waistCm: 83,
+    manualFields: ["waistCm"], manualRecordedAt: "2026-10-02T03:00:00Z"
+  }]);
+  await h.api.backupCurrentWorkspace({ user, subscription: {} });
+  const backedUp = h.remote.get("users/owner/bodyMeasurements/edited-health");
+  assert.equal(backedUp.source, "manual");
+  assert.equal(backedUp.waistCm, 83);
+  assert.equal(backedUp.recordedAt, "2026-10-02T03:00:00Z");
+  for (const key of ["weightKg", "bodyFatPercent", "sourceAppPackage", "sourceRecordId", "sourceMemberIds", "manualFields"]) {
+    assert.equal(Object.hasOwn(backedUp, key), false, key);
+  }
+}
+
+{
+  const h = harness();
+  const importedAt = "2026-10-04T02:00:00.000Z";
+  const id = `measurement-${Date.parse(importedAt)}-legacy`;
+  h.setMeasurements([{
+    id, projectId: project.id, source: "health_connect",
+    recordedAt: "2026-09-01T01:00:00Z", sourceAppPackage: "health.app", sourceRecordId: "device-record",
+    weightKg: 70, bodyFatPercent: 17, skeletalMuscleKg: 29, waistCm: 83, note: "직접 입력"
+  }]);
+  await h.api.backupCurrentWorkspace({ user, subscription: {} });
+  const backedUp = h.remote.get(`users/owner/bodyMeasurements/${id}`);
+  assert.equal(backedUp.recordedAt, importedAt);
+  assert.equal(backedUp.skeletalMuscleKg, 29);
+  assert.equal(backedUp.waistCm, 83);
+  assert.equal(backedUp.note, "직접 입력");
+  for (const key of ["weightKg", "bodyFatPercent", "sourceAppPackage", "sourceRecordId", "sourceMemberIds"]) {
+    assert.equal(Object.hasOwn(backedUp, key), false, key);
+  }
+}
+
+{
+  const h = harness();
+  const edited = {
+    id: "edited-detach", projectId: project.id, photoId: photo.id, sequence: 1,
+    recordedAt: photo.createdAt, source: "health_connect", sourceRecordId: "private-source",
+    weightKg: 70, waistCm: 83, manualFields: ["waistCm"], manualRecordedAt: photo.createdAt
+  };
+  h.setMeasurements([edited]);
+  await h.api.backupCurrentWorkspace({ user, subscription: {} });
+  const key = "users/owner/bodyMeasurements/edited-detach";
+  assert.equal(h.remote.get(key).photoId, photo.id);
+  const { photoId: removedPhotoId, ...detached } = edited;
+  h.setMeasurements([detached]);
+  await h.api.backupProjectSupplementIfEnabled({ user, subscription: {}, projectId: project.id, mode: "measurement", measurementId: edited.id });
+  assert.equal(Object.hasOwn(h.remote.get(key), "photoId"), false);
+  assert.equal(h.remote.get(key).waistCm, 83);
+  assert.equal(Object.hasOwn(h.remote.get(key), "weightKg"), false);
+  h.remote.delete("users/owner/photoBackups/" + removedPhotoId);
+  h.emptyLocal();
+  await h.api.restoreCloudBackupToLocal({ user, projectIds: [project.id] });
+  const restored = h.measurements().find(entry => entry.id === edited.id);
+  assert.equal(restored?.photoId, undefined);
+  assert.equal(restored?.waistCm, 83);
 }
