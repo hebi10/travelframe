@@ -249,7 +249,8 @@ export const saveBodyMeasurement = async ({
   });
 
 export const mergeBodyMeasurementsFromBackup = async (
-  incoming: ReadonlyArray<BodyMeasurementEntry>
+  incoming: ReadonlyArray<BodyMeasurementEntry>,
+  restorableIds: ReadonlySet<string> = new Set()
 ) =>
   runMutation(async () => {
     const [current, deletedIds] = await Promise.all([
@@ -269,7 +270,8 @@ export const mergeBodyMeasurementsFromBackup = async (
     const added: BodyMeasurementEntry[] = [];
     for (const value of incoming) {
       const entry = normalizeBodyMeasurementEntry(value);
-      if (!entry || existingIds.has(entry.id) || deletedIds.has(entry.id)) continue;
+      if (!entry || existingIds.has(entry.id) ||
+          (deletedIds.has(entry.id) && !restorableIds.has(entry.id))) continue;
       const link = entry.photoId && entry.source === "manual"
         ? `${entry.projectId}:manual:${entry.photoId}`
         : entry.source === "health_connect" && entry.sourceRecordId
@@ -281,6 +283,11 @@ export const mergeBodyMeasurementsFromBackup = async (
       added.push(entry);
     }
     if (added.length > 0) await writeEntries([...current, ...added]);
+    const deletedCount = deletedIds.size;
+    for (const entry of incoming) {
+      if (restorableIds.has(entry.id) && existingIds.has(entry.id)) deletedIds.delete(entry.id);
+    }
+    if (deletedIds.size !== deletedCount) await writeDeletedMeasurementIds(deletedIds);
     return added;
   });
 

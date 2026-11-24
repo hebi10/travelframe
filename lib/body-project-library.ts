@@ -1,6 +1,6 @@
 import { normalizeReferencePhotoMode } from "@/lib/body-frame-normalization";
 import { localStorageAdapter } from "@/lib/local-storage";
-import { enqueueProjectCloudSync } from "@/lib/project-cloud-sync-queue";
+import { enqueueProjectCloudSync, getProjectCloudSyncTasks } from "@/lib/project-cloud-sync-queue";
 import { sanitizeProjectPathSegment } from "@/lib/body-frame-stage2-utils";
 import type { BodyProject, ProjectSaveMode, ReferencePhotoMode } from "@/types/body-project";
 import { isProjectSaveMode } from "@/lib/project-save-policy";
@@ -270,14 +270,37 @@ export const replaceBodyProjects = async (projects: BodyProject[]) => {
   return getBodyProjects();
 };
 
-export const mergeBodyProjectsFromBackup = async (projects: BodyProject[]) =>
-  runProjectMutation(async () => {
-    const current = await getBodyProjects();
-    const existingIds = new Set([...current.map(project => project.id), ...await getDeletedBodyProjectIds()]);
-    const incoming = projects
-      .map(normalizeBodyProject)
-      .filter((project): project is BodyProject => Boolean(project))
-      .filter(project => !existingIds.has(project.id));
-    await writeProjects([...current, ...incoming]);
-    return getBodyProjects();
-  });
+export const mergeBodyProjectsFromBackup = async <T>(
+  projects: BodyProject[],
+  mergeItems: (projects: BodyProject[], deletedProjectIds: ReadonlySet<string>, restoredProjectIds: ReadonlySet<string>) => Promise<T>,
+  explicitSelection = false,
+  deletingAtStart: ReadonlySet<string> = new Set()
+) => runProjectMutation(async () => {
+  const current = await getBodyProjects();
+  const deletedProjectIds = await getDeletedBodyProjectIds();
+  const restoredProjectIds = new Set<string>();
+  if (explicitSelection) {
+    const queued = await getProjectCloudSyncTasks();
+    const deleting = new Set([...deletingAtStart,
+      ...queued.filter((task) => task.kind === "delete-project").map((task) => task.projectId)
+    ]);
+    if (projects.some((project) => deleting.has(project.id))) {
+      throw new Error("클라우드 삭제가 끝난 뒤 프로젝트를 복원할 수 있습니다.");
+    }
+    for (const project of projects) {
+      if (deletedProjectIds.delete(project.id)) restoredProjectIds.add(project.id);
+    }
+  }
+  const existingIds = new Set([...current.map((project) => project.id), ...deletedProjectIds]);
+  const incoming = projects
+    .map(normalizeBodyProject)
+    .filter((project): project is BodyProject => Boolean(project))
+    .filter((project) => !existingIds.has(project.id));
+  const merged = [...current, ...incoming];
+  await writeProjects(merged);
+  const result = await mergeItems(merged, deletedProjectIds, restoredProjectIds);
+  if (restoredProjectIds.size) {
+    await localStorageAdapter.setItem(DELETED_PROJECT_IDS_KEY, JSON.stringify([...deletedProjectIds]));
+  }
+  return result;
+});

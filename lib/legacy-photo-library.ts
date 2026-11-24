@@ -953,17 +953,25 @@ export const recordPhotoLocalDeletion = (id: string) =>
 
 // Read local state only after earlier mutations have committed. Local edits win;
 // deletion markers prevent a later cloud restore from resurrecting deleted items.
-export const mergePhotosFromBackup = (incoming: PhotoItem[]) =>
+export const mergePhotosFromBackup = (
+  incoming: PhotoItem[],
+  restorableIds: ReadonlySet<string> = new Set()
+) =>
   runPhotoLibraryMutation(async () => {
     const current = await getPhotos();
     const deleted = await getDeletedPhotoIds();
     const ids = new Set(current.map(item => item.id));
     const added = incoming.filter(item => {
-      if (ids.has(item.id) || deleted.has(item.id)) return false;
+      if (ids.has(item.id) || (deleted.has(item.id) && !restorableIds.has(item.id))) return false;
       ids.add(item.id);
       return true;
     });
     if (added.length) await writePhotos([...current, ...added]);
+    const deletedCount = deleted.size;
+    for (const item of incoming) {
+      if (restorableIds.has(item.id) && ids.has(item.id)) deleted.delete(item.id);
+    }
+    if (deleted.size !== deletedCount) await localStorageAdapter.setItem(PHOTO_DELETION_MARKER_KEY, JSON.stringify([...deleted]));
     return added;
   });
 
@@ -972,6 +980,15 @@ export const mergePhotosFromBackup = (incoming: PhotoItem[]) =>
 const isSamePhotoVersion = (current: PhotoItem, expected: PhotoItem) =>
   current.uri === expected.uri &&
   (current.updatedAt ?? current.createdAt) === (expected.updatedAt ?? expected.createdAt);
+
+export const markPhotoVersionBackedUp = (expected: PhotoItem) =>
+  runPhotoLibraryMutation(async () => {
+    const photos = await getPhotos();
+    const current = photos.find((photo) => photo.id === expected.id);
+    if (!current || current.backupStatus !== "pending" || !isSamePhotoVersion(current, expected)) return;
+    const updated: PhotoItem = { ...current, backupStatus: "backed_up" };
+    await writePhotos(photos.map((photo) => photo.id === current.id ? updated : photo));
+  });
 
 export const updatePhotoMetadata = (id: string, updates: Partial<PhotoItem>, expectedDraft?: PhotoItem) =>
   runPhotoLibraryMutation(async () => {

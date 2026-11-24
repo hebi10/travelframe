@@ -526,15 +526,32 @@ const deleteBackupProjectCloudData = async ({ uid, projectId }) => {
   const videos = videoSnapshot.docs.filter((item) => belongsToProject(item.data()));
   const imageWorks = imageWorkSnapshot.docs.filter((item) => belongsToProject(item.data()));
   const backupDocs = [...photoSnapshot.docs, ...videos, ...imageWorks];
-  const storagePaths = [
-    ...backupDocs.flatMap((item) => {
+  const itemStoragePaths = new Set(backupDocs.flatMap((item) => {
       const data = item.data();
       return [
         data.storagePath,
         data.previewStoragePath,
         ...(Array.isArray(data.storagePaths) ? data.storagePaths : [])
       ].filter(Boolean);
-    }),
+    }));
+  const referencedIds = new Set(backupDocs.flatMap((item) => {
+    const data = item.data();
+    return [data.backupSessionId, ...(Array.isArray(data.backupSessionIds) ? data.backupSessionIds : [])]
+      .filter((id) => typeof id === "string" && id && !id.includes("/") && id !== "." && id !== "..");
+  }));
+  for (const session of sessionSnapshot.docs) referencedIds.delete(session.id);
+  const legacySessions = [];
+  const referencedRefs = [...referencedIds].map((id) => getSessionRef(uid, id));
+  for (let index = 0; index < referencedRefs.length; index += 450) {
+    const snapshots = await db.getAll(...referencedRefs.slice(index, index + 450));
+    legacySessions.push(...snapshots.filter((snapshot) => {
+      const session = snapshot.data();
+      return session && session.projectId == null && session.status === "completed" &&
+        itemStoragePaths.has(session.storagePath);
+    }));
+  }
+  const storagePaths = [
+    ...itemStoragePaths,
     ...sessionSnapshot.docs.map((item) => item.data().storagePath).filter(Boolean),
     ...adminSessionSnapshot.docs.map((item) => item.data().storagePath).filter(Boolean)
   ];
@@ -548,9 +565,11 @@ const deleteBackupProjectCloudData = async ({ uid, projectId }) => {
   );
 
   const refs = [
-    ...backupDocs.map((item) => item.ref),
+    // Keep backup documents available to rediscover legacy refs if a batch needs a retry.
+    ...legacySessions.map((item) => item.ref),
     ...sessionSnapshot.docs.map((item) => item.ref),
     ...adminSessionSnapshot.docs.map((item) => item.ref),
+    ...backupDocs.map((item) => item.ref),
     ...measurementSnapshot.docs.map((item) => item.ref),
     userRef.collection("bodyProjectSettings").doc(projectId),
     userRef.collection("bodyProjects").doc(projectId)
@@ -3115,12 +3134,13 @@ const deleteBackupItemForUser = async ({ uid, itemType, itemId, projectId }) => 
   const itemRef = getBackupItemRef({ uid, itemType, itemId });
   const snapshot = await itemRef.get();
   if (!snapshot.exists) {
+    if (projectId !== undefined) return { deleted: false };
     throw new HttpsError("not-found", "Backup item was not found.");
   }
 
   const data = snapshot.data();
   if (projectId !== undefined && data.projectId !== projectId) {
-    throw new HttpsError("not-found", "Backup item was not found in this project.");
+    return { deleted: false };
   }
   if (itemType === "measurement") {
     await itemRef.delete();

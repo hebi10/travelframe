@@ -148,7 +148,7 @@ for (const fragment of [
   'doc(firestore, "users", userId, "bodyProjectSettings", projectId)',
   'getDocs(collection(firestore, "users", user.uid, "bodyMeasurements"))',
   'getDocs(collection(firestore, "users", user.uid, "bodyProjectSettings"))',
-  "mergeBodyMeasurementsFromBackup(remoteMeasurements)",
+  "mergeBodyMeasurementsFromBackup(",
   "selectCloudProjectRestoreItems({",
   "restoredProjectIds.has(entry.projectId)",
   "mergeBodyCaptureContextStatesFromBackup"

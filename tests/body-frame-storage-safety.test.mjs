@@ -97,7 +97,7 @@ function cloudFixture(f, hooks = {}) {
     "@/lib/local-library-owner": { assertLocalLibraryOwner: async () => {} },
     "@/lib/cloud-backup-project-slots": { getSelectedCloudBackupProjectIds: async () => new Set(["pr"]) },
     "@/lib/plan-entitlements": { getPlanEntitlements: () => ({ maxCloudBackupProjects: 1 }), getPlanTier: () => "pro" },
-    "@/lib/body-project-library": { getBodyProjects: async () => [], getBodyProjectById: async () => null, getDeletedBodyProjectIds: async () => new Set(), mergeBodyProjectsFromBackup: hooks.mergeProjects ?? (async () => {}) },
+    "@/lib/body-project-library": { getBodyProjects: async () => [], getBodyProjectById: async () => null, getDeletedBodyProjectIds: async () => new Set(), mergeBodyProjectsFromBackup: async (values, mergeItems) => { await hooks.mergeProjects?.(values); return mergeItems([], new Set(), new Set()); } },
     "@/lib/project-save-policy": load("lib/project-save-policy.ts", {}),
     "@/lib/work-library": load("lib/work-library.ts", f.dependencies),
     "@/lib/video-library": load("lib/video-library.ts", f.dependencies),

@@ -33,7 +33,7 @@ import {
   getSelectedCloudBackupProjectIds
 } from "@/lib/cloud-backup-project-slots";
 import { firebaseAuth, firebaseFunctions, firestore, firebaseStorage } from "@/lib/firebase";
-import { getBodyProjectById, getBodyProjects, getDeletedBodyProjectIds, mergeBodyProjectsFromBackup } from "@/lib/body-project-library";
+import { getBodyProjectById, getBodyProjects, mergeBodyProjectsFromBackup } from "@/lib/body-project-library";
 import {
   getBodyMeasurements,
   getBodyMeasurementSettings,
@@ -54,6 +54,7 @@ import type { BodyCaptureContextState } from "@/types/body-capture-context";
 import { canUploadLinkedProjectWork, isProjectCloudSaveMode, projectWantsCloudBackup } from "@/lib/project-save-policy";
 import { normalizeBodyFrameVideoOptions } from "@/lib/body-frame-video";
 import { isPhotoBackupCurrent, recoverMissingBodyProjects } from "@/lib/body-project-backup";
+import { getProjectCloudSyncTasks, type ProjectCloudSyncTask } from "@/lib/project-cloud-sync-queue";
 import { selectCloudProjectRestoreItems } from "@/lib/project-restore-selection";
 import type { BodyProject } from "@/types/body-project";
 import {
@@ -67,6 +68,7 @@ import { getPlanEntitlements, getPlanTier } from "@/lib/plan-entitlements";
 import {
   getPhotos,
   markPhotoCloudOnly,
+  markPhotoVersionBackedUp,
   mergePhotosFromBackup,
   wasPhotoDeletedLocally
 } from "@/lib/photo-library";
@@ -380,9 +382,7 @@ export const deleteProjectBackupItem = async ({
 }) => {
   await assertLocalLibraryOwner(user.uid);
   if (firebaseAuth?.currentUser?.uid !== user.uid) throw new Error("백업 계정이 변경되었습니다.");
-  await deleteUserBackupItem({ projectId, itemType, itemId }).catch((error: unknown) => {
-    if ((error as { code?: string } | null)?.code !== "functions/not-found") throw error;
-  });
+  await deleteUserBackupItem({ projectId, itemType, itemId });
 };
 
 const serializeVideoForBackup = (video: MadeVideoItem) =>
@@ -1061,6 +1061,7 @@ export const backupCurrentWorkspace = async ({
       continue;
     }
     if (isPhotoBackupCurrent(photo, existingPhotoBackups.get(photo.id))) {
+      if (photo.backupStatus === "pending") await markPhotoVersionBackedUp(photo);
       continue;
     }
     backupablePhotoBackups.push(photo);
@@ -1268,6 +1269,7 @@ export const backupCurrentWorkspace = async ({
       continue;
     }
 
+    if (photo.backupStatus === "pending") await markPhotoVersionBackedUp(photo);
     await applyStorageSaverPolicy({
       settings,
       photo,
@@ -1583,6 +1585,7 @@ export const backupPhoto = async ({
 
   if (photo.projectId) await backupBodyProjects(user.uid, photo.projectId);
   if (existingSnapshot.exists() && isPhotoBackupCurrent(photo, existingData)) {
+    if (photo.backupStatus === "pending") await markPhotoVersionBackedUp(photo);
     return existingData;
   }
 
@@ -1684,6 +1687,7 @@ export const backupPhoto = async ({
     return null;
   }
 
+  if (photo.backupStatus === "pending") await markPhotoVersionBackedUp(photo);
   await refreshBackupOverview(user.uid, backedUpAt);
   await applyStorageSaverPolicy({
     settings,
@@ -2278,6 +2282,10 @@ export const restoreCloudBackupToLocal = async ({
     throw new Error("Firebase 연결 정보가 아직 설정되지 않았습니다.");
   }
 
+  const pendingBeforeRestore = projectIds ? await getProjectCloudSyncTasks() : [];
+  const deletingAtStart = new Set(pendingBeforeRestore
+    .filter((task) => task.kind === "delete-project").map((task) => task.projectId));
+
   const [
     photoSnapshot, imageWorkSnapshot, videoSnapshot, projectSnapshot,
     measurementSnapshot, projectSettingsSnapshot
@@ -2325,55 +2333,81 @@ export const restoreCloudBackupToLocal = async ({
     })
   });
 
-  // Each library merges the latest local state; project selection never overwrites
-  // another project's photos, measurements, videos or preferences.
-  await mergeBodyProjectsFromBackup(selected.projects);
-  const deletedProjectIds = await getDeletedBodyProjectIds();
-  const deletedProjectPhotoIds = new Set(selected.photos
-    .filter((photo) => photo.projectId && deletedProjectIds.has(photo.projectId))
-    .map((photo) => photo.id));
-  const [missingPhotos, missingImageWorks, missingVideos] = await Promise.all([
-    mergePhotosFromBackup(selected.photos.filter((photo) => !deletedProjectPhotoIds.has(photo.id))),
-    mergeImageBundleWorksFromBackup(selected.imageWorks.filter((work) =>
-      !work.photoIds.some((id) => deletedProjectPhotoIds.has(id)))),
-    mergeMadeVideosFromBackup(selected.videos.filter((video) =>
-      (!video.projectId || !deletedProjectIds.has(video.projectId)) &&
-      !video.photoIds.some((id) => deletedProjectPhotoIds.has(id))))
-  ]);
+  const counts = await mergeBodyProjectsFromBackup(selected.projects, async (
+    projects, deletedProjectIds, explicitlyRestoredIds
+  ) => {
+    const pending = explicitlyRestoredIds.size
+      ? [...pendingBeforeRestore, ...await getProjectCloudSyncTasks()]
+      : [];
+    const canRestore = (kind: ProjectCloudSyncTask["kind"], id: string) =>
+      !pending.some((task) => task.kind === kind && task.itemId === id);
+    const deletedProjectPhotoIds = new Set(selected.photos
+      .filter((photo) => photo.projectId && deletedProjectIds.has(photo.projectId))
+      .map((photo) => photo.id));
+    const explicitlyRestoredPhotoIds = new Set(selected.photos
+      .filter((photo) => photo.projectId && explicitlyRestoredIds.has(photo.projectId))
+      .map((photo) => photo.id));
+    const fromRestoredPhotos = (photoIds: string[]) =>
+      photoIds.length > 0 && photoIds.every((id) => explicitlyRestoredPhotoIds.has(id));
+    const [missingPhotos, missingImageWorks, missingVideos] = await Promise.all([
+      mergePhotosFromBackup(
+        selected.photos.filter((photo) => !deletedProjectPhotoIds.has(photo.id)),
+        new Set([...explicitlyRestoredPhotoIds].filter((id) => canRestore("delete-photo", id)))
+      ),
+      mergeImageBundleWorksFromBackup(
+        selected.imageWorks.filter((work) => !work.photoIds.some((id) => deletedProjectPhotoIds.has(id))),
+        new Set(selected.imageWorks.filter((work) => fromRestoredPhotos(work.photoIds)).map((work) => work.id))
+      ),
+      mergeMadeVideosFromBackup(
+        selected.videos.filter((video) => (!video.projectId || !deletedProjectIds.has(video.projectId)) &&
+          !video.photoIds.some((id) => deletedProjectPhotoIds.has(id))),
+        new Set(selected.videos
+          .filter((video) => canRestore("delete-video", video.id) &&
+            (video.projectId ? explicitlyRestoredIds.has(video.projectId) : fromRestoredPhotos(video.photoIds)))
+          .map((video) => video.id))
+      )
+    ]);
 
-  const restoredProjectIds = new Set((await getBodyProjects()).map((project) => project.id));
-  const remoteMeasurements = selected.measurements.filter((entry) =>
-    restoredProjectIds.has(entry.projectId)
-  );
-  const remoteProjectSettings = selected.settings.filter((entry) =>
-    restoredProjectIds.has(entry.projectId)
-  );
-  await mergeBodyMeasurementsFromBackup(remoteMeasurements);
-  await Promise.all([
-    mergeBodyMeasurementSettingsFromBackup(
-      remoteProjectSettings.map((item) => ({
-        projectId: item.projectId,
-        settings: normalizeBodyMeasurementSettings(item.measurementSettings) as BodyMeasurementSettings
-      }))
-    ),
-    mergeBodyPoseAlignmentSettingsFromBackup(
-      remoteProjectSettings.map((item) => ({
-        projectId: item.projectId,
-        enabled: item.poseAlignmentEnabled === true
-      }))
-    ),
-    mergeBodyCaptureContextStatesFromBackup(
-      remoteProjectSettings.map((item) => ({
-        projectId: item.projectId,
-        state: item.captureContextState as BodyCaptureContextState
-      }))
-    )
-  ]);
+    const restoredProjectIds = new Set(projects
+      .filter((project) => !deletedProjectIds.has(project.id)).map((project) => project.id));
+    const remoteMeasurements = selected.measurements.filter((entry) => restoredProjectIds.has(entry.projectId));
+    const remoteProjectSettings = selected.settings.filter((entry) => restoredProjectIds.has(entry.projectId));
+    await mergeBodyMeasurementsFromBackup(
+      remoteMeasurements,
+      new Set(remoteMeasurements.filter((entry) =>
+        explicitlyRestoredIds.has(entry.projectId) && canRestore("delete-measurement", entry.id)
+      ).map((entry) => entry.id))
+    );
+    await Promise.all([
+      mergeBodyMeasurementSettingsFromBackup(
+        remoteProjectSettings.map((item) => ({
+          projectId: item.projectId,
+          settings: normalizeBodyMeasurementSettings(item.measurementSettings) as BodyMeasurementSettings
+        }))
+      ),
+      mergeBodyPoseAlignmentSettingsFromBackup(
+        remoteProjectSettings.map((item) => ({
+          projectId: item.projectId,
+          enabled: item.poseAlignmentEnabled === true
+        }))
+      ),
+      mergeBodyCaptureContextStatesFromBackup(
+        remoteProjectSettings.map((item) => ({
+          projectId: item.projectId,
+          state: item.captureContextState as BodyCaptureContextState
+        }))
+      )
+    ]);
+
+    return {
+      photoCount: missingPhotos.length,
+      imageBundleCount: missingImageWorks.length,
+      videoCount: missingVideos.length
+    };
+  }, projectIds !== undefined, deletingAtStart);
 
   return {
-    photoCount: missingPhotos.length,
-    imageBundleCount: missingImageWorks.length,
-    videoCount: missingVideos.length,
+    ...counts,
     imageBackupBytes: await getCurrentImageBackupSize({ userId: user.uid }),
     deleteAfter: null
   };
