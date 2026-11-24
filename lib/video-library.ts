@@ -478,16 +478,24 @@ export const recordVideoLocalDeletion = (id: string) =>
 
 // Read local state only after earlier mutations have committed. Local edits win;
 // deletion markers prevent a later cloud restore from resurrecting deleted items.
-export const mergeMadeVideosFromBackup = (incoming: MadeVideoItem[]) =>
+export const mergeMadeVideosFromBackup = (
+  incoming: MadeVideoItem[],
+  restorableIds: ReadonlySet<string> = new Set()
+) =>
   runVideoMutation(async () => {
     const current = await getMadeVideos();
     const deleted = await getDeletedVideoIds();
     const ids = new Set(current.map(item => item.id));
     const added = incoming.filter(item => {
-      if (ids.has(item.id) || deleted.has(item.id)) return false;
+      if (ids.has(item.id) || (deleted.has(item.id) && !restorableIds.has(item.id))) return false;
       ids.add(item.id);
       return true;
     });
     if (added.length) await writeVideos([...current, ...added]);
+    const deletedCount = deleted.size;
+    for (const item of incoming) {
+      if (restorableIds.has(item.id) && ids.has(item.id)) deleted.delete(item.id);
+    }
+    if (deleted.size !== deletedCount) await localStorageAdapter.setItem(VIDEO_DELETION_MARKER_KEY, JSON.stringify([...deleted]));
     return added;
   });

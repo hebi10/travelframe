@@ -12,6 +12,9 @@ function harness() {
   let owner = user.uid;
   const remote = new Map();
   let localPhotos = [photo];
+  const deletedProjects = new Set();
+  const deletedPhotos = new Set();
+  const queued = [];
   let localProjects = [project];
   let localWorks = [];
   const sampleMeasurement = {
@@ -76,8 +79,29 @@ function harness() {
     "@/lib/cloud-backup-project-slots": {
       getSelectedCloudBackupProjectIds: async () => new Set([project.id])
     },
-    "@/lib/photo-library": { getPhotos: async () => localPhotos, getDeletedPhotoIds: async () => new Set(), wasPhotoDeletedLocally: async () => false, mergePhotosFromBackup: async values => { const added = values.filter(value => !localPhotos.some(item => item.id === value.id)); localPhotos = [...localPhotos, ...added]; return added; } },
-    "@/lib/body-project-library": { getBodyProjects: async () => localProjects, getBodyProjectById: async id => localProjects.find(p=>p.id===id), getDeletedBodyProjectIds: async () => new Set(), mergeBodyProjectsFromBackup: async values => { localProjects = [...localProjects, ...values.filter(p=>!localProjects.some(x=>x.id===p.id))]; }, replaceBodyProjects: async values => { localProjects = values; } },
+    "@/lib/photo-library": {
+      getPhotos: async () => localPhotos,
+      getDeletedPhotoIds: async () => deletedPhotos,
+      wasPhotoDeletedLocally: async (id) => deletedPhotos.has(id),
+      markPhotoVersionBackedUp: async (expected) => {
+        localPhotos = localPhotos.map((item) => item.id === expected.id && item.updatedAt === expected.updatedAt
+          ? { ...item, backupStatus: "backed_up" } : item);
+      },
+      mergePhotosFromBackup: async (values, restorable) => {
+        const added = values.filter((value) => !localPhotos.some((item) => item.id === value.id) &&
+          (!deletedPhotos.has(value.id) || restorable.has(value.id)));
+        localPhotos = [...localPhotos, ...added];
+        return added;
+      }
+    },
+    "@/lib/project-cloud-sync-queue": { getProjectCloudSyncTasks: async () => queued },
+    "@/lib/body-project-library": { getBodyProjects: async () => localProjects, getBodyProjectById: async id => localProjects.find(p=>p.id===id), getDeletedBodyProjectIds: async () => new Set(), mergeBodyProjectsFromBackup: async (values, mergeItems, explicit, deletingAtStart) => {
+      if (explicit && values.some((value) => deletingAtStart.has(value.id))) throw new Error("pending cloud deletion");
+      const restoring = new Set(values.filter((value) => explicit && deletedProjects.has(value.id)).map((value) => value.id));
+      const remaining = new Set([...deletedProjects].filter((id) => !restoring.has(id)));
+      localProjects = [...localProjects, ...values.filter((value) => !remaining.has(value.id) && !localProjects.some((item) => item.id === value.id))];
+      return mergeItems(localProjects, remaining, restoring);
+    }, replaceBodyProjects: async values => { localProjects = values; } },
     "@/lib/body-measurement-library": {
       getBodyMeasurements: async id => localMeasurements.filter(item => !id || item.projectId === id),
       getBodyMeasurementSettings: async id => localMeasurementSettings[id] ?? sampleMeasurementSettings,
@@ -131,6 +155,9 @@ function harness() {
     api: load("lib/cloud-backup.ts"),
     remote, released, uploads: () => uploads,
     projects: () => localProjects,
+    photos: () => localPhotos,
+    setPhotos: (values) => { localPhotos = values; },
+    deletedProjects, deletedPhotos, queued,
     measurements: () => localMeasurements,
     measurementSettings: () => localMeasurementSettings,
     captureContext: () => localCapture,
@@ -236,4 +263,30 @@ console.log("ok - project backups restore relationships and replace edited photo
   await h.api.backupImageBundleWork({user,work,enabled:true});
   assert.ok(h.released.includes("old-work-session"));
   assert.equal(h.remote.get("users/owner/imageWorks/work-a").backupSessionIds[0],"session-1");
+}
+
+{
+  const h = harness();
+  await h.api.backupPhoto({ user, photo, enabled: true });
+  h.emptyLocal();
+  h.deletedProjects.add(project.id);
+  h.deletedPhotos.add(photo.id);
+  assert.equal((await h.api.restoreCloudBackupToLocal({ user })).photoCount, 0);
+  h.queued.push({ projectId: project.id, kind: "delete-project" });
+  await assert.rejects(h.api.restoreCloudBackupToLocal({ user, projectIds: [project.id] }), /pending cloud deletion/);
+  h.queued.pop();
+  assert.equal((await h.api.restoreCloudBackupToLocal({ user, projectIds: [project.id] })).photoCount, 1);
+  assert.equal(h.photos()[0].id, photo.id);
+}
+
+{
+  const h = harness();
+  const edited = { ...photo, backupStatus: "pending", updatedAt: "2026-11-21T12:00:00Z" };
+  h.setPhotos([edited]);
+  await h.api.backupPhoto({ user, photo: edited, enabled: true });
+  assert.equal(h.photos()[0].backupStatus, "backed_up");
+  const changed = { ...h.photos()[0], sequence: 2, updatedAt: "2026-11-22T12:00:00Z" };
+  await h.api.backupProjectPhotoMetadata(user, changed);
+  await h.api.backupPhoto({ user, photo: changed, enabled: true });
+  assert.equal(h.uploads(), 1, "a metadata update must not upload edited image pixels again");
 }
