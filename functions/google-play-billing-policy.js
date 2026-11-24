@@ -135,10 +135,13 @@ const getEffectiveSubscription = (subscriptions, now = Date.now()) => {
   return expert ?? plus ?? creator ?? adRemove ?? null;
 };
 
-const shouldUpdateSubscriptionForPurchase = ({ purchase, existingProduct, tokenHash, active, source }) => {
+const shouldUpdateSubscriptionForPurchase = ({ purchase, existingProduct, tokenHash, active, source, linkedHash }) => {
   if (purchase?.supersededBy) return false;
   const currentToken = existingProduct?.googlePurchaseTokenHash;
-  if (currentToken && currentToken !== tokenHash && (!active || source === "rtdn")) return false;
+  if (currentToken && currentToken !== tokenHash) {
+    if (!active) return false;
+    if (source === "rtdn" && !canExpireLinkedSubscription({ existingProduct, linkedHash })) return false;
+  }
   return true;
 };
 

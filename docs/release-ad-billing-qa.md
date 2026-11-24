@@ -61,3 +61,10 @@ AdMob 앱 승인·스토어 연결·app-ads.txt·개인정보 메시지, Google 
 - Google Play 구독 변경: https://developer.android.com/google/play/billing/subscriptions
 - Google UMP 동의·개인정보 옵션: https://developers.google.com/admob/android/privacy
 - React Native Google Mobile Ads 동의: https://docs.page/invertase/react-native-google-mobile-ads/european-user-consent
+
+
+## TF-FINAL-04 — 교체 대기·RTDN·이전 토큰 회귀 검증 (2026-11-24)
+
+최신 main bcb8b73e에서 구독 교체가 대기 중이거나 취소된 경우에도 이전 토큰을 superseded 처리하던 조건을 수정한다. 실제 활성화 및 트랜잭션 권한 반영이 확인된 경우만 이전 토큰을 교체한다. 동일 상품의 활성 후속 토큰은 확인된 연결 토큰이 현행 권한과 일치하는 경우 RTDN으로 처리하며, 이전 토큰의 지연 결과는 활성 복원 응답 및 서버 캐시로 사용하지 않는다.
+
+새 테스트는 실제 Functions 결제 서비스·검증 게이트·트랜잭션 로직을 실행하고 Publisher API와 Firestore만 격리된 대역을 사용한다. 대기→활성, 동일 상품 교체, 연쇄 교체의 지연 RTDN, 타 계정 연결 차단, 대기 취소, 광고 제거 권한 유지 사례를 검증한다. 실제 상품 결제·환불·Publisher API/RTDN 운영 연동 성공 증거는 아니다. 가격·슬롯·광고 제거 기존 정책·운영 Firebase/Play 변경 없음.

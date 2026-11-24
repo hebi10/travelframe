@@ -14,3 +14,16 @@ assert.equal(shouldUpdateSubscriptionForPurchase({ purchase: {}, existingProduct
 assert.equal(shouldUpdateSubscriptionForPurchase({ purchase: {}, existingProduct: null, tokenHash: 'new', active: true }), true);
 assert.equal(shouldUpdateSubscriptionForPurchase({ purchase: {}, existingProduct: { googlePurchaseTokenHash: 'new' }, tokenHash: 'old', active: true, source: 'rtdn' }), false);
 console.log('ok - obsolete purchase tokens cannot revoke the current subscription');
+
+assert.equal(shouldUpdateSubscriptionForPurchase({
+  purchase: {}, existingProduct: { provider: "google_play", googlePurchaseTokenHash: "old" },
+  tokenHash: "new", linkedHash: "old", active: true, source: "rtdn"
+}), true, "an active same-product successor can complete a pending replacement through RTDN");
+assert.equal(shouldUpdateSubscriptionForPurchase({
+  purchase: {}, existingProduct: { provider: "google_play", googlePurchaseTokenHash: "other" },
+  tokenHash: "new", linkedHash: "old", active: true, source: "rtdn"
+}), false);
+assert.equal(shouldUpdateSubscriptionForPurchase({
+  purchase: {}, existingProduct: { provider: "google_play", googlePurchaseTokenHash: "old" },
+  tokenHash: "new", linkedHash: "old", active: false, source: "rtdn"
+}), false);
