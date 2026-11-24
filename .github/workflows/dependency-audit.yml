@@ -18,6 +18,7 @@ on:
       - "tests/body-frame-stage15-release-readiness.test.mjs"
       - "docs/design/body-frame-stage15-release-readiness-20261106.md"
       - "docs/body-frame-release-checklist.md"
+      - "docs/release/tf-final-01-07-20261124.md"
       - ".github/workflows/android-play-aab.yml"
       - ".github/workflows/body-frame-play-preflight.yml"
 

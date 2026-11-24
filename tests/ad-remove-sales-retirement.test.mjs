@@ -76,16 +76,20 @@ const calls = [];
 const legacyPurchase = { productId: "ad_remove", purchaseToken: "legacy-purchase-token" };
 const verify = load("processVerifiedPurchase", {
   isGooglePlayProductId,
+  user: { uid: "legacy-buyer" },
+  assertBillingAccount: () => {},
   purchaseTokenFrom: item => item.purchaseToken,
   verifyGooglePlayPurchase: async request => {
     calls.push(["verify", request.productId, request.purchaseToken]);
-    return { verified: true, active: true, status: "active" };
+    return { verified: true, active: true, status: "active", productId: request.productId };
   },
   finishTransactionRef: { current: async request => calls.push(["finish", request.isConsumable]) },
   refreshUser: async () => calls.push(["refresh"])
 });
 const restore = load("restorePurchases", {
   Platform: { OS: "android" }, user: { uid: "legacy-buyer" }, connected: true,
+  pendingPurchaseRef: { current: null }, billingOperationRef: { current: false },
+  assertBillingAccount: () => {},
   setIsRestoring: () => {}, setBillingMessage: () => {},
   getAvailablePurchases: async () => [legacyPurchase],
   isGooglePlayProductId,

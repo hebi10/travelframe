@@ -1,7 +1,13 @@
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
-const { shouldUpdateSubscriptionForPurchase } = require('../functions/google-play-billing-policy.js');
+const { shouldUpdateSubscriptionForPurchase, canUseLinkedPurchase, canExpireLinkedSubscription } = require('../functions/google-play-billing-policy.js');
+assert.equal(canUseLinkedPurchase({ linkedPurchase: { uid: 'alice' }, uid: 'bob' }), false);
+assert.equal(canUseLinkedPurchase({ linkedPurchase: { uid: 'alice' }, uid: 'alice' }), true);
+assert.equal(canUseLinkedPurchase({ linkedPurchase: undefined, uid: 'alice' }), true);
+assert.equal(canExpireLinkedSubscription({ existingProduct: { provider: 'google_play', googlePurchaseTokenHash: 'new' }, linkedHash: 'old' }), false);
+assert.equal(canExpireLinkedSubscription({ existingProduct: { provider: 'google_play', googlePurchaseTokenHash: 'old' }, linkedHash: 'old' }), true);
+assert.equal(canExpireLinkedSubscription({ existingProduct: { provider: 'admin', googlePurchaseTokenHash: 'old' }, linkedHash: 'old' }), false);
 assert.equal(shouldUpdateSubscriptionForPurchase({ purchase: { supersededBy: 'new' }, existingProduct: { googlePurchaseTokenHash: 'new' }, tokenHash: 'old', active: false }), false);
 assert.equal(shouldUpdateSubscriptionForPurchase({ purchase: {}, existingProduct: { googlePurchaseTokenHash: 'new' }, tokenHash: 'old', active: false }), false);
 assert.equal(shouldUpdateSubscriptionForPurchase({ purchase: {}, existingProduct: { googlePurchaseTokenHash: 'same' }, tokenHash: 'same', active: false }), true);
