@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { patchViewRecorderAndroidCallbacks } from "./patch-view-recorder.mjs";
+import { patchUriDecoder } from "./patch-uri-decoder.mjs";
 
 const root = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const reactNativeVisionCameraRoot = path.join(
@@ -206,6 +207,23 @@ function patchViewRecorderAndroidStopRace() {
   console.info("applied local ViewRecorder Android callback stop-race patch");
 }
 
+function patchCommonJsUriDecoder() {
+  const packageRoot = path.join(root, "node_modules", "decode-uri-component");
+  const installed = JSON.parse(readFrom(packageRoot, "package.json"));
+  const lock = JSON.parse(fs.readFileSync(path.join(root, "package-lock.json"), "utf8"));
+  const locations = Object.keys(lock.packages ?? {}).filter(
+    (name) => /(^|\/)node_modules\/decode-uri-component$/.test(name)
+  );
+  if (installed.name !== "decode-uri-component" || locations.length !== 1 ||
+      locations[0] !== "node_modules/decode-uri-component" ||
+      lock.packages[locations[0]].version !== installed.version) {
+    throw new Error("URI decoder patch requires the reviewed single lockfile location");
+  }
+  writeTo(packageRoot, "index.js", patchUriDecoder(readFrom(packageRoot, "index.js"), installed.version));
+  console.info("applied reviewed CommonJS URI decoder security backport");
+}
+
+patchCommonJsUriDecoder();
 patchVisionCameraAndroidShutterSound();
 patchReactNativeGradleFoojayResolver();
 patchGoogleMobileAdsExpoConfig();
