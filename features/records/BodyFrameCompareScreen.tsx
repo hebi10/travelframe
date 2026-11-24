@@ -1,7 +1,7 @@
 import * as FileSystem from "expo-file-system/legacy";
 import { Feather } from "@expo/vector-icons";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   FlatList,
   Modal,
@@ -33,7 +33,19 @@ import { useAppAppearance } from "@/lib/app-appearance";
 import type { PhotoItem } from "@/types/photo";
 
 const COMPARISON_EXPORT_WIDTH = 360;
-const COMPARISON_EXPORT_HEIGHT = 310;
+const COMPARISON_SHARE_MAX_AGE = 24 * 60 * 60 * 1000;
+
+const removeExpiredComparisonShares = async () => {
+  const directory = FileSystem.cacheDirectory;
+  if (!directory) return;
+  const expiresBefore = Date.now() - COMPARISON_SHARE_MAX_AGE;
+  const names = await FileSystem.readDirectoryAsync(directory);
+  await Promise.all(names.flatMap((name) => {
+    const timestamp = /^body-frame-comparison-(\d+)\.jpg$/.exec(name)?.[1];
+    return timestamp && Number(timestamp) < expiresBefore
+      ? [FileSystem.deleteAsync(directory + name, { idempotent: true })] : [];
+  }));
+};
 const formatMetric = (value: number | undefined, unit: string) =>
   value === undefined ? "—" : `${value.toFixed(1)}${unit}`;
 const formatChange = (before: number | undefined, after: number | undefined, unit: string) => {
@@ -176,6 +188,11 @@ export default function BodyFrameCompareScreen() {
     return Number.isNaN(date.getTime()) ? "" : date.toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" });
   };
 
+  const exportHeight = useRef(0);
+  useEffect(() => {
+    void removeExpiredComparisonShares().catch(() => undefined);
+  }, []);
+
   const exportComparison = async (action: "save" | "share") => {
     if (!comparison || exportInProgress.current) return;
     const cacheDirectory = FileSystem.cacheDirectory;
@@ -195,13 +212,14 @@ export default function BodyFrameCompareScreen() {
         resolvePrivateMediaUri(comparison.after.uri)
       ]);
       readiness.current = createBodyFrameImageReadiness();
+      exportHeight.current = 0;
       setExportImages(images);
-      await Promise.all([readiness.current.wait("0"), readiness.current.wait("1")]);
+      await Promise.all(["0", "1", "layout"].map((key) => readiness.current.wait(key)));
       await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
       await recorder.snapshot({
         output: uri.replace(/^file:\/\//, ""),
         width: COMPARISON_EXPORT_WIDTH * 3,
-        height: COMPARISON_EXPORT_HEIGHT * 3,
+        height: Math.ceil(exportHeight.current * 3),
         format: "jpg",
         quality: 0.95
       });
@@ -458,7 +476,16 @@ export default function BodyFrameCompareScreen() {
       </ScrollView>
       {exportImages && comparison ? (
         <View pointerEvents="none" importantForAccessibility="no-hide-descendants" style={styles.exportHost}>
-          <OptionalRecordingView available={recorderAvailable} sessionId={recorder.sessionId} style={styles.exportCanvas}>
+          <OptionalRecordingView
+            available={recorderAvailable}
+            sessionId={recorder.sessionId}
+            style={styles.exportCanvas}
+            onLayout={({ nativeEvent: { layout } }) => {
+              if (layout.height <= 0) return;
+              exportHeight.current = layout.height;
+              readiness.current.displayed("layout");
+            }}
+          >
             <View style={styles.exportPhotos}>
               {[comparison.before, comparison.after].map((photo, index) => (
                 <View key={photo.id} style={styles.exportPhoto}>
@@ -626,7 +653,7 @@ export default function BodyFrameCompareScreen() {
 
 const styles = StyleSheet.create({
   exportHost: { position: "absolute", top: 0, left: -10000, width: COMPARISON_EXPORT_WIDTH },
-  exportCanvas: { width: COMPARISON_EXPORT_WIDTH, height: COMPARISON_EXPORT_HEIGHT, backgroundColor: "#111111", padding: 8, gap: 4 },
+  exportCanvas: { width: COMPARISON_EXPORT_WIDTH, backgroundColor: "#111111", padding: 8, gap: 4 },
   exportPhotos: { flexDirection: "row", gap: 8 },
   exportPhoto: { flex: 1, gap: 4 },
   exportImage: { width: "100%", height: 228, backgroundColor: "#171717" },

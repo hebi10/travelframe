@@ -1,6 +1,7 @@
 import { openPlans } from "@/lib/plan-navigation";
 import { AppText as Text } from "@/components/app-text";
 import { Feather } from "@expo/vector-icons";
+import { useAudioPlayer } from "expo-audio";
 import * as FileSystem from "expo-file-system/legacy";
 import { router,
   useFocusEffect, useLocalSearchParams } from "expo-router";
@@ -147,7 +148,8 @@ export default function BodyFrameVideoScreen() {
     ...(selectedTrack ? {} : { musicTrackId: undefined })
   }), [draftOptions, planEntitlements.canUseAdvancedOutput, selectedTrack]);
   const [optionKind, setOptionKind] = useState<VideoOptionKind | null>(null);
-  const loadedProjectId = useRef<string | null>(null);
+  const loadedVideoContext = useRef<string | null>(null);
+  const loadRequest = useRef(0);
   const projectPhotos = useMemo(
     () => selectBodyFrameVideoPhotos(availablePhotos, selectedIds),
     [availablePhotos, selectedIds]
@@ -190,21 +192,56 @@ export default function BodyFrameVideoScreen() {
   const [previewIndex, setPreviewIndex] = useState(0);
   const [previewPlaying, setPreviewPlaying] = useState(false);
   const previewPhoto = projectPhotos[previewIndex] ?? projectPhotos[0] ?? null;
+  const previewStartIndex = useRef(0);
+  const previewPlayer = useAudioPlayer(null);
+
   useEffect(() => {
     if (!previewPlaying || projectPhotos.length < 2 || isExporting || optionKind) return;
-    const start = Date.now();
+    let active = true;
+    let timer: ReturnType<typeof setInterval> | undefined;
     const intervalMs = videoOptions.interval * 1000;
-    const timer = setInterval(() => {
-      setPreviewIndex(Math.floor((Date.now() - start) / intervalMs) % projectPhotos.length);
-    }, Math.min(50, intervalMs));
+    const startIndex = Math.min(previewStartIndex.current, projectPhotos.length - 1);
+    const startPreview = async () => {
+      let playMusic = false;
+      if (selectedTrack) {
+        try {
+          const track = await restoreUserMusicTrackIfNeeded(user, selectedTrack);
+          if (!active) return;
+          previewPlayer.replace({ uri: track.uri });
+          await previewPlayer.seekTo(startIndex * videoOptions.interval);
+          if (!active) return;
+          previewPlayer.play();
+          playMusic = true;
+        } catch {
+          if (!active) return;
+          setMessage("배경음악 미리보기를 재생하지 못했습니다.");
+        }
+      }
+      const startedAt = Date.now();
+      let previousCycle = 0;
+      timer = setInterval(() => {
+        const index = startIndex + Math.floor((Date.now() - startedAt) / intervalMs);
+        const cycle = Math.floor(index / projectPhotos.length);
+        if (playMusic && cycle !== previousCycle) {
+          void previewPlayer.seekTo(0).then(() => {
+            if (active) previewPlayer.play();
+          }).catch(() => undefined);
+        }
+        previousCycle = cycle;
+        setPreviewIndex(index % projectPhotos.length);
+      }, Math.min(50, intervalMs));
+    };
+    void startPreview();
     const appState = AppState.addEventListener("change", (state) => {
       if (state !== "active") setPreviewPlaying(false);
     });
     return () => {
+      active = false;
       clearInterval(timer);
+      if (selectedTrack) previewPlayer.pause();
       appState.remove();
     };
-  }, [isExporting, optionKind, previewPlaying, projectPhotos.length, videoOptions.interval]);
+  }, [isExporting, optionKind, previewPlayer, previewPlaying, projectPhotos.length, selectedTrack, user, videoOptions.interval]);
   const recordingFrame = useMemo(
     () => ({
       currentPhoto: recordingPhotos[getBodyFrameVideoPhotoIndex(recordingFrameIndex, videoOptions.interval)] ?? null,
@@ -245,6 +282,7 @@ export default function BodyFrameVideoScreen() {
   }, [cancelExport]);
 
   const loadActiveProject = useCallback(async () => {
+    const request = ++loadRequest.current;
     setIsLoading(true);
     try {
       const [
@@ -266,25 +304,33 @@ export default function BodyFrameVideoScreen() {
         videoId ? getMadeVideos() : Promise.resolve([]),
         planEntitlements.musicTrackLimit > 0 ? getUserMusicTracks(user?.uid) : Promise.resolve([])
       ]);
+      if (request !== loadRequest.current) return;
       const savedVideo = videoId ? storedVideos.find((video) => video.id === videoId) : null;
       const selectedProject = videoId
-        ? projects.find((project) => project.id === savedVideo?.projectId) ?? null
+        ? projects.find((project) => project.id === savedVideo?.projectId && !project.archived) ?? null
         : selectActiveBodyProject(projects, lastActiveProjectId);
       setEditingVideo(savedVideo ?? null);
       setMusicTracks(storedTracks);
 
       setActiveProject(selectedProject);
-      if (loadedProjectId.current !== (selectedProject?.id ?? null)) {
+      const context = JSON.stringify([selectedProject?.id ?? null, videoId ?? null]);
+      if (loadedVideoContext.current !== context) {
         setSelectedIds(savedVideo ? savedVideo.photoIds : null);
         if (savedVideo) {
           const options = normalizeBodyFrameVideoOptions(savedVideo.bodyFrameOptions ?? {
             interval: savedVideo.durations[savedVideo.photoIds[0]],
             ratio: savedVideo.ratio
           });
-          if (options) setVideoOptions(options);
+          setVideoOptions(options ?? DEFAULT_BODY_FRAME_VIDEO_OPTIONS);
+        } else {
+          setVideoOptions(DEFAULT_BODY_FRAME_VIDEO_OPTIONS);
         }
+        setPreviewPlaying(false);
+        setPreviewIndex(0);
+        setAlbumRetryUri(null);
+        setMessage(null);
         setOptionKind(null);
-        loadedProjectId.current = selectedProject?.id ?? null;
+        loadedVideoContext.current = context;
       }
       setAvailablePhotos(
         selectedProject
@@ -304,6 +350,7 @@ export default function BodyFrameVideoScreen() {
         await setLastActiveProjectId(selectedProject.id);
       }
     } catch (error) {
+      if (request !== loadRequest.current) return;
       setActiveProject(null);
       setAvailablePhotos([]);
       setMeasurements([]);
@@ -311,7 +358,7 @@ export default function BodyFrameVideoScreen() {
         getUserFacingErrorMessage(error, "프로젝트 사진을 불러오지 못했습니다.")
       );
     } finally {
-      setIsLoading(false);
+      if (request === loadRequest.current) setIsLoading(false);
     }
   }, [isLoggedIn, planEntitlements.musicTrackLimit, planEntitlements.weeklyVideoExportLimit, user?.uid, videoId]);
 
@@ -319,6 +366,7 @@ export default function BodyFrameVideoScreen() {
     useCallback(() => {
       void loadActiveProject();
       return () => {
+        loadRequest.current++;
         setPreviewPlaying(false);
         cancelExport();
       };
@@ -615,7 +663,7 @@ export default function BodyFrameVideoScreen() {
           >
             <Feather name="chevron-left" size={24} color={palette.text} />
           </Pressable>
-          <Text style={[styles.pageTitle, { color: palette.text }]}>변화 영상 만들기</Text>
+          <Text style={[styles.pageTitle, { color: palette.text }]}>{editingVideo ? "변화 영상 다시 편집" : "변화 영상 만들기"}</Text>
           <Pressable
             accessibilityRole="button"
             disabled={isExporting}
@@ -700,7 +748,10 @@ export default function BodyFrameVideoScreen() {
             }}>
               <Text style={{ color: palette.text }}>이전 사진</Text>
             </Pressable>
-            <Pressable disabled={isExporting} accessibilityRole="button" onPress={() => setPreviewPlaying((playing) => !playing)}>
+            <Pressable disabled={isExporting} accessibilityRole="button" onPress={() => {
+              previewStartIndex.current = previewIndex;
+              setPreviewPlaying(!previewPlaying);
+            }}>
               <Text style={{ color: palette.text }}>{previewPlaying ? "일시 정지" : "미리보기 재생"}</Text>
             </Pressable>
             <Pressable disabled={isExporting} accessibilityRole="button" onPress={() => {
@@ -846,7 +897,7 @@ export default function BodyFrameVideoScreen() {
             </View>
           ) : (
             <Text style={[styles.primaryButtonText, { color: actionTextColor }]}>
-              영상 만들기
+              {editingVideo ? "편집 저장" : "영상 만들기"}
             </Text>
           )}
         </Pressable>
