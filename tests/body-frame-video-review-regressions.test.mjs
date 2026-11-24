@@ -5,7 +5,7 @@ import vm from 'node:vm';
 const compile = (code, fileName='module.ts') => ts.transpileModule(code, { fileName, compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText;
 const load = (path, modules={}) => {
   const exports={};
-  vm.runInNewContext(compile(fs.readFileSync(path,'utf8'),path), { exports, require: name => { assert.ok(modules[name],name); return modules[name]; }, setTimeout, clearTimeout, Error });
+  vm.runInNewContext(compile(fs.readFileSync(path,'utf8'),path), { exports, require: name => { assert.ok(modules[name],name); return modules[name]; }, setTimeout, clearTimeout, AbortController, Error });
   return exports;
 };
 const helpers=load('lib/body-frame-video-export.ts');
@@ -26,6 +26,7 @@ await check('missing primary with valid original fallback persists real cover be
   const files=new Map(); const storage=new Map(); const copied=[]; const deleted=[];
   const FileSystem={cacheDirectory:'file:///cache/',documentDirectory:'file:///documents/',
     makeDirectoryAsync:async()=>{},
+    getFreeDiskStorageAsync:async()=>2*1024*1024*1024,
     getInfoAsync:async uri=>({exists:files.has(uri),isDirectory:false,size:files.get(uri)?.length??0}),
     copyAsync:async ({from,to})=>{ if(!files.has(from))throw Error(`missing source ${from}`); files.set(to,files.get(from)); copied.push([from,to]); },
     deleteAsync:async uri=>{ deleted.push(uri); for(const path of files.keys())if(path===uri||path.startsWith(uri))files.delete(path); }
@@ -58,7 +59,7 @@ await check('missing primary with valid original fallback persists real cover be
   context.recordProjectVideo=vm.runInNewContext(compile(`(${callbacks.recordProjectVideo})`),context);
   const create=vm.runInNewContext(compile(`(${callbacks.createVideo})`),context);
   await create();
-  assert.equal(encoded,1);
+  assert.equal(encoded,1,`expected native recording: ${overlays.at(-1)}`);
   const videos=await library.getMadeVideos();
   assert.equal(videos.length,1,`valid video must persist despite missing primary URI: ${overlays.at(-1)}`);
   assert.equal(files.get(videos[0].coverUri),'verified-original');

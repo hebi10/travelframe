@@ -89,6 +89,36 @@ for (const [name, file, key, get, save, merge, remove, data] of [
   assert.equal((await api[get]()).some(x => x.id === "remote"), false);
 });
 
+for (const fault of ["cover", "video-metadata"]) test(`new video save ${fault} failure removes only uncommitted copies`, async () => {
+  const f = fixture();
+  const source = "file:///cache/rendered.mp4";
+  const cover = "file:///cache/cover.jpg";
+  const existing = "file:///docs/made-videos/existing.mp4";
+  f.files.set(source, "video");
+  f.files.set(cover, "cover");
+  f.files.set(existing, "existing");
+  const key = "travel-frame.videos.v1";
+  const before = JSON.stringify([{ id: "existing", uri: existing, createdAt: "2026-10-01", photoIds: [] }]);
+  f.storage.set(key, before);
+  const native = f.dependencies["expo-file-system/legacy"];
+  const copy = native.copyAsync;
+  native.copyAsync = async ({ from, to }) => {
+    if (fault === "cover" && from === cover) { f.files.set(to, "partial"); throw Error("cover disk failure"); }
+    return copy({ from, to });
+  };
+  const setItem = f.adapter.setItem;
+  f.adapter.setItem = async (name, value) => {
+    if (fault === "video-metadata" && name === key) throw Error("video metadata failure");
+    return setItem(name, value);
+  };
+  const library = load("lib/video-library.ts", f.dependencies);
+  const originalPaths = [...f.files.keys()].sort();
+  await assert.rejects(library.saveMadeVideo({ uri: source, coverUri: cover, photoIds: [], ratio: "3:4" }), /failure/);
+  assert.equal(f.storage.get(key), before);
+  assert.deepEqual([...f.files.keys()].sort(), originalPaths);
+  assert.equal(f.files.get(existing), "existing");
+});
+
 function cloudFixture(f, hooks = {}) {
   const user = { uid: "u" }, remote = { ...oldPhoto, localId: "p", sequence: 1, sourceUpdatedAt: "2026-10-01", storagePath: "original/storage", downloadURL: "https://private/photo", uri: "https://private/photo", backupSessionId: "owner-session", sourceDeviceId: "owner-device", backupStatus: "backed_up" };
   const documents = new Map([["photoBackups/p", remote]]); let uploads = 0;

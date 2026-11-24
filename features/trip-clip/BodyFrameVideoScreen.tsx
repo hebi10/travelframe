@@ -43,7 +43,7 @@ import {
   getBodyFrameVideoPhotos,
   getBodyFrameVideoTotalFrames
 } from "@/lib/body-frame-video";
-import { assertBodyFrameExportActive, createBodyFrameImageReadiness, prepareBodyFrameVideoPhotos, runBodyFrameNativeRecording, withBodyFrameExportTimeout } from "@/lib/body-frame-video-export";
+import { assertBodyFrameExportActive, assertBodyFrameExportSpace, createBodyFrameImageReadiness, getBodyFrameExportReserveBytes, prepareBodyFrameVideoPhotos, runBodyFrameNativeRecording, stageBodyFrameOriginalFile, withBodyFrameExportTimeout } from "@/lib/body-frame-video-export";
 import { downloadPrivateFile } from "@/lib/private-storage";
 import { selectActiveBodyProject } from "@/lib/body-frame-camera-project";
 import {
@@ -388,6 +388,9 @@ export default function BodyFrameVideoScreen() {
       throw new Error("영상으로 만들 프로젝트 사진이 없습니다.");
     }
 
+    const reserveBytes = getBodyFrameExportReserveBytes(totalFrames, BODY_FRAME_VIDEO_FPS, BODY_FRAME_VIDEO_BITRATE);
+    assertBodyFrameExportSpace(await FileSystem.getFreeDiskStorageAsync(), reserveBytes);
+    assertBodyFrameExportActive(signal);
     const runId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
     const directory = `${FileSystem.cacheDirectory}body-frame-export-${runId}/`;
     const outputUri = `${FileSystem.cacheDirectory}body-frame-${runId}.mp4`;
@@ -399,21 +402,18 @@ export default function BodyFrameVideoScreen() {
     };
     let completed = false;
     try {
-      const stagedPhotos = await prepareBodyFrameVideoPhotos(projectPhotos, async (uri, photoId) => {
-        assertBodyFrameExportActive(signal);
-        const destination = `${directory}${encodeURIComponent(photoId)}-${Math.random().toString(36).slice(2)}.image`;
-        if (/^https?:\/\//i.test(uri)) {
-          await downloadPrivateFile(uri, destination);
-        } else {
-          const info = await FileSystem.getInfoAsync(uri);
-          if (!info.exists || info.isDirectory || !(info.size > 0)) throw new Error("원본 사진 파일을 찾지 못했습니다.");
-          await FileSystem.copyAsync({ from: uri, to: destination });
-        }
-        assertBodyFrameExportActive(signal);
-        const info = await FileSystem.getInfoAsync(destination);
-        if (!info.exists || info.isDirectory || !(info.size > 0)) throw new Error("원본 사진 파일이 비어 있습니다.");
-        return destination;
-      }, signal, (prepared, total) => setExportProgress(5 + Math.round(prepared / total * 15)));
+      const stagedPhotos = await prepareBodyFrameVideoPhotos(projectPhotos, (uri, photoId, attemptSignal) =>
+        stageBodyFrameOriginalFile({
+          uri,
+          destination: `${directory}${encodeURIComponent(photoId)}-${Math.random().toString(36).slice(2)}.image`,
+          signal: attemptSignal,
+          reserveBytes,
+          getInfo: FileSystem.getInfoAsync,
+          getFreeBytes: FileSystem.getFreeDiskStorageAsync,
+          copy: (from, to) => FileSystem.copyAsync({ from, to }),
+          download: downloadPrivateFile,
+          discard: (uri) => FileSystem.deleteAsync(uri, { idempotent: true })
+        }), signal, (prepared, total) => setExportProgress(5 + Math.round(prepared / total * 15)));
       imageReadiness.current = createBodyFrameImageReadiness();
       setRecordingPhotos(stagedPhotos);
       setRecordingRunId(runId);
@@ -426,6 +426,8 @@ export default function BodyFrameVideoScreen() {
       if (track && !track.uri.startsWith("file://")) {
         throw new Error("배경음악 파일을 열 수 없습니다. 음악을 다시 선택해 주세요.");
       }
+      assertBodyFrameExportSpace(await FileSystem.getFreeDiskStorageAsync(), reserveBytes);
+      assertBodyFrameExportActive(signal);
       const recordedPath = await runBodyFrameNativeRecording(() => recorder.record({
         output: toNativeFilePath(outputUri),
         fps: BODY_FRAME_VIDEO_FPS,
@@ -461,6 +463,10 @@ export default function BodyFrameVideoScreen() {
         throw new Error("MP4 파일 생성은 완료됐지만 저장할 파일을 찾지 못했습니다.");
       }
 
+      const coverInfo = await FileSystem.getInfoAsync(stagedPhotos[0].uri);
+      assertBodyFrameExportSpace(await FileSystem.getFreeDiskStorageAsync(),
+        fileInfo.size + (coverInfo.exists && !coverInfo.isDirectory ? coverInfo.size : 0));
+      assertBodyFrameExportActive(signal);
       completed = true;
       return { uri: recordedUri, coverUri: stagedPhotos[0].uri, cleanup };
     } finally {
