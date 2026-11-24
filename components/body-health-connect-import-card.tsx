@@ -205,7 +205,8 @@ export function BodyHealthConnectImportCard({
       for (const group of groups) {
         const legacy = [...group.originalRecordIds, ...group.legacyGroupIds]
           .map((id) => savedBySourceId.get(id))
-          .filter((entry) => entry !== undefined && !matchedEntryIds.has(entry.id));
+          .filter((entry) => entry !== undefined)
+          .filter((entry) => !matchedEntryIds.has(entry.id));
         const current = savedBySourceId.get(group.sourceRecordId);
         const existing = current && !matchedEntryIds.has(current.id) ? current
           : legacy.find((entry) => entry.photoId) ?? legacy[0];
