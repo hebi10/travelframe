@@ -41,17 +41,22 @@ test("UI-R10-02A uses 2 columns on phones and 3 on tablets across drag calculati
   assert.ok(detail.includes("gridColumns={projectPhotoGridColumns}"));
   assert.ok(detail.includes("startRow = Math.floor(index / gridColumns)"));
   assert.ok(detail.includes("targetRow * gridColumns + targetColumn"));
-  assert.ok(detail.includes("Math.ceil(count / gridColumns)"));
+  assert.ok(detail.includes("Math.ceil(dragCount / gridColumns)"));
+  assert.ok(detail.includes("dragCount={renderedPhotoCount}"));
+  assert.ok(detail.includes("count={projectPhotos.length}"));
+  assert.ok(detail.includes("dragCount - 1"));
   assert.ok(detail.includes("PROJECT_PHOTO_GRID_GAP * (projectPhotoGridColumns - 1)"));
   assert.ok(!detail.includes("PROJECT_PHOTO_GRID_COLUMNS"));
   assert.ok(detail.includes('contentFit="contain"'));
 });
 
-test("UI-R10-02A keeps compare, reorder and import actions, with photos ahead of CTAs", () => {
+test("UI-R10-02A keeps compare, reorder and import actions, with capture and export reachable above a long photo list", () => {
   const section = detail.slice(detail.indexOf('detailTab === "records" ? ('), detail.indexOf('detailTab === "metrics" ? ('));
   assert.ok(section.indexOf("styles.comparePreviewCard") < section.indexOf("styles.projectHeader"));
   assert.ok(section.indexOf("styles.projectHeader") < section.indexOf("styles.recordsSection"));
-  assert.ok(section.indexOf("styles.photoGrid") < section.indexOf("styles.recordsFooterActions"));
+  assert.ok(section.indexOf("styles.recordsFooterActions") < section.indexOf("styles.photoGrid"));
+  assert.ok(section.indexOf("styles.videoAction") < section.indexOf("styles.photoGrid"));
+  assert.ok(section.includes("projectPhotos.slice(0, renderedPhotoCount)"));
   assert.ok(section.indexOf("styles.recordsFooterActions") < section.indexOf("styles.videoAction"));
   assert.ok(section.includes('onPress={() => void openCamera()}'));
   assert.ok(section.includes('onPress={() => void importProjectPhotos()}'));
