@@ -188,7 +188,7 @@ check("creation and onboarding content can scroll inside bounded containers", ()
 });
 check("photo actions open, move both directions, and offer direct position entry", () => {
   assert.ok(detail.includes('onAccessibilityTap={onOpen}'));
-  assert.ok(detail.includes('accessibilityValue={{ min: 1, max: count, now: count - index }}'));
+  assert.ok(detail.includes('accessibilityValue={canReorder ? { min: 1, max: count, now: count - index } : undefined}'));
   for (const action of ["activate", "increment", "decrement", "moveToPosition"]) {
     assert.ok(detail.includes(`name: "${action}"`), `${action} missing`);
   }
@@ -222,16 +222,25 @@ await (async () => {
       (node) => ts.isJsxAttribute(node) && node.name.getText() === "onAccessibilityAction",
       (node) => node.initializer.expression);
     const photoEvents = [];
-    const photoHandler = evaluate(photoAction, {
-      disabled: false, index: 2, count: 5,
+    const photoHandlerFor = (canReorder) => evaluate(photoAction, {
+      disabled: false, canReorder, index: 2, count: 5,
       getPhotoAccessibilityMoveIndex: helpers.getPhotoAccessibilityMoveIndex,
       onDrop: (...args) => photoEvents.push(["drop", ...args]),
       onOpen: () => photoEvents.push(["open"]),
       onMoveToPosition: () => photoEvents.push(["position"])
     });
+    const photoHandler = photoHandlerFor(true);
     for (const actionName of ["activate", "increment", "decrement", "moveToPosition"]) photoHandler({ nativeEvent: { actionName } });
     check("actual tile handler opens and routes each move through persistence callback", () => {
       assert.deepEqual(photoEvents, [["open"], ["drop", 2, 1], ["drop", 2, 3], ["position"]]);
+    });
+    check("archived photos still open while accessibility actions cannot reorder them", () => {
+      photoEvents.length = 0;
+      const readOnlyHandler = photoHandlerFor(false);
+      for (const actionName of ["activate", "increment", "decrement", "moveToPosition"]) {
+        readOnlyHandler({ nativeEvent: { actionName } });
+      }
+      assert.deepEqual(photoEvents, [["open"]]);
     });
     const sliders = await loadPure("features/camera/slider-accessibility.ts");
     check("slider actions use ten finite steps, support fractions, and clamp at edges", () => {

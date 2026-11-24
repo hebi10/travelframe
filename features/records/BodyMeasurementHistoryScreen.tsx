@@ -131,6 +131,7 @@ export default function BodyMeasurementHistoryScreen() {
     if (
       addRequested === "1" &&
       storedSettings.enabled &&
+      !storedProject?.archived &&
       !handledAddRequestRef.current
     ) {
       handledAddRequestRef.current = true;
@@ -174,12 +175,14 @@ export default function BodyMeasurementHistoryScreen() {
   );
 
   const openNewEntry = () => {
+    if (project?.archived) return;
     setEditingEntry(null);
     setNewRecordedAt(new Date().toISOString());
     setEditorOpen(true);
   };
 
   const openEntry = (entry: BodyMeasurementEntry) => {
+    if (project?.archived) return;
     setEditingEntry(entry);
     setNewRecordedAt(entry.recordedAt);
     setEditorOpen(true);
@@ -278,6 +281,7 @@ export default function BodyMeasurementHistoryScreen() {
           <Pressable
             accessibilityRole="button"
             style={[styles.addButton, { borderColor: palette.line }]}
+            disabled={project.archived}
             onPress={openNewEntry}
           >
             <Text style={[styles.addButtonText, { color: palette.text }]}>추가</Text>
@@ -453,7 +457,8 @@ export default function BodyMeasurementHistoryScreen() {
                   >
                     <Pressable
                       accessibilityRole="button"
-                      accessibilityLabel={`${formatDate(entry.recordedAt)}, ${metricMeta.label} ${value}${metricMeta.unit} 기록 수정`}
+                      accessibilityLabel={`${formatDate(entry.recordedAt)}, ${metricMeta.label} ${value}${metricMeta.unit}${project.archived ? "" : " 기록 수정"}`}
+                      disabled={project.archived}
                       style={styles.historyMain}
                       onPress={() => openEntry(entry)}
                     >
@@ -525,6 +530,7 @@ export default function BodyMeasurementHistoryScreen() {
               <Pressable
                 accessibilityRole="button"
                 style={[styles.secondaryButton, { borderColor: palette.line }]}
+                disabled={project.archived}
                 onPress={openNewEntry}
               >
                 <Text
@@ -536,19 +542,18 @@ export default function BodyMeasurementHistoryScreen() {
             </View>
           )}
         </View>
-        <View style={styles.healthConnectSection}>
+        {!project.archived ? <View style={styles.healthConnectSection}>
           <Text style={[styles.sectionTitle, { color: palette.text }]}>외부 데이터 가져오기</Text>
         <BodyHealthConnectImportCard
           projectId={project.id}
           settings={settings}
           onImported={() => void reload()}
         />
-
-        </View>
+        </View> : null}
       </ScrollView>
 
       <BodyMeasurementEditorSheet
-        visible={editorOpen}
+        visible={editorOpen && !project.archived}
         projectId={project.id}
         photoId={editingEntry?.photoId}
         sequence={editingEntry?.sequence}

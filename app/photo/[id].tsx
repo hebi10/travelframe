@@ -117,7 +117,7 @@ export default function PhotoDetailScreen() {
       setProject(storedProject);
       setMeasurementSettings(storedSettings);
       setMeasurementEntry(storedMeasurement);
-      if (measurement === "1") {
+      if (measurement === "1" && !storedProject?.archived) {
         setMeasurementEditorOpen(true);
       }
     } catch (error) {
@@ -320,6 +320,7 @@ export default function PhotoDetailScreen() {
               </View>
               <Pressable
                 accessibilityRole="button"
+                disabled={project?.archived}
                 style={[styles.measurementButton, { borderColor: palette.line }]}
                 onPress={() => setMeasurementEditorOpen(true)}
               >
@@ -434,6 +435,7 @@ export default function PhotoDetailScreen() {
 
           <Pressable
             accessibilityRole="button"
+            disabled={project?.archived}
             style={[styles.secondaryButton, { borderColor: palette.line }]}
             onPress={() => {
               if (!user) {
@@ -452,7 +454,7 @@ export default function PhotoDetailScreen() {
 
           <Pressable
             accessibilityRole="button"
-            disabled={isDeleting}
+            disabled={isDeleting || project?.archived}
             style={[
               styles.deleteButton,
               { borderColor: palette.line, opacity: isDeleting ? 0.5 : 1 }
@@ -474,7 +476,7 @@ export default function PhotoDetailScreen() {
 
       {photo.projectId ? (
         <BodyMeasurementEditorSheet
-          visible={measurementEditorOpen}
+          visible={measurementEditorOpen && !project?.archived}
           projectId={photo.projectId}
           photoId={photo.id}
           sequence={photo.sequence}

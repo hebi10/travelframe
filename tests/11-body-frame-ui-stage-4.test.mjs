@@ -57,7 +57,7 @@ assert.equal(
 
 assert.ok(
   detailSource.includes("Modal") &&
-    detailSource.includes("visible={settingsOpen}") &&
+    detailSource.includes("visible={!project.archived && settingsOpen}") &&
     detailSource.includes("프로젝트 보관"),
   "legacy project editing should remain available inside the project settings sheet"
 );

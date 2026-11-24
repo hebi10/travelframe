@@ -59,7 +59,7 @@ const settingRowIcons: Record<string, keyof typeof Feather.glyphMap> = {
   "촬영 비율": "crop",
   "촬영 세부 설정": "sliders",
   "저장 방식": "save",
-  "클라우드 백업": "cloud",
+  "프로젝트 클라우드 백업": "cloud",
   "저장·백업 세부 설정": "archive",
   "사진 간격": "clock",
   "출력 규격": "film",

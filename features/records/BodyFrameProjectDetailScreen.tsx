@@ -162,6 +162,7 @@ function SortableProjectPhotoTile({
   gridColumns,
   tileWidth,
   disabled,
+  canReorder,
   dropTarget,
   dragSourceIndex,
   dragTargetIndex,
@@ -179,6 +180,7 @@ function SortableProjectPhotoTile({
   gridColumns: number;
   tileWidth: number;
   disabled: boolean;
+  canReorder: boolean;
   dropTarget: boolean;
   dragSourceIndex: number | null;
   dragTargetIndex: number | null;
@@ -289,7 +291,7 @@ function SortableProjectPhotoTile({
           if (!dragActivated.value) {
             const elapsed = Date.now() - pressStartedAt.value;
 
-            if (elapsed < PROJECT_PHOTO_LONG_PRESS_MS) {
+            if (!canReorder || elapsed < PROJECT_PHOTO_LONG_PRESS_MS) {
               if (
                 distanceSquared >
                 PROJECT_PHOTO_PRE_DRAG_DISTANCE * PROJECT_PHOTO_PRE_DRAG_DISTANCE
@@ -354,6 +356,7 @@ function SortableProjectPhotoTile({
           }
         }),
     [
+      canReorder,
       disabled,
       dragActivated,
       dragging,
@@ -440,22 +443,23 @@ function SortableProjectPhotoTile({
     <GestureDetector gesture={gesture}>
       <Animated.View
         accessible
-        accessibilityRole="adjustable"
+        accessibilityRole={canReorder ? "adjustable" : "button"}
         accessibilityLabel={`${photo.sequence ?? ""}번째 기록 ${formatDate(photo.createdAt)}`}
-        accessibilityHint="두 번 탭하여 사진을 엽니다. 위아래로 쓸어 순번을 바꾸거나 순번 이동 동작을 사용하세요."
+        accessibilityHint={canReorder ? "두 번 탭하여 사진을 엽니다. 위아래로 쓸어 순번을 바꾸거나 순번 이동 동작을 사용하세요." : "두 번 탭하여 사진을 엽니다."}
         accessibilityState={{ disabled, busy: disabled }}
-        accessibilityValue={{ min: 1, max: count, now: count - index }}
-        accessibilityActions={[
+        accessibilityValue={canReorder ? { min: 1, max: count, now: count - index } : undefined}
+        accessibilityActions={canReorder ? [
           { name: "activate", label: "사진 열기" },
           { name: "increment", label: "다음 순번으로 이동" },
           { name: "decrement", label: "이전 순번으로 이동" },
           { name: "moveToPosition", label: "원하는 순번으로 이동" }
-        ]}
+        ] : [{ name: "activate", label: "사진 열기" }]}
         onAccessibilityTap={onOpen}
         onAccessibilityAction={(event) => {
           if (disabled) return;
           const action = event.nativeEvent.actionName;
           if (action === "activate") onOpen();
+          else if (!canReorder) return;
           else if (action === "moveToPosition") onMoveToPosition();
           else if (action === "increment" || action === "decrement") {
             onDrop(index, getPhotoAccessibilityMoveIndex(index, count, action));
@@ -771,13 +775,14 @@ export default function BodyFrameProjectDetailScreen() {
   ]);
 
   const openReminderSettings = useCallback(() => {
+    if (project?.archived) return;
     setReminderEnabledDraft(reminderSettings.enabled);
     setReminderTimeDraft(formatProjectReminderTime(reminderSettings));
     setReminderMessageDraft(reminderSettings.message);
     setReminderRepeatModeDraft(reminderSettings.repeatMode);
     setReminderWeekdaysDraft(reminderSettings.weekdays);
     setReminderModalOpen(true);
-  }, [reminderSettings]);
+  }, [project?.archived, reminderSettings]);
 
   const toggleReminderWeekday = useCallback(
     (weekday: ProjectReminderWeekday) => {
@@ -791,7 +796,7 @@ export default function BodyFrameProjectDetailScreen() {
   );
 
   const saveReminderSettings = useCallback(async () => {
-    if (!project || reminderSaving) return;
+    if (!project || project.archived || reminderSaving) return;
 
     const parsedTime = parseProjectReminderTime(reminderTimeDraft);
     if (!parsedTime) {
@@ -857,7 +862,7 @@ export default function BodyFrameProjectDetailScreen() {
   );
 
   const confirmArchive = useCallback(() => {
-    if (!project) return;
+    if (!project || project.archived) return;
 
     Alert.alert(
       "프로젝트 보관",
@@ -1017,7 +1022,7 @@ export default function BodyFrameProjectDetailScreen() {
   const handleProjectPhotoDrop = useCallback(
     async (fromIndex: number, toIndex: number) => {
       if (
-        !project ||
+        !project || project.archived ||
         photoOrderSaving ||
         fromIndex === toIndex ||
         fromIndex < 0 ||
@@ -1140,6 +1145,7 @@ export default function BodyFrameProjectDetailScreen() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="프로젝트 설정 열기"
+            disabled={project.archived}
             style={[styles.settingsButton, { borderColor: palette.line }]}
             onPress={() => {
               setMeasurementDraft(measurementSettings);
@@ -1268,7 +1274,7 @@ export default function BodyFrameProjectDetailScreen() {
               </Text>
             </View>
             <View style={styles.sectionActions}>
-              {projectPhotos.length > 1 ? (
+              {!project.archived && projectPhotos.length > 1 ? (
                 <Pressable
                   accessibilityRole="button"
                   accessibilityState={{ selected: photoOrderMode }}
@@ -1299,7 +1305,7 @@ export default function BodyFrameProjectDetailScreen() {
             </View>
           </View>
 
-          {projectPhotos.length > 1 ? (
+          {!project.archived && projectPhotos.length > 1 ? (
             <Text style={[styles.recordsHint, { color: palette.faint }]}>
               {photoOrderSaving
                 ? "변경한 순서를 저장하는 중입니다."
@@ -1324,7 +1330,8 @@ export default function BodyFrameProjectDetailScreen() {
                       gridColumns={projectPhotoGridColumns}
                       tileWidth={projectPhotoTileWidth}
                       disabled={photoOrderSaving}
-                      orderMode={photoOrderMode}
+                      canReorder={!project.archived}
+                      orderMode={!project.archived && photoOrderMode}
                       onMoveToPosition={() => setPhotoPositionId(photo.id)}
                       dropTarget={
                         isPhotoDragging && photoDropTargetIndex === index
@@ -1458,6 +1465,7 @@ export default function BodyFrameProjectDetailScreen() {
                 <Pressable
                   accessibilityRole="button"
                   style={[styles.detailTabAction, { borderColor: palette.line }]}
+                  disabled={project.archived}
                   onPress={() => {
                     setMeasurementDraft(measurementSettings);
                     setRememberCaptureContextDraft(rememberCaptureContext);
@@ -1519,6 +1527,7 @@ export default function BodyFrameProjectDetailScreen() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="프로젝트 촬영 알림 설정"
+          disabled={project.archived}
           style={[
             styles.reminderCard,
             {
@@ -1563,7 +1572,7 @@ export default function BodyFrameProjectDetailScreen() {
       </ScrollView>
 
       <PhotoPositionSheet
-        currentPosition={photoPositionId !== null && projectPhotos.some((photo) => photo.id === photoPositionId)
+        currentPosition={!project.archived && photoPositionId !== null && projectPhotos.some((photo) => photo.id === photoPositionId)
           ? projectPhotos.length - projectPhotos.findIndex((photo) => photo.id === photoPositionId)
           : null}
         count={projectPhotos.length}
@@ -1578,7 +1587,7 @@ export default function BodyFrameProjectDetailScreen() {
       <Modal
         transparent
         animationType="fade"
-        visible={reminderModalOpen}
+        visible={!project.archived && reminderModalOpen}
         onRequestClose={() => setReminderModalOpen(false)}
       >
         <KeyboardAvoidingView
@@ -1819,7 +1828,7 @@ export default function BodyFrameProjectDetailScreen() {
       <Modal
         transparent
         animationType="slide"
-        visible={settingsOpen}
+        visible={!project.archived && settingsOpen}
         onRequestClose={() => setSettingsOpen(false)}
       >
         <KeyboardAvoidingView
