@@ -108,7 +108,7 @@ test("UI-R05 isolates actual native MP4, cancellation and verified Android scree
   assert.ok(native.includes('ro.kernel.qemu') && native.includes('device.seed(True, "medium", theme_mode="dark")'));
   assert.ok(native.includes("video_failure_and_background_smoke") && native.includes("video_smoke"));
   assert.ok(audit.includes("sha256") && audit.includes("nb_read_frames"));
-  assert.ok(audit.includes("1080, 1440") && audit.includes("guestQuotaUnchanged"));
+  assert.ok(audit.includes("720, 960") && audit.includes("guestQuotaUnchanged"));
   assert.ok(audit.includes("NOT_TESTED") && audit.includes("ffprobe"));
   assert.doesNotMatch(workflow, /\[deploy-closed\]|\[publish-store-shots\]/);
 });

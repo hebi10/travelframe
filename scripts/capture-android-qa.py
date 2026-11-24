@@ -29,6 +29,7 @@ import xml.etree.ElementTree as ET
 PACKAGE = 'com.haebi.photoguide'
 PROJECT = 'qa-demo-project'
 PHOTO = 'qa-demo-photo-1'
+GUEST_VIDEO_SIZE = (720, 960)
 ROOT = Path(__file__).resolve().parents[1]
 PROFILES = [('mobile', '720x1600', 320), ('tablet', '1200x1920', 240)]
 DESIGN_PROFILES = [
@@ -119,7 +120,7 @@ def inspect_native_frames(path, directory):
     for index, frame in enumerate([0,3,6],1):
         data=subprocess.run(['ffmpeg','-v','error','-i',str(path),'-vf',f'select=eq(n\\,{frame})',
             '-frames:v','1','-f','rawvideo','-pix_fmt','rgb24','pipe:1'],capture_output=True,check=True,timeout=30).stdout
-        item=validate_marker_pixels(data,1080,1440,index)
+        item=validate_marker_pixels(data, *GUEST_VIDEO_SIZE, index)
         item['frame']=frame
         evidence.append(item)
         subprocess.run(['ffmpeg','-v','error','-y','-i',str(path),'-vf',f'select=eq(n\\,{frame})',
@@ -791,7 +792,7 @@ def creation_keyboard(device):
 
 def onboarding_welcome(device):
     device.ready(['기준 사진 표시'])
-    device.tap('사용 가이드',match='summary')
+    device.tap('사용 가이드', match='summary', search='below')
     device.ready(['첫 사진을 남겨 보세요'])
     device.find_control('다음')  # Verify the pinned guide footer is reachable at large text sizes.
 
@@ -821,8 +822,8 @@ def validate_video_probe(probe):
     stream = next((stream for stream in probe.get('streams', []) if stream.get('codec_type') == 'video'), None)
     if not stream or stream.get('codec_name') != 'h264':
         raise ValueError('Native recorder did not produce an H.264 video stream')
-    if (stream.get('width'), stream.get('height')) != (1080, 1440):
-        raise ValueError('Native video dimensions do not match default 1080p 3:4 output')
+    if (stream.get('width'), stream.get('height')) != GUEST_VIDEO_SIZE:
+        raise ValueError('Native video dimensions do not match the guest 720p 3:4 output')
     duration = float(probe.get('format', {}).get('duration', 0))
     if abs(duration-0.3) > 1/30+0.0001:
         raise ValueError(f'Unexpected duration for three 0.1-second photos: {duration}')
@@ -1172,7 +1173,7 @@ def capture_design_matrix(device, output, records, manifest):
         ('camera', 'camera', ['프로젝트 선택', '사진 촬영'], None),
         ('records', 'studio', ['QA 데모', '내 프로젝트'], None),
         ('project', f'project/{PROJECT}', ['QA 데모', '프로젝트 설정 열기'], None),
-        ('compare', f'project/{PROJECT}/compare', ['전후 사진 비교', '첫 사진', '마지막 사진'], None),
+        ('compare', f'project/{PROJECT}/compare', ['전후 사진 비교', '이전 · #1', '현재 · #3'], None),
         ('measurements', f'project/{PROJECT}/measurements', ['수치 기록', 'QA 데모'], None),
         ('video-home', 'trip-clip', ['변화 영상 만들기'], None),
         ('video-create', 'video-create', ['변화 영상 만들기', 'QA 데모'], None),
@@ -1327,7 +1328,7 @@ def main():
                     ('photo', f'photo/{PHOTO}', ['기록 상세'], None),
                     ('photo-measurement', f'photo/{PHOTO}?measurement=1', ['몸무게', '체지방률', '저장'], None),
                     ('edit-login-required', 'edit?' + urlencode({'photoId': PHOTO}), ['로그인이 필요합니다', '사진 편집은 무료 로그인부터'], None),
-                    ('compare', f'project/{PROJECT}/compare', ['전후 사진 비교', '첫 사진', '마지막 사진'], None),
+                    ('compare', f'project/{PROJECT}/compare', ['전후 사진 비교', '이전 · #1', '현재 · #3'], None),
                     ('measurements', f'project/{PROJECT}/measurements', ['수치 기록', 'QA 데모'], None),
                     ('measurement-create', f'project/{PROJECT}/measurements?add=1', ['몸무게', '저장'], None),
                     ('video', 'trip-clip', ['변화 영상 만들기'], None),

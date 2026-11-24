@@ -74,15 +74,15 @@ def verify(root, apk):
         capture_output=True, check=True, timeout=30
     ).stdout)
     stream = next((item for item in probe.get("streams", []) if item.get("codec_type") == "video"), None)
-    if not stream or stream.get("codec_name") != "h264" or (stream.get("width"), stream.get("height")) != (1080, 1440):
-        raise AssertionError("Actual MP4 is not default 1080x1440 H.264")
+    if not stream or stream.get("codec_name") != "h264" or (stream.get("width"), stream.get("height")) != (720, 960):
+        raise AssertionError("Actual MP4 is not guest 720x960 H.264")
     if int(stream.get("nb_read_frames", -1)) != 9 or abs(float(probe["format"]["duration"]) - 0.3) > 1/30 + 0.0001:
         raise AssertionError("MP4 frame count or duration does not match test case")
     return {
         "status": "PASS",
         "sha256": apk_sha,
         "mp4Sha256": success["sha256"],
-        "video": {"codec": "h264", "width": 1080, "height": 1440, "frames": 9},
+        "video": {"codec": "h264", "width": 720, "height": 960, "frames": 9},
         "screenshots": screen_checks,
         "cases": list(EXPECTED_CASES),
         "physicalPlayback": "NOT_TESTED",
