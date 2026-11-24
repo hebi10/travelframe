@@ -58,18 +58,29 @@ export const resolvePrivateMediaUri = async (uri: string): Promise<string> => {
   if (existing) {
     const cached = await existing;
     if (firebaseAuth?.currentUser !== request.user) throw new Error("계정이 변경되었습니다.");
-    if ((await FileSystem.getInfoAsync(cached)).exists) return cached;
+    const info = await FileSystem.getInfoAsync(cached);
+    if (firebaseAuth?.currentUser !== request.user) throw new Error("계정이 변경되었습니다.");
+    if (info.exists) return cached;
+    if (pending.get(key) !== existing) return resolvePrivateMediaUri(uri);
     pending.delete(key);
   }
   const task = (async () => {
     if (!FileSystem.cacheDirectory) throw new Error("임시 저장소를 사용할 수 없습니다.");
     const directory = `${FileSystem.cacheDirectory}private-media/${encodeURIComponent(request.user.uid)}/`;
     await FileSystem.makeDirectoryAsync(directory, { intermediates: true });
+    if (firebaseAuth?.currentUser !== request.user) throw new Error("계정이 변경되었습니다.");
     const path = decodeURIComponent(new URL(request.url).pathname);
     const extension = /\.(jpg|jpeg|png|webp|mp4|mp3|m4a|aac|wav)$/i.exec(path)?.[1] ?? "bin";
     const destination = `${directory}${Date.now()}-${Math.random().toString(36).slice(2)}.${extension}`;
     return (await downloadPrivateFile(request.url, destination)).uri;
   })();
   pending.set(key, task);
-  try { return await task; } catch (error) { pending.delete(key); throw error; }
+  try {
+    const cached = await task;
+    if (firebaseAuth?.currentUser !== request.user) throw new Error("계정이 변경되었습니다.");
+    return cached;
+  } catch (error) {
+    if (pending.get(key) === task) pending.delete(key);
+    throw error;
+  }
 };

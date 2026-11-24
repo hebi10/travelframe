@@ -9,6 +9,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Platform } from "react-native";
 import type { User } from "firebase/auth";
+import { firebaseAuth } from "@/lib/firebase";
 
 import {
   GOOGLE_PLAY_PRODUCT_IDS,
@@ -22,6 +23,7 @@ import {
 
 type PendingPurchase = {
   productId: GooglePlayProductId;
+  uid: string;
   resolve: () => void;
   reject: (error: unknown) => void;
 };
@@ -30,6 +32,12 @@ const purchaseTokenFrom = (purchase: Purchase) =>
   typeof purchase.purchaseToken === "string" && purchase.purchaseToken.length > 0
     ? purchase.purchaseToken
     : null;
+
+const assertBillingAccount = (uid: string) => {
+  if (firebaseAuth?.currentUser?.uid !== uid) {
+    throw new Error("결제 중 계정이 변경되었습니다. 기존 계정에서 다시 시도해 주세요.");
+  }
+};
 
 export function useGooglePlayBilling({
   user,
@@ -45,16 +53,18 @@ export function useGooglePlayBilling({
   const [isLoadingProducts, setIsLoadingProducts] = useState(false);
   const productQueryVersionRef = useRef(0);
   const pendingPurchaseRef = useRef<PendingPurchase | null>(null);
+  const billingOperationRef = useRef(false);
   const finishTransactionRef = useRef<
     ((args: { purchase: Purchase; isConsumable?: boolean }) => Promise<void>) | null
   >(null);
 
   const processVerifiedPurchase = useCallback(
-    async (purchase: Purchase) => {
-      if (!isGooglePlayProductId(purchase.productId)) {
+    async (purchase: Purchase, expectedUid = user?.uid) => {
+      if (!expectedUid || !isGooglePlayProductId(purchase.productId)) {
         return false;
       }
 
+      assertBillingAccount(expectedUid);
       const purchaseToken = purchaseTokenFrom(purchase);
       if (!purchaseToken) {
         throw new Error("Google Play 구매 토큰을 확인할 수 없습니다.");
@@ -65,7 +75,8 @@ export function useGooglePlayBilling({
         purchaseToken
       });
 
-      if (!verification.verified || !verification.active) {
+      assertBillingAccount(expectedUid);
+      if (!verification.verified || !verification.active || verification.productId !== purchase.productId) {
         throw new Error(
           verification.status === "expired"
             ? "만료된 구매입니다."
@@ -77,10 +88,11 @@ export function useGooglePlayBilling({
         purchase,
         isConsumable: false
       });
+      assertBillingAccount(expectedUid);
       await refreshUser();
       return true;
     },
-    [refreshUser]
+    [refreshUser, user?.uid]
   );
 
   const {
@@ -90,18 +102,19 @@ export function useGooglePlayBilling({
   } = useIAP({
     onPurchaseSuccess: (purchase) => {
       void (async () => {
+        const pending = pendingPurchaseRef.current;
+        const matched = pending?.productId === purchase.productId ? pending : null;
         try {
-          await processVerifiedPurchase(purchase);
-          const pending = pendingPurchaseRef.current;
-          if (pending && pending.productId === purchase.productId) {
+          const verified = await processVerifiedPurchase(purchase, matched?.uid);
+          if (matched && pendingPurchaseRef.current === matched) {
+            if (!verified) throw new Error("구매를 확인하지 못했습니다.");
             pendingPurchaseRef.current = null;
-            pending.resolve();
+            matched.resolve();
           }
         } catch (error) {
-          const pending = pendingPurchaseRef.current;
-          if (pending && pending.productId === purchase.productId) {
+          if (matched && pendingPurchaseRef.current === matched) {
             pendingPurchaseRef.current = null;
-            pending.reject(error);
+            matched.reject(error);
           }
           setBillingMessage(
             error instanceof Error ? error.message : "구매를 검증하지 못했습니다."
@@ -182,13 +195,17 @@ export function useGooglePlayBilling({
       if (!connected) {
         throw new Error("Google Play 결제 서비스에 연결 중입니다. 잠시 후 다시 시도해 주세요.");
       }
-      if (pendingPurchaseRef.current) {
-        throw new Error("이미 진행 중인 결제가 있습니다.");
+      if (pendingPurchaseRef.current || billingOperationRef.current) {
+        throw new Error("이미 진행 중인 결제 또는 구매 복원이 있습니다.");
       }
 
+      assertBillingAccount(user.uid);
+      billingOperationRef.current = true;
+      try {
       const availablePurchases = await getAvailablePurchases({
         includeSuspendedAndroid: false
       });
+      assertBillingAccount(user.uid);
       const subscriptionProductIds = new Set<string>(GOOGLE_PLAY_SUBSCRIPTION_IDS);
       const currentSubscriptionPurchase = availablePurchases.find(
         (purchase) =>
@@ -219,8 +236,21 @@ export function useGooglePlayBilling({
         if (!confirmed) {
           throw new Error("구독 변경을 취소했습니다.");
         }
+        assertBillingAccount(user.uid);
+        if (!isGooglePlayProductId(currentSubscriptionPurchase.productId)) {
+          throw new Error("기존 구독 상품을 확인할 수 없습니다.");
+        }
+        const previous = await verifyGooglePlayPurchase({
+          productId: currentSubscriptionPurchase.productId,
+          purchaseToken: currentSubscriptionPurchase.purchaseToken
+        });
+        assertBillingAccount(user.uid);
+        if (!previous.verified || !previous.active || previous.productId !== currentSubscriptionPurchase.productId) {
+          throw new Error("기존 구독의 소유권과 이용 상태를 확인할 수 없습니다. 기존 계정에서 구매 복원 후 다시 시도해 주세요.");
+        }
       }
 
+      assertBillingAccount(user.uid);
       const request = {
         type: "subs" as const,
         request: {
@@ -243,14 +273,18 @@ export function useGooglePlayBilling({
 
       setBillingMessage(null);
       await new Promise<void>((resolve, reject) => {
-        pendingPurchaseRef.current = { productId, resolve, reject };
+        const pending = { productId, uid: user.uid, resolve, reject };
+        pendingPurchaseRef.current = pending;
         void requestPurchase(request).catch((error) => {
-          if (pendingPurchaseRef.current?.productId === productId) {
+          if (pendingPurchaseRef.current === pending) {
             pendingPurchaseRef.current = null;
           }
           reject(error);
         });
       });
+      } finally {
+        billingOperationRef.current = false;
+      }
     },
     [connected, requestPurchase, subscriptionsById, user]
   );
@@ -266,12 +300,18 @@ export function useGooglePlayBilling({
       throw new Error("Google Play 결제 서비스에 연결 중입니다.");
     }
 
+    if (pendingPurchaseRef.current || billingOperationRef.current) {
+      throw new Error("이미 진행 중인 결제 또는 구매 복원이 있습니다.");
+    }
+    assertBillingAccount(user.uid);
+    billingOperationRef.current = true;
     setIsRestoring(true);
     setBillingMessage(null);
     try {
       const purchases = await getAvailablePurchases({
         includeSuspendedAndroid: true
       });
+      assertBillingAccount(user.uid);
       let restoredCount = 0;
 
       for (const purchase of purchases) {
@@ -279,8 +319,9 @@ export function useGooglePlayBilling({
           continue;
         }
 
+        assertBillingAccount(user.uid);
         try {
-          if (await processVerifiedPurchase(purchase)) {
+          if (await processVerifiedPurchase(purchase, user.uid)) {
             restoredCount += 1;
           }
         } catch {
@@ -288,9 +329,11 @@ export function useGooglePlayBilling({
         }
       }
 
+      assertBillingAccount(user.uid);
       await refreshUser();
       return restoredCount;
     } finally {
+      billingOperationRef.current = false;
       setIsRestoring(false);
     }
   }, [connected, processVerifiedPurchase, refreshUser, user]);

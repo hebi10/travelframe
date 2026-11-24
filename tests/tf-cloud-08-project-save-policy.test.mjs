@@ -55,7 +55,9 @@ for (const [photoIds, selectedIds, enabled, expected] of [
   [["photo-b"], ["project-b"], true, true],
   [["photo-b"], [], true, false],
   [["photo-a", "photo-b"], ["project-a", "project-b"], true, false],
-  [[], [], true, true],
+  [["photo-b", "missing-photo"], ["project-b"], true, false],
+  [["missing-photo"], ["project-b"], true, false],
+  [[], [], true, false],
   [[], [], false, false]
 ]) {
   assert.equal(policy.canUploadLinkedProjectWork({
@@ -75,9 +77,24 @@ assert.equal(
     selectedProjectIds: new Set(["project-b"]),
     legacyEnabled: true
   }),
-  true,
-  "older image works without photoIds must preserve legacy backup behavior rather than crash"
+  false,
+  "unlinked legacy works remain local until their project can be resolved"
 );
+
+assert.equal(policy.canUploadLinkedProjectWork({
+  photoIds: ["photo-b", "photo-c"],
+  photos: [...linkedPhoto, { id: "photo-c", projectId: "project-c" }],
+  projects: [...projects, { id: "project-c", saveMode: "cloud" }],
+  selectedProjectIds: new Set(["project-b", "project-c"]),
+  legacyEnabled: true
+}), false, "mixed-project work is not assigned to a single backup slot");
+assert.equal(policy.canUploadLinkedProjectWork({
+  photoIds: ["orphan"],
+  photos: [{ id: "orphan", projectId: "missing-project" }],
+  projects,
+  selectedProjectIds: new Set(["missing-project"]),
+  legacyEnabled: true
+}), false, "stale slot does not authorize a missing project");
 
 const memory = new Map();
 const old = [

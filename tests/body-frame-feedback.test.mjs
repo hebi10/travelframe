@@ -19,7 +19,17 @@ const camera = await importPureModule("body-frame-camera-session");
 test("EXIF uses the original date and offset and rejects invalid dates", () => {
   assert.equal(getExifPhotoCapturedAt({ DateTimeOriginal: "2024:02:29 23:00:01", OffsetTimeOriginal: "-05:00" }),
     "2024-03-01T04:00:01.000Z");
-  assert.equal(getExifPhotoCapturedAt({ DateTime: "2024:02:29 23:00:01" }), "2024-02-29T14:00:01.000Z");
+  const previousZone = process.env.TZ;
+  try {
+    process.env.TZ = "Asia/Seoul";
+    assert.equal(getExifPhotoCapturedAt({ DateTime: "2024:02:29 23:00:01" }), "2024-02-29T14:00:01.000Z");
+    process.env.TZ = "America/New_York";
+    assert.equal(getExifPhotoCapturedAt({ DateTime: "2024:02:29 23:00:01" }), "2024-03-01T04:00:01.000Z");
+    assert.equal(getExifPhotoCapturedAt({ DateTime: "2024:03:10 02:30:00" }), undefined);
+  } finally {
+    if (previousZone === undefined) delete process.env.TZ;
+    else process.env.TZ = previousZone;
+  }
   assert.equal(getExifPhotoCapturedAt({ DateTimeOriginal: "2025:02:29 23:00:01" }), undefined);
   assert.equal(getExifPhotoCapturedAt({}), undefined);
 });
@@ -40,8 +50,9 @@ test("Health Connect combines matching instants and picks the closest unused pho
     { id: "near", createdAt: "2026-11-20T21:05:00Z" },
     { id: "later", createdAt: "2026-11-20T23:00:00Z" }
   ];
-  assert.equal(findHealthConnectPhoto(groups[0].recordedAt, photos, new Set(["near"])).id, "later");
-  assert.equal(findHealthConnectPhoto(groups[0].recordedAt, photos, new Set(["near", "later"])), undefined);
+  assert.equal(findHealthConnectPhoto(groups[0].recordedAt, photos, new Set(["near"]), "Asia/Seoul").id, "later");
+  assert.equal(findHealthConnectPhoto(groups[0].recordedAt, photos, new Set(["near", "later"]), "Asia/Seoul"), undefined);
+  assert.equal(findHealthConnectPhoto(groups[0].recordedAt, photos, new Set(["near", "later"]), "America/Los_Angeles").id, "previous-day");
 });
 
 test("Health Connect matches the closest complementary measurement within one minute from the same source", () => {

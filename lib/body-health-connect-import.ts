@@ -172,17 +172,17 @@ export const groupBodyHealthConnectMeasurements = (
   return groups.sort((a, b) => Date.parse(b.recordedAt) - Date.parse(a.recordedAt));
 };
 
-const dayFormat = new Intl.DateTimeFormat("en-CA", {
-  timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit"
-});
-
 export const findHealthConnectPhoto = (
   recordedAt: string,
   photos: readonly PhotoItem[],
-  occupiedPhotoIds: ReadonlySet<string>
+  occupiedPhotoIds: ReadonlySet<string>,
+  timeZone?: string
 ) => {
   const timestamp = Date.parse(recordedAt);
   if (!Number.isFinite(timestamp)) return undefined;
+  const dayFormat = new Intl.DateTimeFormat("en-CA", {
+    ...(timeZone ? { timeZone } : {}), year: "numeric", month: "2-digit", day: "2-digit"
+  });
   const day = dayFormat.format(timestamp);
   return photos
     .filter((photo) => !occupiedPhotoIds.has(photo.id) &&

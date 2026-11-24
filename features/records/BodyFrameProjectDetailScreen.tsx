@@ -11,6 +11,7 @@ import { router,
   useFocusEffect,
   useLocalSearchParams } from "expo-router";
 import { useCallback,
+  useEffect,
   useMemo,
   useState } from "react";
 import {
@@ -110,6 +111,7 @@ import {
 import type { PhotoItem } from "@/types/photo";
 import { getPhotoAccessibilityMoveIndex } from "@/features/records/photo-order-accessibility";
 import { PhotoPositionSheet } from "@/features/records/PhotoPositionSheet";
+import { PROJECT_PHOTO_BATCH, nextProjectPhotoCount } from "@/lib/project-photo-window";
 
 const formatDuration = (seconds: number) =>
   seconds < 60
@@ -159,6 +161,7 @@ function SortableProjectPhotoTile({
   photo,
   index,
   count,
+  dragCount,
   gridColumns,
   tileWidth,
   disabled,
@@ -177,6 +180,7 @@ function SortableProjectPhotoTile({
   photo: PhotoItem;
   index: number;
   count: number;
+  dragCount: number;
   gridColumns: number;
   tileWidth: number;
   disabled: boolean;
@@ -220,7 +224,7 @@ function SortableProjectPhotoTile({
       const columnDelta = Math.round(translationX / cellWidth);
       const maxRow = Math.max(
         0,
-        Math.ceil(count / gridColumns) - 1
+        Math.ceil(dragCount / gridColumns) - 1
       );
       const targetRow = Math.max(0, Math.min(maxRow, startRow + rowDelta));
       const targetColumn = Math.max(
@@ -233,7 +237,7 @@ function SortableProjectPhotoTile({
       const targetIndex = Math.max(
         0,
         Math.min(
-          count - 1,
+          dragCount - 1,
           targetRow * gridColumns + targetColumn
         )
       );
@@ -246,7 +250,7 @@ function SortableProjectPhotoTile({
     [
       cellHeight,
       cellWidth,
-      count,
+      dragCount,
       gridColumns,
       hoverIndex,
       index,
@@ -545,6 +549,8 @@ export default function BodyFrameProjectDetailScreen() {
   const [poseAlignmentDraft, setPoseAlignmentDraft] = useState(false);
   const [isImportingPhotos, setIsImportingPhotos] = useState(false);
   const [photoGridWidth, setPhotoGridWidth] = useState(0);
+  const [visiblePhotoCount, setVisiblePhotoCount] = useState(PROJECT_PHOTO_BATCH);
+  useEffect(() => { setVisiblePhotoCount(PROJECT_PHOTO_BATCH); }, [projectId]);
   const [photoOrderMode, setPhotoOrderMode] = useState(false);
   const [isPhotoDragging, setIsPhotoDragging] = useState(false);
   const [photoDragSourceIndex, setPhotoDragSourceIndex] = useState<number | null>(null);
@@ -625,6 +631,13 @@ export default function BodyFrameProjectDetailScreen() {
         : [],
     [photos, project]
   );
+
+  const renderedPhotoCount = Math.min(visiblePhotoCount, projectPhotos.length);
+  const loadMorePhotos = useCallback(() => {
+    setVisiblePhotoCount((current) => current === visiblePhotoCount
+      ? nextProjectPhotoCount(current, projectPhotos.length)
+      : current);
+  }, [projectPhotos.length, visiblePhotoCount]);
 
   const projectPhotoTileWidth = useMemo(
     () =>
@@ -1123,6 +1136,12 @@ export default function BodyFrameProjectDetailScreen() {
     <View style={[styles.screen, { backgroundColor: palette.background }]}>
       <ScrollView
         scrollEnabled={!isPhotoDragging}
+        scrollEventThrottle={64}
+        onScroll={({ nativeEvent }) => {
+          if (detailTab !== "records" || isPhotoDragging || photoOrderSaving || renderedPhotoCount >= projectPhotos.length) return;
+          const remaining = nativeEvent.contentSize.height - nativeEvent.contentOffset.y - nativeEvent.layoutMeasurement.height;
+          if (remaining < 600) loadMorePhotos();
+        }}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.content,
@@ -1265,6 +1284,42 @@ export default function BodyFrameProjectDetailScreen() {
         </View>
 
 
+        <View style={[styles.recordsFooterActions, fontScale >= 1.3 && styles.recordsFooterActionsLargeFont]}>
+          <Pressable
+            accessibilityRole="button"
+            disabled={project.archived}
+            style={[styles.primaryAction, { backgroundColor: primaryColor, opacity: project.archived ? 0.5 : 1 }]}
+            onPress={() => void openCamera()}
+          >
+            <Text style={[styles.primaryActionText, { color: primaryTextColor }]}>
+              오늘 사진 찍기
+            </Text>
+          </Pressable>
+          <Pressable
+            disabled={project.archived || isImportingPhotos}
+            accessibilityRole="button"
+            accessibilityState={{ disabled: project.archived || isImportingPhotos, busy: isImportingPhotos }}
+            style={[styles.photoAddAction, { borderColor: palette.line }]}
+            onPress={() => void importProjectPhotos()}
+          >
+            <Feather name="upload" size={bodyFrameDesign.iconSize} color={palette.text} />
+            <Text style={[styles.sectionActionText, { color: palette.text }]}>
+              {isImportingPhotos ? "추가 중" : "사진 추가"}
+            </Text>
+          </Pressable>
+        </View>
+
+        <Pressable
+          accessibilityRole="button"
+          disabled={project.archived}
+          style={[styles.videoAction, { borderColor: palette.text, opacity: project.archived ? 0.5 : 1 }]}
+          onPress={() => void openVideo()}
+        >
+          <Text style={[styles.videoActionText, { color: palette.text }]}>
+            변화 영상 만들기
+          </Text>
+        </Pressable>
+
         <View style={styles.recordsSection}>
           <View style={styles.sectionHeader}>
             <View style={styles.recordsHeadingCopy}>
@@ -1321,12 +1376,13 @@ export default function BodyFrameProjectDetailScreen() {
               onLayout={(event) => setPhotoGridWidth(event.nativeEvent.layout.width)}
             >
               {projectPhotoTileWidth > 0
-                ? projectPhotos.map((photo, index) => (
+                ? projectPhotos.slice(0, renderedPhotoCount).map((photo, index) => (
                     <SortableProjectPhotoTile
                       key={photo.id}
                       photo={photo}
                       index={index}
                       count={projectPhotos.length}
+                      dragCount={renderedPhotoCount}
                       gridColumns={projectPhotoGridColumns}
                       tileWidth={projectPhotoTileWidth}
                       disabled={photoOrderSaving}
@@ -1383,41 +1439,21 @@ export default function BodyFrameProjectDetailScreen() {
           )}
         </View>
 
-        <View style={[styles.recordsFooterActions, fontScale >= 1.3 && styles.recordsFooterActionsLargeFont]}>
+        {renderedPhotoCount < projectPhotos.length ? (
           <Pressable
             accessibilityRole="button"
-            disabled={project.archived}
-            style={[styles.primaryAction, { backgroundColor: primaryColor, opacity: project.archived ? 0.5 : 1 }]}
-            onPress={() => void openCamera()}
-          >
-            <Text style={[styles.primaryActionText, { color: primaryTextColor }]}>
-              오늘 사진 찍기
-            </Text>
-          </Pressable>
-          <Pressable
-            disabled={project.archived || isImportingPhotos}
-            accessibilityRole="button"
-            accessibilityState={{ disabled: project.archived || isImportingPhotos, busy: isImportingPhotos }}
+            accessibilityState={{ disabled: isPhotoDragging || photoOrderSaving }}
+            disabled={isPhotoDragging || photoOrderSaving}
             style={[styles.photoAddAction, { borderColor: palette.line }]}
-            onPress={() => void importProjectPhotos()}
+            onPress={loadMorePhotos}
           >
-            <Feather name="upload" size={bodyFrameDesign.iconSize} color={palette.text} />
             <Text style={[styles.sectionActionText, { color: palette.text }]}>
-              {isImportingPhotos ? "추가 중" : "사진 추가"}
+              사진 더 보기 ({renderedPhotoCount}/{projectPhotos.length})
             </Text>
           </Pressable>
-        </View>
+        ) : null}
 
-        <Pressable
-          accessibilityRole="button"
-          disabled={project.archived}
-          style={[styles.videoAction, { borderColor: palette.text, opacity: project.archived ? 0.5 : 1 }]}
-          onPress={() => void openVideo()}
-        >
-          <Text style={[styles.videoActionText, { color: palette.text }]}>
-            변화 영상 만들기
-          </Text>
-        </Pressable>
+
 
 
           </>

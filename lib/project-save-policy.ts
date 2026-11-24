@@ -79,12 +79,14 @@ export const canUploadLinkedProjectWork = ({
 }) => {
   const projectById = new Map(projects.map((project) => [project.id, project]));
   const photoProjectId = new Map(photos.map((photo) => [photo.id, photo.projectId]));
-  const linkedProjects = new Set(
-    (Array.isArray(photoIds) ? photoIds : [])
-      .map((photoId) => photoProjectId.get(photoId))
-      .filter((id): id is string => Boolean(id))
-  );
-  if (linkedProjects.size === 0) return legacyEnabled;
+  if (!Array.isArray(photoIds) || photoIds.length === 0) return false;
+  const linkedProjects = new Set<string>();
+  for (const photoId of photoIds) {
+    const projectId = photoProjectId.get(photoId);
+    if (!projectId || !projectById.has(projectId)) return false;
+    linkedProjects.add(projectId);
+  }
+  if (linkedProjects.size !== 1) return false;
   return [...linkedProjects].every(
     (projectId) =>
       selectedProjectIds.has(projectId) &&

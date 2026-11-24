@@ -92,12 +92,13 @@ for (const [name, file, key, get, save, merge, remove, data] of [
 function cloudFixture(f, hooks = {}) {
   const user = { uid: "u" }, remote = { ...oldPhoto, localId: "p", sequence: 1, sourceUpdatedAt: "2026-10-01", storagePath: "original/storage", downloadURL: "https://private/photo", uri: "https://private/photo", backupSessionId: "owner-session", sourceDeviceId: "owner-device", backupStatus: "backed_up" };
   const documents = new Map([["photoBackups/p", remote]]); let uploads = 0;
+  const localProject = { id: "pr", name: "Backup test", createdAt: oldPhoto.createdAt, updatedAt: oldPhoto.createdAt, targetPhotoCount: 100, referenceMode: "first", archived: false };
   const deps = new Proxy({
     "@/lib/firebase": { firebaseAuth: { currentUser: user }, firestore: {}, firebaseStorage: {}, firebaseFunctions: {} },
     "@/lib/local-library-owner": { assertLocalLibraryOwner: async () => {} },
     "@/lib/cloud-backup-project-slots": { getSelectedCloudBackupProjectIds: async () => new Set(["pr"]) },
     "@/lib/plan-entitlements": { getPlanEntitlements: () => ({ maxCloudBackupProjects: 1 }), getPlanTier: () => "pro" },
-    "@/lib/body-project-library": { getBodyProjects: async () => [], getBodyProjectById: async () => null, getDeletedBodyProjectIds: async () => new Set(), mergeBodyProjectsFromBackup: async (values, mergeItems) => { await hooks.mergeProjects?.(values); return mergeItems([], new Set(), new Set()); } },
+    "@/lib/body-project-library": { getBodyProjects: async () => hooks.workspaceProject ? [localProject] : [], getBodyProjectById: async id => hooks.workspaceProject && id === localProject.id ? localProject : null, getDeletedBodyProjectIds: async () => new Set(), mergeBodyProjectsFromBackup: async (values, mergeItems) => { await hooks.mergeProjects?.(values); return mergeItems([], new Set(), new Set()); } },
     "@/lib/project-save-policy": load("lib/project-save-policy.ts", {}),
     "@/lib/work-library": load("lib/work-library.ts", f.dependencies),
     "@/lib/video-library": load("lib/video-library.ts", f.dependencies),
@@ -231,7 +232,7 @@ for (const finishWithError of [false, true]) test(`project finalization ${finish
 
 for (const mode of ["single", "workspace"]) test(`${mode} backup completion cannot evict a newer photo edit`, async () => {
   const f = fixture(); const reached = barrier(), resume = barrier();
-  const c = cloudFixture(f, { upload: async () => { reached.resolve(); await resume.promise; } });
+  const c = cloudFixture(f, { workspaceProject: mode === "workspace", upload: async () => { reached.resolve(); await resume.promise; } });
   c.documents.clear();
   const backup = mode === "single" ? c.api.backupPhoto({ user: c.user, photo: oldPhoto, enabled: true }) : c.api.backupCurrentWorkspace({ user: c.user, subscription: {} });
   await reached.promise; const edited = await f.api.saveEditedPhoto(editInput);
@@ -242,12 +243,20 @@ for (const mode of ["single", "workspace"]) test(`${mode} backup completion cann
 });
 
 for (const mode of ["single", "workspace"]) test(`${mode} backup evicts the unchanged source version after its upload`, async () => {
-  const f = fixture(); const c = cloudFixture(f, { upload: async () => {} }); c.documents.clear();
+  const f = fixture(); const c = cloudFixture(f, { workspaceProject: mode === "workspace", upload: async () => {} }); c.documents.clear();
   if (mode === "single") await c.api.backupPhoto({ user: c.user, photo: oldPhoto, enabled: true });
   else await c.api.backupCurrentWorkspace({ user: c.user, subscription: {} });
   const persisted = (await f.api.getPhotos()).find(item => item.id === "p");
   assert.equal(persisted.localFileStatus, "cloud_only"); assert.match(persisted.uri, /^https:/);
   assert.equal(f.files.has(oldPhoto.uri), false); assert.equal(f.files.has(oldPhoto.previewUri), true);
+});
+
+test("workspace backup with a missing selected project does not upload or evict the local photo", async () => {
+  const f = fixture(); const c = cloudFixture(f); c.documents.clear();
+  await c.api.backupCurrentWorkspace({ user: c.user, subscription: {} });
+  assert.equal(c.uploads(), 0);
+  assert.equal((await f.api.getPhotos())[0].uri, oldPhoto.uri);
+  assert.ok(f.files.has(oldPhoto.uri));
 });
 
 test("project rollback does not adopt and discard an edit queued before reservation attachment", async () => {

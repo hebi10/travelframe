@@ -12,7 +12,17 @@ export const getExifPhotoCapturedAt = (exif: Record<string, unknown> | null | un
   if (!Number.isFinite(validation.getTime()) || validation.toISOString().slice(0, 19) !== local) return undefined;
 
   const offset = exif?.OffsetTimeOriginal ?? exif?.OffsetTimeDigitized ?? exif?.OffsetTime;
-  const timezone = typeof offset === "string" && EXIF_OFFSET.test(offset) ? offset : "+09:00";
-  const timestamp = new Date(`${local}${timezone}`);
-  return Number.isFinite(timestamp.getTime()) ? timestamp.toISOString() : undefined;
+  if (typeof offset === "string" && offset.trim() && !EXIF_OFFSET.test(offset)) return undefined;
+  const hasOffset = typeof offset === "string" && EXIF_OFFSET.test(offset);
+  const timestamp = new Date(hasOffset ? `${local}${offset}` : local);
+  if (!Number.isFinite(timestamp.getTime())) return undefined;
+  if (!hasOffset && (
+    timestamp.getFullYear() !== validation.getUTCFullYear() ||
+    timestamp.getMonth() !== validation.getUTCMonth() ||
+    timestamp.getDate() !== validation.getUTCDate() ||
+    timestamp.getHours() !== validation.getUTCHours() ||
+    timestamp.getMinutes() !== validation.getUTCMinutes() ||
+    timestamp.getSeconds() !== validation.getUTCSeconds()
+  )) return undefined;
+  return timestamp.toISOString();
 };

@@ -991,8 +991,8 @@ export const backupCurrentWorkspace = async ({
   const projectById = new Map(projects.map((project) => [project.id, project]));
   const cloudProjectIds = new Set(
     [...selectedProjectIds].filter((id) => {
-      const mode = projectById.get(id)?.saveMode;
-      return !mode || isProjectCloudSaveMode(mode);
+      const project = projectById.get(id);
+      return Boolean(project && (!project.saveMode || isProjectCloudSaveMode(project.saveMode)));
     })
   );
   if (
@@ -1998,7 +1998,7 @@ export const backupMadeVideo = async ({
     );
     if (!selectedProjectIds.has(video.projectId)) return null;
   }
-  if (!video.projectId && video.photoIds?.length) {
+  if (!video.projectId) {
     const [photos, projects, selectedProjectIds] = await Promise.all([
       getPhotos(),
       getBodyProjects(),

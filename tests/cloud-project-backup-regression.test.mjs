@@ -249,7 +249,7 @@ console.log("ok - project backups restore relationships and replace edited photo
 // Regression: partial multi-image failures must retire earlier uploads too.
 {
   const h=harness();
-  const work={id:"work-a", imageUris:["file:///1.jpg","file:///2.jpg"], createdAt:photo.createdAt};
+  const work={id:"work-a", photoIds:[photo.id], imageUris:["file:///1.jpg","file:///2.jpg"], createdAt:photo.createdAt};
   h.setWorks([work]); h.failUpload(2);
   await assert.rejects(h.api.backupImageBundleWork({user,work,enabled:true}), /upload failed/);
   assert.ok(h.released.includes("session-1"));
@@ -258,7 +258,7 @@ console.log("ok - project backups restore relationships and replace edited photo
 // Regression: replacing a multi-image backup must retire its previous sessions.
 {
   const h=harness();
-  const work={id:"work-a", imageUris:["file:///1.jpg"], createdAt:photo.createdAt};
+  const work={id:"work-a", photoIds:[photo.id], imageUris:["file:///1.jpg"], createdAt:photo.createdAt};
   h.setWorks([work]);
   h.remote.set("users/owner/imageWorks/work-a", {backupSessionIds:["old-work-session"],fileSize:100});
   await h.api.backupImageBundleWork({user,work,enabled:true});
@@ -334,6 +334,21 @@ console.log("ok - project backups restore relationships and replace edited photo
   for (const key of ["weightKg", "bodyFatPercent", "sourceAppPackage", "sourceRecordId", "sourceMemberIds"]) {
     assert.equal(Object.hasOwn(backedUp, key), false, key);
   }
+}
+
+{
+  const h = harness();
+  const work = { id: "orphan-work", photoIds: [photo.id, "missing-photo"], imageUris: ["file:///1.jpg"], createdAt: photo.createdAt };
+  h.setWorks([work]);
+  h.remote.set("users/owner/imageWorks/orphan-work", { backupSessionIds: ["existing-session"], fileSize: 100 });
+  assert.equal(await h.api.backupImageBundleWork({ user, work, enabled: true }), null);
+  assert.equal(h.uploads(), 0);
+  assert.deepEqual(h.remote.get("users/owner/imageWorks/orphan-work").backupSessionIds, ["existing-session"]);
+  assert.equal(h.released.length, 0);
+  const unlinked = { ...work, id: "unlinked-work", photoIds: [] };
+  h.setWorks([unlinked]);
+  assert.equal(await h.api.backupImageBundleWork({ user, work: unlinked, enabled: true }), null);
+  assert.equal(h.uploads(), 0);
 }
 
 {
