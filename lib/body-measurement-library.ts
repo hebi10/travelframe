@@ -337,7 +337,8 @@ export const detachBodyMeasurementsFromPhoto = async (photoId: string) =>
 
     if (changed) {
       await writeEntries(next);
-      for (const entry of entries.filter((item) => item.photoId === photoId && item.source === "manual")) {
+      for (const entry of entries.filter((item) => item.photoId === photoId &&
+        (item.source === "manual" || item.manualFields?.length))) {
         await enqueueProjectCloudSync({ projectId: entry.projectId, kind: "measurement", itemId: entry.id });
       }
     }

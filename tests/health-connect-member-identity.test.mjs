@@ -25,4 +25,16 @@ assert.equal(resolveHealthConnectMeasurementMatch(later, saved, new Set([saved[1
 const legacy = { id: "legacy", source: "health_connect", sourceRecordId: later.sourceRecordId };
 assert.equal(resolveHealthConnectMeasurementMatch(later, [legacy], new Set()).existing.id, "legacy");
 assert.equal(resolveHealthConnectMeasurementMatch(later, [...saved, legacy], new Set()).existing.id, saved[1].id);
-console.log("ok - persisted Health Connect member identities take precedence over colliding generated IDs");
+const fat = { ...first, metric: "bodyFat", value: 19, sourceRecordId: "member-fat", recordedAt: "2026-11-20T21:00:30.000Z" };
+const separate = [first, fat].map((candidate, index) => {
+  const [group] = groupBodyHealthConnectMeasurements([candidate]);
+  return { id: "separate-" + index, source: "health_connect", sourceRecordId: group.sourceRecordId, sourceMemberIds: group.originalRecordIds };
+});
+const reimported = groupBodyHealthConnectMeasurements([first, fat], separate);
+assert.equal(reimported.length, 2, "independently saved single metrics must not merge into duplicates");
+for (const group of reimported) {
+  const expected = separate.find(entry => entry.sourceMemberIds.includes(group.originalRecordIds[0]));
+  assert.equal(resolveHealthConnectMeasurementMatch(group, separate, new Set()).existing.id, expected.id);
+}
+assert.equal(groupBodyHealthConnectMeasurements([first, fat]).length, 1, "new complementary metrics still pair");
+console.log("ok - persisted Health Connect member identities take precedence over colliding generated IDs and preserve independently saved records");

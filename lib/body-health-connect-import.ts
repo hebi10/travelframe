@@ -50,10 +50,10 @@ export const groupBodyHealthConnectMeasurements = (
   candidates: readonly BodyHealthConnectCandidate[],
   savedEntries: readonly BodyMeasurementEntry[] = []
 ) => {
-  const pairedIds = new Map<string, string>();
+  const savedMemberOwners = new Map<string, string>();
   for (const entry of savedEntries) {
-    if (entry.source !== "health_connect" || !entry.sourceMemberIds || entry.sourceMemberIds.length < 2) continue;
-    for (const id of entry.sourceMemberIds) pairedIds.set(id, entry.id);
+    if (entry.source !== "health_connect") continue;
+    for (const id of entry.sourceMemberIds ?? []) savedMemberOwners.set(id, entry.id);
   }
 
   const records = candidates.map((candidate) => ({ candidate, time: Date.parse(candidate.recordedAt) }))
@@ -69,7 +69,7 @@ export const groupBodyHealthConnectMeasurements = (
       const difference = right.time - left.time;
       if (difference > MATCH_WINDOW_MS) break;
       if (right.candidate.sourceAppPackage === source && right.candidate.metric !== left.candidate.metric &&
-          pairedIds.get(left.candidate.sourceRecordId) === pairedIds.get(right.candidate.sourceRecordId)) {
+          savedMemberOwners.get(left.candidate.sourceRecordId) === savedMemberOwners.get(right.candidate.sourceRecordId)) {
         pairs.push({ left, right, difference });
       }
     }
