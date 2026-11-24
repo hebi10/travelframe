@@ -47,12 +47,29 @@ test("recorder postinstall patch is repeatable and rejects changed native source
     fs.mkdirSync(path.dirname(sourcePath), { recursive: true });
     fs.cpSync(path.join(root, "scripts"), path.join(directory, "scripts"), { recursive: true });
     fs.writeFileSync(path.join(directory, "package.json"), JSON.stringify({ dependencies: { "react-native-view-recorder": "^0.4.1" } }));
+    // Reproduce the mandatory URI decoder patch contract without bypassing it.
+    const decoderRoot = path.join(root, "node_modules/decode-uri-component");
+    const fixtureDecoder = path.join(directory, "node_modules/decode-uri-component");
+    fs.mkdirSync(fixtureDecoder, { recursive: true });
+    for (const file of ["package.json", "index.js"]) {
+      fs.copyFileSync(path.join(decoderRoot, file), path.join(fixtureDecoder, file));
+    }
+    const lock = JSON.parse(fs.readFileSync(path.join(root, "package-lock.json"), "utf8"));
+    const decoderLocations = Object.entries(lock.packages).filter(([name]) =>
+      /(^|\/)node_modules\/decode-uri-component$/.test(name));
+    assert.equal(decoderLocations.length, 1);
+    fs.writeFileSync(path.join(directory, "package-lock.json"), JSON.stringify({
+      lockfileVersion: lock.lockfileVersion,
+      packages: Object.fromEntries(decoderLocations)
+    }));
     fs.writeFileSync(packagePath, JSON.stringify({ version: "0.4.1" }));
     fs.writeFileSync(sourcePath, installedSource);
     const apply = () => spawnSync(process.execPath, [path.join(directory, "scripts/apply-patches.mjs")], { encoding: "utf8" });
-    assert.equal(apply().status, 0);
+    const first = apply();
+    assert.equal(first.status, 0, first.stderr);
     const patched = fs.readFileSync(sourcePath, "utf8");
-    assert.equal(apply().status, 0);
+    const second = apply();
+    assert.equal(second.status, 0, second.stderr);
     assert.equal(fs.readFileSync(sourcePath, "utf8"), patched);
     const changed = patched.replace("codec.releaseOutputBuffer(index, false)", "codec.releaseOutputBuffer(index, true)");
     fs.writeFileSync(sourcePath, changed);
