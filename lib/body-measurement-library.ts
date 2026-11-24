@@ -202,6 +202,7 @@ export const saveBodyMeasurement = async ({
   note,
   source = "manual",
   sourceRecordId,
+  sourceMemberIds,
   sourceAppPackage,
   manualFields,
   manualRecordedAt
@@ -229,6 +230,7 @@ export const saveBodyMeasurement = async ({
       note,
       source,
       sourceRecordId,
+      sourceMemberIds: sourceMemberIds ?? entries.find((entry) => entry.id === nowId)?.sourceMemberIds,
       sourceAppPackage,
       manualFields,
       manualRecordedAt
@@ -245,7 +247,7 @@ export const saveBodyMeasurement = async ({
     await writeEntries(nextEntries);
     const tombstones = await readDeletedMeasurementIds();
     if (tombstones.delete(normalized.id)) await writeDeletedMeasurementIds(tombstones);
-    if (normalized.source === "manual" || normalized.manualRecordedAt) {
+    if (normalized.source === "manual" || normalized.manualFields?.length) {
       await enqueueProjectCloudSync({ projectId, kind: "measurement", itemId: normalized.id })
         .catch(() => undefined);
     }
@@ -304,7 +306,7 @@ export const getBodyMeasurementBySourceRecordId = async (
     entries.find(
       (entry) =>
         entry.source === "health_connect" &&
-        entry.sourceRecordId === sourceRecordId
+        (entry.sourceRecordId === sourceRecordId || entry.sourceMemberIds?.includes(sourceRecordId))
     ) ?? null
   );
 };

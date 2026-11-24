@@ -37,6 +37,7 @@ export type BodyMeasurementEntry = {
   note?: string;
   source: "manual" | "health_connect";
   sourceRecordId?: string;
+  sourceMemberIds?: string[];
   sourceAppPackage?: string;
   manualFields?: BodyMeasurementValueField[];
   manualRecordedAt?: string;

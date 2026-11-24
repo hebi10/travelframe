@@ -12,7 +12,7 @@ const importPureModule = (file) => {
 };
 
 const { getExifPhotoCapturedAt } = await importPureModule("photo-capture-date");
-const { findHealthConnectPhoto, groupBodyHealthConnectMeasurements } = await importPureModule("body-health-connect-import");
+const { findHealthConnectPhoto, groupBodyHealthConnectMeasurements, indexHealthConnectMeasurements } = await importPureModule("body-health-connect-import");
 const { normalizeBodyFrameVideoOptions } = await importPureModule("body-frame-video");
 const camera = await importPureModule("body-frame-camera-session");
 
@@ -59,6 +59,21 @@ test("Health Connect matches the closest complementary measurement within one mi
   ]);
   assert.deepEqual(groups.find((group) => group.originalRecordIds.includes("paired")).originalRecordIds, ["nearest", "paired"]);
   assert.equal(groups.length, 4);
+});
+
+test("Health Connect finds the same pair when only one previously imported metric is enabled", () => {
+  const weight = { metric: "weight", value: 72, recordedAt: "2026-11-20T21:00:00Z", sourceRecordId: "weight-id", sourceAppPackage: "source" };
+  const fat = { metric: "bodyFat", value: 18, recordedAt: "2026-11-20T21:00:30Z", sourceRecordId: "fat-id", sourceAppPackage: "source" };
+  const [pair] = groupBodyHealthConnectMeasurements([weight, fat]);
+  const saved = {
+    id: "saved-pair", source: "health_connect", sourceRecordId: pair.sourceRecordId,
+    sourceMemberIds: pair.originalRecordIds
+  };
+  const [updated] = groupBodyHealthConnectMeasurements([fat], [saved]);
+  assert.notEqual(updated.sourceRecordId, saved.sourceRecordId);
+  assert.equal(indexHealthConnectMeasurements([saved]).get(updated.originalRecordIds[0]), saved);
+  const nearby = { ...weight, sourceRecordId: "new-weight", recordedAt: "2026-11-20T21:00:29Z" };
+  assert.equal(groupBodyHealthConnectMeasurements([nearby, fat], [saved]).length, 2);
 });
 
 test("saved Body Frame settings round-trip with music and all overlay properties", () => {
