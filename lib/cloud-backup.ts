@@ -1061,6 +1061,7 @@ export const backupCurrentWorkspace = async ({
       continue;
     }
     if (isPhotoBackupCurrent(photo, existingPhotoBackups.get(photo.id))) {
+      if (photo.backupStatus === "pending") await markPhotoVersionBackedUp(photo);
       continue;
     }
     backupablePhotoBackups.push(photo);
@@ -1268,6 +1269,7 @@ export const backupCurrentWorkspace = async ({
       continue;
     }
 
+    if (photo.backupStatus === "pending") await markPhotoVersionBackedUp(photo);
     await applyStorageSaverPolicy({
       settings,
       photo,
