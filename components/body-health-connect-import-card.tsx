@@ -29,7 +29,7 @@ import {
   saveBodyMeasurement
 } from "@/lib/body-measurement-library";
 import { getPhotos } from "@/lib/photo-library";
-import { findHealthConnectPhoto, groupBodyHealthConnectMeasurements, resolveHealthConnectMeasurementMatch } from "@/lib/body-health-connect-import";
+import { findHealthConnectPhoto, getHealthConnectSourceMemberIds, groupBodyHealthConnectMeasurements, resolveHealthConnectMeasurementMatch } from "@/lib/body-health-connect-import";
 import { useAppAppearance } from "@/lib/app-appearance";
 import {
   bodyMeasurementMetricMeta,
@@ -205,7 +205,7 @@ export function BodyHealthConnectImportCard({
         const photo = existing?.photoId ? undefined :
           findHealthConnectPhoto(group.recordedAt, projectPhotos, occupiedPhotoIds);
         const manualFields = existing?.manualFields ?? [];
-        const sourceMemberIds = [...new Set([...(existing?.sourceMemberIds ?? []), ...group.originalRecordIds])];
+        const sourceMemberIds = getHealthConnectSourceMemberIds(existing, group);
         const aliasesChanged = sourceMemberIds.length !== (existing?.sourceMemberIds?.length ?? 0);
         const legacyDuplicates = [...new Set(legacy)].filter((entry) =>
           entry.id !== existing?.id && !entry.photoId && !entry.sourceMemberIds?.length && !entry.manualRecordedAt && !entry.note &&
