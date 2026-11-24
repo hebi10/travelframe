@@ -123,7 +123,6 @@ test("TF-FINAL-08 comparison capture and required MP4 tool setup preserve actual
   assert.ok(independent.includes("timeout 600s"));
   assert.ok(independent.includes("Acquire::Retries=2"));
   assert.ok(independent.includes("command -v ffprobe"));
-  assert.ok(independent.includes("command -v ffmpeg"));
   assert.ok(independent.includes("scripts/verify_ui_r05_video_qa.py"));
   assert.ok(independent.includes("inputs.release_qa == true"));
   assert.ok(workflow.includes('if: github.event_name == \'workflow_dispatch\''));

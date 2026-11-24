@@ -11,6 +11,8 @@ on:
       - '.github/workflows/play-closed-release.yml'
       - 'scripts/release/tf_release_orchestrator.py'
       - 'scripts/release/test_tf_release_auto_contract.py'
+      - 'scripts/capture-stage13-android.py'
+      - 'scripts/test_capture_stage13_qa.py'
   workflow_dispatch:
 
 permissions:
@@ -31,6 +33,8 @@ jobs:
         run: |
           python3 -m py_compile scripts/release/tf_release_orchestrator.py
           python3 -m unittest discover -s scripts/release -p 'test_tf_release_auto*.py' -v
+      - name: Check host-only Android capture contracts
+        run: python3 scripts/test_capture_stage13_qa.py
       - name: Check OPS-07 and OPS-08 release policy regressions
         run: |
           python3 -m unittest discover -s scripts/ops07 -p 'test_*.py' -v

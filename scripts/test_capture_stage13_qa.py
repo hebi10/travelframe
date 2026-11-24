@@ -52,6 +52,17 @@ class Stage13CaptureTest(unittest.TestCase):
         self.assertIn("compare", stage13.CORE)
         self.assertIn("compare", stage13.LARGE_TEXT)
 
+    def test_native_video_verifier_checks_both_host_tools_before_real_media_audit(self):
+        workflow = (SCRIPT.parents[1] / ".github/workflows/body-frame-device-qa.yml").read_text(encoding="utf-8")
+        independent = workflow.split("  ui-r05-native-verify:", 1)[1].split("  ui-r07-visual-verify:", 1)[0]
+        self.assertIn("command -v ffmpeg", independent)
+        self.assertIn("command -v ffprobe", independent)
+        self.assertIn("timeout 600s", independent)
+        self.assertIn("Acquire::Retries=2", independent)
+        self.assertIn("scripts/verify_ui_r05_video_qa.py", independent)
+        self.assertLess(independent.index("command -v ffmpeg"), independent.index("python3 scripts/verify_ui_r05_video_qa.py"))
+        self.assertIn("inputs.release_qa == true", independent)
+
     def test_c2_camera_project_sheet_actions_follow_native_controls(self):
         device = Mock()
         stage13.open_camera_new_project(device)
