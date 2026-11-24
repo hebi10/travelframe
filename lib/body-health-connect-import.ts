@@ -24,6 +24,28 @@ export const indexHealthConnectMeasurements = (entries: readonly BodyMeasurement
   return indexed;
 };
 
+export const resolveHealthConnectMeasurementMatch = (
+  group: Pick<ImportedMeasurement, "sourceRecordId" | "originalRecordIds" | "legacyGroupIds">,
+  savedEntries: readonly BodyMeasurementEntry[],
+  matchedEntryIds: ReadonlySet<string>
+) => {
+  const memberIds = new Set(group.originalRecordIds);
+  const eligible = savedEntries.filter((entry) =>
+    entry.source === "health_connect" && !matchedEntryIds.has(entry.id)
+  );
+  const members = eligible.filter((entry) =>
+    entry.sourceMemberIds?.some((id) => memberIds.has(id))
+  );
+  const fallbackIds = new Set([group.sourceRecordId, ...group.legacyGroupIds, ...group.originalRecordIds]);
+  const legacy = eligible.filter((entry) =>
+    !entry.sourceMemberIds?.length && entry.sourceRecordId && fallbackIds.has(entry.sourceRecordId)
+  );
+  const existing = members.find((entry) => entry.photoId) ?? members[0] ??
+    legacy.find((entry) => entry.sourceRecordId === group.sourceRecordId) ??
+    legacy.find((entry) => entry.photoId) ?? legacy[0];
+  return { existing, legacy };
+};
+
 export const groupBodyHealthConnectMeasurements = (
   candidates: readonly BodyHealthConnectCandidate[],
   savedEntries: readonly BodyMeasurementEntry[] = []
