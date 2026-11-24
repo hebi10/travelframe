@@ -112,15 +112,21 @@ assert.match(cancelledRecording.messages.at(-1), /취소/);
 
 const videoHelpers = {};
 vm.runInNewContext(compile(fs.readFileSync("lib/body-frame-video.ts", "utf8")), { exports: videoHelpers });
+const exportHelpers = {};
+vm.runInNewContext(compile(fs.readFileSync("lib/body-frame-video-export.ts", "utf8")), {
+  exports: exportHelpers, AbortController, Error, setTimeout, clearTimeout
+});
 for (const ratio of ["3:4", "9:16", "1:1", "16:9"]) {
   for (const quality of [720, 1080]) {
     let nativeOptions;
     const outputSize = videoHelpers.getBodyFrameVideoOutputSize(ratio, quality);
     const totalFrames = videoHelpers.getBodyFrameVideoTotalFrames(7, 0.2);
     const record = vm.runInNewContext(compile(`(${recordCallback})`), {
+      ...exportHelpers,
       recordingViewAvailable: true, selectedTrack: null,
       FileSystem: {
-        cacheDirectory: "file:///cache/", getInfoAsync: async () => ({ exists: true, size: 50 }),
+        cacheDirectory: "file:///cache/", getInfoAsync: async () => ({ exists: true, isDirectory: false, size: 50 }),
+        getFreeDiskStorageAsync: async () => 2 * 1024 * 1024 * 1024,
         makeDirectoryAsync: async () => {}, deleteAsync: async () => {}
       },
       projectPhotos: Array.from({ length: 7 }), totalFrames, outputSize,
