@@ -1,7 +1,9 @@
+import { normalizeBodyFrameVideoOptions } from "@/lib/body-frame-video";
 import * as FileSystem from "expo-file-system/legacy";
 import { downloadPrivateFile } from "@/lib/private-storage";
 
 import { localStorageAdapter } from "@/lib/local-storage";
+import { enqueueProjectCloudSync } from "@/lib/project-cloud-sync-queue";
 import { assertLocalLibraryCapacity } from "@/lib/local-library-limit";
 import { getNextTripClipTitle, TRIP_CLIP_TITLE_PREFIX } from "@/lib/trip-clip-title";
 import type { MadeVideoItem } from "@/types/video";
@@ -85,6 +87,7 @@ const normalizeMadeVideoItem = (
   durations: normalizeVideoDurations(video.durations),
   musicId: normalizeText(video.musicId, "none") as MadeVideoItem["musicId"],
   musicLabel: normalizeText(video.musicLabel, "무음"),
+  bodyFrameOptions: normalizeBodyFrameVideoOptions(video.bodyFrameOptions),
   storagePath: typeof video.storagePath === "string" ? video.storagePath : undefined,
   downloadURL: typeof video.downloadURL === "string" ? video.downloadURL : undefined,
   localUri: typeof video.localUri === "string" ? video.localUri : undefined,
@@ -177,8 +180,7 @@ const isLocalVideoAvailable = async (uri?: string | null) => {
 
 const persistMadeVideoFile = async (
   uri: string,
-  videoId: string,
-  options: { overwrite?: boolean } = {}
+  videoId: string
 ) => {
   if (isRemoteUri(uri) || !isFileUri(uri)) {
     return uri;
@@ -191,11 +193,13 @@ const persistMadeVideoFile = async (
 
   const destinationUri = `${directory}${videoId}.${getVideoFileExtension(uri)}`;
   const existingDestination = await FileSystem.getInfoAsync(destinationUri);
-  if (existingDestination.exists && options.overwrite) {
-    await FileSystem.deleteAsync(destinationUri, { idempotent: true });
-  }
-  if (!existingDestination.exists || options.overwrite) {
-    await FileSystem.copyAsync({ from: uri, to: destinationUri });
+  if (!existingDestination.exists) {
+    try {
+      await FileSystem.copyAsync({ from: uri, to: destinationUri });
+    } catch (error) {
+      await FileSystem.deleteAsync(destinationUri, { idempotent: true }).catch(() => undefined);
+      throw error;
+    }
   }
 
   return destinationUri;
@@ -214,6 +218,13 @@ const persistVideoCover = async (uri: string | undefined, videoId: string) => {
     await FileSystem.copyAsync({ from: uri, to: destinationUri });
   }
   return destinationUri;
+};
+
+const isOwnedVideoCover = (uri: string, id: string) => {
+  if (!FileSystem.documentDirectory) return false;
+  const prefix = `${FileSystem.documentDirectory}${VIDEO_DIRECTORY}${id}`;
+  return uri === `${prefix}-cover.jpg` ||
+    (uri.startsWith(`${prefix}-revision-`) && uri.endsWith("-cover.jpg"));
 };
 
 export const getMadeVideos = async () => {
@@ -242,6 +253,14 @@ export const getMadeVideoById = async (id: string) => {
   const videos = await getMadeVideos();
   const video = videos.find((item) => item.id === id) ?? null;
   return video ? restoreMadeVideoIfNeeded(video) : null;
+};
+
+export const requireLocalMadeVideo = async (id: string) => {
+  const video = await getMadeVideoById(id);
+  if (!video || !isFileUri(video.uri) || !(await isLocalVideoAvailable(video.uri))) {
+    throw new Error("이 영상을 기기에 불러오지 못했습니다.");
+  }
+  return video;
 };
 
 export const replaceMadeVideosFromBackup = async (videos: MadeVideoItem[]) => runVideoMutation(async () => {
@@ -276,6 +295,10 @@ export const saveMadeVideo = async (
   };
 
   await writeVideos([savedVideo, ...videos]);
+  if (savedVideo.projectId) {
+    await enqueueProjectCloudSync({ projectId: savedVideo.projectId, kind: "video", itemId: savedVideo.id })
+      .catch(() => undefined);
+  }
   return savedVideo;
 });
 
@@ -290,12 +313,18 @@ export const updateMadeVideo = async (
     return null;
   }
 
-  const persistedUri = updates.uri
-    ? await persistMadeVideoFile(updates.uri, id, { overwrite: true })
-    : video.uri;
-  const coverUri = updates.coverUri
-    ? await persistVideoCover(updates.coverUri, id)
-    : video.coverUri;
+  const revisionId = `${id}-revision-${createVideoId()}`;
+  let persistedUri = video.uri;
+  let coverUri = video.coverUri;
+  try {
+    if (updates.uri) persistedUri = await persistMadeVideoFile(updates.uri, revisionId);
+    if (updates.coverUri) coverUri = await persistVideoCover(updates.coverUri, revisionId);
+  } catch (error) {
+    if (persistedUri !== video.uri && persistedUri !== updates.uri && isFileUri(persistedUri)) {
+      await FileSystem.deleteAsync(persistedUri, { idempotent: true }).catch(() => undefined);
+    }
+    throw error;
+  }
   const updatedVideo: MadeVideoItem = {
     ...video,
     ...updates,
@@ -303,13 +332,31 @@ export const updateMadeVideo = async (
     id: video.id,
     uri: persistedUri,
     localUri: isRemoteUri(persistedUri) ? updates.localUri ?? video.localUri : persistedUri,
-    createdAt: video.createdAt
+    createdAt: video.createdAt,
+    updatedAt: new Date().toISOString()
   };
 
-  await writeVideos(videos.map((item) => (item.id === id ? updatedVideo : item)));
+  try {
+    await writeVideos(videos.map((item) => (item.id === id ? updatedVideo : item)));
+  } catch (error) {
+    for (const uri of [persistedUri, coverUri]) {
+      if (uri && uri !== video.uri && uri !== video.coverUri &&
+          uri !== updates.uri && uri !== updates.coverUri && isFileUri(uri)) {
+        await FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => undefined);
+      }
+    }
+    throw error;
+  }
+  if (updatedVideo.projectId) {
+    await enqueueProjectCloudSync({ projectId: updatedVideo.projectId, kind: "video", itemId: id })
+      .catch(() => undefined);
+  }
 
-  if (video.uri && video.uri !== persistedUri && !isRemoteUri(video.uri)) {
-    await FileSystem.deleteAsync(video.uri, { idempotent: true });
+  if (video.uri && video.uri !== persistedUri && isFileUri(video.uri)) {
+    await FileSystem.deleteAsync(video.uri, { idempotent: true }).catch(() => undefined);
+  }
+  if (video.coverUri && video.coverUri !== coverUri && isOwnedVideoCover(video.coverUri, id)) {
+    await FileSystem.deleteAsync(video.coverUri, { idempotent: true }).catch(() => undefined);
   }
 
   return updatedVideo;
@@ -409,22 +456,21 @@ export const markMadeVideoCloudOnly = async (
   return nextVideo;
 });
 
-export const deleteMadeVideo = async (id: string) => runVideoMutation(async () => {
+export const deleteMadeVideo = async (id: string, { projectDeletion = false } = {}) => runVideoMutation(async () => {
   await recordVideoLocalDeletionUnlocked(id);
   const videos = await getMadeVideos();
   const video = videos.find((item) => item.id === id);
-  if (video?.uri && !isRemoteUri(video.uri)) {
-    await FileSystem.deleteAsync(video.uri, { idempotent: true });
+  await writeVideos(videos.filter((item) => item.id !== id));
+  if (video?.uri && isFileUri(video.uri)) {
+    await FileSystem.deleteAsync(video.uri, { idempotent: true }).catch(() => undefined);
   }
   // Old records may share a project photo as their cover. Delete only our own copy.
-  if (
-    video?.coverUri &&
-    FileSystem.documentDirectory &&
-    video.coverUri === `${FileSystem.documentDirectory}${VIDEO_DIRECTORY}${video.id}-cover.jpg`
-  ) {
-    await FileSystem.deleteAsync(video.coverUri, { idempotent: true });
+  if (video?.coverUri && isOwnedVideoCover(video.coverUri, video.id)) {
+    await FileSystem.deleteAsync(video.coverUri, { idempotent: true }).catch(() => undefined);
   }
-  await writeVideos(videos.filter((video) => video.id !== id));
+  if (video?.projectId && !projectDeletion) {
+    await enqueueProjectCloudSync({ projectId: video.projectId, kind: "delete-video", itemId: id });
+  }
 });
 
 export const recordVideoLocalDeletion = (id: string) =>
@@ -432,16 +478,24 @@ export const recordVideoLocalDeletion = (id: string) =>
 
 // Read local state only after earlier mutations have committed. Local edits win;
 // deletion markers prevent a later cloud restore from resurrecting deleted items.
-export const mergeMadeVideosFromBackup = (incoming: MadeVideoItem[]) =>
+export const mergeMadeVideosFromBackup = (
+  incoming: MadeVideoItem[],
+  restorableIds: ReadonlySet<string> = new Set()
+) =>
   runVideoMutation(async () => {
     const current = await getMadeVideos();
     const deleted = await getDeletedVideoIds();
     const ids = new Set(current.map(item => item.id));
     const added = incoming.filter(item => {
-      if (ids.has(item.id) || deleted.has(item.id)) return false;
+      if (ids.has(item.id) || (deleted.has(item.id) && !restorableIds.has(item.id))) return false;
       ids.add(item.id);
       return true;
     });
     if (added.length) await writeVideos([...current, ...added]);
+    const deletedCount = deleted.size;
+    for (const item of incoming) {
+      if (restorableIds.has(item.id) && ids.has(item.id)) deleted.delete(item.id);
+    }
+    if (deleted.size !== deletedCount) await localStorageAdapter.setItem(VIDEO_DELETION_MARKER_KEY, JSON.stringify([...deleted]));
     return added;
   });

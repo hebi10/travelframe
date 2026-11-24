@@ -37,7 +37,10 @@ test("Stage D gallery actions stay accessible and retain editing, viewing and de
 test("Stage D tests Android dark/light modes with 150% system font independently", () => {
   assert.ok(capture.includes("('light-150', 'light', 'large', 1.5)"));
   assert.ok(capture.includes("('dark-150', 'dark', 'large', 1.5)"));
-  assert.ok(stage13.includes('"dark-100", "light-130", "dark-150", "light-150"'));
+  for (const variant of ["dark-100", "light-100", "dark-130", "light-130", "dark-150", "light-150"]) {
+    assert.ok(stage13.includes('"' + variant + '"'), variant);
+  }
+  assert.ok(stage13.includes("for variant in C7_VARIANTS:"));
   assert.ok(stage13.includes('"onboarding-first-run-light-large"'));
   assert.ok(stage13.includes('"new-project-light-large"'));
   assert.ok(stage13.includes("intro_seen=False"));

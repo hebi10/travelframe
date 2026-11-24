@@ -33,7 +33,7 @@ for (const snippet of [
   "setCameraSaveScope(settings.cameraSaveScope)",
   "const toggleCameraSaveTarget = (target: CameraSaveTarget)",
   "queueAppSettingsUpdate({ cameraSaveScope: nextScope })",
-  "저장 범위",
+  "저장 위치",
   "const cameraNativeCaptureInProgressRef = useRef(false)",
   "const captureSaveQueueTailRef = useRef<Promise<void>>(Promise.resolve())",
   "const [pendingPhotoSaveCount, setPendingPhotoSaveCount] = useState(0)",

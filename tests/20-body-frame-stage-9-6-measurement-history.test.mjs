@@ -40,7 +40,7 @@ for (const token of [
   'label="기록"',
   "기록 목록",
   "사진과 연결되지 않은 기록",
-  "현재 기기에만 저장됩니다.",
+  "프로젝트 백업 설정에 따라 클라우드에도 저장됩니다.",
   'router.push(("/photo/" + entry.photoId) as Href)'
 ]) {
   assert.ok(

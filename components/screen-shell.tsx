@@ -1,6 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import type { ReactNode } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View, type TextStyle } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions, type TextStyle } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { bodyFrameDesign, bodyFrameTypography, spacing, typography } from "@/constants/app-theme";
@@ -31,9 +31,11 @@ export function ScreenShell({
   children
 }: ScreenShellProps) {
   const insets = useSafeAreaInsets();
+  const { fontScale: systemFontScale } = useWindowDimensions();
   const { settings, palette, fontSizeScale, layoutScale, fontFamily } = useAppAppearance();
   const screenPadding = Math.round(bodyFrameDesign.horizontalPadding * layoutScale);
   const sectionGap = Math.round(bodyFrameDesign.sectionGap * layoutScale);
+  const extraTabLabelHeight = Math.max(0, Math.ceil(16 * fontSizeScale * systemFontScale) - 16);
 
   return (
     <ScrollView
@@ -47,6 +49,7 @@ export function ScreenShell({
           paddingTop: safeTop ? insets.top + screenPadding : screenPadding,
           paddingBottom:
             TAB_BAR_CONTENT_RESERVE_HEIGHT +
+            extraTabLabelHeight +
             Math.max(insets.bottom + 8, TAB_BAR_MIN_BOTTOM_PADDING)
         }
       ]}

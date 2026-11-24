@@ -105,7 +105,7 @@
 
 ## 출시 전 브랜드 QA
 
-- `assets/icons/app-icon.png`은 승인된 인물 윤곽·촬영 프레임·라임 포인트의 1024×1024 앱 아이콘이다.
+- `assets/icons/app-icon.png`은 2026-11-11 승인 인물 윤곽·회색 촬영 프레임의 1024×1024 평면 앱 아이콘이다.
 - `assets/icons/adaptive-icon.png`은 승인된 심볼에 Android 안전 여백을 적용한 1024×1024 이미지다.
 - Android Adaptive background는 `#151719`를 사용한다.
 - 실제 설치 앱의 런처 아이콘이 원형·둥근 사각형 마스크에서도 잘리지 않는지 확인한다.

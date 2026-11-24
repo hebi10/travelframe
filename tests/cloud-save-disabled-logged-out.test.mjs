@@ -7,11 +7,11 @@ const settingsSource = fs.readFileSync("features/settings/SettingsScreen.tsx", "
 for (const snippet of [
   "const canSelectCloudSaveTarget = planEntitlements.canBackupToCloud",
   'target === "cloud" && !canSelectCloudSaveTarget',
-  "const captureSaveScope = canSelectCloudSaveTarget",
-  "cloud: false",
+  "cloudAllowed: canSelectCloudSaveTarget",
+  "getProjectSaveTargets({",
   "saveScope: captureSaveScope",
-  "disabled={isCloudSaveTargetDisabled}",
-  "accessibilityState={{ disabled: isCloudSaveTargetDisabled"
+  "disabled={option.value === \"app\" || isCloudSaveTargetDisabled}",
+  "accessibilityState={{ disabled: option.value === \"app\" || isCloudSaveTargetDisabled"
 ]) {
   assert.ok(cameraSource.includes(snippet), `camera should disable cloud saves while logged out: ${snippet}`);
 }
@@ -20,7 +20,7 @@ for (const snippet of [
   "const canSelectCloudSaveTarget = planEntitlements.canBackupToCloud",
   'target === "cloud" && !canSelectCloudSaveTarget',
   "const isCloudSaveTargetDisabled = scope.value === \"cloud\" && !canSelectCloudSaveTarget",
-  "disabled={isCloudSaveTargetDisabled}",
+  "disabled={isDisabled}",
   "active={getCameraSaveScopeTargets(settings.cameraSaveScope)[scope.value] && !isCloudSaveTargetDisabled}"
 ]) {
   assert.ok(settingsSource.includes(snippet), `settings should disable cloud saves while logged out: ${snippet}`);

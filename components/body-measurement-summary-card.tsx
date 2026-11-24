@@ -37,13 +37,26 @@ const formatRangeDate = (recordedAt: string) => {
 function Sparkline({
   series,
   lineColor,
-  mutedColor
+  mutedColor,
+  axisLabelColor,
+  metricLabel,
+  unit
 }: {
   series: BodyMeasurementSeriesPoint[];
   lineColor: string;
   mutedColor: string;
+  axisLabelColor: string;
+  metricLabel: string;
+  unit: string;
 }) {
   const [width, setWidth] = useState(0);
+  const axisLabels = useMemo(() => {
+    const values = series.map((point) => point.value);
+    const minimum = Math.min(...values);
+    const maximum = Math.max(...values);
+    const formatter = new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 2 });
+    return [maximum, (maximum + minimum) / 2, minimum].map((value) => formatter.format(value));
+  }, [series]);
   const points = useMemo(
     () =>
       normalizeBodyMeasurementSparklinePoints({
@@ -56,10 +69,20 @@ function Sparkline({
 
   return (
     <View
-      style={styles.chart}
-      onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
+      style={styles.chartRow}
+      accessible
+      accessibilityRole="image"
+      accessibilityLabel={`${metricLabel} 변화 그래프, 시작 ${series[0]?.value}${unit}, 최근 ${series[series.length - 1]?.value}${unit}, 총 ${series.length}회 기록`}
     >
-      <View style={[styles.chartGuide, { backgroundColor: mutedColor }]} />
+      <View style={styles.chartAxis} accessible={false}>
+        {axisLabels.map((label, index) => (
+          <Text key={index} numberOfLines={1} style={[styles.chartAxisText, { color: axisLabelColor }]}>
+            {label}
+          </Text>
+        ))}
+      </View>
+      <View style={styles.chart} onLayout={(event) => setWidth(event.nativeEvent.layout.width)}>
+        <View style={[styles.chartGuide, { backgroundColor: mutedColor }]} />
 
       {points.slice(0, -1).map((point, index) => {
         const next = points[index + 1];
@@ -98,6 +121,7 @@ function Sparkline({
           ]}
         />
       ))}
+      </View>
     </View>
   );
 }
@@ -107,13 +131,15 @@ export function BodyMeasurementSummaryCard({
   series,
   onAddMeasurement,
   onOpenHistory,
-  compact = false
+  compact = false,
+  chartOnly = false
 }: {
   metric: BodyMeasurementMetric;
   series: BodyMeasurementSeriesPoint[];
   onAddMeasurement?: () => void;
   onOpenHistory?: () => void;
   compact?: boolean;
+  chartOnly?: boolean;
 }) {
   const { palette } = useAppAppearance();
   const meta = bodyMeasurementMetricMeta[metric];
@@ -124,18 +150,25 @@ export function BodyMeasurementSummaryCard({
     change === null
       ? null
       : `${change > 0 ? "+" : ""}${change}${meta.unit}`;
+  const range = useMemo(() => {
+    if (series.length < 2) return null;
+    const values = series.map((point) => point.value);
+    return { min: Math.min(...values), max: Math.max(...values) };
+  }, [series]);
 
   return (
     <View
       style={[
         styles.card,
         compact && styles.compactCard,
+        chartOnly && styles.chartOnlyCard,
         {
           borderColor: palette.line,
           backgroundColor: palette.surface
         }
       ]}
     >
+      {!chartOnly ? (
       <View style={styles.header}>
         <View style={styles.headerCopy}>
           <Text style={[styles.label, { color: palette.muted }]}>
@@ -147,12 +180,17 @@ export function BodyMeasurementSummaryCard({
                 ? "기록 없음"
                 : `${currentValue}${meta.unit}`}
             </Text>
-            {changeText ? (
+            {!compact && changeText ? (
               <Text style={[styles.change, { color: palette.muted }]}>
                 시작 대비 {changeText}
               </Text>
             ) : null}
           </View>
+          {compact && changeText ? (
+            <Text style={[styles.compactChange, { color: palette.text }]}>
+              시작 대비 {changeText}
+            </Text>
+          ) : null}
         </View>
         <View style={styles.headerActions}>
           <Text style={[styles.count, { color: palette.faint }]}>
@@ -171,25 +209,53 @@ export function BodyMeasurementSummaryCard({
           ) : null}
         </View>
       </View>
+      ) : null}
 
       {series.length >= 2 ? (
         <>
+          {compact && range ? (
+            <View style={styles.chartContext}>
+              <Text style={[styles.chartContextText, { color: palette.muted }]}>
+                변화 추이 · {meta.unit}
+              </Text>
+              <Text style={[styles.chartContextText, { color: palette.muted }]}>
+                최저 {range.min}{meta.unit} · 최고 {range.max}{meta.unit}
+              </Text>
+            </View>
+          ) : null}
           <Sparkline
             series={series}
             lineColor={palette.text}
             mutedColor={palette.line}
+            axisLabelColor={palette.muted}
+            metricLabel={meta.label}
+            unit={meta.unit}
           />
           <View style={styles.rangeRow}>
-            <Text style={[styles.rangeText, { color: palette.faint }]}>
-              {compact && summary.first
-                ? `시작 ${formatRangeDate(summary.first.recordedAt)}`
-                : "시작"}
-            </Text>
-            <Text style={[styles.rangeText, { color: palette.faint }]}>
-              {compact && summary.latest
-                ? `최근 ${formatRangeDate(summary.latest.recordedAt)}`
-                : "최근"}
-            </Text>
+            <View style={styles.rangeEndpoint}>
+              <Text style={[styles.rangeText, { color: palette.muted }]}>
+                {compact && summary.first
+                  ? `시작 ${formatRangeDate(summary.first.recordedAt)}`
+                  : "시작"}
+              </Text>
+              {compact && summary.first ? (
+                <Text style={[styles.rangeValue, { color: palette.text }]}>
+                  {summary.first.value}{meta.unit}
+                </Text>
+              ) : null}
+            </View>
+            <View style={[styles.rangeEndpoint, styles.rangeEndpointEnd]}>
+              <Text style={[styles.rangeText, { color: palette.muted }]}>
+                {compact && summary.latest
+                  ? `최근 ${formatRangeDate(summary.latest.recordedAt)}`
+                  : "최근"}
+              </Text>
+              {compact && summary.latest ? (
+                <Text style={[styles.rangeValue, { color: palette.text }]}>
+                  {summary.latest.value}{meta.unit}
+                </Text>
+              ) : null}
+            </View>
           </View>
         </>
       ) : series.length === 1 ? (
@@ -233,6 +299,10 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     padding: 12
   },
+  chartOnlyCard: {
+    gap: 6,
+    paddingVertical: 10
+  },
   header: {
     minHeight: bodyFrameDesign.minTouchSize,
     flexDirection: "row",
@@ -263,6 +333,22 @@ const styles = StyleSheet.create({
     fontSize: bodyFrameTypography.caption,
     fontVariant: ["tabular-nums"]
   },
+  compactChange: {
+    fontSize: bodyFrameTypography.body,
+    fontWeight: "600",
+    fontVariant: ["tabular-nums"]
+  },
+  chartContext: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 4
+  },
+  chartContextText: {
+    fontSize: bodyFrameTypography.caption,
+    fontVariant: ["tabular-nums"]
+  },
   count: {
     fontSize: bodyFrameTypography.caption,
     fontVariant: ["tabular-nums"]
@@ -282,9 +368,26 @@ const styles = StyleSheet.create({
     fontSize: bodyFrameTypography.caption,
     fontWeight: "600"
   },
+  chartRow: {
+    height: CHART_HEIGHT,
+    flexDirection: "row",
+    alignItems: "stretch",
+    gap: 8
+  },
+  chartAxis: {
+    width: 40,
+    minWidth: 40,
+    alignItems: "flex-end",
+    justifyContent: "space-between"
+  },
+  chartAxisText: {
+    fontSize: 11,
+    fontVariant: ["tabular-nums"]
+  },
   chart: {
     position: "relative",
-    width: "100%",
+    flex: 1,
+    minWidth: 0,
     height: CHART_HEIGHT,
     overflow: "hidden"
   },
@@ -308,10 +411,24 @@ const styles = StyleSheet.create({
   },
   rangeRow: {
     flexDirection: "row",
-    justifyContent: "space-between"
+    justifyContent: "space-between",
+    gap: 12
+  },
+  rangeEndpoint: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2
+  },
+  rangeEndpointEnd: {
+    alignItems: "flex-end"
   },
   rangeText: {
     fontSize: bodyFrameTypography.caption
+  },
+  rangeValue: {
+    fontSize: bodyFrameTypography.body,
+    fontWeight: "600",
+    fontVariant: ["tabular-nums"]
   },
   singleState: {
     minHeight: 54,

@@ -2,6 +2,7 @@ import { AppText as Text, AppTextInput as TextInput } from "@/components/app-tex
 import {
   useEffect,
   useMemo,
+  useRef,
   useState } from "react";
 import {
   Alert,
@@ -16,6 +17,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { bodyFrameDesign, bodyFrameSheetDesign, bodyFrameTypography } from "@/constants/app-theme";
+import { Image } from "@/components/private-media-image";
 import { BodyFrameSheetFooter, BodyFrameSheetHandle, BodyFrameSheetHeader } from "@/components/body-frame-sheet";
 import {
   deleteBodyMeasurement,
@@ -28,6 +30,7 @@ import {
 import { useAppAppearance } from "@/lib/app-appearance";
 import {
   bodyMeasurementMetricMeta,
+  bodyMeasurementValueFields,
   type BodyMeasurementEntry,
   type BodyMeasurementMetric,
   type BodyMeasurementSettings
@@ -128,7 +131,9 @@ export function BodyMeasurementEditorSheet({
   entry,
   requiredMetrics = [],
   allowRecordedAtEdit = false,
+  capturePhoto,
   onClose,
+  onSavePhotoDate,
   onSaved,
   onDeleted
 }: {
@@ -141,7 +146,9 @@ export function BodyMeasurementEditorSheet({
   entry?: BodyMeasurementEntry | null;
   requiredMetrics?: BodyMeasurementMetric[];
   allowRecordedAtEdit?: boolean;
+  capturePhoto?: { uri: string; projectName: string; sequence?: number };
   onClose: () => void;
+  onSavePhotoDate?: (recordedAt: string) => Promise<void>;
   onSaved: (entry: BodyMeasurementEntry) => void;
   onDeleted?: () => void;
 }) {
@@ -151,6 +158,12 @@ export function BodyMeasurementEditorSheet({
   const [recordedDateDraft, setRecordedDateDraft] = useState("");
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const requestClose = () => {
+    if (!savingRef.current) onClose();
+  };
 
   const activeMetrics = useMemo(() => {
     const configuredMetrics = (
@@ -167,16 +180,18 @@ export function BodyMeasurementEditorSheet({
   useEffect(() => {
     if (!visible) return;
     setDrafts(getEntryDrafts(entry));
-    setRecordedDateDraft(formatRecordedDate(entry?.recordedAt ?? recordedAt));
+    setRecordedDateDraft(formatRecordedDate(onSavePhotoDate ? recordedAt : entry?.recordedAt ?? recordedAt));
     setNote(entry?.note ?? "");
-  }, [entry, recordedAt, visible]);
+    setSaveError(null);
+  }, [entry, onSavePhotoDate, photoId, projectId, recordedAt, sequence, visible]);
 
   const updateDraft = (metric: BodyMeasurementMetric, value: string) => {
     setDrafts((current) => ({ ...current, [metric]: value }));
   };
 
   const submit = async () => {
-    if (saving) return;
+    if (savingRef.current) return;
+    setSaveError(null);
 
     const parsed = Object.fromEntries(
       activeMetrics.map((metric) => [metric, parseDraft(metric, drafts[metric])])
@@ -191,9 +206,10 @@ export function BodyMeasurementEditorSheet({
       return;
     }
 
+    const currentRecordedAt = onSavePhotoDate ? recordedAt : entry?.recordedAt ?? recordedAt;
     const nextRecordedAt = allowRecordedAtEdit
-      ? parseRecordedDate(recordedDateDraft, entry?.recordedAt ?? recordedAt)
-      : recordedAt;
+      ? parseRecordedDate(recordedDateDraft, currentRecordedAt)
+      : currentRecordedAt;
     if (!nextRecordedAt) {
       Alert.alert(
         "날짜를 확인해 주세요.",
@@ -202,26 +218,53 @@ export function BodyMeasurementEditorSheet({
       return;
     }
 
+    const dateChanged = nextRecordedAt !== currentRecordedAt;
+    const values = {
+      weightKg: activeMetrics.includes("weight") ? parsed.weight ?? undefined : entry?.weightKg,
+      bodyFatPercent: activeMetrics.includes("bodyFat") ? parsed.bodyFat ?? undefined : entry?.bodyFatPercent,
+      skeletalMuscleKg: activeMetrics.includes("skeletalMuscle") ? parsed.skeletalMuscle ?? undefined : entry?.skeletalMuscleKg,
+      waistCm: activeMetrics.includes("waist") ? parsed.waist ?? undefined : entry?.waistCm,
+      note: note.trim() || undefined
+    };
+    const changedFields = bodyMeasurementValueFields.filter((field) => values[field] !== entry?.[field]);
+    const isImported = entry?.source === "health_connect";
+    const saveMeasurement = changedFields.length > 0 ||
+      Boolean(entry && dateChanged && (!onSavePhotoDate || !isImported));
+    if (!saveMeasurement && !(onSavePhotoDate && dateChanged)) {
+      requestClose();
+      return;
+    }
+
+    savingRef.current = true;
     setSaving(true);
     try {
-      const saved = await saveBodyMeasurement({
-        id: entry?.id,
-        projectId,
-        photoId,
-        sequence,
-        recordedAt: nextRecordedAt,
-        weightKg: parsed.weight ?? undefined,
-        bodyFatPercent: parsed.bodyFat ?? undefined,
-        skeletalMuscleKg: parsed.skeletalMuscle ?? undefined,
-        waistCm: parsed.waist ?? undefined,
-        note,
-        source: entry?.source ?? "manual",
-        sourceRecordId: entry?.sourceRecordId,
-        sourceAppPackage: entry?.sourceAppPackage
-      });
-      onSaved(saved);
+      if (saveMeasurement) {
+        const manualFields = isImported
+          ? [...new Set([...(entry.manualFields ?? []), ...changedFields])]
+          : undefined;
+        const saved = await saveBodyMeasurement({
+          id: entry?.id,
+          projectId,
+          photoId,
+          sequence,
+          recordedAt: isImported && onSavePhotoDate ? entry.recordedAt : nextRecordedAt,
+          ...values,
+          source: entry?.source ?? "manual",
+          sourceRecordId: entry?.sourceRecordId,
+          sourceAppPackage: entry?.sourceAppPackage,
+          manualFields,
+          manualRecordedAt: manualFields?.length
+            ? (onSavePhotoDate || dateChanged ? nextRecordedAt : entry?.manualRecordedAt ?? new Date().toISOString())
+            : undefined
+        });
+        onSaved(saved);
+      }
+      if (onSavePhotoDate && dateChanged) await onSavePhotoDate(nextRecordedAt);
       onClose();
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : "수치 기록을 저장하지 못했습니다. 다시 시도해 주세요.");
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   };
@@ -229,7 +272,7 @@ export function BodyMeasurementEditorSheet({
   const confirmDelete = () => {
     if (!entry || saving) return;
 
-    Alert.alert("수치 기록을 삭제할까요?", "사진은 삭제되지 않습니다.", [
+    Alert.alert("수치 기록을 삭제할까요?", "이 수치 기록과 연결된 클라우드 백업이 삭제됩니다. 사진은 유지됩니다.", [
       { text: "취소", style: "cancel" },
       {
         text: "삭제",
@@ -255,14 +298,14 @@ export function BodyMeasurementEditorSheet({
       transparent
       animationType="slide"
       visible={visible}
-      onRequestClose={onClose}
+      onRequestClose={requestClose}
     >
       <KeyboardAvoidingView
         style={styles.keyboardAvoidingRoot}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
       <View style={styles.backdrop}>
-        <Pressable accessibilityRole="button" accessibilityLabel="수치 기록 닫기" style={StyleSheet.absoluteFill} onPress={onClose} />
+        <Pressable accessibilityRole="button" accessibilityLabel={capturePhoto ? "나중에 입력" : "수치 기록 닫기"} style={StyleSheet.absoluteFill} onPress={requestClose} />
         <View
           accessibilityViewIsModal
           style={[
@@ -276,11 +319,16 @@ export function BodyMeasurementEditorSheet({
         >
           <BodyFrameSheetHandle />
           <BodyFrameSheetHeader
-            title={allowRecordedAtEdit
-              ? entry ? "기록 정보 수정" : "기록 정보"
-              : entry ? "수치 기록 수정" : "수치 기록"}
-            description="입력한 값은 현재 기기에만 저장됩니다."
-            onClose={onClose}
+            title={capturePhoto
+              ? "촬영 기록 입력"
+              : allowRecordedAtEdit
+                ? entry ? "기록 정보 수정" : "기록 정보"
+                : entry ? "수치 기록 수정" : "수치 기록"}
+            description={capturePhoto
+              ? "사진은 이미 저장되었습니다. 원하는 항목만 입력하거나 나중에 입력할 수 있습니다."
+              : "직접 입력한 수치는 프로젝트 백업 설정에 따라 클라우드에도 저장됩니다."}
+            closeLabel={capturePhoto ? "나중에 입력" : "닫기"}
+            onClose={requestClose}
           />
 
           <ScrollView
@@ -290,6 +338,24 @@ export function BodyMeasurementEditorSheet({
             keyboardDismissMode="on-drag"
             contentContainerStyle={styles.content}
           >
+            {capturePhoto ? (
+              <View style={[styles.captureContext, { borderColor: palette.line, backgroundColor: palette.background }]}>
+                <Image
+                  source={{ uri: capturePhoto.uri }}
+                  style={styles.captureThumbnail}
+                  contentFit="contain"
+                  accessibilityLabel="방금 저장한 사진"
+                />
+                <View style={styles.captureContextCopy}>
+                  <Text numberOfLines={2} style={[styles.label, { color: palette.text }]}>
+                    {capturePhoto.projectName}
+                  </Text>
+                  <Text style={[styles.detail, { color: palette.muted }]}>
+                    {capturePhoto.sequence ? `${capturePhoto.sequence}번째 기록 · ` : ""}{formatRecordedDate(recordedAt)}
+                  </Text>
+                </View>
+              </View>
+            ) : null}
             {allowRecordedAtEdit ? (
               <View style={styles.field}>
                 <Text style={[styles.label, { color: palette.muted }]}>날짜</Text>
@@ -373,10 +439,16 @@ export function BodyMeasurementEditorSheet({
 
           </ScrollView>
           <View style={styles.actionFooter}>
+            {saveError ? (
+              <Text accessibilityLiveRegion="polite" style={[styles.detail, { color: palette.text }]}>
+                {saveError}
+              </Text>
+            ) : null}
             <BodyFrameSheetFooter
-              onCancel={onClose}
+              onCancel={requestClose}
               onConfirm={() => void submit()}
-              confirmLabel={saving ? "저장 중" : "저장"}
+              cancelLabel={capturePhoto ? "나중에 입력" : "취소"}
+              confirmLabel={saving ? "저장 중" : capturePhoto ? "정보 저장" : "저장"}
               disabled={saving}
             />
             {entry ? (
@@ -462,6 +534,21 @@ const styles = StyleSheet.create({
   actionFooter: {
     gap: 8,
     paddingTop: 10
+  },
+  captureContext: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    borderWidth: bodyFrameDesign.borderWidth,
+    padding: 10
+  },
+  captureThumbnail: {
+    width: 64,
+    height: 80
+  },
+  captureContextCopy: {
+    flex: 1,
+    gap: 4
   },
   field: {
     gap: 7

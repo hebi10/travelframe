@@ -1,3 +1,4 @@
+import { openPlans } from "@/lib/plan-navigation";
 import { AppText as Text } from "@/components/app-text";
 import {
   Feather } from "@expo/vector-icons";
@@ -125,6 +126,14 @@ export default function BodyFrameVideoHomeScreen() {
     [activeProject]
   );
 
+  const activeProjectPhotos = activeProject ? getBodyProjectPhotos(photos, activeProject.id) : [];
+  const activeProjectCover = activeProject
+    ? activeProjectPhotos.find(photo => photo.id === activeProject.coverPhotoId) ??
+      [...activeProjectPhotos].sort((a, b) => (b.sequence ?? 0) - (a.sequence ?? 0))[0]
+    : null;
+  const activeProjectSummary = activeProject
+    ? getBodyProjectProgressSummary(photos, activeProject)
+    : null;
   const recentVideos = videos.slice(0, 3);
 
   if (loading) {
@@ -141,7 +150,10 @@ export default function BodyFrameVideoHomeScreen() {
   const savedVideosSection = (
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: palette.text }]}>저장한 영상</Text>
+            <View style={styles.savedHeadingCopy}>
+              <Text style={[styles.sectionTitle, { color: palette.text }]}>저장한 영상</Text>
+              <Text style={[styles.sectionCount, { color: palette.muted }]}>{videos.length}개</Text>
+            </View>
             <Pressable
               accessibilityRole="button"
               onPress={() => router.push("/video-library")}
@@ -159,6 +171,7 @@ export default function BodyFrameVideoHomeScreen() {
                 <Pressable
                   key={video.id}
                   accessibilityRole="button"
+                  accessibilityLabel={`${video.title} 영상 재생 및 상세, ${formatDuration(video.duration)}, ${formatDate(video.createdAt)}`}
                   onPress={() =>
                     router.push({
                       pathname: "/video/[id]",
@@ -196,16 +209,22 @@ export default function BodyFrameVideoHomeScreen() {
                   </View>
                   <View style={styles.rowCopy}>
                     <Text
-                      numberOfLines={1}
+                      numberOfLines={2}
                       style={[styles.rowTitle, { color: palette.text }]}
                     >
                       {video.title}
                     </Text>
                     <Text style={[styles.rowDetail, { color: palette.muted }]}>
-                      {formatDate(video.createdAt)} · {formatDuration(video.duration)}
+                      {formatDate(video.createdAt)}
+                    </Text>
+                    <Text style={[styles.rowDetail, { color: palette.muted }]}>
+                      {formatDuration(video.duration)} · {video.ratio}
                     </Text>
                   </View>
-                  <Feather name="chevron-right" size={18} color={palette.muted} />
+                  <View style={styles.rowAction}>
+                    <Text style={[styles.rowActionText, { color: palette.text }]}>재생</Text>
+                    <Feather name="chevron-right" size={16} color={palette.muted} />
+                  </View>
                 </Pressable>
               ))}
             </View>
@@ -257,27 +276,43 @@ export default function BodyFrameVideoHomeScreen() {
           ]}
         >
           <View style={styles.heroHeader}>
-            <View style={[styles.heroIllustrationFrame, { backgroundColor: palette.surfaceStrong }]}>
-              <Image
-                source={require("../../assets/ui/illustrations/feature-video.png")}
-                style={styles.heroIllustration}
-                contentFit="contain"
-                accessible={false}
-              />
+            <View style={[
+              styles.heroIllustrationFrame,
+              activeProjectCover && styles.heroCoverFrame,
+              { backgroundColor: palette.surfaceStrong }
+            ]}>
+              {activeProjectCover ? (
+                <Image
+                  source={{ uri: activeProjectCover.previewUri ?? activeProjectCover.uri }}
+                  style={styles.heroCoverImage}
+                  contentFit="contain"
+                  accessible={false}
+                />
+              ) : (
+                <Image
+                  source={require("../../assets/ui/illustrations/feature-video.png")}
+                  style={styles.heroIllustration}
+                  contentFit="contain"
+                  accessible={false}
+                />
+              )}
             </View>
             <View style={styles.heroCopy}>
-              <Text style={[styles.heroTitle, { color: palette.text }]}>
-                변화 영상 만들기
+              <Text style={[styles.heroEyebrow, { color: palette.muted }]}>선택 프로젝트</Text>
+              <Text numberOfLines={2} style={[styles.heroTitle, { color: palette.text }]}>
+                {activeProject?.name ?? "변화 영상 만들기"}
               </Text>
               <Text style={[styles.heroDetail, { color: palette.muted }]}>
-                {activeProject
-                  ? `${activeProject.name} 프로젝트의 기록으로 영상을 만듭니다.`
+                {activeProjectSummary
+                  ? `${activeProjectSummary.photoCount}장 · 예상 영상 ${formatDuration(activeProjectSummary.durationSeconds)}`
                   : "먼저 프로젝트를 만들어 주세요."}
               </Text>
             </View>
           </View>
-          <Pressable
+        </View>
+        <Pressable
             accessibilityRole="button"
+            accessibilityLabel="선택한 프로젝트로 변화 영상 만들기"
             disabled={!activeProject}
             accessibilityState={{ disabled: !activeProject }}
             onPress={() => void startVideo()}
@@ -294,7 +329,25 @@ export default function BodyFrameVideoHomeScreen() {
               영상 만들기
             </Text>
           </Pressable>
-        </View>
+
+        {recentVideos.length > 0 ? savedVideosSection : null}
+
+        {planEntitlements.showWatermark ? (
+          <View style={[styles.policyRow, { borderColor: palette.line, backgroundColor: palette.surface }]}>
+            <Feather name="film" size={16} color={palette.muted} />
+            <Text style={[styles.policyText, { color: palette.muted }]}>
+              Pro 이상에서는 광고와 영상 워터마크를 제거하고 고급 출력 옵션을 사용할 수 있습니다.
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="영상 Pro 플랜 혜택 비교"
+              onPress={() => openPlans("video", "Pro")}
+              style={styles.textButton}
+            >
+              <Text style={[styles.textButtonText, { color: palette.text }]}>플랜 보기</Text>
+            </Pressable>
+          </View>
+        ) : null}
 
         <View
           style={[
@@ -312,8 +365,6 @@ export default function BodyFrameVideoHomeScreen() {
               : `비로그인 사용자는 주 1회 출력할 수 있습니다. 이번 주 ${guestUsage?.count ?? 0}/1회 사용`}
           </Text>
         </View>
-
-        {recentVideos.length > 0 ? savedVideosSection : null}
 
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
@@ -466,6 +517,18 @@ const styles = StyleSheet.create({
     width: 74,
     height: 74
   },
+  heroCoverFrame: {
+    width: 98,
+    height: 122
+  },
+  heroCoverImage: {
+    width: "100%",
+    height: "100%"
+  },
+  heroEyebrow: {
+    fontSize: bodyFrameTypography.caption,
+    fontWeight: "600"
+  },
   heroCopy: {
     flex: 1,
     minWidth: 0,
@@ -520,6 +583,12 @@ const styles = StyleSheet.create({
     fontSize: bodyFrameTypography.sectionTitle,
     fontWeight: "600"
   },
+  savedHeadingCopy: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    flexWrap: "wrap",
+    gap: 8
+  },
   sectionCount: {
     fontSize: bodyFrameTypography.caption
   },
@@ -559,6 +628,7 @@ const styles = StyleSheet.create({
   },
   rowCopy: {
     flex: 1,
+    minWidth: 0,
     gap: 4
   },
   rowTitle: {
@@ -567,7 +637,7 @@ const styles = StyleSheet.create({
   },
   rowDetail: {
     fontSize: bodyFrameTypography.caption,
-    lineHeight: 17
+    lineHeight: 18
   },
   rowAction: {
     flexDirection: "row",
@@ -579,7 +649,7 @@ const styles = StyleSheet.create({
     fontWeight: "600"
   },
   videoRow: {
-    minHeight: 94,
+    minHeight: 108,
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
@@ -589,8 +659,8 @@ const styles = StyleSheet.create({
     borderRadius: bodyFrameDesign.cardRadius
   },
   videoCover: {
-    width: 60,
-    height: 78,
+    width: 72,
+    height: 92,
     overflow: "hidden",
     alignItems: "center",
     justifyContent: "center",
@@ -617,18 +687,23 @@ const styles = StyleSheet.create({
     alignSelf: "center"
   },
   emptyCard: {
-    gap: 6,
+    gap: 8,
+    minHeight: 172,
     padding: 16,
+    alignItems: "center",
+    justifyContent: "center",
     borderWidth: bodyFrameDesign.borderWidth,
     borderRadius: bodyFrameDesign.cardRadius
   },
   emptyTitle: {
     fontSize: bodyFrameTypography.rowTitle,
-    fontWeight: "600"
+    fontWeight: "600",
+    textAlign: "center"
   },
   emptyDetail: {
     fontSize: bodyFrameTypography.caption,
-    lineHeight: 18
+    lineHeight: 19,
+    textAlign: "center"
   },
   message: {
     fontSize: bodyFrameTypography.caption,

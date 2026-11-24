@@ -61,7 +61,8 @@ await (async () => {
       setCameraSaveScope: (scope) => { selectedScope = scope; },
       queueAppSettingsUpdate: (settings) => { updates.push(settings); persistedSettings = { ...persistedSettings, ...settings }; },
       Alert: { alert: (_title, _message, buttons) => { actions = buttons; } },
-      Linking: { openSettings: () => {} }
+      Linking: { openSettings: () => {} },
+      getBodyFrameCameraSessionSnapshot: () => ({ projectId: null })
     })("권한 거절");
     actions.find((button) => button.text === "앱에만 저장").onPress();
     check("actual permission prompt callback applies the local fallback", () => {
@@ -147,6 +148,7 @@ const createCallback = findExpression(records,
     getBodyFrameProjectCreationLimitState,
     getBodyProjects: async () => Array.from({ length: activeCount }, (_, id) => ({ id: String(id), archived: false })),
     createBodyProject: async () => { markCreationStarted(); await creationGate; activeCount++; return { id: "created" }; },
+    initializeNewBodyProjectMeasurements: async () => {},
     archiveBodyProject: async () => { await creationGate; activeCount++; },
     setLastActiveProjectId: async () => {}, reload: async () => {}, Alert: { alert: () => {} }
   };
@@ -186,7 +188,7 @@ check("creation and onboarding content can scroll inside bounded containers", ()
 });
 check("photo actions open, move both directions, and offer direct position entry", () => {
   assert.ok(detail.includes('onAccessibilityTap={onOpen}'));
-  assert.ok(detail.includes('accessibilityValue={{ min: 1, max: count, now: count - index }}'));
+  assert.ok(detail.includes('accessibilityValue={canReorder ? { min: 1, max: count, now: count - index } : undefined}'));
   for (const action of ["activate", "increment", "decrement", "moveToPosition"]) {
     assert.ok(detail.includes(`name: "${action}"`), `${action} missing`);
   }
@@ -220,16 +222,25 @@ await (async () => {
       (node) => ts.isJsxAttribute(node) && node.name.getText() === "onAccessibilityAction",
       (node) => node.initializer.expression);
     const photoEvents = [];
-    const photoHandler = evaluate(photoAction, {
-      disabled: false, index: 2, count: 5,
+    const photoHandlerFor = (canReorder) => evaluate(photoAction, {
+      disabled: false, canReorder, index: 2, count: 5,
       getPhotoAccessibilityMoveIndex: helpers.getPhotoAccessibilityMoveIndex,
       onDrop: (...args) => photoEvents.push(["drop", ...args]),
       onOpen: () => photoEvents.push(["open"]),
       onMoveToPosition: () => photoEvents.push(["position"])
     });
+    const photoHandler = photoHandlerFor(true);
     for (const actionName of ["activate", "increment", "decrement", "moveToPosition"]) photoHandler({ nativeEvent: { actionName } });
     check("actual tile handler opens and routes each move through persistence callback", () => {
       assert.deepEqual(photoEvents, [["open"], ["drop", 2, 1], ["drop", 2, 3], ["position"]]);
+    });
+    check("archived photos still open while accessibility actions cannot reorder them", () => {
+      photoEvents.length = 0;
+      const readOnlyHandler = photoHandlerFor(false);
+      for (const actionName of ["activate", "increment", "decrement", "moveToPosition"]) {
+        readOnlyHandler({ nativeEvent: { actionName } });
+      }
+      assert.deepEqual(photoEvents, [["open"]]);
     });
     const sliders = await loadPure("features/camera/slider-accessibility.ts");
     check("slider actions use ten finite steps, support fractions, and clamp at edges", () => {

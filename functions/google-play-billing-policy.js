@@ -142,7 +142,16 @@ const shouldUpdateSubscriptionForPurchase = ({ purchase, existingProduct, tokenH
   return true;
 };
 
+const canUseLinkedPurchase = ({ linkedPurchase, uid }) =>
+  !linkedPurchase?.uid || linkedPurchase.uid === uid;
+
+const canExpireLinkedSubscription = ({ existingProduct, linkedHash }) =>
+  Boolean(linkedHash && existingProduct?.provider === "google_play" &&
+    existingProduct.googlePurchaseTokenHash === linkedHash);
+
 module.exports = {
+  canUseLinkedPurchase,
+  canExpireLinkedSubscription,
   shouldUpdateSubscriptionForPurchase,
   SUBSCRIPTION_ACCESS_STATES,
   getEffectiveSubscription,

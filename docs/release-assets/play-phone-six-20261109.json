@@ -1,0 +1,63 @@
+{
+  "packageName": "com.haebi.photoguide",
+  "language": "ko-KR",
+  "imageType": "phoneScreenshots",
+  "width": 1080,
+  "height": 1920,
+  "assets": [
+    {
+      "index": 1,
+      "fileId": "1smrtFjOEBLaEMOYH2SBWaDjlQ1oIQVTW",
+      "sourceSha256": "2ae308034a819a17053fbd15fb39d13c4b70ee82a388f5fac3810c521a594a5c",
+      "sourceWidth": 941,
+      "sourceHeight": 1672,
+      "heading": "몸 변화 기록을, 더 꾸준하게",
+      "outputName": "01_TravelFrame_01_1080x1920.png"
+    },
+    {
+      "index": 2,
+      "fileId": "1lyUHyddLg1nF6iRQO921Ro67hNFb4a6r",
+      "sourceSha256": "912bda42a3fd29bd929db3988ae963330a94f8193b434f5d1d8f2022b71d6f57",
+      "sourceWidth": 941,
+      "sourceHeight": 1672,
+      "heading": "프로젝트로 기록을 한눈에",
+      "outputName": "02_TravelFrame_02_1080x1920.png"
+    },
+    {
+      "index": 3,
+      "fileId": "1tNj-AzeY0VbG8Lg1Zd3J-mJxHR7mCkyn",
+      "sourceSha256": "15869de4b0207e04d1177addae41c460718429c79dcc6ccba4de7d4ec05b7045",
+      "sourceWidth": 941,
+      "sourceHeight": 1672,
+      "heading": "전후 사진을 정확하게 비교",
+      "outputName": "03_TravelFrame_03_1080x1920.png"
+    },
+    {
+      "index": 4,
+      "fileId": "1ixmpktiaKeZRmG7KsBP2QvS4y6XGFlL_",
+      "sourceSha256": "d0dd8f1b601ddbd369466d99819a73d4fa70586103b55e5271995386bee77cf4",
+      "sourceWidth": 941,
+      "sourceHeight": 1672,
+      "heading": "사진과 함께 수치도 기록",
+      "outputName": "04_TravelFrame_04_1080x1920.png"
+    },
+    {
+      "index": 5,
+      "fileId": "1VOw00FrpzWmkffq6W_fxxBdyfYD_fTY2",
+      "sourceSha256": "db05e066294f50ea48ea7894b897f9885b2e173c90ffa3b3b26527868be5601d",
+      "sourceWidth": 941,
+      "sourceHeight": 1672,
+      "heading": "기록을 변화 영상으로",
+      "outputName": "05_TravelFrame_05_1080x1920.png"
+    },
+    {
+      "index": 6,
+      "fileId": "1cyO1KtHZBcA4f6bNnYsgGDqDi4dOUwjj",
+      "sourceSha256": "9d4a46f97cb46c6a17c9ee28ca91e6812ec3f2d62cbf44d1d51d60ffdc7627b6",
+      "sourceWidth": 941,
+      "sourceHeight": 1672,
+      "heading": "같은 구도로 꾸준하게 촬영",
+      "outputName": "06_TravelFrame_06_1080x1920.png"
+    }
+  ]
+}

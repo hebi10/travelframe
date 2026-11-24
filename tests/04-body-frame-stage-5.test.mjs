@@ -190,10 +190,10 @@ assert.equal(cameraSession.getBodyFrameCameraSessionSnapshot().projectPhotoCount
 assert.equal(cameraSession.getBodyFrameCameraSessionSnapshot().pendingSaveCount, 0);
 
 const reserved100 = cameraSession.reserveBodyFrameCameraCapture();
-assert.equal(reserved100?.sequence, 101);
+assert.equal(reserved100?.sequence, 100);
 cameraSession.finishBodyFrameCameraCapture({
   projectId: "project-a",
-  sequence: 101,
+  sequence: 100,
   success: true
 });
 assert.equal(cameraSession.getBodyFrameCameraSessionSnapshot().projectPhotoCount, 100);

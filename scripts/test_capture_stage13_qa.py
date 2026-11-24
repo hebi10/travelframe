@@ -6,7 +6,7 @@ from pathlib import Path
 import tempfile
 import unittest
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import Mock, call, patch
 
 SCRIPT = Path(__file__).resolve().with_name("capture-stage13-android.py")
 SPEC = importlib.util.spec_from_file_location("body_frame_stage13_test_target", SCRIPT)
@@ -30,12 +30,125 @@ class Stage13CaptureTest(unittest.TestCase):
         self.assertGreaterEqual(len(names), 27)
         for needed in ("camera", "records", "project", "project-metrics", "project-stats",
                        "compare", "photo", "measurements", "video-home", "video-create",
-                       "video-library", "settings", "account", "video-overlay"):
+                       "video-library", "settings", "account", "plans", "video-overlay"):
             self.assertIn(needed, names)
         self.assertTrue(stage13.CORE.issubset(set(names)))
         self.assertTrue(stage13.LARGE_TEXT.issubset(set(names)))
         self.assertIn("new-project", [item[0] for item in stage13.ADDITIONAL])
         self.assertIn("empty-projects", [item[0] for item in stage13.ADDITIONAL])
+        self.assertIn("camera-project-picker", names)
+        self.assertIn("camera-new-project", names)
+        self.assertIn("camera-new-project", stage13.CORE)
+        self.assertIn("camera-new-project", stage13.LARGE_TEXT)
+        self.assertIn("plans", stage13.CORE)
+        self.assertIn("plans", stage13.LARGE_TEXT)
+        self.assertIn("plans", stage13.C7_PRIMARY)
+
+
+    def test_c2_camera_project_sheet_actions_follow_native_controls(self):
+        device = Mock()
+        stage13.open_camera_new_project(device)
+        device.ready.assert_called_once_with(["프로젝트 선택", "사진 촬영"])
+        self.assertEqual(device.open_control.call_args_list, [
+            call("프로젝트 선택", ["내 프로젝트", "프로젝트 관리"]),
+            call("+ 새 프로젝트", ["프로젝트 이름", "목표 기록 수", "프로젝트 만들기"]),
+        ])
+
+    def test_c3_camera_settings_capture_opens_real_native_sheet(self):
+        device = Mock()
+        stage13.open_camera_settings(device)
+        device.ready.assert_called_once_with(["프로젝트 선택", "사진 촬영"])
+        device.open_control.assert_called_once_with(
+            "촬영 설정 열기", ["촬영 도구", "촬영 옵션"]
+        )
+
+    def test_c3_storage_capture_finds_enabled_album_option(self):
+        device = Mock()
+        stage13.open_camera_save_targets(device)
+        device.find_control.assert_called_once_with("핸드폰 앨범", search="below")
+        names = [case[0] for case in stage13.CASES]
+        for case in ("camera-settings", "camera-settings-storage"):
+            self.assertIn(case, names)
+
+    def test_c4_camera_guide_settings_opens_from_native_camera_tools(self):
+        device = Mock()
+        stage13.open_camera_guide_settings(device)
+        self.assertEqual(device.open_control.call_args_list, [
+            call("촬영 설정 열기", ["촬영 도구", "촬영 옵션"]),
+            call("라인 가이드 설정 열기", ["가이드 설정", "가이드라인"]),
+        ])
+        self.assertIn("camera-guide-settings", [item[0] for item in stage13.CASES])
+
+    def test_c4_reference_adjustment_uses_existing_accessible_opacity_control(self):
+        device = Mock()
+        device.dump.return_value = (
+            '<hierarchy><node content-desc="기준 사진 투명도 42퍼센트"/></hierarchy>'
+        )
+        stage13.open_camera_reference_setup(device)
+        device.open_control.assert_called_once_with(
+            "기준 사진 투명도 42퍼센트", ["기준 사진 조정", "확인"]
+        )
+        self.assertIn("camera-reference-adjust", [item[0] for item in stage13.CASES])
+
+    def test_c4_reference_adjustment_requires_one_unambiguous_source(self):
+        device = Mock()
+        device.dump.return_value = '<hierarchy><node content-desc="다른 동작"/></hierarchy>'
+        with self.assertRaisesRegex(RuntimeError, "Exactly one reference photo"):
+            stage13.open_camera_reference_setup(device)
+        device.open_control.assert_not_called()
+
+    def test_c5_color_save_and_reset_are_visible_without_scrolling(self):
+        device = Mock()
+        device.viewport.return_value = (0, 24, 720, 1500)
+        device.dump.return_value = (
+            '<hierarchy>'
+            '<node content-desc="선택한 색감 슬롯에 현재 설정 저장" clickable="true" '
+            'enabled="true" bounds="[12,1400][280,1460]"/>'
+            '<node content-desc="색감 조절값 초기화" clickable="true" '
+            'enabled="true" bounds="[300,1400][520,1460]"/>'
+            '<node class="android.widget.ScrollView"/>'
+            '</hierarchy>'
+        )
+        stage13.open_camera_color_panel(device)
+        self.assertEqual(device.open_control.call_args_list, [
+            call("촬영 설정 열기", ["촬영 도구", "촬영 옵션"]),
+            call("색감 설정 열기", ["색감", "저장 슬롯", "설정 저장"]),
+        ])
+        device.viewport.assert_called()
+        self.assertIn("camera-color-panel", stage13.CORE)
+        self.assertIn("camera-color-panel", stage13.LARGE_TEXT)
+
+    def test_c5_color_footer_outside_viewport_is_rejected(self):
+        device = Mock()
+        device.viewport.return_value = (0, 24, 720, 1500)
+        device.dump.return_value = (
+            '<hierarchy>'
+            '<node content-desc="선택한 색감 슬롯에 현재 설정 저장" clickable="true" '
+            'enabled="true" bounds="[12,1510][280,1560]"/>'
+            '<node content-desc="색감 조절값 초기화" clickable="true" '
+            'enabled="true" bounds="[300,1400][520,1460]"/>'
+            '<node class="android.widget.ScrollView"/>'
+            '</hierarchy>'
+        )
+        with self.assertRaisesRegex(RuntimeError, "outside the usable viewport"):
+            stage13.open_camera_color_panel(device)
+
+    def test_c5_zoom_and_light_open_from_camera_tools(self):
+        zoom = Mock()
+        stage13.open_camera_zoom_panel(zoom)
+        self.assertEqual(zoom.open_control.call_args_list, [
+            call("촬영 설정 열기", ["촬영 도구", "촬영 옵션"]),
+            call("확대 설정 열기", ["확대", "1x"]),
+        ])
+        light = Mock()
+        stage13.open_camera_light_panel(light)
+        self.assertEqual(light.open_control.call_args_list, [
+            call("촬영 설정 열기", ["촬영 도구", "촬영 옵션"]),
+            call("라이트 설정 열기", ["조명", "끄기", "켜기"]),
+        ])
+        names = [case[0] for case in stage13.CASES]
+        self.assertIn("camera-zoom-panel", names)
+        self.assertIn("camera-light-panel", names)
 
     def test_stage_d_light_150_still_separates_first_install_and_replayed_guide(self):
         self.assertEqual(stage13.ALL_VARIANTS["light-150"], ("light", "large", 1.5))

@@ -189,6 +189,7 @@ const IMAGE_WORK_BACKUP_KEYS = new Set([
   "title",
   "createdAt",
   "updatedAt",
+  "sourceUpdatedAt",
   "coverUri",
   "ratio",
   "photoIds",
@@ -468,9 +469,11 @@ exports.selectCloudBackupProject = secureOnCall(async (request) => {
         { length: 5 },
         (_, index) => slotsRef.doc(`slot-${index + 1}`)
       );
-      const candidates = await Promise.all(
-        candidateRefs.map((ref) => tx.get(ref))
-      );
+      const [lock, ...candidates] = await Promise.all([
+        tx.get(db.doc(`users/${uid}/backupProjectLocks/${projectId}`)),
+        ...candidateRefs.map((ref) => tx.get(ref))
+      ]);
+      if (lock.exists) throw new HttpsError("aborted", "이 프로젝트의 백업 변경이 진행 중입니다.");
       const chosen = chooseBackupProjectSlot(candidates, projectId, slotLimit);
       if (chosen?.action === "reserved") {
         throw new HttpsError(
@@ -506,24 +509,49 @@ exports.selectCloudBackupProject = secureOnCall(async (request) => {
 
 const deleteBackupProjectCloudData = async ({ uid, projectId }) => {
   const userRef = db.doc(`users/${uid}`);
-  const [photoSnapshot, videoSnapshot, sessionSnapshot, adminSessionSnapshot] =
+  const [photoSnapshot, videoSnapshot, imageWorkSnapshot, sessionSnapshot, adminSessionSnapshot, measurementSnapshot] =
     await Promise.all([
       userRef.collection("photoBackups").where("projectId", "==", projectId).get(),
-      userRef.collection("videos").where("projectId", "==", projectId).get(),
+      userRef.collection("videos").get(),
+      userRef.collection("imageWorks").get(),
       userRef.collection("backupUploadSessions").where("projectId", "==", projectId).get(),
-      userRef.collection("adminBackupUploadSessions").where("projectId", "==", projectId).get()
+      userRef.collection("adminBackupUploadSessions").where("projectId", "==", projectId).get(),
+      userRef.collection("bodyMeasurements").where("projectId", "==", projectId).get()
     ]);
 
-  const backupDocs = [...photoSnapshot.docs, ...videoSnapshot.docs];
-  const storagePaths = [
-    ...backupDocs.flatMap((item) => {
+  const photoIds = new Set(photoSnapshot.docs.map((photo) => photo.id));
+  const belongsToProject = (data) => data.projectId === projectId ||
+    (!data.projectId && Array.isArray(data.photoIds) && data.photoIds.length > 0 &&
+      data.photoIds.every((id) => photoIds.has(id)));
+  const videos = videoSnapshot.docs.filter((item) => belongsToProject(item.data()));
+  const imageWorks = imageWorkSnapshot.docs.filter((item) => belongsToProject(item.data()));
+  const backupDocs = [...photoSnapshot.docs, ...videos, ...imageWorks];
+  const itemStoragePaths = new Set(backupDocs.flatMap((item) => {
       const data = item.data();
       return [
         data.storagePath,
         data.previewStoragePath,
         ...(Array.isArray(data.storagePaths) ? data.storagePaths : [])
       ].filter(Boolean);
-    }),
+    }));
+  const referencedIds = new Set(backupDocs.flatMap((item) => {
+    const data = item.data();
+    return [data.backupSessionId, ...(Array.isArray(data.backupSessionIds) ? data.backupSessionIds : [])]
+      .filter((id) => typeof id === "string" && id && !id.includes("/") && id !== "." && id !== "..");
+  }));
+  for (const session of sessionSnapshot.docs) referencedIds.delete(session.id);
+  const legacySessions = [];
+  const referencedRefs = [...referencedIds].map((id) => getSessionRef(uid, id));
+  for (let index = 0; index < referencedRefs.length; index += 450) {
+    const snapshots = await db.getAll(...referencedRefs.slice(index, index + 450));
+    legacySessions.push(...snapshots.filter((snapshot) => {
+      const session = snapshot.data();
+      return session && session.projectId == null && session.status === "completed" &&
+        itemStoragePaths.has(session.storagePath);
+    }));
+  }
+  const storagePaths = [
+    ...itemStoragePaths,
     ...sessionSnapshot.docs.map((item) => item.data().storagePath).filter(Boolean),
     ...adminSessionSnapshot.docs.map((item) => item.data().storagePath).filter(Boolean)
   ];
@@ -537,9 +565,13 @@ const deleteBackupProjectCloudData = async ({ uid, projectId }) => {
   );
 
   const refs = [
-    ...backupDocs.map((item) => item.ref),
+    // Keep backup documents available to rediscover legacy refs if a batch needs a retry.
+    ...legacySessions.map((item) => item.ref),
     ...sessionSnapshot.docs.map((item) => item.ref),
     ...adminSessionSnapshot.docs.map((item) => item.ref),
+    ...backupDocs.map((item) => item.ref),
+    ...measurementSnapshot.docs.map((item) => item.ref),
+    userRef.collection("bodyProjectSettings").doc(projectId),
     userRef.collection("bodyProjects").doc(projectId)
   ];
   await commitDeleteBatch(refs);
@@ -547,9 +579,53 @@ const deleteBackupProjectCloudData = async ({ uid, projectId }) => {
 
   return {
     deletedPhotoCount: photoSnapshot.size,
-    deletedVideoCount: videoSnapshot.size
+    deletedVideoCount: videos.length
   };
 };
+
+exports.deleteCloudBackupProject = secureOnCall(async (request) => {
+  try {
+    const uid = requireUid(request);
+    const projectId = normalizeBackupProjectId(request.data?.projectId);
+    if (!projectId || request.data?.confirmDeleteProjectId !== projectId) {
+      throw new HttpsError("failed-precondition", "삭제할 프로젝트를 명시적으로 확인해 주세요.");
+    }
+
+    const userRef = db.collection("users").doc(uid);
+    const lockRef = userRef.collection("backupProjectLocks").doc(projectId);
+    const slotRefs = Array.from({ length: 5 }, (_, index) =>
+      userRef.collection("backupProjectSlots").doc(`slot-${index + 1}`)
+    );
+    const alreadyDeleted = await db.runTransaction(async (tx) => {
+      const [lock, ...slots] = await Promise.all([tx.get(lockRef), ...slotRefs.map((ref) => tx.get(ref))]);
+      if (lock.data()?.status === "deleted") return true;
+      if ((lock.exists && lock.data()?.operation !== "delete-project") ||
+          slots.some((slot) => slot.data()?.pendingProjectId === projectId ||
+            (slot.data()?.projectId === projectId && slot.data()?.status === "replacing"))) {
+        throw new HttpsError("aborted", "백업 슬롯 변경이 완료된 후 삭제할 수 있습니다.");
+      }
+      if (!lock.exists) {
+        tx.create(lockRef, { userId: uid, projectId, operation: "delete-project", startedAt: FieldValue.serverTimestamp() });
+      }
+      return false;
+    });
+    if (alreadyDeleted) return { deletedPhotoCount: 0, deletedVideoCount: 0 };
+
+    await assertNoReservedProjectUploads(uid, projectId);
+    const result = await deleteBackupProjectCloudData({ uid, projectId });
+    await db.runTransaction(async (tx) => {
+      const [lock, ...slots] = await Promise.all([tx.get(lockRef), ...slotRefs.map((ref) => tx.get(ref))]);
+      if (lock.data()?.operation !== "delete-project") return;
+      for (const slot of slots) {
+        if (slot.data()?.projectId === projectId) tx.delete(slot.ref);
+      }
+      tx.update(lockRef, { status: "deleted", deletedAt: FieldValue.serverTimestamp() });
+    });
+    return result;
+  } catch (error) {
+    throw toHttpsError(error);
+  }
+});
 
 const assertNoReservedProjectUploads = async (uid, projectId) => {
   const ref = db.doc(`users/${uid}`);
@@ -592,6 +668,13 @@ exports.replaceCloudBackupProject = secureOnCall(async (request) => {
     if (!previousProjectId) {
       throw new HttpsError("failed-precondition", "기존 백업 프로젝트를 확인할 수 없습니다.");
     }
+    if (previousProjectId !== projectId &&
+        normalizeBackupProjectId(request.data?.confirmDeletePreviousProjectId) !== previousProjectId) {
+      throw new HttpsError(
+        "failed-precondition",
+        "기존 프로젝트 클라우드 파일의 영구 삭제를 명시적으로 확인해야 합니다."
+      );
+    }
     const initial = decideSlotReplacement({
       slot: current.data(), previousProjectId, projectId
     });
@@ -616,10 +699,12 @@ exports.replaceCloudBackupProject = secureOnCall(async (request) => {
     }
     const outcome = await runSlotReplacement({
       begin: async () => db.runTransaction(async (tx) => {
-        const [allSlots, lockSnapshot] = await Promise.all([
+        const [allSlots, lockSnapshot, targetLock] = await Promise.all([
           Promise.all(candidateSlots.map((ref) => tx.get(ref))),
-          tx.get(lockRef)
+          tx.get(lockRef),
+          tx.get(db.doc(`users/${uid}/backupProjectLocks/${projectId}`))
         ]);
+        if (targetLock.exists) throw new HttpsError("aborted", "새 백업 프로젝트의 변경이 진행 중입니다.");
         const slotSnapshot = allSlots.find((snapshot) => snapshot.id === slotId);
         if (isBackupTargetInOtherSlot(allSlots, slotId, projectId)) {
           throw new HttpsError(
@@ -1686,6 +1771,11 @@ const sanitizeImageWorkBackupData = ({ uid, workId, imageWork }) => {
 
   if (!VALID_BACKUP_STATUSES.has(imageWork.backupStatus)) {
     throw new HttpsError("invalid-argument", "Invalid image work backup status.");
+  }
+  if (imageWork.sourceUpdatedAt !== undefined &&
+      (typeof imageWork.sourceUpdatedAt !== "string" ||
+        Number.isNaN(Date.parse(imageWork.sourceUpdatedAt)))) {
+    throw new HttpsError("invalid-argument", "Invalid image work source revision.");
   }
 
   return Object.fromEntries(keys.map((key) => [key, imageWork[key]]));
@@ -3022,32 +3112,40 @@ exports.completeAdminBackupUpload = secureOnCall(async (request) => {
 });
 
 const getBackupItemRef = ({ uid, itemType, itemId }) => {
-  const refByType = {
-    photo: db.doc(`users/${uid}/photoBackups/${itemId}`),
-    imageWork: db.doc(`users/${uid}/imageWorks/${itemId}`),
-    video: db.doc(`users/${uid}/videos/${itemId}`),
-    music: db.doc(`users/${uid}/musicTracks/${itemId}`)
+  const collections = {
+    photo: "photoBackups",
+    imageWork: "imageWorks",
+    video: "videos",
+    music: "musicTracks",
+    measurement: "bodyMeasurements"
   };
-  const itemRef = refByType[itemType];
-  if (!itemRef) {
+  if (!Object.hasOwn(collections, itemType)) {
     throw new HttpsError("invalid-argument", "Unsupported backup item type.");
   }
 
-  return itemRef;
+  return db.collection("users").doc(uid).collection(collections[itemType]).doc(itemId);
 };
 
-const deleteBackupItemForUser = async ({ uid, itemType, itemId }) => {
-  if (typeof itemId !== "string" || !itemId) {
+const deleteBackupItemForUser = async ({ uid, itemType, itemId, projectId }) => {
+  if (typeof itemId !== "string" || !itemId || itemId.includes("/") || itemId === "." || itemId === "..") {
     throw new HttpsError("invalid-argument", "itemId is required.");
   }
 
   const itemRef = getBackupItemRef({ uid, itemType, itemId });
   const snapshot = await itemRef.get();
   if (!snapshot.exists) {
+    if (projectId !== undefined) return { deleted: false };
     throw new HttpsError("not-found", "Backup item was not found.");
   }
 
   const data = snapshot.data();
+  if (projectId !== undefined && data.projectId !== projectId) {
+    return { deleted: false };
+  }
+  if (itemType === "measurement") {
+    await itemRef.delete();
+    return { deleted: true };
+  }
   const storagePaths = [
     data.storagePath,
     data.previewStoragePath,
@@ -3074,8 +3172,12 @@ const deleteBackupItemForUser = async ({ uid, itemType, itemId }) => {
 exports.deleteUserBackupItem = secureOnCall(async (request) => {
   try {
     const uid = requireUid(request);
-    const { itemType, itemId } = request.data ?? {};
-    return await deleteBackupItemForUser({ uid, itemType, itemId });
+    const { itemType, itemId, projectId } = request.data ?? {};
+    if ((itemType === "measurement" || projectId !== undefined) &&
+        (typeof projectId !== "string" || !projectId)) {
+      throw new HttpsError("invalid-argument", "projectId is required.");
+    }
+    return await deleteBackupItemForUser({ uid, itemType, itemId, projectId });
   } catch (error) {
     throw toHttpsError(error);
   }
@@ -3089,6 +3191,9 @@ exports.deleteAdminBackupItem = secureOnCall(async (request) => {
       throw new HttpsError("invalid-argument", "targetUid is required.");
     }
 
+    if (itemType === "measurement") {
+      throw new HttpsError("permission-denied", "수치 기록은 계정 소유자가 삭제해야 합니다.");
+    }
     return await deleteBackupItemForUser({ uid: targetUid, itemType, itemId });
   } catch (error) {
     throw toHttpsError(error);
@@ -3143,6 +3248,8 @@ const deleteCloudBackupDataForUser = async (uid) => {
     videoSnapshot,
     musicSnapshot,
     projectSnapshot,
+    measurementSnapshot,
+    projectSettingsSnapshot,
     sessionSnapshot,
     adminSessionSnapshot,
     musicSessionSnapshot,
@@ -3154,6 +3261,8 @@ const deleteCloudBackupDataForUser = async (uid) => {
     userRef.collection("videos").get(),
     userRef.collection("musicTracks").get(),
     userRef.collection("bodyProjects").get(),
+    userRef.collection("bodyMeasurements").get(),
+    userRef.collection("bodyProjectSettings").get(),
     userRef.collection("backupUploadSessions").get(),
     userRef.collection("adminBackupUploadSessions").get(),
     userRef.collection("musicUploadSessions").get(),
@@ -3164,6 +3273,8 @@ const deleteCloudBackupDataForUser = async (uid) => {
   let imageBackupBytes = 0;
   const documentDeletes = [
     ...projectSnapshot.docs,
+    ...measurementSnapshot.docs,
+    ...projectSettingsSnapshot.docs,
     ...sessionSnapshot.docs,
     ...adminSessionSnapshot.docs,
     ...musicSessionSnapshot.docs,
@@ -3258,7 +3369,14 @@ const deleteCloudBackupDataForUser = async (uid) => {
 
 exports.deleteCloudBackupData = secureOnCall(async (request) => {
   try {
-    return await deleteCloudBackupDataForUser(requireUid(request));
+    const uid = requireUid(request);
+    if (request.data?.confirmation !== "DELETE_ALL_CLOUD_BACKUPS") {
+      throw new HttpsError(
+        "failed-precondition",
+        "클라우드의 모든 사진·영상·수치 기록을 영구 삭제하려면 별도 확인이 필요합니다."
+      );
+    }
+    return await deleteCloudBackupDataForUser(uid);
   } catch (error) {
     throw toHttpsError(error);
   }

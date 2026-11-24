@@ -128,10 +128,10 @@ for (const forbidden of [
 for (const token of [
   "BodyHealthConnectImportCard",
   "Health Connect 연결",
-  "최신 기록 확인",
+  "최근 기록 확인",
   "가져오기",
   "최근 30일",
-  "getBodyMeasurementBySourceRecordId",
+  "groupBodyHealthConnectMeasurements",
   'source: "health_connect"',
   "sourceRecordId",
   "Firebase에는 자동으로 업로드되지 않습니다.",
@@ -171,11 +171,10 @@ assert.ok(
   "editing an imported measurement should preserve its provenance"
 );
 
-assert.equal(
-  cloudBackupSource.includes("body-health-connect") ||
-    cloudBackupSource.includes("sourceRecordId"),
-  false,
-  "Health Connect measurements should not be coupled to photo cloud backup"
+assert.ok(
+  cloudBackupSource.includes('getCloudBodyMeasurement(entry, backedUpAt)') &&
+    cloudBackupSource.includes("video.containsLocalHealthData"),
+  "Health Connect values and derived overlay videos must stay out of automatic cloud backup"
 );
 
 for (const source of [privacyMarkdown, publicPrivacy, adminPrivacy]) {

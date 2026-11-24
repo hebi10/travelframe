@@ -1,3 +1,4 @@
+import { openPlans } from "@/lib/plan-navigation";
 import { AppText as Text, AppTextInput as TextInput } from "@/components/app-text";
 import {
   Feather } from "@expo/vector-icons";
@@ -10,6 +11,7 @@ import { router,
   useFocusEffect,
   useLocalSearchParams } from "expo-router";
 import { useCallback,
+  useEffect,
   useMemo,
   useState } from "react";
 import {
@@ -21,6 +23,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  useWindowDimensions,
   View
 } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
@@ -32,7 +35,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { bodyFrameAccent, bodyFrameDesign, bodyFrameSheetDesign, bodyFrameTypography, getBodyFrameControlColors } from "@/constants/app-theme";
+import { bodyFrameDesign, bodyFrameSheetDesign, bodyFrameTypography, getBodyFrameControlColors } from "@/constants/app-theme";
 import {
   getBodyProjectPhotos,
   getBodyProjectProgressSummary,
@@ -63,6 +66,7 @@ import {
   getBodyFrameUpgradeLabel,
   isBodyFrameProjectTargetAllowed
 } from "@/lib/body-frame-plan-limits";
+import { getExifPhotoCapturedAt } from "@/lib/photo-capture-date";
 import { backupPhotoIfEnabled } from "@/lib/cloud-backup";
 import { recordBackupFailure } from "@/lib/backup-failure-queue";
 import {
@@ -78,6 +82,9 @@ import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 import { useAppAppearance } from "@/lib/app-appearance";
 import { useAuth } from "@/lib/auth-context";
 import { getPlanEntitlements } from "@/lib/plan-entitlements";
+import { getSelectedCloudBackupProjectIds } from "@/lib/cloud-backup-project-slots";
+import { enqueueProjectCloudSync } from "@/lib/project-cloud-sync-queue";
+import { PROJECT_SAVE_MODE_OPTIONS, isProjectCloudSaveMode } from "@/lib/project-save-policy";
 import {
   DEFAULT_PROJECT_REMINDER_MESSAGE,
   PROJECT_REMINDER_WEEKDAY_OPTIONS,
@@ -93,7 +100,7 @@ import {
   type ProjectReminderSettings,
   type ProjectReminderWeekday
 } from "@/lib/project-reminder";
-import type { BodyProject, ReferencePhotoMode } from "@/types/body-project";
+import type { BodyProject, ProjectSaveMode, ReferencePhotoMode } from "@/types/body-project";
 import {
   bodyMeasurementMetricMeta,
   defaultBodyMeasurementSettings,
@@ -104,6 +111,7 @@ import {
 import type { PhotoItem } from "@/types/photo";
 import { getPhotoAccessibilityMoveIndex } from "@/features/records/photo-order-accessibility";
 import { PhotoPositionSheet } from "@/features/records/PhotoPositionSheet";
+import { PROJECT_PHOTO_BATCH, nextProjectPhotoCount } from "@/lib/project-photo-window";
 
 const formatDuration = (seconds: number) =>
   seconds < 60
@@ -134,7 +142,8 @@ const sortProjectPhotos = (photos: PhotoItem[]) =>
   });
 
 
-const PROJECT_PHOTO_GRID_COLUMNS = 3;
+const PROJECT_PHOTO_PHONE_COLUMNS = 2;
+const PROJECT_PHOTO_TABLET_COLUMNS = 3;
 const PROJECT_PHOTO_GRID_GAP = 8;
 const PROJECT_PHOTO_LONG_PRESS_MS = 320;
 const PROJECT_PHOTO_TAP_DISTANCE = 12;
@@ -152,8 +161,11 @@ function SortableProjectPhotoTile({
   photo,
   index,
   count,
+  dragCount,
+  gridColumns,
   tileWidth,
   disabled,
+  canReorder,
   dropTarget,
   dragSourceIndex,
   dragTargetIndex,
@@ -168,8 +180,11 @@ function SortableProjectPhotoTile({
   photo: PhotoItem;
   index: number;
   count: number;
+  dragCount: number;
+  gridColumns: number;
   tileWidth: number;
   disabled: boolean;
+  canReorder: boolean;
   dropTarget: boolean;
   dragSourceIndex: number | null;
   dragTargetIndex: number | null;
@@ -203,27 +218,27 @@ function SortableProjectPhotoTile({
       translateX.value = translationX;
       translateY.value = translationY;
 
-      const startRow = Math.floor(index / PROJECT_PHOTO_GRID_COLUMNS);
-      const startColumn = index % PROJECT_PHOTO_GRID_COLUMNS;
+      const startRow = Math.floor(index / gridColumns);
+      const startColumn = index % gridColumns;
       const rowDelta = Math.round(translationY / cellHeight);
       const columnDelta = Math.round(translationX / cellWidth);
       const maxRow = Math.max(
         0,
-        Math.ceil(count / PROJECT_PHOTO_GRID_COLUMNS) - 1
+        Math.ceil(dragCount / gridColumns) - 1
       );
       const targetRow = Math.max(0, Math.min(maxRow, startRow + rowDelta));
       const targetColumn = Math.max(
         0,
         Math.min(
-          PROJECT_PHOTO_GRID_COLUMNS - 1,
+          gridColumns - 1,
           startColumn + columnDelta
         )
       );
       const targetIndex = Math.max(
         0,
         Math.min(
-          count - 1,
-          targetRow * PROJECT_PHOTO_GRID_COLUMNS + targetColumn
+          dragCount - 1,
+          targetRow * gridColumns + targetColumn
         )
       );
 
@@ -235,7 +250,8 @@ function SortableProjectPhotoTile({
     [
       cellHeight,
       cellWidth,
-      count,
+      dragCount,
+      gridColumns,
       hoverIndex,
       index,
       onDragHover,
@@ -279,7 +295,7 @@ function SortableProjectPhotoTile({
           if (!dragActivated.value) {
             const elapsed = Date.now() - pressStartedAt.value;
 
-            if (elapsed < PROJECT_PHOTO_LONG_PRESS_MS) {
+            if (!canReorder || elapsed < PROJECT_PHOTO_LONG_PRESS_MS) {
               if (
                 distanceSquared >
                 PROJECT_PHOTO_PRE_DRAG_DISTANCE * PROJECT_PHOTO_PRE_DRAG_DISTANCE
@@ -344,6 +360,7 @@ function SortableProjectPhotoTile({
           }
         }),
     [
+      canReorder,
       disabled,
       dragActivated,
       dragging,
@@ -388,10 +405,10 @@ function SortableProjectPhotoTile({
       }
     }
 
-    const sourceRow = Math.floor(index / PROJECT_PHOTO_GRID_COLUMNS);
-    const sourceColumn = index % PROJECT_PHOTO_GRID_COLUMNS;
-    const targetRow = Math.floor(shiftedIndex / PROJECT_PHOTO_GRID_COLUMNS);
-    const targetColumn = shiftedIndex % PROJECT_PHOTO_GRID_COLUMNS;
+    const sourceRow = Math.floor(index / gridColumns);
+    const sourceColumn = index % gridColumns;
+    const targetRow = Math.floor(shiftedIndex / gridColumns);
+    const targetColumn = shiftedIndex % gridColumns;
     const siblingTranslateX =
       (targetColumn - sourceColumn) * cellWidth;
     const siblingTranslateY =
@@ -419,6 +436,7 @@ function SortableProjectPhotoTile({
   }, [
     cellHeight,
     cellWidth,
+    gridColumns,
     dragSourceIndex,
     dragTargetIndex,
     index
@@ -429,22 +447,23 @@ function SortableProjectPhotoTile({
     <GestureDetector gesture={gesture}>
       <Animated.View
         accessible
-        accessibilityRole="adjustable"
+        accessibilityRole={canReorder ? "adjustable" : "button"}
         accessibilityLabel={`${photo.sequence ?? ""}번째 기록 ${formatDate(photo.createdAt)}`}
-        accessibilityHint="두 번 탭하여 사진을 엽니다. 위아래로 쓸어 순번을 바꾸거나 순번 이동 동작을 사용하세요."
+        accessibilityHint={canReorder ? "두 번 탭하여 사진을 엽니다. 위아래로 쓸어 순번을 바꾸거나 순번 이동 동작을 사용하세요." : "두 번 탭하여 사진을 엽니다."}
         accessibilityState={{ disabled, busy: disabled }}
-        accessibilityValue={{ min: 1, max: count, now: count - index }}
-        accessibilityActions={[
+        accessibilityValue={canReorder ? { min: 1, max: count, now: count - index } : undefined}
+        accessibilityActions={canReorder ? [
           { name: "activate", label: "사진 열기" },
           { name: "increment", label: "다음 순번으로 이동" },
           { name: "decrement", label: "이전 순번으로 이동" },
           { name: "moveToPosition", label: "원하는 순번으로 이동" }
-        ]}
+        ] : [{ name: "activate", label: "사진 열기" }]}
         onAccessibilityTap={onOpen}
         onAccessibilityAction={(event) => {
           if (disabled) return;
           const action = event.nativeEvent.actionName;
           if (action === "activate") onOpen();
+          else if (!canReorder) return;
           else if (action === "moveToPosition") onMoveToPosition();
           else if (action === "increment" || action === "decrement") {
             onDrop(index, getPhotoAccessibilityMoveIndex(index, count, action));
@@ -464,7 +483,7 @@ function SortableProjectPhotoTile({
         <Image
           source={{ uri: photo.previewUri ?? photo.uri }}
           style={styles.photoImage}
-          contentFit="cover"
+          contentFit="contain"
           cachePolicy="memory-disk"
         />
         <View style={styles.photoMetaOverlay}>
@@ -494,8 +513,12 @@ export default function BodyFrameProjectDetailScreen() {
   const { id } = useLocalSearchParams<{ id?: string | string[] }>();
   const projectId = Array.isArray(id) ? id[0] : id;
   const insets = useSafeAreaInsets();
-  const { palette, effectiveThemeMode } = useAppAppearance();
-  const accent = effectiveThemeMode === "dark" ? bodyFrameAccent : palette.text;
+  const { width: windowWidth, fontScale } = useWindowDimensions();
+  const projectPhotoGridColumns = windowWidth >= 600
+    ? PROJECT_PHOTO_TABLET_COLUMNS
+    : PROJECT_PHOTO_PHONE_COLUMNS;
+  const { palette } = useAppAppearance();
+  const accent = palette.text;
   const { selected: modalSelectionColor, primaryText: modalSelectionText } =
     getBodyFrameControlColors(palette);
   const { primaryBackground: primaryColor, primaryText: primaryTextColor } =
@@ -510,6 +533,7 @@ export default function BodyFrameProjectDetailScreen() {
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
   const [nameDraft, setNameDraft] = useState("");
   const [targetDraft, setTargetDraft] = useState("");
+  const [saveModeDraft, setSaveModeDraft] = useState<ProjectSaveMode | null>(null);
   const [saving, setSaving] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [detailTab, setDetailTab] = useState<"records" | "metrics" | "stats">("records");
@@ -525,6 +549,8 @@ export default function BodyFrameProjectDetailScreen() {
   const [poseAlignmentDraft, setPoseAlignmentDraft] = useState(false);
   const [isImportingPhotos, setIsImportingPhotos] = useState(false);
   const [photoGridWidth, setPhotoGridWidth] = useState(0);
+  const [visiblePhotoCount, setVisiblePhotoCount] = useState(PROJECT_PHOTO_BATCH);
+  useEffect(() => { setVisiblePhotoCount(PROJECT_PHOTO_BATCH); }, [projectId]);
   const [photoOrderMode, setPhotoOrderMode] = useState(false);
   const [isPhotoDragging, setIsPhotoDragging] = useState(false);
   const [photoDragSourceIndex, setPhotoDragSourceIndex] = useState<number | null>(null);
@@ -582,7 +608,8 @@ export default function BodyFrameProjectDetailScreen() {
     if (storedProject) {
       setNameDraft(storedProject.name);
       setTargetDraft(String(storedProject.targetPhotoCount));
-      await setLastActiveProjectId(storedProject.id);
+      setSaveModeDraft(storedProject.saveMode ?? null);
+      if (!storedProject.archived) await setLastActiveProjectId(storedProject.id);
     }
   }, [projectId]);
 
@@ -605,14 +632,21 @@ export default function BodyFrameProjectDetailScreen() {
     [photos, project]
   );
 
+  const renderedPhotoCount = Math.min(visiblePhotoCount, projectPhotos.length);
+  const loadMorePhotos = useCallback(() => {
+    setVisiblePhotoCount((current) => current === visiblePhotoCount
+      ? nextProjectPhotoCount(current, projectPhotos.length)
+      : current);
+  }, [projectPhotos.length, visiblePhotoCount]);
+
   const projectPhotoTileWidth = useMemo(
     () =>
       photoGridWidth > 0
         ? (photoGridWidth -
-            PROJECT_PHOTO_GRID_GAP * (PROJECT_PHOTO_GRID_COLUMNS - 1)) /
-          PROJECT_PHOTO_GRID_COLUMNS
+            PROJECT_PHOTO_GRID_GAP * (projectPhotoGridColumns - 1)) /
+          projectPhotoGridColumns
         : 0,
-    [photoGridWidth]
+    [photoGridWidth, projectPhotoGridColumns]
   );
 
   const measurementSeries = useMemo(
@@ -669,10 +703,39 @@ export default function BodyFrameProjectDetailScreen() {
 
     setSaving(true);
     try {
+      if (saveModeDraft && saveModeDraft !== project.saveMode && isProjectCloudSaveMode(saveModeDraft)) {
+        if (!user || !planEntitlements.canBackupToCloud) {
+          Alert.alert("클라우드 구독 필요", "Pro 이상 구독으로 클라우드 프로젝트 백업을 사용할 수 있습니다.");
+          return;
+        }
+        const eligibleProjects = await getSelectedCloudBackupProjectIds(
+          user,
+          planEntitlements.maxCloudBackupProjects
+        );
+        if (!eligibleProjects.has(project.id)) {
+          Alert.alert(
+            "백업 프로젝트 선택 필요",
+            "먼저 계정 화면에서 이 프로젝트를 클라우드 백업 대상으로 선택해 주세요.",
+            [
+              { text: "취소", style: "cancel" },
+              {
+                text: "계정으로 이동",
+                onPress: () => {
+                  setSettingsOpen(false);
+                  router.push("/account");
+                }
+              }
+            ]
+          );
+          return;
+        }
+      }
+
       await Promise.all([
         updateBodyProject(project.id, {
           name: nextProjectName,
-          targetPhotoCount: target
+          targetPhotoCount: target,
+          ...(saveModeDraft ? { saveMode: saveModeDraft } : {})
         }),
         updateBodyMeasurementSettings(project.id, measurementDraft),
         updateBodyCaptureContextEnabled(
@@ -681,6 +744,11 @@ export default function BodyFrameProjectDetailScreen() {
         ),
         updateBodyPoseAlignmentSettings(project.id, poseAlignmentDraft)
       ]);
+      if (saveModeDraft && saveModeDraft !== project.saveMode &&
+          isProjectCloudSaveMode(saveModeDraft)) {
+        await enqueueProjectCloudSync({ projectId: project.id, kind: "initial" })
+          .catch(() => undefined);
+      }
 
       if (reminderSettings.enabled && nextProjectName !== project.name) {
         try {
@@ -696,6 +764,8 @@ export default function BodyFrameProjectDetailScreen() {
 
       await reload();
       setSettingsOpen(false);
+    } catch (error) {
+      Alert.alert("프로젝트 설정 저장 실패", getUserFacingErrorMessage(error, "프로젝트 설정을 저장하지 못했습니다."));
     } finally {
       setSaving(false);
     }
@@ -703,6 +773,10 @@ export default function BodyFrameProjectDetailScreen() {
     nameDraft,
     planEntitlements.label,
     planEntitlements.maxProgressPhotos,
+    planEntitlements.maxCloudBackupProjects,
+    planEntitlements.canBackupToCloud,
+    saveModeDraft,
+    user,
     measurementDraft,
     rememberCaptureContextDraft,
     poseAlignmentDraft,
@@ -714,13 +788,14 @@ export default function BodyFrameProjectDetailScreen() {
   ]);
 
   const openReminderSettings = useCallback(() => {
+    if (project?.archived) return;
     setReminderEnabledDraft(reminderSettings.enabled);
     setReminderTimeDraft(formatProjectReminderTime(reminderSettings));
     setReminderMessageDraft(reminderSettings.message);
     setReminderRepeatModeDraft(reminderSettings.repeatMode);
     setReminderWeekdaysDraft(reminderSettings.weekdays);
     setReminderModalOpen(true);
-  }, [reminderSettings]);
+  }, [project?.archived, reminderSettings]);
 
   const toggleReminderWeekday = useCallback(
     (weekday: ProjectReminderWeekday) => {
@@ -734,7 +809,7 @@ export default function BodyFrameProjectDetailScreen() {
   );
 
   const saveReminderSettings = useCallback(async () => {
-    if (!project || reminderSaving) return;
+    if (!project || project.archived || reminderSaving) return;
 
     const parsedTime = parseProjectReminderTime(reminderTimeDraft);
     if (!parsedTime) {
@@ -800,7 +875,7 @@ export default function BodyFrameProjectDetailScreen() {
   );
 
   const confirmArchive = useCallback(() => {
-    if (!project) return;
+    if (!project || project.archived) return;
 
     Alert.alert(
       "프로젝트 보관",
@@ -826,13 +901,13 @@ export default function BodyFrameProjectDetailScreen() {
   }, [project]);
 
   const openCamera = useCallback(async () => {
-    if (!project) return;
+    if (!project || project.archived) return;
     await setLastActiveProjectId(project.id);
     router.push("/camera");
   }, [project]);
 
   const importProjectPhotos = useCallback(async () => {
-    if (!project || isImportingPhotos) return;
+    if (!project || project.archived || isImportingPhotos) return;
 
     const remaining =
       planEntitlements.maxProgressPhotos === null
@@ -863,6 +938,7 @@ export default function BodyFrameProjectDetailScreen() {
         mediaTypes: ["images"],
         allowsMultipleSelection: true,
         selectionLimit: Math.min(20, remaining),
+        exif: true,
         allowsEditing: false,
         quality: 1
       });
@@ -889,6 +965,7 @@ export default function BodyFrameProjectDetailScreen() {
             uri: asset.uri,
             width: asset.width,
             height: asset.height,
+            createdAt: getExifPhotoCapturedAt(asset.exif),
             localImageLimit: planEntitlements.localImageLimit,
             projectId: project.id,
             sequence: nextSequence
@@ -904,6 +981,7 @@ export default function BodyFrameProjectDetailScreen() {
             });
           } catch (backupError) {
             backupFailureCount += 1;
+            await enqueueProjectCloudSync({ projectId: project.id, kind: "photo", itemId: savedPhoto.id });
             await recordBackupFailure({
               id: savedPhoto.id,
               kind: "photo",
@@ -957,7 +1035,7 @@ export default function BodyFrameProjectDetailScreen() {
   const handleProjectPhotoDrop = useCallback(
     async (fromIndex: number, toIndex: number) => {
       if (
-        !project ||
+        !project || project.archived ||
         photoOrderSaving ||
         fromIndex === toIndex ||
         fromIndex < 0 ||
@@ -1013,7 +1091,7 @@ export default function BodyFrameProjectDetailScreen() {
   );
 
   const openVideo = useCallback(async () => {
-    if (!project) return;
+    if (!project || project.archived) return;
     await setLastActiveProjectId(project.id);
     router.push("/video-create");
   }, [project]);
@@ -1058,6 +1136,12 @@ export default function BodyFrameProjectDetailScreen() {
     <View style={[styles.screen, { backgroundColor: palette.background }]}>
       <ScrollView
         scrollEnabled={!isPhotoDragging}
+        scrollEventThrottle={64}
+        onScroll={({ nativeEvent }) => {
+          if (detailTab !== "records" || isPhotoDragging || photoOrderSaving || renderedPhotoCount >= projectPhotos.length) return;
+          const remaining = nativeEvent.contentSize.height - nativeEvent.contentOffset.y - nativeEvent.layoutMeasurement.height;
+          if (remaining < 600) loadMorePhotos();
+        }}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.content,
@@ -1080,6 +1164,7 @@ export default function BodyFrameProjectDetailScreen() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="프로젝트 설정 열기"
+            disabled={project.archived}
             style={[styles.settingsButton, { borderColor: palette.line }]}
             onPress={() => {
               setMeasurementDraft(measurementSettings);
@@ -1120,19 +1205,26 @@ export default function BodyFrameProjectDetailScreen() {
 
         {detailTab === "records" ? (
           <>
+        {projectPhotos.length < 2 ? (
+          <View style={[
+            styles.comparePreviewCard,
+            styles.comparePreviewEmptyCard,
+            { borderColor: palette.line, backgroundColor: palette.surface }
+          ]}>
+            <Text style={[styles.comparePreviewTitle, { color: palette.text }]}>전후 사진 비교</Text>
+            <Text style={[styles.comparePreviewDetail, { color: palette.muted }]}>
+              사진을 2장 이상 기록하면 비교할 수 있습니다.
+            </Text>
+          </View>
+        ) : null}
         {projectPhotos.length > 1 && firstPhoto && latestPhoto ? (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="프로젝트 첫 사진과 마지막 사진 비교"
+            accessibilityHint="전후 비교 화면에서 사진 두 장을 선택할 수 있습니다."
             onPress={() => router.push(`/project/${project.id}/compare` as Href)}
             style={[styles.comparePreviewCard, { borderColor: palette.line, backgroundColor: palette.surface }]}
           >
-            <View style={styles.comparePreviewHeading}>
-              <Text style={[styles.comparePreviewTitle, { color: palette.text }]}>
-                전후 사진 비교
-              </Text>
-              <Feather name="chevron-right" size={bodyFrameDesign.iconSize} color={palette.text} />
-            </View>
             <View style={styles.comparePreviewPair}>
               {[{ label: "시작", photo: firstPhoto }, { label: "최근", photo: latestPhoto }].map(({ label, photo }) => (
                 <View key={photo.id} style={[styles.comparePreviewItem, { backgroundColor: palette.surfaceStrong }]}>
@@ -1148,14 +1240,25 @@ export default function BodyFrameProjectDetailScreen() {
                 </View>
               ))}
             </View>
+            <View style={styles.comparePreviewCopy}>
+              <Text style={[styles.comparePreviewTitle, { color: palette.text }]}>
+                전후 사진 비교
+              </Text>
+              <Text numberOfLines={2} style={[styles.comparePreviewDetail, { color: palette.muted }]}>
+                시작·최근 사진 비교
+              </Text>
+              <Text style={[styles.comparePreviewActionLabel, { color: palette.text }]}>
+                비교하기
+              </Text>
+            </View>
+            <Feather name="chevron-right" size={bodyFrameDesign.iconSize} color={palette.text} />
           </Pressable>
         ) : null}
-
 
         <View style={styles.projectHeader}>
           <View style={styles.progressHeading}>
             <Text style={[styles.progressCount, { color: palette.text }]}>
-              {summary.photoCount} / {summary.targetPhotoCount}
+              기록 {summary.photoCount} / {summary.targetPhotoCount}장
             </Text>
             <Text style={[styles.progressPercent, { color: palette.muted }]}>
               {progressPercent}% 진행
@@ -1181,16 +1284,41 @@ export default function BodyFrameProjectDetailScreen() {
         </View>
 
 
+        <View style={[styles.recordsFooterActions, fontScale >= 1.3 && styles.recordsFooterActionsLargeFont]}>
+          <Pressable
+            accessibilityRole="button"
+            disabled={project.archived}
+            style={[styles.primaryAction, { backgroundColor: primaryColor, opacity: project.archived ? 0.5 : 1 }]}
+            onPress={() => void openCamera()}
+          >
+            <Text style={[styles.primaryActionText, { color: primaryTextColor }]}>
+              오늘 사진 찍기
+            </Text>
+          </Pressable>
+          <Pressable
+            disabled={project.archived || isImportingPhotos}
+            accessibilityRole="button"
+            accessibilityState={{ disabled: project.archived || isImportingPhotos, busy: isImportingPhotos }}
+            style={[styles.photoAddAction, { borderColor: palette.line }]}
+            onPress={() => void importProjectPhotos()}
+          >
+            <Feather name="upload" size={bodyFrameDesign.iconSize} color={palette.text} />
+            <Text style={[styles.sectionActionText, { color: palette.text }]}>
+              {isImportingPhotos ? "추가 중" : "사진 추가"}
+            </Text>
+          </Pressable>
+        </View>
+
         <Pressable
           accessibilityRole="button"
-          style={[styles.primaryAction, { backgroundColor: primaryColor }]}
-          onPress={() => void openCamera()}
+          disabled={project.archived}
+          style={[styles.videoAction, { borderColor: palette.text, opacity: project.archived ? 0.5 : 1 }]}
+          onPress={() => void openVideo()}
         >
-          <Text style={[styles.primaryActionText, { color: primaryTextColor }]}>
-            오늘 사진 찍기
+          <Text style={[styles.videoActionText, { color: palette.text }]}>
+            변화 영상 만들기
           </Text>
         </Pressable>
-
 
         <View style={styles.recordsSection}>
           <View style={styles.sectionHeader}>
@@ -1201,18 +1329,7 @@ export default function BodyFrameProjectDetailScreen() {
               </Text>
             </View>
             <View style={styles.sectionActions}>
-              <Pressable
-                disabled={isImportingPhotos}
-                accessibilityRole="button"
-                style={[styles.sectionAction, { borderColor: palette.line }]}
-                onPress={() => void importProjectPhotos()}
-              >
-                <Feather name="upload" size={15} color={palette.text} />
-                <Text style={[styles.sectionActionText, { color: palette.text }]}>
-                  {isImportingPhotos ? "추가 중" : "사진 추가"}
-                </Text>
-              </Pressable>
-              {projectPhotos.length > 1 ? (
+              {!project.archived && projectPhotos.length > 1 ? (
                 <Pressable
                   accessibilityRole="button"
                   accessibilityState={{ selected: photoOrderMode }}
@@ -1243,7 +1360,7 @@ export default function BodyFrameProjectDetailScreen() {
             </View>
           </View>
 
-          {projectPhotos.length > 1 ? (
+          {!project.archived && projectPhotos.length > 1 ? (
             <Text style={[styles.recordsHint, { color: palette.faint }]}>
               {photoOrderSaving
                 ? "변경한 순서를 저장하는 중입니다."
@@ -1259,15 +1376,18 @@ export default function BodyFrameProjectDetailScreen() {
               onLayout={(event) => setPhotoGridWidth(event.nativeEvent.layout.width)}
             >
               {projectPhotoTileWidth > 0
-                ? projectPhotos.map((photo, index) => (
+                ? projectPhotos.slice(0, renderedPhotoCount).map((photo, index) => (
                     <SortableProjectPhotoTile
                       key={photo.id}
                       photo={photo}
                       index={index}
                       count={projectPhotos.length}
+                      dragCount={renderedPhotoCount}
+                      gridColumns={projectPhotoGridColumns}
                       tileWidth={projectPhotoTileWidth}
                       disabled={photoOrderSaving}
-                      orderMode={photoOrderMode}
+                      canReorder={!project.archived}
+                      orderMode={!project.archived && photoOrderMode}
                       onMoveToPosition={() => setPhotoPositionId(photo.id)}
                       dropTarget={
                         isPhotoDragging && photoDropTargetIndex === index
@@ -1319,16 +1439,21 @@ export default function BodyFrameProjectDetailScreen() {
           )}
         </View>
 
+        {renderedPhotoCount < projectPhotos.length ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ disabled: isPhotoDragging || photoOrderSaving }}
+            disabled={isPhotoDragging || photoOrderSaving}
+            style={[styles.photoAddAction, { borderColor: palette.line }]}
+            onPress={loadMorePhotos}
+          >
+            <Text style={[styles.sectionActionText, { color: palette.text }]}>
+              사진 더 보기 ({renderedPhotoCount}/{projectPhotos.length})
+            </Text>
+          </Pressable>
+        ) : null}
 
-        <Pressable
-          accessibilityRole="button"
-          style={[styles.videoAction, { borderColor: palette.text }]}
-          onPress={() => void openVideo()}
-        >
-          <Text style={[styles.videoActionText, { color: palette.text }]}>
-            변화 영상 만들기
-          </Text>
-        </Pressable>
+
 
 
           </>
@@ -1376,6 +1501,7 @@ export default function BodyFrameProjectDetailScreen() {
                 <Pressable
                   accessibilityRole="button"
                   style={[styles.detailTabAction, { borderColor: palette.line }]}
+                  disabled={project.archived}
                   onPress={() => {
                     setMeasurementDraft(measurementSettings);
                     setRememberCaptureContextDraft(rememberCaptureContext);
@@ -1437,6 +1563,7 @@ export default function BodyFrameProjectDetailScreen() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="프로젝트 촬영 알림 설정"
+          disabled={project.archived}
           style={[
             styles.reminderCard,
             {
@@ -1481,7 +1608,7 @@ export default function BodyFrameProjectDetailScreen() {
       </ScrollView>
 
       <PhotoPositionSheet
-        currentPosition={photoPositionId !== null && projectPhotos.some((photo) => photo.id === photoPositionId)
+        currentPosition={!project.archived && photoPositionId !== null && projectPhotos.some((photo) => photo.id === photoPositionId)
           ? projectPhotos.length - projectPhotos.findIndex((photo) => photo.id === photoPositionId)
           : null}
         count={projectPhotos.length}
@@ -1496,7 +1623,7 @@ export default function BodyFrameProjectDetailScreen() {
       <Modal
         transparent
         animationType="fade"
-        visible={reminderModalOpen}
+        visible={!project.archived && reminderModalOpen}
         onRequestClose={() => setReminderModalOpen(false)}
       >
         <KeyboardAvoidingView
@@ -1737,7 +1864,7 @@ export default function BodyFrameProjectDetailScreen() {
       <Modal
         transparent
         animationType="slide"
-        visible={settingsOpen}
+        visible={!project.archived && settingsOpen}
         onRequestClose={() => setSettingsOpen(false)}
       >
         <KeyboardAvoidingView
@@ -1826,7 +1953,7 @@ export default function BodyFrameProjectDetailScreen() {
                 <Pressable
                   accessibilityRole="button"
                   style={[styles.upgradeButton, { borderColor: palette.line }]}
-                  onPress={() => router.push("/account")}
+                  onPress={() => openPlans("project", upgradePlanLabel)}
                 >
                   <Text style={[styles.upgradeButtonText, { color: palette.text }]}>
                     플랜 보기 · {upgradePlanLabel}
@@ -1875,6 +2002,50 @@ export default function BodyFrameProjectDetailScreen() {
                 })}
               </View>
 
+              <View style={styles.settingDivider} />
+
+              <Text style={[styles.settingTitle, { color: palette.text }]}>
+                저장 및 백업
+              </Text>
+              <Text style={[styles.settingDetail, { color: palette.muted }]}>
+                앱 보관함 · 필수 저장 (해제할 수 없음). 프로젝트에 추가할 저장 위치를 선택합니다.
+              </Text>
+              <View style={styles.metricChoiceGrid}>
+                {PROJECT_SAVE_MODE_OPTIONS.map((option) => {
+                  const active = saveModeDraft === option.value;
+                  return (
+                    <Pressable
+                      key={option.value}
+                      disabled={saving}
+                      accessibilityRole="radio"
+                      accessibilityLabel={option.label}
+                      accessibilityHint={option.detail}
+                      accessibilityState={{ selected: active, disabled: saving }}
+                      style={[
+                        styles.choiceButton,
+                        {
+                          borderColor: active ? modalSelectionColor : palette.line,
+                          backgroundColor: active ? modalSelectionColor : palette.background
+                        }
+                      ]}
+                      onPress={() => setSaveModeDraft(option.value)}
+                    >
+                      <Text style={[styles.choiceText, { color: active ? modalSelectionText : palette.text }]}>
+                        {option.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              <Text style={[styles.settingHint, { color: palette.muted }]}>
+                {saveModeDraft
+                  ? PROJECT_SAVE_MODE_OPTIONS.find((item) => item.value === saveModeDraft)?.detail
+                  : "기존 프로젝트는 이전 공통 저장 설정을 유지합니다. 선택하면 이 프로젝트부터 새 방식이 적용됩니다."}
+              </Text>
+              <Text style={[styles.settingHint, { color: palette.muted }]}>
+                클라우드를 포함한 방식은 Pro 이상 구독과 계정의 백업 프로젝트 선택이 필요합니다.
+                저장 방식을 변경해도 이전 사진이나 기존 클라우드 백업이 자동 삭제되지 않습니다.
+              </Text>
               <View style={styles.settingDivider} />
 
               <Text style={[styles.settingTitle, { color: palette.text }]}>
@@ -1969,7 +2140,7 @@ export default function BodyFrameProjectDetailScreen() {
                 수치 기록
               </Text>
               <Text style={[styles.settingDetail, { color: palette.muted }]}>
-                원하는 경우에만 몸무게 같은 수치를 사진 기록과 함께 저장합니다. 현재 기기에만 저장됩니다.
+                원하는 경우 몸무게 같은 수치를 사진과 함께 기록할 수 있습니다. 직접 입력한 값은 프로젝트 백업 설정에 따라 클라우드에도 저장됩니다.
               </Text>
               <View style={styles.choiceRow}>
                 {([
@@ -2254,17 +2425,38 @@ const styles = StyleSheet.create({
   },
   projectHeader: {
     gap: 8,
-    marginBottom: 10
+    marginBottom: 8
   },
   comparePreviewCard: {
     width: "100%",
     maxWidth: 560,
     alignSelf: "center",
-    gap: 6,
-    padding: 8,
-    marginBottom: 8,
+    minHeight: bodyFrameDesign.minTouchSize,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    padding: 10,
+    marginBottom: 6,
     borderWidth: bodyFrameDesign.borderWidth,
     borderRadius: bodyFrameDesign.cardRadius
+  },
+  comparePreviewEmptyCard: {
+    flexDirection: "column",
+    alignItems: "flex-start",
+    gap: 4
+  },
+  comparePreviewCopy: {
+    flex: 1,
+    minWidth: 0,
+    gap: 4
+  },
+  comparePreviewDetail: {
+    fontSize: bodyFrameTypography.caption,
+    lineHeight: 18
+  },
+  comparePreviewActionLabel: {
+    fontSize: bodyFrameTypography.caption,
+    fontWeight: "700"
   },
   comparePreviewHeading: {
     minHeight: bodyFrameDesign.minTouchSize,
@@ -2279,12 +2471,11 @@ const styles = StyleSheet.create({
   },
   comparePreviewPair: {
     flexDirection: "row",
-    gap: 8
+    gap: 4
   },
   comparePreviewItem: {
-    flex: 1,
-    minWidth: 0,
-    height: 156,
+    width: 72,
+    height: 110,
     overflow: "hidden"
   },
   comparePreviewImage: {
@@ -2392,11 +2583,30 @@ const styles = StyleSheet.create({
     fontWeight: "600"
   },
   primaryAction: {
+    flex: 1,
     minHeight: bodyFrameDesign.primaryButtonHeight,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: bodyFrameDesign.buttonRadius,
-    marginBottom: 10
+    borderRadius: bodyFrameDesign.buttonRadius
+  },
+  recordsFooterActions: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 10
+  },
+  recordsFooterActionsLargeFont: {
+    flexDirection: "column"
+  },
+  photoAddAction: {
+    flex: 1,
+    minHeight: bodyFrameDesign.primaryButtonHeight,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingHorizontal: 10,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderRadius: bodyFrameDesign.buttonRadius
   },
   primaryActionText: {
     fontSize: bodyFrameTypography.button,
@@ -2412,7 +2622,7 @@ const styles = StyleSheet.create({
     alignSelf: "center"
   },
   recordsSection: {
-    gap: 12
+    gap: 8
   },
   sectionHeader: {
     flexDirection: "row",
@@ -2454,7 +2664,9 @@ const styles = StyleSheet.create({
     fontWeight: "600"
   },
   sectionCount: {
-    fontSize: bodyFrameTypography.caption
+    fontSize: bodyFrameTypography.body,
+    fontWeight: "600",
+    fontVariant: ["tabular-nums"]
   },
   photoGrid: {
     width: "100%",

@@ -69,5 +69,5 @@ test("Stage C Android QA distinguishes initial launch from settings replay", () 
   assert.ok(cases.includes('"onboarding-first-run"'));
   assert.ok(cases.includes('"시작하기", "나중에 보기"'));
   assert.ok(cases.includes('"onboarding-welcome"'));
-  assert.ok(cases.includes('"바디 프레임에 오신 것을 환영합니다.", "다음"'));
+  assert.ok(cases.includes('"첫 사진을 남겨 보세요", "다음"'));
 });

@@ -38,12 +38,12 @@ assert.deepEqual(pngDimensions(adaptiveIcon), {
 
 assert.equal(
   sha256(appIcon),
-  "891e4d5fb09248587d0547ca09c00c31a833c9d1a750f571e3ceaf14b87447c7",
+  "8088be1abc9cfdb9f2d1c28a53af820dd321f1be9328b3409c073daabdbb7899",
   "app icon should match the approved body outline and frame asset"
 );
 assert.equal(
   sha256(adaptiveIcon),
-  "0438c59759fe1ffdf898c2010b057f61a358a167a207e6777df954df74b365df",
+  "2560aa25185687dcbf24b0bf62d1c681b46a6fdc25b028549175f9de3e9a5064",
   "adaptive foreground should match the approved symbol with safe-area padding"
 );
 
@@ -94,9 +94,7 @@ for (const token of [
   "overlayButton: {\n    minHeight: bodyFrameDesign.minTouchSize",
   "overlayCompactButton: {\n    minHeight: bodyFrameDesign.minTouchSize",
   "overlayConfirmButton: {\n    minHeight: bodyFrameDesign.minTouchSize",
-  "modalCloseButton: {\n    minHeight: bodyFrameDesign.minTouchSize",
   "optionButton: {\n    minHeight: bodyFrameDesign.minTouchSize",
-  "cameraColorCloseButton: {\n    width: bodyFrameDesign.minTouchSize",
   "height: bodyFrameDesign.minTouchSize",
   "quickPillButton: {\n    minWidth: 48,\n    minHeight: bodyFrameDesign.minTouchSize",
   "opacityStepButton: {\n    width: bodyFrameDesign.minTouchSize"
@@ -105,6 +103,17 @@ for (const token of [
     cameraStyles.includes(token),
     `camera touch-target contract should contain ${token}`
   );
+}
+
+for (const [name, properties] of [
+  ["modalCloseButton", ["minHeight", "minWidth"]],
+  ["cameraColorCloseButton", ["width", "height"]]
+]) {
+  const block = cameraStyles.match(new RegExp(`${name}: \\{([^}]+)\\}`))?.[1];
+  assert.ok(block, `${name} touch target must exist`);
+  for (const property of properties) {
+    assert.match(block, new RegExp(`${property}: bodyFrameDesign\\.minTouchSize`), `${name}.${property}`);
+  }
 }
 
 const accountStyles = fs.readFileSync(

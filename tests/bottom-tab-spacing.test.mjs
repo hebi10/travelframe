@@ -12,7 +12,7 @@ const screenShellSource = fs.readFileSync(
 
 for (const snippet of [
   "const tabBarBottomPadding = Math.max(insets.bottom + 8, 16);",
-  "const tabBarHeight = 58 + tabBarBottomPadding;",
+  "const tabBarHeight = 58 + tabBarBottomPadding + extraFontHeight;",
   "paddingTop: 6",
   "minHeight: bodyFrameDesign.minTouchSize"
 ]) {

@@ -1,0 +1,22 @@
+{
+  "nativePopupBounds": [
+    47,
+    637,
+    1033,
+    1866
+  ],
+  "nativePopupPixels": [
+    986,
+    1229
+  ],
+  "referenceOriginalPixels": [
+    1122,
+    1402
+  ],
+  "referenceAlignedPixels": [
+    986,
+    1232
+  ],
+  "referenceMinusNativeHeightPx": 3,
+  "normalization": "Reference uniformly resized to native popup width; native pixels unchanged; bottom padding only for board"
+}

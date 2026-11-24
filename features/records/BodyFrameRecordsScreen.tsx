@@ -1,3 +1,4 @@
+import { openPlans } from "@/lib/plan-navigation";
 import { AppText as Text } from "@/components/app-text";
 import { Feather } from "@expo/vector-icons";
 import {
@@ -20,7 +21,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppGuideOverlay } from "@/components/app-guide-overlay";
-import { bodyFrameAccent, bodyFrameDesign, bodyFrameTypography } from "@/constants/app-theme";
+import { bodyFrameDesign, bodyFrameTypography } from "@/constants/app-theme";
 import { BodyFrameProjectSwitcher } from "@/features/camera/BodyFrameProjectSwitcher";
 import { useAuth } from "@/lib/auth-context";
 import {
@@ -36,8 +37,11 @@ import {
   createBodyProject,
   getBodyProjects
 } from "@/lib/body-project-library";
+import { permanentlyDeleteArchivedProject } from "@/lib/body-project-deletion";
+import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 import { setLastActiveProjectId } from "@/lib/body-project-preferences";
 import { getPhotos } from "@/lib/photo-library";
+import { initializeNewBodyProjectMeasurements } from "@/lib/body-measurement-library";
 import { getPlanEntitlements } from "@/lib/plan-entitlements";
 import { useAppAppearance } from "@/lib/app-appearance";
 import type { BodyProject, ReferencePhotoMode } from "@/types/body-project";
@@ -80,16 +84,18 @@ type CreateProjectInput = {
 
 export default function BodyFrameRecordsScreen() {
   const insets = useSafeAreaInsets();
-  const { width: windowWidth } = useWindowDimensions();
+  const { width: windowWidth, fontScale } = useWindowDimensions();
   const contentWidth = Math.min(windowWidth, bodyFrameDesign.contentMaxWidth) - bodyFrameDesign.horizontalPadding * 2;
   const projectColumnCount = contentWidth >= 560 ? 2 : 1;
   const projectCardWidth = Math.max(
     0,
     (contentWidth - 12 * (projectColumnCount - 1)) / projectColumnCount
   );
-  const { palette, effectiveThemeMode } = useAppAppearance();
-  const highlightColor = effectiveThemeMode === "dark" ? bodyFrameAccent : palette.text;
-  const coverWidth = Math.min(128, Math.max(108, Math.round(projectCardWidth * 0.36)));
+  const { palette } = useAppAppearance();
+  const highlightColor = palette.text;
+  const coverWidth = fontScale >= 1.3
+    ? Math.min(120, Math.max(100, Math.round(projectCardWidth * 0.32)))
+    : Math.min(144, Math.max(116, Math.round(projectCardWidth * 0.40)));
   const { isLoggedIn, subscription } = useAuth();
   const planEntitlements = useMemo(
     () => getPlanEntitlements({ isLoggedIn, subscription }),
@@ -135,7 +141,7 @@ export default function BodyFrameRecordsScreen() {
   );
 
   const openProject = useCallback(async (project: BodyProject) => {
-    await setLastActiveProjectId(project.id);
+    if (!project.archived) await setLastActiveProjectId(project.id);
     router.push({
       pathname: "/project/[id]",
       params: { id: project.id }
@@ -174,6 +180,36 @@ export default function BodyFrameRecordsScreen() {
     [planEntitlements.maxProjectCount, reload]
   );
 
+  const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
+  const confirmDeleteProject = (project: BodyProject) => {
+    Alert.alert(
+      "보관된 프로젝트를 영구 삭제할까요?",
+      `"${project.name}"의 프로젝트 기록, 사진, 수치와 연결 영상이 삭제됩니다.${isLoggedIn ? " 계정에 백업된 프로젝트도 삭제를 요청합니다." : ""} 기기 앨범으로 내보낸 파일은 유지됩니다.`,
+      [
+        { text: "취소", style: "cancel" },
+        {
+          text: "영구 삭제",
+          style: "destructive",
+          onPress: () => void (async () => {
+            if (projectActivationInFlight.current) return;
+            projectActivationInFlight.current = true;
+            setDeletingProjectId(project.id);
+            try {
+              await permanentlyDeleteArchivedProject(project.id, isLoggedIn);
+              await reload();
+              if (isLoggedIn) Alert.alert("기기에서 프로젝트를 삭제했습니다", "계정 백업 삭제를 대기열에 등록했습니다.");
+            } catch (error) {
+              Alert.alert("프로젝트 삭제 실패", getUserFacingErrorMessage(error, "잠시 후 다시 시도해 주세요."));
+            } finally {
+              projectActivationInFlight.current = false;
+              setDeletingProjectId(null);
+            }
+          })()
+        }
+      ]
+    );
+  };
+
   const handleCreateProject = useCallback(
     async ({ name, targetPhotoCount, referenceMode }: CreateProjectInput) => {
       if (projectActivationInFlight.current) {
@@ -198,6 +234,9 @@ export default function BodyFrameRecordsScreen() {
           name,
           targetPhotoCount,
           referenceMode
+        });
+        await initializeNewBodyProjectMeasurements(project.id).catch(() => {
+          Alert.alert("수치 입력 설정", "프로젝트는 생성됐지만 촬영 후 수치 입력 설정을 저장하지 못했습니다. 프로젝트 설정에서 다시 활성화해 주세요.");
         });
         await setLastActiveProjectId(project.id);
         await reload();
@@ -236,11 +275,16 @@ export default function BodyFrameRecordsScreen() {
         </View>
 
         <View style={styles.projectsHeading}>
-          <View style={styles.projectsHeadingCopy}>
-            <Text style={[styles.projectsTitle, { color: palette.text }]}>내 프로젝트</Text>
-            <Text style={[styles.projectsCount, { color: palette.muted }]}>{cards.length}개</Text>
+          <View style={styles.projectsHeadingIntro}>
+            <View style={styles.projectsHeadingCopy}>
+              <Text style={[styles.projectsTitle, { color: palette.text }]}>내 프로젝트</Text>
+              <Text style={[styles.projectsCount, { color: palette.muted }]}>{cards.length}개</Text>
+            </View>
+            <Text style={[styles.projectsDescription, { color: palette.muted }]}>
+              촬영한 사진으로 변화 과정을 기록하세요.
+            </Text>
           </View>
-          <View style={styles.quickActions}>
+          <View style={[styles.quickActions, fontScale >= 1.3 && styles.quickActionsLargeFont]}>
             <BodyFrameProjectSwitcher
               createOnly
               disabled={restoringProjectId !== null}
@@ -253,7 +297,7 @@ export default function BodyFrameRecordsScreen() {
               upgradePlanLabel={upgradePlanLabel}
               onSelectProject={() => undefined}
               onCreateProject={handleCreateProject}
-              onUpgrade={() => router.push("/account")}
+              onUpgrade={() => openPlans("records", upgradePlanLabel)}
             />
             <Pressable
               accessibilityRole="button"
@@ -304,6 +348,7 @@ export default function BodyFrameRecordsScreen() {
                   key={project.id}
                   accessibilityRole="button"
                   accessibilityLabel={`${project.name} 프로젝트 열기`}
+                  accessibilityHint={`기록 ${summary.photoCount}장, 목표 ${summary.targetPhotoCount}장, 진행률 ${progressPercent}%, 예상 영상 ${formatDuration(summary.durationSeconds)}입니다.`}
                   onPress={() => void openProject(project)}
                   style={({ pressed }) => [
                     styles.projectCard,
@@ -325,7 +370,7 @@ export default function BodyFrameRecordsScreen() {
                       <Image
                         source={{ uri: cover.previewUri ?? cover.uri }}
                         style={styles.coverImage}
-                        contentFit="cover"
+                        contentFit="contain"
                         cachePolicy="memory-disk"
                       />
                     ) : (
@@ -361,9 +406,6 @@ export default function BodyFrameRecordsScreen() {
                         {progressPercent}%
                       </Text>
                     </View>
-                    <Text style={[styles.projectDuration, { color: palette.faint }]}>
-                      변화 영상 {formatDuration(summary.durationSeconds)}
-                    </Text>
                     <View
                       accessible
                       accessibilityRole="progressbar"
@@ -384,6 +426,9 @@ export default function BodyFrameRecordsScreen() {
                         ]}
                       />
                     </View>
+                    <Text style={[styles.projectDuration, { color: palette.muted }]}>
+                      예상 영상 {formatDuration(summary.durationSeconds)}
+                    </Text>
                   </View>
                 </Pressable>
               );
@@ -411,7 +456,13 @@ export default function BodyFrameRecordsScreen() {
                     }
                   ]}
                 >
-                  <View style={styles.archivedCopy}>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`${project.name} 보관 기록 열기`}
+                    disabled={deletingProjectId !== null}
+                    onPress={() => void openProject(project)}
+                    style={styles.archivedCopy}
+                  >
                     <Text
                       numberOfLines={1}
                       style={[styles.archivedName, { color: palette.text }]}
@@ -422,11 +473,22 @@ export default function BodyFrameRecordsScreen() {
                       목표 {project.targetPhotoCount}장 · 기준{" "}
                       {project.referenceMode === "first" ? "첫 사진" : "최근 사진"}
                     </Text>
-                  </View>
+                  </Pressable>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`${project.name} 영구 삭제`}
+                    style={[styles.restoreButton, { borderColor: palette.line }]}
+                    disabled={deletingProjectId !== null || restoringProjectId !== null}
+                    onPress={() => confirmDeleteProject(project)}
+                  >
+                    <Text style={[styles.restoreButtonText, { color: palette.text }]}>
+                      {deletingProjectId === project.id ? "삭제 중" : "삭제"}
+                    </Text>
+                  </Pressable>
                   <Pressable
                     accessibilityRole="button"
                     style={[styles.restoreButton, { borderColor: palette.line }]}
-                    disabled={restoringProjectId !== null}
+                    disabled={restoringProjectId !== null || deletingProjectId !== null}
                     accessibilityState={{ disabled: restoringProjectId !== null, busy: restoringProjectId === project.id }}
                     onPress={() => void restoreProject(project)}
                   >
@@ -474,6 +536,9 @@ const styles = StyleSheet.create({
     alignItems: "stretch",
     gap: 8
   },
+  quickActionsLargeFont: {
+    width: 232
+  },
   pageTitle: {
     fontSize: bodyFrameTypography.pageTitle,
     fontWeight: "600"
@@ -499,11 +564,21 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     flexWrap: "wrap",
     gap: 8,
-    marginBottom: 6
+    marginBottom: 12
+  },
+  projectsHeadingIntro: {
+    flex: 1,
+    minWidth: 0,
+    gap: 4
+  },
+  projectsDescription: {
+    fontSize: bodyFrameTypography.caption,
+    lineHeight: 17
   },
   projectsHeadingCopy: {
     flexDirection: "row",
     alignItems: "baseline",
+    flexWrap: "wrap",
     gap: 8
   },
   projectsTitle: {
@@ -522,7 +597,7 @@ const styles = StyleSheet.create({
     gap: 12
   },
   projectCard: {
-    minHeight: 136,
+    minHeight: 154,
     flexDirection: "row",
     overflow: "hidden",
     borderWidth: bodyFrameDesign.borderWidth,
@@ -555,8 +630,8 @@ const styles = StyleSheet.create({
   projectCopy: {
     flex: 1,
     minWidth: 0,
-    gap: 5,
-    padding: 10,
+    gap: 6,
+    padding: 12,
     justifyContent: "space-between"
   },
   projectNameRow: {
@@ -566,7 +641,8 @@ const styles = StyleSheet.create({
   },
   projectName: {
     flex: 1,
-    fontSize: bodyFrameTypography.rowTitle,
+    fontSize: bodyFrameTypography.sectionTitle,
+    lineHeight: 24,
     fontWeight: "600"
   },
   projectDate: {
@@ -575,17 +651,19 @@ const styles = StyleSheet.create({
   },
   projectStatsRow: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "baseline",
     justifyContent: "space-between",
+    flexWrap: "wrap",
     gap: 8
   },
   projectMeta: {
     flexShrink: 1,
-    fontSize: bodyFrameTypography.caption,
-    lineHeight: 17
+    fontSize: bodyFrameTypography.body,
+    fontWeight: "600",
+    lineHeight: 20
   },
   projectPercent: {
-    fontSize: bodyFrameTypography.caption,
+    fontSize: bodyFrameTypography.body,
     fontWeight: "700",
     fontVariant: ["tabular-nums"]
   },

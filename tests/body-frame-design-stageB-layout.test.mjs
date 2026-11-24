@@ -23,7 +23,7 @@ test("Stage B four Android screens parse and retain existing media controls", ()
 });
 
 test("Stage B video reduces preview without changing aspect ratio or export path", () => {
-  assert.ok(source.video.includes("windowHeight * 0.30 * frameAspectRatio"));
+  assert.ok(source.video.includes("windowHeight * 0.34 * frameAspectRatio"));
   assert.ok(source.video.includes("windowWidth * 0.82"));
   assert.ok(source.video.includes("aspectRatio: frameAspectRatio"));
   for (const token of [
@@ -41,7 +41,7 @@ test("Stage B video reduces preview without changing aspect ratio or export path
 });
 
 test("Stage B detail exposes records sooner without cropping or mutating photo order", () => {
-  assert.ok(source.project.includes("height: 156,"));
+  assert.ok(source.project.includes("width: 72,") && source.project.includes("height: 110,"));
   assert.ok(source.project.includes('contentFit="contain"'));
   assert.ok(source.project.includes("marginBottom: 8"));
   for (const token of [
@@ -51,15 +51,15 @@ test("Stage B detail exposes records sooner without cropping or mutating photo o
   ]) assert.ok(source.project.includes(token), token);
 });
 
-test("Stage B camera hint remains non-interactive and preserves camera project/session logic", () => {
-  assert.ok(source.camera.includes("styles.captureHintPanel"));
-  assert.ok(source.camera.includes('pointerEvents="none"'));
-  assert.ok(source.camera.includes("marginTop: 4"));
-  assert.ok(source.camera.includes("paddingVertical: 4"));
+test("Stage B camera preserves project/session semantics after C1 status relocation", () => {
+  assert.ok(source.camera.includes("footerStatus={"));
+  assert.ok(source.camera.includes("styles.captureStatusRow"));
+  assert.ok(!source.camera.includes("styles.captureHintWrap"));
   for (const token of [
     "<CameraScreen", "<BodyFrameProjectSwitcher", "captureBlockedReason",
     "automaticReferenceUri", "getNextBodyProjectSequence",
-    "getBodyFrameCaptureLimitState", "clearBodyFrameCameraSession"
+    "getBodyFrameCaptureLimitState", "clearBodyFrameCameraSession",
+    "measurementPromptPhotoId", "플랜 보기 · {upgradePlanLabel}"
   ]) assert.ok(source.camera.includes(token), token);
 });
 
@@ -69,6 +69,6 @@ test("Stage B comparison keeps adjustable divider, 25/50/75 presets and accessib
     "PanResponder.create", 'accessibilityRole="adjustable"',
     "onAccessibilityAction", "[0.25, 0.5, 0.75]",
     "changeDivider(divider + 0.1)", "changeDivider(divider - 0.1)",
-    "styles.dividerHandle", 'contentFit="cover"'
+    "styles.dividerHandle", 'contentFit="contain"'
   ]) assert.ok(source.compare.includes(token), token);
 });

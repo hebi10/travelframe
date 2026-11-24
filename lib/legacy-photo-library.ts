@@ -168,15 +168,19 @@ const getPreviewResize = (width?: number, height?: number) => {
 const createPhotoPreview = async ({
   sourceUri,
   id,
+  projectId,
   width,
   height
 }: {
   sourceUri: string;
   id: string;
+  projectId?: string;
   width?: number;
   height?: number;
 }) => {
-  const directory = await ensurePhotoPreviewDirectory();
+  const root = await ensurePhotoPreviewDirectory();
+  const directory = projectId ? `${root}${encodeURIComponent(projectId)}/` : root;
+  if (projectId) await FileSystem.makeDirectoryAsync(directory, { intermediates: true });
   const previewUri = `${directory}${id}-preview.jpg`;
   const resize = getPreviewResize(width, height);
   const rendered = await manipulateAsync(
@@ -355,7 +359,7 @@ export const reorderProjectPhotos = async ({
       }
 
       const sequence = sequenceById.get(photo.id);
-      if (!sequence) {
+      if (!sequence || photo.sequence === sequence) {
         return photo;
       }
 
@@ -618,6 +622,7 @@ export const saveCapturedPhoto = async ({
   uri,
   width,
   height,
+  createdAt,
   ratioLabel = "Original",
   colorAdjustment,
   localImageLimit
@@ -664,7 +669,7 @@ export const saveCapturedPhoto = async ({
       id,
       uri: destinationUri,
       previewUri,
-      createdAt: new Date().toISOString(),
+      createdAt: createdAt ?? new Date().toISOString(),
       width: prepared.width ?? 0,
       height: prepared.height ?? 0,
       ratioLabel: shouldApplyRatio
@@ -715,7 +720,11 @@ export const saveEditedPhoto = async ({
     });
   }
   const id = targetPhotoId ?? createPhotoId();
-  const directory = await ensurePhotoDirectory();
+  const rootDirectory = await ensurePhotoDirectory();
+  const directory = existingPhoto?.projectId
+    ? `${rootDirectory}${encodeURIComponent(existingPhoto.projectId)}/`
+    : rootDirectory;
+  await FileSystem.makeDirectoryAsync(directory, { intermediates: true });
   // Keep photoId immutable; each content version gets independent file paths.
   const versionId = `${id}-${createPhotoId()}`;
   const destinationUri = `${directory}${versionId}-edited.jpg`;
@@ -748,6 +757,7 @@ export const saveEditedPhoto = async ({
     previewUri = await createPhotoPreview({
       sourceUri: destinationUri,
       id: versionId,
+      projectId: existingPhoto?.projectId,
       width: prepared.width,
       height: prepared.height
     });
@@ -875,12 +885,13 @@ export const deletePhoto = async (id: string) => runPhotoLibraryMutation(async (
 
   await writePhotos(photos.filter((item) => item.id !== id));
   if (photo) {
-    await deleteLocalFile(photo.uri);
-    if (photo.previewUri) {
-      await deleteLocalFile(photo.previewUri);
-    }
+    await Promise.all(
+      [...new Set([photo.uri, photo.previewUri, photo.localUri, photo.localPreviewUri])]
+        .filter((uri): uri is string => Boolean(uri))
+        .map((uri) => deleteLocalFile(uri).catch(() => undefined))
+    );
   }
-
+  return photo ?? null;
 });
 
 export const togglePhotoForVideo = async (id: string) => runPhotoLibraryMutation(async () => {
@@ -942,17 +953,25 @@ export const recordPhotoLocalDeletion = (id: string) =>
 
 // Read local state only after earlier mutations have committed. Local edits win;
 // deletion markers prevent a later cloud restore from resurrecting deleted items.
-export const mergePhotosFromBackup = (incoming: PhotoItem[]) =>
+export const mergePhotosFromBackup = (
+  incoming: PhotoItem[],
+  restorableIds: ReadonlySet<string> = new Set()
+) =>
   runPhotoLibraryMutation(async () => {
     const current = await getPhotos();
     const deleted = await getDeletedPhotoIds();
     const ids = new Set(current.map(item => item.id));
     const added = incoming.filter(item => {
-      if (ids.has(item.id) || deleted.has(item.id)) return false;
+      if (ids.has(item.id) || (deleted.has(item.id) && !restorableIds.has(item.id))) return false;
       ids.add(item.id);
       return true;
     });
     if (added.length) await writePhotos([...current, ...added]);
+    const deletedCount = deleted.size;
+    for (const item of incoming) {
+      if (restorableIds.has(item.id) && ids.has(item.id)) deleted.delete(item.id);
+    }
+    if (deleted.size !== deletedCount) await localStorageAdapter.setItem(PHOTO_DELETION_MARKER_KEY, JSON.stringify([...deleted]));
     return added;
   });
 
@@ -961,6 +980,15 @@ export const mergePhotosFromBackup = (incoming: PhotoItem[]) =>
 const isSamePhotoVersion = (current: PhotoItem, expected: PhotoItem) =>
   current.uri === expected.uri &&
   (current.updatedAt ?? current.createdAt) === (expected.updatedAt ?? expected.createdAt);
+
+export const markPhotoVersionBackedUp = (expected: PhotoItem) =>
+  runPhotoLibraryMutation(async () => {
+    const photos = await getPhotos();
+    const current = photos.find((photo) => photo.id === expected.id);
+    if (!current || current.backupStatus !== "pending" || !isSamePhotoVersion(current, expected)) return;
+    const updated: PhotoItem = { ...current, backupStatus: "backed_up" };
+    await writePhotos(photos.map((photo) => photo.id === current.id ? updated : photo));
+  });
 
 export const updatePhotoMetadata = (id: string, updates: Partial<PhotoItem>, expectedDraft?: PhotoItem) =>
   runPhotoLibraryMutation(async () => {

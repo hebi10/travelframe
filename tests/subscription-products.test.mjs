@@ -7,7 +7,12 @@ const accountSource = fs.readFileSync(
   new URL("../features/account/AccountScreen.tsx", import.meta.url),
   "utf8"
 );
-const source = fs.readFileSync(sourceUrl, "utf8");
+const planModule = ts.transpileModule(fs.readFileSync(new URL("../lib/plan-entitlements.ts", import.meta.url), "utf8"), {
+  compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 }
+}).outputText;
+const source = fs.readFileSync(sourceUrl, "utf8").replace(
+  "@/lib/plan-entitlements", `data:text/javascript,${encodeURIComponent(planModule)}`
+);
 const transpiled = ts.transpileModule(source, {
   compilerOptions: {
     module: ts.ModuleKind.ESNext,

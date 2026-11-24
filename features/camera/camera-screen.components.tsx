@@ -13,7 +13,6 @@ import Animated, { runOnJS, useDerivedValue, useSharedValue } from "react-native
 
 import { bodyFrameDarkColors, colors } from "@/constants/app-theme";
 import {
-  EXPOSURE_CONTROL_GAP,
   EXPOSURE_SUN_ICON_SIZE,
   EXPOSURE_TRACK_WIDTH
 } from "@/features/camera/camera-screen.constants";
@@ -35,6 +34,7 @@ export type GuideSizeSliderProps = {
   min?: number;
   max?: number;
   compact?: boolean;
+  dark?: boolean;
   onChange: (value: number) => void;
   onCommit: (value: number) => void;
 };
@@ -44,6 +44,7 @@ export function GuideSizeSlider({
   min = GUIDE_SIZE_MIN,
   max = GUIDE_SIZE_MAX,
   compact = false,
+  dark = false,
   onChange,
   onCommit
 }: GuideSizeSliderProps) {
@@ -53,6 +54,7 @@ export function GuideSizeSlider({
       min={min}
       max={max}
       compact={compact}
+      dark={dark}
       label="미세 조정"
       onChange={onChange}
       onCommit={onCommit}
@@ -200,6 +202,7 @@ export function CameraShutterSoundChoice({
       </View>
       <View style={styles.shutterSoundOptions}>
         <Pressable
+          accessibilityRole="button"
           style={[
             styles.optionButton,
             dark && styles.cameraSettingsOptionButton,
@@ -222,6 +225,7 @@ export function CameraShutterSoundChoice({
           </Text>
         </Pressable>
         <Pressable
+          accessibilityRole="button"
           style={[
             styles.optionButton,
             dark && styles.cameraSettingsOptionButton,
@@ -442,14 +446,16 @@ export function SmoothValueSlider({
     () =>
       Gesture.Pan()
         .enabled(trackWidth > 0)
+        .activeOffsetX([-6, 6])
+        .failOffsetY([-10, 10])
         .hitSlop({ top: 10, bottom: 10, left: 10, right: 10 })
-        .onBegin((event) => {
+        .onStart((event) => {
           isDragging.value = true;
-          dragStartThumbX.value = Math.max(0, Math.min(trackWidth, event.x));
-          thumbX.value = dragStartThumbX.value;
+          dragStartThumbX.value = event.x - event.translationX;
+          thumbX.value = Math.max(0, Math.min(trackWidth, event.x));
           const nextRatio =
             trackWidth > 0
-              ? Math.max(0, Math.min(1, dragStartThumbX.value / trackWidth))
+              ? Math.max(0, Math.min(1, thumbX.value / trackWidth))
               : 0;
           runOnJS(previewValue)(min + nextRatio * (max - min));
         })
@@ -464,12 +470,41 @@ export function SmoothValueSlider({
           runOnJS(previewValue)(min + nextRatio * (max - min));
         })
         .onFinalize(() => {
+          const wasDragging = isDragging.value;
+          isDragging.value = false;
+          if (!wasDragging) {
+            return;
+          }
           const nextRatio =
             trackWidth > 0 ? Math.max(0, Math.min(1, thumbX.value / trackWidth)) : 0;
-          isDragging.value = false;
           runOnJS(onCommit)(min + nextRatio * (max - min));
         }),
     [dragStartThumbX, isDragging, max, min, onCommit, previewValue, thumbX, trackWidth]
+  );
+
+  const sliderTapGesture = useMemo(
+    () =>
+      Gesture.Tap()
+        .enabled(trackWidth > 0)
+        .maxDeltaX(10)
+        .maxDeltaY(10)
+        .hitSlop({ top: 10, bottom: 10, left: 10, right: 10 })
+        .onEnd((event, success) => {
+          if (!success) {
+            return;
+          }
+          thumbX.value = Math.max(0, Math.min(trackWidth, event.x));
+          const nextRatio =
+            trackWidth > 0 ? Math.max(0, Math.min(1, thumbX.value / trackWidth)) : 0;
+          const nextValue = min + nextRatio * (max - min);
+          runOnJS(previewValue)(nextValue);
+          runOnJS(onCommit)(nextValue);
+        }),
+    [max, min, onCommit, previewValue, thumbX, trackWidth]
+  );
+  const sliderControlGesture = useMemo(
+    () => Gesture.Exclusive(sliderGesture, sliderTapGesture),
+    [sliderGesture, sliderTapGesture]
   );
 
   if (compact) {
@@ -496,7 +531,7 @@ export function SmoothValueSlider({
           >
             {label}
           </Text>
-          <GestureDetector gesture={sliderGesture}>
+          <GestureDetector gesture={sliderControlGesture}>
             <Animated.View
               {...sliderAccessibilityProps}
               collapsable={false}
@@ -542,25 +577,26 @@ export function SmoothValueSlider({
   return (
     <View style={styles.sizeSliderArea}>
       <View style={styles.sizeSliderMeta}>
-        <Text selectable={false} style={styles.sizeSliderMetaText}>
+        <Text selectable={false} style={[styles.sizeSliderMetaText, dark && styles.cameraColorSliderLabel]}>
           {label}
         </Text>
-        <Text selectable={false} style={styles.sizeSliderMetaText}>
+        <Text selectable={false} style={[styles.sizeSliderMetaText, dark && styles.cameraColorSliderValue]}>
           {valueLabel}
         </Text>
       </View>
-      <GestureDetector gesture={sliderGesture}>
+      <GestureDetector gesture={sliderControlGesture}>
         <Animated.View
           {...sliderAccessibilityProps}
           collapsable={false}
           style={styles.sizeTrack}
           onLayout={(event) => setTrackWidth(event.nativeEvent.layout.width)}
         >
-          <View style={styles.sizeTrackFillBase} />
-          <Animated.View style={[styles.sizeTrackFill, { width: thumbX }]} />
+          <View style={[styles.sizeTrackFillBase, dark && styles.cameraColorTrackBase]} />
+          <Animated.View style={[styles.sizeTrackFill, dark && styles.cameraColorTrackFill, { width: thumbX }]} />
           <Animated.View
             style={[
               styles.sizeThumb,
+              dark && styles.cameraColorThumb,
               { transform: [{ translateX: thumbTranslateX }] }
             ]}
           />

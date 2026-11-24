@@ -165,10 +165,12 @@ const cameraSaveScopeTargets: Record<CameraSaveScope, CameraSaveTargets> = {
 };
 
 export const getCameraSaveScopeTargets = (scope: CameraSaveScope): CameraSaveTargets => ({
-  ...cameraSaveScopeTargets[scope]
+  ...cameraSaveScopeTargets[scope],
+  app: true
 });
 
 export const createCameraSaveScope = (targets: CameraSaveTargets): CameraSaveScope => {
+  targets = { ...targets, app: true };
   if (targets.app && targets.device && targets.cloud) {
     return "all";
   }
@@ -413,13 +415,13 @@ const normalizeGuideShapePoints = (value: unknown): GuideShapePoints => {
   };
 };
 
-const normalizeCameraZoomPercent = (value: unknown) => {
+export const normalizeCameraZoomPercent = (value: unknown) => {
   const parsedValue = Number(value);
   if (!Number.isFinite(parsedValue)) {
     return defaultAppSettings.cameraZoomPercent;
   }
 
-  return Math.round(Math.max(0, Math.min(100, parsedValue)));
+  return Number(Math.max(0, Math.min(100, parsedValue)).toFixed(4));
 };
 
 const normalizeGuideLineOpacity = (value: unknown) => {

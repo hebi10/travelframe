@@ -12,8 +12,24 @@ function harness() {
   let owner = user.uid;
   const remote = new Map();
   let localPhotos = [photo];
+  const deletedProjects = new Set();
+  const deletedPhotos = new Set();
+  const queued = [];
   let localProjects = [project];
   let localWorks = [];
+  const sampleMeasurement = {
+    id: "measurement-a", projectId: project.id, photoId: photo.id,
+    sequence: 1, recordedAt: photo.createdAt,
+    weightKg: 71.2, bodyFatPercent: 17.6, source: "manual"
+  };
+  let localMeasurements = [sampleMeasurement];
+  const sampleMeasurementSettings = {
+    enabled: true, promptAfterCapture: true, primaryMetric: "weight",
+    fields: { weight: true, bodyFat: true, skeletalMuscle: false, waist: false }
+  };
+  let localMeasurementSettings = { [project.id]: sampleMeasurementSettings };
+  let localPose = { [project.id]: { enabled: true } };
+  let localCapture = { [project.id]: { enabled: true, context: null } };
   let uploads = 0;
   let failUploadNumber = 0;
   let releaseFailures = 0;
@@ -63,8 +79,64 @@ function harness() {
     "@/lib/cloud-backup-project-slots": {
       getSelectedCloudBackupProjectIds: async () => new Set([project.id])
     },
-    "@/lib/photo-library": { getPhotos: async () => localPhotos, getDeletedPhotoIds: async () => new Set(), wasPhotoDeletedLocally: async () => false, mergePhotosFromBackup: async values => { const added = values.filter(value => !localPhotos.some(item => item.id === value.id)); localPhotos = [...localPhotos, ...added]; return added; } },
-    "@/lib/body-project-library": { getBodyProjects: async () => localProjects, getBodyProjectById: async id => localProjects.find(p=>p.id===id), mergeBodyProjectsFromBackup: async values => { localProjects = [...localProjects, ...values.filter(p=>!localProjects.some(x=>x.id===p.id))]; }, replaceBodyProjects: async values => { localProjects = values; } },
+    "@/lib/photo-library": {
+      getPhotos: async () => localPhotos,
+      getDeletedPhotoIds: async () => deletedPhotos,
+      wasPhotoDeletedLocally: async (id) => deletedPhotos.has(id),
+      markPhotoVersionBackedUp: async (expected) => {
+        localPhotos = localPhotos.map((item) => item.id === expected.id && item.updatedAt === expected.updatedAt
+          ? { ...item, backupStatus: "backed_up" } : item);
+      },
+      mergePhotosFromBackup: async (values, restorable) => {
+        const added = values.filter((value) => !localPhotos.some((item) => item.id === value.id) &&
+          (!deletedPhotos.has(value.id) || restorable.has(value.id)));
+        localPhotos = [...localPhotos, ...added];
+        return added;
+      }
+    },
+    "@/lib/project-cloud-sync-queue": { getProjectCloudSyncTasks: async () => queued },
+    "@/lib/body-project-library": { getBodyProjects: async () => localProjects, getBodyProjectById: async id => localProjects.find(p=>p.id===id), getDeletedBodyProjectIds: async () => new Set(), mergeBodyProjectsFromBackup: async (values, mergeItems, explicit, deletingAtStart) => {
+      if (explicit && values.some((value) => deletingAtStart.has(value.id))) throw new Error("pending cloud deletion");
+      const restoring = new Set(values.filter((value) => explicit && deletedProjects.has(value.id)).map((value) => value.id));
+      const remaining = new Set([...deletedProjects].filter((id) => !restoring.has(id)));
+      localProjects = [...localProjects, ...values.filter((value) => !remaining.has(value.id) && !localProjects.some((item) => item.id === value.id))];
+      return mergeItems(localProjects, remaining, restoring);
+    }, replaceBodyProjects: async values => { localProjects = values; } },
+    "@/lib/body-measurement-library": {
+      getBodyMeasurements: async id => localMeasurements.filter(item => !id || item.projectId === id),
+      getBodyMeasurementSettings: async id => localMeasurementSettings[id] ?? sampleMeasurementSettings,
+      mergeBodyMeasurementsFromBackup: async values => {
+        const added = values.filter(item => !localMeasurements.some(existing => existing.id === item.id));
+        localMeasurements = [...localMeasurements, ...added];
+        return added;
+      },
+      mergeBodyMeasurementSettingsFromBackup: async values => {
+        for (const item of values) {
+          if (!(item.projectId in localMeasurementSettings)) localMeasurementSettings[item.projectId] = item.settings;
+        }
+      }
+    },
+    "@/lib/body-measurement-normalization": {
+      getCloudBodyMeasurement: (entry, backedUpAt) => load("lib/body-measurement-normalization.ts").getCloudBodyMeasurement(entry, backedUpAt),
+      normalizeBodyMeasurementEntry: value => value,
+      normalizeBodyMeasurementSettings: value => value
+    },
+    "@/lib/body-pose-alignment": {
+      getBodyPoseAlignmentSettings: async id => localPose[id] ?? { enabled: false },
+      mergeBodyPoseAlignmentSettingsFromBackup: async values => {
+        for (const item of values) {
+          if (!(item.projectId in localPose)) localPose[item.projectId] = { enabled: item.enabled };
+        }
+      }
+    },
+    "@/lib/body-frame-capture-context": {
+      getBodyCaptureContextState: async id => localCapture[id] ?? { enabled: true, context: null },
+      mergeBodyCaptureContextStatesFromBackup: async values => {
+        for (const item of values) {
+          if (!(item.projectId in localCapture)) localCapture[item.projectId] = item.state;
+        }
+      }
+    },
     "@/lib/subscription": { isCreatorSubscriptionActive: () => true },
     "@/lib/storage-mode": { isStorageSaverMode: () => false, shouldUseCloudBackupForStorageMode: () => true },
     "@/lib/video-library": { getMadeVideos: async () => [], getDeletedVideoIds: async () => new Set(), wasVideoDeletedLocally: async () => false, mergeMadeVideosFromBackup: async values => values },
@@ -80,11 +152,30 @@ function harness() {
     }, fetch: async () => ({ blob: async () => ({ size: 100 }) }), console, setTimeout });
     return exports;
   }
-  return { api: load("lib/cloud-backup.ts"), remote, released, uploads: () => uploads, projects: () => localProjects,
-    changeUser: next => { auth.currentUser = next; }, setOwner: next => { owner = next; },
-    setWorks: values => { localWorks=values; }, failUpload: n => { failUploadNumber=n; },
+  return {
+    api: load("lib/cloud-backup.ts"),
+    remote, released, uploads: () => uploads,
+    projects: () => localProjects,
+    photos: () => localPhotos,
+    setPhotos: (values) => { localPhotos = values; },
+    deletedProjects, deletedPhotos, queued,
+    measurements: () => localMeasurements,
+    measurementSettings: () => localMeasurementSettings,
+    captureContext: () => localCapture,
+    poseSettings: () => localPose,
+    changeUser: next => { auth.currentUser = next; },
+    setOwner: next => { owner = next; },
+    setWorks: values => { localWorks=values; },
+    setMeasurements: values => { localMeasurements=values; },
+    setProjectSaveMode: mode => { localProjects = localProjects.map(value => ({ ...value, saveMode: mode })); },
+    failUpload: n => { failUploadNumber=n; },
     failFirstRelease: () => { releaseFailures=1; },
-    emptyLocal: () => { localPhotos=[]; localProjects=[]; }, rejectWrites: () => { rejectPhotoWrite=true; } };
+    emptyLocal: () => {
+      localPhotos=[]; localProjects=[]; localMeasurements=[];
+      localMeasurementSettings={}; localPose={}; localCapture={};
+    },
+    rejectWrites: () => { rejectPhotoWrite=true; }
+  };
 }
 
 // Stale callers and unclaimed/foreign libraries must fail before cloud writes.
@@ -108,16 +199,37 @@ function harness() {
   assert.equal(h.remote.get("users/owner/photoBackups/photo-a").sourceUpdatedAt, "2026-09-19T00:00:00.000Z");
   assert.ok(h.released.includes("old-session"), "replacement should retire the old upload");
 }
-// Regression: repeat full backup should reuse the unchanged upload and include its project.
+// Regression: repeated backup preserves a project's photo, measurement and selected UI settings.
 {
   const h=harness();
   await h.api.backupCurrentWorkspace({user, subscription: {}});
   await h.api.backupCurrentWorkspace({user, subscription: {}});
   assert.equal(h.uploads(),1,"unchanged photos must not consume another upload reservation");
   assert.equal(h.remote.get("users/owner/bodyProjects/project-a").name,"Training");
+  assert.equal(h.remote.get("users/owner/bodyMeasurements/measurement-a").weightKg,71.2);
+  assert.equal(h.remote.get("users/owner/bodyProjectSettings/project-a").measurementSettings.promptAfterCapture,true);
+  assert.equal(h.remote.get("users/owner/bodyProjectSettings/project-a").poseAlignmentEnabled,true);
   h.emptyLocal();
   await h.api.restoreCloudBackupToLocal({user});
   assert.equal(h.projects()[0].name,"Training","a fresh device must restore project metadata");
+  assert.equal(h.measurements()[0].photoId,"photo-a","measurement must retain original photoId");
+  assert.equal(h.measurements()[0].weightKg,71.2,"new device restores body measurements");
+  assert.equal(h.measurementSettings()[project.id].promptAfterCapture,true);
+  assert.equal(h.poseSettings()[project.id].enabled,true);
+  assert.equal(h.captureContext()[project.id].enabled,true);
+  await h.api.restoreCloudBackupToLocal({user});
+  assert.equal(h.measurements().length,1,"repeat restore must not duplicate measurements");
+  h.setMeasurements([{ ...h.measurements()[0], weightKg: 72.9 }]);
+  await h.api.restoreCloudBackupToLocal({user});
+  assert.equal(h.measurements()[0].weightKg,72.9,"local measurement edits must take precedence");
+}
+// Regression: switching a project to local-only must not send sensitive measurements.
+{
+  const h=harness();
+  h.setProjectSaveMode("local_only");
+  await h.api.backupCurrentWorkspace({user,subscription:{}});
+  assert.equal(h.remote.has("users/owner/bodyMeasurements/measurement-a"),false);
+  assert.equal(h.remote.has("users/owner/bodyProjectSettings/project-a"),false);
 }
 // Regression: old backups with project IDs but no project documents must remain reachable.
 {
@@ -137,7 +249,7 @@ console.log("ok - project backups restore relationships and replace edited photo
 // Regression: partial multi-image failures must retire earlier uploads too.
 {
   const h=harness();
-  const work={id:"work-a", imageUris:["file:///1.jpg","file:///2.jpg"], createdAt:photo.createdAt};
+  const work={id:"work-a", photoIds:[photo.id], imageUris:["file:///1.jpg","file:///2.jpg"], createdAt:photo.createdAt};
   h.setWorks([work]); h.failUpload(2);
   await assert.rejects(h.api.backupImageBundleWork({user,work,enabled:true}), /upload failed/);
   assert.ok(h.released.includes("session-1"));
@@ -146,10 +258,120 @@ console.log("ok - project backups restore relationships and replace edited photo
 // Regression: replacing a multi-image backup must retire its previous sessions.
 {
   const h=harness();
-  const work={id:"work-a", imageUris:["file:///1.jpg"], createdAt:photo.createdAt};
+  const work={id:"work-a", photoIds:[photo.id], imageUris:["file:///1.jpg"], createdAt:photo.createdAt};
   h.setWorks([work]);
   h.remote.set("users/owner/imageWorks/work-a", {backupSessionIds:["old-work-session"],fileSize:100});
   await h.api.backupImageBundleWork({user,work,enabled:true});
   assert.ok(h.released.includes("old-work-session"));
   assert.equal(h.remote.get("users/owner/imageWorks/work-a").backupSessionIds[0],"session-1");
+}
+
+{
+  const h = harness();
+  await h.api.backupPhoto({ user, photo, enabled: true });
+  h.emptyLocal();
+  h.deletedProjects.add(project.id);
+  h.deletedPhotos.add(photo.id);
+  assert.equal((await h.api.restoreCloudBackupToLocal({ user })).photoCount, 0);
+  h.queued.push({ projectId: project.id, kind: "delete-project" });
+  await assert.rejects(h.api.restoreCloudBackupToLocal({ user, projectIds: [project.id] }), /pending cloud deletion/);
+  h.queued.pop();
+  assert.equal((await h.api.restoreCloudBackupToLocal({ user, projectIds: [project.id] })).photoCount, 1);
+  assert.equal(h.photos()[0].id, photo.id);
+}
+
+{
+  const h = harness();
+  const edited = { ...photo, backupStatus: "pending", updatedAt: "2026-11-21T12:00:00Z" };
+  h.setPhotos([edited]);
+  await h.api.backupPhoto({ user, photo: edited, enabled: true });
+  assert.equal(h.photos()[0].backupStatus, "backed_up");
+  const changed = { ...h.photos()[0], sequence: 2, updatedAt: "2026-11-22T12:00:00Z" };
+  await h.api.backupProjectPhotoMetadata(user, changed);
+  await h.api.backupPhoto({ user, photo: changed, enabled: true });
+  assert.equal(h.uploads(), 1, "a metadata update must not upload edited image pixels again");
+
+  const workspaceEdit = { ...changed, backupStatus: "pending", updatedAt: "2026-11-23T12:00:00Z" };
+  h.setPhotos([workspaceEdit]);
+  await h.api.backupCurrentWorkspace({ user, subscription: {} });
+  assert.equal(h.photos()[0].backupStatus, "backed_up");
+  assert.equal(h.uploads(), 2, "the workspace backup uploads the new version exactly once");
+}
+
+{
+  const h = harness();
+  h.setMeasurements([{
+    id: "edited-health", projectId: project.id, photoId: photo.id,
+    source: "health_connect", recordedAt: "2026-10-01T01:00:00Z", sourceAppPackage: "health.app",
+    sourceRecordId: "device-record", sourceMemberIds: ["weight-record", "fat-record"], weightKg: 70, bodyFatPercent: 17, waistCm: 83,
+    manualFields: ["waistCm"], manualRecordedAt: "2026-10-02T03:00:00Z"
+  }]);
+  await h.api.backupCurrentWorkspace({ user, subscription: {} });
+  const backedUp = h.remote.get("users/owner/bodyMeasurements/edited-health");
+  assert.equal(backedUp.source, "manual");
+  assert.equal(backedUp.waistCm, 83);
+  assert.equal(backedUp.recordedAt, "2026-10-02T03:00:00Z");
+  for (const key of ["weightKg", "bodyFatPercent", "sourceAppPackage", "sourceRecordId", "sourceMemberIds", "manualFields"]) {
+    assert.equal(Object.hasOwn(backedUp, key), false, key);
+  }
+}
+
+{
+  const h = harness();
+  const importedAt = "2026-10-04T02:00:00.000Z";
+  const id = `measurement-${Date.parse(importedAt)}-legacy`;
+  h.setMeasurements([{
+    id, projectId: project.id, source: "health_connect",
+    recordedAt: "2026-09-01T01:00:00Z", sourceAppPackage: "health.app", sourceRecordId: "device-record",
+    weightKg: 70, bodyFatPercent: 17, skeletalMuscleKg: 29, waistCm: 83, note: "직접 입력"
+  }]);
+  await h.api.backupCurrentWorkspace({ user, subscription: {} });
+  const backedUp = h.remote.get(`users/owner/bodyMeasurements/${id}`);
+  assert.equal(backedUp.recordedAt, importedAt);
+  assert.equal(backedUp.skeletalMuscleKg, 29);
+  assert.equal(backedUp.waistCm, 83);
+  assert.equal(backedUp.note, "직접 입력");
+  for (const key of ["weightKg", "bodyFatPercent", "sourceAppPackage", "sourceRecordId", "sourceMemberIds"]) {
+    assert.equal(Object.hasOwn(backedUp, key), false, key);
+  }
+}
+
+{
+  const h = harness();
+  const work = { id: "orphan-work", photoIds: [photo.id, "missing-photo"], imageUris: ["file:///1.jpg"], createdAt: photo.createdAt };
+  h.setWorks([work]);
+  h.remote.set("users/owner/imageWorks/orphan-work", { backupSessionIds: ["existing-session"], fileSize: 100 });
+  assert.equal(await h.api.backupImageBundleWork({ user, work, enabled: true }), null);
+  assert.equal(h.uploads(), 0);
+  assert.deepEqual(h.remote.get("users/owner/imageWorks/orphan-work").backupSessionIds, ["existing-session"]);
+  assert.equal(h.released.length, 0);
+  const unlinked = { ...work, id: "unlinked-work", photoIds: [] };
+  h.setWorks([unlinked]);
+  assert.equal(await h.api.backupImageBundleWork({ user, work: unlinked, enabled: true }), null);
+  assert.equal(h.uploads(), 0);
+}
+
+{
+  const h = harness();
+  const edited = {
+    id: "edited-detach", projectId: project.id, photoId: photo.id, sequence: 1,
+    recordedAt: photo.createdAt, source: "health_connect", sourceRecordId: "private-source",
+    weightKg: 70, waistCm: 83, manualFields: ["waistCm"], manualRecordedAt: photo.createdAt
+  };
+  h.setMeasurements([edited]);
+  await h.api.backupCurrentWorkspace({ user, subscription: {} });
+  const key = "users/owner/bodyMeasurements/edited-detach";
+  assert.equal(h.remote.get(key).photoId, photo.id);
+  const { photoId: removedPhotoId, ...detached } = edited;
+  h.setMeasurements([detached]);
+  await h.api.backupProjectSupplementIfEnabled({ user, subscription: {}, projectId: project.id, mode: "measurement", measurementId: edited.id });
+  assert.equal(Object.hasOwn(h.remote.get(key), "photoId"), false);
+  assert.equal(h.remote.get(key).waistCm, 83);
+  assert.equal(Object.hasOwn(h.remote.get(key), "weightKg"), false);
+  h.remote.delete("users/owner/photoBackups/" + removedPhotoId);
+  h.emptyLocal();
+  await h.api.restoreCloudBackupToLocal({ user, projectIds: [project.id] });
+  const restored = h.measurements().find(entry => entry.id === edited.id);
+  assert.equal(restored?.photoId, undefined);
+  assert.equal(restored?.waistCm, 83);
 }

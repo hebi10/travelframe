@@ -111,8 +111,8 @@ assert.equal(
       position: "bottom-right"
     }
   }),
-  "26.09.20",
-  "editable record date should take precedence over the photo capture date"
+  "26.09.22",
+  "the capture date remains independent of a linked measurement date"
 );
 
 const photos = [

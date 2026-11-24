@@ -28,7 +28,8 @@ function harness({ localFailure = false, deviceOnly = false, albumFailure = fals
     useCallback: (fn) => fn,
     setPendingPhotoSaveCount: (fn) => { pending = fn(pending); },
     setPhotoSaveStage: (value) => { stage = value; },
-    getCameraSaveScopeTargets: () => ({ app: !deviceOnly, device: true, cloud: !deviceOnly }),
+    getCameraSaveScopeTargets: () => ({ app: true, device: true, cloud: !deviceOnly }),
+    requestPhotoSavePermission: async () => {},
     saveCapturedPhoto: async () => {
       if (localFailure) throw new Error("local failure");
       return { id: "photo", uri: "file://stored.jpg" };
@@ -38,6 +39,7 @@ function harness({ localFailure = false, deviceOnly = false, albumFailure = fals
       if (albumFailure) throw new Error("album failure");
     },
     setRecentPhoto: (photo) => { recent = photo; },
+    onPhotoSaved: () => {},
     getBodyCaptureContextState: async () => ({ enabled: false }),
     saveBodyCaptureContext: async () => {},
     backupPhotoIfEnabled: async () => { await backup.promise; },
@@ -81,7 +83,7 @@ const onlyDevice = harness({ deviceOnly: true, albumFailure: true });
 onlyDevice.enqueue();
 await flush();
 assert.equal(onlyDevice.state().stage, "device");
-assert.equal(onlyDevice.state().recent, null);
+assert.equal(onlyDevice.state().recent?.id, "photo", "album-only legacy preference still saves to the required app library");
 onlyDevice.album.resolve();
 await onlyDevice.tail.current;
 await flush();

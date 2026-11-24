@@ -5,14 +5,15 @@ import { bodyFrameDesign, getBodyFrameControlColors } from "@/constants/app-them
 import { useAppAppearance } from "@/lib/app-appearance";
 
 type TabGlyphProps = {
-  kind: "camera" | "studio" | "video" | "settings";
+  kind: "camera" | "studio" | "video" | "plans" | "settings";
   focused: boolean;
 };
 
 const iconNames = {
   camera: "camera",
   studio: "image",
-  video: "youtube",
+  video: "film",
+  plans: "credit-card",
   settings: "settings"
 } as const;
 

@@ -1,6 +1,20 @@
 # Body Frame Release Assets
 
-## Approved Body Frame symbol (2026-09-19)
+## 2026-11-11 — Flat Frame Journal icon (current)
+
+- Current direction: flat human silhouette plus camera crop corners, white/neutral gray on #151719. No three-dimensional shading, glow, or neon accent. Generated as an image, then technically normalized for deterministic Android packaging.
+- Approved master: `assets/icons/body-frame-approved.png` (1024×1024).
+- Android launcher: `assets/icons/app-icon.png` (1024×1024).
+- Adaptive foreground: `assets/icons/adaptive-icon.png` (1024×1024, 144px inset on matching #151719 background).
+- Splash: `assets/icons/splash-icon.png` (1024×1024, 184px inset).
+- Play listing icon: `assets/play-store/ko-KR/app-icon-512.png` (512×512, RGBA PNG).
+- Fixed SHA-256 and Drive provenance: `docs/release-assets/brand-icon-20261111.json`.
+- Source: https://drive.google.com/file/d/1xBtSZ04FRwhpkN_HNQ-Hlev0jTYiJ78W/view
+- Store icon: https://drive.google.com/file/d/1XkJqB2iIko6XXvAWUOE-pn_jIRWLSbmZ/view
+- Status: new artwork staged in GitHub; this is **not** proof of Google Play icon publication or a new signed APK/AAB. Any new release requires exact-head CI and on-device QA. A Play listing icon change is independent of Android launcher changes.
+- Do not publish or modify the existing six store screenshots, feature graphic, subscriptions, production releases, Firebase, or user data in this icon-only stage.
+
+## Approved Body Frame symbol (2026-09-19, previous design)
 
 승인 방향: **인물 윤곽 + 촬영 프레임 + 라임 포인트** / 차콜 배경. 이전 **BF 모노그램 v2**를 교체했습니다.
 

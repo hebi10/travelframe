@@ -1,8 +1,10 @@
+import { openPlans } from "@/lib/plan-navigation";
 import { AppText as Text } from "@/components/app-text";
 import { Feather } from "@expo/vector-icons";
+import { useAudioPlayer } from "expo-audio";
 import * as FileSystem from "expo-file-system/legacy";
 import { router,
-  useFocusEffect } from "expo-router";
+  useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback,
   useMemo,
   useEffect,
@@ -30,6 +32,7 @@ import {
   getBodyFrameVideoOverlayText,
   getBodyFrameVideoPhotoIndex,
   getBodyFrameVideoMeasurement,
+  normalizeBodyFrameVideoOptions,
   getBodyFrameVideoPreviewTransform,
   selectBodyFrameVideoPhotos,
   BODY_FRAME_VIDEO_TEMPLATE,
@@ -70,7 +73,8 @@ import {
 } from "@/lib/video-export-quota";
 import { saveVideoToLibrary } from "@/lib/trip-clip-export";
 import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
-import { getMadeVideos, saveMadeVideo } from "@/lib/video-library";
+import { getUserMusicTracks, restoreUserMusicTrackIfNeeded, type UserMusicTrack } from "@/lib/user-music";
+import { getMadeVideos, saveMadeVideo, updateMadeVideo } from "@/lib/video-library";
 import { assertLocalLibraryCapacity } from "@/lib/local-library-limit";
 import {
   isRecordingViewAvailable,
@@ -81,6 +85,7 @@ import { RECORDING_VIEW_WIDTH } from "@/features/trip-clip/trip-clip-screen.cons
 import type { BodyProject } from "@/types/body-project";
 import type { BodyMeasurementEntry } from "@/types/body-measurement";
 import type { PhotoItem } from "@/types/photo";
+import type { MadeVideoItem } from "@/types/video";
 
 const BODY_FRAME_VIDEO_BITRATE = 5_000_000;
 const EMPTY_ADJUSTMENTS = {};
@@ -118,7 +123,8 @@ export default function BodyFrameVideoScreen() {
     getBodyFrameControlColors(palette);
   const recorder = useOptionalViewRecorder();
   const recordingViewAvailable = isRecordingViewAvailable();
-  const { isLoggedIn, subscription } = useAuth();
+  const { videoId } = useLocalSearchParams<{ videoId?: string }>();
+  const { user, isLoggedIn, subscription } = useAuth();
   const { requestPostSaveAd, cancelPostSaveAd } = usePostSaveAd();
   const planEntitlements = useMemo(
     () => getPlanEntitlements({ isLoggedIn, subscription }),
@@ -130,9 +136,20 @@ export default function BodyFrameVideoScreen() {
   const [availablePhotos, setAvailablePhotos] = useState<PhotoItem[]>([]);
   const [measurements, setMeasurements] = useState<BodyMeasurementEntry[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[] | null>(null);
-  const [videoOptions, setVideoOptions] = useState(DEFAULT_BODY_FRAME_VIDEO_OPTIONS);
+  const [draftOptions, setVideoOptions] = useState(DEFAULT_BODY_FRAME_VIDEO_OPTIONS);
+  const [editingVideo, setEditingVideo] = useState<MadeVideoItem | null>(null);
+  const [musicTracks, setMusicTracks] = useState<UserMusicTrack[]>([]);
+  const selectedTrack = planEntitlements.musicTrackLimit > 0
+    ? musicTracks.find((track) => track.id === draftOptions.musicTrackId)
+    : undefined;
+  const videoOptions = useMemo(() => ({
+    ...draftOptions,
+    quality: planEntitlements.canUseAdvancedOutput ? draftOptions.quality : 720 as const,
+    ...(selectedTrack ? {} : { musicTrackId: undefined })
+  }), [draftOptions, planEntitlements.canUseAdvancedOutput, selectedTrack]);
   const [optionKind, setOptionKind] = useState<VideoOptionKind | null>(null);
-  const loadedProjectId = useRef<string | null>(null);
+  const loadedVideoContext = useRef<string | null>(null);
+  const loadRequest = useRef(0);
   const projectPhotos = useMemo(
     () => selectBodyFrameVideoPhotos(availablePhotos, selectedIds),
     [availablePhotos, selectedIds]
@@ -149,7 +166,7 @@ export default function BodyFrameVideoScreen() {
   );
   const outputSize = getBodyFrameVideoOutputSize(videoOptions.ratio, videoOptions.quality);
   const frameAspectRatio = outputSize.width / outputSize.height;
-  const previewDisplayWidth = Math.max(160, Math.min(360, windowWidth * 0.82, windowHeight * 0.30 * frameAspectRatio));
+  const previewDisplayWidth = Math.max(160, Math.min(360, windowWidth * 0.82, windowHeight * 0.34 * frameAspectRatio));
   const [isLoading, setIsLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
@@ -172,7 +189,59 @@ export default function BodyFrameVideoScreen() {
     [planEntitlements.maxProgressVideoSeconds, totalDuration]
   );
   const upgradePlanLabel = getBodyFrameUpgradeLabel(planEntitlements.tier);
-  const previewPhoto = projectPhotos[0] ?? null;
+  const [previewIndex, setPreviewIndex] = useState(0);
+  const [previewPlaying, setPreviewPlaying] = useState(false);
+  const previewPhoto = projectPhotos[previewIndex] ?? projectPhotos[0] ?? null;
+  const previewStartIndex = useRef(0);
+  const previewPlayer = useAudioPlayer(null);
+
+  useEffect(() => {
+    if (!previewPlaying || projectPhotos.length < 2 || isExporting || optionKind) return;
+    let active = true;
+    let timer: ReturnType<typeof setInterval> | undefined;
+    const intervalMs = videoOptions.interval * 1000;
+    const startIndex = Math.min(previewStartIndex.current, projectPhotos.length - 1);
+    const startPreview = async () => {
+      let playMusic = false;
+      if (selectedTrack) {
+        try {
+          const track = await restoreUserMusicTrackIfNeeded(user, selectedTrack);
+          if (!active) return;
+          previewPlayer.replace({ uri: track.uri });
+          await previewPlayer.seekTo(startIndex * videoOptions.interval);
+          if (!active) return;
+          previewPlayer.play();
+          playMusic = true;
+        } catch {
+          if (!active) return;
+          setMessage("배경음악 미리보기를 재생하지 못했습니다.");
+        }
+      }
+      const startedAt = Date.now();
+      let previousCycle = 0;
+      timer = setInterval(() => {
+        const index = startIndex + Math.floor((Date.now() - startedAt) / intervalMs);
+        const cycle = Math.floor(index / projectPhotos.length);
+        if (playMusic && cycle !== previousCycle) {
+          void previewPlayer.seekTo(0).then(() => {
+            if (active) previewPlayer.play();
+          }).catch(() => undefined);
+        }
+        previousCycle = cycle;
+        setPreviewIndex(index % projectPhotos.length);
+      }, Math.min(50, intervalMs));
+    };
+    void startPreview();
+    const appState = AppState.addEventListener("change", (state) => {
+      if (state !== "active") setPreviewPlaying(false);
+    });
+    return () => {
+      active = false;
+      clearInterval(timer);
+      if (selectedTrack) previewPlayer.pause();
+      appState.remove();
+    };
+  }, [isExporting, optionKind, previewPlayer, previewPlaying, projectPhotos.length, selectedTrack, user, videoOptions.interval]);
   const recordingFrame = useMemo(
     () => ({
       currentPhoto: recordingPhotos[getBodyFrameVideoPhotoIndex(recordingFrameIndex, videoOptions.interval)] ?? null,
@@ -213,6 +282,7 @@ export default function BodyFrameVideoScreen() {
   }, [cancelExport]);
 
   const loadActiveProject = useCallback(async () => {
+    const request = ++loadRequest.current;
     setIsLoading(true);
     try {
       const [
@@ -220,7 +290,9 @@ export default function BodyFrameVideoScreen() {
         lastActiveProjectId,
         storedPhotos,
         storedMeasurements,
-        nextGuestUsage
+        nextGuestUsage,
+        storedVideos,
+        storedTracks
       ] = await Promise.all([
         getBodyProjects(),
         getLastActiveProjectId(),
@@ -228,15 +300,37 @@ export default function BodyFrameVideoScreen() {
         getBodyMeasurements(),
         isLoggedIn
           ? Promise.resolve(null)
-          : getGuestWeeklyVideoExportUsage(planEntitlements.weeklyVideoExportLimit)
+          : getGuestWeeklyVideoExportUsage(planEntitlements.weeklyVideoExportLimit),
+        videoId ? getMadeVideos() : Promise.resolve([]),
+        planEntitlements.musicTrackLimit > 0 ? getUserMusicTracks(user?.uid) : Promise.resolve([])
       ]);
-      const selectedProject = selectActiveBodyProject(projects, lastActiveProjectId);
+      if (request !== loadRequest.current) return;
+      const savedVideo = videoId ? storedVideos.find((video) => video.id === videoId) : null;
+      const selectedProject = videoId
+        ? projects.find((project) => project.id === savedVideo?.projectId && !project.archived) ?? null
+        : selectActiveBodyProject(projects, lastActiveProjectId);
+      setEditingVideo(savedVideo ?? null);
+      setMusicTracks(storedTracks);
 
       setActiveProject(selectedProject);
-      if (loadedProjectId.current !== (selectedProject?.id ?? null)) {
-        setSelectedIds(null);
+      const context = JSON.stringify([selectedProject?.id ?? null, videoId ?? null]);
+      if (loadedVideoContext.current !== context) {
+        setSelectedIds(savedVideo ? savedVideo.photoIds : null);
+        if (savedVideo) {
+          const options = normalizeBodyFrameVideoOptions(savedVideo.bodyFrameOptions ?? {
+            interval: savedVideo.durations[savedVideo.photoIds[0]],
+            ratio: savedVideo.ratio
+          });
+          setVideoOptions(options ?? DEFAULT_BODY_FRAME_VIDEO_OPTIONS);
+        } else {
+          setVideoOptions(DEFAULT_BODY_FRAME_VIDEO_OPTIONS);
+        }
+        setPreviewPlaying(false);
+        setPreviewIndex(0);
+        setAlbumRetryUri(null);
+        setMessage(null);
         setOptionKind(null);
-        loadedProjectId.current = selectedProject?.id ?? null;
+        loadedVideoContext.current = context;
       }
       setAvailablePhotos(
         selectedProject
@@ -252,10 +346,11 @@ export default function BodyFrameVideoScreen() {
       );
       setGuestUsage(nextGuestUsage);
 
-      if (selectedProject && selectedProject.id !== lastActiveProjectId) {
+      if (!videoId && selectedProject && selectedProject.id !== lastActiveProjectId) {
         await setLastActiveProjectId(selectedProject.id);
       }
     } catch (error) {
+      if (request !== loadRequest.current) return;
       setActiveProject(null);
       setAvailablePhotos([]);
       setMeasurements([]);
@@ -263,14 +358,18 @@ export default function BodyFrameVideoScreen() {
         getUserFacingErrorMessage(error, "프로젝트 사진을 불러오지 못했습니다.")
       );
     } finally {
-      setIsLoading(false);
+      if (request === loadRequest.current) setIsLoading(false);
     }
-  }, [isLoggedIn, planEntitlements.weeklyVideoExportLimit]);
+  }, [isLoggedIn, planEntitlements.musicTrackLimit, planEntitlements.weeklyVideoExportLimit, user?.uid, videoId]);
 
   useFocusEffect(
     useCallback(() => {
       void loadActiveProject();
-      return cancelExport;
+      return () => {
+        loadRequest.current++;
+        setPreviewPlaying(false);
+        cancelExport();
+      };
     }, [cancelExport, loadActiveProject])
   );
 
@@ -322,6 +421,11 @@ export default function BodyFrameVideoScreen() {
       await imageReadiness.current.wait(`${runId}:${stagedPhotos[0].id}`, signal);
       await withBodyFrameExportTimeout(waitForPaint(), signal, 15_000);
 
+      const track = selectedTrack ? await restoreUserMusicTrackIfNeeded(user, selectedTrack) : null;
+      assertBodyFrameExportActive(signal);
+      if (track && !track.uri.startsWith("file://")) {
+        throw new Error("배경음악 파일을 열 수 없습니다. 음악을 다시 선택해 주세요.");
+      }
       const recordedPath = await runBodyFrameNativeRecording(() => recorder.record({
         output: toNativeFilePath(outputUri),
         fps: BODY_FRAME_VIDEO_FPS,
@@ -332,6 +436,7 @@ export default function BodyFrameVideoScreen() {
         quality: 0.92,
         bitrate: BODY_FRAME_VIDEO_BITRATE,
         keyFrameInterval: 1,
+        ...(track ? { audioFile: { path: toNativeFilePath(track.uri), startTime: 0 } } : {}),
         onFrame: async ({ frameIndex }) => {
           assertBodyFrameExportActive(signal);
           const photo = stagedPhotos[getBodyFrameVideoPhotoIndex(frameIndex, videoOptions.interval)];
@@ -368,6 +473,8 @@ export default function BodyFrameVideoScreen() {
     recordingViewAvailable,
     outputSize.width,
     outputSize.height,
+    selectedTrack,
+    user,
     totalFrames
   ]);
 
@@ -409,36 +516,46 @@ export default function BodyFrameVideoScreen() {
       cancelPostSaveAd();
 
       const storedVideos = await getMadeVideos();
-      assertLocalLibraryCapacity({
-        currentCount: storedVideos.length,
-        limit: planEntitlements.localVideoLimit,
-        label: "영상"
-      });
+      if (!editingVideo) {
+        assertLocalLibraryCapacity({
+          currentCount: storedVideos.length,
+          limit: planEntitlements.localVideoLimit,
+          label: "영상"
+        });
+      }
       assertBodyFrameExportActive(controller.signal);
       recordingResult = await recordProjectVideo(controller.signal);
       const videoUri = recordingResult.uri;
       setExportProgress(88);
       assertBodyFrameExportActive(controller.signal);
-      const savedVideo = await saveMadeVideo(
-        {
-          uri: videoUri,
-          coverUri: recordingResult.coverUri,
-          projectId: activeProject.id,
-          title: `${activeProject.name} 변화 영상`,
-          ratio: videoOptions.ratio,
-          template: BODY_FRAME_VIDEO_TEMPLATE,
-          transition: BODY_FRAME_VIDEO_TRANSITION,
-          transitionDuration: BODY_FRAME_VIDEO_TRANSITION_DURATION,
-          duration: totalDuration,
-          photoIds: projectPhotos.map((photo) => photo.id),
-          durations,
-          musicId: "none",
-          musicLabel: "무음"
-        },
-        {
-          localVideoLimit: planEntitlements.localVideoLimit
-        }
-      );
+      const videoToSave = {
+        uri: videoUri,
+        coverUri: recordingResult.coverUri,
+        projectId: activeProject.id,
+        title: editingVideo?.title ?? `${activeProject.name} 변화 영상`,
+        ratio: videoOptions.ratio,
+        template: BODY_FRAME_VIDEO_TEMPLATE,
+        transition: BODY_FRAME_VIDEO_TRANSITION,
+        transitionDuration: BODY_FRAME_VIDEO_TRANSITION_DURATION,
+        duration: totalDuration,
+        photoIds: projectPhotos.map((photo) => photo.id),
+        durations,
+        musicId: selectedTrack ? "custom" as const : "none" as const,
+        musicLabel: selectedTrack?.name ?? "무음",
+        bodyFrameOptions: normalizeBodyFrameVideoOptions(videoOptions),
+        containsLocalHealthData: projectPhotos.some((photo) => {
+          const entry = getMeasurementForPhoto(photo);
+          return entry?.source === "health_connect" &&
+            ((videoOptions.overlay.showWeight && entry.weightKg !== undefined) ||
+             (videoOptions.overlay.showBodyFat && entry.bodyFatPercent !== undefined));
+        }),
+        localFileStatus: "available" as const,
+        backupStatus: "pending" as const
+      };
+      const savedVideo = editingVideo
+        ? await updateMadeVideo(editingVideo.id, videoToSave)
+        : await saveMadeVideo(videoToSave, { localVideoLimit: planEntitlements.localVideoLimit });
+      if (!savedVideo) throw new Error("편집 중에 영상이 삭제되었습니다.");
 
       appSaved = true;
       await FileSystem.deleteAsync(videoUri, { idempotent: true }).catch(() => undefined);
@@ -481,6 +598,8 @@ export default function BodyFrameVideoScreen() {
     activeProject,
     cancelPostSaveAd,
     durations,
+    editingVideo,
+    getMeasurementForPhoto,
     guestUsage,
     isExporting,
     isLoggedIn,
@@ -491,8 +610,9 @@ export default function BodyFrameVideoScreen() {
     projectPhotos,
     recordProjectVideo,
     requestPostSaveAd,
+    selectedTrack,
     totalDuration,
-    videoOptions.ratio,
+    videoOptions,
     videoLimitState.allowed,
     videoLimitState.limit
   ]);
@@ -543,7 +663,7 @@ export default function BodyFrameVideoScreen() {
           >
             <Feather name="chevron-left" size={24} color={palette.text} />
           </Pressable>
-          <Text style={[styles.pageTitle, { color: palette.text }]}>변화 영상 만들기</Text>
+          <Text style={[styles.pageTitle, { color: palette.text }]}>{editingVideo ? "변화 영상 다시 편집" : "변화 영상 만들기"}</Text>
           <Pressable
             accessibilityRole="button"
             disabled={isExporting}
@@ -567,11 +687,14 @@ export default function BodyFrameVideoScreen() {
         <View style={styles.previewHeader}>
           <Text style={[styles.sectionTitle, { color: palette.text }]}>미리보기</Text>
           <Text style={[styles.previewMeta, { color: palette.muted }]}>
-            {projectPhotos.length}장 · {formatDuration(totalDuration)}
+            {projectPhotos.length}장 · {formatDuration(totalDuration)} · {videoOptions.ratio}
           </Text>
         </View>
 
         <View
+          accessible
+          accessibilityRole="image"
+          accessibilityLabel={`영상 미리보기 ${previewIndex + 1}번째 사진, ${projectPhotos.length}장, 영상 길이 ${formatDuration(totalDuration)}, 화면 비율 ${videoOptions.ratio}`}
           style={[
             styles.previewFrame,
             {
@@ -617,9 +740,36 @@ export default function BodyFrameVideoScreen() {
           )}
         </View>
 
-        <Text style={[styles.sectionTitle, styles.settingsTitle, { color: palette.text }]}>
-          영상 설정
-        </Text>
+        {projectPhotos.length > 1 ? (
+          <View style={styles.previewControls}>
+            <Pressable disabled={isExporting} accessibilityRole="button" onPress={() => {
+              setPreviewPlaying(false);
+              setPreviewIndex((index) => Math.max(0, index - 1));
+            }}>
+              <Text style={{ color: palette.text }}>이전 사진</Text>
+            </Pressable>
+            <Pressable disabled={isExporting} accessibilityRole="button" onPress={() => {
+              previewStartIndex.current = previewIndex;
+              setPreviewPlaying(!previewPlaying);
+            }}>
+              <Text style={{ color: palette.text }}>{previewPlaying ? "일시 정지" : "미리보기 재생"}</Text>
+            </Pressable>
+            <Pressable disabled={isExporting} accessibilityRole="button" onPress={() => {
+              setPreviewPlaying(false);
+              setPreviewIndex((index) => Math.min(projectPhotos.length - 1, index + 1));
+            }}>
+              <Text style={{ color: palette.text }}>다음 사진</Text>
+            </Pressable>
+          </View>
+        ) : null}
+        <View style={styles.settingsHeading}>
+          <Text style={[styles.sectionTitle, styles.settingsTitle, { color: palette.text }]}>
+            영상 설정
+          </Text>
+          <Text style={[styles.settingsMeta, { color: palette.muted }]}>
+            {videoOptions.quality}p · {videoOptions.ratio}
+          </Text>
+        </View>
         <View
           style={[
             styles.summaryCard,
@@ -633,6 +783,12 @@ export default function BodyFrameVideoScreen() {
           <SummaryRow label="사진 간격" value={`${videoOptions.interval}초`} disabled={isExporting} onPress={() => setOptionKind("interval")} />
           <SummaryRow label="영상 길이" value={formatDuration(totalDuration)} />
           <SummaryRow label="화질" value={`${videoOptions.quality}p`} disabled={isExporting} onPress={() => setOptionKind("quality")} />
+          <SummaryRow
+            label="배경음악"
+            value={planEntitlements.musicTrackLimit > 0 ? selectedTrack?.name ?? "무음" : "Pro 이상"}
+            disabled={isExporting}
+            onPress={() => planEntitlements.musicTrackLimit > 0 ? setOptionKind("music") : openPlans("video", "Pro")}
+          />
           <SummaryRow label="화면 비율" value={videoOptions.ratio} disabled={isExporting} onPress={() => setOptionKind("ratio")} />
           <SummaryRow
             label="텍스트"
@@ -643,7 +799,7 @@ export default function BodyFrameVideoScreen() {
         </View>
 
         <Text style={[styles.orderHint, { color: palette.muted }]}>
-          영상은 프로젝트의 사진 순서(#1 → #2 → #3 …)대로 만들어집니다. 순서를 바꾸려면 프로젝트 상세의 순서 조정에서 변경해 주세요.
+영상은 프로젝트의 사진 순서(#1 → #2 → #3 …)대로 만들어집니다. 순서 변경은 프로젝트 상세의 순서 조정에서 가능합니다.
         </Text>
 
         {!videoLimitState.allowed ? (
@@ -665,7 +821,7 @@ export default function BodyFrameVideoScreen() {
               <Pressable
                 accessibilityRole="button"
                 style={[styles.limitPlanButton, { borderColor: palette.text }]}
-                onPress={() => router.push("/account")}
+                onPress={() => openPlans("video", upgradePlanLabel)}
               >
                 <Text style={[styles.limitPlanButtonText, { color: palette.text }]}>
                   플랜 보기 · {upgradePlanLabel}
@@ -741,7 +897,7 @@ export default function BodyFrameVideoScreen() {
             </View>
           ) : (
             <Text style={[styles.primaryButtonText, { color: actionTextColor }]}>
-              영상 만들기
+              {editingVideo ? "편집 저장" : "영상 만들기"}
             </Text>
           )}
         </Pressable>
@@ -767,11 +923,15 @@ export default function BodyFrameVideoScreen() {
           options={videoOptions}
           photos={availablePhotos}
           selectedIds={selectedIds}
+          canUseAdvancedOutput={planEntitlements.canUseAdvancedOutput}
+          musicTracks={musicTracks}
           onCancel={() => setOptionKind(null)}
           onApply={(options, ids) => {
             setVideoOptions(options);
             setSelectedIds(ids);
             setRecordingFrameIndex(0);
+            setPreviewIndex(0);
+            setPreviewPlaying(false);
             setMessage(null);
             setOptionKind(null);
           }}
@@ -900,13 +1060,13 @@ const styles = StyleSheet.create({
     fontWeight: "600"
   },
   projectName: {
-    marginTop: 6,
-    marginBottom: 2,
+    marginTop: 4,
+    marginBottom: 0,
     fontSize: bodyFrameTypography.body
   },
   previewHeader: {
-    marginTop: 4,
-    marginBottom: 4,
+    marginTop: 2,
+    marginBottom: 2,
     minHeight: 32,
     flexDirection: "row",
     flexWrap: "wrap",
@@ -922,9 +1082,23 @@ const styles = StyleSheet.create({
     fontSize: bodyFrameTypography.caption,
     fontVariant: ["tabular-nums"]
   },
+  previewControls: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-evenly", gap: 12, paddingVertical: 12 },
+  settingsHeading: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+    marginTop: 4,
+    marginBottom: 4
+  },
   settingsTitle: {
-    marginTop: 6,
-    marginBottom: 6
+    marginTop: 0,
+    marginBottom: 0
+  },
+  settingsMeta: {
+    fontSize: bodyFrameTypography.caption,
+    fontVariant: ["tabular-nums"]
   },
   guestLimitText: {
     marginBottom: 6,
@@ -977,15 +1151,15 @@ const styles = StyleSheet.create({
   summaryCard: {
     borderWidth: bodyFrameDesign.borderWidth,
     borderRadius: bodyFrameDesign.cardRadius,
-    paddingHorizontal: 14
+    paddingHorizontal: 12
   },
   summaryRow: {
     minHeight: bodyFrameDesign.primaryButtonHeight,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: 12,
-    paddingVertical: 8
+    gap: 10,
+    paddingVertical: 6
   },
   summaryLabel: {
     flexShrink: 0,
@@ -993,6 +1167,7 @@ const styles = StyleSheet.create({
   },
   summaryValueGroup: {
     flex: 1,
+    minWidth: 0,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "flex-end",
@@ -1005,7 +1180,7 @@ const styles = StyleSheet.create({
     textAlign: "right"
   },
   orderHint: {
-    marginTop: 10,
+    marginTop: 6,
     fontSize: bodyFrameTypography.caption,
     lineHeight: 17
   },

@@ -12,7 +12,6 @@ import { Component,
   useCallback,
   useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   Pressable,
   ScrollView,
@@ -22,11 +21,13 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AdBanner } from "@/components/ad-banner";
+import { BodyFrameStatusNotice } from "@/components/body-frame-status-notice";
 import { bodyFrameDesign, bodyFrameTypography, colors, spacing, typography, getBodyFrameControlColors } from "@/constants/app-theme";
 import { useAuth } from "@/lib/auth-context";
 import { useAppAppearance } from "@/lib/app-appearance";
 import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
-import { getMadeVideoById } from "@/lib/video-library";
+import { saveVideoToLibrary, shareVideo } from "@/lib/trip-clip-export";
+import { getMadeVideoById, requireLocalMadeVideo } from "@/lib/video-library";
 import { getVideoAspectRatio } from "@/lib/video-utils";
 import type { MadeVideoItem } from "@/types/video";
 
@@ -74,6 +75,26 @@ export default function VideoDetailScreen() {
   const videoSource = video?.uri || null;
   const hasPlayableVideoSource = Boolean(videoSource);
 
+  const [exporting, setExporting] = useState(false);
+  const exportVideo = async (action: "save" | "share") => {
+    if (!video || exporting) return;
+    setExporting(true);
+    setMessage(null);
+    try {
+      const { uri } = await requireLocalMadeVideo(video.id);
+      if (action === "save") {
+        await saveVideoToLibrary(uri);
+        setMessage("영상을 기기 앨범에 저장했습니다.");
+      } else {
+        await shareVideo(uri);
+      }
+    } catch (error) {
+      setMessage(getUserFacingErrorMessage(error, "영상을 저장하거나 공유하지 못했습니다."));
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const loadVideo = useCallback(async () => {
     if (!id) {
       setIsLoading(false);
@@ -117,7 +138,7 @@ export default function VideoDetailScreen() {
       <>
         <Stack.Screen options={{ title: "만든 영상" }} />
         <View style={[styles.centerScreen, { backgroundColor: palette.background }]}>
-          <ActivityIndicator color={palette.text} />
+          <BodyFrameStatusNotice variant="loading" title="영상을 불러오는 중입니다." />
         </View>
       </>
     );
@@ -128,14 +149,13 @@ export default function VideoDetailScreen() {
       <>
         <Stack.Screen options={{ title: "만든 영상" }} />
         <View style={[styles.centerScreen, { backgroundColor: palette.background }]}>
-          <Text selectable style={[styles.emptyTitle, { color: palette.text }]}>
-            영상을 찾을 수 없습니다.
-          </Text>
-          <Pressable accessibilityRole="button" style={[styles.darkButton, { backgroundColor: palette.text }]} onPress={() => router.replace("/video-library")}>
-            <Text selectable={false} style={[styles.darkButtonText, { color: palette.inverse }]}>
-              영상 목록으로 돌아가기
-            </Text>
-          </Pressable>
+          <BodyFrameStatusNotice
+            variant={message ? "error" : "empty"}
+            title={message ? "영상을 불러오지 못했습니다." : "영상을 찾을 수 없습니다."}
+            detail={message ?? "영상이 삭제되었거나 현재 기기에서 찾을 수 없습니다."}
+            actionLabel="영상 목록으로 돌아가기"
+            onAction={() => router.replace("/video-library")}
+          />
         </View>
       </>
     );
@@ -232,6 +252,15 @@ export default function VideoDetailScreen() {
         ) : null}
 
         <View style={styles.actions}>
+          {(["save", "share"] as const).map((action) => (
+            <Pressable key={action} accessibilityRole="button" disabled={exporting}
+              style={[styles.lightButton, { backgroundColor: palette.background, borderColor: palette.text }]}
+              onPress={() => void exportVideo(action)}>
+              <Text style={[styles.lightButtonText, { color: palette.text }]}>
+                {action === "save" ? "앨범 저장" : "공유"}
+              </Text>
+            </Pressable>
+          ))}
           <Pressable
             accessibilityRole="button"
             style={[styles.darkButton, { backgroundColor: actionColor }]}
@@ -241,6 +270,10 @@ export default function VideoDetailScreen() {
                 return;
               }
 
+              if (video.projectId && (video.bodyFrameOptions || video.transition === "none")) {
+                router.push({ pathname: "/video-create", params: { videoId: video.id } });
+                return;
+              }
               router.push({
                 pathname: "/legacy-video-edit",
                 params: { videoId: video.id, returnTo: `/video/${video.id}` }

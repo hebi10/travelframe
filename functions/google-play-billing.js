@@ -4,6 +4,8 @@ const crypto = require("crypto");
 const { GoogleAuth } = require("google-auth-library");
 const { createBillingVerificationGate } = require("./billing-verification-gate");
 const {
+  canUseLinkedPurchase,
+  canExpireLinkedSubscription,
   getEffectiveSubscription,
   isActiveSubscriptionDocument,
   parseOneTimePurchase,
@@ -219,6 +221,15 @@ const createGooglePlayBillingService = ({
       );
     }
     verifyExternalAccount({ result, uid });
+    const linkedHash = result.linkedPurchaseToken
+      ? hashPurchaseToken(result.linkedPurchaseToken)
+      : null;
+    const linkedRef = linkedHash
+      ? db.doc(`googlePlayPurchases/${linkedHash}`)
+      : null;
+    if (linkedRef && !canUseLinkedPurchase({ linkedPurchase: (await linkedRef.get()).data(), uid })) {
+      throw new HttpsError("permission-denied", "The linked Google Play purchase belongs to another account.");
+    }
 
     let acknowledgementState = result.acknowledgementState;
     if (acknowledge && result.active && !result.acknowledged) {
@@ -244,13 +255,6 @@ const createGooglePlayBillingService = ({
     );
     const currentRef = db.doc(`users/${uid}/subscriptions/current`);
     const eventRef = db.collection(`users/${uid}/paymentEvents`).doc();
-    const linkedHash = result.linkedPurchaseToken
-      ? hashPurchaseToken(result.linkedPurchaseToken)
-      : null;
-    const linkedRef = linkedHash
-      ? db.doc(`googlePlayPurchases/${linkedHash}`)
-      : null;
-
     await db.runTransaction(async (transaction) => {
       const refsToRead = [
         purchaseRef,
@@ -285,6 +289,9 @@ const createGooglePlayBillingService = ({
 
       const linkedSnapshot =
         linkedRef ? snapshots[1 + productIds.length] ?? null : null;
+      if (!canUseLinkedPurchase({ linkedPurchase: linkedSnapshot?.data(), uid })) {
+        throw new HttpsError("permission-denied", "The linked Google Play purchase belongs to another account.");
+      }
       const linkedProductId =
         linkedSnapshot?.exists &&
         linkedSnapshot.data()?.uid === uid &&
@@ -317,7 +324,7 @@ const createGooglePlayBillingService = ({
         updateEntitlement && result.active &&
         linkedProductId &&
         linkedProductId !== productId &&
-        currentProducts[linkedProductId]?.provider === "google_play"
+        canExpireLinkedSubscription({ existingProduct: currentProducts[linkedProductId], linkedHash })
       ) {
         replacedSubscription = {
           ...currentProducts[linkedProductId],

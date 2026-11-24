@@ -64,8 +64,9 @@ test("Stage A video home prioritizes existing saves without breaking empty proje
 });
 
 test("Stage A project cards increase photo/record prominence with original ownership and touch contracts", () => {
-  assert.ok(records.includes("Math.round(projectCardWidth * 0.36)"));
-  assert.ok(records.includes("Math.min(128, Math.max(108"));
+  assert.ok(records.includes("const coverWidth = fontScale >= 1.3"));
+  assert.ok(records.includes("Math.min(120, Math.max(100, Math.round(projectCardWidth * 0.32)))"));
+  assert.ok(records.includes("Math.min(144, Math.max(116, Math.round(projectCardWidth * 0.40)))"));
   assert.ok(records.includes("기록 {summary.photoCount} / {summary.targetPhotoCount}장"));
   assert.match(records, /progressTrack:\s*\{[^}]*height:\s*6/);
   for (const token of [

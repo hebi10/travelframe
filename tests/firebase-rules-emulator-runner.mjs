@@ -61,8 +61,10 @@ const firestoreValue = (value) => {
     return { stringValue: value };
   }
 
-  if (typeof value === "number" && Number.isInteger(value)) {
-    return { integerValue: String(value) };
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return Number.isInteger(value)
+      ? { integerValue: String(value) }
+      : { doubleValue: value };
   }
 
   if (typeof value === "boolean") {
@@ -258,7 +260,94 @@ await expectAllowed("owner creates Body Frame project", firestoreRequest("PATCH"
 await expectDenied("other users cannot read Body Frame projects", firestoreRequest("GET", `users/${ownerUid}/bodyProjects/project-1`, { uid: otherUid }));
 await expectDenied("health data stays outside project backups", firestoreRequest("PATCH", `users/${ownerUid}/bodyProjects/project-1`, { uid: ownerUid, data: { ...projectBackup, weight: 65 } }));
 await expectAllowed("owner updates project metadata", firestoreRequest("PATCH", `users/${ownerUid}/bodyProjects/project-1`, { uid: ownerUid, data: { ...projectBackup, archived: true } }));
+await expectAllowed("owner sets project cloud save mode", firestoreRequest("PATCH", `users/${ownerUid}/bodyProjects/project-1`, { uid: ownerUid, data: { ...projectBackup, saveMode: "cloud" } }));
+await expectAllowed("owner selects local only without deleting legacy data", firestoreRequest("PATCH", `users/${ownerUid}/bodyProjects/project-1`, { uid: ownerUid, data: { ...projectBackup, saveMode: "local_only" } }));
+await expectAllowed("owner can preserve a project's previous cloud mode", firestoreRequest("PATCH", `users/${ownerUid}/bodyProjects/project-1`, { uid: ownerUid, data: { ...projectBackup, saveMode: "local_only", cloudResumeMode: "cloud" } }));
+await expectDenied("resume mode is only valid for paused projects", firestoreRequest("PATCH", `users/${ownerUid}/bodyProjects/project-1`, { uid: ownerUid, data: { ...projectBackup, saveMode: "cloud", cloudResumeMode: "cloud" } }));
+await expectDenied("project save mode rejects unknown values", firestoreRequest("PATCH", `users/${ownerUid}/bodyProjects/project-1`, { uid: ownerUid, data: { ...projectBackup, saveMode: "public" } }));
 await expectDenied("other users cannot delete project metadata", firestoreRequest("DELETE", `users/${ownerUid}/bodyProjects/project-1`, { uid: otherUid }));
+
+const projectMeasurement = {
+  id: "measurement-1",
+  userId: ownerUid,
+  projectId: "project-1",
+  schemaVersion: 1,
+  recordedAt: "2026-11-18T06:00:00.000Z",
+  photoId: "body-photo",
+  sequence: 1,
+  weightKg: 72.5,
+  bodyFatPercent: 18.2,
+  note: "몸 변화 기록",
+  source: "manual",
+  backedUpAt: "2026-11-18T06:00:10.000Z"
+};
+await expectAllowed("owner backs up private body measurement", firestoreRequest("PATCH",
+  `users/${ownerUid}/bodyMeasurements/measurement-1`, { uid: ownerUid, data: projectMeasurement }));
+await expectDenied("Health Connect values remain local even for old clients", firestoreRequest("PATCH",
+  `users/${ownerUid}/bodyMeasurements/measurement-1`, { uid: ownerUid, data: { ...projectMeasurement, source: "health_connect" } }));
+await seedDoc(`users/${ownerUid}/backupProjectLocks/project-deleted`, { status: "deleted", operation: "delete-project" });
+await expectDenied("deleted projects cannot be recreated by a stale client", firestoreRequest("PATCH",
+  `users/${ownerUid}/bodyProjects/project-deleted`, { uid: ownerUid, data: { ...projectBackup, id: "project-deleted" } }));
+await expectAllowed("owner reads private measurement", firestoreRequest("GET",
+  `users/${ownerUid}/bodyMeasurements/measurement-1`, { uid: ownerUid }));
+await expectDenied("other account cannot read private measurements", firestoreRequest("GET",
+  `users/${ownerUid}/bodyMeasurements/measurement-1`, { uid: otherUid }));
+await seedDoc(`admins/${adminUid}`, { role: "admin" });
+await expectDenied("administrator client cannot view private measurements", firestoreRequest("GET",
+  `users/${ownerUid}/bodyMeasurements/measurement-1`, { uid: adminUid }));
+await expectDenied("other account cannot write private measurements", firestoreRequest("PATCH",
+  `users/${ownerUid}/bodyMeasurements/measurement-1`, { uid: otherUid, data: projectMeasurement }));
+await expectDenied("out of range weight is rejected", firestoreRequest("PATCH",
+  `users/${ownerUid}/bodyMeasurements/measurement-1`, {
+    uid: ownerUid, data: { ...projectMeasurement, weightKg: 999 }
+  }));
+await expectDenied("measurement location is never persisted", firestoreRequest("PATCH",
+  `users/${ownerUid}/bodyMeasurements/measurement-1`, {
+    uid: ownerUid, data: { ...projectMeasurement, latitude: 36.1 }
+  }));
+await expectDenied("owner cannot directly delete remote measurement", firestoreRequest("DELETE",
+  `users/${ownerUid}/bodyMeasurements/measurement-1`, { uid: ownerUid }));
+const projectMeasurementSettings = {
+  id: "project-1",
+  userId: ownerUid,
+  projectId: "project-1",
+  schemaVersion: 1,
+  measurementSettings: {
+    enabled: true,
+    fields: { weight: true, bodyFat: true, skeletalMuscle: false, waist: false },
+    primaryMetric: "weight",
+    promptAfterCapture: true
+  },
+  poseAlignmentEnabled: false,
+  captureContextState: { enabled: true, context: null },
+  backedUpAt: "2026-11-18T06:00:10.000Z"
+};
+await expectAllowed("owner backs up private project settings", firestoreRequest("PATCH",
+  `users/${ownerUid}/bodyProjectSettings/project-1`, {
+    uid: ownerUid, data: projectMeasurementSettings
+  }));
+await expectDenied("other account cannot read project settings", firestoreRequest("GET",
+  `users/${ownerUid}/bodyProjectSettings/project-1`, { uid: otherUid }));
+await expectDenied("administrator client cannot view private project settings", firestoreRequest("GET",
+  `users/${ownerUid}/bodyProjectSettings/project-1`, { uid: adminUid }));
+await expectDenied("other account cannot overwrite project settings", firestoreRequest("PATCH",
+  `users/${ownerUid}/bodyProjectSettings/project-1`, {
+    uid: otherUid, data: projectMeasurementSettings
+  }));
+await expectDenied("invalid measurement field is rejected", firestoreRequest("PATCH",
+  `users/${ownerUid}/bodyProjectSettings/project-1`, {
+    uid: ownerUid,
+    data: {
+      ...projectMeasurementSettings,
+      measurementSettings: {
+        ...projectMeasurementSettings.measurementSettings,
+        primaryMetric: "bloodPressure"
+      }
+    }
+  }));
+await expectDenied("owner cannot directly delete remote project settings", firestoreRequest("DELETE",
+  `users/${ownerUid}/bodyProjectSettings/project-1`, { uid: ownerUid }));
+
 await seedBackupUploadSession({ sessionId: "body-photo", storagePath: `users/${ownerUid}/backups/photos/body.jpg`, fileSize: 1024, status: "completed" });
 const bodyPhoto = { ...validPhotoBackup(ownerUid, "body-photo"), storagePath: `users/${ownerUid}/backups/photos/body.jpg`, backupSessionId: "body-photo", projectId: "project-1", sequence: 1, sourceUpdatedAt: "2026-09-19T00:00:00Z" };
 await expectAllowed("first Body Frame photo backup", firestoreRequest("PATCH", `users/${ownerUid}/photoBackups/body-photo`, { uid: ownerUid, data: bodyPhoto }));
@@ -269,6 +358,28 @@ await seedBackupUploadSession({ sessionId: "body-released", storagePath: `users/
 await expectDenied("released upload cannot replace a photo", firestoreRequest("PATCH", `users/${ownerUid}/photoBackups/body-photo`, { uid: ownerUid, data: { ...bodyPhoto, storagePath: `users/${ownerUid}/backups/photos/body-released.jpg`, backupSessionId: "body-released" } }));
 await seedBackupUploadSession({ sessionId: "body-video", storagePath: `users/${ownerUid}/backups/videos/body.mp4`, fileSize: 2048, contentType: "video/mp4", mediaKind: "video", status: "completed" });
 await expectAllowed("Body Frame video keeps its project", firestoreRequest("PATCH", `users/${ownerUid}/videos/body-video`, { uid: ownerUid, data: { ...validVideoBackup(ownerUid, "body-video"), storagePath: `users/${ownerUid}/backups/videos/body.mp4`, backupSessionId: "body-video", projectId: "project-1" } }));
+await expectAllowed("video edit revision permits ISO source timestamp", firestoreRequest("PATCH",
+  `users/${ownerUid}/videos/body-video`, {
+    uid: ownerUid,
+    data: {
+      ...validVideoBackup(ownerUid, "body-video"),
+      storagePath: `users/${ownerUid}/backups/videos/body.mp4`,
+      backupSessionId: "body-video",
+      projectId: "project-1",
+      sourceUpdatedAt: "2026-11-18T08:00:00.000Z"
+    }
+  }));
+await expectDenied("invalid video edit revision is rejected", firestoreRequest("PATCH",
+  `users/${ownerUid}/videos/body-video`, {
+    uid: ownerUid,
+    data: {
+      ...validVideoBackup(ownerUid, "body-video"),
+      storagePath: `users/${ownerUid}/backups/videos/body.mp4`,
+      backupSessionId: "body-video",
+      projectId: "project-1",
+      sourceUpdatedAt: 100
+    }
+  }));
 
 await expectDenied(
   "unauthenticated users cannot read backup overview",

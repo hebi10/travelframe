@@ -32,8 +32,10 @@ assert.equal(
 );
 
 assert.ok(
-  wrapper.includes("styles.captureHintWrap"),
-  "capture guidance should remain below the compact header"
+  wrapper.includes("footerStatus={") &&
+    wrapper.includes("styles.captureStatusRow") &&
+    !wrapper.includes("styles.captureHintWrap"),
+  "capture guidance should sit in the shutter status slot instead of covering the preview"
 );
 
 assert.ok(

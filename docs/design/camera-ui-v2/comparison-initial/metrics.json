@@ -1,0 +1,191 @@
+{
+  "main": {
+    "actualOriginal": [
+      1080,
+      2424
+    ],
+    "referenceNormalized": [
+      1080,
+      2558
+    ],
+    "nativePixelsRescaled": false,
+    "referenceFrame": null,
+    "controls": [
+      {
+        "label": "프로젝트 선택",
+        "bounds": "[184,163][896,289]",
+        "selected": "false"
+      },
+      {
+        "label": "사진 촬영",
+        "bounds": "[451,1920][629,2099]",
+        "selected": "false"
+      }
+    ]
+  },
+  "settings": {
+    "actualOriginal": [
+      1080,
+      2424
+    ],
+    "referenceNormalized": [
+      1080,
+      2431
+    ],
+    "nativePixelsRescaled": false,
+    "referenceFrame": 0,
+    "controls": [
+      {
+        "label": "촬영 설정 닫기",
+        "bounds": "[884,577][1000,692]",
+        "selected": "false"
+      }
+    ]
+  },
+  "guide": {
+    "actualOriginal": [
+      1080,
+      2424
+    ],
+    "referenceNormalized": [
+      1080,
+      2431
+    ],
+    "nativePixelsRescaled": false,
+    "referenceFrame": 1,
+    "controls": [
+      {
+        "label": "가이드 설정 닫기",
+        "bounds": "[884,571][1000,687]",
+        "selected": "false"
+      }
+    ]
+  },
+  "projects": {
+    "actualOriginal": [
+      1080,
+      2424
+    ],
+    "referenceNormalized": [
+      1080,
+      2431
+    ],
+    "nativePixelsRescaled": false,
+    "referenceFrame": 2,
+    "controls": []
+  },
+  "create": {
+    "actualOriginal": [
+      1080,
+      2424
+    ],
+    "referenceNormalized": [
+      1080,
+      2431
+    ],
+    "nativePixelsRescaled": false,
+    "referenceFrame": 3,
+    "controls": []
+  },
+  "reference": {
+    "actualOriginal": [
+      1080,
+      2424
+    ],
+    "referenceNormalized": [
+      1080,
+      2431
+    ],
+    "nativePixelsRescaled": false,
+    "referenceFrame": 0,
+    "controls": [
+      {
+        "label": "프로젝트 선택",
+        "bounds": "[184,163][896,289]",
+        "selected": "false"
+      }
+    ]
+  },
+  "color": {
+    "actualOriginal": [
+      1080,
+      2424
+    ],
+    "referenceNormalized": [
+      1080,
+      2431
+    ],
+    "nativePixelsRescaled": false,
+    "referenceFrame": 1,
+    "controls": [
+      {
+        "label": "프로젝트 선택",
+        "bounds": "[184,163][896,289]",
+        "selected": "false"
+      },
+      {
+        "label": "사진 촬영",
+        "bounds": "[451,1920][629,2099]",
+        "selected": "false"
+      }
+    ]
+  },
+  "zoom": {
+    "actualOriginal": [
+      1080,
+      2424
+    ],
+    "referenceNormalized": [
+      1080,
+      2431
+    ],
+    "nativePixelsRescaled": false,
+    "referenceFrame": 2,
+    "controls": [
+      {
+        "label": "프로젝트 선택",
+        "bounds": "[184,163][896,289]",
+        "selected": "false"
+      },
+      {
+        "label": "확대 설정 닫기",
+        "bounds": "[930,1589][1046,1705]",
+        "selected": "false"
+      },
+      {
+        "label": "사진 촬영",
+        "bounds": "[451,1920][629,2099]",
+        "selected": "false"
+      }
+    ]
+  },
+  "light": {
+    "actualOriginal": [
+      1080,
+      2424
+    ],
+    "referenceNormalized": [
+      1080,
+      2431
+    ],
+    "nativePixelsRescaled": false,
+    "referenceFrame": 3,
+    "controls": [
+      {
+        "label": "프로젝트 선택",
+        "bounds": "[184,163][896,289]",
+        "selected": "false"
+      },
+      {
+        "label": "조명 설정 닫기",
+        "bounds": "[930,1589][1046,1705]",
+        "selected": "false"
+      },
+      {
+        "label": "사진 촬영",
+        "bounds": "[451,1920][629,2099]",
+        "selected": "false"
+      }
+    ]
+  }
+}

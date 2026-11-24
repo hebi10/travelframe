@@ -15,18 +15,15 @@ const styles = fs.readFileSync(
   "utf8"
 );
 
-const saveEffectStart = bodyCamera.indexOf(
-  "session.lastSavedAt <= 0"
-);
-const timeoutEffectStart = bodyCamera.indexOf(
-  "if (!saveMessage) {",
-  saveEffectStart
-);
-const saveEffect = bodyCamera.slice(saveEffectStart, timeoutEffectStart);
+const saveCallbackStart = bodyCamera.indexOf("const handleCapturedPhotoSaved");
+const timeoutEffectStart = bodyCamera.indexOf("if (!saveMessage) {", saveCallbackStart);
+const saveEffect = bodyCamera.slice(saveCallbackStart, timeoutEffectStart);
 
 assert.ok(
-  bodyCamera.includes('setSaveMessage(`${session.lastSavedSequence}번째 사진을 저장했습니다.`);'),
-  "camera should show the saved photo sequence message"
+  saveCallbackStart >= 0 &&
+    timeoutEffectStart > saveCallbackStart &&
+    bodyCamera.includes('setSaveMessage(`${photo.sequence ?? 1}번째 사진을 저장했습니다.`);'),
+  "camera should show the actual saved photo sequence rather than a stale session value"
 );
 assert.ok(
   bodyCamera.includes("}, 4200);") &&

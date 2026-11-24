@@ -1,3 +1,4 @@
+import { openPlans } from "@/lib/plan-navigation";
 import { AppText as Text } from "@/components/app-text";
 import {
   useFocusEffect } from "expo-router";
@@ -20,19 +21,24 @@ import {
   selectCloudBackupProject,
   type CloudBackupProjectSlot
 } from "@/lib/cloud-backup-project-slots";
-import { getBodyProjects } from "@/lib/body-project-library";
+import { getBodyProjects, updateBodyProject } from "@/lib/body-project-library";
 import { getPhotos } from "@/lib/photo-library";
+import { enqueueProjectCloudSync } from "@/lib/project-cloud-sync-queue";
 import type { BodyProject } from "@/types/body-project";
 import type { PhotoItem } from "@/types/photo";
 
 export function CloudBackupProjectSlotsSection({
   user,
   maxSlots,
-  maxPhotosPerProject
+  maxPhotosPerProject,
+  backupStorageBytes,
+  onBackupChanged
 }: {
   user: User | null;
   maxSlots: number;
   maxPhotosPerProject: number;
+  backupStorageBytes: number;
+  onBackupChanged?: () => void;
 }) {
   const { palette } = useAppAppearance();
   const [projects, setProjects] = useState<BodyProject[]>([]);
@@ -104,10 +110,12 @@ export function CloudBackupProjectSlotsSection({
     try {
       await selectCloudBackupProject({ user, projectId: project.id });
       await reload();
+      onBackupChanged?.();
       setMessage(
         `"${project.name}" 프로젝트를 클라우드 백업 프로젝트로 선택했습니다.`
       );
     } catch (error) {
+      await reload().catch(() => undefined);
       setMessage(
         error instanceof Error
           ? error.message
@@ -127,9 +135,13 @@ export function CloudBackupProjectSlotsSection({
     setBusyProjectId(projectId);
     setMessage(null);
     try {
-      await replaceCloudBackupProject({ user, slotId: slot.id, projectId });
+      await replaceCloudBackupProject({
+        user, slotId: slot.id, projectId,
+        confirmDeletePreviousProjectId: slot.projectId
+      });
       setReplacementSlotId(null);
       await reload();
+      onBackupChanged?.();
       setMessage(
         `"${projectName}" 프로젝트로 백업 슬롯을 변경했습니다. 새 프로젝트는 처음부터 다시 백업됩니다.`
       );
@@ -145,6 +157,46 @@ export function CloudBackupProjectSlotsSection({
     }
   };
 
+  const stopProjectCloudBackup = async (project: BodyProject) => {
+    if (busyProjectId) return;
+    setBusyProjectId(project.id);
+    try {
+      await updateBodyProject(project.id, {
+        saveMode: "local_only",
+        cloudResumeMode: project.saveMode === "cloud" ? "cloud" : "local_cloud"
+      });
+      await enqueueProjectCloudSync({ projectId: project.id, kind: "project-state" });
+      await reload();
+      onBackupChanged?.();
+      setMessage(
+        `"${project.name}" 프로젝트의 새 클라우드 백업을 중지했습니다. 이 기기의 앱 보관함·앨범 저장은 유지되며 기존 원격 파일은 삭제되지 않습니다. 슬롯은 계속 사용합니다.`
+      );
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "백업 중지 설정을 저장하지 못했습니다.");
+    } finally {
+      setBusyProjectId(null);
+    }
+  };
+
+  const resumeProjectCloudBackup = async (project: BodyProject) => {
+    if (busyProjectId) return;
+    setBusyProjectId(project.id);
+    try {
+      const resumeMode = project.cloudResumeMode === "cloud" ? "cloud" : "local_cloud";
+      await updateBodyProject(project.id, { saveMode: resumeMode, cloudResumeMode: null });
+      await enqueueProjectCloudSync({ projectId: project.id, kind: "initial" });
+      await reload();
+      onBackupChanged?.();
+      setMessage(
+        `"${project.name}" 프로젝트의 기존 저장 방식으로 클라우드 백업을 재개했습니다. 중지 중 변경된 항목은 동기화 대기열에 등록했습니다.`
+      );
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "백업 재개 설정을 저장하지 못했습니다.");
+    } finally {
+      setBusyProjectId(null);
+    }
+  };
+
   const confirmReplaceProject = (
     slot: CloudBackupProjectSlot,
     project: BodyProject
@@ -153,7 +205,7 @@ export function CloudBackupProjectSlotsSection({
       projectById.get(slot.projectId)?.name ?? "현재 백업 프로젝트";
     Alert.alert(
       "백업 프로젝트를 변경할까요?",
-      `"${currentName}"의 클라우드 백업 사진과 연결된 프로젝트 영상이 모두 삭제됩니다. 기기에 저장된 원본은 삭제되지 않습니다. "${project.name}" 프로젝트는 처음부터 다시 업로드해야 합니다.`,
+      `"${currentName}"의 기존 클라우드 사진·영상·측정 기록과 촬영 설정이 영구 삭제됩니다. 이 기기에 원본이 없으면 복구할 수 없습니다. "${project.name}" 프로젝트는 다시 업로드해야 합니다.`,
       [
         { text: "취소", style: "cancel" },
         {
@@ -174,7 +226,7 @@ export function CloudBackupProjectSlotsSection({
     const name = projectById.get(pending)?.name ?? "새 프로젝트";
     Alert.alert(
       "중단된 백업 프로젝트 변경",
-      `이전 교체 작업이 완료되지 않았습니다. 기존 클라우드 데이터 삭제를 이어서 진행하고 "${name}" 프로젝트로 변경할까요? 이미 삭제된 데이터는 복구되지 않습니다.`,
+      `이전 교체 작업이 완료되지 않았습니다. 기존 클라우드 사진·영상·수치 기록 삭제를 이어서 진행하고 "${name}" 프로젝트로 변경할까요? 이미 삭제된 데이터는 복구되지 않습니다.`,
       [
         { text: "취소", style: "cancel" },
         {
@@ -191,6 +243,29 @@ export function CloudBackupProjectSlotsSection({
     : null;
   const canAddSlot = slots.filter((slot) => slot.slotNumber <= maxSlots).length < maxSlots;
 
+  if (maxSlots <= 0) {
+    return (
+      <SectionBlock title="클라우드 프로젝트 백업">
+        <View style={[styles.notice, { borderColor: palette.line, backgroundColor: palette.surface }]}>
+          <Text style={[styles.noticeTitle, { color: palette.text }]}>
+            Pro 이상 구독 후 프로젝트를 클라우드에 백업할 수 있습니다.
+          </Text>
+          <Text style={[styles.detail, { color: palette.muted }]}>
+            Pro는 1개·2GB, Plus는 3개·6GB, Expert는 5개·10GB의 계정 공유 저장 공간을 제공합니다.
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="클라우드 백업 플랜 비교하기"
+            onPress={() => openPlans("backup", "Pro")}
+            style={[styles.smallButton, { borderColor: palette.line }]}
+          >
+            <Text style={[styles.buttonText, { color: palette.text }]}>백업 플랜 비교</Text>
+          </Pressable>
+        </View>
+      </SectionBlock>
+    );
+  }
+
   return (
     <SectionBlock title="클라우드 프로젝트 백업">
       <View
@@ -206,13 +281,15 @@ export function CloudBackupProjectSlotsSection({
           {Math.min(slots.length, maxSlots)} / {maxSlots}개 프로젝트 선택
         </Text>
         <Text style={[styles.detail, { color: palette.muted }]}>
-          선택한 프로젝트만 클라우드에 백업되며 프로젝트당 사진 최대{" "}
-          {maxPhotosPerProject}장을 저장할 수 있습니다.
+          선택한 프로젝트만 클라우드에 백업됩니다. 계정 전체 저장 용량{" "}
+          {Math.round(backupStorageBytes / (1024 * 1024 * 1024))}GB ·
+          프로젝트당 사진 최대 {maxPhotosPerProject}장입니다.
+          촬영 수치와 설정도 선택한 프로젝트와 함께 백업됩니다.
         </Text>
         <Text style={[styles.warning, { color: palette.text }]}>
-          백업 프로젝트는 선택 후 바로 수정할 수 없습니다. 변경하려면 기존
-          클라우드 백업을 모두 삭제한 뒤 새 프로젝트를 처음부터 다시
-          업로드해야 합니다. 로컬 원본은 삭제되지 않습니다.
+          새 백업 중지는 원격 데이터를 삭제하지 않습니다. 슬롯 교체는 명시적으로
+          기존 클라우드 파일을 영구 삭제하는 별도 작업입니다. 원본이 현재 기기에
+          없을 수 있으므로 교체 전에 복원 상태를 확인해 주세요.
         </Text>
       </View>
 
@@ -240,6 +317,34 @@ export function CloudBackupProjectSlotsSection({
                       : "백업 프로젝트 고정됨"}
                 </Text>
               </View>
+              {!lockedByPlan && !replacing && project ? (
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={Boolean(busyProjectId)}
+                  style={[styles.smallButton, { borderColor: palette.line }]}
+                  onPress={() => {
+                    if (project.saveMode === "local_only") {
+                      void resumeProjectCloudBackup(project);
+                    } else {
+                      Alert.alert(
+                        "새 백업만 중지",
+                        "이 프로젝트의 새 클라우드 업로드만 중지합니다. 기존 원격 사진·영상·측정 기록은 그대로 보존되고 슬롯은 사용 중 상태로 남습니다.",
+                        [
+                          { text: "취소", style: "cancel" },
+                          {
+                            text: "백업 중지",
+                            onPress: () => { void stopProjectCloudBackup(project); }
+                          }
+                        ]
+                      );
+                    }
+                  }}
+                >
+                  <Text style={[styles.buttonText, { color: palette.text }]}>
+                    {project.saveMode === "local_only" ? "클라우드 재개" : "새 백업 중지"}
+                  </Text>
+                </Pressable>
+              ) : null}
               {!lockedByPlan ? (
                 <Pressable
                   accessibilityRole="button"

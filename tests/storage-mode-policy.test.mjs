@@ -119,8 +119,8 @@ for (const forbidden of [
 }
 
 for (const snippet of [
-  "저장 방식",
-  "getStorageModeLabel(effectiveStorageMode)",
+  "프로젝트별로 백업을 시작하거나 중지",
+  "ProjectCloudStatusCards",
   "getEffectiveStorageMode",
   "클라우드 백업"
 ]) {

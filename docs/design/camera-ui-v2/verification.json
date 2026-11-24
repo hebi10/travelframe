@@ -1,0 +1,53 @@
+{
+  "workspace": "D:/dev_app/travelframe",
+  "defaultTestFileCount": 362,
+  "exclusions": [
+    "firebase-rules-emulator.test.mjs (separate environment)"
+  ],
+  "environment": "Process-only JAVA_HOME/PATH and NODE_OPTIONS preload map only kotlinc spawnSync to installed Kotlin compiler using JDK 21; product files unchanged by verifier",
+  "results": [
+    {
+      "stage": "test",
+      "command": "npm.cmd test",
+      "startedAt": "2026-11-09T16:11:17.13Z",
+      "finishedAt": "2026-11-09T16:13:09.506Z",
+      "code": 0,
+      "signal": null,
+      "logPath": "D:\\dev_app\\.setup\\camera-ui-v2-final-test.log"
+    },
+    {
+      "stage": "typecheck",
+      "command": "npm.cmd run typecheck",
+      "startedAt": "2026-11-09T16:13:09.507Z",
+      "finishedAt": "2026-11-09T16:13:22.218Z",
+      "code": 0,
+      "signal": null,
+      "logPath": "D:\\dev_app\\.setup\\camera-ui-v2-final-typecheck.log"
+    },
+    {
+      "stage": "lint",
+      "command": "npm.cmd run lint",
+      "startedAt": "2026-11-09T16:13:22.219Z",
+      "finishedAt": "2026-11-09T16:13:26.38Z",
+      "code": 0,
+      "signal": null,
+      "logPath": "D:\\dev_app\\.setup\\camera-ui-v2-final-lint.log"
+    },
+    {
+      "stage": "diff-check",
+      "command": "git diff --check",
+      "startedAt": "2026-11-09T16:13:26.38Z",
+      "finishedAt": "2026-11-09T16:13:26.678Z",
+      "code": 0,
+      "signal": null,
+      "logPath": "D:\\dev_app\\.setup\\camera-ui-v2-final-diff-check.log"
+    }
+  ],
+  "supplementaryVerification": {
+    "command": "npm.cmd test -- camera-slider-scroll-gesture",
+    "code": 0,
+    "testCount": 7,
+    "logPath": "D:/dev_app/.setup/camera-ui-v2-final-slider.log",
+    "reason": "Latest tap hitSlop change landed while the full suite was running"
+  }
+}

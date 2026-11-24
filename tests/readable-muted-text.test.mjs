@@ -8,8 +8,8 @@ const actionRowSource = readFileSync("components/action-row.tsx", "utf8");
 const screenShellSource = readFileSync("components/screen-shell.tsx", "utf8");
 
 assert.ok(
-  appThemeSource.includes('muted: "#444444"') &&
-    appThemeSource.includes('faint: "#707070"') &&
+  appThemeSource.includes('muted: "#5D6269"') &&
+    appThemeSource.includes('faint: "#5D6269"') &&
     !appThemeSource.includes('muted: "#666666"') &&
     !appThemeSource.includes('faint: "#999999"'),
   "light theme secondary text colors should be darker and easier to read"

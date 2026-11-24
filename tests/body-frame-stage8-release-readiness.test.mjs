@@ -7,7 +7,7 @@ const pkg = JSON.parse(read("package.json"));
 const lock = JSON.parse(read("package-lock.json"));
 const publisher = read("scripts/publish-play-release.mjs");
 const workflow = read(".github/workflows/android-play-aab.yml");
-const versionName = "1.0.32";
+const versionName = "1.0.33";
 
 assert.equal(app.expo.version, versionName, "Expo display version must match the reviewed candidate");
 assert.equal(pkg.version, versionName, "package.json must carry the same display version");
@@ -26,7 +26,7 @@ assert.ok(
   plan.includes("vars.BODY_FRAME_PLAY_SIGNING_APPROVED_20261107 == 'true'"),
   "Play AAB build/publish must remain gated until upload signing is verified"
 );
-assert.ok(plan.includes("inputs.operation == 'inventory'"), "Read-only inventory must remain available");
+assert.ok(plan.includes("inputs.mode == 'check'"), "Read-only inventory must remain available");
 assert.ok(plan.includes("run: node build-tools/scripts/check-play-upload-certificate.mjs"));
 assert.ok(plan.includes("fetch-depth: 0"), "Release ancestry check needs full Git history");
 assert.ok(plan.includes("scripts/publish-play-release.mjs check-source"));

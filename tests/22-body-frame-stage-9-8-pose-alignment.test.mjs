@@ -145,21 +145,26 @@ assert.ok(
   "pose guidance should remain a compact Body Frame banner"
 );
 
-for (const forbidden of [
-  "pose",
-  "landmark",
-  "shoulder",
-  "bodyPose"
-]) {
+for (const forbidden of ["pose", "landmark", "shoulder", "bodyPose"]) {
   assert.equal(
     new RegExp(forbidden, "i").test(photoTypes),
     false,
-    `PhotoItem should not store pose data: ${forbidden}`
+    `PhotoItem should not store pose analysis data: ${forbidden}`
   );
+}
+const posePreferenceBackup = cloudBackup.slice(
+  cloudBackup.indexOf("const backupBodyProjectSupplement"),
+  cloudBackup.indexOf("const uploadLocalFile")
+);
+assert.ok(
+  posePreferenceBackup.includes("poseAlignmentEnabled: poseSettings.enabled"),
+  "a cloud-selected project may restore the Boolean pose help preference"
+);
+for (const forbidden of ["PoseLandmark", "landmark", "shoulder", "poseGuidance", "poseSnapshot", "poseMetrics"]) {
   assert.equal(
-    new RegExp(forbidden, "i").test(cloudBackup),
+    new RegExp(forbidden, "i").test(posePreferenceBackup),
     false,
-    `cloud photo backup should not include pose data: ${forbidden}`
+    `pose landmarks, snapshots and analysis must never enter a cloud backup: ${forbidden}`
   );
 }
 

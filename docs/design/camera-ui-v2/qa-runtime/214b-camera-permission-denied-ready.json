@@ -1,0 +1,258 @@
+{
+  "avd": "BodyFrame_Camera_QA_20261110\r\r\nOK",
+  "nodes": [
+    {
+      "text": "",
+      "content-desc": "",
+      "class": "android.widget.TextView",
+      "bounds": "[84,501][147,567]",
+      "clickable": "false",
+      "enabled": "true",
+      "selected": "false",
+      "checked": "false",
+      "focused": "false"
+    },
+    {
+      "text": "촬영 준비",
+      "content-desc": "",
+      "class": "android.widget.TextView",
+      "bounds": "[42,639][1038,687]",
+      "clickable": "false",
+      "enabled": "true",
+      "selected": "false",
+      "checked": "false",
+      "focused": "false"
+    },
+    {
+      "text": "카메라 접근 권한이 필요합니다.",
+      "content-desc": "",
+      "class": "android.widget.TextView",
+      "bounds": "[42,719][1038,803]",
+      "clickable": "false",
+      "enabled": "true",
+      "selected": "false",
+      "checked": "false",
+      "focused": "false"
+    },
+    {
+      "text": "실시간 촬영 화면과 구도 가이드를 사용하려면 카메라 권한이 필요합니다.",
+      "content-desc": "",
+      "class": "android.widget.TextView",
+      "bounds": "[42,834][1038,950]",
+      "clickable": "false",
+      "enabled": "true",
+      "selected": "false",
+      "checked": "false",
+      "focused": "false"
+    },
+    {
+      "text": "권한 사용 목적",
+      "content-desc": "",
+      "class": "android.widget.TextView",
+      "bounds": "[86,1026][994,1079]",
+      "clickable": "false",
+      "enabled": "true",
+      "selected": "false",
+      "checked": "false",
+      "focused": "false"
+    },
+    {
+      "text": "촬영 화면을 표시하고 사진을 찍을 때만 카메라를 사용합니다.",
+      "content-desc": "",
+      "class": "android.widget.TextView",
+      "bounds": "[86,1105][994,1217]",
+      "clickable": "false",
+      "enabled": "true",
+      "selected": "false",
+      "checked": "false",
+      "focused": "false"
+    },
+    {
+      "text": "권한을 허용하지 않아도 기록 탭에서 저장된 사진을 확인할 수 있습니다.",
+      "content-desc": "",
+      "class": "android.widget.TextView",
+      "bounds": "[86,1244][994,1356]",
+      "clickable": "false",
+      "enabled": "true",
+      "selected": "false",
+      "checked": "false",
+      "focused": "false"
+    },
+    {
+      "text": "",
+      "content-desc": "카메라 권한 허용",
+      "class": "android.widget.Button",
+      "bounds": "[42,1816][1038,1942]",
+      "clickable": "true",
+      "enabled": "true",
+      "selected": "false",
+      "checked": "false",
+      "focused": "false"
+    },
+    {
+      "text": "카메라 권한 허용",
+      "content-desc": "",
+      "class": "android.widget.TextView",
+      "bounds": "[412,1852][668,1905]",
+      "clickable": "false",
+      "enabled": "true",
+      "selected": "false",
+      "checked": "false",
+      "focused": "false"
+    },
+    {
+      "text": "",
+      "content-desc": "기록으로 이동",
+      "class": "android.widget.Button",
+      "bounds": "[42,1968][1038,2094]",
+      "clickable": "true",
+      "enabled": "true",
+      "selected": "false",
+      "checked": "false",
+      "focused": "false"
+    },
+    {
+      "text": "기록으로 이동",
+      "content-desc": "",
+      "class": "android.widget.TextView",
+      "bounds": "[433,2004][646,2057]",
+      "clickable": "false",
+      "enabled": "true",
+      "selected": "false",
+      "checked": "false",
+      "focused": "false"
+    },
+    {
+      "text": "",
+      "content-desc": ", 촬영",
+      "class": "android.view.View",
+      "bounds": "[0,2210][270,2335]",
+      "clickable": "true",
+      "enabled": "true",
+      "selected": "true",
+      "checked": "false",
+      "focused": "false"
+    },
+    {
+      "text": "",
+      "content-desc": "",
+      "class": "android.widget.TextView",
+      "bounds": "[107,2231][160,2287]",
+      "clickable": "false",
+      "enabled": "true",
+      "selected": "false",
+      "checked": "false",
+      "focused": "false"
+    },
+    {
+      "text": "촬영",
+      "content-desc": "",
+      "class": "android.widget.TextView",
+      "bounds": "[108,2299][162,2335]",
+      "clickable": "false",
+      "enabled": "true",
+      "selected": "false",
+      "checked": "false",
+      "focused": "false"
+    },
+    {
+      "text": "",
+      "content-desc": ", 기록",
+      "class": "android.view.View",
+      "bounds": "[270,2210][540,2335]",
+      "clickable": "true",
+      "enabled": "true",
+      "selected": "false",
+      "checked": "false",
+      "focused": "false"
+    },
+    {
+      "text": "",
+      "content-desc": "",
+      "class": "android.widget.TextView",
+      "bounds": "[377,2231][430,2287]",
+      "clickable": "false",
+      "enabled": "true",
+      "selected": "false",
+      "checked": "false",
+      "focused": "false"
+    },
+    {
+      "text": "기록",
+      "content-desc": "",
+      "class": "android.widget.TextView",
+      "bounds": "[378,2299][432,2335]",
+      "clickable": "false",
+      "enabled": "true",
+      "selected": "false",
+      "checked": "false",
+      "focused": "false"
+    },
+    {
+      "text": "",
+      "content-desc": ", 영상",
+      "class": "android.view.View",
+      "bounds": "[540,2210][810,2335]",
+      "clickable": "true",
+      "enabled": "true",
+      "selected": "false",
+      "checked": "false",
+      "focused": "false"
+    },
+    {
+      "text": "",
+      "content-desc": "",
+      "class": "android.widget.TextView",
+      "bounds": "[647,2231][700,2287]",
+      "clickable": "false",
+      "enabled": "true",
+      "selected": "false",
+      "checked": "false",
+      "focused": "false"
+    },
+    {
+      "text": "영상",
+      "content-desc": "",
+      "class": "android.widget.TextView",
+      "bounds": "[648,2299][702,2335]",
+      "clickable": "false",
+      "enabled": "true",
+      "selected": "false",
+      "checked": "false",
+      "focused": "false"
+    },
+    {
+      "text": "",
+      "content-desc": ", 설정",
+      "class": "android.view.View",
+      "bounds": "[810,2210][1080,2335]",
+      "clickable": "true",
+      "enabled": "true",
+      "selected": "false",
+      "checked": "false",
+      "focused": "false"
+    },
+    {
+      "text": "",
+      "content-desc": "",
+      "class": "android.widget.TextView",
+      "bounds": "[917,2231][970,2287]",
+      "clickable": "false",
+      "enabled": "true",
+      "selected": "false",
+      "checked": "false",
+      "focused": "false"
+    },
+    {
+      "text": "설정",
+      "content-desc": "",
+      "class": "android.widget.TextView",
+      "bounds": "[918,2299][972,2335]",
+      "clickable": "false",
+      "enabled": "true",
+      "selected": "false",
+      "checked": "false",
+      "focused": "false"
+    }
+  ]
+}

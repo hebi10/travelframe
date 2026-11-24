@@ -33,8 +33,29 @@ import {
   getSelectedCloudBackupProjectIds
 } from "@/lib/cloud-backup-project-slots";
 import { firebaseAuth, firebaseFunctions, firestore, firebaseStorage } from "@/lib/firebase";
-import { getBodyProjects, mergeBodyProjectsFromBackup } from "@/lib/body-project-library";
+import { getBodyProjectById, getBodyProjects, mergeBodyProjectsFromBackup } from "@/lib/body-project-library";
+import {
+  getBodyMeasurements,
+  getBodyMeasurementSettings,
+  mergeBodyMeasurementsFromBackup,
+  mergeBodyMeasurementSettingsFromBackup
+} from "@/lib/body-measurement-library";
+import {
+  getBodyPoseAlignmentSettings,
+  mergeBodyPoseAlignmentSettingsFromBackup
+} from "@/lib/body-pose-alignment";
+import {
+  getBodyCaptureContextState,
+  mergeBodyCaptureContextStatesFromBackup
+} from "@/lib/body-frame-capture-context";
+import { getCloudBodyMeasurement, normalizeBodyMeasurementEntry, normalizeBodyMeasurementSettings } from "@/lib/body-measurement-normalization";
+import type { BodyMeasurementEntry, BodyMeasurementSettings } from "@/types/body-measurement";
+import type { BodyCaptureContextState } from "@/types/body-capture-context";
+import { canUploadLinkedProjectWork, isProjectCloudSaveMode, projectWantsCloudBackup } from "@/lib/project-save-policy";
+import { normalizeBodyFrameVideoOptions } from "@/lib/body-frame-video";
 import { isPhotoBackupCurrent, recoverMissingBodyProjects } from "@/lib/body-project-backup";
+import { getProjectCloudSyncTasks, type ProjectCloudSyncTask } from "@/lib/project-cloud-sync-queue";
+import { selectCloudProjectRestoreItems } from "@/lib/project-restore-selection";
 import type { BodyProject } from "@/types/body-project";
 import {
   calculateCombinedImageBackupSize,
@@ -47,6 +68,7 @@ import { getPlanEntitlements, getPlanTier } from "@/lib/plan-entitlements";
 import {
   getPhotos,
   markPhotoCloudOnly,
+  markPhotoVersionBackedUp,
   mergePhotosFromBackup,
   wasPhotoDeletedLocally
 } from "@/lib/photo-library";
@@ -326,19 +348,47 @@ const releaseBackupUpload = async (data: { backupSessionId: string }) => {
 };
 
 const deleteCloudBackupDataCallable = () =>
-  callBackupFunction<Record<string, never>, BackupSummary>(
+  callBackupFunction<{ confirmation: "DELETE_ALL_CLOUD_BACKUPS" }, BackupSummary>(
     "deleteCloudBackupData",
-    {}
+    { confirmation: "DELETE_ALL_CLOUD_BACKUPS" }
   );
 
 const deleteUserBackupItem = (data: {
-  itemType: "photo" | "imageWork" | "video" | "music";
+  itemType: "photo" | "imageWork" | "video" | "music" | "measurement";
   itemId: string;
+  projectId?: string;
 }) =>
   callBackupFunction<typeof data, { deleted: boolean; summary: BackupSummary }>(
     "deleteUserBackupItem",
     data
   );
+
+export const deleteCloudProjectBackup = async (user: User, projectId: string) => {
+  await assertLocalLibraryOwner(user.uid);
+  if (firebaseAuth?.currentUser?.uid !== user.uid) throw new Error("백업 계정이 변경되었습니다.");
+  await callBackupFunction("deleteCloudBackupProject", { projectId, confirmDeleteProjectId: projectId });
+};
+
+export const deleteProjectBackupItem = async ({
+  user,
+  projectId,
+  itemType,
+  itemId
+}: {
+  user: User;
+  projectId: string;
+  itemType: "photo" | "video" | "measurement";
+  itemId: string;
+}) => {
+  await assertLocalLibraryOwner(user.uid);
+  if (firebaseAuth?.currentUser?.uid !== user.uid) throw new Error("백업 계정이 변경되었습니다.");
+  await deleteUserBackupItem({ projectId, itemType, itemId });
+};
+
+const serializeVideoForBackup = (video: MadeVideoItem) =>
+  Object.fromEntries(Object.entries(video).filter(([key, value]) =>
+    key !== "containsLocalHealthData" && value !== undefined
+  ));
 
 const normalizeDateValue = (value: unknown) => {
   if (!value) {
@@ -381,8 +431,115 @@ const backupBodyProjects = async (userId: string, projectId?: string) => {
   const projects = await getBodyProjects();
   for (const project of projects) {
     if (projectId && project.id !== projectId) continue;
-    await setDoc(doc(firestore, "users", userId, "bodyProjects", project.id), project);
+    const { cloudResumeMode, ...data } = project;
+    await setDoc(doc(firestore, "users", userId, "bodyProjects", project.id), {
+      ...data,
+      ...(cloudResumeMode ? { cloudResumeMode } : {})
+    });
   }
+};
+
+export const backupPausedProjectMetadata = async (user: User, projectId: string) => {
+  const project = await getBodyProjectById(projectId);
+  if (project?.saveMode !== "local_only" || !project.cloudResumeMode) return;
+  if (firebaseAuth?.currentUser?.uid !== user.uid) throw new Error("백업 계정이 변경되었습니다.");
+  await backupBodyProjects(user.uid, projectId);
+};
+
+const backupBodyProjectSupplement = async (
+  userId: string,
+  projectId: string,
+  {
+    mode = "all",
+    measurementId
+  }: {
+    mode?: "all" | "settings" | "measurement";
+    measurementId?: string;
+  } = {}
+) => {
+  if (!firestore) throw new Error("Firebase 연결 정보가 아직 설정되지 않았습니다.");
+  const backedUpAt = new Date().toISOString();
+  if (mode !== "measurement") {
+    const [measurementSettings, poseSettings, captureContextState] =
+      await Promise.all([
+        getBodyMeasurementSettings(projectId),
+        getBodyPoseAlignmentSettings(projectId),
+        getBodyCaptureContextState(projectId)
+      ]);
+    await setDoc(
+      doc(firestore, "users", userId, "bodyProjectSettings", projectId),
+      {
+        id: projectId,
+        userId,
+        projectId,
+        schemaVersion: 1,
+        measurementSettings,
+        poseAlignmentEnabled: poseSettings.enabled,
+        captureContextState,
+        backedUpAt
+      }
+    );
+  }
+  if (mode !== "settings") {
+    const measurements = await getBodyMeasurements(projectId);
+    for (const entry of measurements) {
+      if (measurementId && entry.id !== measurementId) continue;
+      const backupEntry = getCloudBodyMeasurement(entry, backedUpAt);
+      if (!backupEntry) {
+        if (entry.manualRecordedAt) {
+          await deleteUserBackupItem({ itemType: "measurement", itemId: entry.id, projectId });
+        }
+        continue;
+      }
+      await setDoc(
+        doc(firestore, "users", userId, "bodyMeasurements", entry.id),
+        {
+          ...backupEntry,
+          userId,
+          schemaVersion: 1,
+          backedUpAt
+        }
+      );
+    }
+  }
+};
+
+export const backupProjectSupplementIfEnabled = async ({
+  user,
+  subscription,
+  projectId,
+  mode = "all",
+  measurementId
+}: {
+  user: User | null;
+  subscription: UserSubscription;
+  projectId: string;
+  mode?: "all" | "settings" | "measurement";
+  measurementId?: string;
+}) => {
+  if (!user || !isCreatorSubscriptionActive(subscription)) return false;
+  if (firebaseAuth?.currentUser?.uid !== user.uid) {
+    throw new Error("백업 계정이 변경되었습니다.");
+  }
+  await assertLocalLibraryOwner(user.uid);
+  const [project, settings, selected] = await Promise.all([
+    getBodyProjectById(projectId),
+    getAppSettings(),
+    getSelectedCloudBackupProjectIds(
+      user, getPlanEntitlements({ isLoggedIn: true, subscription }).maxCloudBackupProjects
+    )
+  ]);
+  if (!project || !selected.has(projectId) ||
+      !projectWantsCloudBackup(project, isCloudBackupTargetEnabled(settings, "photos"))) {
+    return false;
+  }
+  if (firebaseAuth?.currentUser?.uid !== user.uid) {
+    throw new Error("백업 계정이 변경되었습니다.");
+  }
+  if (mode === "measurement" && !measurementId) return false;
+  await backupBodyProjects(user.uid, projectId);
+  await backupBodyProjectSupplement(user.uid, projectId, { mode, measurementId });
+  return true;
 };
 
 const uploadLocalFile = async ({
@@ -816,7 +973,7 @@ export const backupCurrentWorkspace = async ({
   const backupLimitTier = getBackupLimitTier(subscription);
   emitBackupProgress(onProgress, 3, "백업할 데이터를 준비하고 있습니다.");
 
-  const [settings, photos, imageBundles, videos, selectedProjectIds] =
+  const [settings, photos, imageBundles, videos, selectedProjectIds, projects] =
     await Promise.all([
       getAppSettings(),
       getPhotos(),
@@ -828,8 +985,16 @@ export const backupCurrentWorkspace = async ({
           isLoggedIn: Boolean(user),
           subscription
         }).maxCloudBackupProjects
-      )
+      ),
+      getBodyProjects()
     ]);
+  const projectById = new Map(projects.map((project) => [project.id, project]));
+  const cloudProjectIds = new Set(
+    [...selectedProjectIds].filter((id) => {
+      const project = projectById.get(id);
+      return Boolean(project && (!project.saveMode || isProjectCloudSaveMode(project.saveMode)));
+    })
+  );
   if (
     isCloudBackupTargetEnabled(settings, "photos") &&
     selectedProjectIds.size === 0 &&
@@ -840,25 +1005,49 @@ export const backupCurrentWorkspace = async ({
     );
   }
 
-  const selectedPhotoBackups = isCloudBackupTargetEnabled(settings, "photos")
-    ? photos.filter(
-        (photo) =>
-          Boolean(photo.projectId) &&
-          selectedProjectIds.has(photo.projectId as string)
+  const selectedPhotoBackups = photos.filter(
+    (photo) =>
+      Boolean(photo.projectId) &&
+      cloudProjectIds.has(photo.projectId as string) &&
+      projectWantsCloudBackup(
+        projectById.get(photo.projectId as string),
+        isCloudBackupTargetEnabled(settings, "photos")
       )
-    : [];
-  const selectedImageBundleBackups = isCloudBackupTargetEnabled(settings, "imageBundles")
-    ? imageBundles
-    : [];
-  const selectedVideoBackups = isCloudBackupTargetEnabled(settings, "videos")
-    ? videos.filter(
-        (video) =>
-          !video.projectId || selectedProjectIds.has(video.projectId)
-      )
-    : [];
-  if (isCloudBackupTargetEnabled(settings, "photos")) {
-    for (const projectId of selectedProjectIds) {
+  );
+  const selectedImageBundleBackups = imageBundles.filter(
+    (work) => canUploadLinkedProjectWork({
+      photoIds: work.photoIds,
+      photos,
+      projects,
+      selectedProjectIds: cloudProjectIds,
+      legacyEnabled: isCloudBackupTargetEnabled(settings, "imageBundles")
+    })
+  );
+  const selectedVideoBackups = videos.filter((video) => !video.containsLocalHealthData).filter(
+    (video) =>
+      video.projectId
+        ? cloudProjectIds.has(video.projectId) &&
+          projectWantsCloudBackup(
+            projectById.get(video.projectId),
+            isCloudBackupTargetEnabled(settings, "videos")
+          )
+        : canUploadLinkedProjectWork({
+            photoIds: video.photoIds ?? [],
+            photos,
+            projects,
+            selectedProjectIds: cloudProjectIds,
+            legacyEnabled: isCloudBackupTargetEnabled(settings, "videos")
+          })
+  );
+  for (const projectId of cloudProjectIds) {
+    const localProject = projectById.get(projectId);
+    if (!localProject) continue;
+    if (projectWantsCloudBackup(
+      localProject,
+      isCloudBackupTargetEnabled(settings, "photos")
+    )) {
       await backupBodyProjects(user.uid, projectId);
+      await backupBodyProjectSupplement(user.uid, projectId);
     }
   }
   const existingPhotoSnapshot = await getDocs(collection(firestore, "users", user.uid, "photoBackups"));
@@ -878,6 +1067,7 @@ export const backupCurrentWorkspace = async ({
       continue;
     }
     if (isPhotoBackupCurrent(photo, existingPhotoBackups.get(photo.id))) {
+      if (photo.backupStatus === "pending") await markPhotoVersionBackedUp(photo);
       continue;
     }
     backupablePhotoBackups.push(photo);
@@ -1085,6 +1275,7 @@ export const backupCurrentWorkspace = async ({
       continue;
     }
 
+    if (photo.backupStatus === "pending") await markPhotoVersionBackedUp(photo);
     await applyStorageSaverPolicy({
       settings,
       photo,
@@ -1235,7 +1426,7 @@ export const backupCurrentWorkspace = async ({
     await setDoc(
       doc(firestore, "users", user.uid, "videos", video.id),
       {
-        ...video,
+        ...serializeVideoForBackup(video),
         userId: user.uid,
         localId: video.id,
         localUri: video.uri,
@@ -1325,11 +1516,23 @@ const updateCloudOnlyPhotoMetadata = async (
   if (!(await isPhotoStillBackupEligible(photo.id))) return null;
   const metadata = {
     ...(typeof photo.sequence === "number" ? { sequence: photo.sequence } : {}),
-    sourceUpdatedAt: photo.updatedAt ?? photo.createdAt,
+    createdAt: photo.createdAt,
+    ...(photo.backupStatus === "pending" ? {} : { sourceUpdatedAt: photo.updatedAt ?? photo.createdAt }),
     updatedAt: serverTimestamp()
   };
   await setDoc(doc(firestore, "users", userId, "photoBackups", photo.id), metadata, { merge: true });
   return { ...existingData, ...metadata };
+};
+
+export const backupProjectPhotoMetadata = async (user: User, photo: PhotoItem) => {
+  if (!firestore || firebaseAuth?.currentUser?.uid !== user.uid) {
+    throw new Error("백업 계정이 변경되었습니다.");
+  }
+  const snapshot = await getDoc(doc(firestore, "users", user.uid, "photoBackups", photo.id));
+  const existing = snapshot.data();
+  if (existing && !isPhotoBackupCurrent(photo, existing)) {
+    await updateCloudOnlyPhotoMetadata(user.uid, photo, existing);
+  }
 };
 
 export const backupPhoto = async ({
@@ -1359,6 +1562,10 @@ export const backupPhoto = async ({
   if (!photo.projectId) {
     return null;
   }
+  const currentProject = await getBodyProjectById(photo.projectId);
+  if (currentProject?.saveMode === "local_only") {
+    return null;
+  }
   const selectedProjectIds = await getSelectedCloudBackupProjectIds(
     user,
     getPlanEntitlements({
@@ -1384,6 +1591,7 @@ export const backupPhoto = async ({
 
   if (photo.projectId) await backupBodyProjects(user.uid, photo.projectId);
   if (existingSnapshot.exists() && isPhotoBackupCurrent(photo, existingData)) {
+    if (photo.backupStatus === "pending") await markPhotoVersionBackedUp(photo);
     return existingData;
   }
 
@@ -1485,6 +1693,7 @@ export const backupPhoto = async ({
     return null;
   }
 
+  if (photo.backupStatus === "pending") await markPhotoVersionBackedUp(photo);
   await refreshBackupOverview(user.uid, backedUpAt);
   await applyStorageSaverPolicy({
     settings,
@@ -1520,18 +1729,20 @@ export const backupPhotoIfEnabled = async ({
   subscription: UserSubscription;
   photo: PhotoItem;
 }) => {
-  const settings = await getAppSettings();
-  if (
-    !shouldUseCloudBackupForStorageMode(
-      settings.storageMode,
-      isCreatorSubscriptionActive(subscription)
-    ) ||
-    !isCloudBackupTargetEnabled(settings, "photos") ||
-    !user ||
-    !photo.projectId
-  ) {
+  if (!user || !photo.projectId) {
     return null;
   }
+  const [settings, project] = await Promise.all([
+    getAppSettings(),
+    getBodyProjectById(photo.projectId)
+  ]);
+  const isSubscribed = isCreatorSubscriptionActive(subscription);
+  const cloudEnabled = isSubscribed && projectWantsCloudBackup(
+    project,
+    shouldUseCloudBackupForStorageMode(settings.storageMode, isSubscribed) &&
+      isCloudBackupTargetEnabled(settings, "photos")
+  );
+  if (!cloudEnabled) return null;
 
   const selectedProjectIds = await getSelectedCloudBackupProjectIds(
     user,
@@ -1548,10 +1759,7 @@ export const backupPhotoIfEnabled = async ({
     user,
     photo,
     subscription,
-    enabled: shouldUseCloudBackupForStorageMode(
-      settings.storageMode,
-      isCreatorSubscriptionActive(subscription)
-    )
+    enabled: cloudEnabled
   });
 };
 
@@ -1577,8 +1785,22 @@ export const backupImageBundleWork = async ({
     throw new Error("Firebase 연결 정보가 아직 설정되지 않았습니다.");
   }
 
-  const settings = await getAppSettings();
-  if (!isCloudBackupTargetEnabled(settings, "imageBundles")) {
+  const [settings, photos, projects, selectedProjectIds] = await Promise.all([
+    getAppSettings(),
+    getPhotos(),
+    getBodyProjects(),
+    getSelectedCloudBackupProjectIds(
+      user,
+      getPlanEntitlements({ isLoggedIn: true, subscription: subscription ?? null }).maxCloudBackupProjects
+    )
+  ]);
+  if (!canUploadLinkedProjectWork({
+    photoIds: work.photoIds,
+    photos,
+    projects,
+    selectedProjectIds,
+    legacyEnabled: isCloudBackupTargetEnabled(settings, "imageBundles")
+  })) {
     return null;
   }
 
@@ -1593,6 +1815,19 @@ export const backupImageBundleWork = async ({
 
   if (work.localFileStatus === "cloud_only") {
     return null;
+  }
+
+  const existingWorkSnapshot = await getDoc(
+    doc(firestore, "users", user.uid, "imageWorks", work.id)
+  );
+  const existingWork = existingWorkSnapshot.data();
+  if (existingWorkSnapshot.exists() &&
+      existingWork?.backupStatus === "backed_up" &&
+      existingWork?.localId === work.id &&
+      existingWork?.sourceUpdatedAt === (work.updatedAt ?? work.createdAt) &&
+      Array.isArray(existingWork?.storagePaths) &&
+      existingWork.storagePaths.length > 0) {
+    return existingWork;
   }
 
   const sourceDeviceId = await getSourceDeviceId();
@@ -1679,6 +1914,7 @@ export const backupImageBundleWork = async ({
     imageQuality: settings.imageBackupQuality,
     userId: user.uid,
     localId: work.id,
+    sourceUpdatedAt: work.updatedAt ?? work.createdAt,
     backupStatus: "backed_up",
     backupEnabledAt: backedUpAt,
     lastBackedUpAt: backedUpAt,
@@ -1732,7 +1968,7 @@ export const backupMadeVideo = async ({
   enabled: boolean;
   subscription?: UserSubscription | null;
 }) => {
-  if (!enabled || !user) {
+  if (!enabled || !user || video.containsLocalHealthData) {
     return null;
   }
 
@@ -1743,12 +1979,41 @@ export const backupMadeVideo = async ({
     throw new Error("Firebase 연결 정보가 아직 설정되지 않았습니다.");
   }
 
-  const [sourceDeviceId, settings] = await Promise.all([
+  const [sourceDeviceId, settings, project] = await Promise.all([
     getSourceDeviceId(),
-    getAppSettings()
+    getAppSettings(),
+    video.projectId ? getBodyProjectById(video.projectId) : Promise.resolve(null)
   ]);
-  if (!isCloudBackupTargetEnabled(settings, "videos")) {
+  if (!projectWantsCloudBackup(project, isCloudBackupTargetEnabled(settings, "videos"))) {
     return null;
+  }
+  if (video.projectId) {
+    if (!project) return null;
+    const selectedProjectIds = await getSelectedCloudBackupProjectIds(
+      user,
+      getPlanEntitlements({
+        isLoggedIn: true,
+        subscription: subscription ?? null
+      }).maxCloudBackupProjects
+    );
+    if (!selectedProjectIds.has(video.projectId)) return null;
+  }
+  if (!video.projectId) {
+    const [photos, projects, selectedProjectIds] = await Promise.all([
+      getPhotos(),
+      getBodyProjects(),
+      getSelectedCloudBackupProjectIds(
+        user,
+        getPlanEntitlements({ isLoggedIn: true, subscription: subscription ?? null }).maxCloudBackupProjects
+      )
+    ]);
+    if (!canUploadLinkedProjectWork({
+      photoIds: video.photoIds,
+      photos,
+      projects,
+      selectedProjectIds,
+      legacyEnabled: isCloudBackupTargetEnabled(settings, "videos")
+    })) return null;
   }
 
   if (!(await isVideoStillBackupEligible(video.id))) {
@@ -1765,13 +2030,16 @@ export const backupMadeVideo = async ({
         backupStatus?: string;
         localId?: string;
         storagePath?: string;
+        backupSessionId?: string;
+        sourceUpdatedAt?: string;
       }
     | undefined;
   if (
     existingSnapshot.exists() &&
     existingVideo?.backupStatus === "backed_up" &&
     existingVideo.localId === video.id &&
-    existingVideo.storagePath
+    existingVideo.storagePath &&
+    existingVideo.sourceUpdatedAt === (video.updatedAt ?? video.createdAt)
   ) {
     return existingVideo;
   }
@@ -1783,7 +2051,7 @@ export const backupMadeVideo = async ({
   const currentVideoCount = await getCollectionSize(user.uid, "videos");
   const backupLimitTier = getBackupLimitTier(subscription);
   const videoLimit = getCloudBackupVideoLimit(backupLimitTier);
-  if (!canBackupMoreVideos(currentVideoCount, backupLimitTier)) {
+  if (!existingSnapshot.exists() && !canBackupMoreVideos(currentVideoCount, backupLimitTier)) {
     throw new Error(
       `영상 백업 한도 ${videoLimit}개를 모두 사용했습니다. 설정에서 기존 영상 백업을 정리한 뒤 다시 시도해 주세요.`
     );
@@ -1794,7 +2062,10 @@ export const backupMadeVideo = async ({
   const upload = await uploadLocalFile({
     uri: video.uri,
     storagePath,
-    mediaKind: "video"
+    mediaKind: "video",
+    itemType: "video",
+    projectId: video.projectId,
+    itemId: video.id
   });
   const downloadUrl = upload.downloadURL;
 
@@ -1807,7 +2078,7 @@ export const backupMadeVideo = async ({
   await setDoc(
     doc(firestore, "users", user.uid, "videos", video.id),
     {
-      ...video,
+      ...serializeVideoForBackup(video),
       userId: user.uid,
       localId: video.id,
       localUri: video.uri,
@@ -1818,6 +2089,7 @@ export const backupMadeVideo = async ({
       backupStatus: "backed_up",
       backupEnabledAt: settings.cloudBackupEnabled ? backedUpAt : null,
       lastBackedUpAt: backedUpAt,
+      sourceUpdatedAt: video.updatedAt ?? video.createdAt,
       sourceDeviceId,
       fileType: "video/mp4",
       backedUpAt,
@@ -1839,6 +2111,10 @@ export const backupMadeVideo = async ({
     return null;
   }
 
+  if (existingVideo?.backupSessionId &&
+      existingVideo.backupSessionId !== upload.backupSessionId) {
+    await releaseBackupUploads([existingVideo.backupSessionId]).catch(() => undefined);
+  }
   await refreshBackupOverview(user.uid, backedUpAt);
   await applyStorageSaverPolicy({
     settings,
@@ -1932,6 +2208,7 @@ const normalizeVideoBackup = (
       : {},
   musicId: data.musicId === "custom" || typeof data.musicId === "string" ? (data.musicId as MadeVideoItem["musicId"]) : "none",
   musicLabel: typeof data.musicLabel === "string" ? data.musicLabel : "무음",
+  bodyFrameOptions: normalizeBodyFrameVideoOptions(data.bodyFrameOptions),
   downloadURL:
     (typeof data.downloadURL === "string" && data.downloadURL) ||
     (typeof data.uri === "string" && /^https?:\/\//i.test(data.uri) && data.uri) ||
@@ -1940,7 +2217,66 @@ const normalizeVideoBackup = (
   backupStatus: "backed_up"
 });
 
-export const restoreCloudBackupToLocal = async ({ user }: { user: User | null }) => {
+export type RestorableCloudProject = {
+  id: string;
+  name: string;
+  updatedAt: string;
+  photoCount: number;
+  videoCount: number;
+  measurementCount: number;
+};
+
+export const getRestorableCloudProjects = async ({
+  user
+}: { user: User | null }): Promise<RestorableCloudProject[]> => {
+  if (!user || firebaseAuth?.currentUser?.uid !== user.uid) {
+    throw new Error("로그인한 계정의 백업만 확인할 수 있습니다.");
+  }
+  await assertLocalLibraryOwner(user.uid);
+  if (!firestore) {
+    throw new Error("Firebase 연결 정보가 아직 설정되지 않았습니다.");
+  }
+  const [projectSnapshot, photoSnapshot, videoSnapshot, measurementSnapshot] = await Promise.all([
+    getDocs(collection(firestore, "users", user.uid, "bodyProjects")),
+    getDocs(collection(firestore, "users", user.uid, "photoBackups")),
+    getDocs(collection(firestore, "users", user.uid, "videos")),
+    getDocs(collection(firestore, "users", user.uid, "bodyMeasurements"))
+  ]);
+  if (firebaseAuth?.currentUser?.uid !== user.uid) {
+    throw new Error("계정이 변경되어 백업 조회를 중단했습니다.");
+  }
+  const photos = photoSnapshot.docs.map((item) => normalizePhotoBackup(item.data(), item.id));
+  const projects = recoverMissingBodyProjects(
+    projectSnapshot.docs.map((item) => ({ ...item.data(), id: item.id }) as BodyProject),
+    photos
+  );
+  const videos = videoSnapshot.docs.map((item) => normalizeVideoBackup(item.data(), item.id));
+  const counts = projects.map((project) => {
+    const projectPhotos = photos.filter((photo) => photo.projectId === project.id);
+    const photoIds = new Set(projectPhotos.map((photo) => photo.id));
+    const videoCount = videos.filter((video) =>
+      video.projectId === project.id ||
+      (!video.projectId && video.photoIds.length > 0 &&
+        video.photoIds.every((id) => photoIds.has(id)))
+    ).length;
+    return {
+      id: project.id,
+      name: project.name,
+      updatedAt: project.updatedAt,
+      photoCount: projectPhotos.length,
+      videoCount,
+      measurementCount: measurementSnapshot.docs.filter((item) =>
+        item.data().projectId === project.id
+      ).length
+    };
+  });
+  return counts.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+};
+
+export const restoreCloudBackupToLocal = async ({
+  user,
+  projectIds
+}: { user: User | null; projectIds?: string[] }) => {
   if (!user) {
     throw new Error("로그인이 필요합니다.");
   }
@@ -1952,38 +2288,132 @@ export const restoreCloudBackupToLocal = async ({ user }: { user: User | null })
     throw new Error("Firebase 연결 정보가 아직 설정되지 않았습니다.");
   }
 
-  const [photoSnapshot, imageWorkSnapshot, videoSnapshot, projectSnapshot] = await Promise.all([
+  const pendingBeforeRestore = projectIds ? await getProjectCloudSyncTasks() : [];
+  const deletingAtStart = new Set(pendingBeforeRestore
+    .filter((task) => task.kind === "delete-project").map((task) => task.projectId));
+
+  const [
+    photoSnapshot, imageWorkSnapshot, videoSnapshot, projectSnapshot,
+    measurementSnapshot, projectSettingsSnapshot
+  ] = await Promise.all([
     getDocs(collection(firestore, "users", user.uid, "photoBackups")),
     getDocs(collection(firestore, "users", user.uid, "imageWorks")),
     getDocs(collection(firestore, "users", user.uid, "videos")),
-    getDocs(collection(firestore, "users", user.uid, "bodyProjects"))
+    getDocs(collection(firestore, "users", user.uid, "bodyProjects")),
+    getDocs(collection(firestore, "users", user.uid, "bodyMeasurements")),
+    getDocs(collection(firestore, "users", user.uid, "bodyProjectSettings"))
   ]);
-  const photos = photoSnapshot.docs.map((item) =>
+  const allPhotos = photoSnapshot.docs.map((item) =>
     normalizePhotoBackup(item.data(), item.id)
   );
-  const imageWorks = imageWorkSnapshot.docs.map((item) =>
+  const allImageWorks = imageWorkSnapshot.docs.map((item) =>
     normalizeImageWorkBackup(item.data(), item.id)
   );
-  const videos = videoSnapshot.docs.map((item) =>
+  const allVideos = videoSnapshot.docs.map((item) =>
     normalizeVideoBackup(item.data(), item.id)
   );
   if (firebaseAuth?.currentUser?.uid !== user.uid) throw new Error("계정이 변경되어 복원을 중단했습니다.");
   await assertLocalLibraryOwner(user.uid);
 
-  const projects = projectSnapshot.docs.map(item => ({ ...item.data(), id: item.id }) as BodyProject);
-  // Each library reads and merges current state under its own mutation queue.
-  // No snapshot taken before project restoration can overwrite a later capture.
-  await mergeBodyProjectsFromBackup(recoverMissingBodyProjects(projects, [...await getPhotos(), ...photos]));
-  const [missingPhotos, missingImageWorks, missingVideos] = await Promise.all([
-    mergePhotosFromBackup(photos),
-    mergeImageBundleWorksFromBackup(imageWorks),
-    mergeMadeVideosFromBackup(videos)
-  ]);
+  const remoteProjects = recoverMissingBodyProjects(
+    projectSnapshot.docs.map((item) => ({ ...item.data(), id: item.id }) as BodyProject),
+    allPhotos
+  );
+  const selected = selectCloudProjectRestoreItems({
+    requestedProjectIds: projectIds,
+    projects: remoteProjects,
+    photos: allPhotos,
+    imageWorks: allImageWorks,
+    videos: allVideos,
+    measurements: measurementSnapshot.docs
+      .map((item) => normalizeBodyMeasurementEntry({ ...item.data(), id: item.id }))
+      .filter((item): item is BodyMeasurementEntry => Boolean(item)),
+    settings: projectSettingsSnapshot.docs.map((item) => {
+      const data = item.data() as Record<string, unknown>;
+      return {
+        projectId: item.id,
+        measurementSettings: data.measurementSettings,
+        poseAlignmentEnabled: data.poseAlignmentEnabled,
+        captureContextState: data.captureContextState
+      };
+    })
+  });
+
+  const counts = await mergeBodyProjectsFromBackup(selected.projects, async (
+    projects, deletedProjectIds, explicitlyRestoredIds
+  ) => {
+    const pending = explicitlyRestoredIds.size
+      ? [...pendingBeforeRestore, ...await getProjectCloudSyncTasks()]
+      : [];
+    const canRestore = (kind: ProjectCloudSyncTask["kind"], id: string) =>
+      !pending.some((task) => task.kind === kind && task.itemId === id);
+    const deletedProjectPhotoIds = new Set(selected.photos
+      .filter((photo) => photo.projectId && deletedProjectIds.has(photo.projectId))
+      .map((photo) => photo.id));
+    const explicitlyRestoredPhotoIds = new Set(selected.photos
+      .filter((photo) => photo.projectId && explicitlyRestoredIds.has(photo.projectId))
+      .map((photo) => photo.id));
+    const fromRestoredPhotos = (photoIds: string[]) =>
+      photoIds.length > 0 && photoIds.every((id) => explicitlyRestoredPhotoIds.has(id));
+    const [missingPhotos, missingImageWorks, missingVideos] = await Promise.all([
+      mergePhotosFromBackup(
+        selected.photos.filter((photo) => !deletedProjectPhotoIds.has(photo.id)),
+        new Set([...explicitlyRestoredPhotoIds].filter((id) => canRestore("delete-photo", id)))
+      ),
+      mergeImageBundleWorksFromBackup(
+        selected.imageWorks.filter((work) => !work.photoIds.some((id) => deletedProjectPhotoIds.has(id))),
+        new Set(selected.imageWorks.filter((work) => fromRestoredPhotos(work.photoIds)).map((work) => work.id))
+      ),
+      mergeMadeVideosFromBackup(
+        selected.videos.filter((video) => (!video.projectId || !deletedProjectIds.has(video.projectId)) &&
+          !video.photoIds.some((id) => deletedProjectPhotoIds.has(id))),
+        new Set(selected.videos
+          .filter((video) => canRestore("delete-video", video.id) &&
+            (video.projectId ? explicitlyRestoredIds.has(video.projectId) : fromRestoredPhotos(video.photoIds)))
+          .map((video) => video.id))
+      )
+    ]);
+
+    const restoredProjectIds = new Set(projects
+      .filter((project) => !deletedProjectIds.has(project.id)).map((project) => project.id));
+    const remoteMeasurements = selected.measurements.filter((entry) => restoredProjectIds.has(entry.projectId));
+    const remoteProjectSettings = selected.settings.filter((entry) => restoredProjectIds.has(entry.projectId));
+    await mergeBodyMeasurementsFromBackup(
+      remoteMeasurements,
+      new Set(remoteMeasurements.filter((entry) =>
+        explicitlyRestoredIds.has(entry.projectId) && canRestore("delete-measurement", entry.id)
+      ).map((entry) => entry.id))
+    );
+    await Promise.all([
+      mergeBodyMeasurementSettingsFromBackup(
+        remoteProjectSettings.map((item) => ({
+          projectId: item.projectId,
+          settings: normalizeBodyMeasurementSettings(item.measurementSettings) as BodyMeasurementSettings
+        }))
+      ),
+      mergeBodyPoseAlignmentSettingsFromBackup(
+        remoteProjectSettings.map((item) => ({
+          projectId: item.projectId,
+          enabled: item.poseAlignmentEnabled === true
+        }))
+      ),
+      mergeBodyCaptureContextStatesFromBackup(
+        remoteProjectSettings.map((item) => ({
+          projectId: item.projectId,
+          state: item.captureContextState as BodyCaptureContextState
+        }))
+      )
+    ]);
+
+    return {
+      photoCount: missingPhotos.length,
+      imageBundleCount: missingImageWorks.length,
+      videoCount: missingVideos.length
+    };
+  }, projectIds !== undefined, deletingAtStart);
 
   return {
-    photoCount: missingPhotos.length,
-    imageBundleCount: missingImageWorks.length,
-    videoCount: missingVideos.length,
+    ...counts,
     imageBackupBytes: await getCurrentImageBackupSize({ userId: user.uid }),
     deleteAfter: null
   };

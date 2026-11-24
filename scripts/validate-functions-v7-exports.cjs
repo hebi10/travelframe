@@ -9,6 +9,7 @@ const expected = [
   "verifyGooglePlayPurchase",
   "handleGooglePlayBillingNotification",
   "selectCloudBackupProject",
+  "deleteCloudBackupProject",
   "replaceCloudBackupProject",
   "reserveWeeklyVideoExport",
   "releaseWeeklyVideoExport",
@@ -45,6 +46,9 @@ process.env.FUNCTIONS_ENABLE_ADMIN_FULL_BACKUP_DELETION = "false";
 const { getApps, deleteApp } = requireFunctions("firebase-admin/app");
 const { FieldValue, Timestamp } = requireFunctions("firebase-admin/firestore");
 const exportsMap = requireFunctions("./index.js");
+
+assert.deepEqual(Object.keys(exportsMap).sort(), [...expected].sort(),
+  "All current server endpoints must be included in the registration contract");
 
 for (const name of expected) {
   assert.equal(typeof exportsMap[name], "function", name + " is not registered as a callable/event function");

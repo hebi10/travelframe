@@ -2,7 +2,10 @@ import type { User } from "firebase/auth";
 import { collection, getDocs } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 
-import { firebaseFunctions, firestore } from "@/lib/firebase";
+import { getBodyProjectById, updateBodyProject } from "@/lib/body-project-library";
+import { assertLocalLibraryOwner } from "@/lib/local-library-owner";
+import { firebaseAuth, firebaseFunctions, firestore } from "@/lib/firebase";
+import { enqueueProjectCloudSync } from "@/lib/project-cloud-sync-queue";
 
 export type CloudBackupProjectSlot = {
   id: string;
@@ -64,6 +67,17 @@ export const getCloudBackupProjectSlots = async (
     .sort((first, second) => first.slotNumber - second.slotNumber);
 };
 
+const startSelectedProjectBackup = async (user: User, projectId: string) => {
+  await assertLocalLibraryOwner(user.uid);
+  if (firebaseAuth?.currentUser?.uid !== user.uid) throw new Error("백업 계정이 변경되었습니다.");
+  const project = await getBodyProjectById(projectId);
+  if (!project) throw new Error("선택한 프로젝트를 찾지 못했습니다.");
+  if (!project.saveMode || project.saveMode === "local_only") {
+    await updateBodyProject(projectId, { saveMode: project.cloudResumeMode ?? "local_cloud", cloudResumeMode: null });
+  }
+  await enqueueProjectCloudSync({ projectId, kind: "initial" });
+};
+
 export const selectCloudBackupProject = async ({
   user,
   projectId
@@ -75,29 +89,35 @@ export const selectCloudBackupProject = async ({
     throw new Error("로그인 후 백업 프로젝트를 선택할 수 있습니다.");
   }
 
-  return callSlotFunction<{ projectId: string }, SlotResponse>(
+  const response = await callSlotFunction<{ projectId: string }, SlotResponse>(
     "selectCloudBackupProject",
     { projectId }
   );
+  await startSelectedProjectBackup(user, projectId);
+  return response;
 };
 
 export const replaceCloudBackupProject = async ({
   user,
   slotId,
-  projectId
+  projectId,
+  confirmDeletePreviousProjectId
 }: {
   user: User;
   slotId: string;
   projectId: string;
+  confirmDeletePreviousProjectId: string;
 }) => {
   if (!user.uid) {
     throw new Error("로그인 후 백업 프로젝트를 변경할 수 있습니다.");
   }
 
-  return callSlotFunction<
-    { slotId: string; projectId: string },
+  const response = await callSlotFunction<
+    { slotId: string; projectId: string; confirmDeletePreviousProjectId: string },
     SlotResponse & { deletedPhotoCount: number; deletedVideoCount: number }
-  >("replaceCloudBackupProject", { slotId, projectId });
+  >("replaceCloudBackupProject", { slotId, projectId, confirmDeletePreviousProjectId });
+  await startSelectedProjectBackup(user, projectId);
+  return response;
 };
 
 export const getSelectedCloudBackupProjectIds = async (

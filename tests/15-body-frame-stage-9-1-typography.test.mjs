@@ -44,12 +44,15 @@ for (const [name, source] of [
 
 assert.ok(
   recordsSource.includes(
-    "projectPercent: {\n    fontSize: bodyFrameTypography.caption"
+    "projectPercent: {\n    fontSize: bodyFrameTypography.body"
   ) &&
+    recordsSource.includes(
+      "projectMeta: {\n    flexShrink: 1,\n    fontSize: bodyFrameTypography.body"
+    ) &&
     recordsSource.includes(
       "projectDuration: {\n    fontSize: bodyFrameTypography.caption"
     ),
-  "project cards should use the readable shared caption size"
+  "project cards should distinguish primary record progress from secondary duration"
 );
 
 assert.ok(

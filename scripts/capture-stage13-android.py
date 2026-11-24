@@ -24,11 +24,110 @@ SPEC.loader.exec_module(qa)
 
 ALL_PROFILES = {name: (size, dpi) for name, size, dpi in qa.DESIGN_PROFILES}
 ALL_VARIANTS = {name: (theme, font, scale) for name, theme, font, scale in qa.DESIGN_VARIANTS}
+ALL_VARIANTS.update({
+    "light-100": ("light", "medium", 1.0),
+    "dark-130": ("dark", "large", 1.3),
+})
+C7_VARIANTS = ("dark-100", "light-100", "dark-130", "light-130", "dark-150", "light-150")
 
 P = qa.PROJECT
 F = qa.PHOTO
+
+def open_camera_project_picker(device):
+    device.ready(["프로젝트 선택", "사진 촬영"])
+    device.open_control("프로젝트 선택", ["내 프로젝트", "프로젝트 관리"])
+
+def open_camera_new_project(device):
+    open_camera_project_picker(device)
+    device.open_control("+ 새 프로젝트", ["프로젝트 이름", "목표 기록 수", "프로젝트 만들기"])
+
+def open_camera_settings(device):
+    device.ready(["프로젝트 선택", "사진 촬영"])
+    device.open_control("촬영 설정 열기", ["촬영 도구", "촬영 옵션"])
+
+def open_camera_save_targets(device):
+    open_camera_settings(device)
+    device.find_control("핸드폰 앨범", search="below")
+
+def open_camera_guide_settings(device):
+    open_camera_settings(device)
+    device.open_control("라인 가이드 설정 열기", ["가이드 설정", "가이드라인"])
+
+def open_camera_reference_setup(device):
+    device.ready(["프로젝트 선택", "사진 촬영"])
+    labels = [
+        node.get("content-desc", "")
+        for node in qa.ET.fromstring(device.dump()).iter("node")
+        if node.get("content-desc", "").startswith("기준 사진 투명도 ")
+    ]
+    if len(set(labels)) != 1:
+        raise RuntimeError("Exactly one reference photo opacity control must be visible")
+    device.open_control(labels[0], ["기준 사진 조정", "확인"])
+
+def open_camera_color_panel(device):
+    open_camera_settings(device)
+    device.open_control("색감 설정 열기", ["색감", "저장 슬롯", "설정 저장"])
+    xml = device.dump()
+    qa.target_bounds(
+        xml, "선택한 색감 슬롯에 현재 설정 저장", viewport=device.viewport()
+    )
+    qa.target_bounds(xml, "색감 조절값 초기화", viewport=device.viewport())
+    root = qa.ET.fromstring(xml)
+    if not any("ScrollView" in node.get("class", "") for node in root.iter("node")):
+        raise RuntimeError("Color panel must keep a native scroll area above the pinned footer")
+
+def open_camera_zoom_panel(device):
+    open_camera_settings(device)
+    device.open_control("확대 설정 열기", ["확대", "1x"])
+
+def open_camera_light_panel(device):
+    open_camera_settings(device)
+    device.open_control("라이트 설정 열기", ["조명", "끄기", "켜기"])
+
+def capture_camera_permission_denied(device, directory):
+    """Capture an actual Android permission-denied state; restore emulator permission afterward."""
+    device.shell("am", "force-stop", qa.PACKAGE)
+    device.shell("pm", "revoke", qa.PACKAGE, "android.permission.CAMERA")
+    try:
+        record = verified_capture(
+            device, directory, "camera-permission-denied", "camera",
+            ["카메라 접근 권한이 필요합니다.", "기록으로 이동"]
+        )
+        xml = device.dump()
+        controls = qa.ui_strings(xml)
+        primary = (
+            "카메라 권한 허용"
+            if any("카메라 권한 허용" in item for item in controls)
+            else "앱 설정에서 권한 허용"
+        )
+        qa.target_bounds(xml, primary, viewport=device.viewport())
+        qa.target_bounds(xml, "기록으로 이동", viewport=device.viewport())
+        record["permissionActionEvidence"] = {"primary": primary, "fixedActionsVisible": True}
+        return record
+    finally:
+        device.shell("pm", "grant", qa.PACKAGE, "android.permission.CAMERA", check=False)
+        device.shell("am", "force-stop", qa.PACKAGE, check=False)
+
+
 CASES = [
     ("camera", "촬영", "camera", ["프로젝트 선택", "사진 촬영"], None),
+    ("camera-project-picker", "촬영 프로젝트 선택", "camera",
+     ["내 프로젝트", "프로젝트 관리"], open_camera_project_picker),
+    ("camera-new-project", "촬영 새 프로젝트", "camera",
+     ["프로젝트 이름", "목표 기록 수", "프로젝트 만들기"], open_camera_new_project),
+    ("camera-settings", "촬영 설정·도구", "camera", ["촬영 도구", "촬영 옵션"], open_camera_settings),
+    ("camera-settings-storage", "촬영 설정·저장 위치", "camera",
+     ["앱 보관함", "핸드폰 앨범"], open_camera_save_targets),
+    ("camera-guide-settings", "촬영 가이드 설정", "camera",
+     ["가이드 설정", "가이드라인"], open_camera_guide_settings),
+    ("camera-reference-adjust", "촬영 기준 사진 위치·투명도", "camera",
+     ["기준 사진 조정", "확인"], open_camera_reference_setup),
+    ("camera-color-panel", "촬영 색감·슬롯·고정 저장", "camera",
+     ["색감", "저장 슬롯", "설정 저장"], open_camera_color_panel),
+    ("camera-zoom-panel", "촬영 확대 배율", "camera",
+     ["확대", "1x"], open_camera_zoom_panel),
+    ("camera-light-panel", "촬영 손전등 선택", "camera",
+     ["조명", "끄기", "켜기"], open_camera_light_panel),
     ("records", "기록·프로젝트 목록", "studio", ["QA 데모", "내 프로젝트"], None),
     ("project", "프로젝트 상세·기록", f"project/{P}", ["QA 데모", "프로젝트 설정 열기"], None),
     ("project-metrics", "프로젝트 상세·수치 탭", f"project/{P}", ["QA 데모", "수치 기록", "전체 수치 기록 보기"], (["QA 데모"], "수치")),
@@ -49,6 +148,7 @@ CASES = [
     ("video-ratio", "영상 비율 옵션", "video-create", ["화면 비율", "적용"], (["변화 영상 만들기"], "화면 비율", "summary")),
     ("video-overlay", "영상 오버레이 옵션", "video-create", ["텍스트 오버레이", "적용"], (["변화 영상 만들기"], "텍스트", "summary")),
     ("video-library", "영상 보관함", "video-library", ["영상 관리", "저장한 영상"], None),
+    ("plans", "플랜 비교", "plans", ["플랜", "내 멤버십"], None),
     ("settings", "설정", "settings", ["설정", "기준 사진 표시"], None),
     ("settings-reference", "기준 사진 설정 시트", "settings", ["기준 사진 표시", "닫기"], (["기준 사진 표시"], "기준 사진 표시", "summary")),
     ("legacy-studio", "레거시 스튜디오", "legacy-studio", ["사진과 영상을 관리하세요."], None),
@@ -57,19 +157,28 @@ CASES = [
     ("capture-preview", "촬영 후 미리보기", f"capture-preview?id={F}", ["촬영 미리보기", "다시 촬영"], None),
 ]
 CORE = {
-    "camera", "records", "project", "project-metrics", "project-stats", "compare",
+    "camera", "camera-project-picker", "camera-new-project", "camera-settings", "camera-settings-storage", "camera-guide-settings", "camera-reference-adjust", "camera-color-panel", "camera-zoom-panel", "camera-light-panel", "records", "project", "project-metrics", "project-stats", "compare",
     "measurements", "video-home", "video-create", "video-library",
-    "settings", "account", "project-settings", "video-photos", "video-quality",
+    "settings", "account", "plans", "project-settings", "video-photos", "video-quality",
 }
 LARGE_TEXT = {
-    "camera", "records", "project", "project-metrics", "project-stats", "compare",
-    "video-home", "video-create", "settings", "account", "project-settings", "video-photos",
+    "camera", "camera-new-project", "camera-settings", "camera-guide-settings", "camera-color-panel", "records", "project", "project-metrics", "project-stats", "compare",
+    "video-home", "video-create", "settings", "account", "plans", "project-settings", "video-photos",
 }
+# Cover the same primary navigation pages in all 24 theme/font/device combinations.
+C7_PRIMARY = {
+    "camera", "records", "project", "compare", "measurements",
+    "video-home", "video-create", "settings", "account", "plans"
+}
+if not C7_PRIMARY.issubset(CORE):
+    raise RuntimeError("C7 primary routes must be present in the core screenshot list")
+LARGE_TEXT.update(C7_PRIMARY)
+
 ADDITIONAL = [
     ("empty-projects", "기록 빈 상태", "studio", ["내 프로젝트"], None),
     ("new-project", "새 프로젝트 생성", "studio", ["프로젝트 이름", "목표 기록 수"], (["내 프로젝트"], "새 프로젝트 만들기")),
-    ("onboarding-welcome", "설정에서 여는 가이드", "settings", ["바디 프레임에 오신 것을 환영합니다.", "다음"], qa.onboarding_welcome),
-    ("onboarding-next", "온보딩 다음 화면", "settings", ["프로젝트로 기록을 나눕니다", "다음"], qa.onboarding_scrolled),
+    ("onboarding-welcome", "설정에서 여는 가이드", "settings", ["첫 사진을 남겨 보세요", "다음"], qa.onboarding_welcome),
+    ("onboarding-next", "온보딩 다음 화면", "settings", ["프로젝트별 기록", "다음"], qa.onboarding_scrolled),
 ]
 
 
@@ -158,6 +267,9 @@ def main():
         "pixelSize": size,
         "densityDpi": density,
         "sourceCommit": os.environ.get("GITHUB_SHA", "local"),
+        "prHeadCommit": os.environ.get("C7_HEAD_SHA", "unknown"),
+        "captureMatrix": list(C7_VARIANTS),
+        "integrationStage": "Frame Journal C7 — 24 theme/font/width combinations",
         "apkSha256": hashlib.sha256(args.apk.read_bytes()).hexdigest(),
         "capturedAt": datetime.now(timezone.utc).isoformat(),
         "syntheticData": "Local-only offline sample; cards 1/2/3; no production login, purchase, cloud or private media",
@@ -178,15 +290,15 @@ def main():
         device.shell("wm", "size", size)
         device.shell("wm", "density", density)
         manifest["displayEvidence"] = qa.wait_for_visual_profile(device, size, density)
-        for variant in ("dark-100", "light-130", "dark-150", "light-150"):
+        for variant in C7_VARIANTS:
             theme, font, scale = ALL_VARIANTS[variant]
             directory = output / variant
             directory.mkdir(exist_ok=True)
             device.shell("settings", "put", "system", "font_scale", scale)
             device.seed(True, font, theme_mode=theme)
-            if variant == "dark-100":
+            if variant in ("dark-100", "light-100"):
                 cases = CASES
-            elif variant == "light-130":
+            elif variant in ("light-130", "dark-130"):
                 cases = [case for case in CASES if case[0] in CORE]
             else:
                 cases = [case for case in CASES if case[0] in LARGE_TEXT]
@@ -215,7 +327,7 @@ def main():
                 device.seed(True, font, theme_mode=theme, intro_seen=False)
                 large_welcome = verified_capture(
                     device, directory, "onboarding-first-run-light-large", "camera",
-                    ["바디 프레임에 오신 것을 환영합니다.", "시작하기", "나중에 보기"]
+                    ["첫 사진을 남겨 보세요", "시작하기", "나중에 보기"]
                 )
                 large_welcome.update(profile=args.profile, variant=variant,
                                      label="라이트 테마 글자 150% 최초 실행")
@@ -223,7 +335,7 @@ def main():
                 (directory / "onboarding-first-run-light-large.json").write_text(
                     json.dumps(large_welcome, indent=2, ensure_ascii=False), encoding="utf-8"
                 )
-            if variant == "dark-100":
+            if variant in ("dark-100", "light-100"):
                 device.seed(False, font, theme_mode=theme)
                 for name, label, route, expected, action in ADDITIONAL[:2]:
                     record = verified_capture(device, directory, name, route, expected, action)
@@ -233,7 +345,7 @@ def main():
                 device.seed(True, font, theme_mode=theme, intro_seen=False)
                 first_run = verified_capture(
                     device, directory, "onboarding-first-run", "camera",
-                    ["바디 프레임에 오신 것을 환영합니다.", "시작하기", "나중에 보기"]
+                    ["첫 사진을 남겨 보세요", "시작하기", "나중에 보기"]
                 )
                 first_run.update(profile=args.profile, variant=variant, label="최초 실행 환영 화면")
                 manifest["captures"].append(first_run)
@@ -246,6 +358,14 @@ def main():
                     record.update(profile=args.profile, variant=variant, label=label)
                     manifest["captures"].append(record)
                     (directory / f"{name}.json").write_text(json.dumps(record, indent=2, ensure_ascii=False), encoding="utf-8")
+            if variant in ("dark-100", "light-150"):
+                device.seed(True, font, theme_mode=theme)
+                permission = capture_camera_permission_denied(device, directory)
+                permission.update(profile=args.profile, variant=variant, label="Android 카메라 권한 거절")
+                manifest["captures"].append(permission)
+                (directory / "camera-permission-denied.json").write_text(
+                    json.dumps(permission, indent=2, ensure_ascii=False), encoding="utf-8"
+                )
     except Exception as error:
         manifest["fatalError"] = str(error)
     finally:

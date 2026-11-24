@@ -28,7 +28,7 @@ for (const guard of [
 assert.ok(fs.existsSync("tests/view-recorder-stop-race.test.mjs"));
 assert.ok(fs.existsSync("tests/fixtures/view-recorder-callback-harness.kt"));
 assert.ok(workflow.includes("BODY_FRAME_PLAY_SIGNING_APPROVED_20261107 == 'true'"), "Play signing release hold must remain active");
-assert.ok(workflow.includes("inputs.operation == 'inventory'"), "Read-only Play inventory must remain possible");
+assert.ok(workflow.includes("inputs.mode == 'check'"), "Read-only Play inventory must remain possible");
 assert.ok(nativeQA.includes("stage6-design-matrix:"));
 assert.ok(nativeQA.includes("startsWith(github.head_ref, 'fix/body-frame-stage7-')"));
 for(const marker of [

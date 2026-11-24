@@ -20,7 +20,8 @@ for (const token of [
   "변화 영상 만들기",
   "projectPhotos",
   "getBodyProjectPhotos",
-  "PROJECT_PHOTO_GRID_COLUMNS = 3",
+  "PROJECT_PHOTO_PHONE_COLUMNS = 2",
+  "PROJECT_PHOTO_TABLET_COLUMNS = 3",
   "projectPhotoTileWidth",
   "tileHeight = tileWidth * (4 / 3)",
   "photoMetaOverlay",
@@ -56,7 +57,7 @@ assert.equal(
 
 assert.ok(
   detailSource.includes("Modal") &&
-    detailSource.includes("visible={settingsOpen}") &&
+    detailSource.includes("visible={!project.archived && settingsOpen}") &&
     detailSource.includes("프로젝트 보관"),
   "legacy project editing should remain available inside the project settings sheet"
 );

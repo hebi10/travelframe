@@ -1,6 +1,6 @@
 import { AppText as Text, AppTextInput as TextInput } from "@/components/app-text";
-import { useCallback, useMemo, useState } from "react";
-import { useFocusEffect } from "expo-router";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import {
   ActivityIndicator,
   Alert,
@@ -31,9 +31,9 @@ import {
 } from "@/lib/subscription";
 import { getSubscriptionProductsFromSubscription } from "@/lib/subscription-products";
 import { getPlanEntitlements } from "@/lib/plan-entitlements";
+import { getPlanReturnPath } from "@/lib/plan-navigation";
 import {
-  getEffectiveStorageMode,
-  getStorageModeLabel
+  getEffectiveStorageMode
 } from "@/lib/storage-mode";
 import { useAppAppearance } from "@/lib/app-appearance";
 import {
@@ -42,6 +42,10 @@ import {
   isGoogleSignInConfigured,
   signInWithGoogleAuthSession
 } from "@/lib/google-auth";
+import { ProjectCloudStatusCards } from "@/features/settings/ProjectCloudStatusCards";
+import { getProjectCloudBackupStatuses, type ProjectCloudBackupStatus } from "@/lib/project-cloud-backup-status";
+import { enqueueProjectCloudSync } from "@/lib/project-cloud-sync-queue";
+import { flushProjectCloudSync } from "@/lib/project-cloud-sync";
 import { restoreCloudBackupToLocal } from "@/lib/cloud-backup";
 import { formatImageBackupSize } from "@/lib/image-backup-utils";
 import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
@@ -69,6 +73,12 @@ import { getLastActiveProjectId } from "@/lib/body-project-preferences";
 import { getPhotos } from "@/lib/photo-library";
 
 export default function AccountScreen() {
+  const { purchasePlan, checkoutId, returnSource } = useLocalSearchParams<{
+    purchasePlan?: string;
+    checkoutId?: string;
+    returnSource?: string;
+  }>();
+  const handledCheckoutRef = useRef<string | null>(null);
   const insets = useSafeAreaInsets();
   const { palette, fontFamily } = useAppAppearance();
   const themed = useMemo(
@@ -107,6 +117,17 @@ export default function AccountScreen() {
   const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false);
   const [isBackupRestoreSubmitting, setIsBackupRestoreSubmitting] = useState(false);
   const [selectedPaymentPlan, setSelectedPaymentPlan] = useState<PaymentPlan | null>(null);
+
+  useEffect(() => {
+    if (!isLoggedIn || isAuthLoading || typeof checkoutId !== "string" ||
+        typeof purchasePlan !== "string" || handledCheckoutRef.current === checkoutId) {
+      return;
+    }
+    const requestedPlan = paymentPlans.find((candidate) => candidate.id === purchasePlan);
+    if (!requestedPlan) return;
+    handledCheckoutRef.current = checkoutId;
+    setSelectedPaymentPlan(requestedPlan);
+  }, [checkoutId, isAuthLoading, isLoggedIn, purchasePlan]);
   const [showDeleteRequestInfo, setShowDeleteRequestInfo] = useState(false);
   const {
     connected: billingConnected,
@@ -308,7 +329,46 @@ export default function AccountScreen() {
     });
   };
 
-  const restoreBackupData = async () => {
+  const [projectStatuses, setProjectStatuses] = useState<ProjectCloudBackupStatus[]>([]);
+  const [projectStatusError, setProjectStatusError] = useState<string | null>(null);
+  const [projectStatusBusy, setProjectStatusBusy] = useState(false);
+  const projectRefresh = useRef(0);
+  const refreshProjectStatuses = useCallback(async () => {
+    const request = ++projectRefresh.current;
+    if (!user) return;
+    setProjectStatusBusy(true);
+    setProjectStatusError(null);
+    try {
+      const statuses = await getProjectCloudBackupStatuses({ user });
+      if (projectRefresh.current === request) setProjectStatuses(statuses);
+    } catch (error) {
+      if (projectRefresh.current === request) {
+        setProjectStatusError(getUserFacingErrorMessage(error, "프로젝트 백업 현황을 확인하지 못했습니다."));
+      }
+    } finally {
+      if (projectRefresh.current === request) setProjectStatusBusy(false);
+    }
+  }, [user]);
+  useFocusEffect(useCallback(() => {
+    void refreshProjectStatuses();
+    return () => {
+      projectRefresh.current++;
+      setProjectStatuses([]);
+    };
+  }, [refreshProjectStatuses]));
+
+  const retryProjectBackup = async (projectId: string) => {
+    if (!user || !planEntitlements.canBackupToCloud) return;
+    try {
+      await enqueueProjectCloudSync({ projectId, kind: "initial" });
+      await flushProjectCloudSync({ user, subscription });
+      await refreshProjectStatuses();
+    } catch (error) {
+      setMessage(getUserFacingErrorMessage(error, "프로젝트 동기화를 요청하지 못했습니다."));
+    }
+  };
+
+  const restoreBackupData = async (projectId?: string) => {
     if (isBackupRestoreSubmitting) {
       return;
     }
@@ -321,7 +381,8 @@ export default function AccountScreen() {
     try {
       setIsBackupRestoreSubmitting(true);
       setMessage(null);
-      const summary = await restoreCloudBackupToLocal({ user });
+      const summary = await restoreCloudBackupToLocal({ user, ...(projectId ? { projectIds: [projectId] } : {}) });
+      void refreshProjectStatuses();
       setMessage(
         `클라우드 백업에서 현재 앱에 없는 항목만 불러왔습니다. 사진 ${summary.photoCount}장, 영상 ${summary.videoCount}개를 추가했습니다.`
       );
@@ -360,9 +421,11 @@ export default function AccountScreen() {
   const getPaymentActionLabel = (plan: PaymentPlan) =>
     getPaymentPlanStatus(plan).active
       ? "사용 중"
-      : !billingConnected
+      : !billingConnected || isLoadingProducts
         ? "Google Play 연결 중..."
-        : "구독하기";
+        : !getStorePrice(getPaymentProductId(plan))
+          ? "상품 가격 확인 필요"
+          : "구독하기";
 
   const runPaymentPurchase = async (plan: PaymentPlan) => {
     if (isSubmitting) return;
@@ -375,6 +438,9 @@ export default function AccountScreen() {
         `${plan.title} 구독이 활성화되었습니다. 아래 클라우드 프로젝트 백업에서 백업할 프로젝트를 선택할 수 있습니다.`
       );
       setSelectedPaymentPlan(null);
+      if (typeof checkoutId === "string" && purchasePlan === plan.id) {
+        router.replace(getPlanReturnPath(returnSource));
+      }
     } catch (error) {
       setMessage(getUserFacingErrorMessage(error, "결제를 완료하지 못했습니다."));
     } finally {
@@ -383,7 +449,9 @@ export default function AccountScreen() {
   };
 
   const handlePaymentPurchase = () => {
-    if (isSubmitting || !selectedPaymentPlan) {
+    if (isSubmitting || !selectedPaymentPlan || !billingConnected || isLoadingProducts ||
+        productLoadError || isSubscriptionCheckFailed ||
+        !getStorePrice(getPaymentProductId(selectedPaymentPlan))) {
       return;
     }
 
@@ -439,6 +507,17 @@ export default function AccountScreen() {
     };
   };
 
+  const canSubmitSelectedPlan = Boolean(
+    selectedPaymentPlan &&
+    billingConnected &&
+    !isLoadingProducts &&
+    !productLoadError &&
+    !isSubscriptionCheckFailed &&
+    subscriptionStatus === "verified" &&
+    getStorePrice(getPaymentProductId(selectedPaymentPlan)) &&
+    !getPaymentPlanStatus(selectedPaymentPlan).active
+  );
+
   return (
     <>
       <KeyboardAvoidingView
@@ -455,6 +534,18 @@ export default function AccountScreen() {
         }
         safeTop
       >
+      {typeof checkoutId === "string" ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="플랜 비교로 돌아가기"
+          onPress={() => router.replace("/plans")}
+          style={[styles.secondaryButton, themed.secondaryButton]}
+        >
+          <Text selectable={false} style={[styles.secondaryButtonText, themed.text]}>
+            플랜 비교로 돌아가기
+          </Text>
+        </Pressable>
+      ) : null}
       {!isFirebaseReady ? (
         <SectionBlock title="연결 필요">
           <View style={[styles.noticePanel, themed.panel]}>
@@ -481,6 +572,7 @@ export default function AccountScreen() {
               return (
                 <Pressable accessibilityRole="button"
                   key={item.value}
+                  accessibilityLabel={`${item.label} 선택`}
                   accessibilityState={{ selected: isActive }}
                   style={[
                     styles.segmentButton,
@@ -495,6 +587,7 @@ export default function AccountScreen() {
                 >
                   <Text
                     selectable={false}
+                    numberOfLines={2}
                     style={[
                       styles.segmentText,
                       themed.text,
@@ -516,6 +609,7 @@ export default function AccountScreen() {
               autoCorrect={false}
               keyboardType="email-address"
               placeholder="이메일"
+              accessibilityLabel="로그인 이메일"
               placeholderTextColor={palette.faint}
               style={[styles.input, themed.input]}
               onChangeText={setEmail}
@@ -525,6 +619,7 @@ export default function AccountScreen() {
                 value={password}
                 secureTextEntry
                 placeholder="비밀번호 6자리 이상"
+                accessibilityLabel="계정 비밀번호"
                 placeholderTextColor={palette.faint}
                 style={[styles.input, themed.input]}
                 onChangeText={setPassword}
@@ -537,6 +632,7 @@ export default function AccountScreen() {
             )}
             <Pressable accessibilityRole="button"
               disabled={isSubmitting || isAuthLoading}
+              accessibilityState={{ disabled: isSubmitting || isAuthLoading }}
               style={[
                 styles.primaryButton,
                 themed.primaryFill,
@@ -554,6 +650,7 @@ export default function AccountScreen() {
             </Pressable>
             <Pressable accessibilityRole="button"
               disabled={isSubmitting || isAuthLoading || isGoogleSubmitting}
+              accessibilityState={{ disabled: isSubmitting || isAuthLoading || isGoogleSubmitting }}
               style={[
                 styles.secondaryButton,
                 themed.secondaryButton,
@@ -711,14 +808,6 @@ export default function AccountScreen() {
             <View style={[styles.backupSummaryPanel, themed.panel]}>
               <View style={styles.infoList}>
                 <InfoRow
-                  label="백업 설정"
-                  value={effectiveStorageMode === "local_only" ? "꺼짐" : "켜짐"}
-                />
-                <InfoRow
-                  label="저장 방식"
-                  value={getStorageModeLabel(effectiveStorageMode)}
-                />
-                <InfoRow
                 label="백업 권한"
                 value={
                   isSubscriptionCheckFailed
@@ -748,7 +837,7 @@ export default function AccountScreen() {
                 />
               </View>
               <Text selectable={false} style={[styles.helpText, themed.mutedText]}>
-                설정의 클라우드 백업에서 켜거나 끌 수 있습니다. 구독 기간이 끝나면 새 백업은 중단됩니다. 기존 백업 데이터 삭제는 설정에서 직접 요청할 수 있습니다.
+                아래 백업 슬롯에서 프로젝트별로 백업을 시작하거나 중지할 수 있습니다. 구독 기간이 끝나면 새 백업은 중단됩니다. 기존 백업 데이터 삭제는 설정에서 직접 요청할 수 있습니다.
               </Text>
               <Pressable accessibilityRole="button"
                 disabled={isBackupRestoreSubmitting || !isLoggedIn}
@@ -770,7 +859,29 @@ export default function AccountScreen() {
             user={user}
             maxSlots={planEntitlements.maxCloudBackupProjects}
             maxPhotosPerProject={planEntitlements.maxCloudPhotosPerProject}
+            backupStorageBytes={planEntitlements.backupStorageBytes}
+            onBackupChanged={refreshProjectStatuses}
           />
+          {user ? (
+            <ProjectCloudStatusCards
+              statuses={projectStatuses}
+              loading={projectStatusBusy}
+              error={projectStatusError}
+              disabled={isBackupRestoreSubmitting}
+              colors={palette}
+              formatBytes={formatImageBackupSize}
+              onRefresh={() => void refreshProjectStatuses()}
+              onRetry={(projectId) => void retryProjectBackup(projectId)}
+              onRestore={(projectId) => Alert.alert(
+                "프로젝트를 복원할까요?",
+                "이 프로젝트에서 현재 기기에 없는 백업 항목을 불러옵니다.",
+                [
+                  { text: "취소", style: "cancel" },
+                  { text: "복원", onPress: () => void restoreBackupData(projectId) }
+                ]
+              )}
+            />
+          ) : null}
 
           <SectionBlock title="플랜 및 결제">
             <View style={[styles.planCard, themed.panelStrong]}>
@@ -823,7 +934,7 @@ export default function AccountScreen() {
                         {plan.title}
                       </Text>
                       <Text selectable={false} style={[styles.planPrice, themed.text]}>
-                        {getStorePrice(getPaymentProductId(plan)) ?? plan.price}
+                        {getStorePrice(getPaymentProductId(plan)) ?? "Google Play 가격 확인 중"}
                       </Text>
                       <Text selectable={false} style={[styles.helpText, themed.mutedText]}>
                         월 구독 · 취소 전까지 자동 갱신
@@ -879,7 +990,7 @@ export default function AccountScreen() {
       ) : null}
 
       {message ? (
-        <View style={[styles.messagePanel, themed.panel]}>
+        <View style={[styles.messagePanel, themed.panel]} accessibilityLiveRegion="polite">
           {isSubmitting ? <ActivityIndicator color={palette.text} /> : null}
           <Text selectable={false} style={[styles.messageText, themed.text]}>
             {message}
@@ -960,8 +1071,7 @@ export default function AccountScreen() {
                 </Text>
                 <Text selectable={false} style={[styles.planPrice, themed.text]}>
                   {selectedPaymentPlan
-                    ? getStorePrice(getPaymentProductId(selectedPaymentPlan)) ??
-                      selectedPaymentPlan.price
+                    ? getStorePrice(getPaymentProductId(selectedPaymentPlan)) ?? "Google Play 가격 확인 중"
                     : ""}
                 </Text>
                 <Text selectable={false} style={[styles.benefitText, themed.mutedText]}>
@@ -1040,19 +1150,12 @@ export default function AccountScreen() {
             </ScrollView>
             <View style={styles.paymentModalAction}>
             <Pressable accessibilityRole="button"
-              disabled={
-                isSubmitting ||
-                !billingConnected ||
-                !selectedPaymentPlan ||
-                (selectedPaymentPlan ? getPaymentPlanStatus(selectedPaymentPlan).active : false)
-              }
+              disabled={isSubmitting || !canSubmitSelectedPlan}
+              accessibilityState={{ disabled: isSubmitting || !canSubmitSelectedPlan }}
               style={[
                 styles.primaryButton,
                 themed.primaryFill,
-                (isSubmitting ||
-                  !billingConnected ||
-                  (selectedPaymentPlan ? getPaymentPlanStatus(selectedPaymentPlan).active : false)) &&
-                  styles.disabledButton
+                (isSubmitting || !canSubmitSelectedPlan) && styles.disabledButton
               ]}
               onPress={handlePaymentPurchase}
             >

@@ -23,19 +23,19 @@ See [Stage 9 runbook](design/body-frame-stage9-play-preflight-20261105.md) for s
 
 ## Trigger and source
 
-Every push to `main` runs the pipeline using that push's exact commit SHA. This fits the repository's existing main/pull-request Quality checks and does not depend on a separate tag or release process. The build also runs release verification, TypeScript, lint and the app tests itself before signing. There is no release/tag trigger that could duplicate the push deployment. Keep reviewed product changes on `main` before relying on automatic internal releases.
+Every push to `main` evaluates the release gate, but **an ordinary push or merged PR never publishes**. Automatic test deployment requires exactly one explicit commit-message marker, `[deploy-internal]` or `[deploy-closed]`, and the existing verified upload-key approval variable. For a manual workflow_dispatch run, choose `check`, `build` (safe default), or `deploy`. Build-only mode signs and verifies an AAB/APK without uploading to Play. Deploy mode checks the exact main commit, Play version/track inventory, release signature and application tests before publishing only to an existing testing track. Release/tag triggers are not used.
 
 Manual runs must select `main` as the workflow branch. Inputs are passed through environment variables and validated:
 
 | Input | Behavior |
 | --- | --- |
-| `operation` | Default `publish`; `inventory` reads current version/track metadata without signing, uploading or committing |
+| `mode` | Default `build` (signed AAB/APK without upload); `check` reads current Play track/version metadata only; `deploy` publishes to an existing test track |
 | `track` | Default `internal`; `closed` selects only the existing `alpha` API track |
 | `source_sha` | Optional full 40-character reviewed commit; empty uses the exact main commit associated with this run |
 | `version_code` | Optional positive integer above every API-observed version; empty uses maximum + 1, at most `2100000000` |
-| `version_name` | Manual default `1.0.32`; empty uses the source's `app.json` version |
+| `version_name` | Blank by default; uses the exact source's `app.json` version unless explicitly overridden |
 
-Automatic pushes use the source's `app.json` versionName. A manual `1.0.32` override works even when the source is `1.0.30`: only the build checkout's Expo/package version and generated Gradle version metadata change. The repository and EAS version state are untouched. The versionCode is always allocated from Play, independently of the display versionName. If a new display version is desired for every automatic push, update the normal app version in the reviewed source change.
+Automatic pushes use the source's `app.json` versionName. A manually specified version override works even when the source uses a different display version: only the build checkout's Expo/package version and generated Gradle version metadata change. The repository and EAS version state are untouched. The versionCode is always allocated from Play, independently of the display versionName. If a new display version is desired for every automatic push, update the normal app version in the reviewed source change.
 
 Tools are checked out at the immutable workflow commit, separately from app source. Only this repository's `main` workflow can release. Forks, pull-request events and non-main workflow branches cannot publish. A single concurrency group serializes planning, building and publishing; if an external Console/API upload races the build, the final version guard fails and requires a fresh build.
 
@@ -82,7 +82,7 @@ OIDC is available only in the `plan` and `publish` jobs. They execute trusted wo
 
 ## Play inventory, edit and commit
 
-For initial setup, run manually with `operation=inventory` after WIF/Play access is configured. This mode works without signing secrets or `PLAY_INTERNAL_TRACK`. It creates a temporary edit, lists tracks/bundles/APKs, logs only actual track names and public version/count metadata, then deletes the edit. Build and publish jobs are skipped; no artifact upload, track update, validation or commit is performed. Confirm the actual internal name from this result and set `PLAY_INTERNAL_TRACK` before a publish run. Automatic pushes always force `publish` + `internal`, ignoring manual-mode inputs.
+For initial setup, run manually with `mode=check` after WIF/Play access is configured. This mode works without signing secrets or `PLAY_INTERNAL_TRACK`. It creates a temporary edit, lists tracks/bundles/APKs, logs only actual track names and public version/count metadata, then deletes the edit. Build and publish jobs are skipped; no artifact upload, track update, validation or commit is performed. Confirm the actual internal name from this result and set `PLAY_INTERNAL_TRACK` before a publish run. Automatic main pushes require a single explicit `[deploy-internal]` or `[deploy-closed]` marker and select only that testing track; ordinary push/merge commits never publish.
 
 Planning creates a temporary edit and reads `edits.tracks.list`, `edits.bundles.list` and `edits.apks.list`. This includes bundles/APKs returned by the API even when no track references them. The maximum also retains the previously confirmed floor `26092622`; this is a lower bound, not a claim that it remains the latest. The API lists current resources rather than promising an exhaustive lifetime archive, and Play remains the final authority on version reuse. Invalid/incomplete inventory responses fail closed.
 
@@ -126,3 +126,9 @@ node --test tests/play-aab-build.test.mjs tests/play-aab-signature.test.mjs test
 Signature tests use disposable test-only keys in temporary directories, deleted afterward; they cannot be selected by the production path. Publisher tests use mocked HTTP responses and never authenticate or change Play. Production signing, actual API permission, first upload and physical-device sign-in/billing/ad behavior remain unverified until the real configuration/key and a successful run exist. A green repository Quality run alone does not prove deployment or device QA.
 
 Official references: [Publisher setup](https://developers.google.com/android-publisher/getting_started), [tracks](https://developers.google.com/android-publisher/tracks), [bundle upload](https://developers.google.com/android-publisher/api-ref/rest/v3/edits.bundles/upload), [media sessions](https://developers.google.com/android-publisher/upload), [commit review behavior](https://developers.google.com/android-publisher/api-ref/rest/v3/edits/commit), [keyless GitHub auth](https://github.com/google-github-actions/auth), [bundletool](https://developer.android.com/tools/bundletool).
+
+## Firebase backend release is a separate approval process
+
+`.github/workflows/firebase-backend-release.yml` is manual-only. Its default `mode=check` validates the Functions code without deploying anything. Production `mode=deploy` requires the exact confirmation text, a separate repository approval flag, a dedicated GitHub environment with required reviewers, and a Firebase backend-only WIF service account. This workflow deploys only Cloud Functions and does not modify Play, Hosting or Firebase security Rules. The Play workflow never deploys Firebase.
+
+For the step-by-step approval/runbook, see [Stage 20 Play and Firebase CI/CD separation](security/stage20-play-cicd-firebase-approval-20261108.md). The unreleased Admin 14 / Functions 7 migration remains in Draft PR #128 and is not automatically promoted by this CI/CD change.

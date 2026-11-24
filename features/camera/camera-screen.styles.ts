@@ -1,6 +1,6 @@
 import { StyleSheet } from "react-native";
 
-import { bodyFrameAccent, bodyFrameDarkColors, bodyFrameDesign, bodyFrameSheetDesign, bodyFrameTypography, colors, controls, typography } from "@/constants/app-theme";
+import { bodyFrameDarkColors, bodyFrameDesign, bodyFrameSheetDesign, bodyFrameTypography, colors, controls, typography } from "@/constants/app-theme";
 import {
   CAMERA_CONTROL_TRAY_HORIZONTAL_PADDING,
   CAMERA_FOCUS_INDICATOR_RADIUS,
@@ -61,6 +61,8 @@ export const styles = StyleSheet.create({
   poseAlignmentText: {
     color: colors.inverse,
     fontSize: bodyFrameTypography.caption,
+    includeFontPadding: false,
+    lineHeight: 18,
     fontWeight: "700",
     textAlign: "center",
     letterSpacing: 0
@@ -176,11 +178,12 @@ export const styles = StyleSheet.create({
   cameraHeaderButton: {
     width: bodyFrameDesign.minTouchSize,
     height: bodyFrameDesign.minTouchSize,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: bodyFrameDesign.borderWidth,
-    borderColor: "rgba(255, 255, 255, 0.42)",
-    backgroundColor: "rgba(0, 0, 0, 0.34)"
+    borderColor: "rgba(255, 255, 255, 0.3)",
+    backgroundColor: "rgba(11, 11, 12, 0.8)"
   },
   cameraHeaderCenter: {
     flex: 1,
@@ -202,6 +205,7 @@ export const styles = StyleSheet.create({
   countdownText: {
     color: colors.inverse,
     fontSize: 72,
+    includeFontPadding: false,
     fontWeight: "800",
     lineHeight: 82,
     letterSpacing: 0,
@@ -236,12 +240,16 @@ export const styles = StyleSheet.create({
   overlayTitle: {
     color: colors.inverse,
     fontSize: typography.button,
+    includeFontPadding: false,
+    lineHeight: 18,
     fontWeight: "800",
     letterSpacing: 0
   },
   overlayValue: {
     color: "rgba(255, 255, 255, 0.72)",
     fontSize: typography.button,
+    includeFontPadding: false,
+    lineHeight: 18,
     fontWeight: "800",
     letterSpacing: 0,
     fontVariant: ["tabular-nums"]
@@ -267,19 +275,29 @@ export const styles = StyleSheet.create({
   overlayButtonText: {
     color: colors.inverse,
     fontSize: typography.button,
+    includeFontPadding: false,
+    lineHeight: 18,
     fontWeight: "800",
     letterSpacing: 0
   },
   overlayButtonTextActive: {
     color: colors.inverse
   },
+  overlaySetupViewport: {
+    width: "100%",
+    flexShrink: 1,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderColor: "#414148",
+    borderRadius: 12,
+    overflow: "hidden",
+    backgroundColor: "#101012"
+  },
+  overlaySetupScroll: { flexGrow: 0, flexShrink: 1, minHeight: 0 },
   overlaySetupPanel: {
     width: "100%",
-    gap: 12,
+    gap: 10,
     padding: 12,
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.32)",
-    backgroundColor: "rgba(0, 0, 0, 0.42)"
+    backgroundColor: "rgba(11, 11, 12, 0.96)"
   },
   overlaySetupHeader: {
     flexDirection: "row",
@@ -287,27 +305,45 @@ export const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: 12
   },
+  overlaySetupHeaderCopy: {
+    flex: 1,
+    minWidth: 0,
+    gap: 4
+  },
   overlaySetupTitle: {
     color: colors.inverse,
-    fontSize: typography.button,
-    fontWeight: "800",
+    fontSize: bodyFrameTypography.rowTitle,
+    includeFontPadding: false,
+    lineHeight: 20,
+    fontWeight: "700",
     letterSpacing: 0
   },
   overlaySetupHint: {
-    color: "rgba(255, 255, 255, 0.64)",
+    color: "#E9E9EC",
     fontSize: bodyFrameTypography.caption,
-    lineHeight: 16,
+    includeFontPadding: false,
+    lineHeight: 19,
     letterSpacing: 0
+  },
+  overlaySetupModeNote: {
+    color: "#F5F5F5",
+    fontSize: bodyFrameTypography.caption,
+    fontWeight: "600",
+    includeFontPadding: false,
+    lineHeight: 19
   },
   overlaySetupValue: {
     color: colors.inverse,
     fontSize: typography.button,
+    includeFontPadding: false,
+    lineHeight: 18,
     fontWeight: "800",
     letterSpacing: 0,
     fontVariant: ["tabular-nums"]
   },
   overlaySetupActions: {
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: 8
   },
   overlayOpacityControl: {
@@ -315,37 +351,51 @@ export const styles = StyleSheet.create({
   },
   overlayCompactButton: {
     minHeight: bodyFrameDesign.minTouchSize,
+    minWidth: 70,
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.42)"
+    paddingHorizontal: 4,
+    paddingVertical: 6,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderRadius: 10,
+    borderColor: "rgba(255, 255, 255, 0.42)",
+    backgroundColor: "#18181B"
   },
   overlayRemoveButton: {
-    borderColor: "rgba(255, 90, 95, 0.8)"
+    borderColor: "rgba(255, 255, 255, 0.42)"
   },
   overlayCompactText: {
     color: colors.inverse,
-    fontSize: typography.button,
-    fontWeight: "800",
+    fontSize: bodyFrameTypography.button,
+    includeFontPadding: false,
+    fontWeight: "700",
+    lineHeight: 18,
+    textAlign: "center",
     letterSpacing: 0
   },
   overlayRemoveText: {
-    color: "#FFB3B6"
+    color: colors.inverse
   },
   overlayConfirmButton: {
     minHeight: bodyFrameDesign.minTouchSize,
+    minWidth: 70,
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1,
-    borderColor: colors.inverse,
-    backgroundColor: "transparent"
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderRadius: 10,
+    borderColor: "#F5F5F5",
+    backgroundColor: "#F5F5F5"
   },
   overlayConfirmText: {
-    color: colors.inverse,
-    fontSize: typography.button,
-    fontWeight: "800",
+    color: "#111111",
+    fontSize: bodyFrameTypography.button,
+    includeFontPadding: false,
+    lineHeight: 20,
+    fontWeight: "700",
     letterSpacing: 0
   },
   modalBackdrop: {
@@ -353,7 +403,7 @@ export const styles = StyleSheet.create({
     justifyContent: "flex-end",
     paddingHorizontal: 14,
     paddingTop: 14,
-    backgroundColor: "transparent"
+    backgroundColor: "rgba(0, 0, 0, 0.62)"
   },
   modalGestureRoot: {
     flex: 1
@@ -366,18 +416,20 @@ export const styles = StyleSheet.create({
     backgroundColor: "rgba(0, 0, 0, 0.62)"
   },
   guideModal: {
-    gap: 16,
+    gap: 12,
     flexGrow: 0,
     maxHeight: bodyFrameSheetDesign.maxHeight,
-    padding: 18,
+    padding: 16,
     paddingBottom: 22,
-    borderWidth: 1,
-    borderColor: colors.darkLine,
-    backgroundColor: "rgba(255, 255, 255, 0.5)",
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderColor: bodyFrameDarkColors.line,
+    borderTopLeftRadius: bodyFrameDesign.bottomSheetRadius,
+    borderTopRightRadius: bodyFrameDesign.bottomSheetRadius,
+    backgroundColor: "#101012",
     overflow: "hidden"
   },
   navModal: {
-    gap: 18,
+    gap: 12,
     flexGrow: 0,
     maxHeight: bodyFrameSheetDesign.maxHeight,
     paddingHorizontal: 16,
@@ -399,7 +451,7 @@ export const styles = StyleSheet.create({
     backgroundColor: "#55555B"
   },
   cameraSettingsHeader: {
-    minHeight: 64,
+    minHeight: 52,
     flexDirection: "row",
     alignItems: "flex-start",
     justifyContent: "space-between",
@@ -409,30 +461,36 @@ export const styles = StyleSheet.create({
   cameraSettingsEyebrow: {
     color: bodyFrameDarkColors.muted,
     fontSize: bodyFrameTypography.caption,
+    includeFontPadding: false,
+    lineHeight: 18,
     fontWeight: "700",
     letterSpacing: 0.4
   },
   cameraSettingsTitle: {
     color: bodyFrameDarkColors.text,
-    fontSize: bodyFrameTypography.sectionTitle,
+    fontSize: 20,
+    includeFontPadding: false,
     lineHeight: 28,
-    fontWeight: "600",
+    fontWeight: "700",
     letterSpacing: -0.4
   },
   cameraSettingsCloseButton: {
+    flexShrink: 0,
+    width: bodyFrameDesign.minTouchSize,
     minWidth: bodyFrameDesign.minTouchSize,
     minHeight: bodyFrameDesign.minTouchSize,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 14,
     borderWidth: bodyFrameDesign.borderWidth,
     borderColor: "#3A3A40",
-    borderRadius: bodyFrameDesign.modalRadius,
+    borderRadius: 12,
     backgroundColor: "#171719"
   },
   cameraSettingsCloseText: {
     color: bodyFrameDarkColors.text,
     fontSize: bodyFrameTypography.button,
+    includeFontPadding: false,
+    lineHeight: 20,
     fontWeight: "700",
     letterSpacing: 0
   },
@@ -447,20 +505,15 @@ export const styles = StyleSheet.create({
     maxHeight: 560
   },
   cameraSettingsContent: {
-    gap: 22,
+    gap: 14,
     paddingBottom: 28
   },
   cameraToolIntro: {
-    minHeight: 82,
+    minHeight: 44,
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderWidth: bodyFrameDesign.borderWidth,
-    borderColor: "#35353A",
-    borderRadius: bodyFrameDesign.modalRadius,
-    backgroundColor: "#151517"
+    paddingHorizontal: 2,
+    paddingVertical: 4
   },
   cameraToolIntroCopy: {
     flex: 1,
@@ -468,13 +521,16 @@ export const styles = StyleSheet.create({
   },
   cameraSettingsSectionTitle: {
     color: bodyFrameDarkColors.text,
-    fontSize: bodyFrameTypography.sectionTitle,
+    fontSize: 16,
+    includeFontPadding: false,
+    lineHeight: 26,
     fontWeight: "700",
     letterSpacing: -0.2
   },
   cameraSettingsSectionDetail: {
     color: bodyFrameDarkColors.muted,
     fontSize: bodyFrameTypography.caption,
+    includeFontPadding: false,
     lineHeight: 18,
     letterSpacing: 0
   },
@@ -482,30 +538,93 @@ export const styles = StyleSheet.create({
     height: bodyFrameDesign.borderWidth,
     backgroundColor: bodyFrameDarkColors.line
   },
+  cameraSettingsGroupTitle: {
+    color: bodyFrameDarkColors.text,
+    fontSize: 16,
+    includeFontPadding: false,
+    lineHeight: 26,
+    fontWeight: "700"
+  },
+  cameraSettingsGroup: {
+    gap: 14
+  },
+  cameraSettingsLabelRow: {
+    minHeight: 24,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between"
+  },
+  cameraSettingsRatioRow: {
+    flexWrap: "wrap",
+    alignItems: "stretch"
+  },
+  cameraSettingsRatioOption: {
+    flex: 0,
+    flexGrow: 1,
+    flexShrink: 0,
+    flexBasis: "30%",
+    minWidth: 0
+  },
+  cameraSettingsSaveList: {
+    gap: 8
+  },
+  cameraSettingsSaveOption: {
+    minHeight: 64,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderColor: "#35353A",
+    borderRadius: bodyFrameDesign.buttonRadius,
+    backgroundColor: "#18181B"
+  },
+  cameraSettingsSaveOptionDisabled: { opacity: 0.52 },
+  cameraSettingsSaveCopy: {
+    flex: 1,
+    minWidth: 0,
+    gap: 3
+  },
+  cameraSettingsSaveDetail: {
+    color: bodyFrameDarkColors.muted,
+    fontSize: bodyFrameTypography.caption,
+    includeFontPadding: false,
+    lineHeight: 18
+  },
+  cameraSettingsSaveNotice: {
+    color: bodyFrameDarkColors.muted,
+    fontSize: bodyFrameTypography.caption,
+    includeFontPadding: false,
+    lineHeight: 17
+  },
   cameraSettingsOptionRow: {
     flexDirection: "row",
     gap: 8
   },
   cameraSettingsOptionButton: {
-    minHeight: 52,
+    minHeight: 44,
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
     paddingHorizontal: 12,
+    paddingVertical: 10,
     borderWidth: bodyFrameDesign.borderWidth,
     borderColor: "#35353A",
     borderRadius: bodyFrameDesign.buttonRadius,
     backgroundColor: "#18181B"
   },
   cameraSettingsOptionButtonActive: {
-    borderColor: bodyFrameAccent,
-    backgroundColor: "#050506"
+    borderColor: bodyFrameDarkColors.text,
+    backgroundColor: "#292D31"
   },
   cameraSettingsOptionButtonText: {
     color: bodyFrameDarkColors.text,
     fontSize: bodyFrameTypography.button,
+    includeFontPadding: false,
+    lineHeight: 20,
     fontWeight: "700",
     letterSpacing: 0
   },
@@ -527,26 +646,29 @@ export const styles = StyleSheet.create({
     gap: 8
   },
   cameraToolButton: {
-    width: "31%",
-    minWidth: 88,
-    minHeight: 96,
+    width: "30%",
+    minWidth: 80,
+    minHeight: 76,
     flexGrow: 1,
     alignItems: "center",
     justifyContent: "center",
-    gap: 9,
-    paddingHorizontal: 10,
+    gap: 7,
+    paddingHorizontal: 8,
+    paddingVertical: 9,
     borderWidth: bodyFrameDesign.borderWidth,
     borderColor: "#35353A",
     borderRadius: bodyFrameDesign.buttonRadius,
     backgroundColor: "#18181B"
   },
   cameraToolButtonActive: {
-    borderColor: bodyFrameAccent,
-    backgroundColor: "#0A0A0C"
+    borderColor: bodyFrameDarkColors.text,
+    backgroundColor: "#292D31"
   },
   cameraToolText: {
     color: bodyFrameDarkColors.text,
     fontSize: bodyFrameTypography.button,
+    includeFontPadding: false,
+    lineHeight: 20,
     fontWeight: "700",
     letterSpacing: 0
   },
@@ -587,12 +709,15 @@ export const styles = StyleSheet.create({
   settingToggleTitle: {
     color: colors.text,
     fontSize: typography.body,
+    includeFontPadding: false,
+    lineHeight: 20,
     fontWeight: "800",
     letterSpacing: 0
   },
   settingToggleDetail: {
     color: colors.muted,
     fontSize: typography.small,
+    includeFontPadding: false,
     lineHeight: 17,
     letterSpacing: 0
   },
@@ -600,6 +725,8 @@ export const styles = StyleSheet.create({
     minWidth: 42,
     color: colors.text,
     fontSize: typography.button,
+    includeFontPadding: false,
+    lineHeight: 18,
     fontWeight: "800",
     textAlign: "right",
     letterSpacing: 0
@@ -642,6 +769,7 @@ export const styles = StyleSheet.create({
   shutterSoundDetail: {
     color: colors.muted,
     fontSize: typography.small,
+    includeFontPadding: false,
     lineHeight: 18,
     letterSpacing: 0
   },
@@ -656,33 +784,57 @@ export const styles = StyleSheet.create({
     gap: 16
   },
   modalTitleGroup: {
+    flex: 1,
+    minWidth: 0,
     gap: 4
   },
   modalEyebrow: {
-    color: colors.faint,
+    color: bodyFrameDarkColors.muted,
     fontSize: bodyFrameTypography.caption,
-    fontWeight: "800",
-    letterSpacing: 0,
-    textTransform: "uppercase"
+    includeFontPadding: false,
+    lineHeight: 18,
+    fontWeight: "700",
+    letterSpacing: 0.3
   },
   modalTitle: {
-    color: colors.text,
-    fontSize: 22,
-    fontWeight: "800",
+    color: bodyFrameDarkColors.text,
+    fontSize: 20,
+    includeFontPadding: false,
+    fontWeight: "700",
     lineHeight: 28,
     letterSpacing: 0
   },
+  guideModalDescription: {
+    color: bodyFrameDarkColors.muted,
+    fontSize: bodyFrameTypography.caption,
+    includeFontPadding: false,
+    lineHeight: 18
+  },
+  guideSectionHint: {
+    color: bodyFrameDarkColors.muted,
+    fontSize: bodyFrameTypography.caption,
+    includeFontPadding: false,
+    lineHeight: 18
+  },
   modalCloseButton: {
+    width: bodyFrameDesign.minTouchSize,
+    minWidth: bodyFrameDesign.minTouchSize,
+    flexShrink: 0,
     minHeight: bodyFrameDesign.minTouchSize,
     justifyContent: "center",
+    alignItems: "center",
     paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: colors.line
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderColor: "#3A3A40",
+    borderRadius: bodyFrameDesign.buttonRadius,
+    backgroundColor: "#18181B"
   },
   modalCloseText: {
-    color: colors.text,
-    fontSize: typography.button,
-    fontWeight: "800",
+    color: bodyFrameDarkColors.text,
+    fontSize: bodyFrameTypography.button,
+    includeFontPadding: false,
+    lineHeight: 20,
+    fontWeight: "700",
     letterSpacing: 0
   },
   modalSection: {
@@ -692,14 +844,17 @@ export const styles = StyleSheet.create({
     paddingTop: 8
   },
   modalSectionTitle: {
-    color: colors.text,
-    fontSize: typography.body,
-    fontWeight: "800",
+    color: bodyFrameDarkColors.text,
+    fontSize: bodyFrameTypography.rowTitle,
+    includeFontPadding: false,
+    lineHeight: 20,
+    fontWeight: "700",
     letterSpacing: 0
   },
   modalSectionDetail: {
-    color: colors.muted,
-    fontSize: typography.small,
+    color: bodyFrameDarkColors.muted,
+    fontSize: bodyFrameTypography.caption,
+    includeFontPadding: false,
     lineHeight: 18,
     letterSpacing: 0
   },
@@ -708,30 +863,52 @@ export const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: 8
   },
+  guideTypeGrid: { gap: 8 },
+  guideTypeOption: {
+    flexBasis: "30%",
+    flexGrow: 1,
+    minWidth: 0,
+    minHeight: 64,
+    alignItems: "center",
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 7
+  },
   optionRow: {
     flexDirection: "row",
     gap: 8
   },
+  guideSegmentRow: {
+    flexWrap: "wrap",
+    gap: 6
+  },
   optionButton: {
     minHeight: bodyFrameDesign.minTouchSize,
+    flexGrow: 1,
+    alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.background
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderColor: "#35353A",
+    borderRadius: bodyFrameDesign.buttonRadius,
+    backgroundColor: "#18181B"
   },
   optionButtonActive: {
-    borderColor: colors.text,
-    backgroundColor: colors.text
+    borderColor: bodyFrameDarkColors.text,
+    backgroundColor: "#292D31"
   },
   optionButtonText: {
-    color: colors.text,
-    fontSize: typography.button,
-    fontWeight: "800",
+    color: bodyFrameDarkColors.text,
+    fontSize: bodyFrameTypography.button,
+    includeFontPadding: false,
+    lineHeight: 20,
+    fontWeight: "700",
+    textAlign: "center",
     letterSpacing: 0
   },
   optionButtonTextActive: {
-    color: colors.inverse
+    color: bodyFrameDarkColors.text
   },
   sizeFineControl: {
     minHeight: 44,
@@ -740,6 +917,7 @@ export const styles = StyleSheet.create({
     gap: 10,
     paddingTop: 2
   },
+  guideSizeSliderWrap: { flex: 1, minWidth: 0 },
   sizeSliderArea: {
     flex: 1,
     gap: 9
@@ -758,6 +936,8 @@ export const styles = StyleSheet.create({
     minWidth: 48,
     color: colors.muted,
     fontSize: bodyFrameTypography.caption,
+    includeFontPadding: false,
+    lineHeight: 18,
     fontWeight: "800",
     letterSpacing: 0
   },
@@ -765,6 +945,8 @@ export const styles = StyleSheet.create({
     minWidth: 30,
     color: colors.text,
     fontSize: bodyFrameTypography.caption,
+    includeFontPadding: false,
+    lineHeight: 18,
     fontWeight: "800",
     textAlign: "right",
     letterSpacing: 0,
@@ -778,6 +960,8 @@ export const styles = StyleSheet.create({
   sizeSliderMetaText: {
     color: colors.muted,
     fontSize: bodyFrameTypography.caption,
+    includeFontPadding: false,
+    lineHeight: 18,
     fontWeight: "800",
     letterSpacing: 0
   },
@@ -810,82 +994,103 @@ export const styles = StyleSheet.create({
     width: 58,
     minHeight: controls.height,
     paddingHorizontal: 8,
-    borderWidth: 1,
-    borderColor: colors.text,
-    color: colors.text,
-    fontSize: typography.body,
-    fontWeight: "800",
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderColor: "#5A5A62",
+    borderRadius: bodyFrameDesign.buttonRadius,
+    backgroundColor: "#18181B",
+    color: bodyFrameDarkColors.text,
+    fontSize: bodyFrameTypography.button,
+    includeFontPadding: false,
+    lineHeight: 20,
+    fontWeight: "700",
     textAlign: "center"
   },
   colorRow: {
     flexDirection: "row",
-    flexWrap: "nowrap",
-    justifyContent: "space-between",
-    gap: 4
+    flexWrap: "wrap",
+    gap: 8
   },
   colorOption: {
-    minHeight: 44,
-    flex: 1,
+    flexBasis: "30%",
+    flexGrow: 1,
     minWidth: 0,
+    minHeight: 64,
     alignItems: "center",
     justifyContent: "center",
-    gap: 5,
-    paddingHorizontal: 4,
-    borderWidth: 1,
-    borderColor: colors.line
+    gap: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 7,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderColor: "#35353A",
+    borderRadius: bodyFrameDesign.buttonRadius,
+    backgroundColor: "#18181B"
   },
   colorOptionActive: {
-    borderColor: colors.text
+    borderColor: bodyFrameDarkColors.text,
+    backgroundColor: "#292D31"
   },
   colorSwatch: {
     width: 18,
     height: 18,
-    borderWidth: 1,
-    borderColor: colors.darkLine
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderColor: "#6B6B72"
   },
   colorLabel: {
-    color: colors.text,
+    color: bodyFrameDarkColors.text,
     fontSize: bodyFrameTypography.caption,
-    fontWeight: "800",
+    includeFontPadding: false,
+    lineHeight: 18,
+    fontWeight: "700",
     letterSpacing: 0
   },
   visibilityButton: {
     minHeight: controls.height,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1,
-    borderColor: colors.text
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderColor: "#5A5A62",
+    borderRadius: bodyFrameDesign.buttonRadius,
+    backgroundColor: "#18181B"
   },
   visibilityButtonActive: {
-    backgroundColor: colors.text
+    borderColor: bodyFrameDarkColors.text,
+    backgroundColor: "#292D31"
   },
   visibilityButtonText: {
-    color: colors.text,
-    fontSize: typography.button,
-    fontWeight: "800",
+    color: bodyFrameDarkColors.text,
+    fontSize: bodyFrameTypography.button,
+    includeFontPadding: false,
+    lineHeight: 20,
+    fontWeight: "700",
     letterSpacing: 0
   },
   visibilityButtonTextActive: {
-    color: colors.inverse
+    color: bodyFrameDarkColors.text
   },
   guidePositionButton: {
     minHeight: controls.height,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1,
-    borderColor: colors.text,
-    backgroundColor: colors.background
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderColor: bodyFrameDarkColors.text,
+    borderRadius: bodyFrameDesign.buttonRadius,
+    backgroundColor: "#18181B"
   },
   guidePositionButtonText: {
-    color: colors.text,
-    fontSize: typography.button,
-    fontWeight: "800",
+    color: bodyFrameDarkColors.text,
+    fontSize: bodyFrameTypography.button,
+    includeFontPadding: false,
+    lineHeight: 20,
+    fontWeight: "700",
     letterSpacing: 0
   },
   guidePositionActionGroup: {
     position: "absolute",
     zIndex: 30,
+    maxWidth: "94%",
     flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "flex-end",
     gap: 8
   },
   guidePositionSecondaryButton: {
@@ -901,6 +1106,8 @@ export const styles = StyleSheet.create({
   guidePositionSecondaryText: {
     color: colors.inverse,
     fontSize: typography.button,
+    includeFontPadding: false,
+    lineHeight: 18,
     fontWeight: "800",
     letterSpacing: 0
   },
@@ -917,6 +1124,8 @@ export const styles = StyleSheet.create({
   guidePositionDoneText: {
     color: colors.inverse,
     fontSize: typography.button,
+    includeFontPadding: false,
+    lineHeight: 18,
     fontWeight: "900",
     letterSpacing: 0
   },
@@ -940,12 +1149,16 @@ export const styles = StyleSheet.create({
   navItemTitle: {
     color: colors.text,
     fontSize: typography.body,
+    includeFontPadding: false,
+    lineHeight: 20,
     fontWeight: "800",
     letterSpacing: 0
   },
   navItemDetail: {
     color: colors.muted,
     fontSize: typography.small,
+    includeFontPadding: false,
+    lineHeight: 18,
     letterSpacing: 0
   },
   navItemArrow: {
@@ -979,11 +1192,12 @@ export const styles = StyleSheet.create({
     minHeight: 0
   },
   cameraColorFloatingScroll: {
-    flex: 1
+    flex: 1,
+    minHeight: 0
   },
   cameraColorFloatingScrollContent: {
-    flexGrow: 1,
-    justifyContent: "flex-start"
+    gap: 12,
+    paddingBottom: 8
   },
   cameraControlPanelViewport: {
     width: "100%",
@@ -995,25 +1209,72 @@ export const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center"
   },
+  cameraQuickPanel: {
+    width: "100%",
+    gap: 9,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderColor: "#3A3A40",
+    borderRadius: bodyFrameDesign.buttonRadius,
+    backgroundColor: "#101012"
+  },
+  cameraQuickPanelHeader: {
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8
+  },
+  cameraQuickPanelHeaderActions: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: 8
+  },
+  cameraQuickPanelStatus: { flexShrink: 1, textAlign: "right" },
+  cameraQuickPanelTitle: {
+    color: bodyFrameDarkColors.text,
+    fontSize: 16,
+    includeFontPadding: false,
+    lineHeight: 20,
+    fontWeight: "700"
+  },
+  cameraQuickPanelValue: {
+    color: bodyFrameDarkColors.muted,
+    fontSize: bodyFrameTypography.caption,
+    includeFontPadding: false,
+    lineHeight: 18,
+    fontWeight: "700",
+    fontVariant: ["tabular-nums"]
+  },
+  cameraZoomPresetRow: {
+    flexWrap: "wrap"
+  },
   cameraColorPanel: {
     width: "100%",
-    gap: 14,
-    padding: 14,
+    flex: 1,
+    minHeight: 0,
+    gap: 10,
+    padding: 12,
     borderWidth: bodyFrameDesign.borderWidth,
-    borderColor: "#303035",
+    borderColor: "#35353A",
     borderRadius: bodyFrameDesign.modalRadius,
     backgroundColor: "#101012"
   },
   cameraColorHeaderRow: {
     minHeight: bodyFrameDesign.minTouchSize,
     flexDirection: "row",
-    alignItems: "flex-start",
+    alignItems: "center",
     justifyContent: "space-between",
-    gap: 12
+    gap: 10
   },
   cameraColorHeader: {
     flex: 1,
-    gap: 5
+    minWidth: 0,
+    gap: 4
   },
   cameraColorTitleRow: {
     flexDirection: "row",
@@ -1023,16 +1284,20 @@ export const styles = StyleSheet.create({
   cameraColorTitle: {
     color: bodyFrameDarkColors.text,
     fontSize: bodyFrameTypography.sectionTitle,
+    includeFontPadding: false,
+    lineHeight: 26,
     fontWeight: "700",
     letterSpacing: -0.2
   },
   cameraColorHint: {
     color: bodyFrameDarkColors.muted,
     fontSize: bodyFrameTypography.caption,
+    includeFontPadding: false,
     lineHeight: 18,
     letterSpacing: 0
   },
   cameraColorCloseButton: {
+    flexShrink: 0,
     width: bodyFrameDesign.minTouchSize,
     height: bodyFrameDesign.minTouchSize,
     alignItems: "center",
@@ -1055,6 +1320,8 @@ export const styles = StyleSheet.create({
   cameraColorPresetTitle: {
     color: bodyFrameDarkColors.text,
     fontSize: bodyFrameTypography.caption,
+    includeFontPadding: false,
+    lineHeight: 18,
     fontWeight: "700"
   },
   cameraColorPresetHint: {
@@ -1097,6 +1364,8 @@ export const styles = StyleSheet.create({
   cameraColorSlotText: {
     color: bodyFrameDarkColors.text,
     fontSize: bodyFrameTypography.button,
+    includeFontPadding: false,
+    lineHeight: 20,
     fontWeight: "700",
     letterSpacing: 0,
     fontVariant: ["tabular-nums"]
@@ -1106,8 +1375,8 @@ export const styles = StyleSheet.create({
   },
   cameraColorSliderList: {
     gap: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     borderWidth: bodyFrameDesign.borderWidth,
     borderColor: "#303035",
     borderRadius: bodyFrameDesign.buttonRadius,
@@ -1162,6 +1431,8 @@ export const styles = StyleSheet.create({
   cameraColorSecondaryButtonText: {
     color: bodyFrameDarkColors.text,
     fontSize: bodyFrameTypography.button,
+    includeFontPadding: false,
+    lineHeight: 20,
     fontWeight: "700"
   },
   cameraColorPrimaryButton: {
@@ -1180,15 +1451,19 @@ export const styles = StyleSheet.create({
   cameraColorPrimaryButtonText: {
     color: "#111111",
     fontSize: bodyFrameTypography.button,
+    includeFontPadding: false,
+    lineHeight: 20,
     fontWeight: "700"
   },
 
   quickButtonRow: {
+    width: "100%",
     minHeight: bodyFrameDesign.minTouchSize,
     flexDirection: "row",
+    flexWrap: "wrap",
     alignItems: "center",
     justifyContent: "center",
-    gap: 10
+    gap: 8
   },
   quickPillButton: {
     minWidth: 48,
@@ -1196,33 +1471,43 @@ export const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.36)",
-    backgroundColor: "rgba(0, 0, 0, 0.28)"
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderColor: "#55555B",
+    borderRadius: bodyFrameDesign.buttonRadius,
+    backgroundColor: "#18181B"
   },
   quickPillButtonActive: {
-    borderColor: colors.inverse,
-    backgroundColor: colors.inverse
+    borderColor: "#F5F5F5",
+    backgroundColor: "#F5F5F5"
   },
   quickPillText: {
-    color: colors.inverse,
-    fontSize: typography.button,
-    fontWeight: "900",
+    color: bodyFrameDarkColors.text,
+    fontSize: bodyFrameTypography.button,
+    includeFontPadding: false,
+    lineHeight: 20,
+    fontWeight: "700",
     letterSpacing: 0
   },
   quickPillTextActive: {
-    color: colors.text
+    color: "#111111"
   },
   cameraControlBottomTray: {
     width: "100%",
-    gap: 30,
-    paddingTop: 10,
+    gap: 8,
+    paddingTop: 8,
     paddingHorizontal: CAMERA_CONTROL_HORIZONTAL_PADDING,
-    backgroundColor: "rgba(0, 0, 0, 0.4)"
+    backgroundColor: "rgba(11, 11, 12, 0.92)"
+  },
+  cameraCaptureStatus: {
+    width: "100%",
+    minHeight: 24,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 12
   },
   captureRow: {
     width: "100%",
-    minHeight: 66,
+    minHeight: 68,
     position: "relative",
     alignItems: "center",
     justifyContent: "center"
@@ -1230,11 +1515,12 @@ export const styles = StyleSheet.create({
   galleryButton: {
     position: "absolute",
     left: CAMERA_CONTROL_TRAY_HORIZONTAL_PADDING,
-    width: 54,
-    height: 54,
+    width: 52,
+    height: 52,
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.62)",
     backgroundColor: "rgba(0, 0, 0, 0.38)"
@@ -1242,8 +1528,10 @@ export const styles = StyleSheet.create({
   overlayQuickButton: {
     position: "absolute",
     right: CAMERA_CONTROL_TRAY_HORIZONTAL_PADDING,
-    width: 76,
-    height: 54,
+    width: 72,
+    minHeight: 52,
+    paddingVertical: 6,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
     gap: 2,
@@ -1257,6 +1545,8 @@ export const styles = StyleSheet.create({
   overlayQuickValue: {
     color: colors.inverse,
     fontSize: typography.body,
+    includeFontPadding: false,
+    lineHeight: 20,
     fontWeight: "800",
     letterSpacing: 0,
     fontVariant: ["tabular-nums"]
@@ -1264,6 +1554,8 @@ export const styles = StyleSheet.create({
   overlayQuickLabel: {
     color: "rgba(255, 255, 255, 0.72)",
     fontSize: bodyFrameTypography.caption,
+    includeFontPadding: false,
+    lineHeight: 18,
     fontWeight: "700",
     letterSpacing: 0
   },
@@ -1293,6 +1585,8 @@ export const styles = StyleSheet.create({
     color: colors.inverse,
     textAlign: "center",
     fontSize: bodyFrameTypography.caption,
+    includeFontPadding: false,
+    lineHeight: 18,
     fontWeight: "900",
     letterSpacing: 0
   },
@@ -1305,6 +1599,8 @@ export const styles = StyleSheet.create({
   opacityStepText: {
     color: colors.inverse,
     fontSize: 16,
+    includeFontPadding: false,
+    lineHeight: 22,
     fontWeight: "800",
     letterSpacing: 0
   },
@@ -1312,14 +1608,16 @@ export const styles = StyleSheet.create({
     minWidth: 42,
     color: colors.inverse,
     fontSize: typography.button,
+    includeFontPadding: false,
+    lineHeight: 18,
     fontWeight: "800",
     textAlign: "center",
     letterSpacing: 0,
     fontVariant: ["tabular-nums"]
   },
   shutterOuter: {
-    width: 66,
-    height: 66,
+    width: 68,
+    height: 68,
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 999,
@@ -1330,62 +1628,197 @@ export const styles = StyleSheet.create({
     opacity: 0.45
   },
   shutterInner: {
-    width: 52,
-    height: 52,
+    width: 54,
+    height: 54,
     borderRadius: 999,
     backgroundColor: colors.inverse
   },
+  cameraErrorNotice: {
+    width: "100%",
+    maxWidth: 520,
+    alignSelf: "center",
+    gap: 10,
+    padding: 12,
+    borderWidth: 1,
+    borderRadius: bodyFrameDesign.cardRadius,
+    borderColor: bodyFrameDarkColors.line,
+    backgroundColor: bodyFrameDarkColors.surface
+  },
+  cameraErrorHeading: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8
+  },
+  cameraErrorHeadingText: {
+    color: bodyFrameDarkColors.text,
+    fontSize: bodyFrameTypography.rowTitle,
+    includeFontPadding: false,
+    lineHeight: 20,
+    fontWeight: "700"
+  },
   errorText: {
-    color: colors.inverse,
-    fontSize: typography.small,
-    lineHeight: 17,
-    textAlign: "center",
+    color: bodyFrameDarkColors.muted,
+    fontSize: bodyFrameTypography.caption,
+    includeFontPadding: false,
+    lineHeight: 19,
     letterSpacing: 0
   },
-  permissionScreen: {
+  cameraErrorActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "flex-end",
+    gap: 8
+  },
+  cameraErrorAction: {
+    minHeight: bodyFrameDesign.minTouchSize,
+    minWidth: 86,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderRadius: bodyFrameDesign.buttonRadius,
+    borderColor: bodyFrameDarkColors.darkLine
+  },
+  cameraErrorDismiss: {
+    minHeight: bodyFrameDesign.minTouchSize,
+    minWidth: 68,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderRadius: bodyFrameDesign.buttonRadius,
+    borderColor: bodyFrameDarkColors.line
+  },
+  cameraErrorActionText: {
+    color: bodyFrameDarkColors.text,
+    fontSize: bodyFrameTypography.caption,
+    includeFontPadding: false,
+    lineHeight: 18,
+    fontWeight: "700"
+  },
+  cameraUnavailableScreen: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
     gap: 16,
     padding: 24,
+    backgroundColor: bodyFrameDarkColors.background
+  },
+  cameraUnavailableText: {
+    color: bodyFrameDarkColors.text,
+    fontSize: bodyFrameTypography.body,
+    includeFontPadding: false,
+    lineHeight: 22,
+    textAlign: "center"
+  },
+  permissionScreen: {
+    flex: 1,
     backgroundColor: colors.background
+  },
+  permissionScroll: {
+    width: "100%",
+    flex: 1
+  },
+  permissionContent: {
+    flexGrow: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: bodyFrameDesign.horizontalPadding,
+    gap: 24
+  },
+  permissionPanel: {
+    width: "100%",
+    maxWidth: 480,
+    gap: 12
+  },
+  permissionIconFrame: {
+    width: 56,
+    height: 56,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderRadius: bodyFrameDesign.cardRadius
+  },
+  permissionEyebrow: {
+    fontSize: bodyFrameTypography.caption,
+    includeFontPadding: false,
+    lineHeight: 18,
+    fontWeight: "700",
+    letterSpacing: 1
   },
   permissionTitle: {
     color: colors.text,
-    fontSize: 22,
-    fontWeight: "800",
-    lineHeight: 28,
-    textAlign: "center",
+    fontSize: bodyFrameTypography.projectTitle,
+    includeFontPadding: false,
+    fontWeight: "700",
+    lineHeight: 32,
     letterSpacing: 0
   },
   permissionText: {
     color: colors.muted,
-    fontSize: typography.body,
+    fontSize: bodyFrameTypography.body,
+    includeFontPadding: false,
     lineHeight: 22,
-    textAlign: "center",
     letterSpacing: 0
   },
+  permissionDetail: {
+    gap: 10,
+    padding: 16,
+    borderWidth: 1,
+    borderRadius: bodyFrameDesign.cardRadius
+  },
+  permissionDetailTitle: {
+    fontSize: bodyFrameTypography.rowTitle,
+    includeFontPadding: false,
+    lineHeight: 20,
+    fontWeight: "700"
+  },
+  permissionDetailText: {
+    fontSize: bodyFrameTypography.body,
+    includeFontPadding: false,
+    lineHeight: 21
+  },
+  permissionHelp: {
+    fontSize: bodyFrameTypography.caption,
+    includeFontPadding: false,
+    lineHeight: 20
+  },
+  permissionActions: {
+    width: "100%",
+    maxWidth: 480,
+    alignSelf: "center",
+    paddingHorizontal: bodyFrameDesign.horizontalPadding,
+    paddingTop: 12,
+    gap: bodyFrameDesign.controlGap
+  },
   permissionButton: {
-    minHeight: controls.height,
+    minHeight: bodyFrameDesign.primaryButtonHeight,
+    width: "100%",
+    alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 18,
+    borderRadius: bodyFrameDesign.buttonRadius,
     backgroundColor: colors.text
   },
   permissionSecondaryButton: {
-    backgroundColor: colors.background,
-    borderWidth: controls.borderWidth,
-    borderColor: colors.line
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.surface
   },
   permissionButtonText: {
     color: colors.inverse,
-    fontSize: typography.button,
-    fontWeight: "800",
+    fontSize: bodyFrameTypography.button,
+    includeFontPadding: false,
+    lineHeight: 20,
+    fontWeight: "700",
     letterSpacing: 0
   },
   permissionSecondaryButtonText: {
     color: colors.text,
-    fontSize: typography.button,
-    fontWeight: "800",
+    fontSize: bodyFrameTypography.button,
+    includeFontPadding: false,
+    lineHeight: 20,
+    fontWeight: "700",
     letterSpacing: 0
   }
 });

@@ -1,8 +1,10 @@
 import {
   defaultAppSettings,
+  normalizeCameraZoomPercent,
   type AppSettings
 } from "@/lib/app-settings";
 import { localStorageAdapter } from "@/lib/local-storage";
+import { enqueueProjectCloudSync } from "@/lib/project-cloud-sync-queue";
 import {
   defaultBodyCaptureContextState,
   type BodyCaptureContext,
@@ -52,9 +54,7 @@ export const createBodyCaptureContextFromAppSettings = (
   cameraRatio: cameraRatios.includes(settings.cameraRatio)
     ? settings.cameraRatio
     : defaultAppSettings.cameraRatio,
-  cameraZoomPercent: Math.round(
-    clamp(settings.cameraZoomPercent, 0, 100, defaultAppSettings.cameraZoomPercent)
-  ),
+  cameraZoomPercent: normalizeCameraZoomPercent(settings.cameraZoomPercent),
   cameraExposureBias: Number(
     clamp(
       settings.cameraExposureBias,
@@ -167,6 +167,22 @@ export const getBodyCaptureContextState = async (projectId: string) => {
   return map[projectId] ?? defaultBodyCaptureContextState;
 };
 
+export const mergeBodyCaptureContextStatesFromBackup = async (
+  incoming: ReadonlyArray<{ projectId: string; state: BodyCaptureContextState }>
+) =>
+  runMutation(async () => {
+    const map = await readStateMap();
+    const next = { ...map };
+    let changed = false;
+    for (const item of incoming) {
+      if (!item.projectId || Object.prototype.hasOwnProperty.call(next, item.projectId)) continue;
+      next[item.projectId] = normalizeState(item.state);
+      changed = true;
+    }
+    if (changed) await writeStateMap(next);
+    return changed;
+  });
+
 export const updateBodyCaptureContextEnabled = async (
   projectId: string,
   enabled: boolean
@@ -180,6 +196,7 @@ export const updateBodyCaptureContextEnabled = async (
       updatedAt: new Date().toISOString()
     };
     await writeStateMap({ ...map, [projectId]: next });
+    await enqueueProjectCloudSync({ projectId, kind: "settings" }).catch(() => undefined);
     return next;
   });
 
@@ -196,5 +213,6 @@ export const saveBodyCaptureContext = async (
       updatedAt: new Date().toISOString()
     };
     await writeStateMap({ ...map, [projectId]: next });
+    await enqueueProjectCloudSync({ projectId, kind: "settings" }).catch(() => undefined);
     return next;
   });

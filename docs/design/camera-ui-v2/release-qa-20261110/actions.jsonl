@@ -1,0 +1,136 @@
+{"atUtc": "2026-11-09T17:40:07Z", "serial": "emulator-5558", "action": "capture", "name": "01-release-first-launch"}
+{"atUtc": "2026-11-09T17:40:19Z", "serial": "emulator-5558", "action": "tap", "label": "카메라 권한 허용", "bounds": [42, 1816, 1038, 1942]}
+{"atUtc": "2026-11-09T17:40:24Z", "serial": "emulator-5558", "action": "capture", "name": "02-camera-permission-prompt"}
+{"atUtc": "2026-11-09T17:40:37Z", "serial": "emulator-5558", "action": "tap", "label": "While using the app", "bounds": [133, 1183, 947, 1330]}
+{"atUtc": "2026-11-09T17:40:44Z", "serial": "emulator-5558", "action": "capture", "name": "03-camera-granted"}
+{"atUtc": "2026-11-09T17:41:24Z", "serial": "emulator-5558", "action": "tap", "label": "나중에 보기", "bounds": [63, 2225, 1017, 2340]}
+{"atUtc": "2026-11-09T17:41:28Z", "serial": "emulator-5558", "action": "capture", "name": "04-camera-main"}
+{"atUtc": "2026-11-09T17:41:32Z", "serial": "emulator-5558", "action": "tap", "label": "로그인으로 이동", "bounds": [42, 168, 158, 284]}
+{"atUtc": "2026-11-09T17:41:35Z", "serial": "emulator-5558", "action": "capture", "name": "05-account-route"}
+{"atUtc": "2026-11-09T17:41:35Z", "serial": "emulator-5558", "check": "로그인하고 기록을 보호하세요.", "result": "PASS", "evidence": "05-account-route"}
+{"atUtc": "2026-11-09T17:41:52Z", "serial": "emulator-5558", "action": "back"}
+{"atUtc": "2026-11-09T17:41:57Z", "serial": "emulator-5558", "action": "capture", "name": "06-account-return"}
+{"atUtc": "2026-11-09T17:41:57Z", "serial": "emulator-5558", "check": "로그인으로 이동", "result": "PASS", "evidence": "06-account-return"}
+{"atUtc": "2026-11-09T17:42:00Z", "serial": "emulator-5558", "action": "tap", "label": "프로젝트 선택", "bounds": [184, 163, 896, 289]}
+{"atUtc": "2026-11-09T17:42:04Z", "serial": "emulator-5558", "action": "capture", "name": "07-project-switcher"}
+{"atUtc": "2026-11-09T17:42:14Z", "serial": "emulator-5558", "action": "tap", "label": "+ 새 프로젝트", "bounds": [45, 2232, 525, 2358]}
+{"atUtc": "2026-11-09T17:42:18Z", "serial": "emulator-5558", "action": "capture", "name": "08-create-project"}
+{"atUtc": "2026-11-09T17:42:28Z", "serial": "emulator-5558", "action": "tap", "label": "프로젝트 만들기", "bounds": [458, 2223, 1036, 2349]}
+{"atUtc": "2026-11-09T17:42:32Z", "serial": "emulator-5558", "action": "capture", "name": "09-project-created"}
+{"atUtc": "2026-11-09T17:42:32Z", "serial": "emulator-5558", "check": "새 프로젝트", "result": "PASS", "evidence": "09-project-created"}
+{"atUtc": "2026-11-09T17:42:35Z", "serial": "emulator-5558", "action": "tap", "label": "프로젝트 선택", "bounds": [184, 163, 896, 289]}
+{"atUtc": "2026-11-09T17:42:42Z", "serial": "emulator-5558", "action": "tap", "label": "프로젝트 관리", "bounds": [657, 2268, 870, 2321]}
+{"atUtc": "2026-11-09T17:42:45Z", "serial": "emulator-5558", "action": "capture", "name": "10-project-management-route"}
+{"atUtc": "2026-11-09T17:42:45Z", "serial": "emulator-5558", "check": "새 프로젝트", "result": "PASS", "evidence": "10-project-management-route"}
+{"atUtc": "2026-11-09T17:42:55Z", "serial": "emulator-5558", "action": "tap", "label": "새 프로젝트 프로젝트 열기", "bounds": [42, 567, 1038, 1021]}
+{"atUtc": "2026-11-09T17:42:58Z", "serial": "emulator-5558", "action": "capture", "name": "11-project-detail"}
+{"atUtc": "2026-11-09T17:43:01Z", "serial": "emulator-5558", "action": "tap", "label": "프로젝트 설정 열기", "bounds": [896, 195, 1038, 311]}
+{"atUtc": "2026-11-09T17:43:04Z", "serial": "emulator-5558", "action": "capture", "name": "12-project-settings"}
+{"atUtc": "2026-11-09T17:44:01Z", "serial": "emulator-5558", "action": "scroll-up", "bounds": [45, 595, 1035, 2185], "start": [540, 1898], "end": [540, 992]}
+{"atUtc": "2026-11-09T17:44:04Z", "serial": "emulator-5558", "action": "capture", "name": "13-project-settings-measurement"}
+{"atUtc": "2026-11-09T17:44:26Z", "serial": "emulator-5558", "action": "tap", "label": "수치 기록 > 사용", "bounds": [551, 1794, 1035, 1910]}
+{"atUtc": "2026-11-09T17:44:30Z", "serial": "emulator-5558", "action": "capture", "name": "14-measurements-enabled"}
+{"atUtc": "2026-11-09T17:44:39Z", "serial": "emulator-5558", "action": "scroll-up", "bounds": [45, 595, 1035, 2185], "start": [540, 1898], "end": [540, 992]}
+{"atUtc": "2026-11-09T17:44:42Z", "serial": "emulator-5558", "action": "capture", "name": "15-measurement-prompt-settings"}
+{"atUtc": "2026-11-09T17:45:14Z", "serial": "emulator-5558", "action": "tap", "label": "켬", "bounds": [551, 1543, 1035, 1659]}
+{"atUtc": "2026-11-09T17:45:17Z", "serial": "emulator-5558", "action": "capture", "name": "16-prompt-enabled"}
+{"atUtc": "2026-11-09T17:45:19Z", "serial": "emulator-5558", "action": "tap", "label": "변경 저장", "bounds": [554, 2232, 1036, 2358]}
+{"atUtc": "2026-11-09T17:45:22Z", "serial": "emulator-5558", "action": "capture", "name": "17-project-settings-saved"}
+{"atUtc": "2026-11-09T17:45:36Z", "serial": "emulator-5558", "action": "capture", "name": "18-project-detail-after-settings"}
+{"atUtc": "2026-11-09T17:45:54Z", "serial": "emulator-5558", "action": "tap", "label": "오늘 사진 찍기", "bounds": [42, 1066, 1038, 1192]}
+{"atUtc": "2026-11-09T17:45:57Z", "serial": "emulator-5558", "action": "capture", "name": "19-camera-after-settings"}
+{"atUtc": "2026-11-09T17:45:57Z", "serial": "emulator-5558", "check": "사진 촬영", "result": "PASS", "evidence": "19-camera-after-settings"}
+{"atUtc": "2026-11-09T17:46:00Z", "serial": "emulator-5558", "action": "tap", "label": "사진 촬영", "bounds": [451, 1920, 629, 2099]}
+{"atUtc": "2026-11-09T17:46:13Z", "serial": "emulator-5558", "action": "capture", "name": "20-capture-unexpected-state"}
+{"atUtc": "2026-11-09T17:46:13Z", "serial": "emulator-5558", "check": "capture-to-measurement-prompt", "result": "NOT_OBSERVED"}
+{"atUtc": "2026-11-09T17:46:42Z", "serial": "emulator-5558", "action": "capture", "name": "22-after-capture-observation"}
+{"atUtc": "2026-11-09T17:47:10Z", "serial": "emulator-5558", "action": "tap", "label": "Allow all", "bounds": [133, 1340, 947, 1487]}
+{"atUtc": "2026-11-09T17:47:15Z", "serial": "emulator-5558", "action": "capture", "name": "23-camera-after-media-permission"}
+{"atUtc": "2026-11-09T17:47:19Z", "serial": "emulator-5558", "action": "tap", "label": "사진 촬영", "bounds": [451, 1920, 629, 2099]}
+{"atUtc": "2026-11-09T17:47:23Z", "serial": "emulator-5558", "action": "tap", "label": "수치 기록", "bounds": [637, 1783, 828, 1898]}
+{"atUtc": "2026-11-09T17:47:23Z", "serial": "emulator-5558", "check": "capture-to-measurement-prompt", "result": "PASS", "secondsAfterShutter": 3.853}
+{"atUtc": "2026-11-09T17:47:26Z", "serial": "emulator-5558", "action": "capture", "name": "24-photo-measurement-route"}
+{"atUtc": "2026-11-09T17:47:26Z", "serial": "emulator-5558", "check": "기록 정보", "result": "PASS", "evidence": "24-photo-measurement-route"}
+{"atUtc": "2026-11-09T17:47:54Z", "serial": "emulator-5558", "action": "tap", "label": "취소", "bounds": [45, 2232, 527, 2358]}
+{"atUtc": "2026-11-09T17:47:57Z", "serial": "emulator-5558", "action": "capture", "name": "25-photo-detail-route"}
+{"atUtc": "2026-11-09T17:47:57Z", "serial": "emulator-5558", "action": "back"}
+{"atUtc": "2026-11-09T17:48:00Z", "serial": "emulator-5558", "action": "capture", "name": "26-camera-return-after-measurement"}
+{"atUtc": "2026-11-09T17:48:00Z", "serial": "emulator-5558", "check": "사진 촬영", "result": "PASS", "evidence": "26-camera-return-after-measurement"}
+{"atUtc": "2026-11-09T17:48:03Z", "serial": "emulator-5558", "action": "tap", "label": "촬영 설정 열기", "bounds": [923, 168, 1038, 284]}
+{"atUtc": "2026-11-09T17:48:06Z", "serial": "emulator-5558", "action": "capture", "name": "27-release-capture-settings"}
+{"atUtc": "2026-11-09T17:48:44Z", "serial": "emulator-5558", "action": "tap", "label": "확대 설정 열기", "bounds": [82, 1139, 531, 1339]}
+{"atUtc": "2026-11-09T17:48:47Z", "serial": "emulator-5558", "action": "capture", "name": "28-release-zoom"}
+{"atUtc": "2026-11-09T17:49:10Z", "serial": "emulator-5558", "action": "tap", "label": "확대 3x", "bounds": [402, 1728, 528, 1844]}
+{"atUtc": "2026-11-09T17:49:13Z", "serial": "emulator-5558", "action": "capture", "name": "29-release-zoom-three"}
+{"atUtc": "2026-11-09T17:49:13Z", "serial": "emulator-5558", "check": "3.0x", "result": "PASS", "evidence": "29-release-zoom-three"}
+{"atUtc": "2026-11-09T17:49:16Z", "serial": "emulator-5558", "action": "tap", "label": "확대 설정 닫기", "bounds": [930, 1589, 1046, 1705]}
+{"atUtc": "2026-11-09T17:49:21Z", "serial": "emulator-5558", "action": "tap", "label": "기록", "bounds": [378, 2299, 432, 2335]}
+{"atUtc": "2026-11-09T17:49:23Z", "serial": "emulator-5558", "action": "capture", "name": "30-studio-after-zoom"}
+{"atUtc": "2026-11-09T17:49:23Z", "serial": "emulator-5558", "check": "기록 2 / 100장", "result": "PASS", "evidence": "30-studio-after-zoom"}
+{"atUtc": "2026-11-09T17:49:26Z", "serial": "emulator-5558", "action": "tap", "label": "촬영", "bounds": [108, 2299, 162, 2335]}
+{"atUtc": "2026-11-09T17:49:29Z", "serial": "emulator-5558", "action": "capture", "name": "31-camera-after-zoom-navigation"}
+{"atUtc": "2026-11-09T17:49:31Z", "serial": "emulator-5558", "action": "tap", "label": "촬영 설정 열기", "bounds": [923, 168, 1038, 284]}
+{"atUtc": "2026-11-09T17:49:37Z", "serial": "emulator-5558", "action": "tap", "label": "확대 설정 열기", "bounds": [82, 1139, 531, 1339]}
+{"atUtc": "2026-11-09T17:49:40Z", "serial": "emulator-5558", "action": "capture", "name": "32-zoom-restored-after-navigation"}
+{"atUtc": "2026-11-09T17:51:56Z", "serial": "emulator-5558", "action": "tap", "label": "확대 3x", "bounds": [402, 1728, 528, 1844]}
+{"atUtc": "2026-11-09T17:51:59Z", "serial": "emulator-5558", "action": "capture", "name": "33-zoom-three-again"}
+{"atUtc": "2026-11-09T17:51:59Z", "serial": "emulator-5558", "check": "3.0x", "result": "PASS", "evidence": "33-zoom-three-again"}
+{"atUtc": "2026-11-09T17:52:02Z", "serial": "emulator-5558", "action": "tap", "label": "확대 설정 닫기", "bounds": [930, 1589, 1046, 1705]}
+{"atUtc": "2026-11-09T17:52:04Z", "serial": "emulator-5558", "action": "capture", "name": "34-zoom-panel-closed"}
+{"atUtc": "2026-11-09T17:52:07Z", "serial": "emulator-5558", "action": "tap", "label": "촬영 설정 열기", "bounds": [923, 168, 1038, 284]}
+{"atUtc": "2026-11-09T17:52:13Z", "serial": "emulator-5558", "action": "tap", "label": "확대 설정 열기", "bounds": [82, 1139, 531, 1339]}
+{"atUtc": "2026-11-09T17:52:16Z", "serial": "emulator-5558", "action": "capture", "name": "35-zoom-retained-on-close"}
+{"atUtc": "2026-11-09T17:52:16Z", "serial": "emulator-5558", "check": "3.0x", "result": "PASS", "evidence": "35-zoom-retained-on-close"}
+{"atUtc": "2026-11-09T17:52:19Z", "serial": "emulator-5558", "action": "tap", "label": "확대 설정 닫기", "bounds": [930, 1589, 1046, 1705]}
+{"atUtc": "2026-11-09T17:52:24Z", "serial": "emulator-5558", "action": "tap", "label": "사진 촬영", "bounds": [451, 1920, 629, 2099]}
+{"atUtc": "2026-11-09T17:52:28Z", "serial": "emulator-5558", "action": "capture", "name": "36-third-photo-at-zoom-three"}
+{"atUtc": "2026-11-09T17:52:28Z", "serial": "emulator-5558", "check": "3 / 100", "result": "PASS", "evidence": "36-third-photo-at-zoom-three"}
+{"atUtc": "2026-11-09T17:53:14Z", "serial": "emulator-5558", "action": "tap", "label": "기록", "bounds": [378, 2299, 432, 2335]}
+{"atUtc": "2026-11-09T17:53:16Z", "serial": "emulator-5558", "action": "capture", "name": "37-studio-three-photos"}
+{"atUtc": "2026-11-09T17:53:16Z", "serial": "emulator-5558", "check": "기록 3 / 100장", "result": "PASS", "evidence": "37-studio-three-photos"}
+{"atUtc": "2026-11-09T17:53:19Z", "serial": "emulator-5558", "action": "tap", "label": "촬영", "bounds": [108, 2299, 162, 2335]}
+{"atUtc": "2026-11-09T17:53:24Z", "serial": "emulator-5558", "action": "tap", "label": "촬영 설정 열기", "bounds": [923, 168, 1038, 284]}
+{"atUtc": "2026-11-09T17:53:30Z", "serial": "emulator-5558", "action": "tap", "label": "확대 설정 열기", "bounds": [82, 1139, 531, 1339]}
+{"atUtc": "2026-11-09T17:53:33Z", "serial": "emulator-5558", "action": "capture", "name": "38-project-captured-zoom-restored"}
+{"atUtc": "2026-11-09T17:53:33Z", "serial": "emulator-5558", "check": "3.0x", "result": "PASS", "evidence": "38-project-captured-zoom-restored"}
+{"atUtc": "2026-11-09T17:54:08Z", "serial": "emulator-5558", "action": "tap", "label": "확대 설정 닫기", "bounds": [930, 1589, 1046, 1705]}
+{"atUtc": "2026-11-09T17:54:11Z", "serial": "emulator-5558", "action": "system-home"}
+{"atUtc": "2026-11-09T17:54:15Z", "serial": "emulator-5558", "action": "capture", "name": "39-system-home"}
+{"atUtc": "2026-11-09T17:54:15Z", "serial": "emulator-5558", "action": "resume-installed-release-app"}
+{"atUtc": "2026-11-09T17:54:18Z", "serial": "emulator-5558", "action": "capture", "name": "40-camera-resumed"}
+{"atUtc": "2026-11-09T17:54:18Z", "serial": "emulator-5558", "check": "사진 촬영", "result": "PASS", "evidence": "40-camera-resumed"}
+{"atUtc": "2026-11-09T17:54:21Z", "serial": "emulator-5558", "action": "tap", "label": "촬영 설정 열기", "bounds": [923, 168, 1038, 284]}
+{"atUtc": "2026-11-09T17:54:27Z", "serial": "emulator-5558", "action": "tap", "label": "확대 설정 열기", "bounds": [82, 1139, 531, 1339]}
+{"atUtc": "2026-11-09T17:54:30Z", "serial": "emulator-5558", "action": "capture", "name": "41-zoom-after-background-resume"}
+{"atUtc": "2026-11-09T17:54:30Z", "serial": "emulator-5558", "check": "3.0x", "result": "PASS", "evidence": "41-zoom-after-background-resume"}
+{"atUtc": "2026-11-09T17:54:32Z", "serial": "emulator-5558", "action": "tap", "label": "확대 설정 닫기", "bounds": [930, 1589, 1046, 1705]}
+{"atUtc": "2026-11-09T17:54:35Z", "serial": "emulator-5558", "action": "capture", "name": "42-final-release-camera"}
+{"atUtc": "2026-11-09T17:54:35Z", "serial": "emulator-5558", "check": "3 / 100", "result": "PASS", "evidence": "42-final-release-camera"}
+{"atUtc": "2026-11-09T17:55:26Z", "serial": "emulator-5558", "action": "tap", "label": "설정", "bounds": [918, 2299, 972, 2335]}
+{"atUtc": "2026-11-09T17:55:29Z", "serial": "emulator-5558", "action": "capture", "name": "43-release-settings"}
+{"atUtc": "2026-11-09T17:55:54Z", "serial": "emulator-5558", "action": "scroll-up", "bounds": [0, 0, 1080, 2188], "start": [540, 1794], "end": [540, 547]}
+{"atUtc": "2026-11-09T17:55:57Z", "serial": "emulator-5558", "action": "capture", "name": "44-settings-scroll-one"}
+{"atUtc": "2026-11-09T17:56:00Z", "serial": "emulator-5558", "action": "scroll-up", "bounds": [0, 0, 1080, 2188], "start": [540, 1794], "end": [540, 547]}
+{"atUtc": "2026-11-09T17:56:03Z", "serial": "emulator-5558", "action": "capture", "name": "45-settings-scroll-two"}
+{"atUtc": "2026-11-09T17:56:05Z", "serial": "emulator-5558", "action": "tap", "label": "사용 가이드", "bounds": [160, 877, 791, 983]}
+{"atUtc": "2026-11-09T17:56:08Z", "serial": "emulator-5558", "action": "capture", "name": "46-release-guide-one"}
+{"atUtc": "2026-11-09T17:57:01Z", "serial": "emulator-5558", "action": "tap", "label": "다음", "bounds": [103, 1665, 979, 1791]}
+{"atUtc": "2026-11-09T17:57:04Z", "serial": "emulator-5558", "action": "capture", "name": "47-release-guide-two"}
+{"atUtc": "2026-11-09T17:57:04Z", "serial": "emulator-5558", "check": "2 / 6", "result": "PASS", "evidence": "47-release-guide-two"}
+{"atUtc": "2026-11-09T17:57:07Z", "serial": "emulator-5558", "action": "tap", "label": "다음", "bounds": [334, 1761, 978, 1887]}
+{"atUtc": "2026-11-09T17:57:09Z", "serial": "emulator-5558", "action": "capture", "name": "48-release-guide-three"}
+{"atUtc": "2026-11-09T17:57:09Z", "serial": "emulator-5558", "check": "3 / 6", "result": "PASS", "evidence": "48-release-guide-three"}
+{"atUtc": "2026-11-09T17:57:12Z", "serial": "emulator-5558", "action": "tap", "label": "다음", "bounds": [334, 1761, 978, 1887]}
+{"atUtc": "2026-11-09T17:57:14Z", "serial": "emulator-5558", "action": "capture", "name": "49-release-guide-four"}
+{"atUtc": "2026-11-09T17:57:14Z", "serial": "emulator-5558", "check": "4 / 6", "result": "PASS", "evidence": "49-release-guide-four"}
+{"atUtc": "2026-11-09T17:57:17Z", "serial": "emulator-5558", "action": "tap", "label": "다음", "bounds": [334, 1790, 978, 1916]}
+{"atUtc": "2026-11-09T17:57:20Z", "serial": "emulator-5558", "action": "capture", "name": "50-release-guide-five"}
+{"atUtc": "2026-11-09T17:57:20Z", "serial": "emulator-5558", "check": "5 / 6", "result": "PASS", "evidence": "50-release-guide-five"}
+{"atUtc": "2026-11-09T17:57:22Z", "serial": "emulator-5558", "action": "tap", "label": "다음", "bounds": [334, 1732, 978, 1858]}
+{"atUtc": "2026-11-09T17:57:25Z", "serial": "emulator-5558", "action": "capture", "name": "51-release-guide-six"}
+{"atUtc": "2026-11-09T17:57:25Z", "serial": "emulator-5558", "check": "6 / 6", "result": "PASS", "evidence": "51-release-guide-six"}
+{"atUtc": "2026-11-09T17:59:42Z", "serial": "emulator-5558", "action": "tap", "label": "완료", "bounds": [334, 1790, 978, 1916]}
+{"atUtc": "2026-11-09T17:59:44Z", "serial": "emulator-5558", "action": "capture", "name": "52-guide-completed"}
+{"atUtc": "2026-11-09T17:59:47Z", "serial": "emulator-5558", "action": "tap", "label": "촬영", "bounds": [108, 2299, 162, 2335]}
+{"atUtc": "2026-11-09T17:59:50Z", "serial": "emulator-5558", "action": "capture", "name": "53-final-release-handoff"}
+{"atUtc": "2026-11-09T17:59:50Z", "serial": "emulator-5558", "check": "3 / 100", "result": "PASS", "evidence": "53-final-release-handoff"}

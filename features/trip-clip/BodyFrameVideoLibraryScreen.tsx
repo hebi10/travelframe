@@ -18,7 +18,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { bodyFrameDesign, bodyFrameTypography, getBodyFrameControlColors } from "@/constants/app-theme";
 import { useAppAppearance } from "@/lib/app-appearance";
-import { deleteMadeVideo, getMadeVideos } from "@/lib/video-library";
+import { saveVideoToLibrary, shareVideo } from "@/lib/trip-clip-export";
+import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
+import { deleteMadeVideo, getMadeVideos, requireLocalMadeVideo } from "@/lib/video-library";
 import type { MadeVideoItem } from "@/types/video";
 
 const formatDuration = (seconds: number) =>
@@ -64,10 +66,30 @@ export default function BodyFrameVideoLibraryScreen() {
     }, [load])
   );
 
+  const [exportingId, setExportingId] = useState<string | null>(null);
+  const exportVideo = async (id: string, action: "save" | "share") => {
+    if (exportingId || deletingId) return;
+    setExportingId(id);
+    setMessage(null);
+    try {
+      const { uri } = await requireLocalMadeVideo(id);
+      if (action === "save") {
+        await saveVideoToLibrary(uri);
+        setMessage("영상을 기기 앨범에 저장했습니다.");
+      } else {
+        await shareVideo(uri);
+      }
+    } catch (error) {
+      setMessage(getUserFacingErrorMessage(error, "영상을 저장하거나 공유하지 못했습니다."));
+    } finally {
+      setExportingId(null);
+    }
+  };
+
   const confirmDelete = (video: MadeVideoItem) => {
     Alert.alert(
       "영상을 삭제할까요?",
-      "앱에 저장된 영상 기록이 삭제됩니다.",
+      "이 영상과 연결된 클라우드 백업이 삭제됩니다. 기기 앨범으로 내보낸 영상은 유지됩니다.",
       [
         { text: "취소", style: "cancel" },
         {
@@ -148,7 +170,8 @@ export default function BodyFrameVideoLibraryScreen() {
               >
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel={`${video.title} 영상 상세 보기`}
+                  accessibilityLabel={`${video.title} 영상 재생 및 상세 보기`}
+                  accessibilityHint={`생성 ${formatDate(video.createdAt)}, 재생 시간 ${formatDuration(video.duration)}, 화면 비율 ${video.ratio}`}
                   onPress={() =>
                     router.push({
                       pathname: "/video/[id]",
@@ -182,16 +205,16 @@ export default function BodyFrameVideoLibraryScreen() {
                   </View>
                   <View style={styles.videoCopy}>
                     <Text
-                      numberOfLines={1}
+                      numberOfLines={2}
                       style={[styles.videoTitle, { color: palette.text }]}
                     >
                       {video.title}
                     </Text>
                     <Text style={[styles.videoMeta, { color: palette.muted }]}>
-                      {formatDate(video.createdAt)}
+                      생성 {formatDate(video.createdAt)}
                     </Text>
                     <Text style={[styles.videoMeta, { color: palette.muted }]}>
-                      {formatDuration(video.duration)} · {video.ratio}
+                      재생 {formatDuration(video.duration)} · {video.ratio}
                     </Text>
                   </View>
                   <Feather name="chevron-right" size={18} color={palette.muted} />
@@ -200,6 +223,7 @@ export default function BodyFrameVideoLibraryScreen() {
                 <View style={styles.cardActions}>
                   <Pressable
                     accessibilityRole="button"
+                    accessibilityLabel={`${video.title} 영상 재생 및 상세 보기`}
                     onPress={() =>
                       router.push({
                         pathname: "/video/[id]",
@@ -209,12 +233,24 @@ export default function BodyFrameVideoLibraryScreen() {
                     style={[styles.cardButton, { borderColor: palette.line }]}
                   >
                     <Text style={[styles.cardButtonText, { color: palette.text }]}>
-                      상세
+                      재생·상세
                     </Text>
                   </Pressable>
+                  {(["save", "share"] as const).map((action) => (
+                    <Pressable
+                      key={action}
+                      accessibilityRole="button"
+                      disabled={Boolean(exportingId || deletingId)}
+                      onPress={() => void exportVideo(video.id, action)}
+                      style={[styles.mediaButton, { borderColor: palette.line }]}
+                      accessibilityLabel={`${video.title} ${action === "save" ? "앨범 저장" : "공유"}`}
+                    >
+                      <Text style={{ color: palette.text }}>{action === "save" ? "앨범 저장" : "공유"}</Text>
+                    </Pressable>
+                  ))}
                   <Pressable
                     accessibilityRole="button"
-                    disabled={deletingId === video.id}
+                    disabled={Boolean(exportingId) || deletingId === video.id}
                     accessibilityLabel={`${video.title} 영상 삭제`}
                     accessibilityState={{ disabled: deletingId === video.id }}
                     onPress={() => confirmDelete(video)}
@@ -246,7 +282,7 @@ export default function BodyFrameVideoLibraryScreen() {
               저장한 영상이 없습니다.
             </Text>
             <Text style={[styles.emptyDetail, { color: palette.muted }]}>
-              영상 화면에서 프로젝트를 선택해 첫 변화 영상을 만들어 보세요.
+              프로젝트 사진으로 첫 변화 영상을 만들면 이곳에서 확인할 수 있습니다.
             </Text>
             <Pressable
               accessibilityRole="button"
@@ -269,6 +305,13 @@ export default function BodyFrameVideoLibraryScreen() {
 }
 
 const styles = StyleSheet.create({
+  mediaButton: {
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    minHeight: 44,
+    paddingHorizontal: 10
+  },
   screen: {
     flex: 1
   },
@@ -277,7 +320,7 @@ const styles = StyleSheet.create({
     maxWidth: bodyFrameDesign.contentMaxWidth,
     alignSelf: "center",
     paddingHorizontal: bodyFrameDesign.horizontalPadding,
-    gap: 14
+    gap: 12
   },
   topBar: {
     minHeight: bodyFrameDesign.primaryButtonHeight,
@@ -302,7 +345,7 @@ const styles = StyleSheet.create({
     height: bodyFrameDesign.minTouchSize
   },
   pageDetail: {
-    marginBottom: 6,
+    marginBottom: 2,
     fontSize: bodyFrameTypography.body,
     lineHeight: 20
   },
@@ -310,7 +353,8 @@ const styles = StyleSheet.create({
     minHeight: bodyFrameDesign.minTouchSize,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between"
+    justifyContent: "space-between",
+    gap: 8
   },
   summaryLabel: {
     fontSize: bodyFrameTypography.caption,
@@ -334,18 +378,18 @@ const styles = StyleSheet.create({
     borderRadius: bodyFrameDesign.cardRadius
   },
   videoMain: {
-    minHeight: 106,
+    minHeight: 124,
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: 10,
     padding: 10
   },
   pressed: {
     opacity: 0.82
   },
   videoCover: {
-    width: 72,
-    height: 90,
+    width: 84,
+    height: 108,
     overflow: "hidden",
     alignItems: "center",
     justifyContent: "center",
@@ -372,12 +416,12 @@ const styles = StyleSheet.create({
     gap: 5
   },
   videoTitle: {
-    fontSize: bodyFrameTypography.rowTitle,
+    fontSize: bodyFrameTypography.sectionTitle,
     fontWeight: "600"
   },
   videoMeta: {
     fontSize: bodyFrameTypography.caption,
-    lineHeight: 17
+    lineHeight: 18
   },
   cardActions: {
     flexDirection: "row",

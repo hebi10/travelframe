@@ -1,4 +1,5 @@
 import { AppText as Text } from "@/components/app-text";
+import { getBodyProjectById } from "@/lib/body-project-library";
 import * as ImagePicker from "expo-image-picker";
 import { Feather } from "@expo/vector-icons";
 import { router, type Href, useFocusEffect, useLocalSearchParams } from "expo-router";
@@ -54,7 +55,8 @@ import { useAuth } from "@/lib/auth-context";
 import { getPlanEntitlements } from "@/lib/plan-entitlements";
 import { isMediaLibraryAccessGranted } from "@/lib/media-library-permissions";
 import { requestMediaLibraryAccess } from "@/lib/request-media-library-access";
-import { recordBackupFailure } from "@/lib/backup-failure-queue";
+import { clearBackupFailure, recordBackupFailure } from "@/lib/backup-failure-queue";
+import { enqueueProjectCloudSync } from "@/lib/project-cloud-sync-queue";
 import { backupPhotoIfEnabled } from "@/lib/cloud-backup";
 import { deleteLocalFile, getPhotoById, saveEditedPhoto } from "@/lib/photo-library";
 import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
@@ -176,7 +178,13 @@ export default function EditScreen() {
       }
 
       const photo = await getPhotoById(photoId);
-      if (isMounted && photo) {
+      const project = photo?.projectId ? await getBodyProjectById(photo.projectId) : null;
+      if (!isMounted) return;
+      if (photo && project?.archived) {
+        router.replace({ pathname: "/photo/[id]", params: { id: photo.id } });
+        return;
+      }
+      if (photo) {
         setSourcePhoto(photo);
         setSource({
           uri: photo.uri,
@@ -186,12 +194,14 @@ export default function EditScreen() {
         });
       }
 
-      if (isMounted) {
-        setIsLoading(false);
-      }
+      setIsLoading(false);
     };
 
-    loadPhoto();
+    void loadPhoto().catch((error) => {
+      if (!isMounted) return;
+      setMessage(getUserFacingErrorMessage(error, "편집할 사진을 불러오지 못했습니다."));
+      setIsLoading(false);
+    });
 
     return () => {
       isMounted = false;
@@ -477,6 +487,9 @@ export default function EditScreen() {
     try {
       setIsSaving(true);
       setMessage(null);
+      if (sourcePhoto?.projectId && (await getBodyProjectById(sourcePhoto.projectId))?.archived) {
+        throw new Error("보관된 프로젝트의 사진을 편집하려면 프로젝트를 먼저 복원해 주세요.");
+      }
       const canvas = canvasRef.current;
       if (!canvas) {
         throw new Error("편집 화면을 준비하지 못했습니다. 다시 시도해 주세요.");
@@ -500,11 +513,12 @@ export default function EditScreen() {
         localImageLimit: planEntitlements.localImageLimit
       });
       try {
-        await backupPhotoIfEnabled({
+        const backedUp = await backupPhotoIfEnabled({
           user,
           subscription,
           photo: savedPhoto
         });
+        if (backedUp) await clearBackupFailure(savedPhoto.id).catch(() => undefined);
       } catch (backupError) {
         console.error("편집 사진 자동 백업에 실패했습니다.", backupError);
         await recordBackupFailure({
@@ -515,7 +529,14 @@ export default function EditScreen() {
             backupError,
             "클라우드 백업은 완료하지 못했습니다."
           )
-        });
+        }).catch(() => undefined);
+        if (savedPhoto.projectId) {
+          await enqueueProjectCloudSync({
+            projectId: savedPhoto.projectId,
+            kind: "photo",
+            itemId: savedPhoto.id
+          }).catch(() => undefined);
+        }
         Alert.alert(
           "백업 실패",
           "편집 결과는 현재 기기에 저장되었습니다. 클라우드 백업은 설정에서 다시 시도할 수 있습니다."

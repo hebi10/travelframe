@@ -21,7 +21,7 @@ assert.ok(source.includes("onAccessibilityAction"));
 assert.ok(source.includes('pointerEvents="none"'));
 assert.ok(source.includes("changeDivider(value)"));
 assert.ok(source.includes("[0.25, 0.5, 0.75]"));
-assert.ok(source.includes('contentFit="cover"'));
+assert.ok(source.includes('contentFit="contain"'));
 assert.ok(source.includes("getBodyFrameComparisonPhotos"));
 assert.ok(source.includes("Math.max(insets.bottom, 12)"));
 

@@ -10,6 +10,8 @@ on:
       - "functions/package.json"
       - "functions/package-lock.json"
       - "scripts/summarize-npm-audit.mjs"
+      - "scripts/report-android-dependency-reachability.mjs"
+      - "tests/tf-final-android-bundle-audit.test.mjs"
       - "app/+native-intent.tsx"
       - "lib/native-deep-link.ts"
       - "tests/body-frame-stage16-native-link-security.test.mjs"
@@ -18,6 +20,7 @@ on:
       - "tests/body-frame-stage15-release-readiness.test.mjs"
       - "docs/design/body-frame-stage15-release-readiness-20261106.md"
       - "docs/body-frame-release-checklist.md"
+      - "docs/release/tf-final-01-07-20261124.md"
       - ".github/workflows/android-play-aab.yml"
       - ".github/workflows/body-frame-play-preflight.yml"
 
@@ -50,7 +53,18 @@ jobs:
           npm audit --prefix functions --omit=dev --json > functions-prod-audit.json || true
       - name: Summarize vulnerable packages
         run: node scripts/summarize-npm-audit.mjs app-full-audit.json app-prod-audit.json functions-prod-audit.json
+      - name: Export production Android bundle for dependency evidence
+        timeout-minutes: 15
+        env:
+          EXPO_NO_DOTENV: "1"
+          EXPO_OFFLINE: "1"
+          NODE_ENV: production
+        run: npx --no-install expo export --platform android --source-maps --output-dir "$RUNNER_TEMP/travelframe-android-dependency-export"
+      - name: Record redacted Android bundle and npm explain evidence
+        timeout-minutes: 5
+        run: node scripts/report-android-dependency-reachability.mjs "$RUNNER_TEMP/travelframe-android-dependency-export" app-prod-audit.json package-lock.json android-bundle-dependency-evidence.json
       - name: Upload audit reports
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: dependency-audit-reports
@@ -59,6 +73,7 @@ jobs:
             app-prod-audit.json
             functions-prod-audit.json
             audit-summary.md
+            android-bundle-dependency-evidence.json
             stage15-release-readiness.json
             stage15-release-readiness.md
           retention-days: 14

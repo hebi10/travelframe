@@ -1,0 +1,20 @@
+{
+  "serial": "emulator-5556",
+  "avd": "BodyFrame_Camera_QA_20261110\r\r\nOK",
+  "display": "Physical size: 1080x2424",
+  "density": "Physical density: 420",
+  "fontScale": "1.0",
+  "permissions": [
+    "android.permission.READ_MEDIA_IMAGES: granted=true, flags=[ USER_SET|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]",
+    "android.permission.CAMERA: granted=true, flags=[ USER_SET|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]",
+    "android.permission.READ_MEDIA_VIDEO: granted=false, flags=[ USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]"
+  ],
+  "photoCount": 2,
+  "unchangedPhotoSha256": {
+    "files/photos/project-1794239159621-hbxln72m/photo-1794239296471-393lqn5h.jpg": "ab9a11ab66b61156708c0a80c76f34b58dbe4249eb7f26f48cff9dcfc303865b  files/photos/project-1794239159621-hbxln72m/photo-1794239296471-393lqn5h.jpg",
+    "files/photos/project-1794239159621-hbxln72m/photo-1794239335909-sh0uu8pb.jpg": "d6c70720be9a2dab11b717c387c4f2e3b8ad762d2f74211de89ccfdef6e99f97  files/photos/project-1794239159621-hbxln72m/photo-1794239335909-sh0uu8pb.jpg"
+  },
+  "errorLogSinceUtc": "11-09 15:48:15.000",
+  "errorLines": [],
+  "finalState": "camera main; rear; zoom1; torch off; timer off"
+}

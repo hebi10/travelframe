@@ -1,0 +1,38 @@
+name: TF-RELEASE-AUTO-01 offline safety validation
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/tf-release-auto-01.yml'
+      - '.github/workflows/tf-release-auto-validation.yml'
+      - '.github/workflows/android-play-aab.yml'
+      - '.github/workflows/body-frame-device-qa.yml'
+      - '.github/workflows/play-internal-release.yml'
+      - '.github/workflows/play-closed-release.yml'
+      - 'scripts/release/tf_release_orchestrator.py'
+      - 'scripts/release/test_tf_release_auto_contract.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check Python syntax and offline fail-closed tests
+        run: |
+          python3 -m py_compile scripts/release/tf_release_orchestrator.py
+          python3 -m unittest discover -s scripts/release -p 'test_tf_release_auto*.py' -v
+      - name: Check OPS-07 and OPS-08 release policy regressions
+        run: |
+          python3 -m unittest discover -s scripts/ops07 -p 'test_*.py' -v
+          python3 -m unittest discover -s scripts/ops08 -p 'test_*.py' -v
+          python3 scripts/ops08/final_audit.py --report /tmp/tf-ops08.json

@@ -36,6 +36,10 @@ const runExport = async (storedCount, overrides = {}) => {
     FileSystem: { deleteAsync: async () => {} },
     setAlbumRetryUri: uri => albumRetries.push(uri),
     activeProject: { id: "a", name: "기록" },
+    editingVideo: null,
+    selectedTrack: null,
+    normalizeBodyFrameVideoOptions: (value) => value,
+    getMeasurementForPhoto: () => null,
     projectPhotos: [{ id: "photo", uri: "file:///photo.jpg" }],
     isExporting: false,
     planEntitlements: { canExportVideo: true, localVideoLimit: 30, weeklyVideoExportLimit: 0 },
@@ -114,7 +118,7 @@ for (const ratio of ["3:4", "9:16", "1:1", "16:9"]) {
     const outputSize = videoHelpers.getBodyFrameVideoOutputSize(ratio, quality);
     const totalFrames = videoHelpers.getBodyFrameVideoTotalFrames(7, 0.2);
     const record = vm.runInNewContext(compile(`(${recordCallback})`), {
-      recordingViewAvailable: true,
+      recordingViewAvailable: true, selectedTrack: null,
       FileSystem: {
         cacheDirectory: "file:///cache/", getInfoAsync: async () => ({ exists: true, size: 50 }),
         makeDirectoryAsync: async () => {}, deleteAsync: async () => {}

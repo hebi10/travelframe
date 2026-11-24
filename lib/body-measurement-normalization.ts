@@ -1,5 +1,6 @@
 import {
   defaultBodyMeasurementSettings,
+  bodyMeasurementValueFields,
   type BodyMeasurementEntry,
   type BodyMeasurementFields,
   type BodyMeasurementMetric,
@@ -76,6 +77,9 @@ export const normalizeBodyMeasurementSettings = (
   };
 };
 
+const getLegacyManualFields = (values: Pick<BodyMeasurementEntry, "skeletalMuscleKg" | "waistCm" | "note">) =>
+  (["skeletalMuscleKg", "waistCm", "note"] as const).filter((field) => values[field] !== undefined);
+
 export const normalizeBodyMeasurementEntry = (
   value: unknown
 ): BodyMeasurementEntry | null => {
@@ -116,6 +120,18 @@ export const normalizeBodyMeasurementEntry = (
       ? record.sourceAppPackage.trim()
       : undefined;
 
+  const source = record.source === "health_connect" ? "health_connect" : "manual";
+  const skeletalMuscleKg = normalizeOptionalNumber(record.skeletalMuscleKg, measurementRanges.skeletalMuscleKg);
+  const waistCm = normalizeOptionalNumber(record.waistCm, measurementRanges.waistCm);
+  const manualFields = source !== "health_connect" ? [] : Array.isArray(record.manualFields)
+    ? bodyMeasurementValueFields.filter((field) => (record.manualFields as unknown[]).includes(field))
+    : getLegacyManualFields({ skeletalMuscleKg, waistCm, note });
+  const manualRecordedAt = manualFields.length ? normalizeIsoDate(record.manualRecordedAt) : null;
+  const sourceMemberIds = source === "health_connect" && Array.isArray(record.sourceMemberIds)
+    ? [...new Set(record.sourceMemberIds.flatMap((value: unknown) =>
+        typeof value === "string" && value.trim() ? [value.trim()] : []))]
+    : [];
+
   return {
     id,
     projectId,
@@ -133,21 +149,38 @@ export const normalizeBodyMeasurementEntry = (
           )
         }
       : {}),
-    ...(normalizeOptionalNumber(record.skeletalMuscleKg, measurementRanges.skeletalMuscleKg) !== undefined
-      ? {
-          skeletalMuscleKg: normalizeOptionalNumber(
-            record.skeletalMuscleKg,
-            measurementRanges.skeletalMuscleKg
-          )
-        }
-      : {}),
-    ...(normalizeOptionalNumber(record.waistCm, measurementRanges.waistCm) !== undefined
-      ? { waistCm: normalizeOptionalNumber(record.waistCm, measurementRanges.waistCm) }
-      : {}),
+    ...(skeletalMuscleKg !== undefined ? { skeletalMuscleKg } : {}),
+    ...(waistCm !== undefined ? { waistCm } : {}),
     ...(note ? { note } : {}),
-    source: record.source === "health_connect" ? "health_connect" : "manual",
+    source,
     ...(sourceRecordId ? { sourceRecordId } : {}),
-    ...(sourceAppPackage ? { sourceAppPackage } : {})
+    ...(sourceAppPackage ? { sourceAppPackage } : {}),
+    ...(sourceMemberIds.length ? { sourceMemberIds } : {}),
+    ...(manualFields.length ? { manualFields } : {}),
+    ...(manualRecordedAt ? { manualRecordedAt } : {})
+  };
+};
+
+export const getCloudBodyMeasurement = (entry: BodyMeasurementEntry, backedUpAt: string) => {
+  const { sourceAppPackage, sourceRecordId, sourceMemberIds, manualFields, manualRecordedAt, ...local } = entry;
+  if (local.source === "manual") return local;
+  const fields = manualFields ?? getLegacyManualFields(entry);
+  const values = Object.fromEntries(fields
+    .filter((field) => entry[field] !== undefined)
+    .map((field) => [field, entry[field]]));
+  if (!Object.keys(values).length) return null;
+
+  // Older records stored the import time in the local ID, independently of the Health Connect timestamp.
+  const importedAt = /^measurement-(\d{13})-/.exec(entry.id)?.[1];
+  const legacyDate = importedAt ? new Date(Number(importedAt)).toISOString() : backedUpAt;
+  return {
+    id: entry.id,
+    projectId: entry.projectId,
+    ...(entry.photoId ? { photoId: entry.photoId } : {}),
+    ...(entry.sequence ? { sequence: entry.sequence } : {}),
+    recordedAt: manualRecordedAt ?? legacyDate,
+    source: "manual" as const,
+    ...values
   };
 };
 

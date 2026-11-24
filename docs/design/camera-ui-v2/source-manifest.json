@@ -1,0 +1,17 @@
+{
+  "head": "4ca8b4abe2bf6eb44731bf4b45499f1603481ea8",
+  "branch": "dev/local-android",
+  "committed": false,
+  "files": {
+    "features/camera/CameraScreen.tsx": "30dd8b2e98f812438f45c23a121f81320c245b48bd2c93008e434c46d18cdd69",
+    "features/camera/camera-screen.components.tsx": "f82c3bcd4fcc0cd69744a5c0f8a3e870283b15b6fb56609f2864919179a95dbb",
+    "features/camera/camera-screen.styles.ts": "8a7f24d7d10cfee73b11e9a563b59e897b861326031dfb48a774ff725103b81a",
+    "features/camera/camera-screen.model.ts": "306eb8f712de9344bbfcc6df1b0df1aa5df8bbdf4ab83e639243efa3f5ca4158",
+    "features/camera/BodyFrameProjectSwitcher.tsx": "5c57ce5d5044554a387667c866f3b4510e12eb6fff97efb82123454e6fd3ab45",
+    "components/body-frame-sheet.tsx": "e52686314ebc9c06f65636f32b449d74836d29e45b609772648080ff7918a6ba",
+    "lib/app-settings.ts": "f15617be649605c4498c2acf7a42c6340ffa355a4f00cca15791d389950eae31",
+    "lib/body-frame-capture-context.ts": "e91ff476ac7e9b50fc1292d52fd2e24072f351c43d127fe0240804ca898699e5",
+    "lib/camera-zoom-session.ts": "0037a8adc8d29221a3f725cdc2d319c1f2d59d581dc4daede2c2496280b566ef",
+    "lib/camera-exposure-session.ts": "464b151ec9e64258c3248a1eb36175b99df897f45223ee2c22b82f5bc813b48b"
+  }
+}

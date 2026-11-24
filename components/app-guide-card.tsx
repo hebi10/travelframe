@@ -1,231 +1,182 @@
 import { AppText as Text } from "@/components/app-text";
 import { Image } from "expo-image";
+import { Feather } from "@expo/vector-icons";
 import {
   Pressable,
   StyleSheet,
   View
 } from "react-native";
 
-import { bodyFrameDesign, bodyFrameTypography, colors, controls, getBodyFrameControlColors, typography } from "@/constants/app-theme";
+import { bodyFrameDesign, bodyFrameTypography, getBodyFrameControlColors } from "@/constants/app-theme";
 import type { AppGuideStep } from "@/constants/app-guide-steps";
+import { getAppGuideArtwork } from "@/constants/app-guide-artwork";
 import { useAppAppearance } from "@/lib/app-appearance";
 
 type AppGuideCardProps = {
   step: AppGuideStep;
+};
+
+type AppGuideNavigationProps = {
   current: number;
   total: number;
   canGoBack: boolean;
   onBack: () => void;
   onNext: () => void;
-  onSkip: () => void;
 };
 
-export function AppGuideCard({
-  step,
+export function AppGuideCard({ step }: AppGuideCardProps) {
+  const { palette } = useAppAppearance();
+  const artwork = getAppGuideArtwork(step.id);
+  const isCaptureIntro = step.id === "body-frame-welcome";
+
+  return (
+    <View style={styles.card}>
+      <Text accessibilityRole="header" textBreakStrategy="balanced" selectable={false} style={[styles.textBase, styles.title, { color: palette.text }]}>
+        {step.title}
+      </Text>
+
+      {artwork ? (
+        <Image
+          testID="app-guide-artwork"
+          source={artwork}
+          recyclingKey={step.id}
+          style={[
+            styles.artwork,
+            isCaptureIntro && styles.captureArtwork,
+            { borderColor: palette.line, backgroundColor: palette.background }
+          ]}
+          contentFit={isCaptureIntro ? "cover" : "contain"}
+          accessible={false}
+        />
+      ) : null}
+
+      <Text selectable={false} style={[styles.textBase, styles.description, isCaptureIntro && styles.captureDescription, { color: palette.muted }]}>
+        {step.description}
+      </Text>
+    </View>
+  );
+}
+
+export function AppGuideNavigation({
   current,
   total,
   canGoBack,
   onBack,
-  onNext,
-  onSkip
-}: AppGuideCardProps) {
+  onNext
+}: AppGuideNavigationProps) {
   const { palette } = useAppAppearance();
   const isLast = current === total;
   const { primaryBackground: activeColor, primaryText: activeTextColor } = getBodyFrameControlColors(palette);
-  const artwork =
-    step.id === "body-frame-project" || step.id === "body-frame-records"
-      ? require("../assets/ui/illustrations/feature-records.png")
-      : step.id === "body-frame-reference"
-        ? require("../assets/ui/illustrations/feature-compare.png")
-        : step.id === "body-frame-measurements"
-          ? require("../assets/ui/illustrations/empty-metrics.png")
-          : step.id === "body-frame-video"
-            ? require("../assets/ui/illustrations/feature-video.png")
-            : step.id === "body-frame-settings-backup"
-              ? require("../assets/ui/illustrations/feature-backup.png")
-              : step.id === "body-frame-settings"
-                ? require("../assets/ui/illustrations/feature-capture.png")
-                : null;
 
   return (
-    <View style={[styles.card, { borderColor: palette.text, backgroundColor: palette.background }]}>
-      <View style={styles.metaRow}>
-        <Text selectable={false} style={[styles.textBase, styles.meta, { color: palette.muted }]}>
-          {current} / {total}
-        </Text>
-        {step.targetLabel ? (
-          <View style={[styles.targetPill, { borderColor: palette.line }]}>
-            <Text selectable={false} style={[styles.textBase, styles.targetText, { color: palette.text }]}>
-              {step.targetLabel}
-            </Text>
-          </View>
-        ) : null}
-      </View>
-
-      {artwork ? (
-        <Image source={artwork} style={styles.artwork} contentFit="contain" accessible={false} />
-      ) : null}
-
-      <View style={styles.copy}>
-        <Text selectable={false} style={[styles.textBase, styles.title, { color: palette.text }]}>
-          {step.title}
-        </Text>
-        <Text selectable={false} style={[styles.textBase, styles.description, { color: palette.muted }]}>
-          {step.description}
-        </Text>
-      </View>
-
-      <View style={styles.actions}>
+    <View style={[styles.actions, { backgroundColor: palette.surface }]}>
+      {canGoBack ? (
         <Pressable
           accessibilityRole="button"
-          style={[styles.textButton, { borderColor: palette.line }]}
-          onPress={onSkip}
+          accessibilityLabel="이전"
+          style={[styles.secondaryButton, { borderColor: palette.line }]}
+          onPress={onBack}
         >
-          <Text selectable={false} style={[styles.textBase, styles.textButtonLabel, { color: palette.muted }]}>
-            스킵
+          <Feather name="chevron-left" size={bodyFrameDesign.iconSize} color={palette.text} accessible={false} />
+          <Text selectable={false} style={[styles.textBase, styles.secondaryButtonLabel, { color: palette.text }]}>
+            이전
           </Text>
         </Pressable>
-        <View style={styles.stepActions}>
-          {canGoBack ? (
-            <Pressable
-              accessibilityRole="button"
-              style={[styles.secondaryButton, { borderColor: palette.line }]}
-              onPress={onBack}
-            >
-              <Text selectable={false} style={[styles.textBase, styles.secondaryButtonLabel, { color: palette.text }]}>
-                이전
-              </Text>
-            </Pressable>
-          ) : null}
-          <Pressable
-            accessibilityRole="button"
-            style={[styles.primaryButton, { borderColor: activeColor, backgroundColor: activeColor }]}
-            onPress={onNext}
-          >
-            <Text selectable={false} style={[styles.textBase, styles.primaryButtonLabel, { color: activeTextColor }]}>
-              {isLast ? "완료" : "다음"}
-            </Text>
-          </Pressable>
-        </View>
+      ) : null}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={isLast ? "완료" : "다음"}
+        style={[styles.primaryButton, { borderColor: activeColor, backgroundColor: activeColor }]}
+        onPress={onNext}
+      >
+        <Text selectable={false} style={[styles.textBase, styles.primaryButtonLabel, { color: activeTextColor }]}>
+          {isLast ? "완료" : "다음"}
+        </Text>
+        <Feather name={isLast ? "check" : "arrow-right"} size={bodyFrameDesign.iconSize} color={activeTextColor} accessible={false} />
+      </Pressable>
       </View>
-    </View>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
     width: "100%",
-    gap: 16,
-    padding: 18,
-    borderWidth: 0,
-    backgroundColor: colors.background
+    gap: 20,
+    paddingHorizontal: 20,
+    paddingTop: 0,
+    paddingBottom: 20
   },
   textBase: {
-    backgroundColor: "transparent"
-  },
-  metaRow: {
-    minHeight: 28,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 10
-  },
-  meta: {
-    color: colors.muted,
-    fontSize: 12,
-    fontWeight: "600",
-    letterSpacing: 0
-  },
-  targetPill: {
-    minHeight: 28,
-    justifyContent: "center",
-    paddingHorizontal: 10,
-    borderWidth: 1,
-    borderRadius: bodyFrameDesign.buttonRadius
-  },
-  targetText: {
-    color: colors.text,
-    fontSize: bodyFrameTypography.caption,
-    fontWeight: "600",
-    letterSpacing: 0
+    backgroundColor: "transparent",
+    includeFontPadding: false
   },
   artwork: {
     width: "100%",
-    height: 112,
+    aspectRatio: 1.5,
+    maxHeight: 280,
+    borderRadius: bodyFrameDesign.cardRadius,
+    borderWidth: 1,
     alignSelf: "center"
   },
-  copy: {
-    gap: 8
+  captureArtwork: {
+    aspectRatio: 1.95
+  },
+  captureDescription: {
+    fontWeight: "700"
   },
   title: {
-    color: colors.text,
     fontSize: bodyFrameTypography.projectTitle,
-    fontWeight: "600",
-    lineHeight: 29,
+    fontWeight: "700",
+    lineHeight: 32,
     letterSpacing: 0
   },
   description: {
-    color: colors.muted,
-    fontSize: typography.body,
-    lineHeight: 21,
+    fontSize: bodyFrameTypography.body,
+    lineHeight: 22,
     letterSpacing: 0
   },
   actions: {
-    minHeight: controls.height,
+    flexShrink: 0,
+    paddingHorizontal: 20,
+    paddingBottom: 28,
     flexDirection: "row",
     flexWrap: "wrap",
     alignItems: "center",
-    justifyContent: "space-between",
-    gap: 10
-  },
-  stepActions: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    flexShrink: 1,
-    alignItems: "center",
-    gap: 8
-  },
-  textButton: {
-    minHeight: bodyFrameDesign.minTouchSize,
-    justifyContent: "center",
-    paddingHorizontal: 10,
-    borderWidth: 1,
-    borderRadius: 8
-  },
-  textButtonLabel: {
-    color: colors.muted,
-    fontSize: bodyFrameTypography.button,
-    fontWeight: "600",
-    letterSpacing: 0
+    gap: 12
   },
   secondaryButton: {
-    minWidth: 58,
-    minHeight: 44,
+    minWidth: 72,
+    minHeight: bodyFrameDesign.primaryButtonHeight,
     alignItems: "center",
     justifyContent: "center",
+    flexDirection: "row",
+    gap: 4,
     paddingHorizontal: 12,
     borderWidth: 1,
-    borderRadius: 8
+    borderRadius: bodyFrameDesign.buttonRadius
   },
   secondaryButtonLabel: {
-    color: colors.text,
     fontSize: bodyFrameTypography.button,
+    lineHeight: 20,
     fontWeight: "600",
     letterSpacing: 0
   },
   primaryButton: {
-    minWidth: 64,
+    flex: 1,
+    minWidth: 96,
     minHeight: bodyFrameDesign.primaryButtonHeight,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 14,
+    flexDirection: "row",
+    gap: 8,
+    paddingHorizontal: 20,
     borderWidth: 1,
-    borderRadius: 8
+    borderRadius: bodyFrameDesign.buttonRadius
   },
   primaryButtonLabel: {
-    color: colors.inverse,
     fontSize: bodyFrameTypography.button,
-    fontWeight: "600",
+    lineHeight: 20,
+    fontWeight: "700",
     letterSpacing: 0
   }
 });

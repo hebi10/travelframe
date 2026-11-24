@@ -34,7 +34,9 @@ const scope = {
   defaultOverlayOpacity: { current: 0.4 },
   referenceOverlayRef: { current: { reset: () => { resets++; } } },
   setOverlayResetKey: () => { assert.fail("Hiding must not reassign a stale manual guide to the current project"); },
-  setReferenceUri: () => { assert.fail("Hiding must retain the current guide for restoring"); }
+  referenceUri: null,
+  bodyFrameCameraSession: { automaticReferenceUri: "file:///automatic.jpg" },
+  setReferenceUri: value => { assert.equal(value, null); }
 };
 
 runHandler("removeReferenceOverlay", scope);
@@ -53,4 +55,7 @@ assert.equal(visible, true);
 assert.deepEqual(persistedPatches.at(-1), { referencePhotoVisible: true });
 assert.equal(setup, true);
 
-console.log("ok - reference guide visibility persists while retaining the current guide image");
+runHandler("removeReferenceOverlay", { ...scope, referenceUri: "file:///manual.jpg" });
+assert.equal(visible, true, "removing a manual guide returns to the project guide");
+assert.deepEqual(persistedPatches.at(-1), { referencePhotoVisible: true });
+console.log("ok - removing manual or automatic guides persists the correct visibility");

@@ -29,6 +29,7 @@ import xml.etree.ElementTree as ET
 PACKAGE = 'com.haebi.photoguide'
 PROJECT = 'qa-demo-project'
 PHOTO = 'qa-demo-photo-1'
+GUEST_VIDEO_SIZE = (720, 960)
 ROOT = Path(__file__).resolve().parents[1]
 PROFILES = [('mobile', '720x1600', 320), ('tablet', '1200x1920', 240)]
 DESIGN_PROFILES = [
@@ -72,6 +73,26 @@ def pattern_rgb(index, width=720, height=960):
 
 @lru_cache(maxsize=6)
 def fixture_jpeg(index, preview=False):
+    if os.environ.get('BODY_FRAME_STORE_DEMO_FIXTURES') == '1':
+        media = {
+            1: ('demo-01.jpg', '49d0f8d95510b9b0eeef517001f8c52e19c2b1600484d035ecc85e5352ff3bcb'),
+            2: ('demo-02.jpg', '5cdf2cc2a8868c3d4794fbc29ddd49248a202aef9a3b05d61e7cc8124e2a923a'),
+            3: ('demo-03.jpg', '933cb741e05caa1fe97f48e6395a8e7a1488a40af387a02e3a5965fac4e3446c'),
+        }
+        file_name, digest = media[index]
+        source = ROOT / 'assets' / 'store-demo' / file_name
+        raw = source.read_bytes()
+        if len(raw) > 500_000 or not raw.startswith(bytes.fromhex('ffd8')) or not raw.endswith(bytes.fromhex('ffd9')):
+            raise ValueError('STORE-03-B media must be a small approved JPEG')
+        if hashlib.sha256(raw).hexdigest() != digest:
+            raise ValueError('STORE-03-B media hash mismatch')
+        if not preview:
+            return raw
+        return subprocess.run(
+            ['ffmpeg', '-v', 'error', '-i', 'pipe:0', '-vf', 'scale=360:480:flags=lanczos',
+             '-frames:v', '1', '-q:v', '2', '-f', 'mjpeg', 'pipe:1'],
+            input=raw, capture_output=True, check=True, timeout=30
+        ).stdout
     width, height = (360,480) if preview else (720,960)
     ppm = f'P6\n{width} {height}\n255\n'.encode()+pattern_rgb(index,width,height)
     return subprocess.run(['ffmpeg','-v','error','-f','image2pipe','-vcodec','ppm','-i','pipe:0',
@@ -99,7 +120,7 @@ def inspect_native_frames(path, directory):
     for index, frame in enumerate([0,3,6],1):
         data=subprocess.run(['ffmpeg','-v','error','-i',str(path),'-vf',f'select=eq(n\\,{frame})',
             '-frames:v','1','-f','rawvideo','-pix_fmt','rgb24','pipe:1'],capture_output=True,check=True,timeout=30).stdout
-        item=validate_marker_pixels(data,1080,1440,index)
+        item=validate_marker_pixels(data, *GUEST_VIDEO_SIZE, index)
         item['frame']=frame
         evidence.append(item)
         subprocess.run(['ffmpeg','-v','error','-y','-i',str(path),'-vf',f'select=eq(n\\,{frame})',
@@ -309,6 +330,14 @@ def prepare_native_hierarchy(device,output):
     return metadata
 
 
+class AdbTransportError(RuntimeError):
+    """The selected emulator is offline or no longer registered with ADB."""
+
+
+def adb_disconnected(output):
+    return bool(re.search(r"\bdevice offline\b|\bdevice (?:'[^']+' )?not found\b|no devices/emulators found", output, re.I))
+
+
 class Device:
     def __init__(self, serial=None):
         self.prefix = ['adb'] + (['-s', serial] if serial else [])
@@ -316,12 +345,27 @@ class Device:
         self.command_stderr=''
         self.hierarchy_sequence=0
 
+    def transport_disconnected(self):
+        try:
+            state = subprocess.run([*self.prefix, 'get-state'], capture_output=True, timeout=4)
+        except (OSError, subprocess.TimeoutExpired):
+            return False
+        return state.stdout.strip() == b'offline' or adb_disconnected(state.stderr.decode(errors='replace'))
+
     def run(self, *args, binary=False, check=True, data=None, timeout=120):
-        result = subprocess.run([*self.prefix, *map(str, args)], input=data,
-                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=timeout)
+        try:
+            result = subprocess.run([*self.prefix, *map(str, args)], input=data,
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=timeout)
+        except subprocess.TimeoutExpired as error:
+            if check and self.transport_disconnected():
+                raise AdbTransportError(f'adb {args}: emulator disconnected during command timeout') from error
+            raise
         self.command_stderr=result.stderr.decode(errors='replace')
         if check and result.returncode:
-            raise RuntimeError(f'adb {args}: {result.stderr.decode(errors="replace")}')
+            if adb_disconnected(self.command_stderr) or (not self.command_stderr.strip() and self.transport_disconnected()):
+                raise AdbTransportError(f'adb {args}: {self.command_stderr.strip() or "emulator disconnected"}')
+            detail = self.command_stderr.strip() or result.stdout.decode(errors='replace').strip()
+            raise RuntimeError(f'adb {args} exited {result.returncode}: {detail or "no output"}')
         return result.stdout if binary else result.stdout.decode(errors='replace')
 
     def shell(self, *args, **kwargs):
@@ -362,6 +406,7 @@ class Device:
         backend='native-no-idle' if self.native_hierarchy_jar else 'legacy-uiautomator'
         evidence=dict(sequence=self.hierarchy_sequence,backend=backend,remotePath=target,startedAt=datetime.now(timezone.utc).isoformat(),requestedClickLabel=click_label,acknowledged=False)
         unacknowledged_xml=None
+        transport_lost = False
         try:
             self.shell('rm','-f',target)
             if self.native_hierarchy_jar:
@@ -391,8 +436,9 @@ class Device:
             self.last_hierarchy_evidence=evidence
             return xml
         except Exception as error:
+            transport_lost = isinstance(error, AdbTransportError)
             evidence.update(error=str(error),stderr=self.command_stderr,acknowledged=False)
-            if click_label is not None:
+            if click_label is not None and not transport_lost:
                 try:
                     raw=self.run('exec-out','cat',target,check=False,timeout=5)
                     if raw.strip():
@@ -411,7 +457,7 @@ class Device:
             folder=Path(directory)/'diagnostics/hierarchy-dumps' if directory else None
             if folder:folder.mkdir(parents=True,exist_ok=True)
             archive_error=None
-            if click_label is not None:
+            if click_label is not None and not transport_lost:
                 evidence['acquisitionSnapshots']=[]
                 try:
                     listing=self.shell('find','/data/local/tmp','-maxdepth','1','-type','f','-name',Path(target).name+'.attempt-*.xml',timeout=5)
@@ -432,7 +478,13 @@ class Device:
                 except Exception as error:
                     evidence['acquisitionArchiveError']=str(error)
                     if 'error' not in evidence:archive_error=RuntimeError('Native acquisition snapshots could not be retained: '+str(error))
-            try:self.shell('rm','-f',target,*([target+'.preclick.png'] if click_label is not None else []),check=False,timeout=5)
+            try:
+                if not transport_lost:
+                    self.shell('rm','-f',target,*([target+'.preclick.png'] if click_label is not None else []),timeout=5)
+            except (RuntimeError, subprocess.TimeoutExpired) as error:
+                evidence['cleanupError'] = str(error)
+                if 'error' not in evidence and isinstance(error, (AdbTransportError, subprocess.TimeoutExpired)):
+                    raise
             finally:
                 if folder:
                     if click_label is not None and evidence.get('acknowledged'):
@@ -448,7 +500,7 @@ class Device:
         if restart:
             self.shell('am', 'force-stop', PACKAGE)
         self.shell('am', 'start', '-W', '-a', 'android.intent.action.VIEW',
-                   '-d', 'bodyframe://' + route, '-p', PACKAGE)
+                   '-d', 'bodyframe://' + route, '-p', PACKAGE, timeout=45)
         time.sleep(2)
 
     def ready(self, expected, seconds=45):
@@ -580,6 +632,8 @@ class Device:
             if all(any(marker in text for text in strings) for marker in expected):return current
             self.tap(label,match=match)
             try:return self.ready(expected,seconds=10)
+            except AdbTransportError:
+                raise
             except RuntimeError:
                 # Recheck before retrying; an animation may have completed meanwhile.
                 current=self.dump();strings=ui_strings(current)
@@ -674,8 +728,12 @@ def capture(device, directory, name, route, expected, action=None, open_route=Tr
                       sha256=hashlib.sha256(image).hexdigest(), visibleText=ui_strings(xml), foreground=resumed)
     except Exception as error:
         record.update(status='failed', error=str(error))
+        if isinstance(error, AdbTransportError):
+            record['failureKind'] = 'adb-transport'
+            (directory / f'{name}.json').write_text(json.dumps(record, indent=2, ensure_ascii=False))
+            raise
         try:
-            (directory / f'{name}.failure.png').write_bytes(device.run('exec-out', 'screencap', '-p', binary=True))
+            (directory / f'{name}.failure.png').write_bytes(device.run('exec-out', 'screencap', '-p', binary=True, timeout=8))
             (directory / f'{name}.failure.xml').write_text(device.dump())
         except Exception as diagnostics_error:
             record['diagnosticsError'] = str(diagnostics_error)
@@ -734,15 +792,15 @@ def creation_keyboard(device):
 
 def onboarding_welcome(device):
     device.ready(['기준 사진 표시'])
-    device.tap('사용 가이드',match='summary')
-    device.ready(['바디 프레임에 오신 것을 환영합니다.'])
-    device.find_control('다음')  # Scroll inside the real guide when large text pushes it below the fold.
+    device.tap('사용 가이드', match='summary', search='below')
+    device.ready(['첫 사진을 남겨 보세요'])
+    device.find_control('다음')  # Verify the pinned guide footer is reachable at large text sizes.
 
 
 def onboarding_scrolled(device):
     onboarding_welcome(device)
     device.tap('다음')
-    device.ready(['프로젝트로 기록을 나눕니다'])
+    device.ready(['프로젝트별 기록'])
     device.find_control('다음')  # Verify the footer is reachable without advancing the step.
 
 
@@ -764,8 +822,8 @@ def validate_video_probe(probe):
     stream = next((stream for stream in probe.get('streams', []) if stream.get('codec_type') == 'video'), None)
     if not stream or stream.get('codec_name') != 'h264':
         raise ValueError('Native recorder did not produce an H.264 video stream')
-    if (stream.get('width'), stream.get('height')) != (1080, 1440):
-        raise ValueError('Native video dimensions do not match default 1080p 3:4 output')
+    if (stream.get('width'), stream.get('height')) != GUEST_VIDEO_SIZE:
+        raise ValueError('Native video dimensions do not match the guest 720p 3:4 output')
     duration = float(probe.get('format', {}).get('duration', 0))
     if abs(duration-0.3) > 1/30+0.0001:
         raise ValueError(f'Unexpected duration for three 0.1-second photos: {duration}')
@@ -1115,7 +1173,7 @@ def capture_design_matrix(device, output, records, manifest):
         ('camera', 'camera', ['프로젝트 선택', '사진 촬영'], None),
         ('records', 'studio', ['QA 데모', '내 프로젝트'], None),
         ('project', f'project/{PROJECT}', ['QA 데모', '프로젝트 설정 열기'], None),
-        ('compare', f'project/{PROJECT}/compare', ['전후 사진 비교', '첫 사진', '마지막 사진'], None),
+        ('compare', f'project/{PROJECT}/compare', ['전후 사진 비교', '이전 · #1', '현재 · #3'], None),
         ('measurements', f'project/{PROJECT}/measurements', ['수치 기록', 'QA 데모'], None),
         ('video-home', 'trip-clip', ['변화 영상 만들기'], None),
         ('video-create', 'video-create', ['변화 영상 만들기', 'QA 데모'], None),
@@ -1158,7 +1216,7 @@ def capture_design_matrix(device, output, records, manifest):
                 records.append(record)
             if variant == 'dark-150':
                 record = capture(device, directory, 'onboarding-large-font', 'settings',
-                                 ['바디 프레임에 오신 것을 환영합니다.', '다음'],
+                                 ['첫 사진을 남겨 보세요', '다음'],
                                  onboarding_welcome)
                 record.update(profile=profile, variant=variant, theme=theme,
                               fontScale=system_scale, appFont=app_font)
@@ -1173,6 +1231,27 @@ def capture_design_matrix(device, output, records, manifest):
             device.shell('wm', 'size') + device.shell('wm', 'density') +
             device.shell('getprop', 'ro.build.version.sdk'))
     device.shell('settings', 'put', 'system', 'font_scale', '1.0')
+
+
+def finish_emulator_capture(device, output):
+    errors = {}
+    try:
+        logcat = device.run('logcat', '-d', timeout=8)
+        (output / 'logcat.txt').write_text(logcat, encoding='utf-8')
+    except (RuntimeError, subprocess.TimeoutExpired, OSError) as error:
+        errors['logcat'] = str(error)
+        if isinstance(error, AdbTransportError):
+            return errors
+
+    for command in [('am', 'force-stop', PACKAGE), ('wm', 'size', 'reset'),
+                    ('wm', 'density', 'reset'), ('settings', 'put', 'system', 'font_scale', '1.0')]:
+        try:
+            device.shell(*command, timeout=5)
+        except (RuntimeError, subprocess.TimeoutExpired, OSError) as error:
+            errors[shlex.join(command)] = str(error)
+            if isinstance(error, AdbTransportError):
+                break
+    return errors
 
 
 def main():
@@ -1199,9 +1278,11 @@ def main():
                             'Photo editor requires login: guest capture shows the real login-required alert'], captures=records)
     if args.trust_manifest:
         manifest['apkTrust']=json.loads(args.trust_manifest.read_text())
+    verified_emulator = False
     try:
-        if device.shell('getprop', 'ro.kernel.qemu').strip() != '1':
+        if device.shell('getprop', 'ro.kernel.qemu', timeout=10).strip() != '1':
             raise RuntimeError('Refusing to seed a physical Android device')
+        verified_emulator = True
         device.run('install', '-r', '-g', args.apk.resolve())
         manifest['hierarchyBackend']=prepare_native_hierarchy(device,args.output)
         device.shell('svc', 'wifi', 'disable')
@@ -1247,7 +1328,7 @@ def main():
                     ('photo', f'photo/{PHOTO}', ['기록 상세'], None),
                     ('photo-measurement', f'photo/{PHOTO}?measurement=1', ['몸무게', '체지방률', '저장'], None),
                     ('edit-login-required', 'edit?' + urlencode({'photoId': PHOTO}), ['로그인이 필요합니다', '사진 편집은 무료 로그인부터'], None),
-                    ('compare', f'project/{PROJECT}/compare', ['전후 사진 비교', '첫 사진', '마지막 사진'], None),
+                    ('compare', f'project/{PROJECT}/compare', ['전후 사진 비교', '이전 · #1', '현재 · #3'], None),
                     ('measurements', f'project/{PROJECT}/measurements', ['수치 기록', 'QA 데모'], None),
                     ('measurement-create', f'project/{PROJECT}/measurements?add=1', ['몸무게', '저장'], None),
                     ('video', 'trip-clip', ['변화 영상 만들기'], None),
@@ -1272,26 +1353,29 @@ def main():
                 device.seed(True, 'large')
                 device.shell('settings', 'put', 'system', 'font_scale', '1.3')
                 records.append(capture(device, directory, 'onboarding-welcome-large-font', 'settings',
-                                       ['바디 프레임에 오신 것을 환영합니다.', '다음'], onboarding_welcome))
+                                       ['첫 사진을 남겨 보세요', '다음'], onboarding_welcome))
                 records.append(capture(device, directory, 'onboarding-scroll-large-font', 'settings',
-                                       ['다음', '스킵'], onboarding_scrolled))
+                                       ['다음', '닫기'], onboarding_scrolled))
                 device.shell('settings', 'put', 'system', 'font_scale', '1.0')
                 device.seed(True)
                 records.extend(video_failure_and_background_smoke(device,directory))
                 records.extend(video_smoke(device, directory,restart=False))
                 (directory / 'device.txt').write_text(device.shell('wm', 'size') + device.shell('wm', 'density') + device.shell('getprop', 'ro.build.version.sdk'))
+    except AdbTransportError as error:
+        manifest['fatalError'] = str(error)
+        manifest['fatalKind'] = 'adb-transport'
+        raise
     except Exception as error:
         manifest['fatalError'] = str(error)
         raise
     finally:
         manifest['captured'] = sum(item.get('status') == 'captured' for item in records)
         manifest['failed'] = sum(item.get('status') != 'captured' for item in records)
-        (args.output / 'capture-manifest.json').write_text(json.dumps(manifest, indent=2, ensure_ascii=False))
-        (args.output / 'logcat.txt').write_text(device.run('logcat', '-d', check=False))
-        device.shell('am', 'force-stop', PACKAGE, check=False)
-        device.shell('wm', 'size', 'reset', check=False)
-        device.shell('wm', 'density', 'reset', check=False)
-        device.shell('settings', 'put', 'system', 'font_scale', '1.0', check=False)
+        if verified_emulator and manifest.get('fatalKind') != 'adb-transport':
+            errors = finish_emulator_capture(device, args.output)
+            if errors:
+                manifest['diagnosticErrors'] = errors
+        (args.output / 'capture-manifest.json').write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding='utf-8')
     if manifest['failed']:
         raise SystemExit(f"{manifest['failed']} requested native captures failed; inspect capture-manifest.json and failure screenshots")
 

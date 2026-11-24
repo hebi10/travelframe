@@ -17,16 +17,19 @@ import {
   getBodyHealthConnectAvailability,
   getBodyHealthConnectPermissionState,
   openBodyHealthConnectSettings,
-  readLatestBodyHealthConnectMeasurements,
+  readBodyHealthConnectMeasurements,
   requestBodyHealthConnectReadPermissions,
   type BodyHealthConnectAvailability,
   type BodyHealthConnectCandidate,
   type BodyHealthConnectMetric
 } from "@/lib/body-health-connect";
 import {
-  getBodyMeasurementBySourceRecordId,
+  deleteBodyMeasurement,
+  getBodyMeasurements,
   saveBodyMeasurement
 } from "@/lib/body-measurement-library";
+import { getPhotos } from "@/lib/photo-library";
+import { findHealthConnectPhoto, getHealthConnectReservedEntryIds, getHealthConnectSourceMemberIds, groupBodyHealthConnectMeasurements, resolveHealthConnectMeasurementMatch } from "@/lib/body-health-connect-import";
 import { useAppAppearance } from "@/lib/app-appearance";
 import {
   bodyMeasurementMetricMeta,
@@ -78,6 +81,7 @@ export function BodyHealthConnectImportCard({
   const [permissionGranted, setPermissionGranted] = useState(false);
   const [candidates, setCandidates] = useState<BodyHealthConnectCandidate[]>([]);
   const [loading, setLoading] = useState(false);
+  const groups = useMemo(() => groupBodyHealthConnectMeasurements(candidates), [candidates]);
   const [message, setMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -163,14 +167,14 @@ export function BodyHealthConnectImportCard({
         return;
       }
 
-      const next = await readLatestBodyHealthConnectMeasurements({
+      const next = await readBodyHealthConnectMeasurements({
         metrics: supportedMetrics,
         days: 30
       });
       setCandidates(next);
       setMessage(
         next.length > 0
-          ? "최근 30일에서 가져올 수 있는 최신 기록을 확인했습니다."
+          ? `최근 30일 기록 ${groupBodyHealthConnectMeasurements(next).length}건을 확인했습니다.`
           : "최근 30일에 가져올 수 있는 몸무게 또는 체지방 기록이 없습니다."
       );
     } catch {
@@ -190,26 +194,56 @@ export function BodyHealthConnectImportCard({
       let imported = 0;
       let skipped = 0;
 
-      for (const candidate of candidates) {
-        const existing = await getBodyMeasurementBySourceRecordId(
-          projectId,
-          candidate.sourceRecordId
-        );
-        if (existing) {
+      const [savedEntries, allPhotos] = await Promise.all([getBodyMeasurements(projectId), getPhotos()]);
+      const occupiedPhotoIds = new Set(savedEntries.flatMap((entry) => entry.photoId ? [entry.photoId] : []));
+      const projectPhotos = allPhotos.filter((photo) => photo.projectId === projectId);
+      const matchedEntryIds = new Set<string>();
+
+      const importGroups = groupBodyHealthConnectMeasurements(candidates, savedEntries);
+      const reservedEntryIds = getHealthConnectReservedEntryIds(importGroups);
+      for (const group of importGroups) {
+        const { existing, legacy } = resolveHealthConnectMeasurementMatch(group, savedEntries, matchedEntryIds, reservedEntryIds);
+        if (existing) matchedEntryIds.add(existing.id);
+        const photo = existing?.photoId ? undefined :
+          findHealthConnectPhoto(group.recordedAt, projectPhotos, occupiedPhotoIds);
+        const manualFields = existing?.manualFields ?? [];
+        const sourceMemberIds = getHealthConnectSourceMemberIds(existing, group);
+        const aliasesChanged = sourceMemberIds.length !== (existing?.sourceMemberIds?.length ?? 0);
+        const legacyDuplicates = [...new Set(legacy)].filter((entry) =>
+          entry.id !== existing?.id && !entry.photoId && !entry.sourceMemberIds?.length && !entry.manualRecordedAt && !entry.note &&
+          entry.skeletalMuscleKg === undefined && entry.waistCm === undefined &&
+          (entry.weightKg === undefined || entry.weightKg === group.weightKg) &&
+          (entry.bodyFatPercent === undefined || entry.bodyFatPercent === group.bodyFatPercent));
+        if (existing && !photo && !aliasesChanged && !legacyDuplicates.length &&
+            (group.weightKg === undefined || existing.weightKg !== undefined || manualFields.includes("weightKg")) &&
+            (group.bodyFatPercent === undefined || existing.bodyFatPercent !== undefined || manualFields.includes("bodyFatPercent"))) {
           skipped += 1;
           continue;
         }
 
         await saveBodyMeasurement({
+          id: existing?.id,
           projectId,
-          recordedAt: candidate.recordedAt,
-          ...(candidate.metric === "weight"
-            ? { weightKg: candidate.value }
-            : { bodyFatPercent: candidate.value }),
+          photoId: existing?.photoId ?? photo?.id,
+          sequence: existing?.sequence ?? photo?.sequence,
+          recordedAt: existing?.recordedAt ?? group.recordedAt,
+          weightKg: manualFields.includes("weightKg") ? existing?.weightKg : existing?.weightKg ?? group.weightKg,
+          bodyFatPercent: manualFields.includes("bodyFatPercent") ? existing?.bodyFatPercent : existing?.bodyFatPercent ?? group.bodyFatPercent,
+          skeletalMuscleKg: existing?.skeletalMuscleKg,
+          waistCm: existing?.waistCm,
+          note: existing?.note,
           source: "health_connect",
-          sourceRecordId: candidate.sourceRecordId,
-          sourceAppPackage: candidate.sourceAppPackage
+          sourceRecordId: existing?.sourceRecordId ?? group.sourceRecordId,
+          sourceMemberIds,
+          sourceAppPackage: group.sourceAppPackage,
+          manualFields: existing?.manualFields,
+          manualRecordedAt: existing?.manualRecordedAt
         });
+        for (const duplicate of legacyDuplicates) {
+          await deleteBodyMeasurement(duplicate.id, { projectDeletion: true });
+          matchedEntryIds.add(duplicate.id);
+        }
+        if (photo) occupiedPhotoIds.add(photo.id);
         imported += 1;
       }
 
@@ -234,7 +268,7 @@ export function BodyHealthConnectImportCard({
 
     Alert.alert(
       "Health Connect 기록을 가져올까요?",
-      "선택한 프로젝트의 로컬 수치 기록에 추가됩니다. Firebase에는 자동으로 업로드되지 않습니다.",
+      "선택한 프로젝트의 로컬 수치 기록에 추가됩니다. 같은 날의 사진에 연결될 수 있으며 Firebase에는 자동으로 업로드되지 않습니다.",
       [
         { text: "취소", style: "cancel" },
         {
@@ -275,7 +309,7 @@ export function BodyHealthConnectImportCard({
       </View>
 
       <Text style={[styles.policyText, { color: palette.muted }]}>
-        자동 동기화하지 않으며 최근 30일 기록만 확인합니다. 골격근량과 허리둘레는
+        최근 30일 기록을 한 번에 가져올 수 있습니다. 가져온 수치는 이 기기에 보관합니다. 골격근량과 허리둘레는
         Health Connect에서 자동으로 가져오지 않습니다.
       </Text>
 
@@ -300,7 +334,7 @@ export function BodyHealthConnectImportCard({
               onPress={() => void loadCandidates()}
             >
               <Text style={[styles.secondaryButtonText, { color: palette.text }]}>
-                {loading ? "불러오는 중" : "최신 기록 확인"}
+                {loading ? "불러오는 중" : "최근 기록 확인"}
               </Text>
             </Pressable>
           )}
@@ -325,7 +359,7 @@ export function BodyHealthConnectImportCard({
 
       {candidates.length > 0 ? (
         <View style={styles.preview}>
-          {candidates.map((candidate) => (
+          {candidates.slice(0, 6).map((candidate) => (
             <View key={candidate.sourceRecordId} style={styles.previewRow}>
               <View style={styles.previewCopy}>
                 <Text style={[styles.previewLabel, { color: palette.text }]}>
@@ -342,6 +376,11 @@ export function BodyHealthConnectImportCard({
             </View>
           ))}
 
+          {candidates.length > 6 ? (
+            <Text style={[styles.previewDate, { color: palette.muted }]}>
+              미리보기 6개 · 가져올 수치 기록 {groups.length}건
+            </Text>
+          ) : null}
           <Pressable
             disabled={loading}
             accessibilityRole="button"

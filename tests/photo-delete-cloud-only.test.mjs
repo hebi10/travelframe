@@ -16,12 +16,12 @@ assert.ok(
 );
 
 assert.ok(
-  deletePhotoSource.includes("await deleteLocalFile(photo.uri);"),
+  deletePhotoSource.includes("[photo.uri, photo.previewUri, photo.localUri, photo.localPreviewUri]"),
   "deletePhoto should delete the original through the remote-safe local file helper"
 );
 
 assert.ok(
-  deletePhotoSource.includes("await deleteLocalFile(photo.previewUri);"),
+  deletePhotoSource.includes(".map((uri) => deleteLocalFile(uri)"),
   "deletePhoto should delete previews through the remote-safe local file helper"
 );
 

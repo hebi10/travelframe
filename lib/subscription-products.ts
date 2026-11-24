@@ -1,3 +1,4 @@
+import { getAdRemoveSubscription } from "@/lib/plan-entitlements";
 import type { UserSubscription, UserSubscriptionProducts } from "@/lib/subscription";
 
 export const emptySubscriptionProducts: UserSubscriptionProducts = {
@@ -42,7 +43,7 @@ const isActivePremiumProduct = (
 export const getSubscriptionProductsFromSubscription = (
   subscription: UserSubscription | null
 ): UserSubscriptionProducts => ({
-  adRemove: isActivePremiumProduct(subscription, "ad_remove") ? subscription : null,
+  adRemove: getAdRemoveSubscription(subscription),
   creatorMonthly: isActivePremiumProduct(subscription, "creator_monthly")
     ? subscription
     : null,

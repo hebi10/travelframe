@@ -380,6 +380,15 @@ test("unknown expiry stays conservative and same item reservation is not counted
   await h.output.testCapacity({ uid, projectId, itemId: "pending-photo" });
 });
 
+test("full deletion must reject unconfirmed legacy callers before modifying data", async () => {
+  const h = harness();
+  await assert.rejects(
+    h.output.deleteCloudBackupData({ auth: { uid } }),
+    (error) => error.code === "failed-precondition"
+  );
+  assert.equal(h.deletes.length, 0);
+});
+
 test("full deletion includes orphan music documents and only owned, deduplicated Storage paths", async () => {
   const h = harness();
   const owned = `users/${uid}/music/orphan.mp3`;
@@ -390,7 +399,7 @@ test("full deletion includes orphan music documents and only owned, deduplicated
   h.objects.set(owned, { metadata: { musicSessionId: "pending" } });
   h.objects.set("users/other/music/untouched.mp3", {});
   h.objects.set(`users/${uid}/profile/avatar.jpg`, {});
-  await h.output.deleteCloudBackupData({ auth: { uid } });
+  await h.output.deleteCloudBackupData({ auth: { uid }, data: { confirmation: "DELETE_ALL_CLOUD_BACKUPS" } });
   assert.equal(h.docs.has(sessionPath), false, "orphan session document must be removed");
   assert.deepEqual(h.deletes, [owned], "linked and session references must share one deletion");
   assert.equal(h.objects.has("users/other/music/untouched.mp3"), true);
@@ -405,12 +414,12 @@ test("orphan music Storage failure retains cleanup references and retry tolerate
   const a = addSession(h, { collection: "musicUploadSessions", id: "a", storagePath: first });
   const b = addSession(h, { collection: "musicUploadSessions", id: "b", storagePath: second });
   h.objects.set(first, {}); h.objects.set(second, {}); h.fail(second);
-  await assert.rejects(h.output.deleteCloudBackupData({ auth: { uid } }), (error) => error.code === "internal");
+  await assert.rejects(h.output.deleteCloudBackupData({ auth: { uid }, data: { confirmation: "DELETE_ALL_CLOUD_BACKUPS" } }), (error) => error.code === "internal");
   assert.equal(h.docs.has(a), true); assert.equal(h.docs.has(b), true);
   assert.equal(h.objects.has(first), false); assert.equal(h.objects.has(second), true);
   h.fail(null);
-  await h.output.deleteCloudBackupData({ auth: { uid } });
+  await h.output.deleteCloudBackupData({ auth: { uid }, data: { confirmation: "DELETE_ALL_CLOUD_BACKUPS" } });
   assert.equal(h.docs.has(a), false); assert.equal(h.docs.has(b), false);
   assert.equal(h.objects.has(second), false);
-  await h.output.deleteCloudBackupData({ auth: { uid } });
+  await h.output.deleteCloudBackupData({ auth: { uid }, data: { confirmation: "DELETE_ALL_CLOUD_BACKUPS" } });
 });

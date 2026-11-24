@@ -124,7 +124,7 @@ const productMeta = {
     detailId: "creatorMonthlyDetail",
     productName: "Pro",
     priceLabel: "월 2,000원",
-    description: "프로젝트 수 무제한, 프로젝트당 사진 최대 365장, 클라우드 백업 프로젝트 1개를 제공합니다."
+    description: "프로젝트 수 무제한, 프로젝트당 사진 최대 365장, 클라우드 백업 프로젝트 1개와 계정 공유 용량 2GB를 제공합니다. 측정 기록과 촬영 설정 백업을 포함합니다."
   },
   plus_monthly: {
     cardId: "plusMonthlyCard",
@@ -132,7 +132,7 @@ const productMeta = {
     detailId: "plusMonthlyDetail",
     productName: "Plus",
     priceLabel: "월 4,000원",
-    description: "프로젝트 수 무제한, 프로젝트당 사진 최대 365장, 클라우드 백업 프로젝트 최대 3개를 제공합니다."
+    description: "프로젝트 수 무제한, 프로젝트당 사진 최대 365장, 클라우드 백업 프로젝트 최대 3개와 계정 공유 용량 6GB를 제공합니다. 측정 기록과 촬영 설정 백업을 포함합니다."
   },
   expert_monthly: {
     cardId: "expertMonthlyCard",
@@ -140,7 +140,7 @@ const productMeta = {
     detailId: "expertMonthlyDetail",
     productName: "Expert",
     priceLabel: "월 6,000원",
-    description: "프로젝트 수 무제한, 프로젝트당 사진 최대 365장, 클라우드 백업 프로젝트 최대 5개를 제공합니다."
+    description: "프로젝트 수 무제한, 프로젝트당 사진 최대 365장, 클라우드 백업 프로젝트 최대 5개와 계정 공유 용량 10GB를 제공합니다. 측정 기록과 촬영 설정 백업을 포함합니다."
   }
 };
 

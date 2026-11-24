@@ -40,6 +40,10 @@ function fixture(fault) {
     "@/lib/private-storage": { downloadPrivateFile: async (source, uri) => { files.set(uri, "download"); return { uri }; } },
     "expo-image-manipulator": { SaveFormat: { JPEG: "jpeg" }, manipulateAsync: async () => { files.set("file:///rendered.jpg", "rendered"); return { uri: "file:///rendered.jpg", width: 100, height: 100 }; } },
     "@/lib/local-storage": { localStorageAdapter: adapter },
+    "@/lib/project-cloud-sync-queue": { enqueueProjectCloudSync: async () => {} },
+    "@/lib/body-frame-video": load("lib/body-frame-video.ts"),
+    "@/lib/body-frame-camera-project": load("lib/body-frame-camera-project.ts"),
+    "@/lib/photo-library": { getPhotos: async () => [] },
     "@/lib/local-library-limit": { assertLocalLibraryCapacity: () => {} },
     "@/lib/image-backup-utils": { optimizeImageForStorage: async x => x, resolveImageDimensions: async () => ({ width: 100, height: 100 }) },
     "@/lib/android-image-adjustment": { hasCameraColorAdjustment: () => false },
@@ -88,15 +92,39 @@ for (const [name, file, key, get, save, merge, remove, data] of [
 function cloudFixture(f, hooks = {}) {
   const user = { uid: "u" }, remote = { ...oldPhoto, localId: "p", sequence: 1, sourceUpdatedAt: "2026-10-01", storagePath: "original/storage", downloadURL: "https://private/photo", uri: "https://private/photo", backupSessionId: "owner-session", sourceDeviceId: "owner-device", backupStatus: "backed_up" };
   const documents = new Map([["photoBackups/p", remote]]); let uploads = 0;
+  const localProject = { id: "pr", name: "Backup test", createdAt: oldPhoto.createdAt, updatedAt: oldPhoto.createdAt, targetPhotoCount: 100, referenceMode: "first", archived: false };
   const deps = new Proxy({
     "@/lib/firebase": { firebaseAuth: { currentUser: user }, firestore: {}, firebaseStorage: {}, firebaseFunctions: {} },
     "@/lib/local-library-owner": { assertLocalLibraryOwner: async () => {} },
     "@/lib/cloud-backup-project-slots": { getSelectedCloudBackupProjectIds: async () => new Set(["pr"]) },
     "@/lib/plan-entitlements": { getPlanEntitlements: () => ({ maxCloudBackupProjects: 1 }), getPlanTier: () => "pro" },
-    "@/lib/body-project-library": { getBodyProjects: async () => [], mergeBodyProjectsFromBackup: hooks.mergeProjects ?? (async () => {}) },
+    "@/lib/body-project-library": { getBodyProjects: async () => hooks.workspaceProject ? [localProject] : [], getBodyProjectById: async id => hooks.workspaceProject && id === localProject.id ? localProject : null, getDeletedBodyProjectIds: async () => new Set(), mergeBodyProjectsFromBackup: async (values, mergeItems) => { await hooks.mergeProjects?.(values); return mergeItems([], new Set(), new Set()); } },
+    "@/lib/project-save-policy": load("lib/project-save-policy.ts", {}),
     "@/lib/work-library": load("lib/work-library.ts", f.dependencies),
     "@/lib/video-library": load("lib/video-library.ts", f.dependencies),
     "@/lib/body-project-backup": load("lib/body-project-backup.ts", {}),
+    "@/lib/project-restore-selection": load("lib/project-restore-selection.ts", {}),
+    "@/lib/body-measurement-library": {
+      getBodyMeasurements: async () => [],
+      getBodyMeasurementSettings: async () => ({
+        enabled: false, promptAfterCapture: false, primaryMetric: "weight",
+        fields: { weight: true, bodyFat: false, skeletalMuscle: false, waist: false }
+      }),
+      mergeBodyMeasurementsFromBackup: async () => [],
+      mergeBodyMeasurementSettingsFromBackup: async () => false
+    },
+    "@/lib/body-measurement-normalization": {
+      normalizeBodyMeasurementEntry: data => data,
+      normalizeBodyMeasurementSettings: data => data
+    },
+    "@/lib/body-pose-alignment": {
+      getBodyPoseAlignmentSettings: async () => ({ enabled: false }),
+      mergeBodyPoseAlignmentSettingsFromBackup: async () => false
+    },
+    "@/lib/body-frame-capture-context": {
+      getBodyCaptureContextState: async () => ({ enabled: true, context: null }),
+      mergeBodyCaptureContextStatesFromBackup: async () => false
+    },
     "@/lib/photo-library": f.api,
     "firebase/firestore": { doc: (_, ...parts) => parts.slice(-2).join("/"), collection: (_, ...parts) => parts.at(-1), getDocs: async prefix => ({ docs: [...documents].filter(([key]) => key.startsWith(`${prefix}/`)).map(([key, data]) => ({ id: key.split("/").at(-1), data: () => data })) }), getDoc: async key => ({ exists: () => documents.has(key), data: () => documents.get(key) }), setDoc: async (key, value, options) => { documents.set(key, options?.merge ? { ...documents.get(key), ...value } : value); }, serverTimestamp: () => "server-time" },
     "@/lib/private-storage": { privateStorageUrl: path => `https://private/${path}` },
@@ -145,7 +173,9 @@ test("cloud restore paused at project merge preserves a completed project captur
   c.documents.set("photoBackups/deleted", { ...c.remote, localId: "deleted" });
   const photo = load("lib/photo-library.ts", {
     "@/lib/legacy-photo-library": f.api,
-    "@/lib/body-frame-camera-session": { finishBodyFrameCameraCapture: () => {} },
+    "@/lib/body-frame-camera-project": f.dependencies["@/lib/body-frame-camera-project"],
+    "@/lib/project-cloud-sync-queue": f.dependencies["@/lib/project-cloud-sync-queue"],
+    "@/lib/body-frame-camera-session": { finishBodyFrameCameraCapture: () => {}, resetBodyFrameCameraSequence: () => {} },
     "@/lib/body-project-library": { updateBodyProject: async () => {} },
     "@/lib/body-measurement-library": {},
     "@/lib/body-frame-photo-storage": { storeBodyFramePhotoFile: async ({ photoId }) => {
@@ -174,7 +204,9 @@ for (const finishWithError of [false, true]) test(`project finalization ${finish
   const f = fixture(); const reached = barrier(), resume = barrier(); let draftId, stagedUri, stagedPreview;
   const api = load("lib/photo-library.ts", {
     "@/lib/legacy-photo-library": f.api,
-    "@/lib/body-frame-camera-session": { finishBodyFrameCameraCapture: () => {} },
+    "@/lib/body-frame-camera-project": f.dependencies["@/lib/body-frame-camera-project"],
+    "@/lib/project-cloud-sync-queue": f.dependencies["@/lib/project-cloud-sync-queue"],
+    "@/lib/body-frame-camera-session": { finishBodyFrameCameraCapture: () => {}, resetBodyFrameCameraSequence: () => {} },
     "@/lib/body-project-library": { updateBodyProject: async () => {} },
     "@/lib/body-measurement-library": {},
     "@/lib/body-frame-photo-storage": { storeBodyFramePhotoFile: async ({ photoId }) => {
@@ -200,7 +232,7 @@ for (const finishWithError of [false, true]) test(`project finalization ${finish
 
 for (const mode of ["single", "workspace"]) test(`${mode} backup completion cannot evict a newer photo edit`, async () => {
   const f = fixture(); const reached = barrier(), resume = barrier();
-  const c = cloudFixture(f, { upload: async () => { reached.resolve(); await resume.promise; } });
+  const c = cloudFixture(f, { workspaceProject: mode === "workspace", upload: async () => { reached.resolve(); await resume.promise; } });
   c.documents.clear();
   const backup = mode === "single" ? c.api.backupPhoto({ user: c.user, photo: oldPhoto, enabled: true }) : c.api.backupCurrentWorkspace({ user: c.user, subscription: {} });
   await reached.promise; const edited = await f.api.saveEditedPhoto(editInput);
@@ -211,12 +243,20 @@ for (const mode of ["single", "workspace"]) test(`${mode} backup completion cann
 });
 
 for (const mode of ["single", "workspace"]) test(`${mode} backup evicts the unchanged source version after its upload`, async () => {
-  const f = fixture(); const c = cloudFixture(f, { upload: async () => {} }); c.documents.clear();
+  const f = fixture(); const c = cloudFixture(f, { workspaceProject: mode === "workspace", upload: async () => {} }); c.documents.clear();
   if (mode === "single") await c.api.backupPhoto({ user: c.user, photo: oldPhoto, enabled: true });
   else await c.api.backupCurrentWorkspace({ user: c.user, subscription: {} });
   const persisted = (await f.api.getPhotos()).find(item => item.id === "p");
   assert.equal(persisted.localFileStatus, "cloud_only"); assert.match(persisted.uri, /^https:/);
   assert.equal(f.files.has(oldPhoto.uri), false); assert.equal(f.files.has(oldPhoto.previewUri), true);
+});
+
+test("workspace backup with a missing selected project does not upload or evict the local photo", async () => {
+  const f = fixture(); const c = cloudFixture(f); c.documents.clear();
+  await c.api.backupCurrentWorkspace({ user: c.user, subscription: {} });
+  assert.equal(c.uploads(), 0);
+  assert.equal((await f.api.getPhotos())[0].uri, oldPhoto.uri);
+  assert.ok(f.files.has(oldPhoto.uri));
 });
 
 test("project rollback does not adopt and discard an edit queued before reservation attachment", async () => {
@@ -227,7 +267,9 @@ test("project rollback does not adopt and discard an edit queued before reservat
   };
   const api = load("lib/photo-library.ts", {
     "@/lib/legacy-photo-library": f.api,
-    "@/lib/body-frame-camera-session": { finishBodyFrameCameraCapture: () => {} },
+    "@/lib/body-frame-camera-project": f.dependencies["@/lib/body-frame-camera-project"],
+    "@/lib/project-cloud-sync-queue": f.dependencies["@/lib/project-cloud-sync-queue"],
+    "@/lib/body-frame-camera-session": { finishBodyFrameCameraCapture: () => {}, resetBodyFrameCameraSequence: () => {} },
     "@/lib/body-project-library": { updateBodyProject: async () => {} },
     "@/lib/body-measurement-library": {},
     "@/lib/body-frame-photo-storage": { storeBodyFramePhotoFile: async () => { throw Error("project store failed"); } }

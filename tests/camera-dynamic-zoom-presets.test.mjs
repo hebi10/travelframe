@@ -27,9 +27,7 @@ for (const snippet of [
   "cameraZoomPresets",
   "cameraZoomPresets.map",
   "setZoomPreset(preset)",
-  "cameraNativeZoom",
-  "zoom={cameraNativeZoom}",
-  "getInitialZoom={() => cameraZoomFactor}"
+  "cameraZoomSession.setZoom(cameraZoomFactor);"
 ]) {
   assert.ok(cameraSource.includes(snippet), `dynamic VisionCamera zoom missing: ${snippet}`);
 }

@@ -1,6 +1,6 @@
 import { type CameraDevice, type CameraPosition, type DeviceFilter, type FlashMode, type MeteringMode, type PhysicalDeviceType } from "react-native-vision-camera";
 
-import { DEFAULT_GUIDE_COLOR, type AppSettings, type CameraFacing, type CameraSaveTarget } from "@/lib/app-settings";
+import { DEFAULT_GUIDE_COLOR, normalizeCameraZoomPercent, type AppSettings, type CameraFacing, type CameraSaveTarget } from "@/lib/app-settings";
 import type { PhotoRatioLabel } from "@/types/photo";
 
 export const GUIDE_SIZE_OPTIONS = [
@@ -256,18 +256,26 @@ export function getCameraZoomPresets(
   availableLenses: PhysicalDeviceType[],
   cameraDevice: CameraDevice | undefined
 ) {
-  if (cameraFacing === "front") {
-    return CAMERA_FRONT_ZOOM_PRESETS;
-  }
-
   if (
-    hasCameraLens(availableLenses, CAMERA_LENS_ULTRA_WIDE) &&
-    getCameraSupportsUltraWideZoom(cameraDevice)
+    !cameraDevice ||
+    !Number.isFinite(cameraDevice.minZoom) ||
+    cameraDevice.minZoom <= 0 ||
+    !Number.isFinite(cameraDevice.maxZoom) ||
+    cameraDevice.maxZoom < cameraDevice.minZoom
   ) {
-    return CAMERA_BACK_ZOOM_PRESETS_WITH_ULTRA_WIDE;
+    return [];
   }
 
-  return CAMERA_BACK_ZOOM_PRESETS_DEFAULT;
+  const presets = cameraFacing === "front"
+    ? CAMERA_FRONT_ZOOM_PRESETS
+    : hasCameraLens(availableLenses, CAMERA_LENS_ULTRA_WIDE) &&
+        getCameraSupportsUltraWideZoom(cameraDevice)
+      ? CAMERA_BACK_ZOOM_PRESETS_WITH_ULTRA_WIDE
+      : CAMERA_BACK_ZOOM_PRESETS_DEFAULT;
+
+  return presets.filter(
+    (preset) => preset.factor >= cameraDevice.minZoom && preset.factor <= cameraDevice.maxZoom
+  );
 }
 
 export function getCameraZoomBounds(cameraDevice: CameraDevice | undefined) {
@@ -307,7 +315,7 @@ export function getCameraZoomPercentFromFactor(
     return 0;
   }
 
-  return Math.round(((Math.max(minZoom, Math.min(maxZoom, factor)) - minZoom) / (maxZoom - minZoom)) * 100);
+  return normalizeCameraZoomPercent(((Math.max(minZoom, Math.min(maxZoom, factor)) - minZoom) / (maxZoom - minZoom)) * 100);
 }
 
 export function getCameraZoomPresetFactor(

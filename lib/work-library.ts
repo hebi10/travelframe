@@ -2,9 +2,23 @@ import * as FileSystem from "expo-file-system/legacy";
 import { downloadPrivateFile } from "@/lib/private-storage";
 
 import { localStorageAdapter } from "@/lib/local-storage";
+import { getPhotos } from "@/lib/photo-library";
+import { enqueueProjectCloudSync } from "@/lib/project-cloud-sync-queue";
 import { assertLocalLibraryCapacity } from "@/lib/local-library-limit";
 import { getNextTripClipTitle, TRIP_CLIP_TITLE_PREFIX } from "@/lib/trip-clip-title";
 import type { ImageBundleWorkItem } from "@/types/work";
+
+const enqueueImageWorkIfProjectLinked = async (work: ImageBundleWorkItem) => {
+  if (!work.photoIds.length) return;
+  const photos = await getPhotos();
+  const projectByPhotoId = new Map(photos.map((photo) => [photo.id, photo.projectId]));
+  const linkedProjectIds = new Set(work.photoIds.map((photoId) => projectByPhotoId.get(photoId)));
+  if (linkedProjectIds.size !== 1) return;
+  const projectId = [...linkedProjectIds][0];
+  if (projectId) {
+    await enqueueProjectCloudSync({ projectId, kind: "image-work", itemId: work.id });
+  }
+};
 
 const IMAGE_BUNDLE_STORAGE_KEY = "travel-frame.image-bundles.v1";
 const IMAGE_BUNDLE_DELETION_MARKER_KEY = "travel-frame.image-bundle-deletion-markers.v1";
@@ -196,6 +210,7 @@ export const saveImageBundleWork = async (
   };
 
   await writeImageBundles([savedItem, ...items]);
+  await enqueueImageWorkIfProjectLinked(savedItem).catch(() => undefined);
   return savedItem;
 });
 
@@ -217,7 +232,8 @@ export const updateImageBundleWork = async (
       ...updates,
       id: item.id,
       kind: "image-bundle",
-      createdAt: item.createdAt
+      createdAt: item.createdAt,
+      updatedAt: new Date().toISOString()
     };
 
     return updatedItem;
@@ -228,6 +244,7 @@ export const updateImageBundleWork = async (
   }
 
   await writeImageBundles(nextItems);
+  await enqueueImageWorkIfProjectLinked(updatedItem).catch(() => undefined);
   return updatedItem;
 });
 
@@ -329,16 +346,24 @@ export const recordImageWorkLocalDeletion = (id: string) =>
 
 // Read local state only after earlier mutations have committed. Local edits win;
 // deletion markers prevent a later cloud restore from resurrecting deleted items.
-export const mergeImageBundleWorksFromBackup = (incoming: ImageBundleWorkItem[]) =>
+export const mergeImageBundleWorksFromBackup = (
+  incoming: ImageBundleWorkItem[],
+  restorableIds: ReadonlySet<string> = new Set()
+) =>
   runImageWorkMutation(async () => {
     const current = await getImageBundleWorks();
     const deleted = await getDeletedImageWorkIds();
     const ids = new Set(current.map(item => item.id));
     const added = incoming.filter(item => {
-      if (ids.has(item.id) || deleted.has(item.id)) return false;
+      if (ids.has(item.id) || (deleted.has(item.id) && !restorableIds.has(item.id))) return false;
       ids.add(item.id);
       return true;
     });
     if (added.length) await writeImageBundles([...current, ...added]);
+    const deletedCount = deleted.size;
+    for (const item of incoming) {
+      if (restorableIds.has(item.id) && ids.has(item.id)) deleted.delete(item.id);
+    }
+    if (deleted.size !== deletedCount) await localStorageAdapter.setItem(IMAGE_BUNDLE_DELETION_MARKER_KEY, JSON.stringify([...deleted]));
     return added;
   });

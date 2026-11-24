@@ -25,7 +25,10 @@ const execute = async (oldProductId, productId, confirm = true) => {
   const products = ["creator_monthly", "plus_monthly", "expert_monthly"];
   const context = {
     Platform: { OS: "android" }, user: { uid: "billing-test-user" }, connected: true,
-    pendingPurchaseRef, GOOGLE_PLAY_SUBSCRIPTION_IDS: products,
+    pendingPurchaseRef, billingOperationRef: { current: false }, GOOGLE_PLAY_SUBSCRIPTION_IDS: products,
+    assertBillingAccount: () => {},
+    isGooglePlayProductId: id => products.includes(id),
+    verifyGooglePlayPurchase: async ({ productId }) => ({ verified: true, active: true, productId }),
     subscriptionsById: new Map(products.map(id => [id, { id }])),
     getGooglePlayProductType: id => id === "ad_remove" ? "in-app" : "subs",
     getGooglePlaySubscriptionOfferToken: () => "test-offer",

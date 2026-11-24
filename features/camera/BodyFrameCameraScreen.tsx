@@ -1,3 +1,4 @@
+import { openPlans } from "@/lib/plan-navigation";
 import { AppText as Text } from "@/components/app-text";
 import {
   router,
@@ -10,14 +11,16 @@ import {
   useState,
   useSyncExternalStore
 } from "react";
-import { Pressable,
+import { Alert,
+  Pressable,
   StyleSheet,
   View
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { bodyFrameDesign, bodyFrameTypography } from "@/constants/app-theme";
 import { BodyFrameProjectSwitcher } from "@/features/camera/BodyFrameProjectSwitcher";
+import { BodyMeasurementEditorSheet } from "@/features/records/BodyMeasurementEditorSheet";
+import { createCaptureMeasurementPromptQueue, type CaptureMeasurementPrompt } from "@/lib/capture-measurement-prompt";
 import CameraScreen from "@/features/camera/CameraScreen";
 import { useAuth } from "@/lib/auth-context";
 import {
@@ -42,16 +45,20 @@ import {
   getLastActiveProjectId,
   setLastActiveProjectId
 } from "@/lib/body-project-preferences";
-import { getBodyMeasurementSettings } from "@/lib/body-measurement-library";
+import { getBodyMeasurementSettings, getBodyMeasurementByPhotoId, initializeNewBodyProjectMeasurements } from "@/lib/body-measurement-library";
 import { getBodyPoseAlignmentSettings } from "@/lib/body-pose-alignment";
 import {
   createBodyProject,
+  getBodyProjectById,
   getBodyProjects,
   updateBodyProject
 } from "@/lib/body-project-library";
 import { getPhotos } from "@/lib/photo-library";
 import { getPlanEntitlements } from "@/lib/plan-entitlements";
-import type { BodyProject, ReferencePhotoMode } from "@/types/body-project";
+import { getSelectedCloudBackupProjectIds } from "@/lib/cloud-backup-project-slots";
+import { enqueueProjectCloudSync } from "@/lib/project-cloud-sync-queue";
+import { isProjectCloudSaveMode } from "@/lib/project-save-policy";
+import type { BodyProject, ProjectSaveMode, ReferencePhotoMode } from "@/types/body-project";
 import type { PhotoItem } from "@/types/photo";
 
 type CreateProjectInput = {
@@ -61,8 +68,7 @@ type CreateProjectInput = {
 };
 
 export default function BodyFrameCameraScreen() {
-  const insets = useSafeAreaInsets();
-  const { isLoggedIn, subscription } = useAuth();
+  const { isLoggedIn, subscription, user } = useAuth();
   const planEntitlements = useMemo(
     () => getPlanEntitlements({ isLoggedIn, subscription }),
     [isLoggedIn, subscription]
@@ -80,8 +86,33 @@ export default function BodyFrameCameraScreen() {
   const [measurementPromptPhotoId, setMeasurementPromptPhotoId] =
     useState<string | null>(null);
   const [poseAlignmentEnabled, setPoseAlignmentEnabled] = useState(false);
-  const [cameraHeaderBottom, setCameraHeaderBottom] = useState<number | null>(null);
-  const lastHandledSaveAtRef = useRef(0);
+  const [isScreenFocused, setIsScreenFocused] = useState(false);
+  const [projectSheetOpen, setProjectSheetOpen] = useState(false);
+  const [capturePrompts, setCapturePrompts] = useState<CaptureMeasurementPrompt[]>([]);
+  const capturePromptQueueRef = useRef<ReturnType<typeof createCaptureMeasurementPromptQueue> | null>(null);
+  if (!capturePromptQueueRef.current) {
+    capturePromptQueueRef.current = createCaptureMeasurementPromptQueue({
+      load: async (photo) => {
+        const projectId = photo.projectId;
+        if (!projectId) return null;
+        const [measurementSettings, entry, project] = await Promise.all([
+          getBodyMeasurementSettings(projectId),
+          getBodyMeasurementByPhotoId(projectId, photo.id),
+          getBodyProjectById(projectId)
+        ]);
+        if (!measurementSettings.enabled) return null;
+        setMeasurementPromptPhotoId(photo.id);
+        if (!measurementSettings.promptAfterCapture) return null;
+        return {
+          photo,
+          settings: measurementSettings,
+          projectName: project?.name ?? "프로젝트 기록",
+          entry: entry?.source === "manual" ? entry : null
+        };
+      },
+      onChange: setCapturePrompts
+    });
+  }
 
   const reloadProjectState = useCallback(async () => {
     const [storedProjects, storedPhotos, lastActiveProjectId] = await Promise.all([
@@ -105,8 +136,10 @@ export default function BodyFrameCameraScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      setIsScreenFocused(true);
       void reloadProjectState();
       return () => {
+        setIsScreenFocused(false);
         clearBodyFrameCameraSession();
       };
     }, [reloadProjectState])
@@ -211,54 +244,20 @@ export default function BodyFrameCameraScreen() {
     planEntitlements.maxProgressPhotos
   ]);
 
-  useEffect(() => {
-    if (
-      session.lastSavedAt <= 0 ||
-      session.lastSavedAt === lastHandledSaveAtRef.current ||
-      !session.lastSavedSequence
-    ) {
-      return;
-    }
-
-    lastHandledSaveAtRef.current = session.lastSavedAt;
-    setSaveMessage(`${session.lastSavedSequence}번째 사진을 저장했습니다.`);
+  const handleCapturedPhotoSaved = useCallback((photo: PhotoItem) => {
+    setSaveMessage(`${photo.sequence ?? 1}번째 사진을 저장했습니다.`);
     setMeasurementPromptPhotoId(null);
+    void capturePromptQueueRef.current?.enqueue(photo).catch(() => {
+      setSaveMessage("사진은 저장했습니다. 수치 정보는 사진 상세에서 입력할 수 있습니다.");
+    });
+    void reloadProjectState().catch(() => undefined);
+  }, [reloadProjectState]);
 
-    void (async () => {
-      const projectId = session.projectId;
-      if (!projectId) {
-        await reloadProjectState();
-        return;
-      }
+  const dismissCapturePrompt = useCallback((photoId: string) => {
+    capturePromptQueueRef.current?.dismiss(photoId);
+  }, []);
 
-      const [storedPhotos, measurementSettings] = await Promise.all([
-        getPhotos(),
-        getBodyMeasurementSettings(projectId)
-      ]);
-      const savedPhoto =
-        storedPhotos.find(
-          (photo) =>
-            photo.projectId === projectId &&
-            photo.sequence === session.lastSavedSequence
-        ) ?? null;
-
-      if (
-        measurementSettings.enabled &&
-        measurementSettings.promptAfterCapture &&
-        savedPhoto
-      ) {
-        setMeasurementPromptPhotoId(savedPhoto.id);
-      }
-
-      await reloadProjectState();
-    })();
-
-  }, [
-    reloadProjectState,
-    session.lastSavedAt,
-    session.lastSavedSequence,
-    session.projectId
-  ]);
+  const activeCapturePrompt = capturePrompts[0] ?? null;
 
   useEffect(() => {
     if (!saveMessage) {
@@ -309,6 +308,9 @@ export default function BodyFrameCameraScreen() {
         targetPhotoCount,
         referenceMode
       });
+      await initializeNewBodyProjectMeasurements(project.id).catch(() => {
+        Alert.alert("수치 입력 설정", "프로젝트는 생성됐지만 촬영 후 수치 입력 설정을 저장하지 못했습니다. 프로젝트 설정에서 다시 활성화해 주세요.");
+      });
       const storedPhotos = await getPhotos();
       const storedProjects = await getBodyProjects();
       setProjects(storedProjects);
@@ -326,6 +328,46 @@ export default function BodyFrameCameraScreen() {
     setProjects((current) => current.map((project) => project.id === projectId ? updatedProject : project));
   }, [activeProject?.id]);
 
+  const handleChangeProjectSaveMode = useCallback(async (projectId: string, mode: ProjectSaveMode) => {
+    if (!activeProject || activeProject.id !== projectId ||
+        session.pendingSaveCount > 0 ||
+        getBodyFrameCameraSessionSnapshot().projectId !== projectId) {
+      throw new Error("프로젝트가 변경되거나 사진 저장 중입니다. 다시 시도해 주세요.");
+    }
+    if (isProjectCloudSaveMode(mode)) {
+      if (!user || !planEntitlements.canBackupToCloud) {
+        openPlans("backup", "Pro");
+        return;
+      }
+      const eligibleIds = await getSelectedCloudBackupProjectIds(
+        user, planEntitlements.maxCloudBackupProjects
+      );
+      if (!eligibleIds.has(projectId)) {
+        Alert.alert(
+          "백업 프로젝트 선택 필요",
+          "먼저 계정 화면에서 이 프로젝트를 클라우드 백업 프로젝트로 선택해 주세요.",
+          [
+            { text: "취소", style: "cancel" },
+            { text: "계정으로 이동", onPress: () => router.push("/account") }
+          ]
+        );
+        return;
+      }
+    }
+    if (getBodyFrameCameraSessionSnapshot().projectId !== projectId) {
+      throw new Error("촬영 프로젝트가 변경되었습니다.");
+    }
+    const updated = await updateBodyProject(projectId, { saveMode: mode });
+    if (!updated) throw new Error("프로젝트를 찾지 못했습니다.");
+    setProjects((current) => current.map((item) => item.id === projectId ? updated : item));
+    if (isProjectCloudSaveMode(mode) && mode !== activeProject.saveMode) {
+      await enqueueProjectCloudSync({ projectId, kind: "initial" }).catch(() => undefined);
+    }
+  }, [
+    activeProject, planEntitlements.canBackupToCloud,
+    planEntitlements.maxCloudBackupProjects, session.pendingSaveCount, user
+  ]);
+
   const firstPhotoHint = captureBlockedReason
     ? captureBlockedReason
     : activeProject && activeSummary?.photoCount === 0
@@ -337,12 +379,16 @@ export default function BodyFrameCameraScreen() {
   return (
     <View style={styles.screen}>
       <CameraScreen
-        onHeaderBottomChange={setCameraHeaderBottom}
         projectReferenceMode={activeProject?.referenceMode}
         onProjectReferenceModeChange={activeProject ? handleChangeReferenceMode : undefined}
+        projectSaveMode={activeProject?.saveMode ?? null}
+        onProjectSaveModeChange={activeProject ? handleChangeProjectSaveMode : undefined}
+        onPhotoSaved={handleCapturedPhotoSaved}
+        externalModalOpen={projectSheetOpen || Boolean(isScreenFocused && activeCapturePrompt)}
         headerCenter={
           <BodyFrameProjectSwitcher
             compact
+            onSheetVisibilityChange={setProjectSheetOpen}
             projects={projects}
             photos={photos}
             activeProject={activeProject}
@@ -352,51 +398,72 @@ export default function BodyFrameCameraScreen() {
             upgradePlanLabel={upgradePlanLabel}
             onSelectProject={handleSelectProject}
             onCreateProject={handleCreateProject}
-            onUpgrade={() => router.push("/account")}
+            onUpgrade={() => openPlans("camera", upgradePlanLabel)}
             onManageProjects={() => router.push("/studio")}
           />
         }
+        footerStatus={
+          saveMessage ? (
+            <View style={styles.captureStatusRow} accessibilityLiveRegion="polite">
+              <Text style={styles.captureSavedText} numberOfLines={2}>
+                {saveMessage}
+              </Text>
+              {measurementPromptPhotoId ? (
+                <Pressable
+                  accessibilityRole="button"
+                  style={styles.captureStatusAction}
+                  onPress={() => {
+                    dismissCapturePrompt(measurementPromptPhotoId);
+                    router.push({
+                      pathname: "/photo/[id]",
+                      params: { id: measurementPromptPhotoId, measurement: "1" }
+                    });
+                  }}
+                >
+                  <Text style={styles.captureStatusActionText}>수치 기록</Text>
+                </Pressable>
+              ) : null}
+            </View>
+          ) : (
+            <View style={styles.captureStatusRow}>
+              <Text style={styles.captureStatusText} numberOfLines={2}>
+                {firstPhotoHint}
+              </Text>
+              {captureBlockedReason && upgradePlanLabel ? (
+                <Pressable
+                  accessibilityRole="button"
+                  style={styles.captureStatusAction}
+                  onPress={() => openPlans("camera", upgradePlanLabel)}
+                >
+                  <Text style={styles.captureStatusActionText}>
+                    플랜 보기 · {upgradePlanLabel}
+                  </Text>
+                </Pressable>
+              ) : null}
+            </View>
+          )
+        }
       />
-
-      <View
-        pointerEvents="box-none"
-        style={[
-          styles.captureHintWrap,
-          { top: cameraHeaderBottom ?? Math.max(insets.top + 64, 76) }
-        ]}
-      >
-        <View pointerEvents="none" style={styles.captureHintPanel}>
-          <Text style={styles.captureHint}>{firstPhotoHint}</Text>
-        </View>
-        {captureBlockedReason && upgradePlanLabel ? (
-          <Pressable
-            accessibilityRole="button"
-            style={styles.planButton}
-            onPress={() => router.push("/account")}
-          >
-            <Text style={styles.planButtonText}>플랜 보기 · {upgradePlanLabel}</Text>
-          </Pressable>
-        ) : null}
-      </View>
-
-      {saveMessage ? (
-        <View style={styles.snackbar} accessibilityLiveRegion="polite">
-          <Text style={styles.snackbarText}>{saveMessage}</Text>
-          {measurementPromptPhotoId ? (
-            <Pressable
-              accessibilityRole="button"
-              style={styles.snackbarAction}
-              onPress={() =>
-                router.push({
-                  pathname: "/photo/[id]",
-                  params: { id: measurementPromptPhotoId, measurement: "1" }
-                })
-              }
-            >
-              <Text style={styles.snackbarActionText}>수치 기록</Text>
-            </Pressable>
-          ) : null}
-        </View>
+      {activeCapturePrompt ? (
+        <BodyMeasurementEditorSheet
+          key={activeCapturePrompt.photo.id}
+          visible={isScreenFocused}
+          projectId={activeCapturePrompt.photo.projectId ?? ""}
+          photoId={activeCapturePrompt.photo.id}
+          sequence={activeCapturePrompt.photo.sequence}
+          recordedAt={activeCapturePrompt.photo.createdAt}
+          settings={activeCapturePrompt.settings}
+          entry={activeCapturePrompt.entry}
+          capturePhoto={{
+            uri: activeCapturePrompt.photo.previewUri ?? activeCapturePrompt.photo.uri,
+            projectName: activeCapturePrompt.projectName,
+            sequence: activeCapturePrompt.photo.sequence
+          }}
+          onClose={() => dismissCapturePrompt(activeCapturePrompt.photo.id)}
+          onSaved={() => {
+            setSaveMessage("사진과 수치 기록을 저장했습니다.");
+          }}
+        />
       ) : null}
     </View>
   );
@@ -407,75 +474,43 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#0B0B0C"
   },
-  captureHintWrap: {
-    position: "absolute",
-    left: bodyFrameDesign.horizontalPadding,
-    right: bodyFrameDesign.horizontalPadding,
-    zIndex: 40
-  },
-  captureHintPanel: {
-    alignSelf: "center",
-    maxWidth: "100%",
-    marginTop: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    backgroundColor: "rgba(11,11,12,0.78)"
-  },
-  captureHint: {
-    alignSelf: "center",
-    color: "#F5F5F5",
-    fontSize: bodyFrameTypography.caption,
-    lineHeight: 17,
-    textAlign: "center"
-  },
-  planButton: {
-    alignSelf: "center",
-    minHeight: bodyFrameDesign.minTouchSize,
-    marginTop: 8,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 14,
-    borderWidth: bodyFrameDesign.borderWidth,
-    borderColor: "#F5F5F5",
-    borderRadius: bodyFrameDesign.buttonRadius,
-    backgroundColor: "rgba(11,11,12,0.88)"
-  },
-  planButtonText: {
-    color: "#F5F5F5",
-    fontSize: 13,
-    fontWeight: "600"
-  },
-  snackbar: {
-    position: "absolute",
-    left: bodyFrameDesign.horizontalPadding,
-    right: bodyFrameDesign.horizontalPadding,
-    bottom: 118,
-    minHeight: bodyFrameDesign.minTouchSize,
+  captureStatusRow: {
+    width: "100%",
+    minHeight: 24,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-    paddingHorizontal: 14,
-    borderWidth: bodyFrameDesign.borderWidth,
-    borderColor: "#2A2A2E",
-    borderRadius: bodyFrameDesign.cardRadius,
-    backgroundColor: "#1A1A1D",
-    zIndex: 50
-  },
-  snackbarText: {
-    flex: 1,
-    color: "#F5F5F5",
-    fontSize: 13,
-    fontWeight: "500"
-  },
-  snackbarAction: {
-    minHeight: bodyFrameDesign.minTouchSize,
     justifyContent: "center",
-    paddingHorizontal: 8
+    gap: 10,
+    paddingHorizontal: 6
   },
-  snackbarActionText: {
+  captureStatusText: {
+    flexShrink: 1,
+    color: "#D5D9DE",
+    fontSize: bodyFrameTypography.caption,
+    lineHeight: 18,
+    textAlign: "center"
+  },
+  captureSavedText: {
+    flexShrink: 1,
     color: "#F5F5F5",
-    fontSize: bodyFrameTypography.button,
-    fontWeight: "700"
+    fontSize: bodyFrameTypography.caption,
+    lineHeight: 18,
+    fontWeight: "600",
+    textAlign: "center"
+  },
+  captureStatusAction: {
+    minHeight: bodyFrameDesign.minTouchSize,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 12,
+    borderWidth: bodyFrameDesign.borderWidth,
+    borderColor: "rgba(255,255,255,0.42)",
+    borderRadius: bodyFrameDesign.buttonRadius,
+    backgroundColor: "#1A1A1D"
+  },
+  captureStatusActionText: {
+    color: "#F5F5F5",
+    fontSize: bodyFrameTypography.caption,
+    fontWeight: "600"
   }
 });

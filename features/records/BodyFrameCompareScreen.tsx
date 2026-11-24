@@ -1,8 +1,10 @@
+import * as FileSystem from "expo-file-system/legacy";
 import { Feather } from "@expo/vector-icons";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  ActivityIndicator,
+  FlatList,
+  Modal,
   PanResponder,
   Pressable,
   ScrollView,
@@ -12,15 +14,53 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppText as Text } from "@/components/app-text";
+import { BodyFrameStatusNotice } from "@/components/body-frame-status-notice";
 import { Image } from "@/components/private-media-image";
 import { bodyFrameDesign, bodyFrameTypography, getBodyFrameControlColors } from "@/constants/app-theme";
-import { getBodyFrameComparisonPhotos } from "@/lib/body-frame-photo-compare";
+import { getBodyFrameComparisonCandidates, getBodyFrameComparisonPhotos, selectBodyFrameComparisonPhotos } from "@/lib/body-frame-photo-compare";
+import { shouldStartComparisonPan } from "./comparison-pan-gesture";
+import { createBodyFrameImageReadiness } from "@/lib/body-frame-video-export";
+import { getBodyFrameVideoMeasurement } from "@/lib/body-frame-video";
+import { getBodyMeasurements } from "@/lib/body-measurement-library";
+import { resolvePrivateMediaUri } from "@/lib/private-storage";
+import { saveImageToLibrary, shareImage } from "@/lib/trip-clip-export";
+import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
+import { isRecordingViewAvailable, OptionalRecordingView, useOptionalViewRecorder } from "@/lib/view-recorder";
+import type { BodyMeasurementEntry } from "@/types/body-measurement";
 import { getBodyProjectById } from "@/lib/body-project-library";
 import { getPhotos } from "@/lib/photo-library";
 import { useAppAppearance } from "@/lib/app-appearance";
 import type { PhotoItem } from "@/types/photo";
 
+const COMPARISON_EXPORT_WIDTH = 360;
+const COMPARISON_SHARE_MAX_AGE = 24 * 60 * 60 * 1000;
+
+const removeExpiredComparisonShares = async () => {
+  const directory = FileSystem.cacheDirectory;
+  if (!directory) return;
+  const expiresBefore = Date.now() - COMPARISON_SHARE_MAX_AGE;
+  const names = await FileSystem.readDirectoryAsync(directory);
+  await Promise.all(names.flatMap((name) => {
+    const timestamp = /^body-frame-comparison-(\d+)\.jpg$/.exec(name)?.[1];
+    return timestamp && Number(timestamp) < expiresBefore
+      ? [FileSystem.deleteAsync(directory + name, { idempotent: true })] : [];
+  }));
+};
+const formatMetric = (value: number | undefined, unit: string) =>
+  value === undefined ? "—" : `${value.toFixed(1)}${unit}`;
+const formatChange = (before: number | undefined, after: number | undefined, unit: string) => {
+  if (before === undefined || after === undefined) return "—";
+  const delta = (after - before).toFixed(1);
+  return `${after - before >= 0.05 ? "+" : ""}${delta === "-0.0" ? "0.0" : delta}${unit}`;
+};
+
 const clamp = (value: number) => Math.min(0.9, Math.max(0.1, value));
+type ComparisonMode = "slider" | "side-by-side" | "overlay";
+const comparisonModes: { id: ComparisonMode; label: string }[] = [
+  { id: "slider", label: "슬라이더" },
+  { id: "side-by-side", label: "나란히" },
+  { id: "overlay", label: "겹쳐보기" }
+];
 
 export default function BodyFrameCompareScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -31,6 +71,14 @@ export default function BodyFrameCompareScreen() {
     getBodyFrameControlColors(palette);
   const [projectName, setProjectName] = useState<string | null>(null);
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
+  const [measurements, setMeasurements] = useState<BodyMeasurementEntry[]>([]);
+  const [exportMessage, setExportMessage] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const [exportImages, setExportImages] = useState<string[] | null>(null);
+  const exportInProgress = useRef(false);
+  const readiness = useRef(createBodyFrameImageReadiness());
+  const recorder = useOptionalViewRecorder();
+  const recorderAvailable = isRecordingViewAvailable();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [width, setWidth] = useState(0);
@@ -38,11 +86,49 @@ export default function BodyFrameCompareScreen() {
   const dividerRef = useRef(0.5);
   const gestureStartRef = useRef(0.5);
   const widthRef = useRef(0);
-
-  const comparison = useMemo(
+  const [comparisonMode, setComparisonMode] = useState<ComparisonMode>("slider");
+  const [overlayOpacity, setOverlayOpacity] = useState(0.5);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerSide, setPickerSide] = useState<"before" | "after">("before");
+  const [draftBeforeId, setDraftBeforeId] = useState<string | null>(null);
+  const [draftAfterId, setDraftAfterId] = useState<string | null>(null);
+  const [chosenBeforeId, setChosenBeforeId] = useState<string | null>(null);
+  const [chosenAfterId, setChosenAfterId] = useState<string | null>(null);
+  const candidates = useMemo(
+    () => getBodyFrameComparisonCandidates(photos, projectId),
+    [photos, projectId]
+  );
+  const defaultComparison = useMemo(
     () => getBodyFrameComparisonPhotos(photos, projectId),
     [photos, projectId]
   );
+  const comparison = useMemo(
+    () => chosenBeforeId && chosenAfterId
+      ? selectBodyFrameComparisonPhotos(photos, projectId, chosenBeforeId, chosenAfterId)
+      : defaultComparison,
+    [photos, projectId, chosenBeforeId, chosenAfterId, defaultComparison]
+  );
+  const beforeMeasurement = getBodyFrameVideoMeasurement(comparison?.before, measurements);
+  const afterMeasurement = getBodyFrameVideoMeasurement(comparison?.after, measurements);
+  const comparisonMetrics = [
+    { label: "몸무게", before: beforeMeasurement?.weightKg, after: afterMeasurement?.weightKg, unit: "kg", deltaUnit: "kg" },
+    { label: "체지방률", before: beforeMeasurement?.bodyFatPercent, after: afterMeasurement?.bodyFatPercent, unit: "%", deltaUnit: "%p" }
+  ].filter((metric) => metric.before !== undefined || metric.after !== undefined);
+  const validDraft = Boolean(selectBodyFrameComparisonPhotos(photos, projectId, draftBeforeId ?? "", draftAfterId ?? ""));
+
+  const openPicker = useCallback(() => {
+    setDraftBeforeId(comparison?.before.id ?? null);
+    setDraftAfterId(comparison?.after.id ?? null);
+    setPickerSide("before");
+    setPickerOpen(true);
+  }, [comparison]);
+  const applySelection = useCallback(() => {
+    if (!draftBeforeId || !draftAfterId ||
+        !selectBodyFrameComparisonPhotos(photos, projectId, draftBeforeId, draftAfterId)) return;
+    setChosenBeforeId(draftBeforeId);
+    setChosenAfterId(draftAfterId);
+    setPickerOpen(false);
+  }, [photos, projectId, draftBeforeId, draftAfterId]);
   const changeDivider = useCallback((value: number) => {
     dividerRef.current = clamp(value);
     setDivider(dividerRef.current);
@@ -51,8 +137,9 @@ export default function BodyFrameCompareScreen() {
   const panResponder = useMemo(
     () =>
       PanResponder.create({
-        onStartShouldSetPanResponder: () => true,
-        onMoveShouldSetPanResponder: () => true,
+        onStartShouldSetPanResponder: () => false,
+        onMoveShouldSetPanResponder: (_event, gesture) =>
+          shouldStartComparisonPan(gesture.dx, gesture.dy),
         onPanResponderGrant: () => {
           gestureStartRef.current = dividerRef.current;
         },
@@ -71,12 +158,17 @@ export default function BodyFrameCompareScreen() {
       setLoading(true);
       setError(null);
       changeDivider(0.5);
+      setChosenBeforeId(null);
+      setChosenAfterId(null);
+      setPickerOpen(false);
 
-      void Promise.all([getBodyProjectById(projectId), getPhotos()])
-        .then(([project, storedPhotos]) => {
+      setExportMessage(null);
+      void Promise.all([getBodyProjectById(projectId), getPhotos(), getBodyMeasurements(projectId)])
+        .then(([project, storedPhotos, storedMeasurements]) => {
           if (!active) return;
           setProjectName(project?.name ?? null);
           setPhotos(storedPhotos);
+          setMeasurements(storedMeasurements);
         })
         .catch(() => {
           if (active) setError("비교할 사진을 불러오지 못했습니다.");
@@ -93,7 +185,61 @@ export default function BodyFrameCompareScreen() {
 
   const formatDate = (photo: PhotoItem) => {
     const date = new Date(photo.createdAt);
-    return Number.isNaN(date.getTime()) ? "" : date.toLocaleDateString("ko-KR");
+    return Number.isNaN(date.getTime()) ? "" : date.toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" });
+  };
+
+  const exportHeight = useRef(0);
+  useEffect(() => {
+    void removeExpiredComparisonShares().catch(() => undefined);
+  }, []);
+
+  const exportComparison = async (action: "save" | "share") => {
+    if (!comparison || exportInProgress.current) return;
+    const cacheDirectory = FileSystem.cacheDirectory;
+    if (!cacheDirectory || !recorderAvailable) {
+      setExportMessage("이 기기에서는 비교 이미지 내보내기를 사용할 수 없습니다.");
+      return;
+    }
+
+    exportInProgress.current = true;
+    setExporting(true);
+    setExportMessage(null);
+    const uri = `${cacheDirectory}body-frame-comparison-${Date.now()}.jpg`;
+    let shared = false;
+    try {
+      const images = await Promise.all([
+        resolvePrivateMediaUri(comparison.before.uri),
+        resolvePrivateMediaUri(comparison.after.uri)
+      ]);
+      readiness.current = createBodyFrameImageReadiness();
+      exportHeight.current = 0;
+      setExportImages(images);
+      await Promise.all(["0", "1", "layout"].map((key) => readiness.current.wait(key)));
+      await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+      await recorder.snapshot({
+        output: uri.replace(/^file:\/\//, ""),
+        width: COMPARISON_EXPORT_WIDTH * 3,
+        height: Math.ceil(exportHeight.current * 3),
+        format: "jpg",
+        quality: 0.95
+      });
+      const info = await FileSystem.getInfoAsync(uri);
+      if (!info.exists || info.isDirectory || info.size <= 0) throw new Error("비교 이미지가 생성되지 않았습니다.");
+      if (action === "save") {
+        await saveImageToLibrary(uri);
+        setExportMessage("비교 이미지를 기기 앨범에 저장했습니다.");
+      } else {
+        await shareImage(uri);
+        shared = true;
+      }
+    } catch (error) {
+      setExportMessage(getUserFacingErrorMessage(error, "비교 이미지를 내보내지 못했습니다."));
+    } finally {
+      if (!shared) await FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => undefined);
+      exportInProgress.current = false;
+      setExportImages(null);
+      setExporting(false);
+    }
   };
 
   return (
@@ -120,27 +266,93 @@ export default function BodyFrameCompareScreen() {
           <Text style={[styles.projectName, { color: palette.muted }]}>{projectName}</Text>
         ) : null}
 
+        {!loading && candidates.length >= 2 ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="비교할 사진 두 장 선택"
+            onPress={openPicker}
+            style={[styles.pickPhotosButton, { borderColor: palette.line, backgroundColor: palette.surface }]}
+          >
+            <Feather name="image" size={bodyFrameDesign.iconSize} color={palette.text} />
+            <Text style={{ color: palette.text }}>비교 사진 선택</Text>
+          </Pressable>
+        ) : null}
+
         {loading ? (
-          <ActivityIndicator color={palette.text} />
+          <BodyFrameStatusNotice
+            variant="loading"
+            title="비교 사진을 불러오는 중입니다."
+          />
         ) : error || !comparison ? (
-          <Text style={[styles.emptyText, { color: palette.muted }]}>
-            {error ?? "비교할 사진이 2장 이상 필요합니다."}
-          </Text>
+          <BodyFrameStatusNotice
+            variant={error ? "error" : "empty"}
+            title={error ? "비교 사진을 불러오지 못했습니다." : "비교할 사진이 없습니다."}
+            detail={error ?? (chosenBeforeId && chosenAfterId
+              ? "선택한 사진을 찾을 수 없습니다. 다른 사진을 선택하세요."
+              : "비교할 사진이 2장 이상 필요합니다.")}
+          />
         ) : (
           <>
             <View style={styles.labels}>
-              <Text style={[styles.label, { color: palette.text }]}>
-                첫 사진 · #{comparison.before.sequence}
+              <Text numberOfLines={2} style={[styles.label, { color: palette.text }]}>
+                이전 · #{comparison.before.sequence}
               </Text>
-              <Text style={[styles.label, { color: palette.text }]}>
-                마지막 사진 · #{comparison.after.sequence}
+              <Text numberOfLines={2} style={[styles.label, styles.labelRight, { color: palette.text }]}>
+                현재 · #{comparison.after.sequence}
               </Text>
             </View>
+            <View style={styles.dateLabels}>
+              <Text numberOfLines={2} style={[styles.date, { color: palette.muted }]}>
+                {formatDate(comparison.before)}
+              </Text>
+              <Text numberOfLines={2} style={[styles.date, styles.dateRight, { color: palette.muted }]}>
+                {formatDate(comparison.after)}
+              </Text>
+            </View>
+            {comparisonMetrics.map((metric) => (
+              <View key={metric.label} style={styles.labels}>
+                <Text style={[styles.date, { color: palette.text }]}>
+                  {metric.label} · {formatMetric(metric.before, metric.unit)} → {formatMetric(metric.after, metric.unit)}
+                </Text>
+                <Text style={[styles.date, styles.dateRight, { color: palette.text }]}>
+                  변화 {formatChange(metric.before, metric.after, metric.deltaUnit)}
+                </Text>
+              </View>
+            ))}
+            <View style={styles.modeTabs} accessibilityLabel="사진 비교 방식">
+              {comparisonModes.map(option => (
+                <Pressable
+                  key={option.id}
+                  accessibilityRole="tab"
+                  accessibilityLabel={option.label}
+                  accessibilityHint={
+                    option.id === "slider"
+                      ? "구분선을 좌우로 이동해 첫 사진과 최근 사진을 비교합니다."
+                      : option.id === "side-by-side"
+                        ? "두 사진을 나란히 표시합니다."
+                        : "이전 사진의 불투명도를 조절해 겹쳐 봅니다."
+                  }
+                  accessibilityState={{ selected: comparisonMode === option.id }}
+                  onPress={() => setComparisonMode(option.id)}
+                  style={[
+                    styles.modeTab,
+                    { borderColor: comparisonMode === option.id ? controlColor : palette.line,
+                      backgroundColor: comparisonMode === option.id ? controlColor : palette.surface }
+                  ]}
+                >
+                  <Text style={{ color: comparisonMode === option.id ? controlTextColor : palette.text }}>
+                    {option.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+            {comparisonMode === "slider" ? (
             <View
               style={[styles.comparison, { borderColor: palette.line, backgroundColor: palette.surface }]}
               accessible
               accessibilityRole="adjustable"
               accessibilityLabel="첫 사진 표시 비율"
+              accessibilityHint="가로로 밀거나 접근성 늘리기·줄이기 동작으로 10에서 90퍼센트 사이를 조정합니다."
               accessibilityValue={{ min: 10, max: 90, now: Math.round(divider * 100), text: `${Math.round(divider * 100)}%` }}
               accessibilityActions={[
                 { name: "increment", label: "첫 사진 표시 비율 늘리기" },
@@ -160,14 +372,14 @@ export default function BodyFrameCompareScreen() {
               <Image
                 source={{ uri: comparison.after.uri }}
                 style={StyleSheet.absoluteFill}
-                contentFit="cover"
+                contentFit="contain"
                 accessibilityLabel="마지막 사진"
               />
               <View style={[styles.clippedBefore, { width: width * divider }]}>
                 <Image
                   source={{ uri: comparison.before.uri }}
                   style={{ width, height: "100%" }}
-                  contentFit="cover"
+                  contentFit="contain"
                   accessibilityLabel="첫 사진"
                 />
               </View>
@@ -181,22 +393,122 @@ export default function BodyFrameCompareScreen() {
                 </View>
               </View>
             </View>
-            <View style={styles.dateLabels}>
-              <Text style={[styles.date, { color: palette.muted }]}>
-                {formatDate(comparison.before)}
-              </Text>
-              <Text style={[styles.date, { color: palette.muted }]}>
-                {formatDate(comparison.after)}
-              </Text>
-            </View>
+            ) : comparisonMode === "side-by-side" ? (
+              <View style={[styles.sideBySide, { borderColor: palette.line }]}>
+                {[{ photo: comparison.before, label: "이전" }, { photo: comparison.after, label: "현재" }].map(item => (
+                  <View key={item.photo.id} style={[styles.sidePhoto, { backgroundColor: palette.surface }]}>
+                    <Image
+                      source={{ uri: item.photo.uri }}
+                      style={styles.sideImage}
+                      contentFit="contain"
+                      accessibilityLabel={item.label + " 사진"}
+                    />
+                    <Text style={[styles.sideCaption, { color: palette.text }]}>
+                      {item.label} · #{item.photo.sequence}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <>
+                <View style={[styles.comparison, { borderColor: palette.line, backgroundColor: palette.surface }]}>
+                  <Image
+                    source={{ uri: comparison.after.uri }}
+                    style={StyleSheet.absoluteFill}
+                    contentFit="contain"
+                    accessibilityLabel="현재 사진"
+                  />
+                  <Image
+                    source={{ uri: comparison.before.uri }}
+                    style={[StyleSheet.absoluteFill, { opacity: overlayOpacity }]}
+                    contentFit="contain"
+                    accessibilityLabel="겹쳐진 이전 사진"
+                  />
+                </View>
+                <View style={styles.positions}>
+                  {[0.25, 0.5, 0.75].map(value => (
+                    <Pressable
+                      key={value}
+                      accessibilityRole="button"
+                      accessibilityLabel={`이전 사진 불투명도 ${Math.round(value * 100)}%`}
+                      accessibilityState={{ selected: overlayOpacity === value }}
+                      onPress={() => setOverlayOpacity(value)}
+                      style={[styles.positionButton, {
+                        borderColor: overlayOpacity === value ? controlColor : palette.line,
+                        backgroundColor: overlayOpacity === value ? controlColor : palette.surface
+                      }]}
+                    >
+                      <Text style={{ color: overlayOpacity === value ? controlTextColor : palette.text }}>
+                        {Math.round(value * 100)}%
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </>
+            )}
             <Text style={[styles.hint, { color: palette.muted }]}>
-              구분선을 좌우로 움직여 전후 사진을 비교하세요.
+              {comparisonMode === "slider"
+                ? "구분선을 좌우로 움직여 전후 사진을 비교하세요."
+                : comparisonMode === "side-by-side"
+                  ? "두 사진을 나란히 확인하세요."
+                  : "이전 사진의 불투명도를 바꾸어 비교하세요."}
             </Text>
-
+            <View style={styles.modeTabs}>
+              {(["save", "share"] as const).map((action) => (
+                <Pressable
+                  key={action}
+                  accessibilityRole="button"
+                  disabled={exporting}
+                  style={[styles.modeTab, { borderColor: palette.line, backgroundColor: palette.surface }]}
+                  onPress={() => void exportComparison(action)}
+                >
+                  <Text style={{ color: palette.text }}>{action === "save" ? "비교 이미지 저장" : "비교 이미지 공유"}</Text>
+                </Pressable>
+              ))}
+            </View>
+            {exportMessage || exporting ? (
+              <Text accessibilityLiveRegion="polite" style={[styles.hint, { color: palette.text }]}>
+                {exporting ? "비교 이미지를 만드는 중입니다." : exportMessage}
+              </Text>
+            ) : null}
           </>
         )}
       </ScrollView>
-      {!loading && !error && comparison ? (
+      {exportImages && comparison ? (
+        <View pointerEvents="none" importantForAccessibility="no-hide-descendants" style={styles.exportHost}>
+          <OptionalRecordingView
+            available={recorderAvailable}
+            sessionId={recorder.sessionId}
+            style={styles.exportCanvas}
+            onLayout={({ nativeEvent: { layout } }) => {
+              if (layout.height <= 0) return;
+              exportHeight.current = layout.height;
+              readiness.current.displayed("layout");
+            }}
+          >
+            <View style={styles.exportPhotos}>
+              {[comparison.before, comparison.after].map((photo, index) => (
+                <View key={photo.id} style={styles.exportPhoto}>
+                  <Text style={styles.exportCaption}>{index === 0 ? "이전" : "현재"} · {formatDate(photo)}</Text>
+                  <Image
+                    source={{ uri: exportImages[index] }}
+                    style={styles.exportImage}
+                    contentFit="contain"
+                    onDisplay={() => readiness.current.displayed(String(index))}
+                    onError={() => readiness.current.failed(String(index))}
+                  />
+                </View>
+              ))}
+            </View>
+            {comparisonMetrics.map((metric) => (
+              <Text key={metric.label} style={styles.exportCaption}>
+                {metric.label}  {formatMetric(metric.before, metric.unit)} → {formatMetric(metric.after, metric.unit)}  ·  {formatChange(metric.before, metric.after, metric.deltaUnit)}
+              </Text>
+            ))}
+          </OptionalRecordingView>
+        </View>
+      ) : null}
+      {!loading && !error && comparison && comparisonMode === "slider" ? (
         <View
           style={[
             styles.footer,
@@ -239,11 +551,113 @@ export default function BodyFrameCompareScreen() {
           </View>
         </View>
       ) : null}
+      <Modal
+        visible={pickerOpen}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setPickerOpen(false)}
+      >
+        <View style={styles.pickerBackdrop}>
+          <View style={[styles.pickerSheet, { backgroundColor: palette.surface, borderColor: palette.line, paddingBottom: Math.max(insets.bottom, 16) }]}>
+            <View style={styles.pickerTitleRow}>
+              <Text style={[styles.pickerTitle, { color: palette.text }]}>비교할 사진 선택</Text>
+              <Pressable accessibilityRole="button" accessibilityLabel="사진 선택 취소"
+                onPress={() => setPickerOpen(false)} style={styles.pickerClose}>
+                <Feather name="x" size={20} color={palette.text} />
+              </Pressable>
+            </View>
+            <View style={styles.modeTabs}>
+              {(["before", "after"] as const).map(side => (
+                <Pressable
+                  key={side}
+                  accessibilityRole="button"
+                  accessibilityLabel={side === "before" ? "이전 사진 선택" : "현재 사진 선택"}
+                  accessibilityState={{ selected: pickerSide === side }}
+                  onPress={() => setPickerSide(side)}
+                  style={[styles.modeTab, {
+                    borderColor: pickerSide === side ? controlColor : palette.line,
+                    backgroundColor: pickerSide === side ? controlColor : palette.surface
+                  }]}
+                >
+                  <Text style={{ color: pickerSide === side ? controlTextColor : palette.text }}>
+                    {side === "before" ? "이전" : "현재"} · #{side === "before"
+                      ? candidates.find(photo => photo.id === draftBeforeId)?.sequence ?? "?"
+                      : candidates.find(photo => photo.id === draftAfterId)?.sequence ?? "?"}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+            <Text style={{ color: palette.muted, fontSize: bodyFrameTypography.caption }}>
+              이전 사진보다 촬영 순번이 뒤인 사진을 현재 사진으로 선택해 주세요.
+            </Text>
+            <FlatList
+              style={styles.pickerListViewport}
+              data={candidates}
+              keyExtractor={item => item.id}
+              numColumns={2}
+              contentContainerStyle={styles.pickerList}
+              columnWrapperStyle={styles.pickerRow}
+              renderItem={({ item }) => {
+                const selected = pickerSide === "before" ? draftBeforeId === item.id : draftAfterId === item.id;
+                return (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`${item.sequence}번째 사진, ${formatDate(item)}`}
+                    accessibilityState={{ selected }}
+                    onPress={() => {
+                      if (pickerSide === "before") {
+                        setDraftBeforeId(item.id);
+                        setPickerSide("after");
+                      } else setDraftAfterId(item.id);
+                    }}
+                    style={[styles.pickerItem, {
+                      borderColor: selected ? controlColor : palette.line
+                    }]}
+                  >
+                    <Image source={{ uri: item.previewUri ?? item.uri }}
+                      contentFit="contain" style={styles.pickerImage} accessible={false} />
+                    <Text style={[styles.pickerMeta, { color: palette.text }]}>
+                      #{item.sequence} · {formatDate(item)}
+                    </Text>
+                  </Pressable>
+                );
+              }}
+            />
+            {!validDraft ? (
+              <Text accessibilityLiveRegion="polite" style={{ color: palette.text }}>
+                현재 사진의 순번을 이전 사진보다 뒤로 선택해 주세요.
+              </Text>
+            ) : null}
+            <View style={styles.pickerActions}>
+              <Pressable accessibilityRole="button" onPress={() => setPickerOpen(false)}
+                style={[styles.pickerAction, { borderColor: palette.line }]}>
+                <Text style={{ color: palette.text }}>취소</Text>
+              </Pressable>
+              <Pressable accessibilityRole="button" accessibilityLabel="선택한 사진으로 비교"
+                accessibilityState={{ disabled: !validDraft }}
+                disabled={!validDraft}
+                onPress={applySelection}
+                style={[styles.pickerAction, {
+                  backgroundColor: controlColor,
+                  borderColor: controlColor
+                }]}>
+                <Text style={{ color: controlTextColor }}>적용</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  exportHost: { position: "absolute", top: 0, left: -10000, width: COMPARISON_EXPORT_WIDTH },
+  exportCanvas: { width: COMPARISON_EXPORT_WIDTH, backgroundColor: "#111111", padding: 8, gap: 4 },
+  exportPhotos: { flexDirection: "row", gap: 8 },
+  exportPhoto: { flex: 1, gap: 4 },
+  exportImage: { width: "100%", height: 228, backgroundColor: "#171717" },
+  exportCaption: { fontSize: 12, color: "#FFFFFF" },
   screen: { flex: 1 },
   content: {
     width: "100%",
@@ -279,7 +693,13 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: 8
   },
-  label: { fontSize: bodyFrameTypography.caption },
+  label: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: bodyFrameTypography.body,
+    fontWeight: "600"
+  },
+  labelRight: { textAlign: "right" },
   comparison: {
     width: "100%",
     maxWidth: 520,
@@ -293,11 +713,11 @@ const styles = StyleSheet.create({
   divider: { position: "absolute", top: 0, width: 2, height: "100%", backgroundColor: "#FFFFFF" },
   dividerHandle: {
     position: "absolute",
-    left: -21,
+    left: -24,
     top: "50%",
-    width: 44,
-    height: 44,
-    marginTop: -22,
+    width: 48,
+    height: 48,
+    marginTop: -24,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -311,10 +731,22 @@ const styles = StyleSheet.create({
     maxWidth: 520,
     alignSelf: "center",
     flexDirection: "row",
-    justifyContent: "space-between"
+    justifyContent: "space-between",
+    gap: 8
   },
-  date: { fontSize: bodyFrameTypography.caption },
-  hint: { textAlign: "center", fontSize: bodyFrameTypography.caption },
+  date: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: bodyFrameTypography.caption,
+    fontVariant: ["tabular-nums"]
+  },
+  dateRight: { textAlign: "right" },
+  hint: {
+    textAlign: "center",
+    fontSize: bodyFrameTypography.caption,
+    lineHeight: 19,
+    paddingHorizontal: 8
+  },
   footer: {
     width: "100%",
     borderWidth: bodyFrameDesign.borderWidth,
@@ -337,5 +769,31 @@ const styles = StyleSheet.create({
     borderRadius: bodyFrameDesign.buttonRadius
   },
   positionText: { fontSize: bodyFrameTypography.body, fontWeight: "600" },
-  emptyText: { marginTop: 24, textAlign: "center", fontSize: bodyFrameTypography.body }
+  emptyText: { marginTop: 24, textAlign: "center", fontSize: bodyFrameTypography.body },
+  pickPhotosButton: { minHeight: 48, maxWidth: 520, width: "100%", alignSelf: "center",
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+    borderWidth: 1, borderRadius: 8 },
+  modeTabs: { flexDirection: "row", gap: 8, width: "100%", maxWidth: 520, alignSelf: "center" },
+  modeTab: { flex: 1, minHeight: 44, borderWidth: 1, borderRadius: 8,
+    alignItems: "center", justifyContent: "center", paddingHorizontal: 4 },
+  sideBySide: { flexDirection: "row", gap: 8, borderWidth: 1, borderRadius: 8,
+    maxWidth: 520, width: "100%", alignSelf: "center", padding: 8, minHeight: 280 },
+  sidePhoto: { flex: 1, minWidth: 0, borderRadius: 8, padding: 4, gap: 8 },
+  sideImage: { width: "100%", aspectRatio: 3 / 4 },
+  sideCaption: { fontSize: 12, textAlign: "center" },
+  pickerBackdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.62)" },
+  pickerSheet: { maxHeight: "86%", minHeight: 380, borderWidth: 1,
+    borderRadius: 12, paddingTop: 18, paddingHorizontal: 16, gap: 12 },
+  pickerTitleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  pickerTitle: { fontSize: 18, fontWeight: "600" },
+  pickerClose: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
+  pickerList: { paddingBottom: 12, gap: 8 },
+  pickerListViewport: { flexGrow: 0, flexShrink: 1 },
+  pickerRow: { gap: 8 },
+  pickerItem: { flex: 1, borderWidth: 1, borderRadius: 8, padding: 6, minWidth: 0 },
+  pickerImage: { width: "100%", aspectRatio: 3 / 4 },
+  pickerMeta: { fontSize: 12, paddingTop: 6 },
+  pickerActions: { flexDirection: "row", gap: 8 },
+  pickerAction: { flex: 1, minHeight: 48, borderWidth: 1, borderRadius: 8,
+    alignItems: "center", justifyContent: "center" }
 });

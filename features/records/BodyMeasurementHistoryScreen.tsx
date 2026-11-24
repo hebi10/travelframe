@@ -15,6 +15,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  useWindowDimensions,
   View
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -52,6 +53,13 @@ const formatDate = (value: string) =>
     day: "numeric"
   }).format(new Date(value));
 
+const formatSummaryDate = (value: string) =>
+  new Intl.DateTimeFormat("ko-KR", {
+    timeZone: "Asia/Seoul",
+    month: "numeric",
+    day: "numeric"
+  }).format(new Date(value));
+
 const PERIOD_OPTIONS: { value: BodyMeasurementPeriod; label: string }[] = [
   { value: "1m", label: "1개월" },
   { value: "3m", label: "3개월" },
@@ -72,6 +80,9 @@ export default function BodyMeasurementHistoryScreen() {
   const projectId = Array.isArray(id) ? id[0] : id;
   const addRequested = Array.isArray(add) ? add[0] : add;
   const insets = useSafeAreaInsets();
+  const { width: windowWidth } = useWindowDimensions();
+  const contentWidth = Math.min(windowWidth, bodyFrameDesign.contentMaxWidth) - bodyFrameDesign.horizontalPadding * 2;
+  const wideStats = contentWidth >= 560;
   const { palette } = useAppAppearance();
   const { selected: accent, primaryText: accentText } = getBodyFrameControlColors(palette);
   const [project, setProject] = useState<BodyProject | null | undefined>(undefined);
@@ -120,6 +131,7 @@ export default function BodyMeasurementHistoryScreen() {
     if (
       addRequested === "1" &&
       storedSettings.enabled &&
+      !storedProject?.archived &&
       !handledAddRequestRef.current
     ) {
       handledAddRequestRef.current = true;
@@ -163,12 +175,14 @@ export default function BodyMeasurementHistoryScreen() {
   );
 
   const openNewEntry = () => {
+    if (project?.archived) return;
     setEditingEntry(null);
     setNewRecordedAt(new Date().toISOString());
     setEditorOpen(true);
   };
 
   const openEntry = (entry: BodyMeasurementEntry) => {
+    if (project?.archived) return;
     setEditingEntry(entry);
     setNewRecordedAt(entry.recordedAt);
     setEditorOpen(true);
@@ -267,6 +281,7 @@ export default function BodyMeasurementHistoryScreen() {
           <Pressable
             accessibilityRole="button"
             style={[styles.addButton, { borderColor: palette.line }]}
+            disabled={project.archived}
             onPress={openNewEntry}
           >
             <Text style={[styles.addButtonText, { color: palette.text }]}>추가</Text>
@@ -278,10 +293,11 @@ export default function BodyMeasurementHistoryScreen() {
             {project.name}
           </Text>
           <Text style={[styles.projectDetail, { color: palette.muted }]}>
-            직접 입력한 수치는 현재 기기에만 저장됩니다.
+            직접 입력한 수치는 프로젝트 백업 설정에 따라 클라우드에도 저장됩니다. Health Connect에서 가져온 수치는 이 기기에 저장됩니다.
           </Text>
         </View>
 
+        <Text style={[styles.filterLabel, { color: palette.muted }]}>기록 지표</Text>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator
@@ -318,6 +334,7 @@ export default function BodyMeasurementHistoryScreen() {
           })}
         </ScrollView>
 
+        <Text style={[styles.filterLabel, { color: palette.muted }]}>조회 기간</Text>
         <View style={styles.periodSelector} accessibilityLabel="기록 기간">
           {PERIOD_OPTIONS.map((option) => {
             const selected = selectedPeriod === option.value;
@@ -336,7 +353,7 @@ export default function BodyMeasurementHistoryScreen() {
                   }
                 ]}
               >
-                <Text style={[styles.periodButtonText, { color: selected ? accentText : palette.text }]}>
+                <Text numberOfLines={1} style={[styles.periodButtonText, { color: selected ? accentText : palette.text }]}>
                   {option.label}
                 </Text>
               </Pressable>
@@ -344,26 +361,7 @@ export default function BodyMeasurementHistoryScreen() {
           })}
         </View>
 
-        <BodyMeasurementSummaryCard
-          metric={selectedMetric}
-          series={series}
-          compact
-          onAddMeasurement={openNewEntry}
-        />
-
-        <View style={styles.overviewGrid}>
-          <OverviewStat
-            label="시작"
-            value={
-              seriesSummary.first
-                ? String(seriesSummary.first.value) + metricMeta.unit
-                : "-"
-            }
-            textColor={palette.text}
-            mutedColor={palette.muted}
-            borderColor={palette.line}
-            backgroundColor={palette.surface}
-          />
+        <View style={styles.overviewGrid} accessibilityLabel="선택한 지표의 기간별 요약">
           <OverviewStat
             label="현재"
             value={
@@ -371,6 +369,9 @@ export default function BodyMeasurementHistoryScreen() {
                 ? String(seriesSummary.latest.value) + metricMeta.unit
                 : "-"
             }
+            dateLabel={seriesSummary.latest ? formatSummaryDate(seriesSummary.latest.recordedAt) : undefined}
+            prominent
+            wide={wideStats}
             textColor={palette.text}
             mutedColor={palette.muted}
             borderColor={palette.line}
@@ -385,6 +386,23 @@ export default function BodyMeasurementHistoryScreen() {
                   seriesSummary.change +
                   metricMeta.unit
             }
+            dateLabel="시작 대비"
+            prominent
+            wide={wideStats}
+            textColor={palette.text}
+            mutedColor={palette.muted}
+            borderColor={palette.line}
+            backgroundColor={palette.surface}
+          />
+          <OverviewStat
+            label="시작"
+            value={
+              seriesSummary.first
+                ? String(seriesSummary.first.value) + metricMeta.unit
+                : "-"
+            }
+            dateLabel={seriesSummary.first ? formatSummaryDate(seriesSummary.first.recordedAt) : undefined}
+            wide={wideStats}
             textColor={palette.text}
             mutedColor={palette.muted}
             borderColor={palette.line}
@@ -393,6 +411,7 @@ export default function BodyMeasurementHistoryScreen() {
           <OverviewStat
             label="기록"
             value={String(seriesSummary.count) + "회"}
+            wide={wideStats}
             textColor={palette.text}
             mutedColor={palette.muted}
             borderColor={palette.line}
@@ -400,7 +419,13 @@ export default function BodyMeasurementHistoryScreen() {
           />
         </View>
 
-
+        <BodyMeasurementSummaryCard
+          metric={selectedMetric}
+          series={series}
+          compact
+          chartOnly
+          onAddMeasurement={openNewEntry}
+        />
 
         <View style={styles.historySection}>
           <View style={styles.sectionHeader}>
@@ -432,6 +457,8 @@ export default function BodyMeasurementHistoryScreen() {
                   >
                     <Pressable
                       accessibilityRole="button"
+                      accessibilityLabel={`${formatDate(entry.recordedAt)}, ${metricMeta.label} ${value}${metricMeta.unit}${project.archived ? "" : " 기록 수정"}`}
+                      disabled={project.archived}
                       style={styles.historyMain}
                       onPress={() => openEntry(entry)}
                     >
@@ -440,7 +467,7 @@ export default function BodyMeasurementHistoryScreen() {
                           {formatDate(entry.recordedAt)}
                         </Text>
                         <Text
-                          numberOfLines={1}
+                          numberOfLines={2}
                           style={[styles.historyMeta, { color: palette.muted }]}
                         >
                           {entry.sequence
@@ -452,10 +479,14 @@ export default function BodyMeasurementHistoryScreen() {
                             : ""}
                         </Text>
                       </View>
-                      <Text style={[styles.historyValue, { color: palette.text }]}>
-                        {value}
-                        {metricMeta.unit}
-                      </Text>
+                      <View style={styles.historyReading}>
+                        <Text style={[styles.historyValue, { color: palette.text }]}>
+                          {value}
+                        </Text>
+                        <Text style={[styles.historyUnit, { color: palette.muted }]}>
+                          {metricMeta.unit}
+                        </Text>
+                      </View>
                     </Pressable>
 
                     {entry.photoId ? (
@@ -499,6 +530,7 @@ export default function BodyMeasurementHistoryScreen() {
               <Pressable
                 accessibilityRole="button"
                 style={[styles.secondaryButton, { borderColor: palette.line }]}
+                disabled={project.archived}
                 onPress={openNewEntry}
               >
                 <Text
@@ -510,19 +542,18 @@ export default function BodyMeasurementHistoryScreen() {
             </View>
           )}
         </View>
-        <View style={styles.healthConnectSection}>
+        {!project.archived ? <View style={styles.healthConnectSection}>
           <Text style={[styles.sectionTitle, { color: palette.text }]}>외부 데이터 가져오기</Text>
         <BodyHealthConnectImportCard
           projectId={project.id}
           settings={settings}
           onImported={() => void reload()}
         />
-
-        </View>
+        </View> : null}
       </ScrollView>
 
       <BodyMeasurementEditorSheet
-        visible={editorOpen}
+        visible={editorOpen && !project.archived}
         projectId={project.id}
         photoId={editingEntry?.photoId}
         sequence={editingEntry?.sequence}
@@ -546,6 +577,9 @@ export default function BodyMeasurementHistoryScreen() {
 function OverviewStat({
   label,
   value,
+  dateLabel,
+  wide,
+  prominent = false,
   textColor,
   mutedColor,
   borderColor,
@@ -553,6 +587,9 @@ function OverviewStat({
 }: {
   label: string;
   value: string;
+  dateLabel?: string;
+  wide: boolean;
+  prominent?: boolean;
   textColor: string;
   mutedColor: string;
   borderColor: string;
@@ -562,11 +599,16 @@ function OverviewStat({
     <View
       style={[
         styles.overviewStat,
+        wide && styles.overviewStatWide,
+        prominent && styles.overviewStatProminent,
         { borderColor, backgroundColor }
       ]}
     >
       <Text style={[styles.overviewLabel, { color: mutedColor }]}>{label}</Text>
-      <Text style={[styles.overviewValue, { color: textColor }]}>{value}</Text>
+      <Text style={[styles.overviewValue, prominent && styles.overviewValueProminent, { color: textColor }]}>{value}</Text>
+      {dateLabel ? (
+        <Text style={[styles.overviewDate, { color: mutedColor }]}>{dateLabel}</Text>
+      ) : null}
     </View>
   );
 }
@@ -632,6 +674,11 @@ const styles = StyleSheet.create({
     fontSize: bodyFrameTypography.caption,
     lineHeight: 17
   },
+  filterLabel: {
+    fontSize: bodyFrameTypography.caption,
+    fontWeight: "600",
+    marginBottom: 4
+  },
   metricSelector: {
     gap: 6,
     paddingBottom: 8
@@ -654,16 +701,18 @@ const styles = StyleSheet.create({
   },
   periodButton: {
     flex: 1,
+    minWidth: 0,
     minHeight: bodyFrameDesign.minTouchSize,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 6,
+    paddingHorizontal: 4,
     borderWidth: bodyFrameDesign.borderWidth,
     borderRadius: bodyFrameDesign.buttonRadius
   },
   periodButtonText: {
-    fontSize: bodyFrameTypography.caption,
-    fontWeight: "600"
+    fontSize: bodyFrameTypography.body,
+    fontWeight: "600",
+    textAlign: "center"
   },
   overviewGrid: {
     flexDirection: "row",
@@ -674,11 +723,19 @@ const styles = StyleSheet.create({
   },
   overviewStat: {
     width: "48%",
+    minWidth: 0,
     minHeight: 60,
     justifyContent: "space-between",
+    gap: 4,
     padding: 8,
     borderWidth: bodyFrameDesign.borderWidth,
     borderRadius: bodyFrameDesign.cardRadius
+  },
+  overviewStatWide: {
+    width: "24%"
+  },
+  overviewStatProminent: {
+    minHeight: 74
   },
   overviewLabel: {
     fontSize: bodyFrameTypography.caption
@@ -686,6 +743,16 @@ const styles = StyleSheet.create({
   overviewValue: {
     fontSize: bodyFrameTypography.sectionTitle,
     fontWeight: "600",
+    fontVariant: ["tabular-nums"],
+    flexShrink: 1
+  },
+  overviewValueProminent: {
+    fontSize: bodyFrameTypography.projectTitle,
+    lineHeight: 30,
+    fontWeight: "700"
+  },
+  overviewDate: {
+    fontSize: bodyFrameTypography.caption,
     fontVariant: ["tabular-nums"]
   },
   historySection: {
@@ -729,14 +796,29 @@ const styles = StyleSheet.create({
   },
   historyCopy: {
     flex: 1,
+    minWidth: 0,
     gap: 4
+  },
+  historyReading: {
+    maxWidth: "48%",
+    minWidth: 0,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "baseline",
+    justifyContent: "flex-end",
+    gap: 3
+  },
+  historyUnit: {
+    fontSize: bodyFrameTypography.caption,
+    fontWeight: "600"
   },
   historyDate: {
     fontSize: bodyFrameTypography.body,
     fontWeight: "600"
   },
   historyMeta: {
-    fontSize: bodyFrameTypography.caption
+    fontSize: bodyFrameTypography.caption,
+    lineHeight: 18
   },
   historyValue: {
     fontSize: bodyFrameTypography.sectionTitle,

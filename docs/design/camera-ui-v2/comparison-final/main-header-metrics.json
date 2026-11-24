@@ -1,0 +1,17 @@
+{
+  "actualCrop": [
+    34,
+    155,
+    1046,
+    297
+  ],
+  "referenceCropAt1080Width": [
+    34,
+    213,
+    1046,
+    341
+  ],
+  "nativeRescaled": false,
+  "actualProjectHeightDp": 48.0,
+  "referenceApproxProjectHeightDp": 42.40490797546012
+}
