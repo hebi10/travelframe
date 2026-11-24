@@ -255,7 +255,7 @@ const createGooglePlayBillingService = ({
     );
     const currentRef = db.doc(`users/${uid}/subscriptions/current`);
     const eventRef = db.collection(`users/${uid}/paymentEvents`).doc();
-    await db.runTransaction(async (transaction) => {
+    const applied = await db.runTransaction(async (transaction) => {
       const refsToRead = [
         purchaseRef,
         ...productIds.map((id) => productRefs[id])
@@ -305,8 +305,13 @@ const createGooglePlayBillingService = ({
         isActiveSubscriptionDocument(existingProduct);
       const updateEntitlement = shouldUpdateSubscriptionForPurchase({
         purchase: purchaseSnapshot.data(), existingProduct, tokenHash,
-        active: result.active, source
+        active: result.active, source,
+        linkedHash: linkedProductId === productId ? linkedHash : null
       });
+      // Keep Google state for diagnosis, but never report or cache a stale
+      // token as an active entitlement when the transaction rejected its update.
+      const active = updateEntitlement && result.active;
+      const status = updateEntitlement || !result.active ? result.status : "inactive";
 
       const googleSubscription = buildGoogleSubscription({
         productId,
@@ -378,8 +383,8 @@ const createGooglePlayBillingService = ({
           provider: "google_play",
           purchaseToken,
           tokenHash,
-          status: result.status,
-          active: result.active,
+          status,
+          active,
           googleState: result.googleState,
           orderId: result.orderId,
           expiresAt: result.expiresAt,
@@ -397,10 +402,11 @@ const createGooglePlayBillingService = ({
         { merge: true }
       );
 
-      if (linkedRef) {
+      if (linkedRef && active) {
         if (
           linkedSnapshot?.exists &&
-          linkedSnapshot.data()?.uid === uid
+          linkedSnapshot.data()?.uid === uid &&
+          (!linkedSnapshot.data()?.supersededBy || linkedSnapshot.data().supersededBy === tokenHash)
         ) {
           transaction.set(
             linkedRef,
@@ -417,8 +423,8 @@ const createGooglePlayBillingService = ({
         type: "google_play_purchase_synced",
         productId,
         productName: meta.productName,
-        status: result.status,
-        active: result.active,
+        status,
+        active,
         provider: "google_play",
         source,
         tokenHash,
@@ -427,13 +433,14 @@ const createGooglePlayBillingService = ({
         expiresAt: result.expiresAt,
         createdAt: FieldValue.serverTimestamp()
       });
+      return { active, status };
     });
 
     return {
       verified: true,
-      active: result.active,
+      active: applied.active,
       productId,
-      status: result.status,
+      status: applied.status,
       expiresAt: result.expiresAt,
       acknowledgementState
     };
