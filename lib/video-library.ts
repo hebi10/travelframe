@@ -215,7 +215,13 @@ const persistVideoCover = async (uri: string | undefined, videoId: string) => {
   const directory = await ensureVideoDirectory();
   const destinationUri = `${directory}${videoId}-cover.jpg`;
   if (uri !== destinationUri) {
-    await FileSystem.copyAsync({ from: uri, to: destinationUri });
+    const previous = await FileSystem.getInfoAsync(destinationUri);
+    try {
+      await FileSystem.copyAsync({ from: uri, to: destinationUri });
+    } catch (error) {
+      if (!previous.exists) await FileSystem.deleteAsync(destinationUri, { idempotent: true }).catch(() => undefined);
+      throw error;
+    }
   }
   return destinationUri;
 };
@@ -282,19 +288,30 @@ export const saveMadeVideo = async (
   });
   const videoId = createVideoId();
   const createdAt = new Date().toISOString();
-  const persistedUri = await persistMadeVideoFile(video.uri, videoId);
-  const coverUri = await persistVideoCover(video.coverUri, videoId);
-  const savedVideo: MadeVideoItem = {
-    ...video,
-    coverUri,
-    id: videoId,
-    uri: persistedUri,
-    localUri: isRemoteUri(persistedUri) ? video.localUri : persistedUri,
-    createdAt,
-    title: video.title ?? getNextTripClipTitle(videos.map((item) => item.title))
-  };
-
-  await writeVideos([savedVideo, ...videos]);
+  let persistedUri = video.uri;
+  let coverUri = video.coverUri;
+  let savedVideo: MadeVideoItem;
+  try {
+    persistedUri = await persistMadeVideoFile(video.uri, videoId);
+    coverUri = await persistVideoCover(video.coverUri, videoId);
+    savedVideo = {
+      ...video,
+      coverUri,
+      id: videoId,
+      uri: persistedUri,
+      localUri: isRemoteUri(persistedUri) ? video.localUri : persistedUri,
+      createdAt,
+      title: video.title ?? getNextTripClipTitle(videos.map((item) => item.title))
+    };
+    await writeVideos([savedVideo, ...videos]);
+  } catch (error) {
+    for (const uri of [persistedUri, coverUri]) {
+      if (uri && uri !== video.uri && uri !== video.coverUri && isFileUri(uri)) {
+        await FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => undefined);
+      }
+    }
+    throw error;
+  }
   if (savedVideo.projectId) {
     await enqueueProjectCloudSync({ projectId: savedVideo.projectId, kind: "video", itemId: savedVideo.id })
       .catch(() => undefined);
