@@ -75,7 +75,7 @@ function fixture() {
   const { createGooglePlayBillingService, hashPurchaseToken } = context.module.exports;
   const service = createGooglePlayBillingService({ db, FieldValue: { serverTimestamp: () => 1 }, HttpsError });
   const verify = (token, productId, uid = A, source = "client") =>
-    service.syncGooglePlayPurchase({ uid, productId, purchaseToken: token, source, acknowledge: false });
+    service.syncGooglePlayPurchase({ uid, productId, purchaseToken: token, source, acknowledge: source === "rtdn" });
   const notify = (token, productId, kind = "subs") =>
     service.handleGooglePlayBillingNotification({
       packageName: "com.haebi.photoguide",
