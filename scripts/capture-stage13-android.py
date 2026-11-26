@@ -47,7 +47,7 @@ def open_camera_settings(device):
 
 def open_camera_save_targets(device):
     open_camera_settings(device)
-    device.find_control("핸드폰 앨범", search="below")
+    device.find_control("로컬에만", search="below")
 
 def open_camera_guide_settings(device):
     open_camera_settings(device)
@@ -117,7 +117,7 @@ CASES = [
      ["프로젝트 이름", "목표 기록 수", "프로젝트 만들기"], open_camera_new_project),
     ("camera-settings", "촬영 설정·도구", "camera", ["촬영 도구", "촬영 옵션"], open_camera_settings),
     ("camera-settings-storage", "촬영 설정·저장 위치", "camera",
-     ["앱 보관함", "핸드폰 앨범"], open_camera_save_targets),
+     ["로컬 + 클라우드", "로컬에만"], open_camera_save_targets),
     ("camera-guide-settings", "촬영 가이드 설정", "camera",
      ["가이드 설정", "가이드라인"], open_camera_guide_settings),
     ("camera-reference-adjust", "촬영 기준 사진 위치·투명도", "camera",

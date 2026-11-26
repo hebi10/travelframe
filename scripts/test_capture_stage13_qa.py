@@ -80,10 +80,12 @@ class Stage13CaptureTest(unittest.TestCase):
             "촬영 설정 열기", ["촬영 도구", "촬영 옵션"]
         )
 
-    def test_c3_storage_capture_finds_enabled_album_option(self):
+    def test_c3_storage_capture_finds_enabled_project_local_option(self):
         device = Mock()
         stage13.open_camera_save_targets(device)
-        device.find_control.assert_called_once_with("핸드폰 앨범", search="below")
+        device.find_control.assert_called_once_with("로컬에만", search="below")
+        storage = next(case for case in stage13.CASES if case[0] == "camera-settings-storage")
+        self.assertEqual(storage[3], ["로컬 + 클라우드", "로컬에만"])
         names = [case[0] for case in stage13.CASES]
         for case in ("camera-settings", "camera-settings-storage"):
             self.assertIn(case, names)
