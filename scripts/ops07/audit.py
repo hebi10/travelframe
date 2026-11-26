@@ -466,7 +466,12 @@ def findings():
                                  'if not matching: refuse("Missing exact-main CI: "+name)',
                                  'if latest.get("status")!="completed" or latest.get("conclusion")!="success": refuse("Required CI not successful: "+name)',
                                  'for name in json.loads(os.environ["REQUIRED_MANUAL_QA_JSON"])',
+                                 'workflow_path=".github/workflows/body-frame-device-qa.yml"',
+                                 'workflow_api="repos/"+repo+"/actions/workflows/body-frame-device-qa.yml"',
+                                 'workflow.get("path")!=workflow_path',
+                                 'r.get("workflow_id")==workflow_id and r.get("path")==workflow_path',
                                  'r.get("event")=="workflow_dispatch"',
+                                 '"/attempts/"+str(attempt)+"/jobs?per_page=100"',
                                  'if not matched: refuse("Missing exact-main manually dispatched final Android QA: "+name)',
                                  'if latest.get("status")!="completed" or latest.get("conclusion")!="success": refuse("Manual final Android QA failed: "+name)',
                                  'len(found)!=1 or found[0].get("status")!="completed" or found[0].get("conclusion")!="success"'):

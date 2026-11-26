@@ -82,12 +82,26 @@ jobs:
                   if latest.get("status")!="completed" or latest.get("conclusion")!="success": refuse("Required CI not successful: "+name)
               print("Verified exact-main successful CI: "+", ".join(required))
           for name in json.loads(os.environ["REQUIRED_MANUAL_QA_JSON"]):
-              runs=api("repos/"+repo+"/actions/runs?head_sha="+sha+"&branch=main&per_page=100")["workflow_runs"]
-              matched=[r for r in runs if r.get("name")==name and r.get("head_sha")==sha and r.get("head_branch")=="main" and r.get("event")=="workflow_dispatch"]
+              # run-name can vary by request. Resolve the configured workflow file instead.
+              workflow_path=".github/workflows/body-frame-device-qa.yml"
+              workflow_api="repos/"+repo+"/actions/workflows/body-frame-device-qa.yml"
+              workflow=api(workflow_api)
+              workflow_id=workflow.get("id")
+              if type(workflow_id) is not int or workflow_id<=0 or workflow.get("path")!=workflow_path:
+                  refuse("Cannot verify final Android QA workflow identity")
+              run_inventory=api(workflow_api+"/runs?head_sha="+sha+"&branch=main&per_page=100&event=workflow_dispatch")
+              runs=run_inventory.get("workflow_runs",[])
+              if len(runs)!=run_inventory.get("total_count") or len(runs)>100:
+                  refuse("Incomplete final Android QA run inventory")
+              matched=[r for r in runs if r.get("workflow_id")==workflow_id and r.get("path")==workflow_path
+                       and r.get("head_sha")==sha and r.get("head_branch")=="main" and r.get("event")=="workflow_dispatch"]
               if not matched: refuse("Missing exact-main manually dispatched final Android QA: "+name)
               latest=max(matched,key=lambda r:(r.get("run_number",0),r.get("run_attempt",0),r.get("id",0)))
               if latest.get("status")!="completed" or latest.get("conclusion")!="success": refuse("Manual final Android QA failed: "+name)
-              inventory=api("repos/"+repo+"/actions/runs/"+str(latest["id"])+"/jobs?per_page=100")
+              run_id,attempt=latest.get("id"),latest.get("run_attempt")
+              if any(type(value) is not int or value<=0 for value in (run_id,attempt)):
+                  refuse("Invalid final Android QA attempt")
+              inventory=api("repos/"+repo+"/actions/runs/"+str(run_id)+"/attempts/"+str(attempt)+"/jobs?per_page=100")
               jobs=inventory.get("jobs",[])
               if inventory.get("total_count",0)>100 or len(jobs)!=inventory.get("total_count"): refuse("Incomplete final Android QA job evidence")
               expected=[

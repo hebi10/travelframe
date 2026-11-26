@@ -167,6 +167,15 @@ class AppContracts(unittest.TestCase):
             ("forged_push", original.replace(
                 'r.get("event")=="workflow_dispatch"',
                 'r.get("event") in ("push","workflow_dispatch")', 1)),
+            ("wrong_workflow_path", original.replace(
+                'workflow_path=".github/workflows/body-frame-device-qa.yml"',
+                'workflow_path=".github/workflows/quality.yml"', 1)),
+            ("any_workflow_id", original.replace(
+                'r.get("workflow_id")==workflow_id and r.get("path")==workflow_path',
+                'True', 1)),
+            ("unbound_attempt_jobs", original.replace(
+                '"/attempts/"+str(attempt)+"/jobs?per_page=100"',
+                '"/jobs?per_page=100"', 1)),
             ("no_manual_run_required", original.replace(
                 'if not matched: refuse("Missing exact-main manually dispatched final Android QA: "+name)',
                 "if not matched: pass", 1)),
